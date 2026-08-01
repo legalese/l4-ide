@@ -194,108 +194,18 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] advisory — decision_w_offering  (main.l4:1135:20-52)
       `W offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2016  (main.l4:1138:5-107)
-      `W within the limit in 2016` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_w_within_the_limit_in_2016  (main.l4:1138:5-107)
-      `W within the limit in 2016` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_january  (main.l4:1141:5-107)
-      `W within the limit in 2021 January` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_w_within_the_limit_in_2021_january  (main.l4:1141:5-107)
-      `W within the limit in 2021 January` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_june  (main.l4:1144:5-107)
-      `W within the limit in 2021 June` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_w_within_the_limit_in_2021_june  (main.l4:1144:5-107)
-      `W within the limit in 2021 June` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment  (main.l4:1152:5-85)
-      `the cut point the day before the 2017 adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment  (main.l4:1152:5-85)
-      `the cut point the day before the 2017 adjustment` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment  (main.l4:1155:5-85)
-      `the cut point on the day of the 2017 adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment  (main.l4:1155:5-85)
-      `the cut point on the day of the 2017 adjustment` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
   [D-LITERALEXPR] advisory — decision_i_3_investor  (main.l4:1166:22-62)
       `I-3 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2022_rules  (main.l4:1169:5-88)
-      `I-3 limit under the 2022 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_i_3_limit_under_the_2022_rules  (main.l4:1169:5-88)
-      `I-3 limit under the 2022 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2023_rules  (main.l4:1172:5-88)
-      `I-3 limit under the 2023 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_i_3_limit_under_the_2023_rules  (main.l4:1172:5-88)
-      `I-3 limit under the 2023 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
   [D-LITERALEXPR] advisory — decision_i_4_investor  (main.l4:1181:22-64)
       `I-4 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] blocking — decision_i_4_limit_under_the_2022_rules  (main.l4:1184:5-88)
-      `I-4 limit under the 2022 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_i_4_limit_under_the_2022_rules  (main.l4:1184:5-88)
-      `I-4 limit under the 2022 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_the_percentage_case_under_the_2019_rules  (main.l4:1192:5-115)
-      `the percentage case under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_the_percentage_case_under_the_2019_rules  (main.l4:1192:5-115)
-      `the percentage case under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
   [D-LITERALEXPR] advisory — decision_a_investor  (main.l4:1200:20-66)
       `A investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2021_rules  (main.l4:1203:5-111)
-      `A is within the limit under the 2021 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_a_is_within_the_limit_under_the_2021_rules  (main.l4:1203:5-111)
-      `A is within the limit under the 2021 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2019_rules  (main.l4:1206:5-111)
-      `A is within the limit under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_a_is_within_the_limit_under_the_2019_rules  (main.l4:1206:5-111)
-      `A is within the limit under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
   [D-LITERALEXPR] advisory — decision_f_offering  (main.l4:1213:20-50)
       `F offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2019_rules  (main.l4:1216:5-99)
-      `F requirement under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_f_requirement_under_the_2019_rules  (main.l4:1216:5-99)
-      `F requirement under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2023_rules  (main.l4:1219:5-99)
-      `F requirement under the 2023 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_f_requirement_under_the_2023_rules  (main.l4:1219:5-99)
-      `F requirement under the 2023 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_a_small_offering_inside_the_covid_window  (main.l4:1230:5-120)
-      `a small offering inside the COVID window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_a_small_offering_inside_the_covid_window  (main.l4:1230:5-120)
-      `a small offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
-  [D-LITERALEXPR] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1233:5-99)
-      `a large offering inside the COVID window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-RULEDATE-UNBOUND] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1233:5-99)
-      `a large offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
-      lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
   [D-REGULATIVE] lossy — advertising restriction  (main.l4:632:1-637:66)
       `advertising restriction` has a regulative body and no callers, so it is not emitted as a decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a <decision> whose logic is raw deontic L4 misdescribes both
       lost: the obligation's lifecycle: route this rule to the BPMN exporter instead
@@ -323,6 +233,51 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-FIXTURE] advisory — a notice with no platform link  (main.l4:1006:1-1011:167)
       `a notice with no platform link` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2016  (main.l4:1137:1-1138:107)
+      `W within the limit in 2016` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2021 January  (main.l4:1140:1-1141:107)
+      `W within the limit in 2021 January` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2021 June  (main.l4:1143:1-1144:107)
+      `W within the limit in 2021 June` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — the cut point the day before the 2017 adjustment  (main.l4:1151:1-1152:85)
+      `the cut point the day before the 2017 adjustment` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — the cut point on the day of the 2017 adjustment  (main.l4:1154:1-1155:85)
+      `the cut point on the day of the 2017 adjustment` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — I-3 limit under the 2022 rules  (main.l4:1168:1-1169:88)
+      `I-3 limit under the 2022 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — I-3 limit under the 2023 rules  (main.l4:1171:1-1172:88)
+      `I-3 limit under the 2023 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — I-4 limit under the 2022 rules  (main.l4:1183:1-1184:88)
+      `I-4 limit under the 2022 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — the percentage case under the 2019 rules  (main.l4:1191:1-1192:115)
+      `the percentage case under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — A is within the limit under the 2021 rules  (main.l4:1202:1-1203:111)
+      `A is within the limit under the 2021 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — A is within the limit under the 2019 rules  (main.l4:1205:1-1206:111)
+      `A is within the limit under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — F requirement under the 2019 rules  (main.l4:1215:1-1216:99)
+      `F requirement under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — F requirement under the 2023 rules  (main.l4:1218:1-1219:99)
+      `F requirement under the 2023 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — a small offering inside the COVID window  (main.l4:1229:1-1230:120)
+      `a small offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
+  [D-RULEDATE-UNBOUND] lossy — a large offering inside the COVID window  (main.l4:1232:1-1233:99)
+      `a large offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
+      lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
   [D-INERT] advisory — decision_business_days_to_file_a_progress_update  (main.l4:230:1-231:50)
       `business days to file a progress update` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
       lost: nothing: the note exists so a reader can tell a constant stub from a live rule
@@ -418,9 +373,6 @@ fidelity report — DMN 1.3 (XML), camunda flavor
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-FLAVOR-NOSERVICE] advisory — service_top_level_the_whole_exemption
       the decisionService `Top_level_the_whole_exemption` (§ `Top level — the whole exemption`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service_the_rule_version_axis_the_same_question_under_four_regimes
-      the decisionService `The_rule_version_axis_the_same_question_under_four_regimes` (§ `The rule-version axis — the same question under four regimes`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-CYCLE] blocking — decision_ongoing_reporting_obligation
       decision `ongoing reporting obligation` (decision_ongoing_reporting_obligation) requires itself: its informationRequirement subgraph has a self-edge

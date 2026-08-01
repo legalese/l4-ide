@@ -1542,78 +1542,6 @@
       <text>an_offering_of(prior_sales: 0, maximum: 3000000, previously_sold: false)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_w_within_the_limit_in_2016" name="W_within_the_limit_in_2016" label="W within the limit in 2016">
-    <variable id="decision_w_within_the_limit_in_2016_var" name="W_within_the_limit_in_2016" label="W within the limit in 2016" typeRef="boolean"/>
-    <informationRequirement id="decision_w_within_the_limit_in_2016_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_w_within_the_limit_in_2016_ir2">
-      <requiredDecision href="#decision_offering_maximum_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_w_within_the_limit_in_2016_ir3">
-      <requiredDecision href="#decision_w_offering"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_w_within_the_limit_in_2016_kr1">
-      <requiredKnowledge href="#bkm_offering_is_within_the_offering_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_w_within_the_limit_in_2016_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 9, 2016), (`offering is within the offering limit` OF `W offering`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_w_within_the_limit_in_2021_january" name="W_within_the_limit_in_2021_January" label="W within the limit in 2021 January">
-    <variable id="decision_w_within_the_limit_in_2021_january_var" name="W_within_the_limit_in_2021_January" label="W within the limit in 2021 January" typeRef="boolean"/>
-    <informationRequirement id="decision_w_within_the_limit_in_2021_january_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_w_within_the_limit_in_2021_january_ir2">
-      <requiredDecision href="#decision_offering_maximum_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_w_within_the_limit_in_2021_january_ir3">
-      <requiredDecision href="#decision_w_offering"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_w_within_the_limit_in_2021_january_kr1">
-      <requiredKnowledge href="#bkm_offering_is_within_the_offering_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_w_within_the_limit_in_2021_january_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 1, 2021), (`offering is within the offering limit` OF `W offering`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_w_within_the_limit_in_2021_june" name="W_within_the_limit_in_2021_June" label="W within the limit in 2021 June">
-    <variable id="decision_w_within_the_limit_in_2021_june_var" name="W_within_the_limit_in_2021_June" label="W within the limit in 2021 June" typeRef="boolean"/>
-    <informationRequirement id="decision_w_within_the_limit_in_2021_june_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_w_within_the_limit_in_2021_june_ir2">
-      <requiredDecision href="#decision_offering_maximum_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_w_within_the_limit_in_2021_june_ir3">
-      <requiredDecision href="#decision_w_offering"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_w_within_the_limit_in_2021_june_kr1">
-      <requiredKnowledge href="#bkm_offering_is_within_the_offering_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_w_within_the_limit_in_2021_june_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`offering is within the offering limit` OF `W offering`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_the_cut_point_the_day_before_the_2017_adjustment" name="the_cut_point_the_day_before_the_2017_adjustment" label="the cut point the day before the 2017 adjustment">
-    <variable id="decision_the_cut_point_the_day_before_the_2017_adjustment_var" name="the_cut_point_the_day_before_the_2017_adjustment" label="the cut point the day before the 2017 adjustment" typeRef="number"/>
-    <informationRequirement id="decision_the_cut_point_the_day_before_the_2017_adjustment_ir1">
-      <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
-    </informationRequirement>
-    <literalExpression id="decision_the_cut_point_the_day_before_the_2017_adjustment_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 11, 4, 2017), `income or net worth cut point`</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_the_cut_point_on_the_day_of_the_2017_adjustment" name="the_cut_point_on_the_day_of_the_2017_adjustment" label="the cut point on the day of the 2017 adjustment">
-    <variable id="decision_the_cut_point_on_the_day_of_the_2017_adjustment_var" name="the_cut_point_on_the_day_of_the_2017_adjustment" label="the cut point on the day of the 2017 adjustment" typeRef="number"/>
-    <informationRequirement id="decision_the_cut_point_on_the_day_of_the_2017_adjustment_ir1">
-      <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
-    </informationRequirement>
-    <literalExpression id="decision_the_cut_point_on_the_day_of_the_2017_adjustment_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 12, 4, 2017), `income or net worth cut point`</text>
-    </literalExpression>
-  </decision>
   <decision id="decision_i_3_investor" name="I_3_investor" label="I-3 investor">
     <variable id="decision_i_3_investor_var" name="I_3_investor" label="I-3 investor" typeRef="InvestorProfile"/>
     <knowledgeRequirement id="decision_i_3_investor_kr1">
@@ -1621,54 +1549,6 @@
     </knowledgeRequirement>
     <literalExpression id="decision_i_3_investor_literal">
       <text>an_investor_with(accredited: false, income: 110000, worth: 115000, already: 0)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_i_3_limit_under_the_2022_rules" name="I_3_limit_under_the_2022_rules" label="I-3 limit under the 2022 rules">
-    <variable id="decision_i_3_limit_under_the_2022_rules_var" name="I_3_limit_under_the_2022_rules" label="I-3 limit under the 2022 rules" typeRef="number"/>
-    <informationRequirement id="decision_i_3_limit_under_the_2022_rules_ir1">
-      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2022_rules_ir2">
-      <requiredDecision href="#decision_i_3_investor"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2022_rules_ir3">
-      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2022_rules_ir4">
-      <requiredDecision href="#decision_minimum_permitted_investment"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2022_rules_ir5">
-      <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_i_3_limit_under_the_2022_rules_kr1">
-      <requiredKnowledge href="#bkm_investment_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_i_3_limit_under_the_2022_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2022), (`investment limit` OF `I-3 investor`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_i_3_limit_under_the_2023_rules" name="I_3_limit_under_the_2023_rules" label="I-3 limit under the 2023 rules">
-    <variable id="decision_i_3_limit_under_the_2023_rules_var" name="I_3_limit_under_the_2023_rules" label="I-3 limit under the 2023 rules" typeRef="number"/>
-    <informationRequirement id="decision_i_3_limit_under_the_2023_rules_ir1">
-      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2023_rules_ir2">
-      <requiredDecision href="#decision_i_3_investor"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2023_rules_ir3">
-      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2023_rules_ir4">
-      <requiredDecision href="#decision_minimum_permitted_investment"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_3_limit_under_the_2023_rules_ir5">
-      <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_i_3_limit_under_the_2023_rules_kr1">
-      <requiredKnowledge href="#bkm_investment_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_i_3_limit_under_the_2023_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2023), (`investment limit` OF `I-3 investor`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_i_4_investor" name="I_4_investor" label="I-4 investor">
@@ -1680,54 +1560,6 @@
       <text>an_investor_with(accredited: false, income: 1240000, worth: 1240000, already: 0)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_i_4_limit_under_the_2022_rules" name="I_4_limit_under_the_2022_rules" label="I-4 limit under the 2022 rules">
-    <variable id="decision_i_4_limit_under_the_2022_rules_var" name="I_4_limit_under_the_2022_rules" label="I-4 limit under the 2022 rules" typeRef="number"/>
-    <informationRequirement id="decision_i_4_limit_under_the_2022_rules_ir1">
-      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_4_limit_under_the_2022_rules_ir2">
-      <requiredDecision href="#decision_i_4_investor"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_4_limit_under_the_2022_rules_ir3">
-      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_4_limit_under_the_2022_rules_ir4">
-      <requiredDecision href="#decision_minimum_permitted_investment"/>
-    </informationRequirement>
-    <informationRequirement id="decision_i_4_limit_under_the_2022_rules_ir5">
-      <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_i_4_limit_under_the_2022_rules_kr1">
-      <requiredKnowledge href="#bkm_investment_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_i_4_limit_under_the_2022_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2022), (`investment limit` OF `I-4 investor`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_the_percentage_case_under_the_2019_rules" name="the_percentage_case_under_the_2019_rules" label="the percentage case under the 2019 rules">
-    <variable id="decision_the_percentage_case_under_the_2019_rules_var" name="the_percentage_case_under_the_2019_rules" label="the percentage case under the 2019 rules" typeRef="number"/>
-    <informationRequirement id="decision_the_percentage_case_under_the_2019_rules_ir1">
-      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    </informationRequirement>
-    <informationRequirement id="decision_the_percentage_case_under_the_2019_rules_ir2">
-      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_the_percentage_case_under_the_2019_rules_ir3">
-      <requiredDecision href="#decision_minimum_permitted_investment"/>
-    </informationRequirement>
-    <informationRequirement id="decision_the_percentage_case_under_the_2019_rules_ir4">
-      <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_the_percentage_case_under_the_2019_rules_kr1">
-      <requiredKnowledge href="#bkm_an_investor_with"/>
-    </knowledgeRequirement>
-    <knowledgeRequirement id="decision_the_percentage_case_under_the_2019_rules_kr2">
-      <requiredKnowledge href="#bkm_investment_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_the_percentage_case_under_the_2019_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`investment limit` OF (`an investor with` OF FALSE, 60000, 200000, 0))</text>
-    </literalExpression>
-  </decision>
   <decision id="decision_a_investor" name="A_investor" label="A investor">
     <variable id="decision_a_investor_var" name="A_investor" label="A investor" typeRef="InvestorProfile"/>
     <knowledgeRequirement id="decision_a_investor_kr1">
@@ -1737,66 +1569,6 @@
       <text>an_investor_with(accredited: true, income: 1000000, worth: 1000000, already: 200000)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_is_within_the_limit_under_the_2021_rules" name="A_is_within_the_limit_under_the_2021_rules" label="A is within the limit under the 2021 rules">
-    <variable id="decision_a_is_within_the_limit_under_the_2021_rules_var" name="A_is_within_the_limit_under_the_2021_rules" label="A is within the limit under the 2021 rules" typeRef="boolean"/>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir1">
-      <requiredDecision href="#decision_a_investor"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir2">
-      <requiredDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir3">
-      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir4">
-      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir5">
-      <requiredDecision href="#decision_minimum_permitted_investment"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir6">
-      <requiredDecision href="#decision_the_accredited_investor_carve_out_applies_to"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_ir7">
-      <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_a_is_within_the_limit_under_the_2021_rules_kr1">
-      <requiredKnowledge href="#bkm_investor_is_within_the_investment_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_a_is_within_the_limit_under_the_2021_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`investor is within the investment limit` OF `A investor`, 1)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_a_is_within_the_limit_under_the_2019_rules" name="A_is_within_the_limit_under_the_2019_rules" label="A is within the limit under the 2019 rules">
-    <variable id="decision_a_is_within_the_limit_under_the_2019_rules_var" name="A_is_within_the_limit_under_the_2019_rules" label="A is within the limit under the 2019 rules" typeRef="boolean"/>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir1">
-      <requiredDecision href="#decision_a_investor"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir2">
-      <requiredDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir3">
-      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir4">
-      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir5">
-      <requiredDecision href="#decision_minimum_permitted_investment"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir6">
-      <requiredDecision href="#decision_the_accredited_investor_carve_out_applies_to"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_ir7">
-      <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_a_is_within_the_limit_under_the_2019_rules_kr1">
-      <requiredKnowledge href="#bkm_investor_is_within_the_investment_limit"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_a_is_within_the_limit_under_the_2019_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`investor is within the investment limit` OF `A investor`, 1)</text>
-    </literalExpression>
-  </decision>
   <decision id="decision_f_offering" name="F_offering" label="F offering">
     <variable id="decision_f_offering_var" name="F_offering" label="F offering" typeRef="Offering"/>
     <knowledgeRequirement id="decision_f_offering_kr1">
@@ -1804,126 +1576,6 @@
     </knowledgeRequirement>
     <literalExpression id="decision_f_offering_literal">
       <text>an_offering_of(prior_sales: 0, maximum: 550000, previously_sold: true)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_f_requirement_under_the_2019_rules" name="F_requirement_under_the_2019_rules" label="F requirement under the 2019 rules">
-    <variable id="decision_f_requirement_under_the_2019_rules_var" name="F_requirement_under_the_2019_rules" label="F requirement under the 2019 rules" typeRef="FinancialStatementRequirement"/>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir2">
-      <requiredDecision href="#decision_f_offering"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir3">
-      <requiredDecision href="#decision_first_time_issuer_review_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir4">
-      <requiredDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir5">
-      <requiredDecision href="#decision_tier_1_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir6">
-      <requiredDecision href="#decision_tier_2_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2019_rules_ir7">
-      <requiredInput href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_f_requirement_under_the_2019_rules_kr1">
-      <requiredKnowledge href="#bkm_financial_statements_required"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_f_requirement_under_the_2019_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`financial statements required` OF `F offering`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_f_requirement_under_the_2023_rules" name="F_requirement_under_the_2023_rules" label="F requirement under the 2023 rules">
-    <variable id="decision_f_requirement_under_the_2023_rules_var" name="F_requirement_under_the_2023_rules" label="F requirement under the 2023 rules" typeRef="FinancialStatementRequirement"/>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir2">
-      <requiredDecision href="#decision_f_offering"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir3">
-      <requiredDecision href="#decision_first_time_issuer_review_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir4">
-      <requiredDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir5">
-      <requiredDecision href="#decision_tier_1_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir6">
-      <requiredDecision href="#decision_tier_2_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_f_requirement_under_the_2023_rules_ir7">
-      <requiredInput href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_f_requirement_under_the_2023_rules_kr1">
-      <requiredKnowledge href="#bkm_financial_statements_required"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_f_requirement_under_the_2023_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2023), (`financial statements required` OF `F offering`)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_a_small_offering_inside_the_covid_window" name="a_small_offering_inside_the_COVID_window" label="a small offering inside the COVID window">
-    <variable id="decision_a_small_offering_inside_the_covid_window_var" name="a_small_offering_inside_the_COVID_window" label="a small offering inside the COVID window" typeRef="FinancialStatementRequirement"/>
-    <informationRequirement id="decision_a_small_offering_inside_the_covid_window_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_small_offering_inside_the_covid_window_ir2">
-      <requiredDecision href="#decision_first_time_issuer_review_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_small_offering_inside_the_covid_window_ir3">
-      <requiredDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_small_offering_inside_the_covid_window_ir4">
-      <requiredDecision href="#decision_tier_1_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_small_offering_inside_the_covid_window_ir5">
-      <requiredDecision href="#decision_tier_2_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_small_offering_inside_the_covid_window_ir6">
-      <requiredInput href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_a_small_offering_inside_the_covid_window_kr1">
-      <requiredKnowledge href="#bkm_an_offering_of"/>
-    </knowledgeRequirement>
-    <knowledgeRequirement id="decision_a_small_offering_inside_the_covid_window_kr2">
-      <requiredKnowledge href="#bkm_financial_statements_required"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_a_small_offering_inside_the_covid_window_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF (`an offering of` OF 0, 100000, FALSE))</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_a_large_offering_inside_the_covid_window" name="a_large_offering_inside_the_COVID_window" label="a large offering inside the COVID window">
-    <variable id="decision_a_large_offering_inside_the_covid_window_var" name="a_large_offering_inside_the_COVID_window" label="a large offering inside the COVID window" typeRef="FinancialStatementRequirement"/>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir1">
-      <requiredDecision href="#decision_aggregate_offering_amount"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir2">
-      <requiredDecision href="#decision_f_offering"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir3">
-      <requiredDecision href="#decision_first_time_issuer_review_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir4">
-      <requiredDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir5">
-      <requiredDecision href="#decision_tier_1_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir6">
-      <requiredDecision href="#decision_tier_2_ceiling"/>
-    </informationRequirement>
-    <informationRequirement id="decision_a_large_offering_inside_the_covid_window_ir7">
-      <requiredInput href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
-    </informationRequirement>
-    <knowledgeRequirement id="decision_a_large_offering_inside_the_covid_window_kr1">
-      <requiredKnowledge href="#bkm_financial_statements_required"/>
-    </knowledgeRequirement>
-    <literalExpression id="decision_a_large_offering_inside_the_covid_window_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF `F offering`)</text>
     </literalExpression>
   </decision>
   <decision id="hydration_investor" name="investor_hydrated" label="investor">
@@ -2425,43 +2077,6 @@
     <inputDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
     <inputDecision href="#decision_a_delinquent_issuer"/>
   </decisionService>
-  <decisionService id="service_the_rule_version_axis_the_same_question_under_four_regimes" name="The_rule_version_axis_the_same_question_under_four_regimes" label="The rule-version axis — the same question under four regimes">
-    <variable id="service_the_rule_version_axis_the_same_question_under_four_regimes_var" name="The_rule_version_axis_the_same_question_under_four_regimes" label="The rule-version axis — the same question under four regimes" typeRef="Any"/>
-    <outputDecision href="#decision_w_within_the_limit_in_2016"/>
-    <outputDecision href="#decision_w_within_the_limit_in_2021_january"/>
-    <outputDecision href="#decision_w_within_the_limit_in_2021_june"/>
-    <outputDecision href="#decision_the_cut_point_the_day_before_the_2017_adjustment"/>
-    <outputDecision href="#decision_the_cut_point_on_the_day_of_the_2017_adjustment"/>
-    <outputDecision href="#decision_i_3_limit_under_the_2022_rules"/>
-    <outputDecision href="#decision_i_3_limit_under_the_2023_rules"/>
-    <outputDecision href="#decision_i_4_limit_under_the_2022_rules"/>
-    <outputDecision href="#decision_the_percentage_case_under_the_2019_rules"/>
-    <outputDecision href="#decision_a_is_within_the_limit_under_the_2021_rules"/>
-    <outputDecision href="#decision_a_is_within_the_limit_under_the_2019_rules"/>
-    <outputDecision href="#decision_f_requirement_under_the_2019_rules"/>
-    <outputDecision href="#decision_f_requirement_under_the_2023_rules"/>
-    <outputDecision href="#decision_a_small_offering_inside_the_covid_window"/>
-    <outputDecision href="#decision_a_large_offering_inside_the_covid_window"/>
-    <encapsulatedDecision href="#decision_w_offering"/>
-    <encapsulatedDecision href="#decision_i_3_investor"/>
-    <encapsulatedDecision href="#decision_i_4_investor"/>
-    <encapsulatedDecision href="#decision_a_investor"/>
-    <encapsulatedDecision href="#decision_f_offering"/>
-    <inputDecision href="#decision_aggregate_offering_amount"/>
-    <inputDecision href="#decision_offering_maximum_in_a_12_month_period"/>
-    <inputDecision href="#decision_income_or_net_worth_cut_point"/>
-    <inputDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
-    <inputDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
-    <inputDecision href="#decision_minimum_permitted_investment"/>
-    <inputDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
-    <inputDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
-    <inputDecision href="#decision_the_accredited_investor_carve_out_applies_to"/>
-    <inputDecision href="#decision_first_time_issuer_review_ceiling"/>
-    <inputDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
-    <inputDecision href="#decision_tier_1_ceiling"/>
-    <inputDecision href="#decision_tier_2_ceiling"/>
-    <inputData href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
-  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_sec_regulation_crowdfunding_17_cfr_part_227_diagram" name="SEC Regulation Crowdfunding — 17 CFR Part 227">
       <dmndi:DMNShape id="input_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16_shape" dmnElementRef="input_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16">
@@ -2677,33 +2292,6 @@
       <dmndi:DMNShape id="decision_a_conforming_filing_shape" dmnElementRef="decision_a_conforming_filing">
         <dc:Bounds x="2040" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_w_within_the_limit_in_2016_shape" dmnElementRef="decision_w_within_the_limit_in_2016">
-        <dc:Bounds x="2260" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_w_within_the_limit_in_2021_january_shape" dmnElementRef="decision_w_within_the_limit_in_2021_january">
-        <dc:Bounds x="2480" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_w_within_the_limit_in_2021_june_shape" dmnElementRef="decision_w_within_the_limit_in_2021_june">
-        <dc:Bounds x="2700" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_cut_point_the_day_before_the_2017_adjustment_shape" dmnElementRef="decision_the_cut_point_the_day_before_the_2017_adjustment">
-        <dc:Bounds x="2920" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_cut_point_on_the_day_of_the_2017_adjustment_shape" dmnElementRef="decision_the_cut_point_on_the_day_of_the_2017_adjustment">
-        <dc:Bounds x="3140" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_f_requirement_under_the_2019_rules_shape" dmnElementRef="decision_f_requirement_under_the_2019_rules">
-        <dc:Bounds x="3360" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_f_requirement_under_the_2023_rules_shape" dmnElementRef="decision_f_requirement_under_the_2023_rules">
-        <dc:Bounds x="3580" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_small_offering_inside_the_covid_window_shape" dmnElementRef="decision_a_small_offering_inside_the_covid_window">
-        <dc:Bounds x="3800" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_large_offering_inside_the_covid_window_shape" dmnElementRef="decision_a_large_offering_inside_the_covid_window">
-        <dc:Bounds x="4020" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_issuer_is_eligible_shape" dmnElementRef="decision_issuer_is_eligible">
         <dc:Bounds x="60" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
@@ -2718,24 +2306,6 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_transfer_is_permitted_shape" dmnElementRef="decision_transfer_is_permitted">
         <dc:Bounds x="940" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_i_3_limit_under_the_2022_rules_shape" dmnElementRef="decision_i_3_limit_under_the_2022_rules">
-        <dc:Bounds x="1160" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_i_3_limit_under_the_2023_rules_shape" dmnElementRef="decision_i_3_limit_under_the_2023_rules">
-        <dc:Bounds x="1380" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_i_4_limit_under_the_2022_rules_shape" dmnElementRef="decision_i_4_limit_under_the_2022_rules">
-        <dc:Bounds x="1600" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_percentage_case_under_the_2019_rules_shape" dmnElementRef="decision_the_percentage_case_under_the_2019_rules">
-        <dc:Bounds x="1820" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_is_within_the_limit_under_the_2021_rules_shape" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules">
-        <dc:Bounds x="2040" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_is_within_the_limit_under_the_2019_rules_shape" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules">
-        <dc:Bounds x="2260" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_ongoing_reporting_obligation_shape" dmnElementRef="decision_ongoing_reporting_obligation">
         <dc:Bounds x="60" y="220" width="180" height="80"/>
@@ -2802,9 +2372,6 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="service_top_level_the_whole_exemption_shape" dmnElementRef="service_top_level_the_whole_exemption">
         <dc:Bounds x="260" y="200" width="1980" height="440"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="service_the_rule_version_axis_the_same_question_under_four_regimes_shape" dmnElementRef="service_the_rule_version_axis_the_same_question_under_four_regimes">
-        <dc:Bounds x="1140" y="360" width="8800" height="440"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_offering_maximum_in_a_12_month_period_ir1_edge" dmnElementRef="decision_offering_maximum_in_a_12_month_period_ir1">
         <di:waypoint x="150" y="860"/>
@@ -3410,290 +2977,6 @@
         <di:waypoint x="370" y="540"/>
         <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2016_ir1_edge" dmnElementRef="decision_w_within_the_limit_in_2016_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="2350" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2016_ir2_edge" dmnElementRef="decision_w_within_the_limit_in_2016_ir2">
-        <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="2350" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2016_ir3_edge" dmnElementRef="decision_w_within_the_limit_in_2016_ir3">
-        <di:waypoint x="8950" y="700"/>
-        <di:waypoint x="2350" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_january_ir1_edge" dmnElementRef="decision_w_within_the_limit_in_2021_january_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="2570" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_january_ir2_edge" dmnElementRef="decision_w_within_the_limit_in_2021_january_ir2">
-        <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="2570" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_january_ir3_edge" dmnElementRef="decision_w_within_the_limit_in_2021_january_ir3">
-        <di:waypoint x="8950" y="700"/>
-        <di:waypoint x="2570" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_june_ir1_edge" dmnElementRef="decision_w_within_the_limit_in_2021_june_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="2790" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_june_ir2_edge" dmnElementRef="decision_w_within_the_limit_in_2021_june_ir2">
-        <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="2790" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_june_ir3_edge" dmnElementRef="decision_w_within_the_limit_in_2021_june_ir3">
-        <di:waypoint x="8950" y="700"/>
-        <di:waypoint x="2790" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_cut_point_the_day_before_the_2017_adjustment_ir1_edge" dmnElementRef="decision_the_cut_point_the_day_before_the_2017_adjustment_ir1">
-        <di:waypoint x="1250" y="700"/>
-        <di:waypoint x="3010" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_cut_point_on_the_day_of_the_2017_adjustment_ir1_edge" dmnElementRef="decision_the_cut_point_on_the_day_of_the_2017_adjustment_ir1">
-        <di:waypoint x="1250" y="700"/>
-        <di:waypoint x="3230" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_ir1_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_ir1">
-        <di:waypoint x="590" y="540"/>
-        <di:waypoint x="1250" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_ir2_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_ir2">
-        <di:waypoint x="9170" y="700"/>
-        <di:waypoint x="1250" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_ir3_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_ir3">
-        <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="1250" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_ir4_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_ir4">
-        <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="1250" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_ir5_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_ir5">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1250" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_ir1_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_ir1">
-        <di:waypoint x="590" y="540"/>
-        <di:waypoint x="1470" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_ir2_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_ir2">
-        <di:waypoint x="9170" y="700"/>
-        <di:waypoint x="1470" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_ir3_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_ir3">
-        <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="1470" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_ir4_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_ir4">
-        <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="1470" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_ir5_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_ir5">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1470" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_ir1_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_ir1">
-        <di:waypoint x="590" y="540"/>
-        <di:waypoint x="1690" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_ir2_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_ir2">
-        <di:waypoint x="9390" y="700"/>
-        <di:waypoint x="1690" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_ir3_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_ir3">
-        <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="1690" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_ir4_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_ir4">
-        <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="1690" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_ir5_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_ir5">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1690" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_ir1_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_ir1">
-        <di:waypoint x="590" y="540"/>
-        <di:waypoint x="1910" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_ir2_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_ir2">
-        <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="1910" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_ir3_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_ir3">
-        <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="1910" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_ir4_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_ir4">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1910" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir1">
-        <di:waypoint x="9610" y="700"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir2_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir2">
-        <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir3_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir3">
-        <di:waypoint x="590" y="540"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir4_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir4">
-        <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir5_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir5">
-        <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir6_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir6">
-        <di:waypoint x="810" y="540"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir7_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir7">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="2130" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir1">
-        <di:waypoint x="9610" y="700"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir2_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir2">
-        <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir3_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir3">
-        <di:waypoint x="590" y="540"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir4_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir4">
-        <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir5_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir5">
-        <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir6_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir6">
-        <di:waypoint x="810" y="540"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_ir7_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_ir7">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="2350" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir1_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir2_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir2">
-        <di:waypoint x="9830" y="700"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir3_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir3">
-        <di:waypoint x="2350" y="700"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir4_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir4">
-        <di:waypoint x="5870" y="700"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir5_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir5">
-        <di:waypoint x="1910" y="700"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir6_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir6">
-        <di:waypoint x="2130" y="700"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir7_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir7">
-        <di:waypoint x="1250" y="860"/>
-        <di:waypoint x="3450" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir1_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir2_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir2">
-        <di:waypoint x="9830" y="700"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir3_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir3">
-        <di:waypoint x="2350" y="700"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir4_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir4">
-        <di:waypoint x="5870" y="700"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir5_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir5">
-        <di:waypoint x="1910" y="700"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir6_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir6">
-        <di:waypoint x="2130" y="700"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_ir7_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_ir7">
-        <di:waypoint x="1250" y="860"/>
-        <di:waypoint x="3670" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir1_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="3890" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir2_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir2">
-        <di:waypoint x="2350" y="700"/>
-        <di:waypoint x="3890" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir3_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir3">
-        <di:waypoint x="5870" y="700"/>
-        <di:waypoint x="3890" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir4_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir4">
-        <di:waypoint x="1910" y="700"/>
-        <di:waypoint x="3890" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir5_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir5">
-        <di:waypoint x="2130" y="700"/>
-        <di:waypoint x="3890" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir6_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir6">
-        <di:waypoint x="1250" y="860"/>
-        <di:waypoint x="3890" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir1_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir1">
-        <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir2_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir2">
-        <di:waypoint x="9830" y="700"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir3_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir3">
-        <di:waypoint x="2350" y="700"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir4_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir4">
-        <di:waypoint x="5870" y="700"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir5_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir5">
-        <di:waypoint x="1910" y="700"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir6_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir6">
-        <di:waypoint x="2130" y="700"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir7_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir7">
-        <di:waypoint x="1250" y="860"/>
-        <di:waypoint x="4110" y="620"/>
-      </dmndi:DMNEdge>
       <dmndi:DMNEdge id="hydration_investor_ir1_edge" dmnElementRef="hydration_investor_ir1">
         <di:waypoint x="810" y="860"/>
         <di:waypoint x="10050" y="780"/>
@@ -3794,81 +3077,21 @@
         <di:waypoint x="1690" y="140"/>
         <di:waypoint x="8950" y="700"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2016_kr1_edge" dmnElementRef="decision_w_within_the_limit_in_2016_kr1">
-        <di:waypoint x="370" y="140"/>
-        <di:waypoint x="2350" y="540"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_january_kr1_edge" dmnElementRef="decision_w_within_the_limit_in_2021_january_kr1">
-        <di:waypoint x="370" y="140"/>
-        <di:waypoint x="2570" y="540"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_june_kr1_edge" dmnElementRef="decision_w_within_the_limit_in_2021_june_kr1">
-        <di:waypoint x="370" y="140"/>
-        <di:waypoint x="2790" y="540"/>
-      </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_i_3_investor_kr1_edge" dmnElementRef="decision_i_3_investor_kr1">
         <di:waypoint x="1910" y="140"/>
         <di:waypoint x="9170" y="700"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_kr1_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_kr1">
-        <di:waypoint x="590" y="140"/>
-        <di:waypoint x="1250" y="380"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_kr1_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_kr1">
-        <di:waypoint x="590" y="140"/>
-        <di:waypoint x="1470" y="380"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_i_4_investor_kr1_edge" dmnElementRef="decision_i_4_investor_kr1">
         <di:waypoint x="1910" y="140"/>
         <di:waypoint x="9390" y="700"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_kr1_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_kr1">
-        <di:waypoint x="590" y="140"/>
-        <di:waypoint x="1690" y="380"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_kr1_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_kr1">
-        <di:waypoint x="1910" y="140"/>
-        <di:waypoint x="1910" y="380"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_kr2_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_kr2">
-        <di:waypoint x="590" y="140"/>
-        <di:waypoint x="1910" y="380"/>
-      </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_investor_kr1_edge" dmnElementRef="decision_a_investor_kr1">
         <di:waypoint x="1910" y="140"/>
         <di:waypoint x="9610" y="700"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_kr1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_kr1">
-        <di:waypoint x="810" y="140"/>
-        <di:waypoint x="2130" y="380"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_kr1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_kr1">
-        <di:waypoint x="810" y="140"/>
-        <di:waypoint x="2350" y="380"/>
-      </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_f_offering_kr1_edge" dmnElementRef="decision_f_offering_kr1">
         <di:waypoint x="1690" y="140"/>
         <di:waypoint x="9830" y="700"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_kr1_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_kr1">
-        <di:waypoint x="1030" y="140"/>
-        <di:waypoint x="3450" y="540"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_kr1_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_kr1">
-        <di:waypoint x="1030" y="140"/>
-        <di:waypoint x="3670" y="540"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_kr1_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_kr1">
-        <di:waypoint x="1690" y="140"/>
-        <di:waypoint x="3890" y="540"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_kr2_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_kr2">
-        <di:waypoint x="1030" y="140"/>
-        <di:waypoint x="3890" y="540"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_kr1_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_kr1">
-        <di:waypoint x="1030" y="140"/>
-        <di:waypoint x="4110" y="540"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="bkm_investor_is_within_the_investment_limit_kr1_edge" dmnElementRef="bkm_investor_is_within_the_investment_limit_kr1">
         <di:waypoint x="590" y="140"/>

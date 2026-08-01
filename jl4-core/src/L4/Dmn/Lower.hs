@@ -3226,6 +3226,14 @@ lowerModule opts modul@(MkModule _ uri _) =
                  && not (Set.member u constructors)
                  && not (Set.member u selectors)
                  && not (Set.member u computedSelfUniques)
+        -- R12 (§15.12): the rebind predicate, over the RAW body. The old
+        -- lowering-time detection ran over the caramelised+peeled body;
+        -- 'gplate' descends through WHERE/LET locals from the raw body too,
+        -- which not-ok/ruledate-rebind.l4's WHERE-wrapped case pins.
+        , A.piRuleDateRebind   = \b ->
+            or [ getUnique r == TC.evalUnderRulesEffectiveAtUnique
+               | App _ r _ <- toListOf (cosmosOf (gplate @(Expr Resolved))) b
+               ]
         }
       callGraph allDecides
 
@@ -4990,6 +4998,16 @@ lowerModule opts modul@(MkModule _ uri _) =
              \decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a \
              \<decision> whose logic is raw deontic L4 misdescribes both")
             "the obligation's lifecycle: route this rule to the BPMN exporter instead"
+        -- R12 (§15.12): same code as the old lowering-time note, retexted, ONE
+        -- severity (Lossy, D-REGULATIVE's precedent): nothing emitted is
+        -- broken, and the document is genuinely incomplete w.r.t. the source.
+        A.DroppedRuleDateRebind ->
+          dmnNote "D-RULEDATE-UNBOUND" Lossy nm rng
+            ("`" <> nm <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER \
+             \RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no \
+             \scoped rebinding, so no faithful <decision> exists and it is not emitted")
+            "the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE \
+            \across engine invocations"
     | (u, reason) <- Map.toAscList popVerdict.pvDropped
     , let nm  = droppedNameOf u
     , let rng = droppedRangeOf u
@@ -5574,63 +5592,12 @@ lowerModule opts modul@(MkModule _ uri _) =
       reason : _ -> literalFallback (SumTypeRead reason)
       [] -> plainLowering
 
-    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes <> ruleDateUnboundNotes
-
-    -- D-RULEDATE-UNBOUND (§15.5). A decision that evaluates a sub-graph under
-    -- its OWN rule date cannot be governed by the DRG's single global rule-date
-    -- input, because DMN has no scoped rebinding. This ACCOMPANIES its
-    -- D-LITERALEXPR; it does not replace it.
-    --
-    -- v1 matches `EVAL UNDER RULES EFFECTIVE AT` only. The valid-time /
-    -- transaction-time builtins stamp a DIFFERENT temporal context and were not
-    -- measured; adding them silently would change counts with nothing behind
-    -- them (§15.5).
-    ruleDateUnboundNotes =
-      [ uncurry (dmnNote "D-RULEDATE-UNBOUND" Blocking did (bestRange body))
-          ruleDateUnboundText
-      | any isEvalUnderRules subExprs
-      ]
-
-    -- The claim is SCOPED TO WHAT WAS EMITTED. `EVAL UNDER RULES EFFECTIVE AT`
-    -- can sit inside an arm body of a chain that still tabulates, and saying "no
-    -- DMN engine can evaluate this decision" of a decision that ships a real
-    -- <decisionTable> would be false about the rest of the table. On today's
-    -- corpus all 15 instances are boxed literals, which is asserted rather than
-    -- assumed (jl4/tests/DmnExport.hs, "scopes D-RULEDATE-UNBOUND's claim") --
-    -- but the note must not depend on that staying true.
-    ruleDateUnboundText = case logic of
-      -- A hydrator takes the same reading as a boxed literal: neither has any
-      -- row, so nothing about it is "still governed by the rule-date input".
-      -- It is also unreachable in practice -- hydrators are minted OUTSIDE
-      -- this per-decide computation, so 'logic' here is never a context -- but
-      -- the arm is written to the same standard rather than left as an error,
-      -- because an unreachable branch that becomes reachable is exactly how a
-      -- scoped claim silently stops being scoped.
-      LogicContext _ -> literalUnboundText
-      LogicLiteral _ -> literalUnboundText
-      LogicTable _ ->
-        ( "a sub-expression of `" <> decideName d
-            <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-               \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-               \rebinding, so that sub-graph is not governed by it and cannot be, even \
-               \though the surrounding decision table is"
-        , "execution of the rebound sub-graph: supplying the model's rule-date input does \
-          \not make it answer, and the table around it will answer as though it had"
-        )
-
-    literalUnboundText =
-      ( "`" <> decideName d
-          <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-             \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-             \rebinding, so this decision is not governed by it and cannot be"
-      , "execution: no DMN engine can evaluate this decision, and -- the part a reader is \
-        \most likely to get wrong -- supplying the model's rule-date input does not make \
-        \it answer"
-      )
-
-    isEvalUnderRules = \case
-      App _ r _ -> getUnique r == TC.evalUnderRulesEffectiveAtUnique
-      _         -> False
+    -- D-RULEDATE-UNBOUND moved to population time (R12, §15.12): a decide that
+    -- rebinds law time is dropped by 'classifyPopulation' before this function
+    -- ever sees it, and 'populationNotes' carries the (now Lossy) note. The
+    -- per-decision two-message machinery that lived here described an emitted
+    -- element that no longer exists.
+    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes
 
     -- Computed ONCE and shared by 'plainLowering' and the requirement rewrite
     -- below, so the emitted logic and the emitted DRG edges cannot disagree.

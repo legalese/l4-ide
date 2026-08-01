@@ -2438,30 +2438,91 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral _ -> expectationFailure "expected the ordinary table"
 
         LogicContext _ -> expectationFailure "unexpected boxed context"
-    it "fires D-RULEDATE-UNBOUND on every EVAL UNDER RULES EFFECTIVE AT decision" $ do
+    -- R12 (§15.12): a rule-date-rebinding decide is DROPPED at population
+    -- time, so the note is a population note (Lossy) about a decision the
+    -- artifact does not contain — one per rebinding decide, 15 on the corpus.
+    it "drops every EVAL UNDER RULES EFFECTIVE AT decision, Lossy-noted (§15.12)" $ do
       drg <- corpusDrg
       let ns = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
-      ns `shouldSatisfy` (not . null)
-      map (.severity) ns `shouldSatisfy` all (== Blocking)
+      length ns `shouldBe` 15
+      map (.severity) ns `shouldSatisfy` all (== Lossy)
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not emitted")
+      -- ...and none of the named decisions is in the DRG. Population notes
+      -- name the decide by its L4 name (there is no element id to name).
+      let emittedNames = Set.fromList [d.dcnName | d <- drgDecisions drg]
+      [n.element | n <- ns, Set.member n.element emittedNames] `shouldBe` []
+      -- the ~20 assert-only scenario fixtures are NOT rebind-dropped: the gate
+      -- is the structural rebind property, never test-ness (the R12 tripwire).
+      emittedNames `shouldSatisfy` Set.member "the base case qualifies"
 
-    -- ...and the note's CLAIM is scoped to what was emitted. "No DMN engine can
-    -- evaluate this decision" is true of a boxed literal and false of a
-    -- decision that still ships a table (the rebinding can sit inside an arm
-    -- body). Asserted as an invariant over every subject rather than as a fact
-    -- about today's corpus, which is what the earlier version did.
-    it "scopes D-RULEDATE-UNBOUND's claim to what was emitted (§15.5)" $
+    -- The §15.12 non-emission invariant, over every golden subject: no decide
+    -- carrying D-RULEDATE-UNBOUND appears in the emitted decision population.
+    -- (This replaces the retired two-message scoping test: with nothing
+    -- emitted, there is no emitted logic for the claim to be scoped to.)
+    it "never emits a decision that carries D-RULEDATE-UNBOUND (§15.12)" $
       forM_ goldenSubjects \(srcPath, stem, _) -> do
         src <- Text.readFile (examplesRoot </> srcPath)
-        let drg  = drgAsCli srcPath src
-            ns   = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
-            lits = [d.dcnId | d <- drgDecisions drg, LogicLiteral _ <- [d.dcnLogic]]
+        let drg   = drgAsCli srcPath src
+            ns    = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+            names = Set.fromList [d.dcnName | d <- drgDecisions drg]
         forM_ ns \n ->
-          unless (if n.element `elem` lits
-                    then Text.isInfixOf "no DMN engine can evaluate this decision" n.lost
-                    else Text.isInfixOf "a sub-expression of" n.message) $
+          when (Set.member n.element names) $
             expectationFailure
               (stem <> ": D-RULEDATE-UNBOUND on " <> Text.unpack n.element
-                 <> " claims more than the emitted logic supports")
+                 <> " but the decision was emitted anyway")
+
+    describe "the ruledate-rebind fixture (§15.12)" $ do
+      let rebindDrg = do
+            src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
+            pure (drgAsCli "ruledate-rebind.l4" src)
+
+      it "drops the rebinding decides — plain AND WHERE-wrapped — with one Lossy note each" $ do
+        drg <- rebindDrg
+        let names = [d.dcnName | d <- drgDecisions drg]
+        names `shouldNotSatisfy` elem "the fee under the 2016 rules"
+        -- raw-body traversal parity: the old detection ran over the peeled
+        -- body; the population predicate must see through WHERE too
+        names `shouldNotSatisfy` elem "the fee under the 2019 rules, doubled"
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+        map (.severity) ns `shouldSatisfy` all (== Lossy)
+        length ns `shouldBe` 3
+
+      it "keeps the CALLER, whose dropped callee surfaces as an inputData" $ do
+        drg <- rebindDrg
+        let caller = decisionNamed "twice the 2016 fee" drg
+            inputs = [i | NodeInputData i <- drg.drgNodes]
+        [i.idId | i <- inputs, i.idName == "the fee under the 2016 rules"]
+          `shouldBe` ["input_the_fee_under_the_2016_rules"]
+        caller.dcnRequirements
+          `shouldSatisfy` elem (RequiredInput "input_the_fee_under_the_2016_rules")
+        -- no dangling edge: every requirement resolves to an emitted element
+        let decisionIds = Set.fromList [d.dcnId | d <- drgDecisions drg]
+            inputIds    = Set.fromList [i.idId | i <- inputs]
+        forM_ [d | d <- drgDecisions drg] \d ->
+          forM_ d.dcnRequirements \case
+            RequiredDecision t -> Set.member t decisionIds `shouldBe` True
+            RequiredInput t    -> Set.member t inputIds `shouldBe` True
+
+      it "gives a fixture-shaped rebind ONLY the rebind drop, even unverified (§15.12)" $ do
+        -- `the fixture-shaped rebind` satisfies FIXTURE(a)-(c) module-locally.
+        -- With no importer view, the fixture filter would KEEP it with a
+        -- report-only D-FIXTURE advisory — but the rebind gate is structural
+        -- and unconditional, so it is dropped as a rebind, with no D-FIXTURE
+        -- beside the drop and no second drop reason.
+        src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
+        let drg = drgGeneral emptyVFS (\o -> o { dloExternalRefNames = Nothing })
+                    defaultDmnFlavor (const "Test") src
+            notes = (dmnReport drg).notes
+        [d.dcnName | d <- drgDecisions drg] `shouldNotSatisfy` elem "the fixture-shaped rebind"
+        [n.code | n <- notes, n.element == "the fixture-shaped rebind"]
+          `shouldBe` ["D-RULEDATE-UNBOUND"]
+
+      it "still drops on --include-tests: the gate is structural, not test-ness" $ do
+        src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
+        let drg = drgAdjusted (\o -> o { dloIncludeTests = True }) src
+        [d.dcnName | d <- drgDecisions drg] `shouldNotSatisfy` elem "the fee under the 2016 rules"
+        [n.code | n <- (dmnReport drg).notes, n.element == "the fee under the 2016 rules"]
+          `shouldBe` ["D-RULEDATE-UNBOUND"]
 
     it "carries the @ref citation into the annotation column (§15.9)" $ do
       drg <- corpusDrg
