@@ -50,6 +50,9 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-PARTIAL] blocking — decision_stated_term  (main.l4:142:3-29)
       `stated term` could not be certified total (L11 at main.l4:142:3-29: the projection `term in years` scrutinises a multi-constructor IS ONE OF whose constructors do not all declare that field; the selector application raises NonExhaustivePatterns at run time even though no CONSIDER is in sight), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. No call site consumes it (it is a DRG root), so no guard can fence the null
       lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error
+  [D-FLAVOR-NOSERVICE] advisory — service_sum_types_and_the_data_model
+      the decisionService `Sum_types_and_the_data_model` (§ `Sum types and the data model`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-COMPUTEDOUTPUT] advisory — decision_capped_at_ten  (main.l4:156:24-30)
       the output entry `n` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

@@ -304,6 +304,29 @@
       </contextEntry>
     </context>
   </decision>
+  <decisionService id="service_sum_types_and_the_data_model" name="Sum_types_and_the_data_model" label="Sum types and the data model">
+    <variable id="service_sum_types_and_the_data_model_var" name="Sum_types_and_the_data_model" label="Sum types and the data model" typeRef="Any"/>
+    <outputDecision href="#decision_is_a_sale"/>
+    <outputDecision href="#decision_stated_term"/>
+    <outputDecision href="#decision_claim_amount"/>
+    <outputDecision href="#decision_capped_at_ten"/>
+    <outputDecision href="#decision_grade_is_settled"/>
+    <outputDecision href="#decision_grade_is_settled_spelled_longhand"/>
+    <outputDecision href="#decision_claim_payout"/>
+    <outputDecision href="#decision_deep"/>
+    <outputDecision href="#decision_grade_for"/>
+    <outputDecision href="#decision_is_alpha"/>
+    <encapsulatedDecision href="#hydration_cl"/>
+    <inputData href="#input_d"/>
+    <inputData href="#input_disposal"/>
+    <inputData href="#input_c"/>
+    <inputData href="#input_n"/>
+    <inputData href="#input_q"/>
+    <inputData href="#input_p"/>
+    <inputData href="#input_g"/>
+    <inputData href="#input_k"/>
+    <inputData href="#input_cl"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_sum_types_and_the_data_model_diagram" name="Sum types and the data model">
       <dmndi:DMNShape id="input_d_shape" dmnElementRef="input_d">
@@ -365,6 +388,9 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_claim_payout_shape" dmnElementRef="decision_claim_payout">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_sum_types_and_the_data_model_shape" dmnElementRef="service_sum_types_and_the_data_model">
+        <dc:Bounds x="40" y="40" width="2200" height="280"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_is_a_sale_ir1_edge" dmnElementRef="decision_is_a_sale_ir1">
         <di:waypoint x="150" y="380"/>

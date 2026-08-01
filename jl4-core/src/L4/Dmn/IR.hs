@@ -76,9 +76,11 @@ module L4.Dmn.IR
   , knowledgeRequirementTarget
   , Bkm (..)
   , FormalParameter (..)
+  , DecisionService (..)
   , drgDecisions
   , drgInputData
   , drgBkms
+  , drgServices
     -- * Fidelity
     -- $fidelity
   , FidelityLoss (..)
@@ -869,10 +871,33 @@ data InputData = MkInputData
   }
   deriving stock (Eq, Show, Generic)
 
+-- | A @\<decisionService\>@ (§2.3): one per L4 @§@, as GROUPING on both flavors
+-- (probe D1); an invocable target of a @knowledgeRequirement@ on the @kie@
+-- flavor only (§13.4\/§13.5: that one edge is required by KIE and fatal to
+-- Camunda 8\'s @parse()@).
+--
+-- Member lists carry element __ids__. Never emitted with zero outputs (probe
+-- D5: Xerces-valid, KIE validator ERROR + runtime throw, Camunda completely
+-- silent), and never with both 'dsvEncapsulated' and 'dsvInputDecisions' empty
+-- (§6.3.10\'s second SHALL, read at R6\/§2.5.5) — a @§@ that cannot satisfy
+-- both simply emits no service.
+data DecisionService = MkDecisionService
+  { dsvId             :: !Text
+  , dsvName           :: !Text     -- ^ the verbatim @§@ heading → @\@label@
+  , dsvFeelName       :: !Text     -- ^ resolved, in the SERVICE name scope (§5.2 scope 3, probe E6)
+  , dsvType           :: !DmnType  -- ^ the single output\'s type; 'DmnAny' on a multi-output grouping
+  , dsvOutputs        :: ![Text]
+  , dsvEncapsulated   :: ![Text]
+  , dsvInputDecisions :: ![Text]
+  , dsvInputData      :: ![Text]
+  }
+  deriving stock (Eq, Show, Generic)
+
 data DrgNode
   = NodeDecision !Decision
   | NodeInputData !InputData
   | NodeBkm !Bkm
+  | NodeService !DecisionService
   deriving stock (Eq, Show, Generic)
 
 data Drg = MkDrg
@@ -908,6 +933,9 @@ drgInputData drg = [i | NodeInputData i <- drg.drgNodes]
 
 drgBkms :: Drg -> [Bkm]
 drgBkms drg = [b | NodeBkm b <- drg.drgNodes]
+
+drgServices :: Drg -> [DecisionService]
+drgServices drg = [s | NodeService s <- drg.drgNodes]
 
 ------------------------------------------------------------------------
 -- Fidelity
@@ -1030,10 +1058,11 @@ cyclicGroups nodes = [ns | Graph.CyclicSCC ns <- Graph.stronglyConnComp nodes]
 -- names alone are ambiguous under §5.2\'s uniquifier, which can emit two
 -- decisions both labelled @shared@.
 checkDrg :: Drg -> [FidelityNote]
-checkDrg drg = cycleNotes <> recursiveNotes <> knowledgeReqNotes
+checkDrg drg = cycleNotes <> recursiveNotes <> serviceCycleNotes <> knowledgeReqNotes
  where
   decisions = drgDecisions drg
   bkms      = drgBkms drg
+  services  = drgServices drg
 
   -- §6.3.7: the informationRequirement graph. Only decision→decision edges can
   -- close a cycle (an inputData has no requirements), so the graph is over
@@ -1093,6 +1122,57 @@ checkDrg drg = cycleNotes <> recursiveNotes <> knowledgeReqNotes
             (Right b : _) -> b.bkmId
             []            -> ""
     ]
+
+  -- §6.3.10, the THIRD graph (§6.4.4-6): the service-level requirement graph,
+  -- whose edges are manufactured by SECTION GRANULARITY (§2.3.2 — decisions
+  -- may be acyclic while their grouping is not). "L4.Dmn.Lower"'s splitter
+  -- runs this same routine mid-lowering and splits offending sections until
+  -- acyclic, so a note here means the splitter failed — it is the emitted
+  -- artifact's own well-formedness assertion, exactly as D-CYCLE is for
+  -- decisions. Probe svc-cycle is the negative control: KIE's validator AND
+  -- build are clean on the shape, every decision SUCCEEDED-but-null, and only
+  -- the runtime message channel fires — which a design-time exporter cannot
+  -- see, hence a static check or nothing.
+  serviceCycleNotes =
+    [ MkFidelityNote
+        { code     = "D-CYCLE"
+        , severity = Blocking
+        , element  = headId ss
+        , range    = Nothing
+        , message  = cycleMessage "decisionService requirement" "decision service" (memberList ss)
+        , lost     =
+            "well-formedness: DMN 1.3 §6.3.10 requires a DecisionService's requirement \
+            \subgraph to be acyclic. KIE evaluates every member to a silent null under \
+            \status SUCCEEDED; Camunda 8 rejects the file at parse"
+        }
+    | not (null services)
+    , let serviceOfDecision =
+            [ (m, s.dsvId)
+            | s <- services
+            , m <- s.dsvOutputs <> s.dsvEncapsulated
+            ]
+    , let requiresOf = [(d.dcnId, [t | RequiredDecision t <- d.dcnRequirements]) | d <- decisions]
+    , ss <- cyclicGroups
+        [ ( s
+          , s.dsvId
+          , nubOrdText
+              [ sid
+              | m <- s.dsvOutputs <> s.dsvEncapsulated
+              , ts <- [t | (did, t) <- requiresOf, did == m]
+              , t <- ts
+              , (m', sid) <- serviceOfDecision
+              , m' == t
+              , sid /= s.dsvId
+              ]
+          )
+        | s <- services
+        ]
+    , let memberList xs = [(x.dsvName, x.dsvId) | x <- xs]
+    , let headId xs = case xs of (x : _) -> x.dsvId; [] -> ""
+    ]
+
+  nubOrdText :: [Text] -> [Text]
+  nubOrdText = Set.toList . Set.fromList
 
   -- §6.2 / §13.3 consequence 2: knowledgeRequirement COMPLETENESS is asserted,
   -- not assumed — mandatory rather than belt-and-braces, because on the

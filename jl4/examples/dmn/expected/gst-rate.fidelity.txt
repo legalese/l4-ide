@@ -23,6 +23,9 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-BKM-CONSUMERS] advisory — definitions
       1 decision(s) are emitted as businessKnowledgeModels. Both target flavors execute BKMs (KIE 8.44, Camunda 8; §13.3), but two known NON-target consumers cannot: @hbtgmbh/dmn-eval-js has no BKM support and falls through to the next rule on an unresolvable callee (a plausible wrong answer), and Camunda 7 answers null, silently
       lost: nothing on the target engines; portability to BKM-less consumers, which fail silently rather than loudly
+  [D-FLAVOR-NOSERVICE] advisory — service_gst_rate
+      the decisionService `GST_rate` (§ `GST rate`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-COMPUTEDOUTPUT] advisory — decision_gst_rate_percent  (main.l4:79:22-76)
       the output entry `no_GST_rate_exists_before_commencement_on_1994_04_01` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

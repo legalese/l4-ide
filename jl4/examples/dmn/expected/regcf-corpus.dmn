@@ -2347,6 +2347,124 @@
       </literalExpression>
     </encapsulatedLogic>
   </businessKnowledgeModel>
+  <decisionService id="service__1_issuer_eligibility_rule_100_b" name="_1_Issuer_eligibility_Rule_100_b" label="1. Issuer eligibility — Rule 100(b)">
+    <variable id="service__1_issuer_eligibility_rule_100_b_var" name="_1_Issuer_eligibility_Rule_100_b" label="1. Issuer eligibility — Rule 100(b)" typeRef="boolean"/>
+    <outputDecision href="#decision_issuer_is_eligible"/>
+    <encapsulatedDecision href="#decision_b_1_not_organized_under_state_or_territorial_law"/>
+    <encapsulatedDecision href="#decision_b_2_an_exchange_act_reporting_company"/>
+    <encapsulatedDecision href="#decision_b_3_an_investment_company"/>
+    <encapsulatedDecision href="#decision_b_4_subject_to_a_bad_actor_disqualification"/>
+    <encapsulatedDecision href="#decision_b_5_delinquent_in_ongoing_annual_reports"/>
+    <encapsulatedDecision href="#decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan"/>
+    <encapsulatedDecision href="#decision_issuer_is_excluded_by_rule_100_b"/>
+    <inputData href="#input_issuer"/>
+  </decisionService>
+  <decisionService id="service__3_investor_investment_limits_rule_100_a_2" name="_3_Investor_investment_limits_Rule_100_a_2" label="3. Investor investment limits — Rule 100(a)(2)">
+    <variable id="service__3_investor_investment_limits_rule_100_a_2_var" name="_3_Investor_investment_limits_Rule_100_a_2" label="3. Investor investment limits — Rule 100(a)(2)" typeRef="Any"/>
+    <outputDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
+    <outputDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
+    <outputDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
+    <outputDecision href="#decision_the_accredited_investor_carve_out_applies_to"/>
+    <encapsulatedDecision href="#hydration_investor"/>
+    <inputDecision href="#decision_income_or_net_worth_cut_point"/>
+    <inputDecision href="#decision_the_2021_amendments"/>
+    <inputData href="#input_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16"/>
+    <inputData href="#input_rules_effective_date"/>
+    <inputData href="#input_investor"/>
+    <inputData href="#input_amount_to_be_sold_in_this_transaction"/>
+  </decisionService>
+  <decisionService id="service__4_disclosure_requirements_rules_201_201_t_203_a" name="_4_Disclosure_requirements_Rules_201_201_t_203_a" label="4. Disclosure requirements — Rules 201, 201(t), 203(a)">
+    <variable id="service__4_disclosure_requirements_rules_201_201_t_203_a_var" name="_4_Disclosure_requirements_Rules_201_201_t_203_a" label="4. Disclosure requirements — Rules 201, 201(t), 203(a)" typeRef="boolean"/>
+    <outputDecision href="#decision_disclosure_requirements_are_met"/>
+    <encapsulatedDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
+    <encapsulatedDecision href="#decision_financial_statement_requirement_is_satisfied"/>
+    <inputDecision href="#decision_aggregate_offering_amount"/>
+    <inputDecision href="#decision_first_time_issuer_review_ceiling"/>
+    <inputDecision href="#decision_tier_1_ceiling"/>
+    <inputDecision href="#decision_tier_2_ceiling"/>
+    <inputData href="#input_rules_effective_date"/>
+    <inputData href="#input_offering"/>
+    <inputData href="#input_supplied"/>
+    <inputData href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
+    <inputData href="#input_filing"/>
+  </decisionService>
+  <decisionService id="service__5_intermediary_obligations_rules_100_a_3_301_302_303" name="_5_Intermediary_obligations_Rules_100_a_3_301_302_303" label="5. Intermediary obligations — Rules 100(a)(3), 301, 302, 303">
+    <variable id="service__5_intermediary_obligations_rules_100_a_3_301_302_303_var" name="_5_Intermediary_obligations_Rules_100_a_3_301_302_303" label="5. Intermediary obligations — Rules 100(a)(3), 301, 302, 303" typeRef="boolean"/>
+    <outputDecision href="#decision_intermediary_obligations_are_met"/>
+    <encapsulatedDecision href="#decision_a_3_conducted_through_a_single_complying_intermediary"/>
+    <encapsulatedDecision href="#decision_the_21_day_public_availability_period_has_run"/>
+    <encapsulatedDecision href="#decision_the_intermediary_has_discharged_its_investor_facing_duties"/>
+    <inputDecision href="#decision_minimum_days_publicly_available_before_any_sale"/>
+    <inputData href="#input_arrangement"/>
+  </decisionService>
+  <decisionService id="service__8_resale_restrictions_rule_501" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501">
+    <variable id="service__8_resale_restrictions_rule_501_var" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501" typeRef="boolean"/>
+    <outputDecision href="#decision_transfer_is_permitted"/>
+    <encapsulatedDecision href="#decision_transfer_is_within_the_one_year_restricted_period"/>
+    <encapsulatedDecision href="#decision_transfer_falls_within_an_exception_in_rule_501_a"/>
+    <inputDecision href="#decision_days_in_the_resale_restricted_period"/>
+    <inputData href="#input_transfer"/>
+  </decisionService>
+  <decisionService id="service_top_level_the_whole_exemption" name="Top_level_the_whole_exemption" label="Top level — the whole exemption">
+    <variable id="service_top_level_the_whole_exemption_var" name="Top_level_the_whole_exemption" label="Top level — the whole exemption" typeRef="Any"/>
+    <outputDecision href="#decision_the_base_case_qualifies"/>
+    <outputDecision href="#decision_the_delinquent_issuer_case_qualifies"/>
+    <outputDecision href="#decision_the_over_limit_investor_case_qualifies"/>
+    <outputDecision href="#decision_the_short_availability_case_qualifies"/>
+    <outputDecision href="#decision_the_under_assured_financials_case_qualifies"/>
+    <encapsulatedDecision href="#decision_a_conforming_filing"/>
+    <inputDecision href="#decision_reviewed"/>
+    <inputDecision href="#decision_a_clean_issuer"/>
+    <inputDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
+    <inputDecision href="#decision_aggregate_offering_amount"/>
+    <inputDecision href="#decision_disclosure_requirements_are_met"/>
+    <inputDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
+    <inputDecision href="#decision_intermediary_obligations_are_met"/>
+    <inputDecision href="#decision_issuer_is_eligible"/>
+    <inputDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
+    <inputDecision href="#decision_minimum_permitted_investment"/>
+    <inputDecision href="#decision_offering_maximum_in_a_12_month_period"/>
+    <inputDecision href="#decision_the_accredited_investor_carve_out_applies_to"/>
+    <inputDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
+    <inputDecision href="#decision_a_delinquent_issuer"/>
+  </decisionService>
+  <decisionService id="service_the_rule_version_axis_the_same_question_under_four_regimes" name="The_rule_version_axis_the_same_question_under_four_regimes" label="The rule-version axis — the same question under four regimes">
+    <variable id="service_the_rule_version_axis_the_same_question_under_four_regimes_var" name="The_rule_version_axis_the_same_question_under_four_regimes" label="The rule-version axis — the same question under four regimes" typeRef="Any"/>
+    <outputDecision href="#decision_w_within_the_limit_in_2016"/>
+    <outputDecision href="#decision_w_within_the_limit_in_2021_january"/>
+    <outputDecision href="#decision_w_within_the_limit_in_2021_june"/>
+    <outputDecision href="#decision_the_cut_point_the_day_before_the_2017_adjustment"/>
+    <outputDecision href="#decision_the_cut_point_on_the_day_of_the_2017_adjustment"/>
+    <outputDecision href="#decision_i_3_limit_under_the_2022_rules"/>
+    <outputDecision href="#decision_i_3_limit_under_the_2023_rules"/>
+    <outputDecision href="#decision_i_4_limit_under_the_2022_rules"/>
+    <outputDecision href="#decision_the_percentage_case_under_the_2019_rules"/>
+    <outputDecision href="#decision_a_is_within_the_limit_under_the_2021_rules"/>
+    <outputDecision href="#decision_a_is_within_the_limit_under_the_2019_rules"/>
+    <outputDecision href="#decision_f_requirement_under_the_2019_rules"/>
+    <outputDecision href="#decision_f_requirement_under_the_2023_rules"/>
+    <outputDecision href="#decision_a_small_offering_inside_the_covid_window"/>
+    <outputDecision href="#decision_a_large_offering_inside_the_covid_window"/>
+    <encapsulatedDecision href="#decision_w_offering"/>
+    <encapsulatedDecision href="#decision_i_3_investor"/>
+    <encapsulatedDecision href="#decision_i_4_investor"/>
+    <encapsulatedDecision href="#decision_a_investor"/>
+    <encapsulatedDecision href="#decision_f_offering"/>
+    <inputDecision href="#decision_aggregate_offering_amount"/>
+    <inputDecision href="#decision_offering_maximum_in_a_12_month_period"/>
+    <inputDecision href="#decision_income_or_net_worth_cut_point"/>
+    <inputDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
+    <inputDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
+    <inputDecision href="#decision_minimum_permitted_investment"/>
+    <inputDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
+    <inputDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
+    <inputDecision href="#decision_the_accredited_investor_carve_out_applies_to"/>
+    <inputDecision href="#decision_first_time_issuer_review_ceiling"/>
+    <inputDecision href="#decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window"/>
+    <inputDecision href="#decision_tier_1_ceiling"/>
+    <inputDecision href="#decision_tier_2_ceiling"/>
+    <inputData href="#input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_sec_regulation_crowdfunding_17_cfr_part_227_diagram" name="SEC Regulation Crowdfunding — 17 CFR Part 227">
       <dmndi:DMNShape id="input_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16_shape" dmnElementRef="input_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16">
@@ -2669,6 +2787,27 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="bkm_an_arrangement_with_shape" dmnElementRef="bkm_an_arrangement_with">
         <dc:Bounds x="2040" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service__1_issuer_eligibility_rule_100_b_shape" dmnElementRef="service__1_issuer_eligibility_rule_100_b">
+        <dc:Bounds x="40" y="360" width="5280" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service__3_investor_investment_limits_rule_100_a_2_shape" dmnElementRef="service__3_investor_investment_limits_rule_100_a_2">
+        <dc:Bounds x="260" y="520" width="9900" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service__4_disclosure_requirements_rules_201_201_t_203_a_shape" dmnElementRef="service__4_disclosure_requirements_rules_201_201_t_203_a">
+        <dc:Bounds x="260" y="360" width="5720" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service__5_intermediary_obligations_rules_100_a_3_301_302_303_shape" dmnElementRef="service__5_intermediary_obligations_rules_100_a_3_301_302_303">
+        <dc:Bounds x="480" y="360" width="5940" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service__8_resale_restrictions_rule_501_shape" dmnElementRef="service__8_resale_restrictions_rule_501">
+        <dc:Bounds x="920" y="360" width="6820" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_top_level_the_whole_exemption_shape" dmnElementRef="service_top_level_the_whole_exemption">
+        <dc:Bounds x="260" y="200" width="1980" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_the_rule_version_axis_the_same_question_under_four_regimes_shape" dmnElementRef="service_the_rule_version_axis_the_same_question_under_four_regimes">
+        <dc:Bounds x="1140" y="360" width="8800" height="440"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_offering_maximum_in_a_12_month_period_ir1_edge" dmnElementRef="decision_offering_maximum_in_a_12_month_period_ir1">
         <di:waypoint x="150" y="860"/>
@@ -3565,6 +3704,190 @@
       <dmndi:DMNEdge id="hydration_investor_ir1_edge" dmnElementRef="hydration_investor_ir1">
         <di:waypoint x="810" y="860"/>
         <di:waypoint x="10050" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_accredited_investor_carve_out_applies_to_kr1_edge" dmnElementRef="decision_the_accredited_investor_carve_out_applies_to_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="810" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_kr1_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_kr1">
+        <di:waypoint x="1250" y="140"/>
+        <di:waypoint x="1030" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_kr2_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_kr2">
+        <di:waypoint x="1030" y="140"/>
+        <di:waypoint x="1030" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr1_edge" dmnElementRef="decision_the_base_case_qualifies_kr1">
+        <di:waypoint x="2130" y="140"/>
+        <di:waypoint x="370" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr2_edge" dmnElementRef="decision_the_base_case_qualifies_kr2">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="370" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr3_edge" dmnElementRef="decision_the_base_case_qualifies_kr3">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="370" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr4_edge" dmnElementRef="decision_the_base_case_qualifies_kr4">
+        <di:waypoint x="1470" y="140"/>
+        <di:waypoint x="370" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr1_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr1">
+        <di:waypoint x="2130" y="140"/>
+        <di:waypoint x="590" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr2_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr2">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="590" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr3_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr3">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="590" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr4_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr4">
+        <di:waypoint x="1470" y="140"/>
+        <di:waypoint x="590" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr1_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr1">
+        <di:waypoint x="2130" y="140"/>
+        <di:waypoint x="810" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr2_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr2">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="810" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr3_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr3">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="810" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr4_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr4">
+        <di:waypoint x="1470" y="140"/>
+        <di:waypoint x="810" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr1_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr1">
+        <di:waypoint x="2130" y="140"/>
+        <di:waypoint x="1030" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr2_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr2">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="1030" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr3_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr3">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="1030" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr4_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr4">
+        <di:waypoint x="1470" y="140"/>
+        <di:waypoint x="1030" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr1_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr1">
+        <di:waypoint x="2130" y="140"/>
+        <di:waypoint x="1250" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr2_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr2">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="1250" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr3_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr3">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="1250" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr4_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr4">
+        <di:waypoint x="1470" y="140"/>
+        <di:waypoint x="1250" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_w_offering_kr1_edge" dmnElementRef="decision_w_offering_kr1">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="8950" y="700"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2016_kr1_edge" dmnElementRef="decision_w_within_the_limit_in_2016_kr1">
+        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="2350" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_january_kr1_edge" dmnElementRef="decision_w_within_the_limit_in_2021_january_kr1">
+        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="2570" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_w_within_the_limit_in_2021_june_kr1_edge" dmnElementRef="decision_w_within_the_limit_in_2021_june_kr1">
+        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="2790" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_3_investor_kr1_edge" dmnElementRef="decision_i_3_investor_kr1">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="9170" y="700"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_kr1_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_kr1">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="1250" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_3_limit_under_the_2023_rules_kr1_edge" dmnElementRef="decision_i_3_limit_under_the_2023_rules_kr1">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="1470" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_4_investor_kr1_edge" dmnElementRef="decision_i_4_investor_kr1">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="9390" y="700"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_kr1_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_kr1">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="1690" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_kr1_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_kr1">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="1910" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_kr2_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_kr2">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="1910" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_investor_kr1_edge" dmnElementRef="decision_a_investor_kr1">
+        <di:waypoint x="1910" y="140"/>
+        <di:waypoint x="9610" y="700"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_kr1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_kr1">
+        <di:waypoint x="810" y="140"/>
+        <di:waypoint x="2130" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2019_rules_kr1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2019_rules_kr1">
+        <di:waypoint x="810" y="140"/>
+        <di:waypoint x="2350" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_f_offering_kr1_edge" dmnElementRef="decision_f_offering_kr1">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="9830" y="700"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_kr1_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_kr1">
+        <di:waypoint x="1030" y="140"/>
+        <di:waypoint x="3450" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_f_requirement_under_the_2023_rules_kr1_edge" dmnElementRef="decision_f_requirement_under_the_2023_rules_kr1">
+        <di:waypoint x="1030" y="140"/>
+        <di:waypoint x="3670" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_kr1_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_kr1">
+        <di:waypoint x="1690" y="140"/>
+        <di:waypoint x="3890" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_kr2_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_kr2">
+        <di:waypoint x="1030" y="140"/>
+        <di:waypoint x="3890" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_kr1_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_kr1">
+        <di:waypoint x="1030" y="140"/>
+        <di:waypoint x="4110" y="540"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="bkm_investor_is_within_the_investment_limit_kr1_edge" dmnElementRef="bkm_investor_is_within_the_investment_limit_kr1">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="810" y="60"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="bkm_the_transaction_qualifies_for_the_section_4_a_6_exemption_kr1_edge" dmnElementRef="bkm_the_transaction_qualifies_for_the_section_4_a_6_exemption_kr1">
+        <di:waypoint x="810" y="140"/>
+        <di:waypoint x="1470" y="60"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="bkm_the_transaction_qualifies_for_the_section_4_a_6_exemption_kr2_edge" dmnElementRef="bkm_the_transaction_qualifies_for_the_section_4_a_6_exemption_kr2">
+        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="1470" y="60"/>
       </dmndi:DMNEdge>
     </dmndi:DMNDiagram>
   </dmndi:DMNDI>

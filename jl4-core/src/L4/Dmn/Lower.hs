@@ -198,6 +198,16 @@ data NameEnv = MkNameEnv
     -- a COMPUTED-field read through one takes the inline arm
     -- ('neComputedInline') rather than the hydrator fold — a parameter is
     -- per-call, so no global hydrator can stand for it.
+  , neServiceCalls :: !(Map Unique SvcCallInfo)
+    -- ^ @kie@ flavor ONLY (§13.5 — the one flavor bit): decides whose
+    -- saturated call sites render as an invocation of their section's
+    -- @decisionService@, `svc(p: e, …)` with the service's inputData names as
+    -- the parameter names (§2.3.1: named binding at every service call site).
+    -- Populated for the narrow measured shape — a safety-refused parameterised
+    -- decide that is the sole output of its (post-split) service, whose
+    -- service inputs are exactly its own GIVEN params — and EMPTY on the
+    -- default flavor, where the knowledgeRequirement→service edge this render
+    -- requires is fatal to Camunda's parse() (§13.4, probe D2).
   , neRecordCtors :: !(Map Unique [Unique])
     -- ^ RECORD constructors only (never an enum's payload constructor — those
     -- carry a tag FEEL cannot spell and stay refused under @D-SUMTYPE@), each
@@ -224,6 +234,14 @@ data NameEnv = MkNameEnv
 -- is what must be passed.
 data ClosureRef = EnvDirect !Unique | EnvHydrator !Unique
   deriving stock (Eq, Ord, Show)
+
+-- | What a call site needs to know about an invocable @§@ (@kie@ flavor only).
+data SvcCallInfo = MkSvcCallInfo
+  { sciFeelName :: !Text
+  , sciParams   :: ![Text]
+    -- ^ the service's inputData FEEL names, positional in the callee's GIVEN
+    -- order — the names the named-argument invocation binds.
+  }
 
 -- | What a call site needs to know about an emitted BKM (§6.2).
 data BkmCallInfo = MkBkmCallInfo
@@ -265,6 +283,7 @@ emptyNameEnv = MkNameEnv
   , neComputedFields = Set.empty
   , neBkms       = Map.empty
   , neBkmParams  = Set.empty
+  , neServiceCalls = Map.empty
   , neRecordCtors = Map.empty
   , neComputedInline = Map.empty
   }
@@ -1857,6 +1876,23 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                         <> ")"
                     , FullFeel
                     )
+    -- §13.5's one flavor bit, the call-site half: on `kie`, a saturated call
+    -- to a §-invocable decide renders as a named-argument invocation of the
+    -- SERVICE, binding the service's inputData names (§2.3.1). Empty map on
+    -- the default flavor, where the edge this needs kills Camunda's parse().
+    App _ f es@(_ : _)
+      | Just sci <- Map.lookup (getUnique f) names.neServiceCalls
+      , length es == length sci.sciParams ->
+          let parts = map go es
+          in if any (\(_, _, fr) -> fr == L4Verbatim) parts
+               then verbatim e
+               else ( atomPrec
+                    , sci.sciFeelName <> "("
+                        <> Text.intercalate ", "
+                             (zipWith (\p (_, t, _) -> p <> ": " <> t) sci.sciParams parts)
+                        <> ")"
+                    , FullFeel
+                    )
     App _ _ (_ : _) -> verbatim e
     -- R8-d′. A CONSIDER over a MAYBE is an ABSENCE TEST, and FEEL spells one
     -- with a comparison against null. Two arms, in either source order, one
@@ -2965,6 +3001,7 @@ lowerModule opts modul@(MkModule _ uri _) =
                        <> ruleDateNotes <> computedFieldNotes <> hydratorVerbatimNotes
                        <> concatMap snd lowered
                        <> phase4Notes
+                       <> serviceNotes
     }
  where
   modelId = sanitiseId opts.dloModelName
@@ -2981,16 +3018,21 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- edges into informationRequirements and knowledgeRequirements and adds the
   -- requirement edges the rendered closure arguments need.
   nodes =
+    finishedDecisionNodes
+      <> [ NodeBkm (toBkm d dec)
+         | (d, (dec, _)) <- zip decides lowered
+         , isBkmDecide d
+         ]
+      <> serviceNodes
+
+  finishedDecisionNodes :: [DrgNode]
+  finishedDecisionNodes =
     map NodeInputData inputNodes
       <> [ NodeDecision (finishCaller dec)
          | (d, (dec, _)) <- zip decides lowered
          , not (isBkmDecide d)
          ]
       <> map (NodeDecision . finishCaller) hydratorNodes
-      <> [ NodeBkm (toBkm d dec)
-         | (d, (dec, _)) <- zip decides lowered
-         , isBkmDecide d
-         ]
 
   -- The emitted BKM ids, and the way back from an edge target to the BKM.
   bkmIdSet :: Set Text
@@ -3016,13 +3058,31 @@ lowerModule opts modul@(MkModule _ uri _) =
   finishCaller :: Decision -> Decision
   finishCaller dec =
     dec
-      { dcnRequirements  = sort (nubOrd (infoEdges <> closureExtras))
-      , dcnKnowledgeReqs = sort (nubOrd [RequiredBkm t | RequiredDecision t <- bkmEdges])
+      { dcnRequirements  = sort (nubOrd (plainEdges <> closureExtras))
+      , dcnKnowledgeReqs =
+          sort
+            (nubOrd
+               ( [RequiredBkm t | RequiredDecision t <- bkmEdges]
+                   -- kie only (the map is empty otherwise): the caller's info
+                   -- edge on a §-invocable callee becomes the
+                   -- knowledgeRequirement→SERVICE edge the invocation needs —
+                   -- REPLACES, not accompanies: an informationRequirement
+                   -- would make the safety-refused callee a hard dependency
+                   -- of this caller on KIE.
+                   <> [ RequiredService sid
+                      | RequiredDecision t <- svcEdges
+                      , Just sid <- [Map.lookup t svcEdgeByDecisionId]
+                      ]
+               ))
       }
    where
     (bkmEdges, infoEdges) = partition isBkmEdge dec.dcnRequirements
+    (svcEdges, plainEdges) = partition isSvcEdge infoEdges
     isBkmEdge = \case
       RequiredDecision t -> Set.member t bkmIdSet
+      RequiredInput _    -> False
+    isSvcEdge = \case
+      RequiredDecision t -> Map.member t svcEdgeByDecisionId
       RequiredInput _    -> False
     closureExtras =
       [ edge
@@ -3837,6 +3897,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- A BKM's variable, its formalParameters and its logic all carry typeRefs
     -- (§6.2), and each is a reference like any other.
     NodeBkm b -> b.bkmType : map (.fpType) b.bkmParams <> logicTypeRefs b.bkmLogic
+    NodeService s -> [s.dsvType]
    where
     logicTypeRefs = \case
       LogicTable t    -> map (.icType) t.dtInputs
@@ -4274,6 +4335,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         Set.fromList (map (getUnique . decideResolved) computedSelectorDecides)
     , neBkms       = bkmCallInfos
     , neBkmParams  = bkmParamSet
+    , neServiceCalls = svcCallInfos
     , neRecordCtors = recordCtorFields
     , neComputedInline = selfContainedSelectors
     }
@@ -4438,6 +4500,331 @@ lowerModule opts modul@(MkModule _ uri _) =
           }
       )
     | (u, (givens, closures)) <- Map.toList bkmSignatures
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 5: one decisionService per § (§2.3), the splitter (§2.3.2), and
+  -- the flavor bit (§13.5)
+  ------------------------------------------------------------------------
+
+  -- Every NAMED section with its kept, non-BKM member decides — each decide
+  -- assigned to its INNERMOST named §. 'topDecls' flattens the tree, so this
+  -- walks the module itself; the walk is the only consumer of the nesting.
+  sectionTable :: [(Text, [Unique])]
+  sectionTable =
+    [ (nm, [u | (c, u) <- assigns, c == i])
+    | (i, nm) <- secs
+    ]
+   where
+    MkModule _ _ topSec = modul
+    (assigns, secs, _) = goSec Nothing (0 :: Int) topSec
+    goSec cur idx (MkSection _ mName _ ds) =
+      let (cur', idx', secs0) = case mName of
+            Just n  -> (Just idx, idx + 1, [(idx, nameOf n)])
+            Nothing -> (cur, idx, [])
+          step (as, ss, i) dcl = case dcl of
+            Section _ sub ->
+              let (as2, ss2, i2) = goSec cur' i sub
+              in (as <> as2, ss <> ss2, i2)
+            Decide _ dd ->
+              let u = getUnique (decideResolved dd)
+              in ( as
+                     <> [ (c, u)
+                        | Just c <- [cur']
+                        , Map.member u decideByUnique
+                        , not (Set.member u bkmCandidateSet)
+                        ]
+                 , ss
+                 , i
+                 )
+            _ -> (as, ss, i)
+      in foldl' step ([], secs0, idx') ds
+
+  -- The SYNTACTIC decision→decision reference approximation the service
+  -- structure is computed over. Deliberately NOT the emitted edges: the
+  -- emitted `dcnRequirements` force each decision's rendered logic (strict
+  -- fields), and the render reads 'neServiceCalls', which needs the service
+  -- structure — a strict knot. Raw 'freeRefs' is a SUPERSET of the emitted
+  -- edges (dated chains and hydration only remove or redirect), and a
+  -- superset is safe here: an extra edge can cause an extra split (Advisory)
+  -- but never hide a cycle, and 'checkDrg''s §6.3.10 pass asserts the final
+  -- artifact regardless.
+  decideReqUniques :: Map Unique (Set Unique)
+  decideReqUniques = Map.fromList
+    [ ( u
+      , Set.fromList
+          [ ru
+          | r <- freeRefs d
+          , let ru = getUnique r
+          , ru /= u
+          , Map.member ru decideByUnique
+          , not (Set.member ru bkmCandidateSet)
+          ]
+      )
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    ]
+
+  -- The §2.3.2 splitter, run to FIXPOINT over 'cyclicGroups' — the same
+  -- routine as every other acyclicity question (§6.4.4). A section whose
+  -- grouping closes a service-level cycle is split into per-decision
+  -- services; a SINGLETON that still cycles holds a genuine decision-level
+  -- cycle (already D-CYCLE) and is DROPPED rather than re-split, which is
+  -- what makes the iteration terminate on any input.
+  -- Each struct: (original § name if this is a split fragment, service name,
+  -- members).
+  finalServiceStructs :: [(Maybe Text, Text, [Unique])]
+  svcSplitEvents      :: [(Text, [Text])]   -- (§ name, fragment names)
+  svcDroppedCycles    :: [Text]             -- service names dropped as genuine cycles
+  (finalServiceStructs, svcSplitEvents, svcDroppedCycles) =
+    goSplit [(Nothing, nm, us) | (nm, us) <- sectionTable, not (null us)] [] []
+   where
+    goSplit svcs splits dropped =
+      let keyed = zip [0 :: Int ..] svcs
+          memberSvc = Map.fromList [(u, i) | (i, (_, _, us)) <- keyed, u <- us]
+          edgesOf i us = nubOrd
+            [ j
+            | u <- us
+            , t <- Set.toList (Map.findWithDefault Set.empty u decideReqUniques)
+            , Just j <- [Map.lookup t memberSvc]
+            , j /= i
+            ]
+          cycSet = Set.fromList
+            (concat (cyclicGroups [(i, i, edgesOf i us) | (i, (_, _, us)) <- keyed]))
+      in if Set.null cycSet
+           then (svcs, splits, dropped)
+           else
+             let splitOne (i, s@(orig, nm, us))
+                   | not (Set.member i cycSet) = ([s], [], [])
+                   | [_] <- us = ([], [], [nm])
+                   | otherwise =
+                       let frags =
+                             [ ( Just (fromMaybe nm orig)
+                               , nm <> " — " <> decideNameByUnique u
+                               , [u]
+                               )
+                             | u <- us
+                             ]
+                       in (frags, [(fromMaybe nm orig, [n | (_, n, _) <- frags])], [])
+                 parts = map splitOne keyed
+             in goSplit
+                  (concatMap (\(a, _, _) -> a) parts)
+                  (splits <> concatMap (\(_, b, _) -> b) parts)
+                  (dropped <> concatMap (\(_, _, c) -> c) parts)
+
+  decideNameByUnique :: Unique -> Text
+  decideNameByUnique u =
+    Map.findWithDefault "" u
+      (Map.fromList [(getUnique (decideResolved d), decideName d) | d <- decides])
+
+  -- §5.2 SCOPE 3: decisionService names are their OWN uniquifyIn scope —
+  -- measured, not assumed (E6: two same-named services both resolve to the
+  -- FIRST, silently; E5: a service sharing a DECISION's name is
+  -- validator-only with zero runtime effect, so services do not uniquify
+  -- against decisions).
+  svcFeelNames = uniquifyIn (map (\(_, nm, _) -> feelIdentText nm) finalServiceStructs)
+  svcIds       = assignIds "service_" (map (\(_, nm, _) -> nm) finalServiceStructs)
+
+  -- §13.5 row 6: which decides are §-INVOCABLE — the narrow measured shape.
+  -- A kept, parameterised, NOT-un-lifted, NOT-BKM decide (the safety-refused
+  -- verbatim population) that is the SOLE output of its service, whose
+  -- service has encapsulated members, no cross-service decision inputs, and
+  -- whose service inputData are EXACTLY the decide's own GIVEN params. Under
+  -- those conditions `svc(p: e, …)` computes the decide with its inputs bound
+  -- per call, which is what the L4 call means.
+  svcInvocable :: Map Unique Int
+  svcInvocable = Map.fromList
+    [ (uf, i)
+    | (i, (_, _, us)) <- zip [0 :: Int ..] finalServiceStructs
+    , let memberSet = Set.fromList us
+    , let requiredByMembers =
+            Set.unions [Map.findWithDefault Set.empty m decideReqUniques | m <- us]
+    , let outputs = [m | m <- us, not (Set.member m requiredByMembers)]
+    , [uf] <- [outputs]
+    , length us > 1   -- §6.3.10: encapsulated members must exist
+    , Just d <- [listToMaybe [d' | d' <- decides, getUnique (decideResolved d') == uf]]
+    , let ps = A.decideParams d
+    , not (null ps)
+    , not (Set.member uf unliftedSet)
+    , not (Set.member uf bkmCandidateSet)
+    -- every decision reference of every member stays inside the service
+    , Set.isSubsetOf requiredByMembers memberSet
+    -- the members' input references are exactly the callee's params
+    , let inputRefs = Set.fromList
+            [ canonUnique ru
+            | m <- us
+            , d' <- decides
+            , getUnique (decideResolved d') == m
+            , r <- freeRefs d'
+            , let ru = getUnique r
+            , Map.member ru inputByUnique
+            ]
+    , inputRefs == Set.fromList (map (getUnique . fst) ps)
+    ]
+
+  -- The invocation map the renderer reads — populated on `kie` ONLY.
+  svcCallInfos :: Map Unique SvcCallInfo
+  svcCallInfos
+    | opts.dloFlavor /= FlavorKie = Map.empty
+    | otherwise = Map.fromList
+        [ ( uf
+          , MkSvcCallInfo
+              { sciFeelName = svcFeelNames !! i
+              , sciParams =
+                  [ Map.findWithDefault "" (getUnique p) baseVarNames
+                  | Just d <- [listToMaybe [d' | d' <- decides, getUnique (decideResolved d') == uf]]
+                  , (p, _) <- A.decideParams d
+                  ]
+              }
+          )
+        | (uf, i) <- Map.toList svcInvocable
+        ]
+
+  -- decision id → service id, for 'finishCaller' (kie only): the caller's
+  -- info edge onto the callee decision is REPLACED by the knowledgeRequirement
+  -- onto the service — an info requirement would make the (uncompilable,
+  -- safety-refused) callee a hard dependency of the caller on KIE.
+  svcEdgeByDecisionId :: Map Text Text
+  svcEdgeByDecisionId
+    | opts.dloFlavor /= FlavorKie = Map.empty
+    | otherwise = Map.fromList
+        [ (did, svcIds !! i)
+        | (uf, i) <- Map.toList svcInvocable
+        , Just did <- [Map.lookup uf decideByUnique]
+        ]
+
+  -- The final service NODES, assembled from the FINISHED decisions so the
+  -- emitted member lists agree with the emitted edges (lazy — nothing on the
+  -- render path reads these).
+  serviceNodes :: [DrgNode]
+  serviceNodes =
+    [ NodeService MkDecisionService
+        { dsvId             = sid
+        , dsvName           = nm
+        , dsvFeelName       = feel
+        , dsvType           = case outputs of
+            [o] -> maybe DmnAny (.dcnType) (Map.lookup o finishedById)
+            _   -> DmnAny
+        , dsvOutputs        = outputs
+        , dsvEncapsulated   = encapsulated
+        , dsvInputDecisions = inputDecisions
+        , dsvInputData      = inputDataIds
+        }
+    | ((_, nm, us), feel, sid) <- zip3 finalServiceStructs svcFeelNames svcIds
+    , let declaredIds = [did | u <- us, Just did <- [Map.lookup u decideByUnique]]
+    , let declaredSet = Set.fromList declaredIds
+    -- A HYDRATOR whose readers all live in this § joins the service as an
+    -- encapsulated member — it is scaffolding of those readers, and leaving
+    -- it outside makes it an inputDecision that KIE's evaluateDecisionService
+    -- then wants precomputed in the invocation context, warning
+    -- "Required input '<hydrator>' not found ... invoking using null"
+    -- (measured on the bkm exhibit). Cross-§ readers leave it outside.
+    , let absorbedHydrators =
+            [ hid
+            | NodeDecision h <- finishedDecisionNodes
+            , let hid = h.dcnId
+            , Text.isPrefixOf "hydration_" hid
+            , let readers =
+                    [ dec.dcnId
+                    | NodeDecision dec <- finishedDecisionNodes
+                    , RequiredDecision hid `elem` dec.dcnRequirements
+                    ]
+            , not (null readers)
+            , all (`Set.member` declaredSet) readers
+            ]
+    , let memberIds = declaredIds <> absorbedHydrators
+    , let memberSet = Set.fromList memberIds
+    , let memberDecs = [dec | m <- memberIds, Just dec <- [Map.lookup m finishedById]]
+    , let requiredByMembers = Set.fromList
+            [t | dec <- memberDecs, RequiredDecision t <- dec.dcnRequirements]
+    , let outputs      = [m | m <- memberIds, not (Set.member m requiredByMembers)]
+    , let encapsulated = [m | m <- memberIds, Set.member m requiredByMembers]
+    , let inputDecisions = nubOrd
+            [ t
+            | dec <- memberDecs
+            , RequiredDecision t <- dec.dcnRequirements
+            , not (Set.member t memberSet)
+            ]
+    , let inputDataIds = nubOrd
+            [t | dec <- memberDecs, RequiredInput t <- dec.dcnRequirements]
+    -- probe D5: a service with no outputDecision is a KIE runtime throw and a
+    -- Camunda silence; §6.3.10: at least one of encapsulated/inputDecisions
+    -- SHALL be present. A § that cannot satisfy both emits no service.
+    , not (null outputs)
+    , not (null encapsulated && null inputDecisions)
+    ]
+
+  finishedById :: Map Text Decision
+  finishedById = Map.fromList
+    [(dec.dcnId, dec) | NodeDecision dec <- finishedDecisionNodes]
+
+  -- D-SVCSPLIT (Advisory): the artifact departs from the source's sectioning
+  -- (§2.3.2 — the split is OUR granularity repair, semantics-preserving,
+  -- which is exactly why it is performed rather than reported-and-refused;
+  -- contrast §6.4.4-4 on decision-level cycles). D-FLAVOR-NOSERVICE: §13.5's
+  -- two ruled arms.
+  serviceNotes :: [FidelityNote]
+  serviceNotes =
+    [ dmnNote "D-SVCSPLIT" Advisory (feelIdentText orig) Nothing
+        ("the section `" <> orig <> "` would close a service-level requirement cycle \
+          \(DMN 1.3 §6.3.10) as one decisionService, so it is emitted as "
+           <> tshow (length frags) <> " finer service(s): "
+           <> Text.intercalate ", " (map tick frags)
+           <> ". Section granularity can manufacture a cycle decisions do not have; \
+              \splitting until acyclic preserves every decision and every edge")
+        "the source's own sectioning: the artifact's service boundaries are finer than \
+        \the module's § boundaries"
+    | (orig, frags) <- svcSplitEvents
+    ]
+      <> [ dmnNote "D-SVCSPLIT" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` holds a genuine decision-level requirement \
+               \cycle, which no service granularity can repair, so NO decisionService is \
+               \emitted for it (its members and their D-CYCLE note are unaffected)")
+             "the § as an invocable or grouping unit"
+         | nm <- svcDroppedCycles
+         ]
+      <> [ dmnNote "D-FLAVOR-NOSERVICE" Blocking callerId Nothing
+             ("`" <> callerName <> "` applies `" <> decideNameByUnique uf
+                <> "`, which is §-invocable — on the `kie` flavor this call renders as \
+                   \a FEEL invocation of the decisionService `" <> (svcFeelNames !! i)
+                <> "` — but the `camunda` flavor never emits the \
+                   \knowledgeRequirement→decisionService edge that invocation needs \
+                   \(it is fatal to Camunda 8's parse(), §13.4), so the call site stays \
+                   \raw L4")
+             "the invocation on this flavor: route the callee to a BKM (make it \
+             \DMN-SAFE) or evaluate on the kie flavor"
+         | opts.dloFlavor == FlavorCamunda
+         , (uf, i) <- Map.toList svcInvocable
+         , (callerId, callerName) <- qualifyingCallers uf
+         ]
+      <> [ dmnNote "D-FLAVOR-NOSERVICE" Advisory sid Nothing
+             ("the decisionService `" <> feel <> "` (§ `" <> nm <> "`) is emitted as \
+               \GROUPING only: no call site invokes it"
+                <> (if opts.dloFlavor == FlavorKie
+                      then ""
+                      else ", and on this flavor none could — the `camunda` flavor \
+                           \never emits the knowledgeRequirement→decisionService edge \
+                           \an invocation needs (§13.4/§13.5)"))
+             "nothing: an uninvoked grouping service is inert on both engines (probe D1)"
+         | ((_, nm, _), feel, sid, i) <-
+             zip4 finalServiceStructs svcFeelNames svcIds [0 :: Int ..]
+         , i `notElem`
+             [ j | (uf, j) <- Map.toList svcInvocable, not (null (qualifyingCallers uf)) ]
+         ]
+
+  -- The call sites that MEET the §-invocation condition, per callee: applied,
+  -- arity-matching, from an emitted caller. Flavor-independent — on kie they
+  -- render, on camunda they draw the Blocking arm.
+  qualifyingCallers :: Unique -> [(Text, Text)]
+  qualifyingCallers uf = nubOrd
+    [ (callerId, decideNameByUnique c)
+    | Just d <- [listToMaybe [d' | d' <- decides, getUnique (decideResolved d') == uf]]
+    , let arity = length (A.decideParams d)
+    , s <- Map.findWithDefault [] uf callGraph.cgCalls
+    , s.csApplied
+    , length s.csArgs == arity
+    , Just c <- [s.csCaller]
+    , Just callerId <- [Map.lookup c decideByUnique]
     ]
 
   -- §4.4 × §6.2: computed selectors whose bodies reference nothing beyond the

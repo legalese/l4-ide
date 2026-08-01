@@ -2073,17 +2073,41 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       (dmnReport (drgFlavored FlavorKie "T" spacedNames)).target
         `shouldBe` "DMN 1.3 (XML), kie flavor"
 
-    it "EXPECTED TO FAIL AT PHASE 5: the two flavors are still byte-identical" $ do
-      -- The one thing the flavors differ on is whether a <decisionService> may
-      -- be the target of a <knowledgeRequirement> (§13.4), and neither
-      -- decision services nor BKMs are emitted yet. So today the bit has no
-      -- observable effect -- which is exactly the trap this test exists to
-      -- spring. When Phase 5 lands, THIS TEST MUST FAIL, and the fix is to
-      -- split the goldens (reg-cf.kie.dmn beside reg-cf.dmn), not to delete it.
+    it "the flavors DIVERGE on exactly the §-invocation, and nowhere else" $ do
+      -- This test used to be the Phase 5 tripwire ("EXPECTED TO FAIL AT
+      -- PHASE 5: the two flavors are still byte-identical"), and it fired on
+      -- 2026-08-01. Flipped as its own comment instructed: split the goldens
+      -- (svc.kie.dmn beside svc.dmn), keep the test, and assert the seam in
+      -- BOTH directions.
+      --
+      -- Direction 1 — the POSITIVE divergence, on the one subject that
+      -- genuinely diverges (the §-invocation exhibit): the kie bytes carry a
+      -- requiredKnowledge pointing at a decisionService and the rendered
+      -- invocation; the camunda bytes carry neither, because that edge is
+      -- fatal to Camunda 8's parse() (§13.4).
+      svcSrc <- Text.readFile (examplesRoot </> "dmn" </> "svc.l4")
+      let kie     = emitDrg (drgFlavored FlavorKie "S" svcSrc)
+          camunda = emitDrg (drgFlavored FlavorCamunda "S" svcSrc)
+      kie `shouldSatisfy`
+        Text.isInfixOf "<requiredKnowledge href=\"#service_special_assessment\"/>"
+      kie `shouldSatisfy` Text.isInfixOf "special_assessment(p: 150, q: 5)"
+      camunda `shouldNotSatisfy` Text.isInfixOf "requiredKnowledge href=\"#service_"
+      camunda `shouldNotSatisfy` Text.isInfixOf "special_assessment(p:"
+      -- ...and the camunda side says WHY, at Blocking, rather than shipping
+      -- the gap silently (§13.5's D-FLAVOR-NOSERVICE).
+      let camNotes = (dmnReport (drgFlavored FlavorCamunda "S" svcSrc)).notes
+      [n.severity | n <- camNotes, n.code == "D-FLAVOR-NOSERVICE", n.severity == Blocking]
+        `shouldBe` [Blocking]
+      -- Direction 2 — everything WITHOUT a §-invocation stays byte-identical
+      -- (measured 2026-08-01 over every golden subject), so a future change
+      -- that makes the flavors drift anywhere else is announced here.
       emitDrg (drgFlavored FlavorCamunda "T" spacedNames)
         `shouldBe` emitDrg (drgFlavored FlavorKie "T" spacedNames)
       emitDrg (drgFlavored FlavorCamunda "Regulation Crowdfunding" considerConstructors)
         `shouldBe` emitDrg (drgFlavored FlavorKie "Regulation Crowdfunding" considerConstructors)
+      bkmSrc <- Text.readFile (examplesRoot </> "dmn" </> "bkm.l4")
+      emitDrg (drgFlavored FlavorCamunda "B" bkmSrc)
+        `shouldBe` emitDrg (drgFlavored FlavorKie "B" bkmSrc)
 
   describe "dmnmd markdown (the second emitter over the same IR)" $ do
     it "renders a table as a pipe table, with the hit policy as the first header cell" $ do
@@ -3084,6 +3108,17 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       goldenOf examplesRoot srcPath (stem <> ".md.fidelity.txt")
         (renderReport . markdownReport)
 
+  -- §13.6 at Phase 5: the kie flavor's split goldens, for the (measured)
+  -- divergent subjects only. The default flavor keeps the unsuffixed names;
+  -- never a diff-golden — each file is reproducible byte-for-byte by one
+  -- `l4 export --flavor=kie` invocation and feedable to the KIE harness.
+  describe "golden (kie flavor)" $ forM_ kieGoldenSubjects \(srcPath, stem, label) -> do
+    it (label <> ", as DMN 1.3 XML (kie)") $
+      goldenKieOf examplesRoot srcPath (stem <> ".kie.dmn") emitDrg
+    it (label <> "'s fidelity report (kie)") $
+      goldenKieOf examplesRoot srcPath (stem <> ".kie.fidelity.txt")
+        (renderReport . dmnReport)
+
   -- R5 (§6.4): checkDrg + D-CYCLE over the informationRequirement graph, and
   -- the §6.4.4-2 self-edge un-suppression. Every expectation below was
   -- MEASURED on 2026-08-01 against this tree (the fixtures' own headers say
@@ -3361,6 +3396,35 @@ goldenSubjects =
     , "unlift"
     , "the Phase 4 un-lifting exhibit"
     )
+    -- The Phase 5 exhibits. `bkm` holds one of each emission shape (multi-
+    -- parameter BKM, BKM→BKM chain, BKM inside a hydrator, λ-lifted closure)
+    -- and is flavor-IDENTICAL by measurement; `svc` isolates the ONE
+    -- construct that splits the flavors (§-invocation, §13.5) and is the
+    -- only subject with a `.kie.` golden pair — see the kie-flavor golden
+    -- block below and each file's own header.
+  , ( "dmn" </> "bkm.l4"
+    , "bkm"
+    , "the Phase 5 BKM exhibit"
+    )
+  , ( "dmn" </> "svc.l4"
+    , "svc"
+    , "the §-invocation exhibit"
+    )
+  ]
+
+-- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually
+-- diverge by flavor. Measured 2026-08-01 over every golden subject: reg-cf,
+-- gst-rate, regcf-corpus, sumtype, hydration, unlift and bkm are all
+-- byte-IDENTICAL at both flavors (nothing in them invokes a §; BKM emission
+-- is flavor-ungated), so they keep unsuffixed goldens only, and the
+-- flavor-divergence test asserts that identity stays true. `svc` diverges by
+-- construction and gets the split pair.
+kieGoldenSubjects :: [(FilePath, FilePath, String)]
+kieGoldenSubjects =
+  [ ( "dmn" </> "svc.l4"
+    , "svc"
+    , "the §-invocation exhibit"
+    )
   ]
 
 -- | One golden: read the source, lower it the way the CLI would, render it
@@ -3371,6 +3435,16 @@ goldenOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text
 goldenOf examplesRoot srcPath name render = do
   src <- Text.readFile (examplesRoot </> srcPath)
   pure (mkGolden examplesRoot name (render (drgAsCli srcPath src)))
+
+-- | 'goldenOf' at the KIE flavor: what `l4 export --to=dmn --flavor=kie FILE`
+-- writes, with the same model-name precedence.
+goldenKieOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text)
+goldenKieOf examplesRoot srcPath name render = do
+  src <- Text.readFile (examplesRoot </> srcPath)
+  let drg = drgFlavoredWith FlavorKie
+              (\m -> fromMaybe (Text.pack (takeBaseName srcPath)) (moduleTitle m))
+              src
+  pure (mkGolden examplesRoot name (render drg))
 
 -- | Lower exactly as @l4 export --to=dmn FILE@ does with no @--model-name@:
 -- the module's outermost @§@ heading if it has one, else the file's base name.

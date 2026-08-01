@@ -38,6 +38,9 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-PARAM-AS-INPUT] advisory — input_applicant
       the GIVEN parameter `applicant` of two decisions (`applicant score`, `applicant band width`) became the one shared model input `input_applicant`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
       lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-FLAVOR-NOSERVICE] advisory — service_hydration
+      the decisionService `Hydration` (§ `Hydration`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-COMPUTEDOUTPUT] advisory — decision_capped_bonus  (main.l4:150:26-32)
       the output entry `n` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

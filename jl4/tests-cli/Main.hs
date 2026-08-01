@@ -583,6 +583,22 @@ hydrationEngineCases = "examples/dmn/hydration.cases.json"
 sumtypeGolden :: FilePath
 sumtypeGolden = "examples/dmn/expected/sumtype.dmn"
 
+-- The Phase 5 exhibits (spec §6.2, §2.3, §13.5, §13.6). `bkm` is
+-- flavor-identical and MustPass on BOTH engines; `svc` is the one subject
+-- whose goldens SPLIT by flavor — its kie golden MustPass on KIE (the service
+-- invocation executes) and its camunda golden MustFail on Camunda (the §13.5
+-- refusal keeps the call site raw L4, which zeebe-dmn rejects at parse).
+bkmSource, bkmDmnGolden, bkmEngineCases :: FilePath
+bkmSource      = "examples/dmn/bkm.l4"
+bkmDmnGolden   = "examples/dmn/expected/bkm.dmn"
+bkmEngineCases = "examples/dmn/bkm.cases.json"
+
+svcSource, svcGolden, svcKieDmnGolden, svcEngineCases :: FilePath
+svcSource       = "examples/dmn/svc.l4"
+svcGolden       = "examples/dmn/expected/svc.dmn"
+svcKieDmnGolden = "examples/dmn/expected/svc.kie.dmn"
+svcEngineCases  = "examples/dmn/svc.cases.json"
+
 -- The NULL probe (R8-d′). Written and measured BEFORE the MAYBE→null lowering,
 -- because the whole ruling rests on FEEL's `=` against null being a proper
 -- boolean; if it were not, `if x != null then a else b` would take the else
@@ -650,7 +666,9 @@ main = do
        , spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases
        , hydrationProbeModel, hydrationProbeCases
        , nullProbeModel, nullProbeCases, nullAbsentModel, nullAbsentCases
-       , hydrationGolden, hydrationEngineCases, sumtypeGolden ] \fp -> do
+       , hydrationGolden, hydrationEngineCases, sumtypeGolden
+       , bkmSource, bkmDmnGolden, bkmEngineCases
+       , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1387,10 +1405,29 @@ spec bin = do
           code `shouldBe` ExitSuccess
           serr `shouldSatisfy` ("DMN 1.3 (XML), kie flavor" `isInfixOf`)
 
-      it "EXPECTED TO FAIL AT PHASE 5: the two flavors still emit the same bytes" $ do
-        -- The companion of the identity test in jl4/tests/DmnExport.hs, through
-        -- the CLI rather than the library. When decision services land this
-        -- must go red; the fix is to split the goldens, not to delete the test.
+      it "the flavors diverge on the §-invocation exhibit and nowhere else, through the CLI" $ do
+        -- This test used to be the CLI half of the Phase 5 tripwire
+        -- ("EXPECTED TO FAIL AT PHASE 5"); it fired on 2026-08-01 and was
+        -- flipped as instructed: the goldens split (svc.kie.dmn beside
+        -- svc.dmn) and the seam is asserted in both directions.
+        --
+        -- Positive direction: the kie bytes of the §-invocation exhibit carry
+        -- a requiredKnowledge onto a decisionService; the camunda bytes do
+        -- not (that one edge is fatal to Camunda 8's parse(), spec §13.4),
+        -- and each equals its committed golden.
+        Output _ svcCam _ <- runL4 bin ["export", "--to=dmn", svcSource]
+        Output _ svcKie _ <- runL4 bin ["export", "--to=dmn", svcSource, "--flavor=kie"]
+        svcKie `shouldSatisfy`
+          ("<requiredKnowledge href=\"#service_special_assessment\"/>" `isInfixOf`)
+        svcCam `shouldSatisfy` (not . ("requiredKnowledge href=\"#service_" `isInfixOf`))
+        svcCamGolden <- readUtf8 svcGolden
+        svcCam `shouldBe` svcCamGolden
+        svcKieGolden <- readUtf8 svcKieDmnGolden
+        svcKie `shouldBe` svcKieGolden
+        -- Identity direction: reg-cf has no §-invocation, so its flavors stay
+        -- byte-identical (measured 2026-08-01 over every golden subject) and
+        -- both equal the one unsuffixed golden. A drift here means the flavor
+        -- bit grew a second observable, which wants its own golden split.
         Output _ camunda _ <- runL4 bin
           ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
         Output _ kie _ <- runL4 bin
@@ -1644,6 +1681,61 @@ spec bin = do
           -- and pinning it here is what stops it being lost. See §11-R8-a.
           out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
           out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
+
+  -- The Phase 5 EMITTED-BKM legs (spec §6.2, §13.6): the emitter's own BKM
+  -- output through both engines, the strictly-stronger counterpart of the 23
+  -- hand-written dmn-bkm-probe fixtures — a red probe isolates the ENGINE, a
+  -- red run here isolates the LOWERING. Each leg names its flavor; an absent
+  -- harness reports UNEXERCISED (pendingWith) rather than passing.
+  describe "the Phase 5 BKM exhibit (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE evaluates the emitted BKMs: chain, hydrator call, lifted closure (camunda golden)" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        bkmDmnGolden [bkmDmnGolden, "--cases", bkmEngineCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          -- zero warnings pins the DMNDI contract: every BKM has a DMNShape
+          -- and every knowledgeRequirement a DMNEdge (KIE warns
+          -- DMNDI_MISSING_DIAGRAM for each omission — measured 2026-08-01).
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 value(s) as expected" `isInfixOf`)
+
+    it "Camunda evaluates the same bytes (the flavors are byte-identical here, by measurement)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        bkmDmnGolden [bkmDmnGolden, "--cases", bkmEngineCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 value(s) as expected" `isInfixOf`)
+
+  -- The §-invocation exhibit: the ONE construct on which the flavors emit
+  -- different bytes (§13.5), so each golden meets exactly one engine, in
+  -- opposite directions. The asymmetry IS the flavor axis.
+  describe "the §-invocation exhibit (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE executes the kie golden: the service invocation binds per call" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        svcKieDmnGolden [svcKieDmnGolden, "--cases", svcEngineCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          -- case B is the load-bearing pair: special_rate (standalone,
+          -- global-bound) answers 5 while special_case (through the service,
+          -- invocation-bound) answers 195 — the invocation carries its OWN
+          -- bindings, which is the whole point of an invocable §.
+          out `shouldSatisfy` ("8/8 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("8/8 value(s) as expected" `isInfixOf`)
+
+    it "Camunda REJECTS the camunda golden at parse: the refused call site is raw L4, loudly noted" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        svcGolden [svcGolden, "--cases", svcEngineCases] \out -> do
+          -- The camunda flavor cannot emit the KR→service edge (fatal to
+          -- parse(), §13.4), so `special case` stays verbatim and zeebe-dmn
+          -- refuses the file. The loudness lives in the FIDELITY report
+          -- (D-FLAVOR-NOSERVICE, Blocking) — this leg pins that the artifact
+          -- itself is not silently degraded into something that half-loads.
+          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
+
 
   -- R8-d′'s evidence. Written and MEASURED before the MAYBE→null lowering
   -- existed, because the ruling is only safe if `=` against null is a proper

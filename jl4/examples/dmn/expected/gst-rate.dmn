@@ -169,6 +169,18 @@
       </literalExpression>
     </encapsulatedLogic>
   </businessKnowledgeModel>
+  <decisionService id="service_gst_rate" name="GST_rate" label="GST rate">
+    <variable id="service_gst_rate_var" name="GST_rate" label="GST rate" typeRef="Any"/>
+    <outputDecision href="#decision_the_2024_rate_change"/>
+    <outputDecision href="#decision_the_2023_rate_change"/>
+    <outputDecision href="#decision_gst_commenced"/>
+    <outputDecision href="#decision_tourist_refund_minimum_spend"/>
+    <outputDecision href="#decision_gst_payable_on"/>
+    <encapsulatedDecision href="#decision_gst_rate_percent"/>
+    <inputData href="#input_no_gst_rate_exists_before_commencement_on_1994_04_01"/>
+    <inputData href="#input_rules_effective_date"/>
+    <inputData href="#input_supply_value"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_gst_rate_diagram" name="GST rate">
       <dmndi:DMNShape id="input_no_gst_rate_exists_before_commencement_on_1994_04_01_shape" dmnElementRef="input_no_gst_rate_exists_before_commencement_on_1994_04_01">
@@ -200,6 +212,9 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="bkm_the_rules_in_force_include_shape" dmnElementRef="bkm_the_rules_in_force_include">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_gst_rate_shape" dmnElementRef="service_gst_rate">
+        <dc:Bounds x="40" y="200" width="1100" height="280"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_gst_rate_percent_ir1_edge" dmnElementRef="decision_gst_rate_percent_ir1">
         <di:waypoint x="150" y="540"/>

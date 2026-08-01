@@ -153,6 +153,24 @@
       </literalExpression>
     </encapsulatedLogic>
   </businessKnowledgeModel>
+  <decisionService id="service_phase_4_exhibit_un_lifting_tiering_and_the_population_filter" name="Phase_4_exhibit_un_lifting_tiering_and_the_population_filter" label="Phase 4 exhibit — un-lifting, tiering, and the population filter">
+    <variable id="service_phase_4_exhibit_un_lifting_tiering_and_the_population_filter_var" name="Phase_4_exhibit_un_lifting_tiering_and_the_population_filter" label="Phase 4 exhibit — un-lifting, tiering, and the population filter" typeRef="Any"/>
+    <outputDecision href="#decision_capped_benefit"/>
+    <outputDecision href="#decision_low_estimate"/>
+    <outputDecision href="#decision_high_estimate"/>
+    <outputDecision href="#decision_art3_applies"/>
+    <outputDecision href="#decision_art7_applies"/>
+    <outputDecision href="#decision_definition_benefit"/>
+    <outputDecision href="#decision_payout_a"/>
+    <outputDecision href="#decision_payout_b"/>
+    <encapsulatedDecision href="#decision_basic_monthly_benefit"/>
+    <encapsulatedDecision href="#decision_benefit_cap"/>
+    <encapsulatedDecision href="#decision_net_payout"/>
+    <inputData href="#input_claimant"/>
+    <inputData href="#input_s"/>
+    <inputData href="#input_s_2"/>
+    <inputData href="#input_gross"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_phase_4_exhibit_un_lifting_tiering_and_the_population_filter_diagram" name="Phase 4 exhibit — un-lifting, tiering, and the population filter">
       <dmndi:DMNShape id="input_claimant_shape" dmnElementRef="input_claimant">
@@ -203,6 +221,9 @@
       <dmndi:DMNShape id="bkm_scaled_amount_shape" dmnElementRef="bkm_scaled_amount">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
       </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_phase_4_exhibit_un_lifting_tiering_and_the_population_filter_shape" dmnElementRef="service_phase_4_exhibit_un_lifting_tiering_and_the_population_filter">
+        <dc:Bounds x="40" y="200" width="1760" height="280"/>
+      </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_basic_monthly_benefit_ir1_edge" dmnElementRef="decision_basic_monthly_benefit_ir1">
         <di:waypoint x="150" y="540"/>
         <di:waypoint x="150" y="460"/>
@@ -242,6 +263,14 @@
       <dmndi:DMNEdge id="decision_payout_b_ir1_edge" dmnElementRef="decision_payout_b_ir1">
         <di:waypoint x="1690" y="380"/>
         <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_low_estimate_kr1_edge" dmnElementRef="decision_low_estimate_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="590" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_high_estimate_kr1_edge" dmnElementRef="decision_high_estimate_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="810" y="380"/>
       </dmndi:DMNEdge>
     </dmndi:DMNDiagram>
   </dmndi:DMNDI>

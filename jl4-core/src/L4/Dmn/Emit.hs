@@ -234,6 +234,22 @@ nodeXml = \case
         <> zipWith (knowledgeRequirementXml d.dcnId) [1 :: Int ..] d.dcnKnowledgeReqs
         <> [logicXml d.dcnId d.dcnLogic]
   NodeBkm b -> bkmXml b
+  -- tDecisionService (DMN13.xsd:516-519): variable?, outputDecision*,
+  -- encapsulatedDecision*, inputDecision*, inputData* — the XSD child order.
+  -- The SEMANTIC parameter order is the REVERSE (inputData first, then
+  -- inputDecisions, §10.4), which matters only at invocation sites — and
+  -- those emit NAMED parameters (§2.3.1), so the order never binds anything.
+  NodeService s ->
+    Elem "decisionService" (namedAttrs s.dsvId s.dsvFeelName s.dsvName) $
+      [ Elem "variable"
+          (namedAttrs (s.dsvId <> "_var") s.dsvFeelName s.dsvName
+             <> [("typeRef", dmnTypeAttr s.dsvType)])
+          []
+      ]
+        <> [Elem "outputDecision"       [("href", "#" <> t)] [] | t <- s.dsvOutputs]
+        <> [Elem "encapsulatedDecision" [("href", "#" <> t)] [] | t <- s.dsvEncapsulated]
+        <> [Elem "inputDecision"        [("href", "#" <> t)] [] | t <- s.dsvInputDecisions]
+        <> [Elem "inputData"            [("href", "#" <> t)] [] | t <- s.dsvInputData]
 
 -- | The one boxed-expression child every logic carrier shares. The id scheme is
 -- the decision one, unchanged, so pre-BKM goldens keep their bytes.
@@ -430,9 +446,82 @@ dmndiXml drg =
   Elem "dmndi:DMNDI" []
     [ Elem "dmndi:DMNDiagram"
         [("id", drg.drgId <> "_diagram"), ("name", drg.drgName)]
-        (map shapeXml placed <> concatMap edgesXml (drgDecisions drg))
+        (map shapeXml placed
+           <> map serviceShapeXml (drgServices drg)
+           <> concatMap edgesXml (drgDecisions drg)
+           <> concatMap krEdgesXml krOwners)
     ]
  where
+  -- A decisionService is drawn as the bounding box of its member decisions,
+  -- with a margin — the conventional "expanded service" rectangle. It exists
+  -- for the same measured reason the BKM shapes do: KIE's validator raises
+  -- WARN [DMNDI_MISSING_DIAGRAM] for any element with no DMNDiagramElement,
+  -- and the engine legs pin warning counts at zero. A service with no placed
+  -- member (all members filtered) cannot be emitted at all, so the fallback
+  -- box is unreachable in practice and exists to keep this total.
+  serviceBoxes :: Map Text (Int, Int, Int, Int)
+  serviceBoxes = Map.fromList
+    [ (s.dsvId, box)
+    | s <- drgServices drg
+    , let memberPos =
+            [ (x, y)
+            | m <- s.dsvOutputs <> s.dsvEncapsulated
+            , Just (x, y) <- [Map.lookup m positions]
+            ]
+    , let margin = 20
+    , let box = case memberPos of
+            [] -> (0, 0, shapeWidth, shapeHeight)
+            _  ->
+              let xs = map fst memberPos
+                  ys = map snd memberPos
+                  x0 = minimum xs - margin
+                  y0 = minimum ys - margin
+              in ( x0
+                 , y0
+                 , maximum xs + shapeWidth + margin - x0
+                 , maximum ys + shapeHeight + margin - y0
+                 )
+    ]
+
+  serviceShapeXml s =
+    let (bx, by, bw, bh) =
+          Map.findWithDefault (0, 0, shapeWidth, shapeHeight) s.dsvId serviceBoxes
+    in Elem "dmndi:DMNShape" [("id", s.dsvId <> "_shape"), ("dmnElementRef", s.dsvId)]
+         [ Elem "dc:Bounds"
+             [ ("x", tshowInt bx)
+             , ("y", tshowInt by)
+             , ("width", tshowInt bw)
+             , ("height", tshowInt bh)
+             ]
+             []
+         ]
+
+  -- knowledgeRequirement edges get DMNEdges too — measured, not decorative:
+  -- KIE raises WARN [DMNDI_MISSING_DIAGRAM] "Missing DMNEdge for '<owner>_kr1'"
+  -- for each undrawn one, and the engine legs pin warning counts at zero. The
+  -- id scheme mirrors 'knowledgeRequirementXml'.
+  krOwners :: [(Text, [KnowledgeRequirement])]
+  krOwners =
+    [(d.dcnId, d.dcnKnowledgeReqs) | d <- drgDecisions drg]
+      <> [(b.bkmId, b.bkmKnowledgeReqs) | b <- drgBkms drg]
+
+  krEdgesXml (owner, krs) =
+    [ Elem "dmndi:DMNEdge"
+        [ ("id", owner <> "_kr" <> tshowInt i <> "_edge")
+        , ("dmnElementRef", owner <> "_kr" <> tshowInt i)
+        ]
+        [ waypoint (sx + sw `div` 2) (sy + sh)
+        , waypoint (tx + shapeWidth `div` 2) ty
+        ]
+    | (i, kr) <- zip [1 :: Int ..] krs
+    , let target = knowledgeRequirementTarget kr
+    , Just (sx, sy, sw, sh) <-
+        [ case Map.lookup target positions of
+            Just (x, y) -> Just (x, y, shapeWidth, shapeHeight)
+            Nothing     -> Map.lookup target serviceBoxes
+        ]
+    , Just (tx, ty) <- [Map.lookup owner positions]
+    ]
   decLevels = decisionLevels drg
   bkmLevel  = 1 + maximum (0 : Map.elems decLevels)
   levels =
@@ -461,6 +550,8 @@ dmndiXml drg =
     NodeInputData i -> Just i.idId
     NodeDecision d  -> Just d.dcnId
     NodeBkm _       -> Nothing
+    -- services are drawn as member bounding boxes, not grid cells
+    NodeService _   -> Nothing
 
   placed =
     [ (eid, x, y)
