@@ -230,8 +230,15 @@ nodeXml = \case
              <> [("typeRef", dmnTypeAttr d.dcnType)])
           []
       ]
-        <> zipWith (requirementXml d.dcnId) [1 :: Int ..] d.dcnRequirements
-        <> zipWith (knowledgeRequirementXml d.dcnId) [1 :: Int ..] d.dcnKnowledgeReqs
+      -- 'emittedRequirements' / 'emittedKnowledgeReqs', not the raw fields: a
+      -- self-edge stays in the IR (so 'checkDrg' reports it) and stays out of
+      -- the XML (DMN §7.3.1 forbids it, and an unloadable file is not an
+      -- exhibit). See "L4.Dmn.IR"'s $selfedges. The _irN / _krN counters run
+      -- over the FILTERED lists, and 'edgesXml' / 'krEdgesXml' below filter the
+      -- same way, so the ids a DMNEdge points at stay contiguous and matched.
+        <> zipWith (requirementXml d.dcnId) [1 :: Int ..] (emittedRequirements d)
+        <> zipWith (knowledgeRequirementXml d.dcnId) [1 :: Int ..]
+             (emittedKnowledgeReqs d.dcnId d.dcnKnowledgeReqs)
         <> [logicXml d.dcnId d.dcnLogic]
   NodeBkm b -> bkmXml b
   -- tDecisionService (DMN13.xsd:516-519): variable?, outputDecision*,
@@ -287,7 +294,8 @@ bkmXml b =
           -- WARN [ILLEGAL_USE_OF_TYPEREF] on one that does).
           <> [logicXml b.bkmId b.bkmLogic]
     ]
-      <> zipWith (knowledgeRequirementXml b.bkmId) [1 :: Int ..] b.bkmKnowledgeReqs
+      <> zipWith (knowledgeRequirementXml b.bkmId) [1 :: Int ..]
+           (emittedKnowledgeReqs b.bkmId b.bkmKnowledgeReqs)
 
 knowledgeRequirementXml :: Text -> Int -> KnowledgeRequirement -> Xml
 knowledgeRequirementXml owner i kr =
@@ -502,8 +510,8 @@ dmndiXml drg =
   -- id scheme mirrors 'knowledgeRequirementXml'.
   krOwners :: [(Text, [KnowledgeRequirement])]
   krOwners =
-    [(d.dcnId, d.dcnKnowledgeReqs) | d <- drgDecisions drg]
-      <> [(b.bkmId, b.bkmKnowledgeReqs) | b <- drgBkms drg]
+    [(d.dcnId, emittedKnowledgeReqs d.dcnId d.dcnKnowledgeReqs) | d <- drgDecisions drg]
+      <> [(b.bkmId, emittedKnowledgeReqs b.bkmId b.bkmKnowledgeReqs) | b <- drgBkms drg]
 
   krEdgesXml (owner, krs) =
     [ Elem "dmndi:DMNEdge"
@@ -583,7 +591,7 @@ dmndiXml drg =
         [ waypoint (sx + shapeWidth `div` 2) sy
         , waypoint (tx + shapeWidth `div` 2) (ty + shapeHeight)
         ]
-    | (i, req) <- zip [1 :: Int ..] d.dcnRequirements
+    | (i, req) <- zip [1 :: Int ..] (emittedRequirements d)
     , Just (sx, sy) <- [Map.lookup (requirementTarget req) positions]
     , Just (tx, ty) <- [Map.lookup d.dcnId positions]
     ]
@@ -592,9 +600,12 @@ dmndiXml drg =
 
 -- | Longest path to an input, so an edge always points from a lower row to a
 -- higher one. The fold is bounded by the number of decisions, so it terminates
--- on a cyclic requirement graph — which CAN occur, deliberately: §6.4.4-2/-4
--- emit a source-level cycle as it is (with a Blocking @D-CYCLE@ note from
--- 'L4.Dmn.IR.checkDrg') rather than repairing it into a different model.
+-- on a cyclic requirement graph — which CAN occur, deliberately: §6.4.4-4 emits
+-- a MULTI-node source-level cycle as it is (with a Blocking @D-CYCLE@ note from
+-- 'L4.Dmn.IR.checkDrg') rather than repairing it into a different model. The
+-- one-node case is the exception ruled 2026-08-02: it is erased from the XML by
+-- 'L4.Dmn.IR.emittedRequirements' but __not__ from the 'Drg', which is what this
+-- fold reads — so the self-guard in 'bump' is load-bearing, not vestigial.
 decisionLevels :: Drg -> Map Text Int
 decisionLevels drg = go (Map.fromList [(i.idId, 0) | i <- drgInputData drg]) (length ds)
  where
@@ -607,8 +618,9 @@ decisionLevels drg = go (Map.fromList [(i.idId, 0) | i <- drgInputData drg]) (le
     -- included, `1 + max(deps)` re-raises the node's own level on every
     -- relaxation pass until the fuel runs out, which stretched a 96-decision
     -- corpus diagram to y ≈ 15000 for one self-recursive decision. The edge
-    -- stays in the emitted requirements (§6.4.4-2); the diagram simply does not
-    -- let it define "one row above itself".
+    -- stays in the IR (§6.4.4-2, where 'checkDrg' reads it); it leaves at
+    -- emission (§6.4.4-4a) and the diagram never let it define "one row above
+    -- itself" even while it was still being written out.
     let deps = [ Map.findWithDefault 0 t acc
                | r <- d.dcnRequirements
                , let t = requirementTarget r

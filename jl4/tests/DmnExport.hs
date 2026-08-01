@@ -3207,20 +3207,37 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       [n.severity | n <- drgNotesAll drg, n.code == "D-PARTIAL"]
         `shouldBe` [Lossy, Lossy]
 
-    it "p3 (self-recursion): the un-suppressed self-edge is a one-member SCC, said as 'requires itself'" $ do
+    it "p3 (self-recursion): a one-member SCC said as 'requires itself' — REPORTED in the IR, ERASED from the XML" $ do
       -- Before §6.4.4-2 this exported with NO self-edge and advisory-only
       -- fidelity: freeRefs bound the decide's own name and classifyRef
       -- filtered target /= did, so the case §6.3.7 names FIRST was erased
       -- before any graph saw it.
+      --
+      -- §6.4.4-4a (ruled 2026-08-02) splits those two halves apart, and this
+      -- test is where the split is pinned: the IR keeps the self-edge, so the
+      -- Blocking note still fires and still names the decision; the XML does
+      -- not, because DMN §7.3.1 forbids it and etc/validate-dmn.mjs rejects the
+      -- file. Erasing the edge must never erase the finding — if the first
+      -- assertion below ever goes quiet, the fix has become a cover-up.
       drg <- notOkDrg "cycle-p3-self.l4"
       case cycleNotesOf drg of
         [n] -> do
           n.message `shouldSatisfy` Text.isInfixOf "requires itself"
           n.message `shouldSatisfy` Text.isInfixOf "`countdown` (decision_countdown)"
         ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
-      -- and the emitted artifact carries the edge it reports
-      emitDrg drg `shouldSatisfy`
+      emitDrg drg `shouldNotSatisfy`
         Text.isInfixOf "<requiredDecision href=\"#decision_countdown\"/>"
+
+    it "p2 (mutual recursion, nullary): a MULTI-node cycle keeps every edge — the §6.4.4-4a erasure is self-edges only" $ do
+      -- The negative control for the test above. Dropping one edge of a 2-cycle
+      -- would have to choose which member's meaning to change; §6.4.4-4 emits
+      -- it as it is and reports it, and that is unchanged by the 2026-08-02
+      -- ruling. If this ever goes red, the self-edge filter has widened.
+      drg <- notOkDrg "cycle-p2-mutual-nullary.l4"
+      let xml = emitDrg drg
+      for_ [ "<requiredDecision href=\"#decision_the_left_total\"/>"
+           , "<requiredDecision href=\"#decision_the_right_total\"/>" ] \needle ->
+        xml `shouldSatisfy` Text.isInfixOf needle
 
     it "p4 (cycle through a WHERE-local, two decisions): D-CYCLE" $ do
       drg <- notOkDrg "cycle-p4-where-local.l4"

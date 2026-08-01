@@ -1161,15 +1161,12 @@
       <requiredDecision href="#decision_days_to_file_the_annual_report_after_fiscal_year_end"/>
     </informationRequirement>
     <informationRequirement id="decision_ongoing_reporting_obligation_ir3">
-      <requiredDecision href="#decision_ongoing_reporting_obligation"/>
-    </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir4">
       <requiredDecision href="#decision_ongoing_reporting_obligation_may_terminate"/>
     </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir5">
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir4">
       <requiredInput href="#input_annual_cycles"/>
     </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir6">
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir5">
       <requiredInput href="#input_status_2"/>
     </informationRequirement>
     <literalExpression id="decision_ongoing_reporting_obligation_literal">
@@ -3114,18 +3111,14 @@
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir3_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir3">
-        <di:waypoint x="150" y="220"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir4">
         <di:waypoint x="810" y="380"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir5">
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir4">
         <di:waypoint x="2790" y="860"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir6_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir6">
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir5">
         <di:waypoint x="2570" y="860"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>

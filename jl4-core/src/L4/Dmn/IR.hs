@@ -74,6 +74,10 @@ module L4.Dmn.IR
   , requirementTarget
   , KnowledgeRequirement (..)
   , knowledgeRequirementTarget
+    -- ** Self-edges: kept in the IR, erased from the XML
+    -- $selfedges
+  , emittedRequirements
+  , emittedKnowledgeReqs
   , Bkm (..)
   , FormalParameter (..)
   , DecisionService (..)
@@ -746,6 +750,51 @@ knowledgeRequirementTarget :: KnowledgeRequirement -> Text
 knowledgeRequirementTarget = \case
   RequiredBkm t     -> t
   RequiredService t -> t
+
+-- $selfedges
+--
+-- __The IR keeps self-edges; the XML does not.__ A self-recursive L4 definition
+-- lowers to an element that requires itself, and 'checkDrg' reports it — that is
+-- the whole point of the §6.4.4-2 un-suppression, and 'emittedRequirements' and
+-- 'emittedKnowledgeReqs' below do not touch the graph 'checkDrg' reads.
+--
+-- What they change is what "L4.Dmn.Emit" writes. DMN 1.3 §7.3.1 forbids an
+-- element from requiring itself, so a faithfully-emitted self-edge produces a
+-- file no engine will load and the @dmn-moddle@ metamodel gate rejects
+-- (@etc\/validate-dmn.mjs@ checks exactly this shape). __Ruled 2026-08-02
+-- (Meng): erase the self-edge again, and keep the note.__ DMN cannot represent
+-- the recursion at all; the @D-CYCLE@ finding is what tells the truth about it;
+-- and an artifact no engine will load is not an exhibit. See
+-- @specs\/todo\/DMN-RECURSION-FLATTENING-SPEC.md@ §7 for the ruling and its
+-- cost, and the rest of that document for the flattening that would let the
+-- emitted file carry the recursion instead of only the report.
+--
+-- __Self-edges only.__ A cycle of two or more elements keeps every edge and is
+-- emitted exactly as §6.4.4-4 says: there is no way to drop one edge of a
+-- multi-node cycle without choosing which member's meaning to change, whereas a
+-- self-edge has no such choice to make — it is the one case where "drop it and
+-- report it" is not a rewrite of somebody's semantics into somebody else's.
+
+-- | The information requirements of a 'Decision' that may legally be
+-- __emitted__: 'dcnRequirements' minus any edge back to the decision itself.
+-- See $selfedges.
+emittedRequirements :: Decision -> [Requirement]
+emittedRequirements d =
+  [r | r <- d.dcnRequirements, not (isSelf r)]
+ where
+  isSelf = \case
+    RequiredDecision t -> t == d.dcnId
+    RequiredInput _    -> False
+
+-- | The knowledge requirements of an invocable (a 'Decision' or a 'Bkm', hence
+-- the loose id-plus-list signature) that may legally be __emitted__: the given
+-- edges minus any edge back to the owner. The 'Bkm' arm is the reachable one —
+-- 'L4.Dmn.Lower' mints a @RequiredBkm@ for every body reference that landed in
+-- the emitted-BKM set, its own name included — and DMN §6.3.9 forbids it in the
+-- same terms §7.3.1 forbids the decision case. See $selfedges.
+emittedKnowledgeReqs :: Text -> [KnowledgeRequirement] -> [KnowledgeRequirement]
+emittedKnowledgeReqs owner krs =
+  [kr | kr <- krs, knowledgeRequirementTarget kr /= owner]
 
 -- | One @\<contextEntry\>@ of a 'LogicContext'.
 --
