@@ -886,7 +886,13 @@ function deonticObligationToWire(o, ctx, remainingNum, observed) {
 // lapsed a MUST/DO obligation with no LEST clause; jl4-core names that
 // event's party, action, and time in the breach (Machine.hs:995 →
 // serializeBreachReason at Jl4.hs:1216).
-function deonticDeadlineMissedNode(obligation, ev, stamp, absoluteDeadline, ctx) {
+function deonticDeadlineMissedNode(
+  obligation,
+  ev,
+  stamp,
+  absoluteDeadline,
+  ctx,
+) {
   return {
     kind: "BREACH",
     _deadlineMissed: {
@@ -904,7 +910,11 @@ function deonticDeadlineMissedNode(obligation, ev, stamp, absoluteDeadline, ctx)
 // (@{Driver: {...}}@); scalar/enum parties render as their L4 constructor
 // name (backtick-quoted when not a plain identifier).
 function deonticRenderEventParty(evParty, obligation, ctx) {
-  if (evParty != null && typeof evParty === "object" && !Array.isArray(evParty)) {
+  if (
+    evParty != null &&
+    typeof evParty === "object" &&
+    !Array.isArray(evParty)
+  ) {
     const paramName =
       obligation.party && obligation.party.param != null
         ? obligation.party.param
@@ -3091,9 +3101,7 @@ export function createRuntime(opts) {
       __l4_index_of: (hF, nF) => {
         const h = readCString(Number(f64ToU64(hF)));
         const unitIdx = h.indexOf(readCString(Number(f64ToU64(nF))));
-        return ratFromInt(
-          unitIdx < 0 ? -1 : [...h.slice(0, unitIdx)].length,
-        );
+        return ratFromInt(unitIdx < 0 ? -1 : [...h.slice(0, unitIdx)].length);
       },
       // CHARAT indexes by code point (Text.index); out of bounds → ""
       // (reference: i < 0 || i >= Text.length → empty string).

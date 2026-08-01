@@ -692,9 +692,7 @@
       "file": "jl4/examples/not-ok/empty.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/export-after-giveth.l4",
@@ -725,89 +723,67 @@
       "file": "jl4/examples/not-ok/tc/computed-fields-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-long-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-override.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-self-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-type-mismatch.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/datetime-type-errors.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/error-directive-ambiguity.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/error-unify-test.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/mixfix-wrong-keyword.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/overloaded-ambiguous.l4",
       "outcome": "typecheck-fail",
       "errorClass": "ambiguous",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/parse-error1.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting %, ELSE, or space token"
-      ]
+      "error": ["    expecting %, ELSE, or space token"]
     },
     {
       "file": "jl4/examples/not-ok/tc/parse-error2.l4",
@@ -829,57 +805,43 @@
       "file": "jl4/examples/not-ok/tc/parse-error4.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting AKA, IF, IS, OF, identifier, or space token"
-      ]
+      "error": ["    expecting AKA, IF, IS, OF, identifier, or space token"]
     },
     {
       "file": "jl4/examples/not-ok/tc/percent.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/postfix-in-let-block.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/scombinator-fragment.l4",
       "outcome": "lower-fail",
       "errorClass": "other",
-      "error": [
-        "    incorrect indentation (got 1, should be greater than 3)"
-      ]
+      "error": ["    incorrect indentation (got 1, should be greater than 3)"]
     },
     {
       "file": "jl4/examples/not-ok/tc/sing.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/tdnr-ambiguous.l4",
       "outcome": "typecheck-fail",
       "errorClass": "ambiguous",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/not-ok/tc/time-type-errors.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/examples/ok/actus-library-test.l4",
@@ -1723,9 +1685,7 @@
       "file": "jl4/experiments/Singapore-Data-Protection-Act.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/actors.l4",
@@ -1741,9 +1701,7 @@
       "file": "jl4/experiments/britishcitizen.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting operator char"
-      ]
+      "error": ["    expecting operator char"]
     },
     {
       "file": "jl4/experiments/britishcitizen2.l4",
@@ -1819,9 +1777,7 @@
       "file": "jl4/experiments/computed-fields-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/computed-fields-external-of.l4",
@@ -1847,9 +1803,7 @@
       "file": "jl4/experiments/computed-fields-override.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/computed-fields-where-let.l4",
@@ -1865,25 +1819,19 @@
       "file": "jl4/experiments/deontic-may.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting AKA, MEANS, or space token"
-      ]
+      "error": ["    expecting AKA, MEANS, or space token"]
     },
     {
       "file": "jl4/experiments/dogs.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/environmental-quality-review-act-7.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/fetch-uuid.l4",
@@ -1928,9 +1876,7 @@
       "file": "jl4/experiments/jerseyCharities2-tests.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/jerseyCharities2.l4",
@@ -1974,9 +1920,7 @@
       "file": "jl4/experiments/json-roundtrip.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/json-test-minimal.l4",
@@ -1997,17 +1941,13 @@
       "file": "jl4/experiments/macma2.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/macma3.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/misleadingPriceLists.l4",
@@ -2087,9 +2027,7 @@
       "file": "jl4/experiments/purchase.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting operator char"
-      ]
+      "error": ["    expecting operator char"]
     },
     {
       "file": "jl4/experiments/query-planner-tests/01-simple-and.l4",
@@ -2165,9 +2103,7 @@
       "file": "jl4/experiments/regulative-powers.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting AKA, MEANS, identifier, or space token"
-      ]
+      "error": ["    expecting AKA, MEANS, identifier, or space token"]
     },
     {
       "file": "jl4/experiments/restaurant1.l4",
@@ -2181,9 +2117,7 @@
       "file": "jl4/experiments/restaurant2.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": [
-        "    expecting %, ;, LEST, WHERE, end of input, or space token"
-      ]
+      "error": ["    expecting %, ;, LEST, WHERE, end of input, or space token"]
     },
     {
       "file": "jl4/experiments/safe-post-new.l4",
@@ -2194,9 +2128,7 @@
       "file": "jl4/experiments/safe-post-tests.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/safe-post.l4",
@@ -2225,25 +2157,19 @@
       "file": "jl4/experiments/test-anthropic-api-response.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/test-json-roundtrip-nested.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/test-jsondecode-nested.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     },
     {
       "file": "jl4/experiments/test-nested-jsonencode.l4",
@@ -2348,9 +2274,7 @@
       "file": "jl4/tests-cli/fixtures/typecheck-error.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": [
-        "  Typecheck completed with errors"
-      ]
+      "error": ["  Typecheck completed with errors"]
     }
   ]
 }

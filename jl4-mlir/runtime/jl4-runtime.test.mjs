@@ -49,7 +49,9 @@ const throws = (name, fn, pred) => {
   const ok = threw && (pred ? pred(err) : true);
   console.log(
     `${ok ? "ok  " : "FAIL"} ${name}: ${
-      threw ? `threw ${err && err.name}: ${err && err.message}` : "did NOT throw"
+      threw
+        ? `threw ${err && err.name}: ${err && err.message}`
+        : "did NOT throw"
     }`,
   );
   ok ? pass++ : fail++;
@@ -511,20 +513,32 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   // the seller obligation lapses to its explicit LEST BREACH.
   jeq(
     "deontic: out-of-order events replay in submission order → BREACH",
-    runDeontic(sale, 0, [
-      { party: "the seller", action: "deliver the goods", at: 20 },
-      { party: "the seller", action: "deliver the goods", at: 5 },
-    ], {}, null),
+    runDeontic(
+      sale,
+      0,
+      [
+        { party: "the seller", action: "deliver the goods", at: 20 },
+        { party: "the seller", action: "deliver the goods", at: 5 },
+      ],
+      {},
+      null,
+    ),
     { BREACH: { detail: null, party: null, reason: "explicit" } },
   );
   // Control: the same multiset in ascending order fulfils the first leg and
   // leaves a residual buyer obligation — proving order is the sole driver.
   eq(
     "deontic: ascending order does NOT breach the seller leg",
-    !!runDeontic(sale, 0, [
-      { party: "the seller", action: "deliver the goods", at: 5 },
-      { party: "the seller", action: "deliver the goods", at: 20 },
-    ], {}, null).OBLIGATION,
+    !!runDeontic(
+      sale,
+      0,
+      [
+        { party: "the seller", action: "deliver the goods", at: 5 },
+        { party: "the seller", action: "deliver the goods", at: 20 },
+      ],
+      {},
+      null,
+    ).OBLIGATION,
     true,
   );
 
@@ -532,9 +546,13 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   // object, never the bare string "BREACH".
   jeq(
     "deontic: clause-less LEST BREACH → structured explicit object",
-    runDeontic(sale, 0, [
-      { party: "the seller", action: "deliver the goods", at: 15 },
-    ], {}, null),
+    runDeontic(
+      sale,
+      0,
+      [{ party: "the seller", action: "deliver the goods", at: 15 }],
+      {},
+      null,
+    ),
     { BREACH: { detail: null, party: null, reason: "explicit" } },
   );
 
@@ -546,14 +564,28 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     action: "`repay loan`",
     deadline: 30,
     hence: { kind: "FULFILLED" },
-    lest: { kind: "BREACH", by: "`the borrower`", because: '"loan not repaid"' },
+    lest: {
+      kind: "BREACH",
+      by: "`the borrower`",
+      because: '"loan not repaid"',
+    },
   };
   jeq(
     "deontic: explicit BREACH BY/BECAUSE → party + detail",
-    runDeontic(repay, 0, [
-      { party: "the borrower", action: "repay loan", at: 100 },
-    ], {}, null),
-    { BREACH: { detail: "loan not repaid", party: "`the borrower`", reason: "explicit" } },
+    runDeontic(
+      repay,
+      0,
+      [{ party: "the borrower", action: "repay loan", at: 100 }],
+      {},
+      null,
+    ),
+    {
+      BREACH: {
+        detail: "loan not repaid",
+        party: "`the borrower`",
+        reason: "explicit",
+      },
+    },
   );
 
   // Blocker 2b — a MUST with NO LEST that lapses → deadline_missed breach that
@@ -616,21 +648,29 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       { driver: { name: "Alice" } },
       driverMeta,
     ),
-    { OBLIGATION: { action: "drive", deadline: null, modal: "MAY", party: "driver" } },
+    {
+      OBLIGATION: {
+        action: "drive",
+        deadline: null,
+        modal: "MAY",
+        party: "driver",
+      },
+    },
   );
 
   // Minor — a residual MUST with ZERO observed events renders the lazy party
   // name and the original WITHIN literal as a string.
   jeq(
     "deontic: residual MUST at zero events → lazy party + string deadline",
-    runDeontic(
-      seatbeltMust,
-      0,
-      [],
-      { driver: { name: "Alice" } },
-      driverMeta,
-    ),
-    { OBLIGATION: { action: "`wear seatbelt`", deadline: "1", modal: "MUST", party: "driver" } },
+    runDeontic(seatbeltMust, 0, [], { driver: { name: "Alice" } }, driverMeta),
+    {
+      OBLIGATION: {
+        action: "`wear seatbelt`",
+        deadline: "1",
+        modal: "MUST",
+        party: "driver",
+      },
+    },
   );
 }
 

@@ -119,16 +119,16 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
     always true; (b) the deadline is not a numeric literal — `dcDeadline` is only a
     pretty-printed string and the JS runtime does `Number(deadline)`, so any
     computed/aliased deadline (e.g. `WITHIN \`Deadline Days\``) becomes **NaN**,
-    making every `at > deadline` test false so nothing ever lapses (FULFILLED where
-    the reference says BREACH); or (c) a present HENCE/LEST continuation is itself
-    unextractable (`traverse` instead of `>>=`, so a branch we cannot represent
-    refuses rather than silently vanishes). Each routes through the existing
-    `deonticExtractionFailed` guard → `supported:false`. Regression tests: `deontic
+making every `at > deadline` test false so nothing ever lapses (FULFILLED where
+the reference says BREACH); or (c) a present HENCE/LEST continuation is itself
+unextractable (`traverse`instead of`>>=`, so a branch we cannot represent
+refuses rather than silently vanishes). Each routes through the existing
+`deonticExtractionFailed`guard →`supported:false`. Regression tests: `deontic
     PROVIDED guard`, `deontic computed deadline`, `deontic literal deadline`
     (positive control) — Haskell 34→37. Shipped corpus unchanged (8 byte-identical
-    + 1 refused, parityFails 0); the two adversarial probes
-    (`jl4-mlir/coverage-report/provided-probe.l4`, `jl4-mlir/coverage-report/deadline-probe.l4`) that
-    previously shipped `supported:true` silent-wrongs now both refuse.
+    - 1 refused, parityFails 0); the two adversarial probes
+      (`jl4-mlir/coverage-report/provided-probe.l4`, `jl4-mlir/coverage-report/deadline-probe.l4`) that
+      previously shipped `supported:true` silent-wrongs now both refuse.
 - ✅ **`lowerCmp` InfoMap-miss fallback** — DONE (commit `65c94608`). Root cause
   was deeper than the review: `tcdInfoMap` isn't run through the typechecker's
   final substitution, so `typeOfExpr` returns `Just (InfVar …)` (not `Nothing`)
@@ -245,14 +245,14 @@ cannot compile: …`) so the refusal stays diagnosable.
      (`markUnsupported`/`unsupportedMatch` → fallback). Guarded by
      `str-nul-probe.{l4,cases.json}` (branch-crossing embedded-NUL cells across
      `strGt/strGe/strLt/strLe/strEq`) and JS runtime `embedded NUL` unit tests.
-  The **reference was pinned empirically**: jl4-service returns
-  `"banana" > "apple" = true` for a `DECLARE Date IS A STRING` param — string
-  comparison, ignoring `format:date`. Genuine builtin DATE is not a
-  `SynonymDecl`, so it keeps serial marshalling (datetime-probe unaffected).
-  Guarded by `britishcitizen5.cases.json` (5 branch-crossing cells: before /
-  **exactly on** / after each date threshold; UK and Gibraltar paths),
-  `str-ordering-probe.{l4,cases.json}` (the unicode trap), Haskell
-  `STRING ordered < → __l4_str_cmp`, and JS `__l4_str_cmp` unit tests.
+     The **reference was pinned empirically**: jl4-service returns
+     `"banana" > "apple" = true` for a `DECLARE Date IS A STRING` param — string
+     comparison, ignoring `format:date`. Genuine builtin DATE is not a
+     `SynonymDecl`, so it keeps serial marshalling (datetime-probe unaffected).
+     Guarded by `britishcitizen5.cases.json` (5 branch-crossing cells: before /
+     **exactly on** / after each date threshold; UK and Gibraltar paths),
+     `str-ordering-probe.{l4,cases.json}` (the unicode trap), Haskell
+     `STRING ordered < → __l4_str_cmp`, and JS `__l4_str_cmp` unit tests.
 - ✅ **Untyped scalar param → silent wrong answers** — DONE (was the last open
   🔴). `desc.l4`'s `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers
   NUMBER, but the jl4-mlir **schema emitter defaulted the param to
@@ -348,7 +348,7 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
   `mlir-fix/either-consider`, PARITY-HUNT-LOG ledger #10). `EITHER a b` is a
   payload-CARRYING builtin ADT (prelude `x IS AN EITHER a b`; `LEFT`/`RIGHT` are
   `Constructor` entities analogous to `JUST`), not a nullary `DECLARE ... IS ONE
-  OF` enum — so `testPatternTy` had no enum tag for the constructor and refused
+OF` enum — so `testPatternTy` had no enum tag for the constructor and refused
   ("CONSIDER pattern constructor RIGHT could not be resolved to an enum tag").
   `orchestrator.l4`'s four helpers (`isViolation`, `getConfidence`, `getAllTests`,
   `extractText`) each raised it, and `propagateDiagnostics` lifted all 18
@@ -367,7 +367,7 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
   the 0/1 tag, plus a nested CONSIDER mirroring `extractText`), added to **CI Tier-2**;
   Haskell `EITHER CONSIDER → supported dispatch` (34/34); `orchestrator::evaluateClaim`
   STILL refuses but now **only** for the legitimate IO reason (`depends on
-  'callClaudeWithKey' … POST (IO)`) — the `RIGHT`/`LEFT` enum-tag diagnostics are
+'callClaudeWithKey' … POST (IO)`) — the `RIGHT`/`LEFT` enum-tag diagnostics are
   gone (before: 18 present; after: 0). Tier-2 68 → **83 byte-identical, 0 differs,
   0 wasm-error**.
   - ⚠️ **Post-refutation hardening.** The "caught earlier by `lookupRecordFields`/
@@ -382,7 +382,7 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
     `testPatternTy` and `bindPatternTy`; and since construction lowers an
     enum-with-data / record constructor to a bare tag (no payload slot),
     destructuring an arity ≥ 1 user constructor now **REFUSES** (`supported:
-    false`) rather than compute a garbage/trapping payload bind. Nullary user
+false`) rather than compute a garbage/trapping payload bind. Nullary user
     enums are untouched. Full corpus still **104 byte-identical, 0 differs**.
     Guard: Haskell `user LEFT/RIGHT enum → supported:false` + committed
     `either-shadow{,2}.l4` (kept out of the gated corpus — they refuse fully).

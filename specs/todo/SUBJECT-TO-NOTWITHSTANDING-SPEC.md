@@ -8,7 +8,7 @@
 **Status:** Draft
 **Author:** Research compilation for L4 language design
 **Date:** 2025-01-23
-**Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented *advice*; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
+**Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Branch:** mengwong/spec-notwithstanding
 
 ---
@@ -258,40 +258,40 @@ conclusion(x) = Defeasible {
 
 **Connection to default logic:** This aligns with Reiter's default logic and the notion of non-monotonic reasoning. See L4's existing `doc/default-logic.md`.
 
-### 2.8 Unifying view: every override is *advice* (B wraps A)
+### 2.8 Unifying view: every override is _advice_ (B wraps A)
 
-The seven functions in §2.1–2.7 read like seven mechanisms; they are better understood as **seven positions of one mechanism**. In "A `SUBJECT TO` B," B *wraps* A. Borrowing the vocabulary of aspect-oriented programming (Kiczales et al.), B is **advice** applied at A's **join point**, and the *kind* of advice determines which face of the taxonomy you see:
+The seven functions in §2.1–2.7 read like seven mechanisms; they are better understood as **seven positions of one mechanism**. In "A `SUBJECT TO` B," B _wraps_ A. Borrowing the vocabulary of aspect-oriented programming (Kiczales et al.), B is **advice** applied at A's **join point**, and the _kind_ of advice determines which face of the taxonomy you see:
 
-| Mode (what B changes)         | Advice kind | `proceed()` behaviour                 | Subsumes                                            | Legal reading                                |
-| ----------------------------- | ----------- | ------------------------------------- | --------------------------------------------------- | -------------------------------------------- |
-| A's **inputs / applicability** | `before`    | call A with transformed/guarded args  | condition precedent (2.3), domain restriction (2.6) | "subject to approval"; "for the purposes of" |
-| A's **output**                 | `after`     | call A, then transform the result     | proviso / qualification (2.4)                       | "subject to obtaining consent"               |
-| **whether A runs at all**      | `around`    | may *decline* to call A               | priority (2.1), exception (2.2), defeasibility (2.7) | "notwithstanding"; "except when"             |
-| **nothing** (explicit no-wrap) | identity    | always proceed, change nothing        | savings / preservation (2.5)                        | "without affecting"; "shall not limit"       |
+| Mode (what B changes)          | Advice kind | `proceed()` behaviour                | Subsumes                                             | Legal reading                                |
+| ------------------------------ | ----------- | ------------------------------------ | ---------------------------------------------------- | -------------------------------------------- |
+| A's **inputs / applicability** | `before`    | call A with transformed/guarded args | condition precedent (2.3), domain restriction (2.6)  | "subject to approval"; "for the purposes of" |
+| A's **output**                 | `after`     | call A, then transform the result    | proviso / qualification (2.4)                        | "subject to obtaining consent"               |
+| **whether A runs at all**      | `around`    | may _decline_ to call A              | priority (2.1), exception (2.2), defeasibility (2.7) | "notwithstanding"; "except when"             |
+| **nothing** (explicit no-wrap) | identity    | always proceed, change nothing       | savings / preservation (2.5)                         | "without affecting"; "shall not limit"       |
 
-The load-bearing primitive is `around`-advice's **`proceed()`**: B receives A as a *suspended computation* and decides (a) whether to run it, (b) with what inputs, and (c) what to do with its result. (The OOP gloss is identical — B overrides A's method and may or may not call `super()`.) Everything in §2.1–2.7 is then a special case:
+The load-bearing primitive is `around`-advice's **`proceed()`**: B receives A as a _suspended computation_ and decides (a) whether to run it, (b) with what inputs, and (c) what to do with its result. (The OOP gloss is identical — B overrides A's method and may or may not call `super()`.) Everything in §2.1–2.7 is then a special case:
 
-- **"Notwithstanding"** = around-advice that *declines* `proceed()` — B's result replaces A's entirely.
+- **"Notwithstanding"** = around-advice that _declines_ `proceed()` — B's result replaces A's entirely.
 - **"Subject to … provided that …"** = `before` (guard the input) composed with a **proviso** = `after` (transform the output).
-- **Savings clause** = the *identity* advice — an explicit declaration that B does **not** wrap A, defeating implied override (§4.4).
+- **Savings clause** = the _identity_ advice — an explicit declaration that B does **not** wrap A, defeating implied override (§4.4).
 - **Defeasibility** (2.7) = around-advice whose decision to proceed depends on whether a defeater fired — i.e. NAF / default logic under the hood (§5.3, §5.6).
 
 So the apparent seven collapse to **two boundary transforms (in, out) + one control decision (proceed?)** — the full override lattice. This also closes the loop with the regulative layer: the deontic clause `PARTY p MUST X SUBJECT TO (p SHANT Y) LEST Z` is exactly around-advice that, on the prohibited event Y, refuses `proceed()` and runs the handler Z. The cancellation-scope reading (structured concurrency) and the advice reading are the same construct.
 
-### 2.9 The third mode: modifying A's *internals* (amendment as homoiconic rewrite)
+### 2.9 The third mode: modifying A's _internals_ (amendment as homoiconic rewrite)
 
-`before`/`after`/`around` all treat A as a **black box** — they touch only its inputs, its output, and whether it runs. A fourth, strictly more invasive mode modifies A's **internal logic**: *"in section A, the word 'X' shall be construed as 'Y'."* Computationally this is a **macro / homoiconic source rewrite** — B receives A's *code* (its AST), not its behaviour, and edits it. This is the exact shape of a **legislative amendment** (a textual/structural change), as distinct from an *override* (a behavioural interception).
+`before`/`after`/`around` all treat A as a **black box** — they touch only its inputs, its output, and whether it runs. A fourth, strictly more invasive mode modifies A's **internal logic**: _"in section A, the word 'X' shall be construed as 'Y'."_ Computationally this is a **macro / homoiconic source rewrite** — B receives A's _code_ (its AST), not its behaviour, and edits it. This is the exact shape of a **legislative amendment** (a textual/structural change), as distinct from an _override_ (a behavioural interception).
 
 The distinction is a hard design boundary, because it decides whether modular verification survives:
 
-|                  | Behavioural override (boundary advice) | Textual amendment (internal rewrite) |
-| ---------------- | --------------------------------------- | ------------------------------------ |
-| What changes     | A's *behaviour* at runtime              | A's *text*                           |
-| A in isolation   | still readable / verifiable             | no longer meaningful on its own      |
-| Composition      | A and B analysed separately             | must re-analyse the rewritten A′     |
-| CS analogue      | decorator / middleware / AOP advice     | macro / quasiquotation / transform   |
+|                | Behavioural override (boundary advice) | Textual amendment (internal rewrite) |
+| -------------- | -------------------------------------- | ------------------------------------ |
+| What changes   | A's _behaviour_ at runtime             | A's _text_                           |
+| A in isolation | still readable / verifiable            | no longer meaningful on its own      |
+| Composition    | A and B analysed separately            | must re-analyse the rewritten A′     |
+| CS analogue    | decorator / middleware / AOP advice    | macro / quasiquotation / transform   |
 
-**Design rule (the verification boundary).** Boundary advice (`before`/`after`/`around`) is first-class and statically analysable. Internal rewriting is **not** a runtime homoiconic mechanism; it is an explicit **source-to-source transform that *materialises* a fresh, re-typecheckable `.l4` provision A′.** This mirrors how a *consolidated statute* publishes the amended text rather than the amendment diff: you keep the full homoiconic power for amendments, but you materialise the result so the amended provision can still be read and verified standalone. (It is the same discipline the PROLEG→L4 transpiler adopts: emit concrete `.l4`, validate by re-running the typechecker — never trust an un-materialised transform.)
+**Design rule (the verification boundary).** Boundary advice (`before`/`after`/`around`) is first-class and statically analysable. Internal rewriting is **not** a runtime homoiconic mechanism; it is an explicit **source-to-source transform that _materialises_ a fresh, re-typecheckable `.l4` provision A′.** This mirrors how a _consolidated statute_ publishes the amended text rather than the amendment diff: you keep the full homoiconic power for amendments, but you materialise the result so the amended provision can still be read and verified standalone. (It is the same discipline the PROLEG→L4 transpiler adopts: emit concrete `.l4`, validate by re-running the typechecker — never trust an un-materialised transform.)
 
 ---
 
@@ -429,13 +429,13 @@ Contract specification languages like CSL use temporal operators and explicit br
 
 ### 5.5 Aspect-Oriented Programming (the wrapping model)
 
-AOP (Kiczales et al., 1997; AspectJ) is the most direct computational model for §2.8. *Advice* (`before` / `after` / `around`) runs at *join points* selected by a *pointcut*; `around` advice's `proceed()` decides whether and how to invoke the wrapped code. The mapping is exact: the override clause is the advice, the **explicit cross-reference** ("`NOTWITHSTANDING` Section 5.2") is the pointcut selecting A, and "notwithstanding" is `around` advice that declines to `proceed()`. AOP also supplies the cautionary note — unrestricted pointcuts make programs hard to reason about, the analogue of §4.1's "anything to the contrary," which is why §6.5 insists on explicit join-point references.
+AOP (Kiczales et al., 1997; AspectJ) is the most direct computational model for §2.8. _Advice_ (`before` / `after` / `around`) runs at _join points_ selected by a _pointcut_; `around` advice's `proceed()` decides whether and how to invoke the wrapped code. The mapping is exact: the override clause is the advice, the **explicit cross-reference** ("`NOTWITHSTANDING` Section 5.2") is the pointcut selecting A, and "notwithstanding" is `around` advice that declines to `proceed()`. AOP also supplies the cautionary note — unrestricted pointcuts make programs hard to reason about, the analogue of §4.1's "anything to the contrary," which is why §6.5 insists on explicit join-point references.
 
 ### 5.6 PROLEG and the negation-as-failure gloss
 
-PROLEG (Satoh et al., JURISIN 2010) is a pointed precedent for how to *surface* defeasibility. It deliberately **refuses to expose first-class negation-as-failure**; instead a rule carries named exceptions — `H <= B`, `exception(H, E)`, with exceptions-to-exceptions for counter-rebuttals — and the "no applicable exception" step (the NAF) is hidden inside the meta-interpreter. The documented motive is familiarity: "general rule + exceptions" is how *lawyers* reason; it is equally how *imperative programmers* read "default behaviour + exception handling," and how *logicians* read default logic — one construct, three familiar audiences.
+PROLEG (Satoh et al., JURISIN 2010) is a pointed precedent for how to _surface_ defeasibility. It deliberately **refuses to expose first-class negation-as-failure**; instead a rule carries named exceptions — `H <= B`, `exception(H, E)`, with exceptions-to-exceptions for counter-rebuttals — and the "no applicable exception" step (the NAF) is hidden inside the meta-interpreter. The documented motive is familiarity: "general rule + exceptions" is how _lawyers_ reason; it is equally how _imperative programmers_ read "default behaviour + exception handling," and how _logicians_ read default logic — one construct, three familiar audiences.
 
-The deeper lesson for `SUBJECT TO`: legal negation/override is **never neutral**. `exception(H, E)` is strictly more expressive than `H :- …, not E`, because it also records *who bears the burden* of establishing the exception (plaintiff proves the rule's facts; defendant the exception; plaintiff the counter-exception) — information that bare NAF erases. So an L4 override construct should be able to **carry the burden allocation**, not just the truth condition. (L4's PROLEG bridge maps `exception(H, E)` → `… AND NOT E` for decision-only fidelity — sound only when the signed dependency graph is **stratified** — and preserves the burden layer separately; see the PROLEG↔L4 transpiler notes and `TYPICALLY-DEFAULTS-SPEC.md` for the presumption side.)
+The deeper lesson for `SUBJECT TO`: legal negation/override is **never neutral**. `exception(H, E)` is strictly more expressive than `H :- …, not E`, because it also records _who bears the burden_ of establishing the exception (plaintiff proves the rule's facts; defendant the exception; plaintiff the counter-exception) — information that bare NAF erases. So an L4 override construct should be able to **carry the burden allocation**, not just the truth condition. (L4's PROLEG bridge maps `exception(H, E)` → `… AND NOT E` for decision-only fidelity — sound only when the signed dependency graph is **stratified** — and preserves the burden layer separately; see the PROLEG↔L4 transpiler notes and `TYPICALLY-DEFAULTS-SPEC.md` for the presumption side.)
 
 ---
 
@@ -494,7 +494,7 @@ A QUALIFIED BY q          -- after:  transform the output (proviso)
 A WITHOUT AFFECTING C     -- identity: explicit non-wrap (savings clause)
 ```
 
-Each names the **target provision explicitly** (the pointcut), so the override graph is inspectable — directly enabling the acyclicity/completeness checks of §4.2 and Open Question §7.5. Internal amendments are a separate, *materialising* form (§2.9):
+Each names the **target provision explicitly** (the pointcut), so the override graph is inspectable — directly enabling the acyclicity/completeness checks of §4.2 and Open Question §7.5. Internal amendments are a separate, _materialising_ form (§2.9):
 
 ```
 -- PROPOSED: textual amendment → emits a fresh, re-typechecked provision A′
@@ -503,15 +503,15 @@ AMEND A REPLACING `X` WITH `Y`
 
 ### 6.6 Relationship to TYPICALLY (defaults are the simplest advice)
 
-A rebuttable presumption (`TYPICALLY`, see `TYPICALLY-DEFAULTS-SPEC.md`) is just the *weakest* `before`-advice: it supplies a **missing input** before A runs. This unifies the two specs along a single axis of increasing strength:
+A rebuttable presumption (`TYPICALLY`, see `TYPICALLY-DEFAULTS-SPEC.md`) is just the _weakest_ `before`-advice: it supplies a **missing input** before A runs. This unifies the two specs along a single axis of increasing strength:
 
-| Construct                        | Advice kind   | What it touches                       |
-| -------------------------------- | ------------- | ------------------------------------- |
-| `TYPICALLY v`                    | `before`      | fills an *absent* input with a default |
-| `PROVIDED g`                     | `before`      | *guards* an input / applicability      |
-| `QUALIFIED BY q`                 | `after`       | transforms the *output*                |
-| `SUBJECT TO` / `NOTWITHSTANDING` | `around`      | controls *whether A runs*              |
-| `AMEND`                          | source rewrite | edits A's *internals* (materialised)  |
+| Construct                        | Advice kind    | What it touches                        |
+| -------------------------------- | -------------- | -------------------------------------- |
+| `TYPICALLY v`                    | `before`       | fills an _absent_ input with a default |
+| `PROVIDED g`                     | `before`       | _guards_ an input / applicability      |
+| `QUALIFIED BY q`                 | `after`        | transforms the _output_                |
+| `SUBJECT TO` / `NOTWITHSTANDING` | `around`       | controls _whether A runs_              |
+| `AMEND`                          | source rewrite | edits A's _internals_ (materialised)   |
 
 Defaults, provisos, and overrides are therefore not separate features but points on one advice lattice — a single mental model for the whole "subject to" family, with the burden-of-proof attribution (§5.6) as an orthogonal annotation each can carry.
 

@@ -12,30 +12,30 @@ A loan/credit agreement is the textbook case where the two faces of deontic
 obligation collide:
 
 - **Achievement obligations** (Governatori's term; CSL's "punctual"
-  obligations): *borrower MUST pay interest each period*, *MUST deliver audited
-  financials annually*. These are **liveness** — `∃` an event before a deadline.
+  obligations): _borrower MUST pay interest each period_, _MUST deliver audited
+  financials annually_. These are **liveness** — `∃` an event before a deadline.
   They are **one-shot** (this period) or **renewing** (every period). They drive
   the contract forward through a sequence of states. In jl4 they are exactly a
   `Deonton` with `modal = DMust` and a `due` deadline, whose `hence` is the next
   obligation in the cascade.
 
-- **Maintenance obligations** (the negative covenants): *MUSTNOT let leverage
-  exceed 3.0×*, *MUSTNOT sell collateral*, *MUSTNOT pay dividends while a
-  covenant is breached*. These are **safety** — `∀` instants in an interval,
+- **Maintenance obligations** (the negative covenants): _MUSTNOT let leverage
+  exceed 3.0×_, _MUSTNOT sell collateral_, _MUSTNOT pay dividends while a
+  covenant is breached_. These are **safety** — `∀` instants in an interval,
   nothing bad ever happens. They are **continuous** and **standing**: they must
-  hold *across every state the achievement obligations move the contract
-  through*. This is the classical **frame problem**: when a `MUST pay interest`
+  hold _across every state the achievement obligations move the contract
+  through_. This is the classical **frame problem**: when a `MUST pay interest`
   fires its `HENCE` and the contract steps to the next period, the standing
-  prohibitions must be *carried over* to the new state, not silently dropped.
+  prohibitions must be _carried over_ to the new state, not silently dropped.
 
-"Good standing" (Flood & Goodenough, *Contract as Automaton*) is the
+"Good standing" (Flood & Goodenough, _Contract as Automaton_) is the
 **conjunction of all in-force maintenance obligations ∧ no payment default**,
 **framed** (re-asserted) across every transition the achievement obligations
 cause. The performing state is exactly: good standing holds.
 
 The headline finding (Section 3): **jl4 today can express a maintenance
 obligation only as a `SHANT ... WITHIN d` that watches the event stream until
-*its own* deadline `d` and then FULFILLS and disappears** (Machine.hs:977–986).
+_its own_ deadline `d` and then FULFILLS and disappears** (Machine.hs:977–986).
 It does **not** persist across a sibling achievement obligation's `HENCE`
 cascade unless you manually re-`RAnd` it into every successor — there is no
 frame rule. That is the single most important gap.
@@ -47,13 +47,13 @@ frame rule. That is the single most important gap.
 I choose **event calculus + a fragment of linear/branching temporal deontic
 logic**, because:
 
-- jl4's machine is *literally* an event machine over a **linear event trace**
+- jl4's machine is _literally_ an event machine over a **linear event trace**
   (`ScrutinizeEvents`/`ScrutinizeEvent`, Machine.hs:934–947): events
   `EVENT party action time` are consumed in order. Event calculus
   (initiates/terminates/holdsAt over a timeline of happenings) is the closest
   match to what the code does.
 - Achievement = liveness and maintenance = safety are most crisply stated in
-  LTL/CTL, and the double-bind property needs a branching ("no *reachable*
+  LTL/CTL, and the double-bind property needs a branching ("no _reachable_
   state") quantifier, so CTL is the right specification logic.
 - The RAnd/ROr product is a CSL-style synchronous product (Hvitved); I use that
   vocabulary for the composition, automata vocabulary for "good standing."
@@ -75,7 +75,7 @@ Events (happenings) at integer times t:
 ```
 
 `HoldsAt(f, t)` and the inertia axiom (a fluent keeps its value until an event
-terminates it) are *exactly* the frame axioms we will need; jl4 has no built-in
+terminates it) are _exactly_ the frame axioms we will need; jl4 has no built-in
 notion of a fluent that persists, which is the gap.
 
 ### 1.2 The two obligation kinds (worked)
@@ -89,7 +89,7 @@ Ach_interest(k) ≜  F[s_k, s_k+30] pay(B, interest, ·)
 ```
 
 LTL/MTL: `□ ( startPeriod_k → ◇_{≤30} pay(B,interest) )`. Liveness, bounded.
-Renewal: `Ach_interest(k).hence = Ach_interest(k+1)` — the HENCE cascade *is* the
+Renewal: `Ach_interest(k).hence = Ach_interest(k+1)` — the HENCE cascade _is_ the
 period transition. Annual financials: same shape, window 365.
 
 **Maintenance (standing), leverage covenant** over the whole life `[0, T]`:
@@ -128,17 +128,17 @@ property to preserve:   GoodStanding(σ_k) ⇒ checked again at σ_{k+1}
 ```
 
 In words: paying interest advances the period but **does not absolve** the
-borrower of the leverage and collateral covenants — those flags are *framed
-forward unchanged* and re-checked in the new state. This is precisely what jl4
+borrower of the leverage and collateral covenants — those flags are _framed
+forward unchanged_ and re-checked in the new state. This is precisely what jl4
 does **not** do automatically: its `SHANT` lives in its own `WITHIN` window and
 is gone by `σ_{k+1}`.
 
 ### 1.4 The override as a priority / defeasibility relation
 
 Two concrete override shapes; both are **defeasible deontic logic**
-(Governatori): a more specific/prior rule *defeats* a general one.
+(Governatori): a more specific/prior rule _defeats_ a general one.
 
-**(a) Dividend-stopper / cash-sweep:** the dividend covenant is *conditional* on
+**(a) Dividend-stopper / cash-sweep:** the dividend covenant is _conditional_ on
 good standing — it is itself a maintenance obligation guarded by a fluent:
 
 ```
@@ -154,9 +154,9 @@ priority      :  r2 ≻ r1
 ```
 
 Defeasible reading: `O pay(coupon)` holds **unless** `r2` is triggered, in which
-case `F pay(coupon)` overrides and the failure to pay is *not* a breach. The
-defeater converts what would be an achievement breach into a *permitted
-omission*. Formally this is a priority order `≻` over rules with the standard
+case `F pay(coupon)` overrides and the failure to pay is _not_ a breach. The
+defeater converts what would be an achievement breach into a _permitted
+omission_. Formally this is a priority order `≻` over rules with the standard
 defeasible-logic proof condition: `r1` is defeated iff an applicable `r2 ≻ r1`
 fires.
 
@@ -170,7 +170,7 @@ monitors} over all event traces.
 ### Safety
 
 1. **No deontic double-bind (the headline property).** No reachable state in
-   which an action *forced* by a live achievement obligation *necessarily*
+   which an action _forced_ by a live achievement obligation _necessarily_
    violates a live standing prohibition:
 
    ```
@@ -178,15 +178,15 @@ monitors} over all event traces.
                      ∧  noPermittedAlternative(B, s) )
    ```
 
-   CTL `¬EF`: *no path reaches* a bind. Note the `noPermittedAlternative`
+   CTL `¬EF`: _no path reaches_ a bind. Note the `noPermittedAlternative`
    conjunct — under defeasible logic, if a defeater (Section 1.4b) downgrades
-   the obligation or a HENCE offers an escape, it is *not* a true bind. This is
+   the obligation or a HENCE offers an escape, it is _not_ a true bind. This is
    exactly the NZ-legislation race-condition class, lifted to loans.
 
 2. **Good-standing invariant is preserved by every transition.**
    `□ ( GoodStanding ∧ achievementStep → GoodStanding' )` — the frame rule is
-   sound: stepping a period never *silently* clears a covenant. (Today this
-   property is *violated by construction* in jl4 because the SHANT is dropped.)
+   sound: stepping a period never _silently_ clears a covenant. (Today this
+   property is _violated by construction_ in jl4 because the SHANT is dropped.)
 
 3. **Dividend safety.** `G ( covenantBreached → ¬ pay(dividend) )` holds on all
    traces.
@@ -194,11 +194,11 @@ monitors} over all event traces.
 ### Liveness
 
 4. **Achievement progress.** `□ ( startPeriod_k → ◇_{≤30} (pay(interest) ∨
-   declaredBreach) )` — every period either pays or breaches; no period hangs
+declaredBreach) )` — every period either pays or breaches; no period hangs
    forever (jl4's deadline machinery, Machine.hs:977, guarantees the disjunct).
 
 5. **Deadline-vs-precondition deadlock (a temporal property, NOT a safety one).**
-   A `MUST α WITHIN d PROVIDED g` where `g` can only become true *after* `d` is a
+   A `MUST α WITHIN d PROVIDED g` where `g` can only become true _after_ `d` is a
    guaranteed breach — a one-party deadlock:
 
    ```
@@ -208,19 +208,19 @@ monitors} over all event traces.
 
    This is the loan analogue of "regulator MUST approve in 30 days but MAY NOT
    approve until an assessment with no deadline completes." It is checkable as
-   reachability of the guard within the deadline horizon. jl4 will *detect* the
+   reachability of the guard within the deadline horizon. jl4 will _detect_ the
    breach at runtime (the deadline fires, PROVIDED never matched, Machine.hs:990)
-   but cannot *statically warn* that the guard is unsatisfiable in-window.
+   but cannot _statically warn_ that the guard is unsatisfiable in-window.
 
 ### What model-checks against what
 
-| Property | Logic | Tool style |
-|---|---|---|
-| double-bind (1) | CTL `¬EF` | NuSMV / branching |
-| frame preservation (2) | LTL `□(...→...')` | SPIN/TLA+ |
-| dividend safety (3) | LTL `G(...)` | SPIN |
-| achievement progress (4) | MTL `◇_{≤d}` | UPPAAL (timed) |
-| deadline/precondition (5) | CTL reachability | NuSMV |
+| Property                  | Logic             | Tool style        |
+| ------------------------- | ----------------- | ----------------- |
+| double-bind (1)           | CTL `¬EF`         | NuSMV / branching |
+| frame preservation (2)    | LTL `□(...→...')` | SPIN/TLA+         |
+| dividend safety (3)       | LTL `G(...)`      | SPIN              |
+| achievement progress (4)  | MTL `◇_{≤d}`      | UPPAAL (timed)    |
+| deadline/precondition (5) | CTL reachability  | NuSMV             |
 
 ---
 
@@ -234,9 +234,9 @@ monitors} over all event traces.
   `BREACH`/`LEST`.
 - **Recurring achievement (renewal):** encode the next period as the `HENCE`,
   i.e. `... HENCE (PARTY B MUST pay interest WITHIN 30 HENCE ...)`. The cascade
-  *is* the period sequence. (`continueWithFollowup`, Machine.hs:1147.)
+  _is_ the period sequence. (`continueWithFollowup`, Machine.hs:1147.)
 - **Sequential reparation:** `LEST` is the breach handler; `HENCE`/`LEST` run on
-  the *remaining* events (Machine.hs:986, 996, 1040, 1053) — a genuine
+  the _remaining_ events (Machine.hs:986, 996, 1040, 1053) — a genuine
   sequential cascade.
 - **Bounded prohibition:** `PARTY B SHANT sell collateral WITHIN d`.
   `modal = DMustNot`. Machine.hs:1038–1051: prohibited act seen in window →
@@ -254,43 +254,43 @@ monitors} over all event traces.
   `ROr` succeeds on the first fulfilment (1066, 1124–1131); an irreducible pair
   parks as a `ValROp` residual (`ValROp env op …`, ValueLazy.hs:58;
   Machine.hs:1137) and keeps watching later events.
-- **AT1-style override, *partially*:** `ROr` of "MUST pay coupon" with a guarded
-  permission gives you *a* form of choice, and `PROVIDED` lets the coupon
-  obligation itself be conditioned on `NOT breachesBuffer`. So a *hand-wired*
+- **AT1-style override, _partially_:** `ROr` of "MUST pay coupon" with a guarded
+  permission gives you _a_ form of choice, and `PROVIDED` lets the coupon
+  obligation itself be conditioned on `NOT breachesBuffer`. So a _hand-wired_
   defeater is expressible.
 - **Visualization of the achievement skeleton:** `StateGraph.hs` already
   extracts states/transitions from the `HENCE`/`LEST` chains
   (StateGraph.hs:269–370), rendering FULFILLED/BREACH terminals — i.e. the
-  Flood-&-Goodenough automaton of the *achievement* part.
+  Flood-&-Goodenough automaton of the _achievement_ part.
 
 ### 3.2 MISSING (the gaps, in priority order)
 
 1. **A first-class standing / ambient maintenance obligation (the frame rule).**
-   A `SHANT` is scoped to its own `WITHIN` window and is *consumed* once that
+   A `SHANT` is scoped to its own `WITHIN` window and is _consumed_ once that
    window closes (Machine.hs:983–986: deadline passed ⇒ FULFILLED ⇒ gone).
    There is **no construct that says "this prohibition holds for the whole life
    of the contract, across every HENCE step of every sibling obligation."** To
    get standing behaviour today you must manually `RAnd` the covenant into the
-   contract *and* re-inject it into every successor of every cascade — there is
+   contract _and_ re-inject it into every successor of every cascade — there is
    no automatic framing. `StateGraph.hs` confirms the omission structurally: it
-   treats `RAnd` as two *independent* sub-graphs (StateGraph.hs:240–248), so a
+   treats `RAnd` as two _independent_ sub-graphs (StateGraph.hs:240–248), so a
    covenant is never drawn as an invariant on the achievement states.
 
 2. **A priority / override / defeasibility operator.** `RAnd` is symmetric
    conjunction; `ROr` is symmetric disjunction. There is **no asymmetric
    "r2 defeats r1" operator**. The "prohibition defeats obligation" relation can
-   only be *simulated* by threading a `PROVIDED NOT breachesBuffer` guard onto
-   the obligation by hand; the defeasible *priority order* itself is not a
+   only be _simulated_ by threading a `PROVIDED NOT breachesBuffer` guard onto
+   the obligation by hand; the defeasible _priority order_ itself is not a
    language construct, so it cannot be reasoned about or visualized.
 
 3. **A frame axiom over fluents.** jl4 events are discrete `EVENT party action
-   time` happenings; there is no `HoldsAt`/inertia for time-varying *fluents*
+time` happenings; there is no `HoldsAt`/inertia for time-varying _fluents_
    like `leverage`. A covenant on a continuously-varying quantity must be
    re-tested via a `PROVIDED`/observation event; there is no persistence
    semantics. (No fluent type in `Value`, ValueLazy.hs:48–70.)
 
 4. **Static conflict detection (the double-bind, ahead of runtime).** The
-   machine detects a *runtime* breach when a deadline fires (Machine.hs:990–995),
+   machine detects a _runtime_ breach when a deadline fires (Machine.hs:990–995),
    but there is no analyzer that, before any event stream, proves "no reachable
    state forces an action a standing prohibition forbids" — i.e. property (1)/(5)
    of Section 2 is not model-checked. This is the highest-value verification
@@ -337,14 +337,14 @@ loanGoodStanding MEANS
   interestObligation RAND noCollateralSale RAND dividendGate
 ```
 
-This *runs*, but `noCollateralSale` and `dividendGate` only watch until their own
+This _runs_, but `noCollateralSale` and `dividendGate` only watch until their own
 `WITHIN`, and each `HENCE` renewal of `interestObligation` does **not** re-attach
 them. So the "good standing" is only as long-lived as the shortest `WITHIN`.
 
 ### 4.2 PROPOSED minimal additions
 
 **(P1) `ALWAYS` / standing-prohibition modifier (the frame rule).** A covenant
-that is *automatically* re-asserted across every HENCE step of every sibling for
+that is _automatically_ re-asserted across every HENCE step of every sibling for
 the contract's life:
 
 ```l4
@@ -356,7 +356,7 @@ leverageCovenant MEANS
 ```
 
 Semantics (PROPOSED): an `ALWAYS SHANT C` desugars to a monitor that is
-`RAnd`-composed with the *whole* contract **and** automatically re-injected into
+`RAnd`-composed with the _whole_ contract **and** automatically re-injected into
 the `HENCE` and `LEST` of every `Deonton` reachable from it — i.e. an automatic
 frame rule. Operationally: a standing `ValObligation` that is **not** retired
 when an unrelated deadline passes; only an explicit release event clears it.
@@ -390,8 +390,8 @@ the lower rule's obligation is downgraded to permission and cannot produce a
 
 ## 5. Lineage
 
-- **Compositional / synchronous contracts.** Hvitved, *Contract Specification
-  Language (CSL)* and *A Trace-Based Model for Multiparty Contracts* — the
+- **Compositional / synchronous contracts.** Hvitved, _Contract Specification
+  Language (CSL)_ and _A Trace-Based Model for Multiparty Contracts_ — the
   RAnd/ROr synchronous product, blame on the earlier-timed breach, and the
   irreducible-pair residual are CSL idioms (Machine.hs:1077–1138).
 - **Achievement vs. maintenance obligations; defeasible deontic logic.**
@@ -405,8 +405,8 @@ the lower rule's obligation is downgraded to permission and cannot produce a
   (achievement), CTL `¬EF`/reachability for the double-bind and
   deadline-vs-precondition deadlock (Section 2); deontic O/P/F over a temporal
   base (von Wright lineage, normative-systems tradition).
-- **Contract as automaton / "good standing."** Flood & Goodenough, *Contract as
-  Automaton* — the performing state as the conjunction of in-force maintenance
+- **Contract as automaton / "good standing."** Flood & Goodenough, _Contract as
+  Automaton_ — the performing state as the conjunction of in-force maintenance
   obligations framed across transitions; already cited in `StateGraph.hs:9`.
 
 ---
@@ -418,6 +418,6 @@ frame rule (P1) — a covenant that persists across the entire HENCE/LEST cascad
 without manual re-`RAnd`ing — and treat it as the semantic primitive from which
 "good standing" and the static double-bind check are derived.** Everything else
 (the `DEFEATS` override, the `#CONFLICT` analyzer) builds cleanly on top of it,
-and it closes the one gap that is *unsound today*: jl4 silently drops a negative
+and it closes the one gap that is _unsound today_: jl4 silently drops a negative
 covenant the moment its `WITHIN` window passes, so an agreement can model-check
 as performing while a leverage or collateral covenant has, in fact, lapsed.

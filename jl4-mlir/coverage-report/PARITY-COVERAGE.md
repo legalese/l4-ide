@@ -28,7 +28,13 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
 **227 of 227 real comparisons (100%) are byte-identical — the extended sweep
-passes (`PARITY OK`).** This is the post-merge board: the three adversarial-lane
+passes (`PARITY OK`).** Re-measured after merging ~6 weeks of `unstable` into the
+lane, where it first came back **213/14** and had to be earned again: `a9caf2f6`
+had changed the reference's wire format (plain constructor names, `NOTHING` as
+`null`, `JUST x` unwrapped) while this backend still spoke the old dialect. See
+**ledger #13** in [`../PARITY-HUNT-LOG.md`](../PARITY-HUNT-LOG.md) — including
+why the party/action backtick asymmetry in a deontic OBLIGATION is correct on
+both sides and must not be harmonised. This is the post-merge board: the three adversarial-lane
 fix sets (#7 string ordering + NUL, #8 fail-closed deontic, #10 EITHER
 `CONSIDER`) plus the ledger-#12 code-point string-builtin fix, measured over the
 coverage.json corpus + `list-probe` + `either-probe` + the four

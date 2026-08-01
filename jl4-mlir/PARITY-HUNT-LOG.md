@@ -5,16 +5,16 @@ say _what_ each fix does; this says _why the bugs existed_, _how they were found
 _what was tried and rejected_, and _what is still open_. Read this first, then the
 commits.
 
-| commit     | what                                                        |
-| ---------- | ----------------------------------------------------------- |
-| `7c61c21f` | the hunt: curated `cases.json` across the corpus            |
-| `b2ac28f3` | Finding 2 — DATE-operand arithmetic crash (ABI split)       |
-| `692e0f0b` | same-arity overload collision (`Weekday of`)                |
-| `a68195f2` | call-graph diagnostic propagation → prelude `go` collision  |
-| `8e33fbdc` | Finding 1 — bare-head param enrichment (fixes `factorial`)  |
-| `62f5f909` | bundle-wide L4 type map (clears #6; `is-a-weekday` compiles) |
+| commit     | what                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------- |
+| `7c61c21f` | the hunt: curated `cases.json` across the corpus                                                               |
+| `b2ac28f3` | Finding 2 — DATE-operand arithmetic crash (ABI split)                                                          |
+| `692e0f0b` | same-arity overload collision (`Weekday of`)                                                                   |
+| `a68195f2` | call-graph diagnostic propagation → prelude `go` collision                                                     |
+| `8e33fbdc` | Finding 1 — bare-head param enrichment (fixes `factorial`)                                                     |
+| `62f5f909` | bundle-wide L4 type map (clears #6; `is-a-weekday` compiles)                                                   |
 | (lanes)    | three adversarial-workflow lanes, merged: #7 str-ordering + NUL, #8 fail-closed deontic, #10 EITHER `CONSIDER` |
-| `198a1a38` | code-point STRINGLENGTH/INDEXOF/CHARAT/SUBSTRING (clears #12) |
+| `198a1a38` | code-point STRINGLENGTH/INDEXOF/CHARAT/SUBSTRING (clears #12)                                                  |
 
 Findings + matrices: [`coverage-report/PARITY-COVERAGE.md`](./coverage-report/PARITY-COVERAGE.md).
 Per-item fix tracker: [`../specs/todo/mlir-parity-fixes.md`](../specs/todo/mlir-parity-fixes.md).
@@ -34,20 +34,21 @@ ship; a 🔴 is not.
   routes to fallback. Capability gap still open.
 - 🔴 **OPEN** — still silently wrong, or untested.
 
-| #   | Bug                                                                       | State | Where                               | Guarded by                                          |
-| --- | ------------------------------------------------------------------------- | ----- | ----------------------------------- | --------------------------------------------------- |
-| 1   | **DATE operand in `PLUS`/`MINUS`** → wasm crash (ABI split)               | ✅    | `b2ac28f3` `lowerRatBinop`          | `datetime-probe.cases.json` — **CI Tier-2**         |
-| 2   | **Same-arity top-level overloads** collapse → wrong body (`Weekday of`)   | ✅    | `692e0f0b` `symbolFor`              | Haskell `same-arity overloads → distinct symbols`   |
-| 3   | **Lifted local helpers collapse** → `sum [2,3,4] == 3` **in the prelude** | ✅    | `a68195f2` `localSymbolFor`         | `list-probe.cases.json` — **CI Tier-2** (+ Haskell) |
-| 4   | **`emittedBodies` false self-collision** (untraced + `$trace` re-emit)    | ✅    | `a68195f2`                          | Haskell (would spuriously refuse the corpus)        |
-| 5   | **Unsupported helper never reached its caller** (diagnostics discarded)   | ✅    | `a68195f2` `propagateDiagnostics`   | Haskell `unsupported helper → caller unsupported`   |
-| 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable       | ✅    | `62f5f909` `funcL4Types`            | `datetime-probe.cases.json` — **CI Tier-2** (+ Haskell) |
-| 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | ✅    | `__l4_str_cmp` + synonym unfolding  | `britishcitizen5.cases.json` (5 cells) + `str-ordering-probe` — **CI Tier-2 candidate** (+ Haskell + JS) |
-| 8   | **`ceo-performance-award`** — deontic, refuses; now differentially tested  | 🟡    | refuses honestly (2 real gaps)      | harness (refused-unsupported) + `.cases.json.pending` + Haskell |
-| 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
-| 10  | **`orchestrator` helpers** — `CONSIDER` ctor `RIGHT`/`LEFT` (EITHER) unresolved | ✅ | `either-consider` LEFT/RIGHT lowering | `either-probe.cases.json` — **CI Tier-2** (+ Haskell) |
-| 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision        | 🟡    | **by design** (see below)           | Haskell `overload collision → supported:false`      |
-| 12  | **STRINGLENGTH/INDEXOF/CHARAT/SUBSTRING** — UTF-16 code-unit semantics; SUBSTRING read arg 3 as an end index | ✅ | `198a1a38` (runtime code-point conversion) | `str-index-probe.cases.json` (+ JS unit tests) |
+| #   | Bug                                                                                                          | State | Where                                      | Guarded by                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------ | ----- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| 1   | **DATE operand in `PLUS`/`MINUS`** → wasm crash (ABI split)                                                  | ✅    | `b2ac28f3` `lowerRatBinop`                 | `datetime-probe.cases.json` — **CI Tier-2**                                                              |
+| 2   | **Same-arity top-level overloads** collapse → wrong body (`Weekday of`)                                      | ✅    | `692e0f0b` `symbolFor`                     | Haskell `same-arity overloads → distinct symbols`                                                        |
+| 3   | **Lifted local helpers collapse** → `sum [2,3,4] == 3` **in the prelude**                                    | ✅    | `a68195f2` `localSymbolFor`                | `list-probe.cases.json` — **CI Tier-2** (+ Haskell)                                                      |
+| 4   | **`emittedBodies` false self-collision** (untraced + `$trace` re-emit)                                       | ✅    | `a68195f2`                                 | Haskell (would spuriously refuse the corpus)                                                             |
+| 5   | **Unsupported helper never reached its caller** (diagnostics discarded)                                      | ✅    | `a68195f2` `propagateDiagnostics`          | Haskell `unsupported helper → caller unsupported`                                                        |
+| 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable                                          | ✅    | `62f5f909` `funcL4Types`                   | `datetime-probe.cases.json` — **CI Tier-2** (+ Haskell)                                                  |
+| 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates                                             | ✅    | `__l4_str_cmp` + synonym unfolding         | `britishcitizen5.cases.json` (5 cells) + `str-ordering-probe` — **CI Tier-2 candidate** (+ Haskell + JS) |
+| 8   | **`ceo-performance-award`** — deontic, refuses; now differentially tested                                    | 🟡    | refuses honestly (2 real gaps)             | harness (refused-unsupported) + `.cases.json.pending` + Haskell                                          |
+| 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1`                                    | ✅    | `enrichParamTypes` (Export.hs)             | `desc.cases.json` — **CI Tier-2** (+ Haskell)                                                            |
+| 10  | **`orchestrator` helpers** — `CONSIDER` ctor `RIGHT`/`LEFT` (EITHER) unresolved                              | ✅    | `either-consider` LEFT/RIGHT lowering      | `either-probe.cases.json` — **CI Tier-2** (+ Haskell)                                                    |
+| 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision                                           | 🟡    | **by design** (see below)                  | Haskell `overload collision → supported:false`                                                           |
+| 12  | **STRINGLENGTH/INDEXOF/CHARAT/SUBSTRING** — UTF-16 code-unit semantics; SUBSTRING read arg 3 as an end index | ✅    | `198a1a38` (runtime code-point conversion) | `str-index-probe.cases.json` (+ JS unit tests)                                                           |
+| 13  | **The reference moved and we didn't** — backticked constructor names, `"NOTHING"`, `{"JUST":[x]}`            | ✅    | `exprToDeonticParty` + runtime MAYBE wire  | 14 sweep cells (`test`, `deontic-{sale,seatbelt,breach}`) + JS unit test                                 |
 
 **There are no remaining 🔴s.** Post-merge (all three lanes on the rebased branch) +
 the #12 fix, the boards stand at:
@@ -112,7 +113,7 @@ good manners to admit to.
   `lookupEnumTag`. `orchestrator`'s four helpers (`isViolation`, `getConfidence`,
   `getAllTests`, `extractText`) now compile cleanly; `evaluateClaim` **still refuses**,
   but its reason chain is now purely the legitimate IO one (`depends on
-  'callClaudeWithKey' … POST (IO) not supported`) — the 18 `RIGHT`/`LEFT` enum-tag
+'callClaudeWithKey' … POST (IO) not supported`) — the 18 `RIGHT`/`LEFT` enum-tag
   diagnostics are gone. Guarded by `either-probe.cases.json` (**15/15 byte-identical**,
   branch-crossing LEFT/RIGHT + payloads distinct from tags; NUMBER/STRING/BOOLEAN/LIST
   payloads + a nested CONSIDER mirroring `extractText`) and the Haskell test
@@ -161,7 +162,7 @@ good manners to admit to.
   and affects ALL enum-with-data returns. **Fix:** the earlier "blocked because
   `EnumInfo` can't distinguish enum-with-data from nullary" claim was wrong — no
   `EnumInfo` change is needed. **First cut (commit `8ab7b531`) was REFUTED as
-  too narrow** — it keyed the refusal on the *syntactic* GIVETH head type
+  too narrow** — it keyed the refusal on the _syntactic_ GIVETH head type
   (`givethTypeName`/`isDataEnum` in `lowerDecide`), which misses every
   enum-with-data that is not the bare written return type: a RECORD field of
   enum-with-data (`Wrapper HAS inner IS A Rev`), a `MAYBE`/`LIST OF`
@@ -371,6 +372,7 @@ attack.
    Wiring `str_cmp` **exposed two latent bugs** that had been masked while
    `britishcitizen5` refused wholesale (a refusal routes to the fallback; a
    compiled export does not):
+
    - **Marshalling.** jl4-core's `typeToParameter` matches primitive type
      **names** (`date`) before consulting the declares table, so a userland
      `DECLARE Date IS A STRING` was schema'd `format:date` and the runtime's
@@ -393,6 +395,7 @@ attack.
    Result: all **5** curated `britishcitizen5::is-British-citizen` cells (born
    before / **exactly on** / after each of the two date thresholds, UK and
    Gibraltar qualifying-territory paths) are byte-identical; Tier-2 stays 68+0.
+
 4. ✅ **Ledger #8 investigated + honest-refusal fix landed** (see below) —
    `ceo-performance-award` is now differentially exercised by the harness (it refuses)
    and by a Haskell regression test; its two real gaps are documented and gated by
@@ -459,6 +462,61 @@ an emoji in two. `SUBSTRING` was worse — it read its third argument as an end 
 (`SUBSTRING "hello" 1 3` → `"el"`, service says `"ell"`). All four now convert
 through code points; `str-index-probe.{l4,cases.json}` pins the whole matrix
 (26/26 byte-identical) alongside intrinsic-level JS unit tests.
+
+### Ledger #13 — the reference moved while the lane was away
+
+Found by re-running the sweep after merging ~6 weeks of `unstable` into the lane.
+The merge compiled clean, every Haskell suite passed, and the sweep still came
+back **213 byte-identical / 14 differs** against a board that had read 227/0.
+
+The merge changed **no file under `jl4-mlir/`**. `a9caf2f6` (PR #162) changed
+`jl4-service`, and `jl4-service` **is** the reference. Three deliberate changes,
+for the reason that commit states outright — _"It was handing out a schema its
+responses fail."_
+
+| surface          | before (what we still emitted) | after (the reference today) |
+| ---------------- | ------------------------------ | --------------------------- |
+| constructor name | `` `the seller` ``             | `the seller`                |
+| `MAYBE` empty    | `"NOTHING"`                    | `null`                      |
+| `MAYBE` present  | `{"JUST":["x"]}`               | `"x"`                       |
+
+Each is a **silent wrong answer at `supported: true`** — the exact failure this
+whole lane exists to eliminate — and the backtick one is worse than cosmetic: the
+service declares the un-backticked spelling in its own `returnSchema` enum, so a
+caller validating our response against our own schema would reject it. `"NOTHING"`
+is the same bug as ledger #12 in a different coat: a value indistinguishable from
+a genuine string answer, which is precisely what `MAYBE STRING` exists to prevent.
+
+**The party/action asymmetry is deliberate — do not "clean it up".** On the same
+wire object the reference spells the party plain and the action backticked:
+
+```json
+{ "OBLIGATION": { "party": "the seller", "action": "`deliver the goods`" } }
+```
+
+They come from different places. The party is evaluated to a constructor VALUE
+and printed by `Backend.Jl4.constructorText`; the action is an unevaluated `Name`
+printed by `ValueLazyJSON`'s `obligationAction .= prettyLayout action`. Both
+spellings are measured byte-identical against a live service. Harmonising them —
+in either direction — re-breaks half the cells.
+
+**And a literal party splits the same way a parameter party already did.** The
+sweep only revealed this on the second pass, by _reversing_ the two remaining
+failures: unobserved (empty event stream), the reference prints the unevaluated
+expression and the backticks survive; observed, it prints the constructor value
+and they do not. The comment at that site used to assert literal parties "print
+identically either way" — true before `a9caf2f6`, false after, and believed until
+the harness contradicted it. `deonticSourceSpelling` reconstructs the source form
+rather than storing both spellings in the schema.
+
+Restored: **227 byte-identical, 0 differs, 5 honest refusals, `PARITY OK`**, with
+the trace sub-matrix at 62/165 — the figure this document already predicted.
+
+The general lesson for this lane: **a backend whose correctness is defined
+differentially has no such thing as a quiet merge.** `cabal build` and every
+golden in the repo were green while three wire surfaces were wrong, because
+nothing in the Haskell test suite compares us to the reference — only the sweep
+does. Re-run the sweep after every resync, not after every `jl4-mlir` change.
 
 ### Out-of-lane asymmetries — noted, triaged, not chased
 

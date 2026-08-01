@@ -1,6 +1,24 @@
 {
-  "dispatch-left-first": [ { "n": 5 }, { "n": 42 }, { "n": -3 }, { "n": -50 }, { "n": 0 } ],
-  "dispatch-compare":    [ { "n": 5 }, { "n": 15 }, { "n": -3 }, { "n": -50 }, { "n": 0 } ],
-  "dispatch-tagvals":    [ { "n": 5 }, { "n": -3 }, { "n": 0 } ],
-  "dispatch-nested-either": [ { "n": 150 }, { "n": 50 }, { "n": 5 }, { "n": -2 }, { "n": 0 } ]
+  "dispatch-left-first": [
+    { "n": 5 },
+    { "n": 42 },
+    { "n": -3 },
+    { "n": -50 },
+    { "n": 0 }
+  ],
+  "dispatch-compare": [
+    { "n": 5 },
+    { "n": 15 },
+    { "n": -3 },
+    { "n": -50 },
+    { "n": 0 }
+  ],
+  "dispatch-tagvals": [{ "n": 5 }, { "n": -3 }, { "n": 0 }],
+  "dispatch-nested-either": [
+    { "n": 150 },
+    { "n": 50 },
+    { "n": 5 },
+    { "n": -2 },
+    { "n": 0 }
+  ]
 }
