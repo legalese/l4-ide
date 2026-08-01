@@ -965,6 +965,7 @@ export type AiPermissionCategory =
   | 'l4.evaluate'
   | 'l4.refactor'
   | 'mcp.l4Rules'
+  | 'mcp.vscode'
   | 'meta.askUser'
 
 export type AiPermissionValue = 'never' | 'ask' | 'always'
@@ -984,6 +985,128 @@ export const AiPermissionsSet: NotificationType<{
   value: AiPermissionValue
 }> = {
   method: 'aiPermissionsSet',
+}
+
+/** One tool of an MCP server, with its own enable toggle. */
+export interface AiMcpToolInfo {
+  name: string
+  description?: string
+  enabled: boolean
+}
+
+/** One of OUR MCP servers, as shown in the sidebar's "MCP servers"
+ *  settings section. The extension runs these itself (http/sse/stdio,
+ *  with its own OAuth client for protected servers). */
+export interface AiMcpServerInfo {
+  id: string
+  name: string
+  /** `http` / `sse` / `stdio` when known. */
+  transport?: string
+  /** URL or command line, for display. */
+  detail?: string
+  enabled: boolean
+  /** Connection state of the extension's own client. `unauthorized`
+   *  means the server wants an OAuth sign-in — Start in the server
+   *  menu runs the browser flow. */
+  status: 'connected' | 'connecting' | 'error' | 'stopped' | 'unauthorized'
+  /** Human-readable connection failure, when status === 'error'. */
+  error?: string
+  tools: AiMcpToolInfo[]
+}
+
+/** An MCP server registered in VS Code's mcp.json that is NOT ours
+ *  yet — offered (toggled off) below our list. Toggling it on imports
+ *  a copy of its config into our list. */
+export interface AiMcpCandidateInfo {
+  id: string
+  name: string
+  transport?: string
+  detail?: string
+}
+
+/** Webview asks for the current MCP server list. `candidates` are
+ *  VS Code-registered servers offered for import; `allEnabled` is the
+ *  master switch shown atop the list when several servers exist. */
+export const AiMcpServersGet: RequestType<
+  void,
+  {
+    servers: AiMcpServerInfo[]
+    candidates: AiMcpCandidateInfo[]
+    allEnabled: boolean
+  }
+> = {
+  method: 'aiMcpServersGet',
+}
+
+/** Webview imports a VS Code-registered server: its config is copied
+ *  into our list (the mcp.json entry is untouched) and the server is
+ *  started. */
+export const AiMcpServerImport: RequestType<
+  { id: string },
+  { ok: boolean; error?: string }
+> = {
+  method: 'aiMcpServerImport',
+}
+
+/** Webview flips the master switch: off hides every MCP server's
+ *  tools from Legalese AI and drops the connections; on reconnects
+ *  the enabled servers. */
+export const AiMcpAllSetEnabled: NotificationType<{ enabled: boolean }> = {
+  method: 'aiMcpAllSetEnabled',
+}
+
+/** Webview toggles one MCP server on/off for Legalese AI. Persisted in
+ *  VSCode configuration under `legaleseAi.mcp.disabledServers`. */
+export const AiMcpServerSetEnabled: NotificationType<{
+  id: string
+  enabled: boolean
+}> = {
+  method: 'aiMcpServerSetEnabled',
+}
+
+/** Webview runs a state action on one server (three-dot menu):
+ *  start/refresh reconnects the extension's client (running the OAuth
+ *  browser flow when the server requires it), stop drops it, remove
+ *  deletes the entry from OUR list only (mcp.json is untouched). */
+export const AiMcpServerAction: RequestType<
+  { id: string; action: 'start' | 'stop' | 'refresh' | 'remove' },
+  { ok: boolean; error?: string }
+> = {
+  method: 'aiMcpServerAction',
+}
+
+/** Webview toggles a single tool of a server on/off for Legalese AI.
+ *  Persisted under `legaleseAi.mcp.disabledTools`. */
+export const AiMcpToolSetEnabled: NotificationType<{
+  serverId: string
+  toolName: string
+  enabled: boolean
+}> = {
+  method: 'aiMcpToolSetEnabled',
+}
+
+/** Webview adds a new MCP server to OUR list (the extension runs it
+ *  itself; VS Code's mcp.json is not involved). Returns `ok: false`
+ *  with a human-readable `error` on validation failure; a name
+ *  collision additionally sets `exists: true` so the UI can offer to
+ *  replace the entry (confirmed resubmit carries `overwrite: true`). */
+export const AiMcpServerAdd: RequestType<
+  {
+    name: string
+    transport: 'http' | 'sse' | 'stdio'
+    /** For http/sse servers. */
+    url?: string
+    /** For stdio servers: full command line. */
+    command?: string
+    /** Optional bearer token for http/sse servers, stored as an
+     *  `Authorization: Bearer …` header on the mcp.json entry. */
+    bearerToken?: string
+    /** Replace an existing same-name entry (user confirmed). */
+    overwrite?: boolean
+  },
+  { ok: boolean; error?: string; exists?: boolean }
+> = {
+  method: 'aiMcpServerAdd',
 }
 
 /** Chat-panel UI preferences. Persisted on the extension side via

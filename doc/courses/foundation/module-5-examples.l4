@@ -1,151 +1,139 @@
--- Module 5: Regulative Rules - Complete Examples
+-- Module 5: Functions - Complete Examples
 -- All examples are validated and use natural language identifiers
 
--- =============================================================================
--- SECTION 1: Actor and Action Types
--- =============================================================================
-
--- Parties to a contract
-DECLARE `Contract Party` IS ONE OF
-    `the buyer`
-    `the seller`
-    `the landlord`
-    `the tenant`
-    `the employee`
-    `the employer`
-
--- Actions in a sale contract
-DECLARE `Sale Action` IS ONE OF
-    `deliver the goods`
-    `pay the invoice` HAS amount IS A NUMBER
-    `inspect the goods`
-    `cancel the order`
+IMPORT prelude
 
 -- =============================================================================
--- SECTION 2: Basic Obligations with MUST
+-- SECTION 1: Function Basics
 -- =============================================================================
 
--- Simple delivery obligation
-GIVETH A DEONTIC `Contract Party` `Sale Action`
-`the delivery obligation` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-    HENCE FULFILLED
-    LEST BREACH
+-- A function with two parameters and a NUMBER result
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`the sum of x and y` MEANS
+    x + y
+
+-- A function with one parameter
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the square of` MEANS n * n
+
+-- Argument order matters
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`the difference of` MEANS x - y
+
+-- DECIDE IF for boolean predicates
+GIVEN `the person's age` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `the person is an adult` IF `the person's age` >= 18
 
 -- =============================================================================
--- SECTION 3: Permissions with MAY
+-- SECTION 2: Polymorphic Functions
 -- =============================================================================
 
--- The buyer may inspect goods
-GIVETH A DEONTIC `Contract Party` `Sale Action`
-`the inspection right` MEANS
-    PARTY `the buyer`
-    MAY `inspect the goods`
-    HENCE FULFILLED
+-- Works with values of any type
+GIVEN a IS A TYPE
+      x IS AN a
+      y IS AN a
+GIVETH AN a
+`the first of` MEANS x
 
 -- =============================================================================
--- SECTION 4: Chained Obligations with HENCE
+-- SECTION 3: Local Definitions with WHERE
 -- =============================================================================
 
--- Complete sale contract: deliver then pay
-GIVETH A DEONTIC `Contract Party` `Sale Action`
-`the complete sale contract` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-    HENCE
-        PARTY `the buyer`
-        MUST `pay the invoice` 1000
-        WITHIN 30
-        HENCE FULFILLED
-        LEST BREACH
-    LEST
-        PARTY `the seller`
-        MAY `cancel the order`
-        HENCE BREACH
+-- Compound interest with a named helper
+GIVEN `the principal` IS A NUMBER
+      `the annual rate` IS A NUMBER
+      `the years` IS A NUMBER
+GIVETH A NUMBER
+`the compound interest` MEANS
+    `the principal` * EXPONENT `the growth factor` `the years`
+    WHERE
+        `the growth factor` MEANS 1 + `the annual rate`
+
+-- Loan payment with several helpers
+GIVEN `the loan amount` IS A NUMBER
+      `the annual rate` IS A NUMBER
+      `the term in months` IS A NUMBER
+GIVETH A NUMBER
+`the monthly payment` MEANS
+    `the loan amount` *
+    (`the monthly rate` * `the compound factor`) /
+    (`the compound factor` - 1)
+    WHERE
+        `the monthly rate` MEANS `the annual rate` / 12
+        `the compound factor` MEANS EXPONENT (1 + `the monthly rate`) `the term in months`
 
 -- =============================================================================
--- SECTION 5: Alternative Consequences with LEST
+-- SECTION 4: Recursive Functions
 -- =============================================================================
 
--- Late payment with penalty
-GIVETH A DEONTIC `Contract Party` `Sale Action`
-`the payment with late fee` MEANS
-    PARTY `the buyer`
-    MUST `pay the invoice` 1000
-    WITHIN 30
-    HENCE FULFILLED
-    LEST
-        PARTY `the buyer`
-        MUST `pay the invoice` 1100
-        WITHIN 14
-        HENCE FULFILLED
-        LEST BREACH
+-- Simple recursion
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the factorial of` MEANS
+    IF n <= 1
+    THEN 1
+    ELSE n * `the factorial of` (n - 1)
+
+-- List recursion with CONSIDER
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A NUMBER
+`the sum of the list` MEANS
+    CONSIDER numbers
+    WHEN EMPTY THEN 0
+    WHEN x FOLLOWED BY rest THEN x + `the sum of the list` rest
 
 -- =============================================================================
--- SECTION 6: Real-World Example - Wedding Vows
+-- SECTION 5: Higher-Order Functions
 -- =============================================================================
 
-DECLARE Spouse IS ONE OF
-    Spouse1
-    Spouse2
+-- Transform every element with map
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`the doubled numbers` MEANS
+    map (GIVEN n YIELD n * 2) numbers
 
-DECLARE Vow IS ONE OF
-    `exchange vows`
-    `love and cherish`
-    abandon
-    `be unfaithful`
+-- Keep matching elements with filter
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`the positive numbers` MEANS
+    filter (GIVEN n YIELD n > 0) numbers
 
--- The wedding ceremony: mutual exchange of vows
-GIVETH A DEONTIC Spouse Vow
-`the wedding ceremony` MEANS
-    PARTY Spouse1
-    MUST `exchange vows`
-    WITHIN 1
-    HENCE
-        PARTY Spouse2
-        MUST `exchange vows`
-        WITHIN 1
-        HENCE FULFILLED
-        LEST BREACH BY Spouse2 BECAUSE "failed to exchange vows"
-    LEST BREACH BY Spouse1 BECAUSE "failed to exchange vows"
-
--- Fidelity clause: prohibition
-GIVETH A DEONTIC Spouse Vow
-`the fidelity clause` MEANS
-    PARTY Spouse1
-    SHANT `be unfaithful`
-    HENCE FULFILLED
-    LEST BREACH BY Spouse1 BECAUSE "was unfaithful"
+-- Combine a whole list into one value with foldl
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A NUMBER
+`the total of` MEANS
+    foldl (GIVEN acc, n YIELD acc + n) 0 numbers
 
 -- =============================================================================
--- SECTION 7: Tests
+-- SECTION 6: Tests
 -- =============================================================================
 
--- Test the delivery obligation - fulfilled
-#TRACE `the delivery obligation` AT 0 WITH
-    PARTY `the seller` DOES `deliver the goods` AT 10
+-- Function basics
+#EVAL `the sum of x and y` 3 5
+#EVAL `the square of` 5
+#EVAL `the square of` (3 + 2)
+#EVAL `the difference of` 10 3
+#EVAL `the person is an adult` 21
 
--- Test the delivery obligation - breached (late delivery)
-#TRACE `the delivery obligation` AT 0 WITH
-    PARTY `the seller` DOES `deliver the goods` AT 20
+-- Polymorphic functions
+#EVAL `the first of` 1 2
+#EVAL `the first of` "yes" "no"
 
--- Test the complete sale - happy path
-#TRACE `the complete sale contract` AT 0 WITH
-    PARTY `the seller` DOES `deliver the goods` AT 10
-    PARTY `the buyer` DOES `pay the invoice` 1000 AT 35
+-- WHERE
+#EVAL `the compound interest` 1000 0.05 10
+#EVAL `the monthly payment` 300000 0.06 360
 
--- Test the late payment with penalty - pays late with fee
-#TRACE `the payment with late fee` AT 0 WITH
-    PARTY `the buyer` DOES `pay the invoice` 1100 AT 40
+-- Recursion
+#EVAL `the factorial of` 5
+#EVAL `the sum of the list` (LIST 1, 2, 3, 4, 5)
 
--- Test the wedding ceremony - happy marriage
-#TRACE `the wedding ceremony` AT 0 WITH
-    PARTY Spouse1 DOES `exchange vows` AT 0
-    PARTY Spouse2 DOES `exchange vows` AT 0
-
--- Test the fidelity clause - breach
-#TRACE `the fidelity clause` AT 0 WITH
-    PARTY Spouse1 DOES `be unfaithful` AT 100
+-- Higher-order functions
+#EVAL `the doubled numbers` (LIST 1, 2, 3)
+#EVAL `the positive numbers` (LIST -1, 2, -3, 4)
+#EVAL `the total of` (LIST 1, 2, 3, 4, 5)

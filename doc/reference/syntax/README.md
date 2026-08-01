@@ -133,9 +133,27 @@ See [annotation-example.l4](annotation-example.l4)
 
 ### @export
 
-Mark declarations for export.
+Marks a function for export, e.g. as an endpoint when deploying to `jl4-service`. The rest of the annotation line is the exported function's description.
 
-Example: `@export "public_api"`
+```l4
+@export Check whether the applicant qualifies for a discount
+GIVEN applicant IS A Applicant
+GIVETH A BOOLEAN
+DECIDE `qualifies for discount` IF ...
+```
+
+### @export default
+
+Adding the `default` keyword marks the **default exported function** — the primary entry point among a file's exports:
+
+```l4
+@export default Calculate the insurance premium for an applicant
+GIVEN applicant IS A Applicant
+GIVETH A NUMBER
+DECIDE `calculate premium` IS ...
+```
+
+Only functions carrying `@export` are exported; everything else stays internal.
 
 ### @infixl / @infixr / @infix
 

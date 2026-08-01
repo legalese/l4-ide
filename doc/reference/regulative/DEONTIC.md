@@ -220,5 +220,5 @@ Advance time in traces without events:
 ## Further Reading
 
 - [Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md) — Deep dive into deontic logic
-- [Foundation Module 5](../../courses/foundation/module-5-regulative.md) — Tutorial on regulative rules
+- [Foundation Module 5](../../courses/foundation/module-6-regulative.md) — Tutorial on regulative rules
 - [Tom Hvitved's PhD Thesis](https://di.ku.dk/english/research/phd/phd-theses/2011/hvitved12phd.pdf) — Theoretical foundation
