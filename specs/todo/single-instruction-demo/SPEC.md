@@ -273,7 +273,11 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   or redirect.
 - **R4 — ambiguity-fork representation**: parallel `DECIDE`s in one module, sibling modules
   per interpretation, or annotation-gated variants? Interacts with the wizard and DMN legs
-  (each fork is a distinct decision surface). Needs a short design note before G2.
+  (each fork is a distinct decision surface). **Design note drafted 2026-08-01 at Meng's
+  direction — [R4-FORK-REPRESENTATION.md](./R4-FORK-REPRESENTATION.md): a fourth shape, the
+  `Interpretation` record parameter (public interface + private per-reading implementations,
+  exhaustiveness-checked delegation, exhaustive sweep over the fork space). Awaiting Meng's
+  ruling; R4 remains OPEN until then.**
 - **R5 — P8 toolchain**: which verifier first (the in-compiler exhaustiveness machinery, the
   query-planner ROBDD for unsat/dead-branch detection, an external model checker)? Stretch;
   does not gate G0–G4.
