@@ -178,7 +178,9 @@ buildFunctionPaths vis prefix deployId fn =
       )
     ]
 
-  -- POST paths (evaluation, batch, query-plan) + GET state-graphs — only when showEvaluate
+  -- POST paths (evaluation, batch, query-plan) + GET ladder + GET state-graphs
+  -- — only when showEvaluate. /ladder is documented under the same gate as
+  -- /query-plan because it returns a strict subset of query-plan's payload.
   evaluatePaths
     | vis.showEvaluate =
         [ ( Aeson.Key.fromText (fnPath <> "/evaluation")
@@ -240,6 +242,15 @@ buildFunctionPaths vis prefix deployId fn =
                               ]
                           ]
                       ]
+                  , "responses" .= standardResponses
+                  ]
+              ]
+          )
+        , ( Aeson.Key.fromText (fnPath <> "/ladder")
+          , Aeson.object
+              [ "get" .= Aeson.object
+                  [ "summary" .= ("Ladder diagram for " <> fn.fsName :: Text)
+                  , "operationId" .= ("ladder_" <> opIdBase :: Text)
                   , "responses" .= standardResponses
                   ]
               ]

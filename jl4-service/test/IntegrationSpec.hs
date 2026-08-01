@@ -10,17 +10,19 @@ import Backend.Api
 import qualified BundleStore
 import BundleStore (initStore)
 import Compiler (compileBundle, computeVersion)
+import qualified DeploymentLoader
 import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger)
 import Options (Options (..))
 import Types
 
-import Control.Monad (guard)
+import Control.Monad (guard, unless)
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.STM (newTVarIO)
+import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (try)
 import Data.Foldable (toList)
+import qualified Data.List as List
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
@@ -32,14 +34,16 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Time (diffUTCTime, getCurrentTime)
 import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
+import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileExist)
+import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -522,6 +526,211 @@ spec = describe "integration" do
         resp <- queryPlan' baseUrl mgr "qp-404" "no_such_fn"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 404
+
+  describe "ladder" do
+    it "returns the ladder IR for a boolean DECIDE" do
+      withServiceFromSources "ladder-ok" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- getLadder baseUrl mgr "ladder-ok" "compute_qualifies"
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+        lookupKey "verDocId" body `shouldSatisfy` Maybe.isJust
+        case lookupKey "funDecl" body of
+          Just (Aeson.Object fd) -> do
+            -- FunDecl serialises fnName under the key "name" (VizExpr.hs).
+            Aeson.KeyMap.lookup "name" fd `shouldSatisfy` Maybe.isJust
+            length (ladderParams fd) `shouldBe` 3
+            -- walks AND eats AND drinks
+            ladderBodyType fd `shouldBe` Just "And"
+            ladderAtomLabels fd `shouldBe` ["drinks", "eats", "walks"]
+          other -> expectationFailure ("expected funDecl object, got: " <> show other)
+
+    it "returns exactly the ladder that query-plan already embeds" do
+      -- The GET is not a new information surface: byte-for-byte the same value
+      -- is in every query-plan 200. This invariant must survive any future
+      -- change to how the ladder is built, so assert JSON equality, not shape.
+      withServiceFromSources "ladder-same" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        qpResp <- queryPlan' baseUrl mgr "ladder-same" "compute_qualifies"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        statusCode' qpResp `shouldBe` 200
+        ldResp <- getLadder baseUrl mgr "ladder-same" "compute_qualifies"
+        statusCode' ldResp `shouldBe` 200
+        let embedded = lookupKey "ladder" (decodeObject (responseBody qpResp))
+            standalone = Aeson.decode (responseBody ldResp) :: Maybe Aeson.Value
+        embedded `shouldNotBe` Just Aeson.Null
+        standalone `shouldBe` embedded
+
+    it "still answers query-plan, with the same ladder, after a ladder-first request" do
+      -- Request ORDER must not change either answer. Deliberately NOT named for
+      -- the cache: this assertion cannot see the cache at all (see the note on
+      -- the registry tests below), and a name claiming otherwise would advertise
+      -- coverage that does not exist.
+      withServiceFromSources "ladder-first" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        ldResp <- getLadder baseUrl mgr "ladder-first" "compute_qualifies"
+        statusCode' ldResp `shouldBe` 200
+        qpResp <- queryPlan' baseUrl mgr "ladder-first" "compute_qualifies"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "walks" Aeson..= True
+                , "eats" Aeson..= True
+                , "drinks" Aeson..= True
+                ]
+            ])
+        statusCode' qpResp `shouldBe` 200
+        let body = decodeObject (responseBody qpResp)
+        lookupKey "determined" body `shouldBe` Just (Aeson.Bool True)
+        lookupKey "ladder" body `shouldBe` (Aeson.decode (responseBody ldResp) :: Maybe Aeson.Value)
+
+    -- The test above is about AGREEMENT, and it holds whether or not anything
+    -- is cached — both endpoints are deterministic, so an implementation that
+    -- rebuilt the visualization + BDD on every request would pass it byte for
+    -- byte. Memoisation itself is unobservable from the wire, so assert it
+    -- against the registry instead. It is not a nicety: the uncached build runs
+    -- outside `timeoutAction` and holds one of the `maxConcurrentRequests`
+    -- slots, and "it is built once" is the only thing bounding that.
+    it "builds the decision-query cache once and writes it back to the registry" do
+      withServiceFromSourcesTVar "ladder-memo" [("qualifies.l4", qualifiesJL4)]
+        \registry baseUrl mgr -> do
+          let cached = hasDecisionQueryCache registry "ladder-memo" "compute_qualifies"
+          -- Nothing is built at deploy time: the first request pays for it.
+          cached `shouldReturn` False
+          ldResp <- getLadder baseUrl mgr "ladder-memo" "compute_qualifies"
+          statusCode' ldResp `shouldBe` 200
+          cached `shouldReturn` True
+
+    it "...and query-plan first warms the same cache" do
+      withServiceFromSourcesTVar "qp-memo" [("qualifies.l4", qualifiesJL4)]
+        \registry baseUrl mgr -> do
+          let cached = hasDecisionQueryCache registry "qp-memo" "compute_qualifies"
+          cached `shouldReturn` False
+          qpResp <- queryPlan' baseUrl mgr "qp-memo" "compute_qualifies"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' qpResp `shouldBe` 200
+          cached `shouldReturn` True
+
+    -- A deployment outlives the process that compiled it. On restart the
+    -- service rehydrates from bundle.cbor, and CBOR carries no annotations —
+    -- which is where the ladder's boolean-return check reads its type from.
+    -- Both routes 400ed for every restarted deployment until Compiler.hs took
+    -- the AST from the typecheck it was already running.
+    it "serves the ladder after a restart that rehydrates from bundle.cbor" do
+      withServiceRestartedFromCbor "ladder-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- getLadder baseUrl mgr "ladder-restart" "compute_qualifies"
+        statusCode' resp `shouldBe` 200
+        case lookupKey "funDecl" (decodeObject (responseBody resp)) of
+          Just (Aeson.Object fd) -> do
+            ladderBodyType fd `shouldBe` Just "And"
+            ladderAtomLabels fd `shouldBe` ["drinks", "eats", "walks"]
+          other -> expectationFailure ("expected funDecl object, got: " <> show other)
+
+    it "serves query-plan after a restart that rehydrates from bundle.cbor" do
+      -- The sibling route, broken by the same cause and fixed by the same
+      -- change. Pinned here because nothing else in the suite restarts.
+      withServiceRestartedFromCbor "qp-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- queryPlan' baseUrl mgr "qp-restart" "compute_qualifies"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        statusCode' resp `shouldBe` 200
+        lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
+
+    it "and evaluation still works across that restart" do
+      -- The control. /evaluation needs no type annotations, so it kept working
+      -- throughout; if this ever goes red the restart harness itself is broken,
+      -- not the visualization path.
+      withServiceRestartedFromCbor "eval-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "eval-restart" "compute_qualifies"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "walks" Aeson..= True
+                , "eats" Aeson..= True
+                , "drinks" Aeson..= True
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "is reachable on the short route too" do
+      withServiceFromSources "ladder-short" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/ladder-short/compute_qualifies/ladder")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        lookupKey "funDecl" (decodeObject (responseBody resp)) `shouldSatisfy` Maybe.isJust
+
+    it "returns 400 for a DECIDE that does not return a boolean" do
+      withServiceFromSources "ladder-nonbool" [("record.l4", recordJL4)] \baseUrl mgr -> do
+        resp <- getLadder baseUrl mgr "ladder-nonbool" "make_person"
+        statusCode' resp `shouldBe` 400
+
+    it "refuses a ladder past maxLadderNodes instead of streaming megabytes" do
+      -- 32 boolean parameters in a disjunction of conjunctions: four lines of
+      -- L4, and a ladder of 2^16 clauses. Unbounded, this route answered 200
+      -- and was still streaming past 36 MB five minutes later — on an
+      -- unauthenticated GET that a browser will happily prefetch, holding one
+      -- of the maxConcurrentRequests slots the whole time. The refusal must be
+      -- small and prompt; QueryPlanSpec pins the promptness, this pins that the
+      -- route surfaces it rather than swallowing it.
+      withServiceFromSources "ladder-huge" [("blowup.l4", dnfBlowupJL4 32)] \baseUrl mgr -> do
+        resp <- getLadder baseUrl mgr "ladder-huge" "blowup"
+        statusCode' resp `shouldBe` 400
+        LBS.length (responseBody resp) `shouldSatisfy` (< 4096)
+        qpResp <- queryPlan' baseUrl mgr "ladder-huge" "blowup"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        statusCode' qpResp `shouldBe` 400
+
+    it "gives up on a ladder that takes too long to build, rather than holding the slot" do
+      -- The node budget bounds the RESPONSE, and cannot bound the BUILD: by the
+      -- time it can be consulted, doVisualize has already materialised the whole
+      -- normal form. At 64 variables that build does not finish — measured, it
+      -- was still going after ten minutes — so without a timeout this request
+      -- pins a thread and one of maxConcurrentRequests forever, on a GET a
+      -- browser will prefetch. evalTimeout is dropped to 2s here because
+      -- testOptions' 60s would make the suite unpleasant; the property is the
+      -- same at either value.
+      let impatient = testOptions { evalTimeout = 2 }
+      withServiceFromSourcesOpts impatient "ladder-slow" [("blowup.l4", dnfBlowupJL4 64)]
+        \baseUrl mgr -> do
+          started <- getCurrentTime
+          resp <- getLadder baseUrl mgr "ladder-slow" "blowup"
+          finished <- getCurrentTime
+          statusCode' resp `shouldBe` 500
+          diffUTCTime finished started `shouldSatisfy` (< 30)
+
+    it "returns 404 for unknown function" do
+      withServiceFromSources "ladder-404" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- getLadder baseUrl mgr "ladder-404" "no_such_fn"
+        statusCode' resp `shouldBe` 404
+
+    it "returns 404 for unknown deployment" do
+      withEmptyService \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/nope/functions/compute_qualifies/ladder")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 404
+
+    it "KNOWN GAP: ladder atomIds are not in the query-plan's atomId namespace" do
+      -- Characterisation test, NOT an endorsement. L4.Viz.Ladder.generateAtomId
+      -- hashes each input ref as its numeric rootUnique over the atom's direct
+      -- ref set; L4.Decision.QueryPlan.atomIdByUnique hashes it as the ref's
+      -- label over the transitive closure. So the ids disagree for every atom
+      -- with a non-empty ref set, and a client cannot join `ladder` leaves to
+      -- `impactByAtomId`. jl4-lsp reconciles them with
+      -- LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds; jl4-service does not.
+      -- WHEN THAT IS WIRED IN, this expectation should be inverted to assert
+      -- the two sets are equal.
+      withServiceFromSources "ladder-atomids" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        qpResp <- queryPlan' baseUrl mgr "ladder-atomids" "compute_qualifies"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        statusCode' qpResp `shouldBe` 200
+        let body = decodeObject (responseBody qpResp)
+            planIds = case lookupKey "impactByAtomId" body of
+              Just (Aeson.Object m) -> map Aeson.Key.toText (Aeson.KeyMap.keys m)
+              _ -> []
+            ladderIds = case lookupKey "ladder" body of
+              Just (Aeson.Object l) -> case Aeson.KeyMap.lookup "funDecl" l of
+                Just (Aeson.Object fd) -> ladderAtomIds fd
+                _ -> []
+              _ -> []
+        -- Both sides are non-empty, so the disjointness below is meaningful.
+        planIds `shouldSatisfy` (not . null)
+        ladderIds `shouldSatisfy` (not . null)
+        filter (`elem` planIds) ladderIds `shouldBe` []
 
   describe "evaluation with trace" do
     it "includes reasoning when trace=full" do
@@ -1044,6 +1253,17 @@ spec = describe "integration" do
                     statusCode' dotResp `shouldBe` 200
                     let dotText = Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody dotResp))
                     dotText `shouldSatisfy` Text.isInfixOf "digraph"
+                    -- This endpoint is how the captions reach a user, and until
+                    -- now "digraph" was the whole of what it asserted — a
+                    -- caption inverted the way smucclaw/l4-ide#927 describes
+                    -- would have travelled the entire HTTP surface untested.
+                    -- `the sale contract` is two nested MUSTs, each with a
+                    -- WITHIN and an explicit LEST BREACH, so both LEST arms are
+                    -- reached by the clock and both read "timeout".
+                    dotText `shouldSatisfy` Text.isInfixOf "label=timeout"
+                    -- and nothing here is a prohibition or a deadline-less rule
+                    dotText `shouldNotSatisfy` Text.isInfixOf "violation"
+                    dotText `shouldNotSatisfy` Text.isInfixOf "unreachable"
                   _ -> expectationFailure "Graph object missing graphName"
               _ -> expectationFailure "Expected graph object in array"
           _ -> expectationFailure "Expected non-empty graphs array"
@@ -1700,6 +1920,189 @@ withServiceFromSources' deployId sources act = do
     cleanDir tmpPath
     pure result'
 
+-- | 'withServiceFromSources' under caller-chosen 'Options'.
+--
+-- The suite otherwise runs everything on 'testOptions', which sets every limit
+-- generously enough never to fire — so no test can observe what happens when
+-- one does. Tests of the limits themselves need to move one.
+withServiceFromSourcesOpts
+  :: Options -> Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
+withServiceFromSourcesOpts opts deployId sources act = do
+  resOrExc <- try (withServiceFromSourcesOpts' opts deployId sources act)
+  case resOrExc of
+    Left ioe ->
+      if isPermissionError ioe
+        then pendingWith ("Skipping integration test (cannot bind sockets): " <> show ioe) >> pure undefined
+        else do
+          expectationFailure (show ioe)
+          pure undefined
+    Right result -> pure result
+
+withServiceFromSourcesOpts'
+  :: Options -> Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
+withServiceFromSourcesOpts' opts deployId sources act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+
+  let sourceMap = Map.fromList sources
+  result <- compileBundle logger "test" sourceMap
+  (fns, meta) <- case result of
+    Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
+    Right (f, m, _bundles) -> pure (f, m)
+
+  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg
+
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    let baseUrl = "http://localhost:" <> show port
+    result' <- act baseUrl mgr
+    cleanDir tmpPath
+    pure result'
+
+-- | 'withServiceFromSources', with the deployment registry itself handed to the
+-- test.
+--
+-- Needed for properties that are invisible from the wire, because they are
+-- about what the service /kept/ rather than what it answered. Memoisation is
+-- the one this exists for: a handler that rebuilds its cache on every request
+-- returns byte-identical responses to one that builds it once, so no sequence
+-- of HTTP calls can tell them apart — but the registry can.
+withServiceFromSourcesTVar
+  :: Text
+  -> [(FilePath, Text)]
+  -> (TVar (Map DeploymentId DeploymentState) -> String -> Manager -> IO a)
+  -> IO a
+withServiceFromSourcesTVar deployId sources act = do
+  resOrExc <- try (withServiceFromSourcesTVar' deployId sources act)
+  case resOrExc of
+    Left ioe ->
+      if isPermissionError ioe
+        then pendingWith ("Skipping integration test (cannot bind sockets): " <> show ioe) >> pure undefined
+        else do
+          expectationFailure (show ioe)
+          pure undefined
+    Right result -> pure result
+
+withServiceFromSourcesTVar'
+  :: Text
+  -> [(FilePath, Text)]
+  -> (TVar (Map DeploymentId DeploymentState) -> String -> Manager -> IO a)
+  -> IO a
+withServiceFromSourcesTVar' deployId sources act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+
+  let sourceMap = Map.fromList sources
+  result <- compileBundle logger "test" sourceMap
+  (fns, meta) <- case result of
+    Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
+    Right (f, m, _bundles) -> pure (f, m)
+
+  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    let baseUrl = "http://localhost:" <> show port
+    result' <- act registry baseUrl mgr
+    cleanDir tmpPath
+    pure result'
+
+-- | Whether a deployed function currently holds a built 'CachedDecisionQuery'.
+hasDecisionQueryCache :: TVar (Map DeploymentId DeploymentState) -> Text -> Text -> IO Bool
+hasDecisionQueryCache registry deployId fnName = do
+  reg <- readTVarIO registry
+  pure case Map.lookup (DeploymentId deployId) reg of
+    Just (DeploymentReady fns _) -> case Map.lookup fnName fns of
+      Just vf -> Maybe.isJust vf.fnDecisionQueryCache
+      Nothing -> False
+    _ -> False
+
+-- | Compile a bundle, persist it to the store exactly as a deploy does —
+-- sources, @metadata.json@ AND @bundle.cbor@ — then throw the in-memory
+-- registry away and bring the deployment back through the production restart
+-- path, 'DeploymentLoader.loadAndRegister'.
+--
+-- Every other helper in this file registers freshly-compiled
+-- 'ValidatedFunction's straight into the TVar, which makes the whole suite
+-- blind to anything that differs only after a restart. The CBOR round-trip is
+-- exactly such a thing: 'L4.Instances.Serialise' encodes every annotation as
+-- @()@, so a rehydrated AST carries no type information. That is what made
+-- @\/query-plan@ and @\/ladder@ answer 400 ("Can only visualize, as a ladder
+-- diagram, a DECIDE that returns a boolean") on any process restarted since the
+-- deploy, while @\/evaluation@ — which needs no annotations — kept working.
+--
+-- The helper fails if @bundle.cbor@ is gone afterwards: 'loadAndRegister'
+-- deletes it and silently recompiles from source whenever the CBOR rebuild
+-- fails, and a test that quietly took the recompile path would prove nothing.
+withServiceRestartedFromCbor :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
+withServiceRestartedFromCbor deployId sources act = do
+  resOrExc <- try (withServiceRestartedFromCbor' deployId sources act)
+  case resOrExc of
+    Left ioe ->
+      if isPermissionError ioe
+        then pendingWith ("Skipping integration test (cannot bind sockets): " <> show ioe) >> pure undefined
+        else do
+          expectationFailure (show ioe)
+          pure undefined
+    Right result -> pure result
+
+withServiceRestartedFromCbor' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
+withServiceRestartedFromCbor' deployId sources act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+      cborPath = tmpPath </> Text.unpack deployId </> "bundle.cbor"
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+
+  let sourceMap = Map.fromList sources
+      storedMeta = BundleStore.StoredMetadata
+        { BundleStore.smVersion = computeVersion sourceMap
+        , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+        , BundleStore.smDescription = Nothing
+        , BundleStore.smServiceVersion = Nothing
+        , BundleStore.smDeploymentVersion = Nothing
+        }
+  result <- compileBundle logger deployId sourceMap
+  bundles <- case result of
+    Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
+    Right (_fns, _meta, bs) -> pure bs
+  BundleStore.saveBundle store deployId sourceMap storedMeta
+  BundleStore.saveBundleCbor store deployId bundles
+
+  -- The restart. Nothing survives it but the store on disk.
+  registry <- newTVarIO Map.empty
+  DeploymentLoader.loadAndRegister logger testOptions registry store deployId
+
+  stillCached <- doesFileExist cborPath
+  unless stillCached $
+    fail "Test setup: loadAndRegister discarded bundle.cbor and recompiled from source \
+         \— this test would not have exercised the CBOR rehydration path"
+  reg <- readTVarIO registry
+  case Map.lookup (DeploymentId deployId) reg of
+    Just (DeploymentReady _ _) -> pure ()
+    _ -> fail "Test setup: deployment was not ready after restart"
+
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    let baseUrl = "http://localhost:" <> show port
+    result' <- act baseUrl mgr
+    cleanDir tmpPath
+    pure result'
+
 -- | Start a service with an empty deployment registry.
 withEmptyService :: (String -> Manager -> IO a) -> IO a
 withEmptyService act = do
@@ -1817,6 +2220,55 @@ queryPlan' baseUrl mgr deployId fnName body = do
   req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/query-plan") body
   httpLbs req mgr
 
+-- | Fetch a function's ladder diagram via the API.
+getLadder :: String -> Manager -> Text -> Text -> IO (Response LBS.ByteString)
+getLadder baseUrl mgr deployId fnName = do
+  req <- parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/ladder")
+  httpLbs req mgr
+
+-- | The @params@ list of a serialised @FunDecl@ object.
+ladderParams :: Aeson.Object -> [Aeson.Value]
+ladderParams fd =
+  case Aeson.KeyMap.lookup "params" fd of
+    Just (Aeson.Array xs) -> toList xs
+    _ -> []
+
+-- | The @$type@ tag of a serialised @FunDecl@'s body.
+ladderBodyType :: Aeson.Object -> Maybe Text
+ladderBodyType fd =
+  case Aeson.KeyMap.lookup "body" fd of
+    Just (Aeson.Object b) ->
+      case Aeson.KeyMap.lookup "$type" b of
+        Just (Aeson.String t) -> Just t
+        _ -> Nothing
+    _ -> Nothing
+
+-- | Walk a serialised ladder body, collecting one field from every leaf that
+-- carries an @atomId@ (i.e. @UBoolVar@ and @App@ nodes).
+ladderLeafField :: Text -> Aeson.Object -> [Text]
+ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [Text]
+  go (Aeson.Object o) =
+    let here = case Aeson.KeyMap.lookup (Aeson.Key.fromText field) o of
+          Just (Aeson.String t) -> [t]
+          Just (Aeson.Object nm) -> case Aeson.KeyMap.lookup "label" nm of
+            Just (Aeson.String t) -> [t]
+            _ -> []
+          _ -> []
+        kids = concatMap go (Aeson.KeyMap.elems o)
+     in here <> kids
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []
+
+-- | Labels of the ladder's atoms, sorted for a stable comparison.
+ladderAtomLabels :: Aeson.Object -> [Text]
+ladderAtomLabels = List.sort . ladderLeafField "name"
+
+-- | The @atomId@s embedded in the ladder's leaves.
+ladderAtomIds :: Aeson.Object -> [Text]
+ladderAtomIds = ladderLeafField "atomId"
+
 -- | Decode a JSON response body as an Aeson Object.
 decodeObject :: LBS.ByteString -> Maybe Aeson.Object
 decodeObject = Aeson.decode
@@ -1854,4 +2306,5 @@ testOptions = Options
   , evalTimeout = 60
   , compileTimeout = 60
   , instanceToken = Nothing
+  , maxLadderNodes = 10000
   }

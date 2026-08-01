@@ -4,6 +4,22 @@ version: 0.1
 build-type: Simple
 tested-with: GHC==9.10.2
 
+-- KEEP THIS ABOVE THE `flag` STANZAS, AND ABOVE EVERY OTHER SECTION.
+--
+-- Cabal ignores package-level fields that appear after the first section, so a
+-- stanza inserted above this line silently disables it. `cabal check` then says
+-- "Ignoring trailing fields after sections: data-files", the sdist ships no .l4
+-- files at all, and because `cabal install` builds from the sdist, every
+-- installed `l4` gets an EMPTY embedded stdlib and answers "Module not found:
+-- prelude". `cabal build` keeps working, because GHC's cwd for an inplace build
+-- is this directory and the TH splice's cwd fallback finds libraries/ anyway —
+-- which is why the two disagreed, and why nobody noticed for months.
+--
+-- That is not hypothetical: it is what happened between 61653b0e (which
+-- inserted `flag safe-mode` here) and this commit. See the CI step that runs
+-- `cabal check` and greps `cabal sdist --list-only`.
+data-files: libraries/*.l4
+
 flag safe-mode
   description: Disable FETCH/POST builtins (for WASM builds). When enabled, HTTP operations return errors.
   default: False
@@ -13,8 +29,6 @@ flag serialise-support
   description: Enable Serialise instances for AST types (for jl4-service CBOR caching). Disable for WASM builds where cborg doesn't compile.
   default: True
   manual: True
-
-data-files: libraries/*.l4
 
 common defaults
   default-language: GHC2021
@@ -96,10 +110,18 @@ library
     Base.Text
     Paths_jl4_core
     L4.Annotation
+    L4.Bpmn.IR
+    L4.Bpmn.Lower
+    L4.Bpmn.Emit
     L4.Citations
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
+    L4.Dmn.Analysis
+    L4.Dmn.IR
+    L4.Dmn.Lower
+    L4.Dmn.Emit
+    L4.Dmn.Markdown
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON
@@ -156,6 +178,7 @@ library
     L4.Viz.Ladder
     L4.Viz.VizExpr
     L4.Import.Resolution
+    L4.Interchange.Fidelity
     L4.Instances.Serialise
     L4.API
     L4.API.VirtualFS
@@ -182,6 +205,7 @@ test-suite jl4-core-test
     NumberLiteralSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
+    ResolutionCascadeSpec
     RefAnnotationSpec
     TracePostprocessSpec
     EdgeCrashSpec

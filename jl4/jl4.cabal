@@ -51,6 +51,7 @@ executable l4
     L4.Cli.Batch
     L4.Cli.Check
     L4.Cli.Common
+    L4.Cli.Export
     L4.Cli.Format
     L4.Cli.OpenFisca
     L4.Cli.Render
@@ -79,11 +80,13 @@ test-suite jl4-test
   hs-source-dirs: tests
   main-is: Main.hs
   other-modules:
+    BpmnExport
     Hover
     SemanticTokens
     VizAutoRefresh
     VizImplies
     VizGuardedRows
+    DmnExport
     Paths_jl4
   autogen-modules:
     Paths_jl4
@@ -101,6 +104,7 @@ test-suite jl4-test
     optics,
     silently,
     transformers,
+    time,
     lsp-types,
 
 test-suite l4-cli-test

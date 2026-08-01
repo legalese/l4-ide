@@ -1,0 +1,150 @@
+# Reg CF ladder figures
+
+Generated, never hand-drawn. Six decisions from `../regcf.l4`, four carriers each:
+
+| File         | Carrier                                 | Made by                                      |
+| ------------ | --------------------------------------- | -------------------------------------------- |
+| `.svg`       | page/print figure, `ink` theme          | `@repo/ladder-svg` `sceneToSvg(scene,"ink")`  |
+| `.txt`       | monospace grid — pasteable and diffable | `@repo/ladder-core` `sceneToAscii`           |
+| `.mmd`       | Mermaid `railroad-beta`                 | `@repo/ladder-core` `toMermaidRailroad`      |
+| `.sentences` | **readable prose** — one per way to satisfy | `@repo/ladder-core` `expandSentences`     |
+
+**The four are not interchangeable.** `toMermaidRailroad` deliberately drops medial
+inert glue inside an `OR` (a railroad `choice` branch is a live path, and
+prose-as-branch would make the disjunction trivially satisfiable — correct, and
+documented in `mermaid.ts`), so `regcf-resale-exceptions.mmd` carries the chapeau and
+**none** of limbs (2)(3)(4)'s captions while the other three carry all four. Do not
+treat one carrier as a stand-in for another.
+
+The `.sentences` carrier is a **disjunction** view and degrades on conjunctions:
+`regcf-rule-100b.sentences` is six clean numbered limbs, while
+`regcf-exemption.sentences` is one sentence with all five conjuncts run together,
+because an `And` cross-joins into a single product. Use the sentences for OR-rooted
+rules and the ladder for AND-rooted ones.
+
+## Regenerating
+
+```sh
+cd ts-shared/ladder-svg
+npm run demo:regcf                 # spawns jl4-lsp via `cabal run`
+# or, against a binary you already built:
+JL4_LSP_CMD=…/jl4-lsp npm run demo:regcf
+```
+
+The generator is `ts-shared/ladder-svg/demo/regcf.ts`. Unlike `demo/s415.ts` and
+`demo/charities-a3.ts` — which hand-build their `IRExpr` in TypeScript and whose
+labels are, in their own words, "the statutory phrases, **trimmed for the page**" —
+this one reads the corpus through the LSP (`textDocument/codeLens` →
+`l4.visualize` → `RenderAsLadderInfo.funDecl` → `fromVizFunDecl` → `layout`).
+Nothing is retyped, so nothing can drift. That is the point: the competitive
+thesis is single-sourcing, and a figure a human transcribed is a second source.
+It also means these figures are **untrimmed**, which is why two of the six are
+too wide to put on a page — see below.
+
+The generator fails loudly (exit 1) if a named decision is not found, so renaming
+a decision in `regcf.l4` breaks the build rather than silently dropping a figure.
+
+### …but only if someone runs it
+
+"Nothing is retyped, so nothing can drift" is true of the **generator** and was, until
+2026-07-27, false of the twenty-four committed **files**. `demo:regcf` needs a running
+`jl4-lsp`, so it is not in `turbo.json` and CI never ran it; unlike the DMN and BPMN
+goldens, which `cabal test` re-derives from the same corpus on every run, these could
+have sat stale beside a renamed corpus indefinitely.
+
+`ts-shared/ladder-svg/test/regcf-figures.test.ts` closes the realistic half of that
+hole **without** the LSP: every boxed leaf label in every `.txt`, and every
+`.sentences` title, must still be findable in `regcf.l4`. It runs under
+`turbo run test`. It is deliberately **one-directional** — a leaf *added* to the L4 and
+absent from a figure still passes, and layout is not checked at all. Run
+`demo:regcf` for the real thing.
+
+## What was generated
+
+| Slug                         | Decision (`regcf.l4`)                                  | Scene       | Longest leaf |
+| ---------------------------- | ------------------------------------------------------- | ----------- | ------------ |
+| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:211)              | 912 × 571   | 78 ch        |
+| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:550)     | 1006 × 505  | 90 ch        |
+| `regcf-transfer-permitted`   | `transfer is permitted` (:615)                          | 846 × 269   | 63 ch        |
+| `regcf-intermediary`         | `intermediary obligations are met` (:452)               | 2054 × 180  | 75 ch        |
+| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:601) | 2683 × 444 | **304 ch**   |
+| `regcf-exemption`            | `the transaction qualifies…` (:643)                     | **3027 × 185** | 61 ch     |
+
+The corpus has **34** visualisable decisions in total (every boolean-returning
+`DECIDE`/`MEANS`; the LSP code lens does not require `@export`). These six were
+picked for what they demonstrate, not because the rest fail.
+
+## Three of these figures are wrong for a page, and here is why
+
+Reported rather than fixed, because fixing them means either editing the corpus —
+which would put the trimming back — or changing the layout engine.
+
+### 1. An `AND` is a ribbon (`regcf-exemption`, `regcf-intermediary`)
+
+In ladder logic a conjunction is a **series** circuit, so BBE lays an `AND` out
+left to right, and the scene width is the sum of its children's widths. Nothing
+wraps. `the transaction qualifies for the section 4(a)(6) exemption` is an `AND`
+of five, each child a call whose printed form runs 40–60 characters, preceded by
+Rule 100(a)'s 118-character chapeau **riding the wire** (inert prose in an `AND`
+is drawn on the line, not as a heading). Result: **3027 × 185** — a strip 16×
+wider than it is tall. It is a correct diagram and an unusable figure.
+
+This is the root/index picture, so it is the one a reader most wants. Today it
+needs `scale` modes or auto-folding (DESIGN §16), or an `orient: "TB"` for
+conjunctions. Neither exists.
+
+### 2. Leaf labels do not wrap (`regcf-resale-exceptions`)
+
+`layout.ts` sizes a leaf as `caretW + tm.width(label, FONT) + 2*PAD_X`. There is
+no wrap and no ellipsis. Rule 501(a)(4)'s field name is 291 characters in the
+corpus — because it is the CFR's own sentence, which is what isomorphic
+formalisation means — so its leaf is 304 characters printed and roughly 2380 px
+wide on its own. Only **inert** prose wraps, and only to two balanced lines
+(`balanceTwoLines`, gated at `STRADDLE_MIN_WIDTH`), and only when it is riding a
+wire; an `OR` heading is a single line however long.
+
+### 3. A leading run of inert prose is merged into ONE heading
+
+`leadingInert` collects the whole leading run of `InertE` children and joins them
+with a space (`layout.ts:349-355`). In `transfer falls within an exception`, the
+corpus interleaves each paragraph's caption with its operative limb:
+
+```
+"unless such securities are transferred:"
+"(1) To the issuer of the securities;"        <- caption
+transfer's `is to the issuer of the securities`
+"(2) To an accredited investor;"              <- caption
+transfer's `is to an accredited investor`
+…
+```
+
+so the chapeau and caption **(1)** are both in the leading run. The figure's
+heading therefore reads
+
+> unless such securities are transferred: (1) To the issuer of the securities;
+
+as a single line at the top of the group, while captions (2), (3) and (4) sit
+directly above their own rungs. The figure is asymmetric, and a reader takes
+"(1) To the issuer of the securities" for part of the preamble. Verifiable in
+`regcf-resale-exceptions.svg`: one `<text>` prim at `y=87.8` carries both.
+
+### 4. Mermaid drops the medial captions altogether
+
+`toMermaidRailroad` hoists the leading inert run in front of the fan and
+**deliberately discards medial inert glue** in an `OR` — because every child of a
+railroad `choice` is a live branch, and emitting prose as a branch would add a
+free pass-through that makes the disjunction trivially satisfiable. The reasoning
+is right and it is documented in `mermaid.ts`. The consequence for an
+inert-style statutory corpus is that `regcf-resale-exceptions.mmd` carries the
+merged "chapeau + (1)" preamble and **none** of (2), (3) or (4). The SVG and
+ASCII carriers keep all four. Do not treat the three carriers as interchangeable
+for inert-style sources.
+
+## What is right about them
+
+`regcf-rule-100b` is the flagship and needs no trimming at all: the Rule 100(b)
+chapeau becomes the group heading and the six exclusion limbs become six rungs,
+in the CFR's own order, at 912 × 571 — a page. It is the README §3.6 finding
+drawn: limb **(b)(5)**, which the mirrored wiki page omits, is a rung like any
+other. `regcf-reporting-terminates` does the same for §3.7's two missing
+termination conditions.

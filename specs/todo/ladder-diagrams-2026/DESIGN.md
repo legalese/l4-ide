@@ -1558,9 +1558,12 @@ the picture says about an atom **nobody answered**, and what it says about one i
 
 ### 26.1 FALSE was rendering as UNKNOWN — a silent spec violation
 
-`svg.ts` routed render state `dead` to the _unknown_ ink and set `dead === inert` in both
-palettes, so `p.dead` was never read and a **tested-and-false element emitted byte-identical
-SVG to a never-asked one**. That contradicted §6 ("known false → gap / open contact" vs
+`svg.ts` routed render state `dead` to the _unknown_ ink and set `dead === inert` in every
+built-in palette, so `p.dead` was never read and a **tested-and-false element emitted
+byte-identical SVG to a never-asked one**. Step 4's seam-S8 palette extraction (`e720e3da`)
+carried the defect forward faithfully — `DARK_PALETTE`, added there, set `dead` to `inert`'s
+grey too, and `palette.test.ts` gained a test _asserting_ the byte-identity as "a
+pre-existing fact", with a note to whoever wired the state up. This is that. That contradicted §6 ("known false → gap / open contact" vs
 "unknown → plain pass-through box"), §15.1's four-state table, and §18's curve-colour bullet —
 and it broke something load-bearing: §25.4 distinguishes **N/A** from **undetermined** purely
 by _where the break is_ ("a scope that is definitively ✗ shows a clean open contact… a scope

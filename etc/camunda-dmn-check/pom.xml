@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Classpath-only pom for the Camunda 8 DMN checker. Nothing here is part of the
+  L4 build: `run.sh` uses it exclusively to resolve a classpath into $TMPDIR, and
+  the jars never enter the repo.
+
+  CAMUNDA 8, NOT CAMUNDA 7. They are unrelated implementations, not two versions
+  of one engine. Camunda 7 is `org.camunda.bpm.dmn:camunda-engine-dmn` and its
+  own Java engine; it cannot execute a business knowledge model at all, silently
+  ignores <defaultOutputEntry>, and is end-of-life (7.24 is the final minor).
+  Camunda 8 is `io.camunda:zeebe-dmn`, which delegates to dmn-scala and
+  org.camunda.feel:feel-engine, and ran every construct this exporter might emit.
+  See specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §13.1.
+
+  The two classpaths must never be merged: C7's feel-engine 1.19.x-scala-shaded
+  and C8's 1.18.3 collide. Keeping them in separate directories is that rule,
+  made structural.
+
+  VERSION IS PINNED. 8.7.6 is what every claim marked EXECUTED in §13 was
+  measured against; bumping it invalidates those measurements.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.legalese.l4</groupId>
+  <artifactId>camunda-dmn-check</artifactId>
+  <version>1.0</version>
+  <packaging>jar</packaging>
+  <properties>
+    <zeebe.version>8.7.6</zeebe.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.camunda</groupId>
+      <artifactId>zeebe-dmn</artifactId>
+      <version>${zeebe.version}</version>
+    </dependency>
+    <dependency>
+      <!-- zeebe-dmn hands results back as MessagePack, so decoding one needs this -->
+      <groupId>org.msgpack</groupId>
+      <artifactId>jackson-dataformat-msgpack</artifactId>
+      <version>0.9.8</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.13</version>
+    </dependency>
+  </dependencies>
+</project>

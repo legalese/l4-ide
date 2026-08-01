@@ -12,7 +12,7 @@
 
 TIMEZONE IS "Etc/UTC"
 
-past MEANS DATE_SERIAL (DATE_FROM_DMY 1 1 2000)
+past MEANS DATE_FROM_DMY 1 1 2000
 
 -- expected: 730484 (control)
 #EVAL past

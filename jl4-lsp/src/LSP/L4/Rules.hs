@@ -46,13 +46,13 @@ import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified Data.ByteString as BS
 import qualified Data.List as List
+import UnliftIO
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as TextEncoding
 import System.Directory
 import System.Environment (getExecutablePath, lookupEnv)
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import qualified L4.Utils.IntervalMap as IV
-import UnliftIO
 
 type instance RuleResult GetLexTokens = ([PosToken], Text)
 data GetLexTokens = GetLexTokens
@@ -347,7 +347,41 @@ data ImportOutcome = ImportOutcome
   { importUri  :: !(Maybe NormalizedUri)
   , vfsTried   :: ![NormalizedUri]
   , pathsTried :: ![FilePath]
+  , embedTried :: !EmbedStatus
+    -- ^ What happened at the embedded tier. Kept SEPARATE from 'pathsTried'
+    -- because the embed has no path, and the not-found diagnostic listed only
+    -- paths — so the one tier that can silently be empty was the one tier the
+    -- error could not mention. See 'renderEmbedStatus'.
   }
+
+-- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
+data EmbedStatus
+  = EmbedSkipped
+    -- ^ @JL4_LIBRARY_PATH@ is set, so the embed was deliberately not consulted.
+  | EmbedEmpty
+    -- ^ Consulted, and this binary carries NO embedded libraries at all.
+    --
+    -- __Unreachable in a binary built from this tree__, because the @fail@ in
+    -- "L4.API.EmbeddedLibraries" now stops such a binary from being produced.
+    -- Kept anyway: it costs three lines, it explains the failure for the many
+    -- already-installed binaries that predate that @fail@, and if the guard is
+    -- ever weakened this is the message that says what went wrong.
+  | EmbedMissing !Int
+    -- ^ Consulted, carries @n@ modules, and this one is not among them.
+  deriving stock (Eq, Show)
+
+-- | One entry for the not-found diagnostic's list of tried locations.
+renderEmbedStatus :: EmbedStatus -> Text
+renderEmbedStatus = \ case
+  EmbedSkipped   -> "the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)"
+  EmbedMissing n -> "the stdlib embedded in this binary (" <> Text.pack (show n) <> " modules, not among them)"
+  EmbedEmpty     -> Text.unlines
+    [ "the stdlib embedded in this binary -- WHICH IS EMPTY."
+    , "  That is a BUILD DEFECT, not a problem with your file: this binary carries no"
+    , "  standard libraries at all, so no IMPORT of one can ever succeed. If it came"
+    , "  from `cabal install`, check that jl4-core.cabal's `data-files` field still"
+    , "  precedes every section (`cabal check` reports it if not) and rebuild."
+    ]
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -371,7 +405,20 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
     "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
 
   -- VFS tier: project:/ scheme (Monaco), importer-relative, root-relative.
+  --
+  -- These candidates are /speculative/: they are probed before anything is
+  -- known to exist there. So the URIs they can name are exactly the URIs a
+  -- module can be hijacked at, and nothing that must rank below the filesystem
+  -- tier may be reachable from here. That is why the embedded stdlib lives
+  -- outside the @file:@ scheme ('Shake.embeddedLibraryUri') rather than at
+  -- @./<name>.l4@, which both @rootDirectory == "."@ and a bare embedded
+  -- importer URI used to forge.
   let projectUri = toNormalizedUri $ Uri $ Text.pack $ "project:/" <> modName <.> "l4"
+      -- 'Nothing' for a non-file importer — notably an embedded library, which
+      -- has no directory and so contributes no sibling candidate. Its imports
+      -- are then ranked by 'resolveLibrary' alone (project root above embedded,
+      -- per Option B′), the same ranking every other importer gets: one module
+      -- name stays bound to one source across the whole build.
       relativeUri = do
         nfp <- uriToNormalizedFilePath importerUri
         let dir = takeDirectory $ fromNormalizedFilePath nfp
@@ -400,7 +447,9 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
     Just vfsUri -> do
       logWith recorder Info $ LogImportResolution $
         "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
-      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = [] }
+      -- Resolved above the library tiers entirely, so the embed was never reached.
+      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = []
+                         , embedTried = EmbedSkipped }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
       res <- liftIO $ resolveLibrary rootDirectory mImportingNfp modName
@@ -422,8 +471,14 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
           "Candidate order for " <> Text.pack modName <> ": " <> Text.intercalate "; " statuses
         warnOnLibraryShadow res
 
-      let outcome mUri = ImportOutcome
-            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths }
+      let embedStatus
+            | res.hasExplicitPath = EmbedSkipped
+            | n == 0              = EmbedEmpty
+            | otherwise           = EmbedMissing n
+            where n = Map.size EmbeddedLibraries.embeddedLibraries
+          outcome mUri = ImportOutcome
+            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths
+            , embedTried = embedStatus }
 
       case res.winner of
         Just (ix, FileCandidate _ fp) -> do
@@ -444,10 +499,12 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
             "Found in embedded libraries (candidate " <> Text.pack (show ix) <> " of "
             <> Text.pack (show (length res.candidates)) <> "): " <> Text.pack modName
           case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName) of
-            Just libContent -> do
-              let libPath = toNormalizedFilePath ("./" <> modName <.> "l4")
-              _ <- Shake.addVirtualFile libPath libContent
-              pure $ outcome $ Just $ normalizedFilePathToUri libPath
+            Just _ ->
+              -- No VFS write: the embedded copy is already readable at its
+              -- canonical URI via 'Shake.embeddedLibraryVfs'. Registering it
+              -- here would only re-introduce the mid-rule VFS mutation whose
+              -- ordering-dependence caused #906 in the first place.
+              pure $ outcome $ Just $ Shake.embeddedLibraryUri (Text.pack modName)
             Nothing ->
               -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
               -- as existing when the lookup succeeds. Fail soft regardless.
@@ -583,7 +640,13 @@ jl4Rules evalConfig rootDirectory recorder = do
           Just u ->
             pure ([], range, u)
           Nothing ->
-            let allPaths = map ((.getUri) . fromNormalizedUri) outcome.vfsTried <> map Text.pack outcome.pathsTried
+            -- nub: the CLI sets the project root to the importing file's own
+            -- directory, so the root and importer-relative tiers coincide and
+            -- the list used to repeat every path twice.
+            let allPaths = List.nub
+                  ( map ((.getUri) . fromNormalizedUri) outcome.vfsTried
+                 <> map Text.pack outcome.pathsTried )
+                 <> [renderEmbedStatus outcome.embedTried]
                 diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
@@ -630,26 +693,11 @@ jl4Rules evalConfig rootDirectory recorder = do
           , constBodies = cState.constBodies
           , sectionPaths = cState.sectionPaths
           }
+        -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
+        -- applied when the TypeCheckResult is built below), as
+        -- 'unionImportedCheckEnv' requires.
         unionCheckEnv cEnv tcRes =
-          TypeCheck.MkCheckEnv
-            -- NOTE: the environments behave more like sets than like lists, that's why we need to union them
-            { environment = Map.unionWith List.union cEnv.environment tcRes.environment
-            -- NOTE: we assume that if we have a mapping from a specific unique then it must have come from the
-            -- same module. That means that the rhs of it should be identical.
-            , entityInfo = Map.unionWith (\t1 t2 -> assert (t1 == t2) t1) cEnv.entityInfo tcRes.entityInfo
-            , errorContext = cEnv.errorContext
-            , moduleUri = cEnv.moduleUri
-            , functionTypeSigs = Map.empty -- we can omit environments that are only used internally
-            , declTypeSigs = Map.empty
-            , declareDeclarations = Map.empty
-            , assumeDeclarations = Map.empty
-            , mixfixRegistry = TypeCheck.unionMixfixRegistry cEnv.mixfixRegistry tcRes.mixfixRegistry
-            -- ^ Merge mixfix registries from imported modules so cross-module mixfix calls work
-            , computedFields = Map.empty
-            , cyclicSynonyms = mempty
-            , sectionStack = []
-            , localBindings = mempty
-            }
+          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry
         -- NOTE: we don't want to leak the inference variables from the substitution
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
         initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies

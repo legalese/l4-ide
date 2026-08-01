@@ -14,13 +14,13 @@
 TIMEZONE IS "Etc/UTC"
 
 -- expected: 5 (override transparent for context-free values)
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2000)) (2 PLUS 3)
+#EVAL `EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2000) (2 PLUS 3)
 
 `shared today V` MEANS DATE_SERIAL TODAY
 
 -- expected: 739646 — the shared thunk is forced (and cached) while
 -- tcValidTime is overridden to 2000-01-01; TODAY correctly ignores it
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2000)) `shared today V`
+#EVAL `EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2000) `shared today V`
 
 -- expected: 739646 — the cache remains valid at ambient (no read axis
 -- differs), so this also guards against over-invalidation

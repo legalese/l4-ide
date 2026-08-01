@@ -23,7 +23,7 @@ TIMEZONE IS "Etc/UTC"
 
 -- expected: serial(2020-01-01) MINUS serial(2025-01-31) = -1857
 -- (a T6 regression leaks the override value into the ambient read: 0)
-#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `serial snapshot 1`) MINUS `serial snapshot 1`
+#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `serial snapshot 1`) MINUS `serial snapshot 1`
 
 ----------------------------------------------------------------------------
 -- Case 2: forced ambiently first, read under the override second
@@ -33,7 +33,7 @@ TIMEZONE IS "Etc/UTC"
 
 -- expected: serial(2025-01-31) MINUS serial(2020-01-01) = 1857
 -- (a T6 regression leaks the ambient value into the override read: 0)
-#EVAL `serial snapshot 2` MINUS (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `serial snapshot 2`)
+#EVAL `serial snapshot 2` MINUS (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `serial snapshot 2`)
 
 ----------------------------------------------------------------------------
 -- Case 3: nested overrides within one directive
@@ -43,7 +43,7 @@ TIMEZONE IS "Etc/UTC"
 
 -- expected: serial(2020-01-01) MINUS serial(2010-01-01) = 3652
 -- (a T6 regression collapses this to 0 too)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`serial snapshot 3` MINUS (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2010)) `serial snapshot 3`))
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (`serial snapshot 3` MINUS (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2010) `serial snapshot 3`))
 
 ----------------------------------------------------------------------------
 -- Case 4 (sharing sanity): two reads under ONE context still share
@@ -52,4 +52,4 @@ TIMEZONE IS "Etc/UTC"
 `serial snapshot 4` MEANS DATE_SERIAL TODAY
 
 -- expected: 0 — matching contexts serve the cache; no spurious re-forcing
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`serial snapshot 4` MINUS `serial snapshot 4`)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (`serial snapshot 4` MINUS `serial snapshot 4`)

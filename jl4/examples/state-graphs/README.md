@@ -24,6 +24,19 @@ l4 state-graph <file.l4>
 cabal run l4 -- state-graph <file.l4>
 ```
 
+To rebuild every file here from its source, use the script rather than editing
+by hand — these are generated artefacts, and nothing in CI checks them, so a
+hand-patched one looks regenerated without being it:
+
+```bash
+jl4/examples/state-graphs/regenerate.sh
+```
+
+`jl4/experiments/patterns_and_idioms.l4` does not currently typecheck, so its
+four diagrams (`simplePayment`, `serviceContract`, `paymentDue`,
+`loanAgreement`) cannot be regenerated and are stale; the script says so and
+leaves them alone.
+
 ## File Formats
 
 Each example is provided in three formats:
@@ -43,10 +56,13 @@ initial --[violation]--> Breach
 
 ### Chained Obligations: `noSmokingWithConsequences`
 
-Shows a LEST clause creating an intermediate state with a reparation obligation:
+Shows a LEST clause creating an intermediate state with a reparation obligation.
+Note the two LEST edges carry different words, because different events reach
+them: Alice smoking breaches the prohibition, whereas the reparation obligation
+is breached by the clock.
 ```
 initial --[Alice SHANT smoke]--> Fulfilled
-initial --[timeout]--> "Alice must drink"
+initial --[violation]--> "Alice must drink"
 "Alice must drink" --[Alice MUST drink]--> Fulfilled
 "Alice must drink" --[timeout]--> Breach
 ```
@@ -141,12 +157,45 @@ Traditional wedding vows formalized as L4 regulative rules:
 
 - **Edge styles**:
   - Solid green (#28a745): Success/HENCE path
-  - Dashed red (#dc3545): Failure/LEST/timeout path
+  - Dashed red (#dc3545): LEST path — the reparation arm
   - Solid violet (#6f42c1): branch of an `ALL OF` junction — every branch is entered
   - Dotted amber (#e8850c): branch of a `ONE OF` junction — exactly one branch is entered
 
 - **Edge labels**: `<party> <MODAL> <action> [<deadline>] [IF <guard>]`. Edges out of
   a junction are unlabelled: a junction is a control point, not an action.
+
+  A LEST edge is captioned with what *reaches* it rather than with the rule
+  restated, and that differs by modal (`L4.StateGraph.lestArmWording`):
+
+  | Modal | Caption | Reached when |
+  |---|---|---|
+  | `MUST` / `DO`, with a `WITHIN` | `timeout` | the deadline passes without the act |
+  | `MAY`, with a `WITHIN` | `lapses` | the permission goes unexercised; not a failure |
+  | `SHANT` | `violation` | **the prohibited act is performed.** For a prohibition it is the deadline passing that means compliance, so this edge has nothing to do with time |
+  | `MUST` / `DO` / `MAY`, **no `WITHIN`** | `unreachable: no WITHIN` | never |
+
+  That last row is not a hedge. Three of the four modals reach `LEST` only by
+  the deadline running out — the LEST table in
+  `doc/reference/regulative/README.md` defines every non-`SHANT` trigger that
+  way, and the evaluator agrees: with no `WITHIN`, `Contract4` skips the timing
+  step, so `Contract5`, the only frame that consults `lest` on expiry, never
+  runs. Measured:
+
+  ```l4
+  PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
+  #TRACE ... AT 0 WITH (`WAIT UNTIL` 1000)
+  ```
+  leaves the *original* obligation outstanding as a residual; Bob's refund never
+  becomes current. Add `WITHIN 30` to the same rule and it does. The edge is
+  still drawn, because the drafter wrote a `LEST` body and the states extracted
+  from it have to hang off something — but it is captioned with the absence
+  rather than with an event, because both `timeout` (a deadline the rule never
+  set) and `not performed` (a transition the runtime never makes) are assertions
+  that do not survive being checked.
+
+  `SHANT` is the exception on the merits: its trigger is the act, not the clock,
+  so a prohibition with no `WITHIN` still reaches `LEST` the moment the act is
+  performed.
 
 ## Rendering
 

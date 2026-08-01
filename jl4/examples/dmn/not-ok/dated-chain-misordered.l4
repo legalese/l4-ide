@@ -1,0 +1,47 @@
+-- NEGATIVE fixture for the rule-date interval table (spec §15.3, R10).
+--
+-- The arms are ASCENDING, so first-match L4 semantics make arms 2 and 3 dead:
+-- any rule date at or after 1994-04-01 is caught by arm 1. Derived half-open
+-- intervals would be EMPTY, and an empty interval is a rule that can never
+-- fire -- not an artifact worth shipping. So the exporter refuses with
+-- D-DATEDCHAIN (Blocking) and falls back to the ordinary boolean-column table,
+-- which is sound but un-analysable.
+--
+-- Precedent: the OpenFisca backend refuses the same shape outright
+-- ("L4.OpenFisca.Lower":583-585, `dated-formula BRANCH arms must be in
+-- strictly-descending date order`). This backend cannot refuse outright -- a
+-- DMN export must still emit every decision -- so it refuses the TABLE SHAPE
+-- and says so.
+--
+-- NEVER added to `goldenSubjects`: no .dmn is emitted for it, so
+-- etc/validate-dmn.mjs is unaffected. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `misordered dated chain`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A DATE
+`GST commenced` MEANS Date 1 4 1994
+
+GIVETH A DATE
+`the 2023 rate change` MEANS Date 1 1 2023
+
+GIVETH A DATE
+`the 2024 rate change` MEANS Date 1 1 2024
+
+ASSUME `no GST rate exists before commencement` IS A NUMBER
+
+GIVEN change IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` change MEANS
+    `RULES EFFECTIVE DATE` AT LEAST change
+
+GIVETH A NUMBER
+`GST rate percent` MEANS
+    BRANCH IF `the rules in force include` `GST commenced`        THEN 3
+           IF ^                            `the 2023 rate change` THEN 8
+           IF ^                            `the 2024 rate change` THEN 9
+           OTHERWISE `no GST rate exists before commencement`

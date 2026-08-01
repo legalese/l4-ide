@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE D2. The `kie` FLAVOR's decisionService shape, and the SOLE justification
+  for DmnFlavor existing at all: a decision that carries
+  <knowledgeRequirement><requiredKnowledge href="#svc"/> and INVOKES the service
+  from FEEL.
+
+      decisionService `bundle` = { output: total, encapsulated: step, input: n }
+      decision `via_bundle` = bundle(n: n + 100)      <<< KR to the SERVICE
+
+  Section 13.4 calls this "the one measurement that is not allowed to be
+  inherited". Committing it as a fixture is precisely how it stops being
+  inherited: the claim now re-runs on every CI job instead of being copied
+  forward in prose.
+
+  The argument is `n + 100`, not `n`, so the service call cannot accidentally
+  agree with the plain top-level evaluation of `total` under the same context.
+  Without that the two would coincide and a service that silently did nothing
+  would look like a service that worked.
+
+  KIE   : passes; the caller's value is correct.
+  Camunda 8 : parse() throws
+      java.lang.ClassCastException: class ...DecisionServiceImpl cannot be cast
+      to class ...BusinessKnowledgeModel
+  and takes the WHOLE FILE with it, not just the calling decision. Wired
+  HarnessMustFail on the Camunda leg for that reason.
+
+  UPGRADE TRIPWIRE, same as spouse-context-table.dmn carries. If the Camunda leg
+  ever starts PASSING, zeebe-dmn has learned to invoke a decisionService, the
+  `camunda` flavor's reason to exist has evaporated, and DmnFlavor should be
+  deleted rather than maintained. A green day on a HarnessMustFail fixture is
+  the signal to go read the release notes, not to relax the assertion.
+
+  D3 (svc-invoked-minus-kr.dmn) is this file MINUS the one knowledgeRequirement
+  element, and is what isolates the cause to that element rather than to
+  anything else in the file.
+
+  MEASURED 2026-07-31, reproducing section 13.4 exactly:
+    KIE 8.44  : validator and build clean; 6/6 values; via_bundle = 209 and 201,
+                i.e. the service really ran on the substituted argument.
+    Camunda 8 : PARSE INVALID, whole file:
+                  class org.camunda.bpm.model.dmn.impl.instance.DecisionServiceImpl
+                  cannot be cast to class
+                  org.camunda.bpm.model.dmn.instance.BusinessKnowledgeModel
+                0 decisions parsed. Not a per-decision failure, a per-FILE one.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_svc_invoked" name="svc_invoked" namespace="https://legalese.com/l4/dmn/svc_invoked" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_step" name="step">
+    <variable id="decision_step_var" name="step" typeRef="number"/>
+    <informationRequirement id="ir_step_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_step_lit">
+      <text>n * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_total" name="total">
+    <variable id="decision_total_var" name="total" typeRef="number"/>
+    <informationRequirement id="ir_total_step">
+      <requiredDecision href="#decision_step"/>
+    </informationRequirement>
+    <literalExpression id="decision_total_lit">
+      <text>step + 1</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_bundle" name="bundle">
+    <variable id="svc_bundle_var" name="bundle" typeRef="number"/>
+    <outputDecision href="#decision_total"/>
+    <encapsulatedDecision href="#decision_step"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+  <decision id="decision_via_bundle" name="via_bundle">
+    <variable id="decision_via_bundle_var" name="via_bundle" typeRef="number"/>
+    <informationRequirement id="ir_via_bundle_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_via_bundle">
+      <requiredKnowledge href="#svc_bundle"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_via_bundle_lit">
+      <text>bundle(n: n + 100)</text>
+    </literalExpression>
+  </decision>
+</definitions>

@@ -1,0 +1,12 @@
+Parsing successful
+Typechecking successful
+pattern-nested-multibranch-partial.l4:18:3-20:37:
+  I found a problem while checking the definition of `f`:
+    The following branches still need to be considered:
+    
+      WHEN W NOTHING (JUST `_`) `_` THEN
+      WHEN W NOTHING NOTHING FALSE THEN
+      WHEN W (JUST `_`) NOTHING `_` THEN
+      WHEN W (JUST `_`) (JUST NOTHING) `_` THEN
+      WHEN W (JUST `_`) (JUST (JUST `_`)) TRUE THEN
+    

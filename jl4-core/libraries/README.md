@@ -68,16 +68,16 @@ it), so the pin above is the normal dev configuration.
 
 **TL;DR:** `DATE` is the type, `Date` is the constructor function. They're different things with confusingly similar names.
 
-### ⚠️ Upcoming Breaking Change
+### ⚠️ Proposed Breaking Change — still open
 
-**The DATE/Date naming is scheduled for a breaking change to improve clarity.** We're making this change now while adoption is still limited.
+**Status:** proposed, not landed. Nothing below has shipped; `Date` has not been renamed.
 
-The current naming conflates type constructors and value constructors, which is confusing. The proposed change:
+The current naming conflates type constructors and value constructors, which is confusing:
 
 **Current (confusing):**
 
 - `DATE` - the type (builtin)
-- `Date` - value constructor (recommended, in daydate.l4)
+- `Date` - value constructor (in daydate.l4)
 - `DATE` - value constructor (legacy compat, in date-compat.l4)
 
 **Proposed (clearer):**
@@ -86,7 +86,13 @@ The current naming conflates type constructors and value constructors, which is 
 - `makeDate` or `newDate` - primary value constructor
 - `DATE` - legacy constructor (date-compat.l4 only, for migration)
 
-This will eliminate the ambiguity where `DATE` serves dual roles and `Date` differs from `DATE` only by capitalization. If you're writing new code, be prepared to update constructor calls when this change lands.
+This would eliminate the ambiguity where `DATE` serves dual roles and `Date` differs from `DATE` only by capitalization.
+
+#### What `YMD` did and did not change
+
+`YMD year month day` has since landed in `daydate.l4` as the **recommended constructor for new code**. It is **additive and non-breaking** — it renames nothing, and builds through `Date day month year` — but it is deliberately STRICTER: `YMD` bounds-checks its arguments by component round-trip and refuses out-of-range input (a loud `ASSUME` bottom), where `Date` rolls or clamps silently. Strict literals via `YMD`; lenient arithmetic via `Date`.
+
+So `YMD` does **not** discharge the rename proposed above — it addresses a different problem (argument _order_, not constructor _naming_). The `makeDate`/`newDate` question is **still open**, and `Date` remains the little-endian constructor it always was. If you are writing new code, use `YMD`; be prepared to update `Date`/`DATE` call sites if the rename ever lands.
 
 ### The Type System Perspective
 
@@ -100,7 +106,12 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 
 #### Value Constructors (Data Constructors)
 
-- **`Date` function** (in `daydate.l4`) - **Recommended** way to construct DATE values
+- **`YMD` function** (in `daydate.l4`) - **Recommended** way to construct DATE values from components
+
+  - `YMD 1990 3 15` - from year, month, day (ISO 8601 order)
+  - Delegates to `Date day month year`, so behaviour is identical; only the argument order differs. Prefer it because big-endian order is harder to transpose. Note it does **not** validate: a transposed `YMD 1990 15 3` silently overflows month 15 into 1991-03-03 rather than erroring.
+
+- **`Date` function** (in `daydate.l4`) - supported little-endian constructor, used throughout existing corpora
 
   - `Date 15 3 1990` - from day, month, year
   - `Date 738000` - from serial number
@@ -160,7 +171,8 @@ The naming is potentially confusing because:
 
 3. **Post-migration L4**: We have:
    - `DATE` - the type (builtin, uppercase)
-   - `Date` - recommended value constructor (function, titlecase)
+   - `YMD` - recommended value constructor for new code (year, month, day)
+   - `Date` - supported value constructor (function, titlecase; day, month, year)
    - `DATE` - legacy value constructor (function in date-compat.l4, uppercase)
 
 ### Recommendations
@@ -170,11 +182,13 @@ The naming is potentially confusing because:
 ```l4
 IMPORT daydate
 
-GIVEN birthDate IS A DATE  -- DATE is the type
-DECIDE myBirthday IS Date 15 3 1990  -- Date is the constructor
+GIVEN birthDate IS A DATE     -- DATE is the type
+DECIDE myBirthday IS YMD 1990 3 15  -- YMD is the recommended constructor (y, m, d)
 
 #EVAL DATE_DAY myBirthday   -- Use DATE_DAY, DATE_MONTH, DATE_YEAR for field access
 ```
+
+`Date 15 3 1990` constructs the same date in day-month-year order and remains fully supported.
 
 **For legacy code migration:**
 
@@ -185,8 +199,8 @@ IMPORT date-compat  -- Provides backwards-compatible DATE constructor
 -- Old style still works:
 DECIDE legacyDate IS DATE 28 6 1971
 
--- New style preferred:
-DECIDE modernDate IS Date 28 6 1971
+-- New style preferred (ISO 8601 order: year, month, day):
+DECIDE modernDate IS YMD 1971 6 28
 ```
 
 ## Documentation

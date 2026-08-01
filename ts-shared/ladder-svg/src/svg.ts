@@ -1,103 +1,53 @@
 /**
  * Scene IR -> SVG string (DESIGN §4). Canonical text is <text>/<tspan> so the same
- * emit feeds screen AND print (§4.4). `theme` maps state -> ink; no second layout.
+ * emit feeds screen AND print (§4.4). The palette maps state -> ink; no second layout.
  *
- * The import below is deliberately `import type`: the Scene IR is a *contract*, not
- * a library, so this backend carries no runtime dependency on the layout engine.
+ * The `@repo/ladder-core` import below is deliberately `import type`: the Scene IR is a
+ * *contract*, not a library, so this backend carries no runtime dependency on the layout
+ * engine. (`controller.ts` is the one module in the package that does — see index.ts.)
+ *
+ * Seam S8: this file contains NO colour literals. Every colour it can emit is a named field
+ * of `Palette` (`palette.ts`), and `test/palette.test.ts` scans this source to keep that
+ * true.
+ *
+ * S8 itself was byte-identical to its pre-S8 output. This file is NO LONGER byte-identical
+ * to S8's, and deliberately: DESIGN §26.1's fix gives the `dead` state its own ink and wash,
+ * where before it fell through to `inert` and a tested-and-false element drew exactly like a
+ * never-asked one. Default screen and print output both move. What did NOT change is the
+ * shape of the contract — `sceneToSvg(scene)`, `(scene, "screen")` and `(scene,
+ * SCREEN_PALETTE)` are still the same string, character for character.
  */
 import type { Scene, ScenePrim, State, Theme, Flow } from "@repo/ladder-core";
-
-interface Palette {
-  live: string;
-  inert: string;
-  dead: string;
-  ghost: string;
-  rail: string;
-  ink: string;
-  bg: string;
-  /** Interior wash per state. A 1.5px border is the whole of a box's state signal, and at
-   *  phone scale that border is sub-pixel after downscaling — the diagram reads as a row of
-   *  identical white boxes and the T/F/U cycle looks like it did nothing. Filling the box
-   *  puts the state on an area rather than an outline, which survives any scale. Kept pale
-   *  enough that Georgia-on-white body text loses no contrast. */
-  fill: Record<State, string>;
-}
-
-// DESIGN §6/§15.1 gives four leaf states four appearances, and the difference between
-// `dead` and `inert` is the one the picture cannot afford to lose: a FALSE atom was
-// tested and did not bite; an UNKNOWN one was never asked. §25.4 reads N/A off exactly
-// that contrast ("a scope that is definitively ✗ shows a clean open contact; a scope
-// that is ? is grey"), so drawing them in one grey — as this palette did — silently
-// deleted the disambiguation the two-lamp form depends on.
-//
-// Determinacy is what the ink tracks: a settled fact is drawn FIRMLY (dark slate),
-// an open question FAINTLY (light grey), a don't-care fainter still (ghost). Red is
-// deliberately not used — it belongs to the breach lamp, and a false atom is very often
-// the good outcome (an exception that did not apply).
-const SCREEN: Palette = {
-  live: "#1a7f37",
-  inert: "#9aa0a6",
-  dead: "#4a5560",
-  ghost: "#b9bdc2",
-  rail: "#3a3a3a",
-  ink: "#222",
-  bg: "#ffffff",
-  fill: {
-    live: "#e8f5ec", // pale green — carries current
-    dead: "#e4e8ec", // pale slate — tested, did not bite
-    inert: "#ffffff", // white — nobody asked; an empty box for an open question
-    eliminable: "#f6f7f8",
-  },
-};
-const INK: Palette = {
-  ...SCREEN,
-  live: "#222",
-  inert: "#777",
-  dead: "#333",
-  ghost: "#999",
-  rail: "#222",
-  ink: "#111",
-  // Print drops hue but keeps the ordering, so the wash still separates the states in
-  // greyscale and on a mono laser.
-  fill: {
-    live: "#ededed",
-    dead: "#e0e0e0",
-    inert: "#ffffff",
-    eliminable: "#f6f7f8",
-  },
-};
+import { paletteFor } from "./palette.js";
+import type { Palette } from "./palette.js";
 
 // current-flow style (DESIGN §20): closed (leader) thick+dark, streamer (local
 // closure) medium, open thin+light.
 //
-// When the circuit is MADE end to end (`Scene.complete`, TODO G1), the closed run is
-// dark GREEN rather than near-black: the difference between "current has reached here"
-// and "this circuit conducts, source to sink" is the single most legible thing the
-// picture can say, and colour says it without changing the weight the eye already reads
-// as live. Width is deliberately unchanged.
-//
-// A made circuit that rests on assumptions gets a MUTED green instead (`Scene.provisional`):
-// the reader is still told the circuit conducts, but not in the same voice as one made of
-// answered facts. Suppressing the green entirely would hide a real result; giving it the
-// full green would let an all-assumed path pass for a finding.
-const CLOSED_INK = "#1b1b1b";
-const CLOSED_MADE = "#0f5c2a"; // dark green — a completed source→sink path
-const CLOSED_MADE_PROV = "#5f9e77"; // muted green — completed, but on presumptions
-const flowStroke = (f: Flow, complete = false, provisional = false) =>
+// When the circuit is MADE end to end (`Scene.complete`), a closed run takes `wireMade`
+// instead of `wireClosed`, and `wireMadeProvisional` when the making rests on assumptions.
+// Width is deliberately unchanged — see those two palette fields for why colour carries it.
+const flowStroke = (
+  f: Flow,
+  p: Palette,
+  complete = false,
+  provisional = false,
+) =>
   f === "closed"
     ? complete
       ? provisional
-        ? CLOSED_MADE_PROV
-        : CLOSED_MADE
-      : CLOSED_INK
+        ? p.wireMadeProvisional
+        : p.wireMade
+      : p.wireClosed
     : f === "streamer"
-      ? "#7c828a"
-      : "#d6dadd";
+      ? p.wireStreamer
+      : p.wireOpen;
 const flowWidth = (f: Flow) =>
   f === "closed" ? 3.4 : f === "streamer" ? 2.3 : 1.1;
 
 // Four states, four inks. `dead` used to fall through to `p.inert` here, which meant
-// `p.dead` was never read at all — the palette entry existed and the renderer ignored it.
+// `p.dead` was never read at all — the palette entry existed and the renderer ignored it,
+// so a tested-and-false element emitted byte-identical SVG to a never-asked one.
 const strokeFor = (s: State, p: Palette) =>
   s === "live"
     ? p.live
@@ -106,6 +56,17 @@ const strokeFor = (s: State, p: Palette) =>
       : s === "dead"
         ? p.dead
         : p.inert;
+
+// …and four interiors. `inert` is the plain box fill (an empty box for an open question)
+// and `eliminable` keeps its own; only `live` and `dead` need a wash of their own.
+const fillFor = (s: State, p: Palette) =>
+  s === "live"
+    ? p.liveFill
+    : s === "dead"
+      ? p.deadFill
+      : s === "eliminable"
+        ? p.eliminableFill
+        : p.boxFill;
 
 const esc = (t: string) =>
   t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -121,14 +82,14 @@ function prim(
       const { x, y, w, h } = p.rect;
       const a = ` data-fnid="${p.id}"${actAttr(p.act)} class="lad-box${p.act ? " lad-clickable" : ""}"`;
       if (p.state === "eliminable")
-        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${pal.fill.eliminable}" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`;
+        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${pal.eliminableFill}" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`;
       // A folded placeholder keeps its own bluish neutral ONLY while its value is unknown;
       // once it has one, the state wash wins — a fold must not hide the verdict it stands in
       // for, which is the whole point of being able to pin a folded group (§19).
       const fill =
         p.role === "placeholder" && p.state === "inert"
-          ? "#eef1f6"
-          : pal.fill[p.state];
+          ? pal.placeholderFill
+          : fillFor(p.state, pal);
       // tentative (DESIGN §22): fine dots + normal ink — a presumption, not a ghost.
       // Finer dash (1.5 3) distinguishes it from eliminable's coarser dashes (5 4).
       const tent = p.tentative ? ' stroke-dasharray="1.5 3"' : "";
@@ -140,7 +101,7 @@ function prim(
         .join(" ");
       const cls = `class="lad-wire${p.act ? " lad-clickable" : ""}"${actAttr(p.act)}`;
       if (p.flow)
-        return `<polyline ${cls} points="${d}" fill="none" stroke="${flowStroke(p.flow, complete, provisional)}" stroke-width="${flowWidth(p.flow)}"/>`;
+        return `<polyline ${cls} points="${d}" fill="none" stroke="${flowStroke(p.flow, pal, complete, provisional)}" stroke-width="${flowWidth(p.flow)}"/>`;
       const dash = p.state === "eliminable" ? ' stroke-dasharray="5 4"' : "";
       const col = p.role === "rail" ? pal.rail : strokeFor(p.state, pal);
       const op = p.state === "eliminable" ? ' opacity="0.9"' : "";
@@ -150,7 +111,7 @@ function prim(
       const d = `M ${p.from.x.toFixed(1)},${p.from.y.toFixed(1)} C ${p.c1.x.toFixed(1)},${p.c1.y.toFixed(1)} ${p.c2.x.toFixed(1)},${p.c2.y.toFixed(1)} ${p.to.x.toFixed(1)},${p.to.y.toFixed(1)}`;
       const cls = `class="lad-wire${p.act ? " lad-clickable" : ""}"${actAttr(p.act)}`;
       if (p.flow)
-        return `<path ${cls} d="${d}" fill="none" stroke="${flowStroke(p.flow, complete, provisional)}" stroke-width="${flowWidth(p.flow)}"/>`;
+        return `<path ${cls} d="${d}" fill="none" stroke="${flowStroke(p.flow, pal, complete, provisional)}" stroke-width="${flowWidth(p.flow)}"/>`;
       const dash = p.state === "eliminable" ? ' stroke-dasharray="5 4"' : "";
       const op = p.state === "eliminable" ? ' opacity="0.9"' : "";
       return `<path ${cls} d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`;
@@ -167,14 +128,14 @@ function prim(
       // knob can walk a reader from "undetermined" to a lit IN BREACH lamp with no new
       // facts, and the lamp must not report that in the same voice as a finding.
       const prov = provisional && p.lit;
-      const on = p.role === "green" ? "#1a7f37" : "#c0392b";
-      const soft = p.role === "green" ? "#5f9e77" : "#cd8b84";
-      const off = "#c9ced3";
+      const on = p.role === "green" ? pal.coilGreen : pal.coilRed;
+      const soft = p.role === "green" ? pal.coilGreenSoft : pal.coilRedSoft;
+      const off = pal.coilOff;
       const col = p.lit ? (prov ? soft : on) : off;
       const r = 9;
       return (
         `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="${r}" ` +
-        `fill="${p.lit && !prov ? col : "#ffffff"}" stroke="${col}" stroke-width="${p.lit ? 2.6 : 1.4}"` +
+        `fill="${p.lit && !prov ? col : pal.coilHollow}" stroke="${col}" stroke-width="${p.lit ? 2.6 : 1.4}"` +
         `${prov ? ' stroke-dasharray="1.5 3"' : ""}/>` +
         `<text x="${(p.at.x + r + 7).toFixed(1)}" y="${(p.at.y + 4).toFixed(1)}" ` +
         `font-family="Georgia, serif" font-size="12" fill="${p.lit ? col : off}"` +
@@ -184,7 +145,7 @@ function prim(
     case "glyph":
       if (p.role === "changeover")
         // one pole, two throws — the requirement's verdict throws the blade
-        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3" fill="#3a3a3a"/>`;
+        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3" fill="${pal.glyphDot}"/>`;
       if (p.role === "open-contact") {
         // A break on a FALSE element is a settled fact and is drawn firmly; a break on an
         // ELIMINABLE one is a ghost (DESIGN §15.1). Same glyph, different conviction.
@@ -200,13 +161,13 @@ function prim(
       }
       if (p.role === "inverter")
         // the NOT bubble — sits on the output wire (DESIGN §21)
-        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="5" fill="#ffffff" stroke="#1b1b1b" stroke-width="1.5"/>`;
+        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="5" fill="${pal.inverterFill}" stroke="${pal.inverterStroke}" stroke-width="1.5"/>`;
       return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`;
     case "frame": {
       const { x, y, w, h } = p.rect;
       return (
-        `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="10" fill="none" stroke="#b3b7bb" stroke-width="1.2" stroke-dasharray="2 4"/>` +
-        `<text x="${(x + 11).toFixed(1)}" y="${(y + 15).toFixed(1)}" font-family="Georgia, serif" font-size="11" fill="#8a9096" font-style="italic">${esc(p.label)}</text>`
+        `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="10" fill="none" stroke="${pal.frameStroke}" stroke-width="1.2" stroke-dasharray="2 4"/>` +
+        `<text x="${(x + 11).toFixed(1)}" y="${(y + 15).toFixed(1)}" font-family="Georgia, serif" font-size="11" fill="${pal.frameLabel}" font-style="italic">${esc(p.label)}</text>`
       );
     }
     case "text": {
@@ -230,19 +191,19 @@ function prim(
       // SOURCE presumed, blue is what the READER chose to assume. Confusing a drafter's
       // presumption with a viewer's setting is exactly the audit failure to avoid.
       const fill = isCaret
-        ? "#7a7f85"
+        ? pal.caret
         : p.tag === "seam"
-          ? "#1b1b1b"
+          ? pal.seam
           : p.tag === "typically"
-            ? "#9a7b34"
+            ? pal.typically
             : p.tag === "assumed"
-              ? "#3f6d8f"
+              ? pal.assumed
               : p.tag === "otiose"
                 ? pal.ghost
                 : p.state === "live"
                   ? pal.ink
                   : p.tag
-                    ? "#555"
+                    ? pal.tagInk
                     : pal.ink;
       const a = `${p.id != null ? ` data-fnid="${p.id}"` : ""}${actAttr(p.act)}${p.act ? ' class="lad-clickable"' : ""}`;
       return `<text${a} x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`;
@@ -255,8 +216,16 @@ function actAttr(a?: { t: "value" | "fold"; id: number }): string {
   return a ? ` data-${a.t}="${a.id}"` : "";
 }
 
-export function sceneToSvg(scene: Scene, theme: Theme = "screen"): string {
-  const pal = theme === "ink" ? INK : SCREEN;
+/**
+ * The emit. `theme` takes a built-in name (`"screen"` / `"ink"`) or a caller's own
+ * `Palette` — seam S8. `sceneToSvg(scene)` and `sceneToSvg(scene, "screen")` and
+ * `sceneToSvg(scene, SCREEN_PALETTE)` are the same string, character for character.
+ */
+export function sceneToSvg(
+  scene: Scene,
+  theme: Theme | Palette = "screen",
+): string {
+  const pal = paletteFor(theme);
   const { w, h } = scene.size;
   const body = scene.prims
     .map((p) => prim(p, pal, !!scene.complete, !!scene.provisional))

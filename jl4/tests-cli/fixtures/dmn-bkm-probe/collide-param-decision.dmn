@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE E3. Two unmeasured questions in one file, because they cannot be
+  separated: (1) may a BKM body read a DECISION's variable at all, and (2) if a
+  formalParameter is spelled the same as a decision, which wins?
+
+  Question (1) has no obvious answer from the schema. Section 6.2's child list for
+  a BKM is `variable? encapsulatedLogic? knowledgeRequirement* authorityRequirement*`
+  with NO informationRequirement, so a BKM cannot DECLARE a dependency on a
+  decision even if FEEL would let it read one. That makes "can it read one
+  anyway" a genuinely open engine question, and a load-bearing one: if it can,
+  the emitter has an undeclared edge it must either forbid or track.
+
+      decision   base = 7
+      bkm  reader(k)  = base + k       <<< question (1): reads a decision
+      bkm  shadow(base) = base * 1000  <<< question (2): parameter spelled `base`
+      decision   via_reader = reader(1)   -> 8 if a BKM may read `base`
+      decision   via_shadow = shadow(2)   -> 2000 if the parameter shadows
+                                          -> 7000 if the decision wins
+
+  The two candidate answers for via_shadow differ by a factor of 3500, so
+  whichever way it resolves is unmistakable, and neither is null.
+
+  MEASURED 2026-07-31, and BOTH engines refuse question (1):
+    KIE 8.44  : ERROR [ERR_COMPILING_FEEL] Error compiling FEEL expression
+                'base + k' for name 'reader' on node 'reader': Unknown variable
+                'base'. Validator AND build, i.e. compile time.
+    Camunda 8 : parses, and via_reader evaluates to null.
+  Question (2) resolves to the PARAMETER on Camunda (via_shadow = 2000, never
+  7000 or 8000, in both cases).
+
+  A CONSEQUENCE OF (1) WORTH KNOWING BEFORE READING THE KIE LEG: KIE's refusal is
+  a whole-model compile error, so it never reaches question (2) in this file.
+  Question (2) is therefore measured on KIE in collide-param-shadow-visible.dmn
+  (probe E7), which asks it WITHOUT any BKM that reads a decision. The two files
+  are a pair; E3 is the negative control for (1) and E7 is the positive for (2).
+
+  Wired HarnessMustFail on BOTH legs.
+
+  WHAT A FLIP MEANS. If (1) fails, nothing changes: the emitter never wanted an
+  undeclared edge, and a refusal is the engine enforcing what checkDrg would
+  anyway. If (1) SUCCEEDS, section 6.2's invariant list needs a new entry saying
+  the emitter must not produce such a read, because the DRG will not show it. If
+  (2) resolves to the decision on either engine, formalParameter names must be
+  uniquified against decision names as well, which is the widening E1 rules out
+  for inputData names only.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_collide_param_decision" name="collide_param_decision" namespace="https://legalese.com/l4/dmn/collide_param_decision" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_base" name="base">
+    <variable id="decision_base_var" name="base" typeRef="number"/>
+    <informationRequirement id="ir_base_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_base_lit">
+      <text>n + 7</text>
+    </literalExpression>
+  </decision>
+  <businessKnowledgeModel id="bkm_reader" name="reader">
+    <variable id="bkm_reader_var" name="reader" typeRef="number"/>
+    <encapsulatedLogic id="bkm_reader_logic">
+      <formalParameter id="bkm_reader_p1" name="k" typeRef="number"/>
+      <literalExpression id="bkm_reader_lit">
+        <text>base + k</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_shadow" name="shadow">
+    <variable id="bkm_shadow_var" name="shadow" typeRef="number"/>
+    <encapsulatedLogic id="bkm_shadow_logic">
+      <formalParameter id="bkm_shadow_p1" name="base" typeRef="number"/>
+      <literalExpression id="bkm_shadow_lit">
+        <text>base * 1000</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decision id="decision_via_reader" name="via_reader">
+    <variable id="decision_via_reader_var" name="via_reader" typeRef="number"/>
+    <informationRequirement id="ir_via_reader_base">
+      <requiredDecision href="#decision_base"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_via_reader">
+      <requiredKnowledge href="#bkm_reader"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_via_reader_lit">
+      <text>reader(1)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_via_shadow" name="via_shadow">
+    <variable id="decision_via_shadow_var" name="via_shadow" typeRef="number"/>
+    <informationRequirement id="ir_via_shadow_base">
+      <requiredDecision href="#decision_base"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_via_shadow">
+      <requiredKnowledge href="#bkm_shadow"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_via_shadow_lit">
+      <text>shadow(2)</text>
+    </literalExpression>
+  </decision>
+</definitions>

@@ -1,0 +1,11 @@
+{
+  "note": [
+    "Cases for bkm-chain-nokr.dmn (probe C3, NEGATIVE CONTROL). 2 cases x 1 decision = 2 value checks",
+    "per engine. (n+1)*10 is chosen so that a missing inner call (i.e. n*10) and",
+    "a missing outer multiply (n+1) are both visibly wrong at both values."
+  ],
+  "cases": [
+    { "name": "A. n = 4",  "context": { "n": 4 },  "expect": { "result": 50 } },
+    { "name": "B. n = 0",  "context": { "n": 0 },  "expect": { "result": 10 } }
+  ]
+}

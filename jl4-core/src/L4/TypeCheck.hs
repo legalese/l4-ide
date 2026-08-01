@@ -14,7 +14,8 @@ module L4.TypeCheck
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
-  , severity
+  -- 'severity' is re-exported via @module X@ (it lives in
+  -- L4.TypeCheck.Types now, next to candidate viability)
   )
   where
 
@@ -139,6 +140,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
     , cyclicSynonyms = Set.empty
+    , inNonexhaustiveDecide = False
     , moduleUri
     , sectionStack = []
     , localBindings = Set.empty
@@ -194,7 +196,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 exportErrs = Export.validateExportInputs rprog
             in MkCheckResult
               { program = rprog
-              , errors = substErrs ++ moreErrs ++ exportErrs
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -204,6 +206,62 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , descMap = s'.descMap
               , mixfixRegistry = combinedMixfixRegistry
               }
+
+-- | Drop diagnostics that are pure fallout from a name-resolution failure that
+-- has already been reported (issue #920).
+--
+-- When 'resolveType' \/ 'resolveTerm'' cannot pick a binding, they report the
+-- real error ('OutOfScopeError', 'AmbiguousTermError', 'AmbiguousTypeError')
+-- and hand back an 'OutOfScope' sentinel so that checking can continue. Any
+-- type built on such a sentinel is poisoned: it unifies with nothing, so every
+-- 'expect' against it fails and emits a 'TypeMismatch' that tells the user
+-- nothing they were not already told — classically rendered as the useless
+-- "must match ... namely Verdict but is here of type Verdict".
+--
+-- Why filter here, at the boundary, instead of not raising the error in
+-- 'expect'? Because @addError@ is what makes a candidate of the backtracking
+-- 'Check' monad a failure. Silencing 'expect' would turn failing overload
+-- candidates into successes, and a set of poisoned candidates that all succeed
+-- is reported as 'InternalAmbiguityError' — trading one internal-error-grade
+-- message for another. Filtering the finished list leaves resolution, pruning
+-- and overload selection bit-for-bit unchanged and only removes the message.
+--
+-- Two properties keep this from hiding genuine errors:
+--
+-- * We only drop a 'TypeMismatch' that a sentinel /accounts for/: one whose two
+--   sides agree everywhere except at or under a sentinel
+--   ('sameModuloOutOfScope'). Merely /mentioning/ a sentinel is not enough, and
+--   deliberately so. @GIVEN xs IS A LIST OF Typo@ \/ @GIVETH A NUMBER@ \/
+--   @h MEANS xs@ mismatches NUMBER against @LIST OF ⊥@; both heads are
+--   resolved, they genuinely differ, and that error survives verbatim once
+--   @Typo@ is declared — so it is news, and it stays. Likewise
+--   @FUNCTION FROM ⊥ TO BOOLEAN@ against @FUNCTION FROM ⊥ TO NUMBER@: the
+--   poisoned argument matches, the BOOLEAN\/NUMBER return does not, and the
+--   mismatch is reported. What we drop is only the contentless kind: @⊥@
+--   against anything, @LIST OF ⊥@ against @LIST OF NUMBER@.
+--
+-- * We only filter at all when a resolution failure is present in the same
+--   list, and resolution failures are themselves never dropped. So the error
+--   list can never be emptied by this function: a file that failed to check
+--   still fails to check, and still says why.
+suppressResolutionCascade :: [CheckErrorWithContext] -> [CheckErrorWithContext]
+suppressResolutionCascade errs
+  | any (isResolutionFailure . (.kind)) errs = filter (not . isCascade . (.kind)) errs
+  | otherwise                                = errs
+  where
+    isResolutionFailure :: CheckError -> Bool
+    isResolutionFailure = \ case
+      OutOfScopeError    {} -> True
+      AmbiguousTermError {} -> True
+      AmbiguousTypeError {} -> True
+      _                     -> False
+
+    isCascade :: CheckError -> Bool
+    isCascade = \ case
+      TypeMismatch _ec expected given ->
+        (mentionsOutOfScope expected || mentionsOutOfScope given)
+          && sameModuloOutOfScope expected given
+      _ -> False
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
@@ -228,9 +286,11 @@ withExtraMixfix :: MixfixRegistry -> Check a -> Check a
 withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
+    -- positional match: 'mixfixRegistry' is a duplicated field name, so a
+    -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs h i lb) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs h i lb
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs ne h i lb) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs ne h i lb
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -274,6 +334,13 @@ withDeclares rdecls =
     go (MkDeclChecked (Left  a) cis) = Left  . (, MkDeclChecked a cis) <$> rangeOf a
     go (MkDeclChecked (Right a) cis) = Right . (, MkDeclChecked a cis) <$> rangeOf a
   in
+    -- These are frame-local, by-'SrcRange' lookup maps: they are read only by
+    -- 'lookupDeclareCheckedByAnno'/'lookupAssumeCheckedByAnno' to find the
+    -- declaration being checked right now, which always lives in the current
+    -- frame, so replacing (not accumulating) on scope entry is correct.
+    -- Exhaustiveness checking's "every constructor in scope" query does NOT read
+    -- these — it reads 'entityInfo' (see 'constructorsInScopeFromEntityInfo'),
+    -- which is cumulative across scopes and imports and includes builtins.
     extendKnownGlobalMany topDeclares . local \s -> s
       { declareDeclarations = Map.fromList rdeclares
       , assumeDeclarations = Map.fromList rassumes
@@ -367,6 +434,28 @@ runCheckUnique c e s =
     [] -> error "internal error: expected unique result, got none"
     [(w, s')] -> (w, s')
     _ -> error "internal error: expected unique result, got several"
+
+-- | Run a sub-computation for its VALUE only: select one viable candidate
+-- (the first one free of 'SError'-severity diagnostics, the way 'prune'
+-- would), DISCARD every diagnostic it emitted along the way, and return
+-- 'Nothing' when no candidate is viable.
+--
+-- The caller's 'CheckState' is restored except for the unique 'supply',
+-- which advances to the chosen candidate's — fresh uniques minted inside
+-- (by 'def' \/ 'newUnique') may survive in the returned value and must not
+-- be re-minted. Everything else (substitution, 'infoMap' \/ 'nlgMap' \/
+-- 'scopeMap' \/ 'descMap' insertions) is dropped: 'checkClauseMatrix' uses
+-- this to RE-check patterns that were already checked inside the desugared
+-- tree, and re-emitting their diagnostics or map entries would duplicate
+-- every one of them.
+quietly :: Check a -> Check (Maybe a)
+quietly m = MkCheck $ \ e s ->
+  let candidates = runCheck m e s
+  in case filter (viableCandidate . fst) candidates of
+       ((w, s') : _) ->
+         let (_discardedDiags, a) = runWith w
+         in [(Plain (Just a), s { supply = s'.supply })]
+       [] -> [(Plain Nothing, s)]
 
 -- ------------------------------------
 -- Check Primitives
@@ -562,11 +651,22 @@ inferProgram (MkModule ann uri section) = do
 -- TODO: This is more complicated due to potential polymorphism.
 --
 inferDecide :: Decide Name -> Check (Decide Resolved, [CheckInfo])
-inferDecide (MkDecide ann _tysig appForm expr) = do
+inferDecide dec@(MkDecide ann _tysig appForm expr) = do
   errorContext (WhileCheckingDecide (getName appForm)) do
-    lookupFunTypeSigByAnno ann >>= \ dHead -> do
+    -- An @nonexhaustive-decorated definition is declared deliberately partial by
+    -- its author (not defined for all inputs; evaluation fails outside the
+    -- domain), so the non-exhaustive-CONSIDER warning is silenced for its
+    -- whole body, WHERE-bound helpers included. Redundancy warnings stay
+    -- active. See 'L4.Export.isNonexhaustiveDecide' / 'DescFlags'.
+    withNonexhaustiveFlag $ lookupFunTypeSigByAnno ann >>= \ dHead -> do
         decide <- extendKnownMany dHead.arguments $ do
           rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
+          -- Clause-matrix exhaustiveness for multi-clause pattern-matching
+          -- groups (spec §14.7): runs AFTER the body is checked, so
+          -- 'applySubst' can resolve untyped-GIVEN inference variables, and
+          -- INSIDE 'extendKnownMany', so the GIVEN binders' entityInfo
+          -- entries (the column types) are in scope.
+          checkClauseMatrix dec dHead
           -- See Note [Adding type information to all binders]
           MkDecide dHead.anno
             <$> traverse resolvedType dHead.rtysig
@@ -583,6 +683,231 @@ inferDecide (MkDecide ann _tysig appForm expr) = do
             modifying' #constBodies (Map.insert (getUnique hd) rbody)
           _ -> pure ()
         pure (decide, [dHead.name])
+  where
+    withNonexhaustiveFlag :: Check a -> Check a
+    withNonexhaustiveFlag
+      | Export.isNonexhaustiveDecide dec || isSyntheticFallthrough
+          = local (\env -> env { inNonexhaustiveDecide = True })
+      | otherwise                  = id
+
+    -- The multi-clause pattern-matching desugaring (L4.Parser.matchClauses)
+    -- binds the remaining clauses of a group as a LOCAL decide named
+    -- @__pm_fallthrough_<k>@, and deliberately compiles the LAST clause
+    -- without an OTHERWISE so that a non-match is a runtime
+    -- non-exhaustive-pattern error. Each such interior binding is therefore
+    -- partial BY CONSTRUCTION, and warning on it would (a) mis-report a
+    -- total clause group as incomplete and (b) name an invisible binder at
+    -- <no location>. The double-underscore prefix is the desugarer's hygiene
+    -- marker (see 'L4.Parser.fallthroughName').
+    --
+    -- The suppression is CORRECT (not a known limitation) because the clause
+    -- group is checked as a unit at the Decide level: 'checkClauseMatrix'
+    -- analyses the parser-attached source clause matrix
+    -- ('Extension.pmMatrix'), so a genuinely incomplete group warns there,
+    -- with real clause-head ranges (see DMN-EXPORT-PROGRAM-MODEL-SPEC
+    -- §14.7's resolution). The inner CONSIDERs silenced here are compilation
+    -- artifacts; checking them per-node would only reproduce the
+    -- pre-suppression false positives (<no location>, an invisible binder,
+    -- total groups reported incomplete).
+    --
+    -- Residual, stated honestly: a USER-written CONSIDER inside the body of
+    -- clause 2..n also lives inside a fall-through Decide, so its
+    -- missing-arm warning is still silenced — a pre-existing collateral
+    -- false negative this change does not restore. (Follow-up recorded in
+    -- the spec: split the env flag into decorator-suppression vs.
+    -- fallthrough-suppression and let the fallthrough variant suppress only
+    -- RANGELESS CONSIDERs — synthetic nodes are 'emptyAnno', user nodes
+    -- carry ranges.)
+    isSyntheticFallthrough :: Bool
+    isSyntheticFallthrough = case appForm of
+      MkAppForm _ (MkName _ (NormalName t)) _ _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
+      _ -> False
+
+-- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
+-- run over the SOURCE clause matrix the parser attached to the fused
+-- Decide's annotation ('Extension.pmMatrix') — the desugared tree cannot be
+-- analysed instead: 'L4.Parser.matchClauses' gives every non-final clause
+-- an OTHERWISE (the fall-through reference) and buries the un-defaulted
+-- final clause inside a suppressed @__pm_fallthrough_@ binding, so per-node
+-- CONSIDER checking never sees the missing arms (spec §14.7).
+--
+-- Only n >= 2 groups are analysed here: for n = 1 the final clause's
+-- CONSIDER sits in the USER's own Decide (not a fall-through), is
+-- un-suppressed, and already warns via the ordinary 'checkConsider' path
+-- anchored at the head name — analysing it again at matrix level would
+-- double-warn.
+--
+-- Every bail below is FAIL-OPEN to no-warning, the same contract as
+-- 'analyzePatternMatch': no warning is better than a wrong one or a hang.
+checkClauseMatrix :: Decide Name -> FunTypeSig -> Check ()
+checkClauseMatrix dec dHead =
+  case view annPmMatrix (getAnno dec) of
+    Just matrix
+      | length matrix.clauses >= 2
+        -- @nonexhaustive: the author declares the group deliberately
+        -- partial; the missing-clause warning is silenced (redundancy is
+        -- not analysed on this path at all).
+      , not (Export.isNonexhaustiveDecide dec)
+      -> analyseMatrix matrix
+    _ -> pure ()
+  where
+    MkAppForm _ _ colScruts _ = dHead.rappForm
+
+    analyseMatrix :: PmMatrix -> Check ()
+    analyseMatrix matrix = do
+      ei <- asks (.entityInfo)
+      let clauseRows = matrix.clauses
+          -- Column-count mismatch with any clause bails (mirrors
+          -- 'L4.Parser.matchOne', which ignores extra patterns).
+          columnCountOk =
+            not (null colScruts)
+              && all (\ cl -> length cl.patterns == length colScruts) clauseRows
+          -- Opaque bail: any literal or expression pattern anywhere stands
+          -- the whole analysis down — same rule and rationale as
+          -- 'checkConsider' (the guard model would treat them as
+          -- irrefutable, which is wrong in both directions).
+          hasOpaque = any (any patternHasOpaque . (.patterns)) clauseRows
+          -- Column types, read off the GIVEN binders' entityInfo entries
+          -- (in scope: we are called inside @extendKnownMany
+          -- dHead.arguments@); NOT via 'getEntityInfo', which reports a
+          -- 'MissingEntityInfo' error on a miss.
+          mColTypes =
+            traverse
+              (\ r -> case Map.lookup (getUnique r) ei of
+                  Just (_, KnownTerm ty _) -> Just ty
+                  _ -> Nothing)
+              colScruts
+      case mColTypes of
+        Just colTypes0 | columnCountOk, not hasOpaque -> do
+          colTypes <- traverse applySubst colTypes0
+          -- Re-resolve each clause's patterns against the column types,
+          -- 'quietly': the same patterns were already checked inside the
+          -- desugared tree, so all diagnostics are discarded (re-emitting
+          -- would duplicate every error), and any pattern with no viable
+          -- (error-free) candidate bails the whole analysis. EXCEPT the
+          -- column-wildcard idiom, which must be intercepted BEFORE
+          -- resolution: see 'patIsColumnWildcard'.
+          rpatssM <-
+            forM clauseRows \ cl ->
+              forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
+                if patIsColumnWildcard scrutR pat
+                  then pure (Just (PatVar (getAnno pat) scrutR))
+                  else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+          case traverse sequence rpatssM of
+            Just rpatss
+              | all (all patternInfoComplete) rpatss ->
+                  analyseResolvedRows matrix ei rpatss
+            _ -> pure ()
+        _ -> pure ()
+
+    analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check ()
+    analyseResolvedRows matrix ei rpatss = do
+      -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
+      -- (scrutinee, constructor), so cross-clause payload variables are
+      -- shared (which the nabla reasoning needs) and columns cannot
+      -- collide.
+      rows <- flip evalStateT Map.empty $
+        forM (zip matrix.clauses rpatss) \ (cl, rpats) -> do
+          gss <- sequence (zipWith desugarPat colScruts rpats)
+          pure (concat gss, rowLeaf cl)
+      let ctorSets = constructorsInScopeFromEntityInfo ei
+          tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rows ]
+          analysed = flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
+      case analysed of
+        -- bail to no-warning — fail-open, same contract as
+        -- 'analyzePatternMatch': no warning is better than a wrong one or a
+        -- hang (the 'maxUncoveredNablas' cap).
+        Nothing -> pure ()
+        Just (uncovered, _redundant) -> do
+          let arity = constructorArity ei
+              missingRows =
+                nubOrdOn (map (fmap getUnique)) $
+                  concatMap
+                    (\ nabla ->
+                       -- per-column expansion, cartesian product across
+                       -- columns (the list monad's 'sequence')
+                       sequence
+                         [ map (renderColumnWildcard scrutR) (expandToPatterns arity scrutR nabla)
+                         | scrutR <- colScruts
+                         ])
+                    uncovered
+              capped =
+                length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
+          -- cap overflow suppresses the warning entirely, the existing
+          -- capped-to-suppress convention of 'analyzePatternMatch'
+          unless (capped || null missingRows) do
+            case hullRange matrix of
+              -- R2: the warning must anchor at a real source range; if none
+              -- can be produced at all, do not emit.
+              Nothing -> pure ()
+              Just hull ->
+                addWarning (PatternClausesMissing hull (getName dHead.rappForm) missingRows)
+
+    -- | A synthesized leaf whose only consumed parts are its identity and
+    -- its anno (the clause-head range).
+    rowLeaf :: PmMatrixClause -> Branch Resolved
+    rowLeaf cl =
+      MkBranch (mkAnno [mkHoleWithSrcRangeHint cl.headRange])
+        (Otherwise emptyAnno)
+        (Lit emptyAnno (NumericLit emptyAnno 0))
+
+    -- | The hull of the clause-head ranges: first head's start to last
+    -- head's end. If any head range is missing, fall back to the Decide's
+    -- own range (real: it spans sig + clause group, 'L4.Parser.decideAnno').
+    hullRange :: PmMatrix -> Maybe SrcRange
+    hullRange matrix = case traverse (.headRange) matrix.clauses of
+      Just rs@(r0 : _) ->
+        Just MkSrcRange
+          { start = r0.start
+          , end = (List.last rs).end
+          , length = sum (map (.length) rs)
+          , moduleUri = r0.moduleUri
+          }
+      _ -> rangeOf dec
+
+    -- | A column about which the uncovered nabla has no information renders
+    -- as the column's GIVEN name — the language's documented wildcard idiom
+    -- (the lexer rejects a bare @_@; a variable reusing the GIVEN name
+    -- desugars to nothing) — so the suggested clause is valid, pasteable
+    -- L4. Nested wildcards inside applied constructors stay @`_`@.
+    renderColumnWildcard :: Resolved -> Pattern Resolved -> Pattern Resolved
+    renderColumnWildcard scrutR = \ case
+      PatVar a v | v `sameResolved` underscoreRef -> PatVar a scrutR
+      p -> p
+
+    -- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which the matrix analysis
+    -- MUST agree with: a bare pattern that reuses its own column's
+    -- GIVEN\/scrutinee name (or the anonymous wildcard) is compiled by the
+    -- desugarer as an unconditional match — 'L4.Parser.matchOne'\/'matchLast'
+    -- skip the column entirely, emitting no test — EVEN when that name is
+    -- also a nullary constructor of the column type. Re-resolving such a
+    -- pattern through 'checkPattern' would try constructor resolution first
+    -- ('inferPatternApp' before the variable fallback) and mis-read the row
+    -- as covering only that one constructor, producing a
+    -- 'PatternClausesMissing' warning (and, downstream, a DMN D-PARTIAL
+    -- Blocking) that contradicts the shipped runtime semantics of a
+    -- runtime-total group. Intercept before resolution and stand in the
+    -- wildcard the desugarer actually compiled ('desugarPat' turns 'PatVar'
+    -- into no guards). Note the reuse test is against THIS column's
+    -- scrutinee only: a bare name matching a DIFFERENT column's GIVEN, or
+    -- no GIVEN at all, still resolves normally — exactly as at runtime.
+    patIsColumnWildcard :: Resolved -> Pattern Name -> Bool
+    patIsColumnWildcard scrutR = \ case
+      PatApp _ n [] -> nameToText n == "_" || rawName n == rawName (getName scrutR)
+      _ -> False
+
+    -- | Defensive: 'desugarPat' calls 'error' on a PatApp\/PatCons whose
+    -- anno lacks 'resolvedInfo' (possible only for a rangeless anno —
+    -- 'setAnnResolvedType' is a no-op without a range). Parser-built
+    -- patterns always carry ranges, but a crash here would take the IDE
+    -- down with it; bail to no-warning instead.
+    patternInfoComplete :: Pattern Resolved -> Bool
+    patternInfoComplete = \ case
+      PatApp a _ ps   -> isJust (view annInfo a) && all patternInfoComplete ps
+      PatCons a p1 p2 -> isJust (view annInfo a) && patternInfoComplete p1 && patternInfoComplete p2
+      PatVar {}       -> True
+      PatExpr {}      -> True -- unreachable: the opaque bail stood down first
+      PatLit {}       -> True
 
 -- | We allow the following cases:
 --
@@ -921,13 +1246,18 @@ inferConDecl rappForm (MkConDecl ann n tns) = do
     conType = forall' (view appFormArgs rappForm) (fun (typedNameOptionallyNamedType <$> rtns) (appFormType rappForm))
     conInfo = KnownTerm conType Constructor
 
+  -- Data constructors are section-qualifiable too, so that @`Section`.yes@
+  -- names the constructor exactly as @`Section`.someValue@ names a value (#921).
+  -- Aliases only: see 'addQualifiedAliases' for why this must not also record a
+  -- section path for the constructor.
+  conCheckInfo <- addQualifiedAliases (makeKnown dn conInfo)
 
-  condecl <- extendKnownMany (makeKnown dn conInfo : concat extends) do
+  condecl <- extendKnownMany (conCheckInfo : concat extends) do
     -- See Note [Adding type information to all binders]
     MkConDecl ann
       <$> resolvedType dn
       <*> traverse (traverse resolvedType) rtns
-  pure (condecl, makeKnown dn conInfo : concat extends)
+  pure (condecl, conCheckInfo : concat extends)
 
 typedNameOptionallyNamedType :: TypedName n -> OptionallyNamedType n
 typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emptyAnno (Just n) t
@@ -989,7 +1319,11 @@ inferSelector rappForm (MkTypedName ann n t mTypically _mMeans) = do
     Nothing -> pure ()
   -- Note: computed fields (MEANS clause) are desugared before type checking,
   -- so _mExpr is always Nothing here. We pass Nothing in the output.
-  pure (MkTypedName ann dn rt rTypically Nothing, [makeKnown dn selectorInfo])
+  -- Record selectors are section-qualifiable for the same reason constructors
+  -- are (#921): @`Section`.w@ must name the field wherever @w@ would. Aliases
+  -- only, as for constructors (see 'addQualifiedAliases').
+  selCheckInfo <- addQualifiedAliases (makeKnown dn selectorInfo)
+  pure (MkTypedName ann dn rt rTypically Nothing, [selCheckInfo])
 
 -- | Infers / checks a type to be of kind TYPE.
 inferType :: Type' Name -> Check (Type' Resolved)
@@ -1454,45 +1788,165 @@ namesNonConstructorTerm n = do
   let termKinds = [ tk | (_, _, KnownTerm _ tk) <- options ]
   pure (not (null termKinds) && all (/= Constructor) termKinds)
 
-buildConstructorLookup :: [DeclChecked (Declare Resolved)] -> Map Unique [Resolved]
-buildConstructorLookup = foldMap \decl ->
-  let MkDeclare _ _ (MkAppForm _ tr _ _) td = decl.payload
-   in Map.singleton (getUnique tr) case td of
-    RecordDecl _ mc _ -> [fromMaybe tr mc] -- if the constructor name is 'Nothing', that means it's identical to the type name
-    EnumDecl _ cds -> map (\(MkConDecl _ n _) -> n) cds
-    SynonymDecl _ _ -> [] -- TODO: how to look up synonyms?
+-- | Build the exhaustiveness oracle: a map from a type's 'Unique' to the list
+-- of its data constructors.
+--
+-- This is sourced from 'entityInfo' rather than the frame-local
+-- 'declareDeclarations' map, because 'entityInfo' is the cumulative,
+-- cross-module-unioned, builtin-inclusive table of everything in scope. Sourcing
+-- the oracle from here is what lets 'checkConsider' see the constructors of:
+--
+--   * enums imported from another module ('declareDeclarations' is reset to
+--     'Map.empty' at the import boundary, but 'entityInfo' is unioned there);
+--   * enums @DECLARE@d in an enclosing @WHERE@/@LET@ block ('declareDeclarations'
+--     is replaced per scope, but 'entityInfo' is only ever extended); and
+--   * builtin sum types such as @BOOLEAN@ (whose @TRUE@/@FALSE@ live in
+--     'entityInfo' as @'KnownTerm' _ 'Constructor'@ and were never in
+--     'declareDeclarations' at all).
+--
+-- Each constructor is reconstructed as its definition 'Resolved' (@'Def' u name@)
+-- straight from the 'entityInfo' entry — same 'Unique', same 'Name' the checker
+-- assigned — so the output has exactly the same shape and keying
+-- (type-head 'Unique' -> ['Resolved']) that the previous declares-based lookup
+-- produced, leaving 'concretizeInfo' and its analysis unchanged.
+--
+-- @'Map.fromListWith' ('flip' ('<>'))@ over the 'Unique'-ordered entity map keeps
+-- each type's constructors in ascending-'Unique' (i.e. declaration) order, so the
+-- rendered missing/redundant sets are deterministic.
+--
+-- @LIST@ gets its complete constructor pair @[EMPTY, cons]@ INJECTED rather
+-- than scanned: @cons@ is (rightly) tagged 'Computable' in 'entityInfo' —
+-- prelude applies it in expression position — so the scan alone would yield
+-- the partial set @[EMPTY]@ and mis-report. The injection is sound because
+-- the guard model already speaks cons natively: 'desugarBranches' desugars
+-- every @FOLLOWED BY@ pattern to a guard carrying 'consRef'/'consUnique',
+-- and all downstream consumers compare oracle entries by 'getUnique' (and
+-- render by 'getName') only.
+constructorsInScopeFromEntityInfo :: EntityInfo -> Map Unique [Resolved]
+constructorsInScopeFromEntityInfo ei =
+  Map.insert listUnique [emptyRef, consRef] $
+    Map.withoutKeys
+      ( Map.fromListWith (flip (<>))
+          [ (tyUnique, [Def ctorUnq ctorNm])
+          | (ctorUnq, (ctorNm, KnownTerm ctorTy Constructor)) <- Map.toList ei
+          , Just tyUnique <- [resultTypeHeadUnique ctorTy]
+          ]
+      )
+      builtinNonExhaustiveTypeUniques
 
+-- | Builtin sum types over which we deliberately do NOT perform exhaustiveness
+-- checking:
+--
+--   * @CONTRACT@ — PERMANENT by design: the regulative\/deontic values form an
+--     open sum. Only @FULFILLED@ has a pattern form; the obligation\/operator
+--     values have none, and the regulative core matches contract values
+--     partially on purpose. ANY oracle set here would be unsound in both
+--     directions (flag load-bearing partial matches as incomplete, certify
+--     unmatchable cases as covered).
+--
+-- @EVENT@ USED to be excluded here too, but only because the type name @EVENT@
+-- was shadowed by its own term constructor in 'initialEnvironment', making
+-- event-typed annotations unwritable. Now that the shadowing is fixed (both
+-- uniques share the one key), @EVENT@ is checked like any other sum type: its
+-- scanned set is the sole @event@ constructor (@WAIT UNTIL@ is 'Computable' and
+-- delegates to it), which is COMPLETE, so the check is sound. See issue #905.
+--
+-- @MAYBE@ and @EITHER@ have COMPLETE, all-'Constructor' sets
+-- (@nothing@/@just@, @left@/@right@) and ARE checked. @BOOLEAN@ likewise
+-- (@TRUE@/@FALSE@). @LIST@ is checked via the injected pair — see
+-- 'constructorsInScopeFromEntityInfo'.
+builtinNonExhaustiveTypeUniques :: Set Unique
+builtinNonExhaustiveTypeUniques =
+  Set.fromList [contractUnique]
+
+-- | The 'Unique' of the head of a constructor's result type: strip any leading
+-- 'Forall' (type parameters) and 'Fun' (constructor arguments), then take the
+-- head of the resulting type application. 'Nothing' for a type with no
+-- constructor-bearing head (should not occur for a well-formed constructor).
+resultTypeHeadUnique :: Type' Resolved -> Maybe Unique
+resultTypeHeadUnique = \ case
+  Forall _ _ t -> resultTypeHeadUnique t
+  Fun _ _ t    -> resultTypeHeadUnique t
+  TyApp _ r _  -> Just (getUnique r)
+  _            -> Nothing
+
+-- | The number of argument (selector) positions of a constructor, per its
+-- 'entityInfo' entry. Used to pad synthesized missing-branch suggestions
+-- with one underscore wildcard per argument, so the rendered branch is
+-- valid, pasteable L4 (a bare non-nullary constructor would be a type
+-- error). Yields 0 for anything that is not a known constructor.
+constructorArity :: EntityInfo -> Resolved -> Int
+constructorArity ei r = case Map.lookup (getUnique r) ei of
+  Just (_, KnownTerm ty Constructor) -> countArgs ty
+  _ -> 0
+  where
+    countArgs = \ case
+      Forall _ _ t -> countArgs t
+      Fun _ args t -> length args + countArgs t
+      _            -> 0
+
+-- | Type-check a @CONSIDER@ and run the pattern-match analysis
+-- (missing branches, redundant branches) over its arms.
+--
+-- The analysis is skipped wholesale in two situations:
+--
+-- * the scrutinee has a primitive type (NUMBER, STRING, DATE) — such types
+--   have infinitely many literal values, so a constructor-based analysis is
+--   meaningless for them;
+--
+-- * any arm contains a literal ('PatLit') or expression ('PatExpr') pattern
+--   anywhere, including nested inside constructor patterns (@WHEN JUST 5@,
+--   @WHEN EXACTLY red@, @WHEN 0 FOLLOWED BY ys@). These desugar to ZERO
+--   guards, i.e. the guard model treats them as irrefutable match-alls, which
+--   is wrong in both directions: a genuinely refutable literal arm would make
+--   later arms look redundant (a blocking false positive on valid code), and
+--   a partial literal match would be certified exhaustive (a false negative
+--   that crashes at eval). Until the guard model learns opaque refutable
+--   guards (see the design doc's deferred items), such CONSIDERs carry no
+--   exhaustiveness or redundancy guarantee.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
   rbranches <- traverse (checkBranch ec re te t) branches
-  resolvedDecls <- asks (Map.elems . (.declareDeclarations))
+  ei <- asks (.entityInfo)
+  let cl = constructorsInScopeFromEntityInfo ei
   (scrutVar, pt) <- desugarBranches re rbranches
-  let cl = buildConstructorLookup resolvedDecls
-      bs = concretizeInfo cl pt
+  let bs = concretizeInfo cl pt
 
-  let redundant = redundantBranches $ annotateRefinement bs
-      missing = nubBy ((==) `on` fmap getUnique) $ expandToPattern scrutVar $ normalizeRefinement $ uncoverRefinement bs
+  let analysis  = analyzePatternMatch (constructorArity ei) scrutVar bs
+      missing   = maybe [] (.missingArms) analysis
+      redundant = maybe [] (.redundantArms) analysis
 
-  -- Skip pattern analysis warnings for primitive types (NUMBER, STRING, DATE)
-  -- because the analysis is designed for algebraic data types with known constructors.
-  -- Primitive types have infinitely many values (literals) that can't be enumerated.
   -- We need to apply the current substitution to resolve any inference variables.
   resolvedTe <- applySubst te
+  inNonexhaustive <- asks (.inNonexhaustiveDecide)
   let isPrimitiveScrutinee = isPrimitiveType resolvedTe
+      hasOpaquePatterns = any branchHasOpaquePattern rbranches
 
-  unless (null missing || isPrimitiveScrutinee) do
+  -- NOTE: 'hasOpaquePatterns' and 'isPrimitiveScrutinee' come first so that
+  -- the (lazy) analysis above is never forced when we bail out anyway.
+  -- Inside an @nonexhaustive-decorated definition only the MISSING-branch warning
+  -- is silenced; redundancy is a bug regardless of intended partiality.
+  unless (hasOpaquePatterns || isPrimitiveScrutinee || inNonexhaustive || null missing) do
     addWarning $ PatternMatchesMissing missing
-  unless (null redundant || isPrimitiveScrutinee) do
+  unless (hasOpaquePatterns || isPrimitiveScrutinee || null redundant) do
     addWarning $ PatternMatchRedundant redundant
+
+  hintSuspiciousBinders cl resolvedTe rbranches
 
   pure (Consider ann re rbranches)
 
 -- | Infer a plain (non-re-associated) application: the pre-existing App
 -- inference logic, factored out of 'inferExpr' so the fixity chain
 -- pre-pass can fall through to it unchanged.
-inferFlatApp :: Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
-inferFlatApp ann n es = do
+--
+-- The 'Bool' says whether the caller already emitted an Error-severity
+-- diagnostic for this node before delegating here (the 'FixityConflict'
+-- fall-through). Together with a partial mixfix match diagnosed below
+-- ('MixfixMatchErrorCheck'), it forces the ambiguity fallback in overload
+-- resolution — see the CAVEAT on 'forkWithLazyFallback'.
+inferFlatApp :: Bool -> Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
+inferFlatApp preambleErr ann n es = do
       (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
       -- We want good type error messages. Therefore, we pursue the
       -- following strategy:
@@ -1549,13 +2003,23 @@ inferFlatApp ann n es = do
       -- Note that if there are no arguments, then matchFunTy does not
       -- actually insist on the type t being a function.
       let directApp = do
-            (rn, pt) <- resolveTerm actualFuncName
-            t <- instantiate pt
-            (res, rt) <- matchFunTy False rn t actualArgs
-            let finalAnn = if needsAnnoRebuild
-                           then rebuildMixfixAppAnno ann actualFuncName actualArgs
-                           else ann
-            pure (App finalAnn rn res, rt)
+            -- Definite-incompatibility overload pre-filter (#929): drop
+            -- candidates whose parameter types provably cannot match the
+            -- arguments' possible result-type heads, BEFORE the per-candidate
+            -- fork re-checks every argument subtree. See 'appCandidateFilter'
+            -- and 'resolveTermFiltered' for the byte-identity argument.
+            viab <- appCandidateFilter actualArgs
+            -- An Error-severity diagnostic emitted before the overload fork
+            -- (FixityConflict fall-through or partial mixfix match) makes the
+            -- one-success fallback skip unsound; force the fallback then.
+            let preambleDiag = preambleErr || isJust mMixfixError
+            resolveTermFiltered preambleDiag (const True) viab actualFuncName \ (rn, pt) -> do
+              t <- instantiate pt
+              (res, rt) <- matchFunTy False rn t actualArgs
+              let finalAnn = if needsAnnoRebuild
+                             then rebuildMixfixAppAnno ann actualFuncName actualArgs
+                             else ann
+              pure (App finalAnn rn res, rt)
 
           variadicRescue = do
             (rn, pt) <- resolveTerm actualFuncName
@@ -1582,6 +2046,511 @@ inferFlatApp ann n es = do
       case actualArgs of
         _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
         _         -> directApp
+
+-- ----------------------------------------------------------------------------
+-- Definite-incompatibility overload pre-filter (smucclaw/l4-ide#929)
+-- ----------------------------------------------------------------------------
+--
+-- Overload resolution forks the checker per candidate BEFORE looking at the
+-- arguments ('resolveTermFiltered'), and every branch — including the
+-- 'ambiguousTerm' fallback — re-checks every argument subtree from scratch
+-- ('matchFunTy'). With k same-name candidates the work per application node
+-- is (k+1) times the work of its operands, i.e. exponential in the nesting
+-- depth of overloaded-operator chains: measured base 3 for AND\/OR under
+-- @IMPORT prelude@ (the boolean builtin + the prelude SET overload + the
+-- fallback), which makes a flat 27-operand disjunction effectively
+-- uncheckable.
+--
+-- The pre-filter removes candidates that DEFINITELY cannot apply, using a
+-- conservative approximation of each argument's possible result-type heads
+-- that never recurses into the argument's own subexpressions. "Definitely"
+-- means: after peeling 'Forall' binders (mirroring 'instantiate') and
+-- expanding type synonyms (mirroring 'tryExpandTypeSynonym'), the candidate
+-- parameter's head constructor is rigid, every possible head of the argument
+-- is rigid, and they differ — exactly the situation in which
+-- 'checkExpr'\/'expect'\/'unify' must fail with a 'TypeMismatch'
+-- ('unifyBase' compares rigid heads by 'Unique', and rigid heads cannot
+-- change under a growing substitution). Arity mismatches and rigid
+-- non-function candidates likewise cannot succeed ('matchFunTy' adds
+-- 'IncorrectArgsNumberApp'\/'IllegalApp' unconditionally). EVERY uncertainty
+-- — inference variables, 'Forall'-bound variables, mixfix-rewritable call
+-- shapes, missing entity info, empty candidate sets, fuel exhaustion —
+-- degrades to "viable"\/"unknown", never to a prune.
+--
+-- All probes are pure reads of the environment and a pre-fork substitution
+-- snapshot: no 'applySubst' (whose path compression writes the
+-- substitution), no minting, no error emission. Soundness of the snapshot:
+-- the substitution only ever GROWS during checking and rigid heads are
+-- invariant under it, so a definite mismatch computed pre-fork remains a
+-- mismatch inside every candidate branch; anything unbound at the snapshot
+-- is treated as unknown.
+
+-- | Build the candidate-viability predicate for an application with the
+-- given arguments. 'const True' for nullary applications: with no arguments
+-- there is nothing to be incompatible with ('matchFunTy' never fails on an
+-- empty argument list).
+appCandidateFilter :: [Expr Name] -> Check (Type' Resolved -> Bool)
+appCandidateFilter [] = pure (const True)
+appCandidateFilter args = do
+  env <- ask
+  subst <- use #substitution
+  pure (candidateViableForArgs env subst args)
+
+-- | A conservative approximation of the possible result-type heads of an
+-- argument expression.
+data ArgHeads
+  = AHUnknown
+    -- ^ no usable bound; never prune based on this argument
+  | AHRigid (Set Unique)
+    -- ^ nonempty by construction: in every branch of the argument's own
+    -- inference that can still succeed, the argument's type (after synonym
+    -- expansion) is headed by one of these rigid constructors
+
+-- | How one candidate parameter type can constrain matching.
+data ParamHead
+  = PRigid Unique
+    -- ^ rigid head after synonym expansion; can rule out rigid argument heads
+  | PFlex
+    -- ^ anything else: never prunes
+
+-- | The applicability shape of one candidate's declared (pre-'instantiate')
+-- type.
+data CandShape
+  = CandFun [ParamHead]
+    -- ^ a function; per-parameter constraints
+  | CandShapeUnknown
+    -- ^ could apply in ways we cannot bound: keep
+  | CandNeverApplies
+    -- ^ a rigid non-function: 'matchFunTy' must fail ('IllegalApp')
+
+-- | The head contribution of ONE candidate binding of a name the argument
+-- approximation looks up.
+data HeadContrib
+  = ContribNone
+    -- ^ this binding can never produce a value in this position (its branch
+    -- always fails), so it contributes no head
+  | ContribUnknown
+    -- ^ this binding's result head cannot be bounded
+  | ContribHead Unique
+    -- ^ this binding's result head is this rigid constructor
+
+candidateViableForArgs :: CheckEnv -> Substitution -> [Expr Name] -> Type' Resolved -> Bool
+candidateViableForArgs env subst args = viableCand
+  where
+    nargs = length args
+    -- Computed lazily once per application node and shared across all
+    -- candidate tests (never forced when resolution does not fork).
+    argHs = map (approxArgHeads env subst) args
+
+    viableCand :: Type' Resolved -> Bool
+    viableCand candTy =
+      case candShape env subst candTy of
+        CandShapeUnknown -> True
+        CandNeverApplies -> False
+        CandFun ps
+          | length ps /= nargs -> False
+          | otherwise          -> and (zipWith compatible ps argHs)
+
+    compatible :: ParamHead -> ArgHeads -> Bool
+    compatible PFlex      _            = True
+    compatible (PRigid _) AHUnknown    = True
+    compatible (PRigid u) (AHRigid us) = u `Set.member` us
+
+-- | Peel one leading 'Forall', mirroring what 'instantiate' does to a
+-- candidate's type before 'matchFunTy' sees it. The binders become
+-- wildcards: any head equal to one of them is unknowable.
+peelForall :: Type' Resolved -> (Set Unique, Type' Resolved)
+peelForall (Forall _ ns body) = (Set.fromList (getUnique <$> ns), body)
+peelForall t                  = (Set.empty, t)
+
+-- | Pure mirror of 'tryExpandTypeSynonym': expand a type-synonym
+-- application using only the environment's entity info. Quarantined cyclic
+-- synonyms are installed bodyless and therefore do not expand — same as in
+-- the real checker.
+pureExpandSynonym :: CheckEnv -> Resolved -> [Type' Resolved] -> Maybe (Type' Resolved)
+pureExpandSynonym env r targs =
+  case Map.lookup (getUnique r) env.entityInfo of
+    Just (_n, KnownType _kind params (Just body)) ->
+      Just (substituteType (Map.fromList (zipWith (\ pn t' -> (getUnique pn, t')) params targs)) body)
+    _ -> Nothing
+
+-- | Is this 'Unique' a rigid type-constructor head: a datatype\/builtin
+-- ('KnownType' with no expansion — including quarantined cyclic synonyms,
+-- which 'tryExpandTypeSynonym' also refuses to expand) or an in-scope rigid
+-- type variable? Anything unknown is NOT rigid (conservative).
+isRigidTyCon :: CheckEnv -> Unique -> Bool
+isRigidTyCon env u =
+  case Map.lookup u env.entityInfo of
+    Just (_n, KnownType _ _ Nothing) -> True
+    Just (_n, KnownTypeVariable)     -> True
+    _                                -> False
+
+-- | The rigid head of a type, if it provably has one, chasing the
+-- substitution snapshot and expanding synonyms; 'Nothing' otherwise.
+rigidHeadOf :: CheckEnv -> Substitution -> Set Unique -> Type' Resolved -> Maybe Unique
+rigidHeadOf env subst wilds = goT synonymExpansionFuel
+  where
+    goT :: Int -> Type' Resolved -> Maybe Unique
+    goT fuel t
+      | fuel <= 0 = Nothing
+      | otherwise =
+          case t of
+            InfVar _ _ i -> goT fuel =<< Map.lookup i subst
+            TyApp _ r ts
+              | getUnique r `Set.member` wilds -> Nothing
+              | Just t' <- pureExpandSynonym env r ts -> goT (fuel - 1) t'
+              | isRigidTyCon env (getUnique r) -> Just (getUnique r)
+              | otherwise -> Nothing
+            _ -> Nothing  -- Fun / nested Forall / Type
+
+-- | Classify a candidate's declared type for the viability test.
+candShape :: CheckEnv -> Substitution -> Type' Resolved -> CandShape
+candShape env subst t0 =
+  let
+    (wilds, body) = peelForall t0
+
+    goC :: Int -> Type' Resolved -> CandShape
+    goC fuel t
+      | fuel <= 0 = CandShapeUnknown
+      | otherwise =
+          case t of
+            Fun _ onts _ ->
+              CandFun (goP synonymExpansionFuel . optionallyNamedTypeType <$> onts)
+            InfVar _ _ i ->
+              maybe CandShapeUnknown (goC fuel) (Map.lookup i subst)
+            TyApp _ r ts
+              | getUnique r `Set.member` wilds -> CandShapeUnknown
+              | Just t' <- pureExpandSynonym env r ts -> goC (fuel - 1) t'
+              | isRigidTyCon env (getUnique r) -> CandNeverApplies
+              | otherwise -> CandShapeUnknown
+            Forall {} -> CandShapeUnknown  -- nested quantifier: be conservative
+            Type {}   -> CandShapeUnknown
+
+    goP :: Int -> Type' Resolved -> ParamHead
+    goP fuel t
+      | fuel <= 0 = PFlex
+      | otherwise =
+          case t of
+            InfVar _ _ i -> maybe PFlex (goP fuel) (Map.lookup i subst)
+            TyApp _ r ts
+              | getUnique r `Set.member` wilds -> PFlex
+              | Just t' <- pureExpandSynonym env r ts -> goP (fuel - 1) t'
+              | isRigidTyCon env (getUnique r) -> PRigid (getUnique r)
+              | otherwise -> PFlex
+            _ -> PFlex  -- Fun / Forall / Type parameters never prune
+  in
+    goC synonymExpansionFuel body
+
+-- | Approximate the possible result-type heads of an argument expression
+-- WITHOUT recursing into its subexpressions (one level of environment
+-- lookups at most, so the cost per application node is bounded).
+approxArgHeads :: CheckEnv -> Substitution -> Expr Name -> ArgHeads
+approxArgHeads env subst = goE
+  where
+    goE :: Expr Name -> ArgHeads
+    goE = \ case
+      -- Direct string operands of AND\/OR have already been converted to
+      -- 'Inert' by 'setInertContext' before desugaring; 'Inert' infers
+      -- BOOLEAN ('inferExpr'').
+      Inert {}              -> rigid1 booleanRef
+      Lit _ (NumericLit {}) -> rigid1 numberRef
+      Lit _ (StringLit {})  -> rigid1 stringRef
+      List {}               -> rigid1 listRef
+      Percent {}            -> rigid1 numberRef
+      Var _ n               -> finalize (headsOfName valueHead (rawName n))
+      App _ f []
+        | mixfixSuspicious (rawName f) -> AHUnknown
+        | otherwise                    -> finalize (headsOfName valueHead (rawName f))
+      App _ f fargs         -> appHeads (rawName f) fargs
+      Proj _ base l         -> projHeads base l
+      -- Surface binary\/unary operators desugar to applications of builtin
+      -- names ('desugarBinOpToFunction'); approximate them as exactly that
+      -- application. Regulative RAnd\/ROr do not desugar this way and fall
+      -- through to unknown.
+      And _ e1 e2           -> binop andName [e1, e2]
+      Or _ e1 e2            -> binop orName [e1, e2]
+      Implies _ e1 e2       -> binop impliesName [e1, e2]
+      Equals _ e1 e2        -> binop equalsName [e1, e2]
+      Leq _ e1 e2           -> binop leqName [e1, e2]
+      Geq _ e1 e2           -> binop geqName [e1, e2]
+      Lt _ e1 e2            -> binop ltName [e1, e2]
+      Gt _ e1 e2            -> binop gtName [e1, e2]
+      Not _ e1              -> binop notName [e1]
+      Plus _ e1 e2          -> binop plusName [e1, e2]
+      Minus _ e1 e2         -> binop minusName [e1, e2]
+      Times _ e1 e2         -> binop timesName [e1, e2]
+      DividedBy _ e1 e2     -> binop divideName [e1, e2]
+      Modulo _ e1 e2        -> binop moduloName [e1, e2]
+      Cons _ e1 e2          -> binop consName [e1, e2]
+      _                     -> AHUnknown
+
+    rigid1 :: Resolved -> ArgHeads
+    rigid1 r = AHRigid (Set.singleton (getUnique r))
+
+    binop :: Name -> [Expr Name] -> ArgHeads
+    binop nm = appHeads (rawName nm)
+
+    -- An application argument: union of the result heads of the head name's
+    -- candidates — unless the mixfix\/postfix\/fixity machinery could
+    -- restructure the call site to resolve a DIFFERENT name, in which case
+    -- we know nothing.
+    appHeads :: RawName -> [Expr Name] -> ArgHeads
+    appHeads frn fargs
+      | mixfixSuspicious frn = AHUnknown
+      | any (maybe False mixfixSuspicious . bareArgName) fargs = AHUnknown
+      | binaryLeftSpineSuspicious = AHUnknown
+      | otherwise = finalize (headsOfName (appliedHead (length fargs)) frn)
+      where
+        -- 'tryMatchMixfixCall''s binary flattening ('flattenBinaryMixfixApp')
+        -- engages on the FIRST keyword of the left spine of a binary
+        -- application, which can sit arbitrarily deep in nested binary apps.
+        binaryLeftSpineSuspicious = case fargs of
+          [l, _r] -> maybe False mixfixSuspicious (leftSpineName l)
+          _       -> False
+
+    -- A bare-name argument (a 'Var' or nullary 'App'): the shape the mixfix
+    -- machinery inspects via 'getExprName' \/ @markerName@.
+    bareArgName :: Expr Name -> Maybe RawName
+    bareArgName = \ case
+      Var _ n1    -> Just (rawName n1)
+      App _ n1 [] -> Just (rawName n1)
+      _           -> Nothing
+
+    -- Head names along the left spine of left-nested binary applications,
+    -- innermost first — mirrors @flattenLeft@ + 'findFirstKeyword'.
+    leftSpineName :: Expr Name -> Maybe RawName
+    leftSpineName = \ case
+      App _ g [x, _y] -> leftSpineName x <|> Just (rawName g)
+      _               -> Nothing
+
+    -- Could this raw name cause 'tryMatchMixfixCall',
+    -- 'reinterpretPostfixAppIfNeeded' or 'tryReassociateFixityChain' to
+    -- restructure a call site? All of those trigger only on names that are
+    -- registered mixfix keywords or first keywords (a binary infix
+    -- operator's keyword is the operator name itself, so declared-fixity
+    -- chain operators are covered too).
+    mixfixSuspicious :: RawName -> Bool
+    mixfixSuspicious rn =
+      isRegisteredKeyword rn env.mixfixRegistry
+        || not (null (lookupByFirstKeyword rn env.mixfixRegistry))
+
+    -- Union the head contributions of every in-scope 'KnownTerm' candidate
+    -- of a name. 'resolveTerm'' selects a SUBSET of these (locals priority,
+    -- section proximity), so the union over all of them is a sound
+    -- over-approximation regardless of which subset survives. 'Nothing'
+    -- means unknown.
+    headsOfName :: (Type' Resolved -> HeadContrib) -> RawName -> Maybe (Set Unique)
+    headsOfName contrib rn =
+      go Set.empty
+        [ contrib t
+        | u <- Map.findWithDefault [] rn env.environment
+        , Just (_o, KnownTerm t _tk) <- [Map.lookup u env.entityInfo]
+        ]
+      where
+        go acc []       = Just acc
+        go acc (c : cs) = case c of
+          ContribUnknown -> Nothing
+          ContribNone    -> go acc cs
+          ContribHead u  -> go (Set.insert u acc) cs
+
+    -- An empty head set means no binding of the name can succeed here; the
+    -- argument fails identically under every candidate, so pruning would be
+    -- sound but pointless — treat as unknown to keep today's error path
+    -- byte-for-byte.
+    finalize :: Maybe (Set Unique) -> ArgHeads
+    finalize Nothing = AHUnknown
+    finalize (Just s)
+      | Set.null s = AHUnknown
+      | otherwise  = AHRigid s
+
+    -- The head this binding exposes as a BARE occurrence (after
+    -- 'instantiate' peels its quantifier).
+    valueHead :: Type' Resolved -> HeadContrib
+    valueHead t =
+      let (wilds, body) = peelForall t
+      in case rigidHeadOf env subst wilds body of
+           Just u  -> ContribHead u
+           Nothing -> ContribUnknown
+
+    -- The head this binding exposes when APPLIED to @n@ arguments. Arity is
+    -- deliberately ignored: the variadic-construction rescue can collect
+    -- mismatched argument counts for constructors, so any 'Fun' result head
+    -- must be included. A rigid non-function can never be applied
+    -- ('IllegalApp' is unconditional), so it contributes nothing.
+    appliedHead :: Int -> Type' Resolved -> HeadContrib
+    appliedHead _n t0 =
+      let
+        (wilds, body) = peelForall t0
+
+        goA :: Int -> Type' Resolved -> HeadContrib
+        goA fuel t
+          | fuel <= 0 = ContribUnknown
+          | otherwise =
+              case t of
+                Fun _ _onts rt ->
+                  case rigidHeadOf env subst wilds rt of
+                    Just u  -> ContribHead u
+                    Nothing -> ContribUnknown
+                InfVar _ _ i ->
+                  maybe ContribUnknown (goA fuel) (Map.lookup i subst)
+                TyApp _ r ts
+                  | getUnique r `Set.member` wilds -> ContribUnknown
+                  | Just t' <- pureExpandSynonym env r ts -> goA (fuel - 1) t'
+                  | isRigidTyCon env (getUnique r) -> ContribNone
+                  | otherwise -> ContribUnknown
+                Forall {} -> ContribUnknown
+                Type {}   -> ContribUnknown
+      in
+        goA synonymExpansionFuel body
+
+    -- Record projection @base's l@ resolves EITHER as a qualified name
+    -- (section dereference, when the base chain is a name path resolving to
+    -- a term) OR as an application of the label's selector to the base
+    -- ('inferExpr'' 'Proj' case). Union the possible heads of both routes;
+    -- a route that cannot fire contributes nothing.
+    projHeads :: Expr Name -> Name -> ArgHeads
+    projHeads base l =
+      let
+        selM  = headsOfName (appliedHead 1) (rawName l)
+        qualM = case projChainRawName base l of
+          Nothing  -> Just Set.empty
+          Just qrn -> headsOfName valueHead qrn
+      in
+        finalize (Set.union <$> selM <*> qualM)
+
+    -- Mirrors @extractProjNameChain@ in 'inferExpr'': the qualified raw
+    -- name a Proj chain would resolve as, if it is a pure name chain of at
+    -- least two components.
+    projChainRawName :: Expr Name -> Name -> Maybe RawName
+    projChainRawName base l = do
+      comps <- goChain base
+      case comps ++ nameComponents (rawName l) of
+        allComps@(_ : _ : _) ->
+          Just (QualifiedName (NE.fromList (init allComps)) (last allComps))
+        _ -> Nothing
+      where
+        goChain :: Expr Name -> Maybe [Text]
+        goChain = \ case
+          Var _ n1         -> Just (nameComponents (rawName n1))
+          Proj _ inner fn  -> (\pre -> pre ++ nameComponents (rawName fn)) <$> goChain inner
+          _                -> Nothing
+
+        nameComponents :: RawName -> [Text]
+        nameComponents = \ case
+          NormalName t          -> [t]
+          PreDef t              -> [t]
+          QualifiedName qs fin  -> NE.toList qs ++ [fin]
+
+-- | Emit an 'SInfo'-severity hint for each top-level CONSIDER arm whose
+-- pattern is a fresh binder (matching everything) with a name suspiciously
+-- close to a constructor of the scrutinee's type that no other arm covers —
+-- the tell-tale shape of a misspelled constructor, which the resolver
+-- silently turns into a catch-all binder ('inferPattern''s @orElse@
+-- fallback). Trailing typo binders are otherwise invisible: the match is
+-- exhaustive (so no missing warning) and nothing follows it (so no
+-- redundancy warning), yet the program's meaning has changed.
+--
+-- \"Suspiciously close\" means case-insensitively equal (any length; an
+-- exact-case match would have resolved as the constructor), or exactly one
+-- Damerau-Levenshtein edit apart with both names at least 4 characters
+-- (guards against short-name coincidences). The residual false positive —
+-- a legitimate catch-all like @rest@ over a type with a constructor
+-- @rent@ — is accepted because the hint never blocks: it renders at
+-- 'SInfo' severity in both severity functions.
+hintSuspiciousBinders :: Map Unique [Resolved] -> Type' Resolved -> [Branch Resolved] -> Check ()
+hintSuspiciousBinders cl scrutTy rbranches =
+  for_ rbranches \ case
+    MkBranch _ (When _ (PatVar _ binder)) _ ->
+      case find (suspiciouslyClose (lastNameSegment (getName binder))) uncovered of
+        Just ctor -> addError (SuspiciousBinderPattern binder ctor)
+        Nothing   -> pure ()
+    _ -> pure ()
+  where
+    scrutCtors = case scrutTy of
+      TyApp _ r _ -> Map.findWithDefault [] (getUnique r) cl
+      _           -> []
+
+    coveredCtorUniques = Set.fromList
+      [ u
+      | MkBranch _ (When _ p) _ <- rbranches
+      , u <- case p of
+          PatApp _ c _ -> [getUnique c]
+          PatCons {}   -> [consUnique]
+          _            -> []
+      ]
+
+    uncovered =
+      filter (\c -> getUnique c `Set.notMember` coveredCtorUniques) scrutCtors
+
+    suspiciouslyClose binderName ctor =
+      let ctorName = lastNameSegment (getName ctor)
+          lb = Text.toLower binderName
+          lc = Text.toLower ctorName
+      in lb == lc
+         || ( min (Text.length binderName) (Text.length ctorName) >= 4
+              && exactlyOneEditApart lb lc )
+
+-- | The last segment of a name — for a qualified name (@foo.green@), the
+-- part after the final dot, so a qualified typo still resembles the bare
+-- constructor.
+lastNameSegment :: Name -> Text
+lastNameSegment n = case rawName n of
+  NormalName t      -> t
+  QualifiedName _ t -> t
+  PreDef t          -> t
+
+-- | Is @b@ exactly ONE Damerau-Levenshtein edit (insertion, deletion,
+-- substitution, or adjacent transposition) away from @a@? Equal strings are
+-- zero edits apart, i.e. 'False'. Direct comparison instead of a full
+-- distance matrix: we only ever need the @== 1@ predicate.
+exactlyOneEditApart :: Text -> Text -> Bool
+exactlyOneEditApart a b = case compare la lb of
+  EQ -> oneSubstitution || oneAdjacentTransposition
+  LT -> lb - la == 1 && oneInsertion a b
+  GT -> la - lb == 1 && oneInsertion b a
+  where
+    la = Text.length a
+    lb = Text.length b
+
+    mismatches = [ i | (i, (x, y)) <- zip [0 :: Int ..] (Text.zip a b), x /= y ]
+
+    oneSubstitution = length mismatches == 1
+
+    oneAdjacentTransposition = case mismatches of
+      [i, j] -> j == i + 1
+             && Text.index a i == Text.index b j
+             && Text.index a j == Text.index b i
+      _      -> False
+
+    -- @longer@ is @shorter@ with exactly one extra character somewhere
+    oneInsertion shorter longer = go (Text.unpack shorter) (Text.unpack longer) False
+      where
+        go [] []             skipped = skipped
+        go [] [_]            _       = True
+        go (x : xs) (y : ys) skipped
+          | x == y    = go xs ys skipped
+          | skipped   = False
+          | otherwise = go (x : xs) ys True
+        go _ _ _ = False
+
+-- | Does this branch contain a pattern the guard model cannot reason about?
+-- See the haddock on 'checkConsider'.
+branchHasOpaquePattern :: Branch Resolved -> Bool
+branchHasOpaquePattern (MkBranch _ lhs _) = case lhs of
+  When _ p     -> patternHasOpaque p
+  Otherwise {} -> False
+
+-- | Does this pattern contain a literal or expression pattern anywhere —
+-- i.e. a guard the residual-set model would (wrongly) treat as irrefutable?
+-- Pass-polymorphic so 'checkClauseMatrix' can apply it to the Name-pass
+-- patterns of a clause matrix before resolving them.
+patternHasOpaque :: Pattern n -> Bool
+patternHasOpaque = \ case
+  PatLit {}       -> True
+  PatExpr {}      -> True
+  PatVar {}       -> False
+  PatApp _ _ ps   -> any patternHasOpaque ps
+  PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
@@ -1784,11 +2753,15 @@ inferExpr' g =
       -- re-associate it into nested binary applications and infer the result;
       -- see 'tryReassociateFixityChain' (a no-op for anything else). Otherwise
       -- fall through to the ordinary application logic (including the route-α
-      -- variadic-construction rescue), which lives in 'inferFlatApp'.
-      mReassociated <- tryReassociateFixityChain ann n es
+      -- variadic-construction rescue), which lives in 'inferFlatApp'. The
+      -- 'Bool' reports whether the pre-pass emitted an Error-severity
+      -- diagnostic ('FixityConflict') on the fall-through route; it must
+      -- reach overload resolution so that the ambiguity fallback is not
+      -- skipped (see 'forkWithLazyFallback').
+      (fixityErrEmitted, mReassociated) <- tryReassociateFixityChain ann n es
       case mReassociated of
         Just reassociated -> inferExpr reassociated
-        Nothing -> inferFlatApp ann n es
+        Nothing -> inferFlatApp fixityErrEmitted ann n es
     AppNamed ann n nes _morder -> do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
@@ -1955,11 +2928,16 @@ isPrimitiveType :: Type' Resolved -> Bool
 isPrimitiveType ty = case ty of
   InfVar{} -> False  -- Unknown type, don't skip analysis
   TyApp _ tyRef [] ->
-    let t = nameToText (getName tyRef)
-    -- NUMBER and STRING have infinitely many literal values
-    -- DATE also has many values that can't be enumerated
-    -- BOOLEAN has only TRUE/FALSE so analysis works correctly for it
-    in t `elem` ["NUMBER", "STRING", "DATE"]
+    -- NUMBER and STRING have infinitely many literal values; DATE likewise.
+    -- Compare by Unique, not by name text: a USER-declared enum that merely
+    -- happens to be called NUMBER/STRING/DATE is a perfectly ordinary sum
+    -- type and must still be analysed (under the old name-based check, a
+    -- partial match over such an enum silently skipped exhaustiveness
+    -- checking whenever the type was reached via inference).
+    -- BOOLEAN is deliberately NOT skipped: its TRUE/FALSE constructors are
+    -- enumerable from 'entityInfo' (see 'constructorsInScopeFromEntityInfo'), so
+    -- exhaustiveness analysis works correctly for it and catches a missing branch.
+    getUnique tyRef `elem` [numberUnique, stringUnique, dateUnique]
   _ -> False
 
 inferEvent :: Event Name -> Check (Event Resolved, Type' Resolved)
@@ -2136,19 +3114,37 @@ desugarBranches scrut nebs = do
       foldr PatAnd (PatLeaf b) <$> desugarPat v p
     b@(MkBranch _ (Otherwise {}) _) -> pure (PatLeaf b)
 
-  newPatName = do
-    unq <- newUnique
-    let rn = NormalName "patvar"
-        n = MkName emptyAnno rn
-    pure $ Def unq n
-
   -- NOTE: if there's no scrutinee, we create a new variable that is then putas the scrutinee.
   -- So: WHEN Foo Bar THEN expr essentially becomes WHEN Foo bar THEN CONSIDER bar WHEN Bar THEN expr
 
-  desugarPat :: Resolved -> Pattern Resolved -> StateT VarEnv Check [Guard Info Resolved]
-  desugarPat scrut' = \ case
+newPatName :: Check Resolved
+newPatName = do
+  unq <- newUnique
+  let rn = NormalName "patvar"
+      n = MkName emptyAnno rn
+  pure $ Def unq n
+
+-- NOTE: the 'VarEnv' recycles the fresh payload variables allocated for a
+-- constructor occurrence, so that the SAME scrutinee position matched
+-- against the same constructor in DIFFERENT branches shares variables —
+-- 'uncoverRefinement' reasons across branches through that sharing. The
+-- map must be keyed by (scrutinized variable, constructor), not by the
+-- constructor alone: with constructor-only keying, a second occurrence of
+-- the same constructor at a *sibling* position within one branch (e.g.
+-- @WHEN W (JUST x) (JUST y)@) would reuse the first position's variables,
+-- producing bogus cross-position equalities (false redundancy warnings)
+-- and even self-referential constraints (@v = JUST v@) that send
+-- 'expandToPattern' into an infinite loop.
+--
+-- Lifted out of 'desugarBranches' so that the clause-matrix analysis
+-- ('checkClauseMatrix') can desugar per (scrutinee, pattern) pair, running
+-- ONE 'VarEnv' across all rows and columns of a clause matrix (cross-clause
+-- payload-variable sharing is what the nabla reasoning needs; the
+-- two-component key keeps columns from colliding).
+desugarPat :: Resolved -> Pattern Resolved -> StateT VarEnv Check [Guard Info Resolved]
+desugarPat scrut' = \ case
     PatApp ((.extra.resolvedInfo) -> Just info) c ps ->
-      Map.lookup (getUnique c) <$> get >>= \ case
+      Map.lookup (getUnique scrut', getUnique c) <$> get >>= \ case
         Just existingVars -> do
           pats <- getAp $ flip foldMap (zip existingVars ps) \(var, p) -> Ap do
             desugarPat var p
@@ -2161,12 +3157,12 @@ desugarBranches scrut nebs = do
             guards <- desugarPat n p
             pure ([n], guards)
 
-          modify' (Map.insert (getUnique c) vs)
+          modify' (Map.insert (getUnique scrut', getUnique c) vs)
           pure (MkGuard info scrut' c vs : pats)
 
     -- NOTE: this second case is very similar to the one for PatApp, because Cons in general is basically a PatApp
     PatCons ((.extra.resolvedInfo) -> Just info) ph pt ->
-      Map.lookup consUnique <$> get >>= \ case
+      Map.lookup (getUnique scrut', consUnique) <$> get >>= \ case
         Just [nh, nt] -> do
           ph' <- desugarPat nh ph
           pt' <- desugarPat nt pt
@@ -2177,7 +3173,7 @@ desugarBranches scrut nebs = do
           nt <- lift newPatName
           ph' <- desugarPat nh ph
           pt' <- desugarPat nt pt
-          modify' (Map.insert consUnique [nh, nt])
+          modify' (Map.insert (getUnique scrut', consUnique) [nh, nt])
           pure (MkGuard info scrut' consRef [nh, nt] : ph' <> pt')
 
     PatVar _ _ -> pure []
@@ -2191,9 +3187,12 @@ desugarBranches scrut nebs = do
     -- user-writable pattern forms, T4). However, any future stage that
     -- synthesizes CONSIDER branches with 'emptyAnno' would land here — the
     -- root cause would be the missing range, not missing type information.
+    -- ('checkClauseMatrix' guards against it with 'patternInfoComplete'.)
     _ -> error "fatal internal error: expected type information but didn't get any"
 
-type VarEnv = Map Unique [Resolved]
+-- | Recycled payload variables, keyed by (scrutinized variable, constructor).
+-- See the NOTE on 'desugarPat' for why both components are required.
+type VarEnv = Map (Unique, Unique) [Resolved]
 
 -- | replace 'Info' with the names of the constructors that the type has
 concretizeInfo :: Map Unique [n] ->  PatTree n -> PatTree' [n] n
@@ -2207,13 +3206,6 @@ concretizeInfo cmap = \case
      , Just cs <- Map.lookup (getUnique r) cmap
      -> PatAnd (MkGuard cs b n ns) (concretizeInfo cmap t)
    _ -> PatAnd (MkGuard [] b n ns) (concretizeInfo cmap t)
-
-data Refinement n
-  = RefineConj (Refinement n) (Constr n)
-  | RefineDisj (Refinement n) (Refinement n)
-  | RefineTop
-  | RefineBottom
-  deriving stock (Eq, Show, Generic, Functor)
 
 -- a constraint
 data Constr n
@@ -2230,59 +3222,10 @@ data Constr n
   -- - the other constructors of the type that this constraint is about
   deriving stock (Eq, Ord, Show, Generic, Functor, Foldable)
 
--- this is suposed to generate the "unconvered" set, i.e. the
--- values that are not covered by the pattern tree
-uncoverRefinement :: PatTree' [n] n -> Refinement n
-uncoverRefinement = uncoverRefinementWith RefineTop
-
-uncoverRefinementWith :: Refinement n -> PatTree' [n] n -> Refinement n
-uncoverRefinementWith tau = \case
-  PatLeaf _e -> RefineBottom
-  PatOr t1 t2 -> uncoverRefinementWith (uncoverRefinementWith tau t1) t2
-  PatAnd (MkGuard cs b n ns) t -> (tau `RefineConj` IsNotEq b n ns cs) `RefineDisj`
-    uncoverRefinementWith (tau `RefineConj` IsEq b n ns) t
-  PatNoBranches -> tau
-
-data AnnBranch n
-  = AnnLeaf (Refinement n) (Branch n)
-  | AnnEmpty
-  deriving stock (Eq, Show, Generic)
-
-redundantBranches :: [AnnBranch Resolved] -> [Branch Resolved]
-redundantBranches = mapMaybe \case
-  AnnLeaf r b | not (isConsistent r) -> Just b
-  _ -> Nothing
- where
-  isConsistent :: Refinement Resolved -> Bool
-  isConsistent = go [] where
-    go seen = \ case
-      RefineConj r c -> go (c : seen) r && all (isConsistentWith c) seen
-      RefineDisj r1 r2 -> go seen r1 || go seen r2
-      RefineTop -> True
-      RefineBottom -> False
-
--- this is supposed to generate the patterns that *are* matched
-annotateRefinement :: PatTree' [n] n -> [AnnBranch n]
-annotateRefinement = go RefineTop
- where
-  go tau = \case
-    PatLeaf e -> [AnnLeaf tau e]
-    PatOr t1 t2 -> go tau t1 <> go (uncoverRefinementWith tau t1) t2
-    PatAnd (MkGuard _i b n ns) t -> go (tau `RefineConj` IsEq b n ns) t
-    PatNoBranches -> [AnnEmpty]
-
 data Nabla n
  = Bottom
  | Consistent !(Set (Constr n))
  deriving stock (Foldable)
-
-instance Ord n => Semigroup (Nabla n) where
-  Bottom <> s = s
-  s <> Bottom = s
-  Consistent s1 <> Consistent s2 = Consistent $ s1 `Set.union` s2
-
-instance Ord n => Monoid (Nabla n) where
-  mempty = Bottom
 
 lookupConstraints :: Eq n => n -> Nabla n -> [Constr n]
 lookupConstraints n = \ case
@@ -2294,23 +3237,16 @@ constraintName = \ case
   IsEq n _ _ -> n
   IsNotEq n _ _ _ -> n
 
-normalizeRefinement :: Refinement Resolved -> Nabla Resolved
-normalizeRefinement = go (Consistent mempty)
- where
-  go nabla = \ case
-   RefineConj r c -> go (addConsistentConstraint nabla c) r
-   RefineDisj r1 r2 -> go nabla r1 <> go nabla r2
-   RefineTop -> nabla
-   RefineBottom -> Bottom
-
-  addConsistentConstraint :: Nabla Resolved -> Constr Resolved -> Nabla Resolved
-  addConsistentConstraint nabla c = case lookupConstraints (constraintName c) nabla of
-    [] -> insertConstraint c nabla
-    cs -> if all (c `isConsistentWith`) cs then insertConstraint c nabla else nabla
-
-  insertConstraint c = \ case
-    Bottom -> Consistent (Set.singleton c)
-    Consistent s -> Consistent (Set.insert c s)
+-- | Add one constraint to a consistent constraint set; 'Nothing' if it
+-- contradicts a constraint already present (the refined value space is
+-- empty, so the candidate 'Nabla' dies).
+addConstraint :: Constr Resolved -> Nabla Resolved -> Maybe (Nabla Resolved)
+addConstraint _ Bottom = Nothing
+addConstraint c nabla@(Consistent s)
+  | c `Set.member` s = Just nabla
+  | all (c `isConsistentWith`) (lookupConstraints (constraintName c) nabla) =
+      Just (Consistent (Set.insert c s))
+  | otherwise = Nothing
 
 isConsistentWith :: Constr Resolved -> Constr Resolved -> Bool
 IsEq n1 c1 _ `isConsistentWith` IsEq n2 c2 _ | n1 `sameResolved` n2 = c1 `sameResolved` c2
@@ -2318,40 +3254,216 @@ IsNotEq n1 c1 _ _ `isConsistentWith` IsEq n2 c2 _ | n1 `sameResolved` n2 = not $
 IsEq n1 c1 _ `isConsistentWith` IsNotEq n2 c2 _ _ | n1 `sameResolved` n2 = not $ c1 `sameResolved` c2
 _ `isConsistentWith` _ = True
 
+-- | The result of the pattern-match analysis of one CONSIDER.
+data PatternMatchAnalysis = MkPatternMatchAnalysis
+  { missingArms   :: [BranchLhs Resolved]
+    -- ^ synthesized suggestions for the uncovered cases (empty = exhaustive,
+    -- or the suggestion cap was exceeded — see 'maxMissingSuggestions')
+  , redundantArms :: [Branch Resolved]
+    -- ^ arms that can never match (their guards contradict every value
+    -- still uncovered when they are reached)
+  }
+
+-- | Give up the whole analysis when the uncovered set exceeds this many
+-- alternatives. The uncovered set grows by at most (guards per branch) per
+-- branch before consistency pruning, so realistic matches stay tiny; only
+-- pathological shapes (dozens of many-field record arms) approach this, and
+-- for them "no warning" beats hanging the checker — and the IDE with it.
+maxUncoveredNablas :: Int
+maxUncoveredNablas = 128
+
+-- | Stop enumerating missing-branch SUGGESTIONS beyond this many. One
+-- uncovered alternative can still denote a cartesian product of
+-- constructor choices across independent positions; past this bound we
+-- suppress the missing-branch warning (the redundancy results stay) rather
+-- than print pages of arms.
+maxMissingSuggestions :: Int
+maxMissingSuggestions = 64
+
+-- | Sequential coverage analysis, one branch at a time — the classic
+-- residual-set ("Lower Your Guards") shape:
+--
+--   * @uncovered@ is a DISJUNCTION of consistent constraint sets
+--     ('Nabla's) describing every value not matched by the branches seen so
+--     far; it starts as the unconstrained set (everything).
+--   * A branch whose guard conjunction is inconsistent with EVERY current
+--     'Nabla' covers nothing new: redundant. (Guard-less arms — OTHERWISE
+--     and bare binders — are deliberately exempt, preserving the
+--     long-standing behaviour that a defensive trailing catch-all is not
+--     flagged; they still consume the remaining value space.)
+--   * Splitting a 'Nabla' against a branch with guards @g1..gk@ yields the
+--     standard residue: @nabla ∧ ¬g1@, @nabla ∧ g1 ∧ ¬g2@, …; inconsistent
+--     conjunctions die immediately.
+--
+-- Keeping the disjunction as an explicit SET of independent nablas (instead
+-- of one refinement TREE walked per query, or one unioned constraint set)
+-- is what makes this both correct and fast: the predecessor tree walk was
+-- exponential in the branch count for multi-guard arms — a total, idiomatic
+-- 16-branch match over a record of four MAYBEs hung the checker — and the
+-- unioned-set variant conflated independent disjuncts, silently
+-- under-reporting missing arms. Each nabla is expanded to suggestions
+-- separately.
+--
+-- Returns 'Nothing' when the analysis gives up: unexpected tree shape, or
+-- the 'maxUncoveredNablas' cap tripped. No warning is better than a wrong
+-- one or a hang.
+analyzePatternMatch
+  :: (Resolved -> Int)
+  -> Resolved
+  -> PatTree' [Resolved] Resolved
+  -> Maybe PatternMatchAnalysis
+analyzePatternMatch ctorArity scrut tree = do
+  branches <- flattenPatTree tree
+  (uncovered, redundant) <- analyzeGuardRows branches
+  let suggestions =
+        nubOrdOn (fmap getUnique) $
+          concatMap (expandToPattern ctorArity scrut) uncovered
+      capped = length (take (maxMissingSuggestions + 1) suggestions) > maxMissingSuggestions
+  pure MkPatternMatchAnalysis
+    { missingArms   = if capped then [] else suggestions
+    , redundantArms = redundant
+    }
+
+-- | The residual-set fold itself, factored out of 'analyzePatternMatch' so
+-- that the single-CONSIDER wrapper above and the clause-matrix path
+-- ('checkClauseMatrix') share 'analyzeBranch', 'splitByGuards' and the
+-- 'maxUncoveredNablas' cap. Returns the uncovered nablas and the redundant
+-- branches (in source order); 'Nothing' when the cap trips — bail to
+-- no-warning: fail-open, the same contract as 'analyzePatternMatch' (no
+-- warning is better than a wrong one or a hang).
+analyzeGuardRows
+  :: [([Guard [Resolved] Resolved], Branch Resolved)]
+  -> Maybe ([Nabla Resolved], [Branch Resolved])
+analyzeGuardRows branches = do
+  (uncovered, redundant) <- foldM analyzeBranch ([Consistent Set.empty], []) branches
+  pure (uncovered, reverse redundant)
+  where
+    analyzeBranch (uncovered, redundant) (guards, b) =
+      let coversSomething =
+            any (\nab -> isJust (foldM (flip addConstraint) nab (map guardEq guards))) uncovered
+          redundant'
+            | not coversSomething, not (null guards) = b : redundant
+            | otherwise = redundant
+          uncovered' =
+            nubOrdOn nablaKey (concatMap (splitByGuards guards) uncovered)
+      in if length (take (maxUncoveredNablas + 1) uncovered') > maxUncoveredNablas
+           then Nothing
+           else Just (uncovered', redundant')
+
+    -- the residue of one nabla against one branch's guard conjunction
+    splitByGuards guards nabla = go nabla guards
+      where
+        go _ [] = []
+        go nab (g : gs) =
+          maybeToList (addConstraint (guardNeq g) nab)
+          <> case addConstraint (guardEq g) nab of
+               Nothing   -> [] -- prefix already impossible: no deeper residue
+               Just nab' -> go nab' gs
+
+    guardEq  (MkGuard _cs b n ns) = IsEq b n ns
+    guardNeq (MkGuard cs b n ns)  = IsNotEq b n ns cs
+
+    nablaKey = \ case
+      Bottom       -> Nothing
+      Consistent s -> Just (Set.map (fmap getUnique) s)
+
+-- | Decompose the desugared pattern tree back into its per-branch guard
+-- chains. 'desugarBranches' only ever builds a right-nested 'PatOr' of
+-- @foldr PatAnd (PatLeaf b)@ chains, but stay total: any other shape means
+-- the analysis quietly stands down ('Nothing').
+flattenPatTree :: PatTree' i n -> Maybe [([Guard i n], Branch n)]
+flattenPatTree = \ case
+  PatOr t1 t2   -> (<>) <$> flattenPatTree t1 <*> flattenPatTree t2
+  PatNoBranches -> Just []
+  t             -> (: []) <$> chain [] t
+  where
+    chain acc = \ case
+      PatAnd g t -> chain (g : acc) t
+      PatLeaf b  -> Just (reverse acc, b)
+      _          -> Nothing
+
+-- | What a consistent 'Nabla' says about ONE variable: pinned to a
+-- constructor ('EqCon'), excluded from some constructors ('NotEqCons'
+-- carrying the remaining candidates), or unconstrained ('NoInfo').
 data ConsistentSet n
-  = EqCon n [n] (ConsistentSet n)
+  = EqCon n [n]
   | NotEqCons [n] [n]
   | NoInfo
 
-expandToPattern :: Resolved -> Nabla Resolved -> [BranchLhs Resolved]
-expandToPattern scrut = \ case
-  Bottom -> []
-  n@Consistent {} -> map patternToBranch (go scrut n)
+expandToPattern :: (Resolved -> Int) -> Resolved -> Nabla Resolved -> [BranchLhs Resolved]
+expandToPattern ctorArity scrut nabla =
+  map patternToBranch (expandToPatterns ctorArity scrut nabla)
  where
   patternToBranch pat
     | PatVar _ var <- pat, var `sameResolved` underscoreRef
     = Otherwise emptyAnno
     | otherwise = When emptyAnno pat
 
+-- | The pattern-level half of 'expandToPattern' (without the
+-- OTHERWISE-wrapping), shared with the clause-matrix path
+-- ('checkClauseMatrix'), which expands one uncovered nabla PER COLUMN
+-- scrutinee and takes the cartesian product across columns. A column about
+-- which the nabla has no information comes back as
+-- @'PatVar' _ 'underscoreRef'@; the caller decides how to render it.
+expandToPatterns :: (Resolved -> Int) -> Resolved -> Nabla Resolved -> [Pattern Resolved]
+expandToPatterns ctorArity scrut = \ case
+  Bottom -> []
+  n@Consistent {} -> go Set.empty scrut n
+ where
+  -- An 'IsEq' PINS the variable: it dominates and subsumes any
+  -- accompanying 'IsNotEq' constraints (a consistent set can hold e.g.
+  -- {x = C1, x /= C2}; the inequality carries no extra information once
+  -- the equality is known — treating it as an alternative used to append
+  -- spurious wildcard/other-constructor suggestions).
   toConsistentSet :: [Constr Resolved] -> ConsistentSet Resolved
-  toConsistentSet [] = NoInfo
-  toConsistentSet (IsEq _ c ns : rest) = EqCon c ns (toConsistentSet rest)
-  toConsistentSet (IsNotEq _ c ns cs : rest) = case toConsistentSet rest of
-    NotEqCons _ ncs -> NotEqCons ns (delByUnq c ncs)
-    NoInfo -> NotEqCons ns (delByUnq c cs)
-    e@EqCon {} -> e
+  toConsistentSet cs' = case [ (c, ns) | IsEq _ c ns <- cs' ] of
+    (c, ns) : _ -> EqCon c ns
+    []          -> goNeq cs'
+    where
+      goNeq [] = NoInfo
+      goNeq (IsNotEq _ c ns cs : rest) = case goNeq rest of
+        NotEqCons _ ncs -> NotEqCons ns (delByUnq c ncs)
+        NoInfo          -> NotEqCons ns (delByUnq c cs)
+        e@EqCon {}      -> e
+      goNeq (IsEq {} : rest) = goNeq rest
 
   delByUnq = deleteBy sameResolved
 
-  go :: Resolved -> Nabla Resolved -> [Pattern Resolved]
-  go scrutVar nabla = go' cnstrs
+  -- INVARIANT: a variable can never legitimately occur in its own payload —
+  -- 'desugarPat' allocates fresh payload variables per (scrutinee, ctor)
+  -- position. The @seen@ set is an occurs-check backstop: should a future
+  -- constraint-generation bug ever produce a self-referential 'IsEq' again
+  -- (as the constructor-only 'VarEnv' keying once did), the expansion
+  -- degrades that position to @_@ instead of diverging (which would hang
+  -- the type-checker, and with it the IDE, on every keystroke).
+  go :: Set Unique -> Resolved -> Nabla Resolved -> [Pattern Resolved]
+  go seen scrutVar nabla
+    | getUnique scrutVar `Set.member` seen = [PatVar emptyAnno underscoreRef]
+    | otherwise = go' cnstrs
    where
+    seen' = Set.insert (getUnique scrutVar) seen
     cnstrs = toConsistentSet $ lookupConstraints scrutVar nabla
     go' = \ case
-      EqCon c ns more -> map (PatApp emptyAnno c) (traverse (`go` nabla) ns) <> go' more
-      -- TODO: add underscores here, instead of []
-      NotEqCons _ns ncs -> map (\n' -> PatApp emptyAnno n' [] ) ncs
+      EqCon c ns -> map (mkSuggestedPattern c) (traverse (\n' -> go seen' n' nabla) ns)
+      -- pad each suggested constructor with one underscore wildcard per
+      -- argument position, so the rendered missing branch is valid L4 the
+      -- user can paste (a bare non-nullary constructor would not be)
+      NotEqCons _ns ncs -> map (\n' -> mkSuggestedPattern n' (replicate (ctorArity n') (PatVar emptyAnno underscoreRef))) ncs
       NoInfo -> [PatVar emptyAnno underscoreRef]
+
+  -- The builtin cons constructor must be suggested in its surface form,
+  -- a 'PatCons' (rendered @… FOLLOWED BY …@) — never as an application of
+  -- the internal cons name. Its arity is intrinsically 2 (and NOT derivable
+  -- via 'constructorArity', since @cons@ is tagged 'Computable', not
+  -- 'Constructor'), hence the underscore fallback when the argument
+  -- patterns were not supplied.
+  mkSuggestedPattern :: Resolved -> [Pattern Resolved] -> Pattern Resolved
+  mkSuggestedPattern c args
+    | getUnique c == consUnique = case args of
+        [ph, pt'] -> PatCons emptyAnno ph pt'
+        _         -> PatCons emptyAnno wild wild
+    | otherwise = PatApp emptyAnno c args
+    where wild = PatVar emptyAnno underscoreRef
 
 sameResolved :: Resolved -> Resolved -> Bool
 sameResolved = (==) `on` getUnique
@@ -2528,6 +3640,15 @@ withScanTypeAndSigEnvironment preScanDecls scanDecl scanTySig a act = do
 -- @
 --
 -- All of these can be used to refer to @foo@.
+--
+-- This function does two independent things, and callers care about the
+-- difference (see 'addQualifiedAliases'):
+--
+-- 1. it records each name's defining section path, which is what makes
+--    UNQUALIFIED references to it obey nearest-enclosing-section resolution
+--    ('selectByProximity'); and
+-- 2. it adds the qualified spellings, which is what makes QUALIFIED references
+--    to it resolve at all.
 withQualified :: [Resolved] -> CheckEntity -> Check CheckInfo
 withQualified rs ce = do
   sects <- asks (.sectionStack)
@@ -2536,8 +3657,22 @@ withQualified rs ce = do
   -- variants share the same 'Unique' as the original, so recording the original
   -- 'Unique's suffices. (A no-op at top level, where 'sects' is empty.)
   recordSectionPath sects (getUnique <$> rs)
+  qualRs <- qualifiedAliases rs
+  pure $ makeKnownMany (rs <> qualRs) ce
+
+-- | The section-qualified alias 'Resolved's of the given names, under the
+-- current section stack. Empty at top level, and empty for names that are
+-- already qualified or are predefined.
+--
+-- Each alias is a 'defAka' sharing the original's 'Unique', hence its
+-- 'CheckEntity' and its source range: it is the same entity under a second
+-- spelling, keyed in the environment under a 'QualifiedName' 'RawName' that no
+-- 'NormalName' lookup can ever reach.
+qualifiedAliases :: [Resolved] -> Check [Resolved]
+qualifiedAliases rs = do
+  sects <- asks (.sectionStack)
   case nonEmpty sects of
-    Nothing -> pure $ makeKnownMany rs ce
+    Nothing -> pure []
     Just (neSects :: NonEmpty (NonEmpty Text)) -> do
       let
         go :: Resolved -> Check [Resolved]
@@ -2557,8 +3692,30 @@ withQualified rs ce = do
             PreDef _ -> pure []
             QualifiedName _ _ -> pure []
 
-      qualRs <- Extra.concatMapM go rs
-      pure $ makeKnownMany (rs <> qualRs) ce
+      Extra.concatMapM go rs
+
+-- | Add the section-qualified spellings of every name an already-built
+-- 'CheckInfo' binds, and NOTHING else.
+--
+-- Deliberately not 'withQualified': that would additionally 'recordSectionPath'
+-- for the names, which is a change to how UNQUALIFIED references to them
+-- resolve, not merely a second way to spell them. Whether data constructors and
+-- record selectors should be ranked by section proximity the way values are is
+-- a real question — today they are not, and answering it is a separate change
+-- with its own spec and its own corpus fallout. #921 is only about giving them
+-- a qualified spelling, so this adds a qualified spelling and leaves
+-- 'sectionPaths' bit-for-bit as it was.
+--
+-- (Concretely: with the paths recorded, a constructor @yes@ declared in
+-- @§ Alpha@ stops being an ancestor of an unrelated @§ Gamma@, so a reference
+-- to @yes@ from @§ Gamma@ that used to pick the constructor becomes ambiguous
+-- against a same-typed value @yes@ in @§ Beta@ — and, in the other direction, a
+-- previously-ambiguous pair silently resolves to the top-level one. Neither
+-- belongs in a fix about spelling.)
+addQualifiedAliases :: CheckInfo -> Check CheckInfo
+addQualifiedAliases ci = do
+  qualRs <- qualifiedAliases ci.names
+  pure $ makeKnownMany (ci.names <> qualRs) ci.checkEntity
 
 -- ----------------------------------------------------------------------------
 -- Phase 1: Scan & Check Type Declarations (DECLARE & ASSUME)
@@ -2595,7 +3752,23 @@ inferTyDeclDeclare (MkDeclare ann _tysig appForm t) = prune $
   errorContext (WhileCheckingDeclare (getName appForm)) do
     lookupDeclTypeSigByAnno ann >>= \ declHead -> do
         extendKnownMany declHead.tyVars do
-          extendTySynonym <- inferTypeNameAndSynonym declHead.rappForm declHead.typeSynonym
+          -- The section-qualified aliases must be regenerated here, not merely
+          -- inherited from 'scanTyDeclDeclare'. The scan-phase 'CheckInfo' (with
+          -- its qualified variants) is published only by 'withDeclareTypeSigs',
+          -- whose scope ends when the declare phase does; what survives into
+          -- 'inferProgram' is *this* 'CheckInfo', via 'withDeclares'. Without the
+          -- requalification a DECLARE'd type inside a section could not be named
+          -- as @`Section`.Type@ from anywhere outside the declare phase (#921).
+          -- We requalify the infer-phase entity rather than reuse
+          -- @declHead.name@ because only the former carries a type synonym's
+          -- expanded body (see 'inferTypeNameAndSynonym').
+          --
+          -- Aliases only ('addQualifiedAliases', not 'withQualified'): the type
+          -- name's section path was already recorded by 'scanTyDeclDeclare',
+          -- over the same 'Resolved's under the same section stack, so
+          -- re-recording it would be a no-op at best — and we want a guarantee,
+          -- not a coincidence, that this fix leaves resolution alone.
+          extendTySynonym <- addQualifiedAliases =<< inferTypeNameAndSynonym declHead.rappForm declHead.typeSynonym
           (rt, extendsTyDecl) <- inferTypeDecl declHead.rappForm t
           -- See Note [Adding type information to all binders]
           -- TODO: if we did this later during typecheck, we would be
@@ -3134,11 +4307,19 @@ rebuildMixfixAppAnno origAnn funcName args =
 -- grouping (mixed left\/right, or a non-associative @infix operator chained
 -- with itself) report a 'FixityReassociationClash'; grouping then recovers
 -- left-associatively so that checking can continue past the error.
-tryReassociateFixityChain :: Anno -> Name -> [Expr Name] -> Check (Maybe (Expr Name))
+--
+-- The extra 'Bool' reports whether this pass emitted an Error-severity
+-- diagnostic AND declined the chain (the 'FixityConflict' route): the caller
+-- falls through to 'inferFlatApp', which must then force the ambiguity
+-- fallback in overload resolution (see 'forkWithLazyFallback'). All other
+-- declining routes emit nothing and return 'False'; the accepting route
+-- returns a reassociated expression, which is re-inferred wholesale, so its
+-- flag is likewise 'False'.
+tryReassociateFixityChain :: Anno -> Name -> [Expr Name] -> Check (Bool, Maybe (Expr Name))
 tryReassociateFixityChain ann headOp es = do
   registry <- asks (.mixfixRegistry)
   case normalizeChain registry headOp es of
-    Nothing -> pure Nothing
+    Nothing -> pure (False, Nothing)
     Just (operands, allOps) -> do
       -- If the pre-existing mixfix matcher already gives this exact flat shape a
       -- meaning, that interpretation predates fixity declarations and keeps
@@ -3156,15 +4337,15 @@ tryReassociateFixityChain ann headOp es = do
           conflicts = [ (op, fs) | (op, ChainOpConflict fs) <- opFixities ]
           declared = [ (op, f) | (op, ChainOpFixity f) <- opFixities ]
       if | any (isDeclaredChainOperator registry) operands ->
-             pure Nothing
+             pure (False, Nothing)
          | Just _ <- existingMatch ->
-             pure Nothing
+             pure (False, Nothing)
          | ((op, fs) : _) <- conflicts -> do
              addError (FixityConflict (rawName op) fs)
-             pure Nothing
+             pure (True, Nothing)
          | length declared /= length allOps ->
              -- at least one operator has no (complete) fixity declaration
-             pure Nothing
+             pure (False, Nothing)
          | otherwise -> do
              let (reassociated, mClash) = shuntChain declared operands
              case mClash of
@@ -3174,7 +4355,7 @@ tryReassociateFixityChain ann headOp es = do
              -- the needsAnnoRebuild path of the App case: the root keeps the
              -- original source range and extension, with the two-hole payload
              -- the generic ToConcreteNodes instance for App expects.
-             pure $ Just $ case reassociated of
+             pure $ (False,) $ Just $ case reassociated of
                App _ rootOp rootArgs -> App (rebuildMixfixAppAnno ann rootOp rootArgs) rootOp rootArgs
                other -> other
   where
@@ -3827,12 +5008,9 @@ surroundWithCsn before after a =
 -- Typecheck Utils
 -- ----------------------------------------------------------------------------
 
-severity :: CheckErrorWithContext -> Severity
-severity (MkCheckErrorWithContext e _) =
-  case e of
-    CheckInfo {}    -> SInfo
-    CheckWarning {} -> SWarn
-    _               -> SError
+-- NOTE: 'severity' now lives in L4.TypeCheck.Types (single canonical
+-- mapping, shared with candidate viability and the diagnostic renderers)
+-- and is re-exported from here.
 
 prettyCheckErrorWithContext :: CheckErrorWithContext -> [Text]
 prettyCheckErrorWithContext (MkCheckErrorWithContext e ctx) =
@@ -3854,6 +5032,19 @@ prettyCheckErrorContext (WhileCheckingPattern _p ctx)    e = prettyCheckErrorCon
 prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorContext ctx e
 
 prettyCheckError :: CheckError -> [Text]
+prettyCheckError (SuspiciousBinderPattern binder ctor)     =
+  [ "This CONSIDER branch binds a new variable"
+  , ""
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "which matches every remaining case. But its name is very close to"
+  , ""
+  , "  " <> quotedName (getName ctor)
+  , ""
+  , "a constructor of the type being matched that no other branch covers."
+  , "If you meant the constructor, fix the spelling; if you meant a"
+  , "catch-all, consider OTHERWISE or a name unlike any constructor."
+  ]
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
   , ""
@@ -4120,7 +5311,13 @@ prettyCheckWarning = \ case
     [ "The following branches still need to be considered:"
     , "" ]
     <>
-    map (("  " <>) . prettyLayout) b
+    map (("  " <>) . prettyMissingBranchLhs) b
+    <> [ "" ]
+  PatternClausesMissing _ headName rows ->
+    [ "This multi-clause definition does not cover all cases. The following clauses are still needed:"
+    , "" ]
+    <>
+    map (("  " <>) . prettyMissingClauseLhs headName) rows
     <> [ "" ]
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
@@ -4132,6 +5329,48 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN parameters."
     ]
+
+-- | Render a synthesized missing branch as valid, pasteable L4 (the
+-- pattern rendering itself is 'prettyMissingPattern').
+prettyMissingBranchLhs :: BranchLhs Resolved -> Text
+prettyMissingBranchLhs = \ case
+  When _ p    -> "WHEN " <> prettyMissingPattern False p <> " THEN"
+  o@Otherwise {} -> prettyLayout o
+
+-- | Render a synthesized missing CLAUSE of a multi-clause pattern-matching
+-- group as valid, pasteable L4: a new DECIDE clause line ending at IS with
+-- no body — the clause-level analogue of 'prettyMissingBranchLhs''s
+-- @WHEN … THEN@. The DECIDE form is always valid to paste because a group
+-- accepts DECIDE-form and MEANS-form clauses interchangeably
+-- ('L4.Parser.pmClause'). Clause argument positions parse as
+-- 'L4.Parser.atomicPattern', so applied constructors must be parenthesised:
+-- every column is rendered with @nested=True@.
+prettyMissingClauseLhs :: Name -> [Pattern Resolved] -> Text
+prettyMissingClauseLhs headName row =
+  "DECIDE " <> quotedName headName
+    <> Text.concat (map ((" " <>) . prettyMissingPattern True) row)
+    <> " IS"
+
+-- | Render a synthesized pattern as valid, pasteable L4. The generic
+-- layout printer is not suitable here: it does not parenthesize nested
+-- non-nullary constructor patterns (@wa JUST `_`@ instead of
+-- @wa (JUST `_`)@), and it prints cons patterns by the internal constructor
+-- name instead of the FOLLOWED BY surface syntax.
+prettyMissingPattern :: Bool -> Pattern Resolved -> Text
+prettyMissingPattern = go
+  where
+    go :: Bool -> Pattern Resolved -> Text
+    go _ p@PatVar {} = prettyLayout p
+    go _ p@(PatApp _ _ []) = prettyLayout p
+    go nested (PatApp a c ps) =
+      parensIf nested (prettyLayout (PatApp a c []) <> " " <> Text.unwords (map (go True) ps))
+    go nested (PatCons _ ph pt) =
+      parensIf nested (go True ph <> " FOLLOWED BY " <> go True pt)
+    -- literal and expression patterns are never synthesized as missing
+    -- branches; fall back to the generic printer just in case
+    go _ p = prettyLayout p
+
+    parensIf b txt = if b then "(" <> txt <> ")" else txt
 
 
 -- | Render a fixity declaration the way the user writes it, e.g. "@infixl 6".
@@ -4176,6 +5415,7 @@ prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
 prettyTypeMismatch ExpectConsArgument2Context expected given =
   standardTypeMismatch [ "The second argument of FOLLOWED BY is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."
   , "The expression being matched here is"
   , ""
@@ -4183,41 +5423,44 @@ prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   , ""
   , "of type"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but the type of this pattern is"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectIfBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "Both the THEN and the ELSE branch of an IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs must have the same type."
   , "From looking at the context, if have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectConsiderBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All branches in a CONSIDER construct must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectHomogeneousListContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All elements in a LIST literal must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this element is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch (ExpectDecideSignatureContext Nothing) expected given =
   standardTypeMismatch [ "From looking at the context, I have inferred that the type of this definition must be" ] expected given
@@ -4299,14 +5542,56 @@ prettyOrdinal n = Text.pack (show n) <> "th"
 
 standardTypeMismatch :: [Text] -> Type' Resolved -> Type' Resolved -> [Text]
 standardTypeMismatch prefix expected given =
-  prefix ++
-  [ ""
-  , "  " <> prettyLayout expected
-  , ""
-  , "but is here of type"
-  , ""
-  , "  " <> prettyLayout given
-  ]
+  let (e, g) = prettyMismatchedTypes expected given
+  in prefix ++
+     [ ""
+     , "  " <> e
+     , ""
+     , "but is here of type"
+     , ""
+     , "  " <> g
+     ]
+
+-- | Render the two sides of a type mismatch so that they can be told apart.
+--
+-- 'prettyLayout' prints a type from its surface names only — 'Unique's are
+-- never part of any rendering — so two distinct types that happen to be spelled
+-- the same (two @DECLARE Verdict@s in sibling sections, say) produced the
+-- famously unhelpful
+--
+-- > must match ... namely
+-- >   Verdict
+-- > but is here of type
+-- >   Verdict
+--
+-- When the two renderings collide we therefore append, to each side, where the
+-- user-defined names it is built from were declared. Predefined names carry no
+-- range and are skipped, so @LIST OF Verdict@ is annotated with @Verdict@ only;
+-- if nothing can be said we fall back to the plain rendering rather than emit
+-- an empty parenthesis. Sentinels from failed resolution are skipped too: their
+-- 'getOriginal' is the *reference* site, so labelling it "defined at" would lie
+-- (those mismatches are normally suppressed by 'suppressResolutionCascade'
+-- anyway).
+prettyMismatchedTypes :: Type' Resolved -> Type' Resolved -> (Text, Text)
+prettyMismatchedTypes expected given
+  | e /= g    = (e, g)
+  | otherwise = (annotate expected e, annotate given g)
+  where
+    e = prettyLayout expected
+    g = prettyLayout given
+
+    annotate :: Type' Resolved -> Text -> Text
+    annotate t rendered =
+      case mapMaybe describeHead (nubOrdOn getUnique (typeHeads t)) of
+        []          -> rendered
+        descriptions -> rendered <> " (" <> Text.intercalate ", " descriptions <> ")"
+
+    describeHead :: Resolved -> Maybe Text
+    describeHead r
+      | isOutOfScope r = Nothing
+      | otherwise      = do
+          range <- rangeOf (getOriginal r)
+          pure (prettyLayout r <> " defined at " <> prettySrcRange range)
 
 prettyOptionallyNamedType :: OptionallyNamedType Resolved -> Text
 prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =

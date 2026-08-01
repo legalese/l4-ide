@@ -17,6 +17,7 @@ module TestData (
   assumeParamJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
+  dnfBlowupJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -30,6 +31,7 @@ import Control.Monad.Trans.Except
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 rodentAndVerminFunctionSpec :: IO ValidatedFunction
 rodentAndVerminFunctionSpec = either (error . show) id <$> runExceptT rodentAndVerminFunction
@@ -174,6 +176,26 @@ GIVEN walks IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 |]
+
+-- | @(x0 AND x1) OR (x2 AND x3) OR …@ over @n@ boolean parameters, as an
+-- @\@export@.
+--
+-- Small in the source and enormous in the ladder: reaching the AND/OR normal
+-- form a ladder draws distributes OR over AND, so this expands to 2^(n/2)
+-- clauses. Used to pin the @maxLadderNodes@ refusal on the HTTP surface, where
+-- it matters most — @\/ladder@ is an unauthenticated, CORS-open GET.
+dnfBlowupJL4 :: Int -> Text
+dnfBlowupJL4 n =
+  Text.unlines
+    [ "@export blowup"
+    , "GIVEN " <> Text.intercalate "\n      " [param k <> " IS A BOOLEAN" | k <- [0 .. n - 1]]
+    , "GIVETH A BOOLEAN"
+    , "DECIDE blowup IF "
+        <> Text.intercalate " OR "
+             [ "(" <> param k <> " AND " <> param (k + 1) <> ")" | k <- [0, 2 .. n - 2] ]
+    ]
+ where
+  param k = "x" <> Text.pack (show (k :: Int))
 
 -- | L4 source with a module-level ASSUME referenced by an @export.
 -- Exercises the ASSUME→parameter promotion path in the direct-AST

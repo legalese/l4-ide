@@ -222,6 +222,12 @@ iterate until the check passes.
   `#EVALTRACE` evaluation traces as GraphViz (PNG/SVG needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
   graphs as GraphViz DOT.
+- `l4 export --to=dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
+  module out as DMN 1.3 XML, dmnmd markdown, or BPMN 2.0 XML. The
+  document goes to stdout (or `-o FILE`); `--fidelity-report` adds the
+  list of what the target notation could not carry, to `FILE.fidelity.txt`
+  beside `-o` or to stderr otherwise. A one-line tally of the losses is
+  printed to stderr either way.
 
 ### 7. Test with `#EVAL`, `#ASSERT`, `#TRACE`
 
@@ -390,7 +396,13 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 `TODAY` returns `DATE`. `CURRENTTIME` returns `TIME`. Both need e.g. `TIMEZONE IS "America/New_York"` in scope to return a value.
 `NOW` returns `DATETIME` and defaults to `"Etc/UTC"`.
 
-Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
+Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `YMD 2025 1 15`. This is the recommended constructor for new code, because ISO 8601 order is harder to transpose.
+
+The older `Date`/`DATE` constructors are **little-endian** — `Date day month year`, e.g. `Date 15 1 2025`. So writing year-first with them is a bug: `Date 2025 1 15` is read as day 2025 of month 1 and silently evaluates to `0020-07-17`, not 2025-01-15.
+
+The two constructors split strict/lenient deliberately: `YMD` BOUNDS-CHECKS — a transposed `YMD 2025 15 1` refuses loudly (an `ASSUME` bottom named `` `YMD refused an out-of-range month or day` ``), as does `YMD 2023 2 29` (no such leap day) — while `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
+
+Also: `Time hour minute second`, `DateTime date time`.
 
 ### Operators
 

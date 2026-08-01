@@ -157,20 +157,26 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   -- Core libraries (prelude, …) to register as stable virtual files, unless the
   -- deployment ships its own copy of the same name (which then shadows the
   -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand `addVirtualFile` embedded
-  -- fallback (LSP.L4.Rules). That fallback mutates the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yields an unstable/duplicate
-  -- prelude module and spurious overload ambiguity (e.g. `count xs >= n` →
-  -- "ambiguous __GEQ__"). Verified: the same source is rejected via the embedded
-  -- fallback and accepted when the library is a real virtual file. The libraries
-  -- stay *dependencies* (NOT added to `allUris`), so they are never serialized or
-  -- surfaced as deployment files — only resolved when imported.
+  -- the VFS, instead of the resolver's on-demand embedded fallback
+  -- (LSP.L4.Rules). That fallback used to mutate the VFS mid-rule and — under
+  -- -O, in the multi-pass compileBundle/eval path — yielded an
+  -- unstable/duplicate prelude module and spurious overload ambiguity (e.g.
+  -- `count xs >= n` → "ambiguous __GEQ__"). Verified: the same source is
+  -- rejected via the embedded fallback and accepted when the library is a real
+  -- virtual file. The libraries stay *dependencies* (NOT added to `allUris`),
+  -- so they are never serialized or surfaced as deployment files — only
+  -- resolved when imported.
+  --
+  -- They are registered at `Shake.embeddedLibraryUri`, the one URI the resolver
+  -- hands back for an embedded winner. Registering them anywhere else would
+  -- give a bundle two `prelude` modules whenever some importer resolves via the
+  -- VFS tier and another falls through to the embedded tier — which is how the
+  -- duplicate-module ambiguity above arises.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
-        [ (libName, content)
+        [ (name, content)
         | (name, content) <- StrictMap.toList EmbeddedLibraries.embeddedLibraries
-        , let libName = Text.unpack name <.> "l4"
-        , not (libName `Set.member` bundleBasenames)
+        , not ((Text.unpack name <.> "l4") `Set.member` bundleBasenames)
         ]
 
   -- Use the first file's directory as the session root (arbitrary but required)
@@ -190,7 +196,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         -- Register embedded core libraries as stable virtual files (dependencies
         -- only — deliberately NOT added to allUris, see note above).
         forM_ embeddedLibFiles $ \(libName, content) ->
-          void $ Shake.addVirtualFile (toNormalizedFilePath ("./" <> libName)) content
+          void $ Shake.addVirtualFileUri (Shake.embeddedLibraryUri libName) content
 
         -- Typecheck ALL bundle files in one batch — Shake shares import resolution
         let allUris = [uri | (_, _, uri) <- fileNfps]
@@ -1114,15 +1120,27 @@ valueToFnLiteral ei = \case
     pure $ FnLitString $ prettyLayout name
   Eval.ValConstructor resolved [] ->
     -- Special case boolean constructors (preserve original casing for others)
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
      in case Text.toUpper name of
           "TRUE" -> pure $ FnLitBool True
           "FALSE" -> pure $ FnLitBool False
+          -- NOTHING is the absence of a value, and JSON spells that null.
+          -- Emitting the string "NOTHING" made an optional field's empty case
+          -- indistinguishable from a genuine string answer, and made
+          -- `MAYBE NUMBER` unusable for exactly the job it is for: saying that
+          -- a limit does not apply without naming a number that could be
+          -- mistaken for one.
+          "NOTHING" -> pure FnUnknown
           -- Other nullary constructors become strings (original casing preserved)
           _ -> pure $ FnLitString name
+  -- JUST x is x. The Maybe wrapper is L4's, not the caller's, and wrapping it
+  -- in an object would make every optional field a tagged union the client has
+  -- to unwrap. This matches 'L4.Evaluate.ValueLazyJSON', which the LSP uses.
+  Eval.ValConstructor resolved [v]
+    | Text.toUpper (constructorText resolved) == "JUST" -> nfToFnLiteral ei v
   Eval.ValConstructor resolved vals -> do
     lits <- traverse (nfToFnLiteral ei) vals
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
         fieldNames = lookupFieldNames ei resolved
     pure $ case fieldNames of
       Just names | length names == length lits ->
@@ -1137,6 +1155,23 @@ valueToFnLiteral ei = \case
           ]
   Eval.ValAssumed var ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+
+-- | A constructor's name, as a JSON payload should carry it.
+--
+-- NOT 'prettyLayout': that renders a 'Name' as L4 /source/, so an identifier
+-- with spaces in it comes back backtick-quoted — and this value is compared by
+-- clients against the @enum@ the service itself declared in its
+-- @returnSchema@, which is built by 'L4.FunctionSchema.resolvedNameText' and
+-- carries no backticks. So the service was handing out a schema and then
+-- returning values that fail it: declared
+-- @\"financial statements reviewed by an independent public accountant\"@,
+-- returned
+-- @\"\`financial statements reviewed by an independent public accountant\`\"@.
+--
+-- 'getActual' rather than 'getOriginal', matching 'L4.FunctionSchema', so that
+-- the two agree by construction rather than by coincidence.
+constructorText :: Resolved -> Text
+constructorText = rawNameToText . rawName . getActual
 
 -- | Look up field names for a constructor from the EntityInfo.
 -- Returns 'Just' field names if the constructor has named fields, 'Nothing' otherwise.

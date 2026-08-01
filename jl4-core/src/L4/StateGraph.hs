@@ -12,12 +12,17 @@
 --   - Each obligation chain creates states and transitions
 --   - PARTY X MUST/MAY action → transition label
 --   - HENCE → success transition (green)
---   - LEST → failure/timeout transition (red, dashed)
+--   - LEST → reparation transition (red, dashed); what reaches it depends on
+--     the modal, so its caption does too — see 'lestArmWording'
 --   - Fulfilled → terminal success state
 --   - Breach → terminal failure state
 --   - WITHIN deadline → temporal guard on transition
 --   - RAND → an @AllOf@ junction: every branch runs
 --   - ROR  → a @OneOf@ junction: exactly one branch runs
+--   - IF/THEN/ELSE over regulative arms → a @OneOf@ junction whose branch
+--     edges carry the guard that selects them (see 'guardedIfBranches')
+--   - a @HENCE@ back into the rule being extracted → an edge to the initial
+--     state, so a renewing duty is a cycle rather than a dangling stub
 module L4.StateGraph
   ( -- * Types
     StateGraph(..)
@@ -36,6 +41,9 @@ module L4.StateGraph
   , extractStateGraphs
     -- * Rendering
   , stateGraphToDot
+    -- * Arm vocabulary
+  , lestArmWording
+  , noTriggerWording
   ) where
 
 import Base
@@ -55,8 +63,10 @@ import L4.Syntax
   , DeonticModal(..)
   , Pattern(..)
   , AppForm(..)
-  , nameToText
+  , Unique
+  , unqualifiedNameToText
   , getOriginal
+  , getUnique
   )
 import L4.Print (prettyLayout)
 
@@ -67,9 +77,15 @@ import Data.Graph.Inductive.Graph (Node, LNode, LEdge)
 import qualified Data.Graph.Inductive.Graph as FGL
 import qualified Data.Graph.Inductive.PatriciaTree as FGL
 
--- | Convert a Resolved name to Text
+-- | Convert a Resolved name to Text.
+--
+-- Section qualification is dropped: an @Action@ constructor declared under
+-- @§§ Parties and acts@ would otherwise draw as
+-- @SEC Regulation Crowdfunding — 17 CFR Part 227.Parties and acts.file a Form
+-- C-AR annual report@ on every node and every edge, which is a heading, a
+-- subheading and then — eventually — the act. See 'unqualifiedNameToText'.
 resolvedToText :: Resolved -> Text
-resolvedToText = nameToText . getOriginal
+resolvedToText = unqualifiedNameToText . getOriginal
 
 --------------------------------------------------------------------------------
 -- Types
@@ -134,9 +150,83 @@ data TransitionLabel = TransitionLabel
 -- | Classification of transitions for rendering
 data TransitionType
   = HenceTransition        -- ^ Success path (solid, green)
-  | LestTransition         -- ^ Failure/timeout path (dashed, red)
+  | LestTransition         -- ^ Reparation\/failure path (dashed, red). What
+                           --   /reaches/ it depends on the modal — see
+                           --   'lestArmWording'.
   | DefaultTransition      -- ^ Neutral transition
   deriving (Eq, Show)
+
+-- | The caption for an arm that /nothing can take/.
+--
+-- Three of the four modals reach their @LEST@ arm by the deadline running out
+-- (see 'lestArmWording'), so a rule with no @WITHIN@ leaves that arm with no
+-- trigger at all. The spec says so — the LEST table in
+-- @doc\/reference\/regulative\/README.md@ defines every non-@SHANT@ trigger as
+-- the deadline passing — and the evaluator agrees: @Contract4@ takes the
+-- @Left Nothing@ branch on a missing @WITHIN@ and skips the timing step
+-- entirely, so @Contract5@, the only frame that consults @lest@ on expiry,
+-- never runs. Measured, on @jl4:exe:l4 run@:
+--
+-- @
+-- PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
+-- \#TRACE ... AT 0 WITH (\`WAIT UNTIL\` 1000)
+--   ==> PARTY Alice MUST pay HENCE FULFILLED LEST ...   -- residual, not Bob's refund
+-- @
+--
+-- with the same rule plus @WITHIN 30@ yielding @PARTY Bob MUST refund WITHIN 5@,
+-- i.e. the arm taken. The same holds for @MAY@ and for @DO@; @SHANT@ is the
+-- exception, because its trigger is the act, not the clock.
+--
+-- The edge is still drawn, because the drafter wrote a @LEST@ body and dropping
+-- the edge would orphan every state extracted from it. What it must not do is
+-- name an event: @\"timeout\"@ asserts a deadline the rule never set, and
+-- @\"not performed\"@ asserts a transition the runtime never makes. Naming the
+-- absence is the only caption here that survives being checked.
+noTriggerWording :: Text
+noTriggerWording = "unreachable: no WITHIN"
+
+-- | What reaching an obligation's @LEST@ arm /means/, in the fewest words that
+-- are true. This is the caption on the @LEST@ edge.
+--
+-- It is __not__ the whole vocabulary of the pipeline, and claiming so would be
+-- the kind of tidy overstatement this function exists to remove.
+-- 'L4.Bpmn.Lower' has words of its own for a prohibition — @triggerName@,
+-- @boundaryDoc@, @taskArmNote@ — and it needs them, because @raceArms@ puts a
+-- @SHANT@'s boundary event on the /HENCE/ arm, which is a different arm from
+-- the one captioned here. What this function owns is the @LEST@ arm's own
+-- words, everywhere they appear: @Lower@ imports it for the synthesised
+-- @MAY@-lapse timer and shares 'noTriggerWording' with it, rather than
+-- respelling either.
+--
+-- Both arguments are load-bearing.
+--
+-- The __modal__ decides which event takes the arm at all
+-- (@L4.EvaluateLazy.Machine@, and the LEST table in
+-- @doc\/reference\/regulative\/README.md@):
+--
+-- * @MUST@ \/ @DO@: the deadline passes without the act — a missed deadline;
+-- * @MAY@: the deadline passes without the permission being exercised, which
+--   is not a failure at all (its default consequence is @FULFILLED@);
+-- * @SHANT@: __the prohibited act is performed__. Nothing to do with time.
+--   Calling this a timeout says the opposite of what the rule says, since for
+--   a prohibition it is the deadline running out that means /compliance/.
+--
+-- The __deadline__ decides whether there is an arm to caption at all. Only
+-- @SHANT@ short-circuits it, and only because @SHANT@ is the one modal whose
+-- trigger is not temporal: measured, a prohibition with no @WITHIN@ still
+-- reaches @LEST@ the moment the act is performed. For the other three, no
+-- @WITHIN@ means no trigger — see 'noTriggerWording' for the measurement.
+lestArmWording ::
+  DeonticModal ->
+  -- | the obligation's @WITHIN@, if it has one. Only its presence is read, so
+  -- this is deliberately polymorphic: callers pass the deadline expression
+  -- itself and nobody has to pre-render it just to be asked a yes\/no question.
+  Maybe deadline ->
+  Text
+lestArmWording DMustNot _        = "violation"
+lestArmWording DMay     (Just _) = "lapses"
+lestArmWording _        (Just _) = "timeout"
+lestArmWording _        Nothing  = noTriggerWording
 
 -- | The complete state graph for a contract
 data StateGraph = StateGraph
@@ -172,7 +262,11 @@ data ExtractState = ExtractState
   { esNextId      :: StateId
   , esStates      :: [ContractState]
   , esTransitions :: [Transition]
-  } deriving (Show)
+  , esSelf        :: Maybe Unique
+    -- ^ The rule currently being extracted, so that a @HENCE@ back into it is
+    -- recognisable as renewal rather than as an unknown target. See
+    -- 'TargetSelf'.
+  }
 
 type ExtractM = St.State ExtractState
 
@@ -234,12 +328,29 @@ extractFromTopDecl :: Text -> TopDecl Resolved -> [StateGraph]
 extractFromTopDecl _contextName = \case
   Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) ->
     case findRegulativeExpr body of
-      Just regExpr -> [runExtraction (resolvedToText name) regExpr]
+      Just regExpr -> [runExtraction (getUnique name) (resolvedToText name) regExpr]
       Nothing      -> []
   Section _ sec -> extractFromSection sec
   _ -> []
 
--- | Find a regulative expression in an expression tree
+-- | Find a regulative expression in an expression tree.
+--
+-- @IF … THEN … ELSE …@ counts when at least one arm is regulative, because
+-- that is how legislation actually writes a conditional duty: the CFR puts its
+-- guard /outside/ the deontic head — "An issuer must continue to comply with
+-- the ongoing reporting requirements until one of the following occurs",
+-- "unless such securities are transferred: …" — so an isomorphic
+-- formalisation puts the @IF@ above the @PARTY … MUST …@ rather than folding
+-- it into a @PROVIDED@.
+--
+-- Peeling only @Where@ and @LetIn@ (which is what this did until 2026-07-27)
+-- meant every such rule was invisible: @extractStateGraphs@ returned @[]@ and
+-- @l4 export --to=bpmn@ refused with "No regulative rules found in module" on
+-- a module full of obligations. All three regulative rules in
+-- @jl4\/examples\/legal\/regcf\/regcf.l4@ were in that position.
+--
+-- A conditional whose arms are all non-regulative is still not a regulative
+-- rule, and still yields 'Nothing': the test is on the arms, not on the shape.
 findRegulativeExpr :: Expr Resolved -> Maybe (Expr Resolved)
 findRegulativeExpr expr = case expr of
   Regulative{} -> Just expr
@@ -247,22 +358,66 @@ findRegulativeExpr expr = case expr of
   ROr{}        -> Just expr
   Where _ e _  -> findRegulativeExpr e
   LetIn _ _ e  -> findRegulativeExpr e
+  IfThenElse{}
+    | any (isJust . findRegulativeExpr . snd) (guardedIfBranches expr) -> Just expr
   _            -> Nothing
 
+-- | Peel a chain of @IF c THEN a ELSE b@ into guarded branches.
+--
+-- The guard on the n-th arm is its own condition conjoined with the negation
+-- of every condition above it — that is what @ELSE@ means — and the final arm
+-- carries the accumulated negation alone. So
+--
+-- > IF   p THEN x
+-- > ELSE IF q THEN y
+-- >           ELSE z
+--
+-- yields @[(p, x), (NOT (p) AND q, y), (NOT (p) AND NOT (q), z)]@. Keeping the
+-- arms' guards means the branch set stays exhaustive and mutually exclusive by
+-- construction, which is the property that separates a fact-driven branch from
+-- a @ROR@ choice.
+--
+-- Rewriting such a rule as @ROR@ of @PROVIDED@-guarded obligations — the
+-- workaround this replaces — is /not/ the same construct. @ROR@ is a choice
+-- the obliged party makes; @IF@ is a branch the facts make. Worse, the
+-- rewriting loses any arm that imposes no duty (a bare @FULFILLED@ base case),
+-- because there is no obligation to hang a @PROVIDED@ on.
+guardedIfBranches :: Expr Resolved -> [(Maybe Text, Expr Resolved)]
+guardedIfBranches = go []
+ where
+  go priors = \case
+    IfThenElse _ c t e ->
+      let ct = prettyLayout c
+       in (conjoin (priors <> [ct]), t) : go (priors <> ["NOT (" <> ct <> ")"]) e
+    other -> [(conjoin priors, other)]
+
+  conjoin [] = Nothing
+  conjoin ts = Just (Text.intercalate " AND " ts)
+
+-- | The id of the state every graph starts in.
+--
+-- Extraction numbers states from zero and the first state it creates is always
+-- the entry — either the @initial@ state of a lone obligation or the junction
+-- a fan arrives at — so this is a fact about 'newState', not a convention.
+-- Named because a self-recursive @HENCE@ needs to point at it.
+initialStateId :: StateId
+initialStateId = 0
+
 -- | Run the extraction monad and build a StateGraph
-runExtraction :: Text -> Expr Resolved -> StateGraph
-runExtraction name expr =
+runExtraction :: Unique -> Text -> Expr Resolved -> StateGraph
+runExtraction self name expr =
   let initialState = ExtractState
         { esNextId = 0
         , esStates = []
         , esTransitions = []
+        , esSelf = Just self
         }
       finalState = St.execState (extractExpr Nothing expr) initialState
   in StateGraph
        { sgName = name
        , sgStates = reverse finalState.esStates
        , sgTransitions = reverse finalState.esTransitions
-       , sgInitialState = 0  -- First created state is initial
+       , sgInitialState = initialStateId
        }
 
 -- | Extract states and transitions from an expression
@@ -276,6 +431,13 @@ extractExpr mFromState expr = case expr of
 
   -- Choice: exactly one branch is taken.
   ROr{}  -> extractFan OneOf mFromState (flattenROr expr)
+
+  -- A conditional over regulative arms. Also a @OneOf@ junction — exactly one
+  -- arm applies — but unlike @ROr@ the arms are selected by the facts, and the
+  -- condition that selects each one travels with it as the branch edge's
+  -- guard. Downstream that is the difference between an exclusive gateway a
+  -- reader can evaluate and one that reads as a free choice.
+  IfThenElse{} -> extractIf mFromState expr
 
   Where _ e _ -> extractExpr mFromState e
   LetIn _ _ e -> extractExpr mFromState e
@@ -291,9 +453,17 @@ extractExpr mFromState expr = case expr of
 
   _ -> pure ()  -- Skip other expressions
 
--- | Check if a name refers to Fulfilled
+-- | Check if a name refers to the FULFILLED terminal.
+--
+-- The keyword is spelled @FULFILLED@ in source; the builtin behind it is
+-- @fulfil@, renamed for presentation (see 'L4.TypeCheck.Environment'). Neither
+-- spelling is @\"Fulfilled\"@, which is what this predicate used to compare
+-- against — so an explicit @HENCE FULFILLED@ never matched, fell through to
+-- the \"unknown target\" case, and produced a dangling intermediate state
+-- called @next@ instead of an edge to the shared terminal. The mixed-case
+-- spelling is kept only because it costs nothing.
 isFulfilled :: Resolved -> Bool
-isFulfilled name = resolvedToText name == "Fulfilled"
+isFulfilled name = resolvedToText name `elem` ["FULFILLED", "fulfil", "Fulfilled"]
 
 --------------------------------------------------------------------------------
 -- Junctions (RAND / ROR)
@@ -320,57 +490,86 @@ flattenROr = \case
 -- hanging off it. That keeps the branch set recoverable: the junction's
 -- out-edges are exactly the branches, one apiece, and nothing else.
 extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
-extractFan kind mFromState branches = do
+extractFan kind mFromState branches =
+  extractGuardedFan kind mFromState [(Nothing, b) | b <- branches]
+
+-- | Extract an @IF@ chain whose arms are regulative as a guarded @OneOf@
+-- junction. A chain none of whose arms is regulative is not a rule and
+-- produces nothing, so that an ordinary boolean conditional reached through a
+-- @HENCE@ target does not manufacture a spurious gateway.
+extractIf :: Maybe StateId -> Expr Resolved -> ExtractM ()
+extractIf mFromState expr
+  | any (isJust . findRegulativeExpr . snd) branches =
+      extractGuardedFan OneOf mFromState branches
+  | otherwise = pure ()
+ where
+  branches = guardedIfBranches expr
+
+-- | As 'extractFan', with a guard attached to each branch edge.
+extractGuardedFan
+  :: FanKind -> Maybe StateId -> [(Maybe Text, Expr Resolved)] -> ExtractM ()
+extractGuardedFan kind mFromState branches = do
   junction <- case mFromState of
     Just sid -> pure sid
     Nothing  -> newState "initial" InitialState
   markFan junction kind
-  traverse_ (extractBranch junction) branches
+  traverse_ (uncurry (extractBranch junction)) branches
 
 -- | Extract one branch of a junction, wiring the junction to its entry state.
-extractBranch :: StateId -> Expr Resolved -> ExtractM ()
-extractBranch junction branch = case classifyTarget branch of
-  -- A branch that is just FULFILLED or BREACH has no work in it, so it needs
-  -- no entry state: the junction points straight at the terminal.
-  TargetFulfilled -> do
-    fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-    addTransition junction fulfilledId fanLabel DefaultTransition
+extractBranch :: StateId -> Maybe Text -> Expr Resolved -> ExtractM ()
+extractBranch junction mGuard branch = do
+  self <- St.gets (.esSelf)
+  let label = fanLabel mGuard
+  case classifyTarget self branch of
+    -- A branch that is just FULFILLED or BREACH has no work in it, so it needs
+    -- no entry state: the junction points straight at the terminal.
+    TargetFulfilled -> do
+      fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+      addTransition junction fulfilledId label DefaultTransition
 
-  TargetBreach -> do
-    breachId <- getTerminalState "Breach" TerminalBreach
-    addTransition junction breachId fanLabel DefaultTransition
+    TargetBreach -> do
+      breachId <- getTerminalState "Breach" TerminalBreach
+      addTransition junction breachId label DefaultTransition
 
-  TargetDeonton obl -> do
-    entryId <- newState (describeDeonton obl) IntermediateState
-    addTransition junction entryId fanLabel DefaultTransition
-    extractDeonton (Just entryId) obl
+    -- The rule calling itself from inside a branch: the arm renews the whole
+    -- rule rather than doing anything of its own.
+    TargetSelf ->
+      addTransition junction initialStateId label DefaultTransition
 
-  TargetOther -> do
-    entryId <- newState (branchStateName branch) IntermediateState
-    addTransition junction entryId fanLabel DefaultTransition
-    -- A nested RAND/ROR marks this very state as the inner junction.
-    extractExpr (Just entryId) branch
+    TargetDeonton obl -> do
+      entryId <- newState (describeDeonton obl) IntermediateState
+      addTransition junction entryId label DefaultTransition
+      extractDeonton (Just entryId) obl
+
+    TargetOther -> do
+      entryId <- newState (branchStateName branch) IntermediateState
+      addTransition junction entryId label DefaultTransition
+      -- A nested RAND/ROR/IF marks this very state as the inner junction.
+      extractExpr (Just entryId) branch
 
 -- | Name for the entry state of a branch that is neither a bare obligation
 -- nor a terminal.
 branchStateName :: Expr Resolved -> Text
 branchStateName expr = case expr of
-  RAnd{}      -> "all of"
-  ROr{}       -> "one of"
-  App _ n _   -> resolvedToText n
-  Where _ e _ -> branchStateName e
-  LetIn _ _ e -> branchStateName e
-  _           -> "branch"
+  RAnd{}       -> "all of"
+  ROr{}        -> "one of"
+  IfThenElse{} -> "one of"
+  App _ n _    -> resolvedToText n
+  Where _ e _  -> branchStateName e
+  LetIn _ _ e  -> branchStateName e
+  _            -> "branch"
 
--- | The edge from a junction to a branch entry carries no action of its own:
--- a junction is a control point, not a task.
-fanLabel :: TransitionLabel
-fanLabel = TransitionLabel
+-- | The edge from a junction to a branch entry carries no action of its own —
+-- a junction is a control point, not a task — but it may carry the condition
+-- that selects the branch, when the junction came from an @IF@ rather than
+-- from a @RAND@ \/ @ROR@.
+fanLabel :: Maybe Text -> TransitionLabel
+fanLabel mGuard = TransitionLabel
   { labelParty    = Nothing
   , labelModal    = Nothing
   , labelAction   = ""
   , labelDeadline = Nothing
-  , labelGuard    = Nothing
+  , labelGuard    = mGuard
   }
 
 -- | Extract an obligation as a state transition
@@ -396,10 +595,31 @@ extractDeonton mFromState MkDeonton{..} = do
         , labelGuard    = guardText
         }
 
+      -- The caption for whichever LEST arm this obligation turns out to have.
+      -- It carries the modal too: without it a consumer holding only this edge
+      -- cannot tell a missed deadline from a prohibition that was breached,
+      -- which is the whole of smucclaw/l4-ide#927. The party, deadline and
+      -- guard are deliberately absent — they belong to the obligation, which
+      -- the HENCE edge already restates, and repeating them here would read as
+      -- a second, contradictory copy of the rule.
+      lestLabel = TransitionLabel
+        { labelParty    = Nothing
+        , labelModal    = modalVal
+        , labelAction   = lestArmWording action.modal due
+        , labelDeadline = Nothing
+        , labelGuard    = Nothing
+        }
+
+      defaultToBreach = do
+        breachId <- getTerminalState "Breach" TerminalBreach
+        addTransition fromState breachId lestLabel LestTransition
+
+  self <- St.gets (.esSelf)
+
   -- Handle HENCE (success path)
   case hence of
     Just henceExpr -> do
-      case classifyTarget henceExpr of
+      case classifyTarget self henceExpr of
         TargetFulfilled -> do
           fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
           addTransition fromState fulfilledId label HenceTransition
@@ -416,82 +636,137 @@ extractDeonton mFromState MkDeonton{..} = do
           -- Recursively extract the next obligation
           extractDeonton (Just nextStateId) nextObl
 
+        -- The duty renews: HENCE back into the rule being extracted.
+        TargetSelf ->
+          addTransition fromState initialStateId label HenceTransition
+
         TargetOther -> do
           -- Unknown target - create generic next state
           nextStateId <- newState "next" IntermediateState
           addTransition fromState nextStateId label HenceTransition
           extractExpr (Just nextStateId) henceExpr
 
+    -- No HENCE specified. Every modal defaults it to FULFILLED — see the HENCE
+    -- table in doc/reference/regulative/README.md and @fromMaybe fulfilExpr@ in
+    -- L4.EvaluateLazy.Machine — so there is one branch, not four. (This used to
+    -- be a @case@ on the modal with two byte-identical arms, split MAY from the
+    -- rest, and differing only in a comment.)
+    --
+    -- The seam a reader might come looking for is not here. For a prohibition
+    -- this edge is taken by the deadline /expiring/ with the act not performed,
+    -- so its caption reads backwards — but the caption is 'label', which is the
+    -- obligation restated, and downstream that is the record BPMN builds its
+    -- task name and lane from ("SHANT notify"). Rewording it here would rename
+    -- elements in another exporter. L4.Bpmn.Lower names the prohibition's
+    -- compliance arm itself; see 'L4.Bpmn.Lower.raceArms'.
     Nothing -> do
-      -- No HENCE specified - use default based on modal
-      case action.modal of
-        DMay -> do
-          -- MAY without HENCE defaults to Fulfilled
-          fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          addTransition fromState fulfilledId label HenceTransition
-        _ -> do
-          -- MUST/DO without HENCE defaults to Fulfilled
-          fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          addTransition fromState fulfilledId label HenceTransition
+      fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+      addTransition fromState fulfilledId label HenceTransition
 
-  -- Handle LEST (failure/timeout path)
+  -- Handle LEST (the reparation path). Which of these four targets it points at
+  -- is orthogonal to what takes the arm, so all four share one caption, derived
+  -- from the modal by 'lestArmWording'. They used to share the literal word
+  -- "timeout" instead, which on a prohibition asserted the exact opposite of
+  -- the rule.
   case lest of
     Just lestExpr -> do
-      case classifyTarget lestExpr of
+      case classifyTarget self lestExpr of
         TargetFulfilled -> do
           fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState fulfilledId timeoutLabel LestTransition
+          addTransition fromState fulfilledId lestLabel LestTransition
 
         TargetBreach -> do
           breachId <- getTerminalState "Breach" TerminalBreach
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState breachId timeoutLabel LestTransition
+          addTransition fromState breachId lestLabel LestTransition
 
         TargetDeonton nextObl -> do
           let nextStateName = describeDeonton nextObl
           nextStateId <- newState nextStateName IntermediateState
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState nextStateId timeoutLabel LestTransition
+          addTransition fromState nextStateId lestLabel LestTransition
           extractDeonton (Just nextStateId) nextObl
+
+        TargetSelf -> do
+          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
+          addTransition fromState initialStateId timeoutLabel LestTransition
 
         TargetOther -> do
           nextStateId <- newState "failure" IntermediateState
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState nextStateId timeoutLabel LestTransition
+          addTransition fromState nextStateId lestLabel LestTransition
           extractExpr (Just nextStateId) lestExpr
 
     Nothing -> do
       -- No LEST specified - use default based on modal
       case action.modal of
-        DMay -> pure ()  -- MAY without LEST: no failure path needed
-        DMust -> do
-          -- MUST without LEST defaults to Breach
-          breachId <- getTerminalState "Breach" TerminalBreach
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState breachId timeoutLabel LestTransition
-        DMustNot -> do
-          -- SHANT without LEST defaults to Breach (if action IS done)
-          breachId <- getTerminalState "Breach" TerminalBreach
-          let violationLabel = TransitionLabel Nothing Nothing "violation" Nothing Nothing
-          addTransition fromState breachId violationLabel LestTransition
-        DDo -> pure ()  -- DO requires explicit HENCE/LEST
+        -- MAY without LEST: the permission lapses to FULFILLED, and for the
+        -- common shape — no HENCE, or HENCE FULFILLED — that is where the HENCE
+        -- edge already goes, so there is no second arrow to draw.
+        --
+        -- NOTE (not fixed here): when a bare MAY's HENCE points at another
+        -- OBLIGATION the two arms genuinely part company, and this draws only
+        -- one of them. Measured:
+        --
+        --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
+        --     (`WAIT UNTIL` 100)          ==> FULFILLED
+        --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
+        --
+        -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@) while HENCE
+        -- reaches Bob's obligation, and the graph shows no route to FULFILLED at
+        -- all. L4.Bpmn.Lower inherits the gap and makes it worse, sending its
+        -- synthesised lapse timer "wherever HENCE lands" — which in this shape
+        -- is the wrong place. Fixing it means emitting a real lapse edge here
+        -- and retiring that synthesis, which moves BPMN output for every
+        -- permission; it is a separate change from smucclaw/l4-ide#927.
+        DMay -> pure ()
+        -- MUST/SHANT without LEST default to Breach; only the way in differs,
+        -- and 'lestArmWording' is where that difference is spelled.
+        DMust -> defaultToBreach
+        DMustNot -> defaultToBreach
+        -- DO is documented as requiring an explicit LEST, and this used to take
+        -- the documentation at its word and draw nothing. The evaluator does not
+        -- require it: @Contract5@'s @_ -> case lest of Nothing -> ValBreached@
+        -- covers DDo alongside DMust, and measured,
+        --
+        --   PARTY Alice DO pay WITHIN 5    (`WAIT UNTIL` 100)  ==> DEONTIC BREACHED
+        --
+        -- so the graph drew a rule whose only outcome was Fulfilled for a rule
+        -- that breaches. It is the same defect as the caption bug one level up —
+        -- the picture contradicting the runtime — so it is fixed the same way,
+        -- and 'lestArmWording' gives DO the MUST wording it shares.
+        DDo -> defaultToBreach
 
 -- | Classification of HENCE/LEST targets
 data Target
   = TargetFulfilled
   | TargetBreach
   | TargetDeonton (Deonton Resolved)
+  | TargetSelf
+    -- ^ The rule being extracted, applied to fresh arguments: a renewing duty.
   | TargetOther
 
--- | Classify what a HENCE/LEST expression points to
-classifyTarget :: Expr Resolved -> Target
-classifyTarget = \case
-  App _ name [] | resolvedToText name == "Fulfilled" -> TargetFulfilled
+-- | Classify what a HENCE/LEST expression points to, given the 'Unique' of the
+-- rule currently being extracted.
+--
+-- The @self@ case matters because a renewing obligation is written
+-- @HENCE \<this rule\> \<updated state\>@, which is an 'App' /with arguments/.
+-- Until 2026-07-27 that fell through to 'TargetOther', which manufactured an
+-- intermediate state literally named after the rule and left it with no
+-- outgoing transition — so the loop was reported as a dangling path rather
+-- than as a loop, and @P-CYCLE@ could never fire because the cycle never
+-- reached the graph. Reg CF's annual Form C-AR cycle
+-- (@jl4\/examples\/legal\/regcf\/regcf.l4@) is exactly this shape.
+--
+-- The arguments are deliberately ignored. A state graph is a control-flow
+-- abstraction: it can say the duty renews, and it cannot say the renewal
+-- happens with one fewer cycle remaining. What is lost is the /termination
+-- argument/, and that loss is real — see the fidelity report's @P-CYCLE@.
+classifyTarget :: Maybe Unique -> Expr Resolved -> Target
+classifyTarget self = \case
+  App _ name [] | isFulfilled name -> TargetFulfilled
+  App _ name _ | Just u <- self, getUnique name == u -> TargetSelf
   Breach{} -> TargetBreach
   Regulative _ obl -> TargetDeonton obl
-  Where _ e _ -> classifyTarget e
-  LetIn _ _ e -> classifyTarget e
+  Where _ e _ -> classifyTarget self e
+  LetIn _ _ e -> classifyTarget self e
   _ -> TargetOther
 
 -- | Generate a descriptive name for an obligation (for intermediate states)
@@ -617,9 +892,18 @@ oneOfEdgeColor = "#e8850c"
 -- | Format a transition label for display
 formatTransitionLabel :: StateGraphOptions -> TransitionLabel -> Text
 formatTransitionLabel opts TransitionLabel{..} =
-  let parts = catMaybes
+  let -- The modal is a qualifier on a party's action — "Alice MUST pay" — so it
+      -- is drawn only where there is a party to qualify. A LEST edge carries the
+      -- modal for consumers that hold only that edge, but its caption is not a
+      -- restatement of the rule; it names what became of it. "SHANT violation"
+      -- would read as a second and contradictory copy of the obligation.
+      modalPart
+        | not opts.showModal = Nothing
+        | isNothing labelParty = Nothing
+        | otherwise = fmap formatModal labelModal
+      parts = catMaybes
         [ labelParty
-        , if opts.showModal then fmap formatModal labelModal else Nothing
+        , modalPart
         , Just labelAction
         , if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
         , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing

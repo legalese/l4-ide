@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-partial-multicolumn.l4:12:8-16:9:
+  I found a problem while checking the definition of `f`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `f` Blue FALSE IS
+    
+pattern-matching-partial-multicolumn.l4:18:1-19:
+  1
+pattern-matching-partial-multicolumn.l4:19:1-20:
+  4
+pattern-matching-partial-multicolumn.l4:20:1-19:
+  5

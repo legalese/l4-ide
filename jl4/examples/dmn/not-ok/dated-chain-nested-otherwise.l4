@@ -1,0 +1,38 @@
+-- NEGATIVE fixture for the rule-date interval table (spec §15.3, R10).
+--
+-- The `OTHERWISE` is itself a guarded chain. On the ORDINARY path
+-- `expandOtherwise` splices such a chain's rows into the table, and reports the
+-- rows it declines to splice as `D-FLATTENCAP`. The dated path never calls
+-- `flattenGuarded`, so it would have collapsed the whole nested chain into ONE
+-- floor-row output entry -- silently, because `datedTable` passes no capped
+-- bodies and so no cap note can fire.
+--
+-- So the nested-chain test counts the `OTHERWISE` as an arm body, and this
+-- chain is `NotDated`: the existing path, the existing findings, and the rows
+-- the inner chain contributes still present.
+--
+-- Expected: NO D-DATEDCHAIN (this is not a refusal, it is a decline), a `FIRST`
+-- table, and MORE than the two rules a dated table would have emitted.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `nested otherwise under a dated arm`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A DATE
+`the 2024 rate change` MEANS Date 1 1 2024
+
+ASSUME `no GST rate exists before commencement` IS A NUMBER
+
+ASSUME `the transitional relief applies` IS A BOOLEAN
+
+GIVETH A NUMBER
+`GST rate percent` MEANS
+    BRANCH IF `RULES EFFECTIVE DATE` AT LEAST `the 2024 rate change` THEN 9
+           OTHERWISE  IF   `the transitional relief applies`
+                      THEN 0
+                      ELSE `no GST rate exists before commencement`

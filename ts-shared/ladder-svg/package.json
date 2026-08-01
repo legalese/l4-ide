@@ -17,6 +17,7 @@
     "test": "tsx --test test/*.test.ts",
     "demo": "tsx demo/s415.ts",
     "demo:implies": "tsx demo/implies.ts",
+    "demo:regcf": "tsx demo/regcf.ts",
     "standalone": "bash standalone/build.sh",
     "playground": "node standalone/serve.mjs"
   },

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3027" height="185" viewBox="0 0 3027 185">
+<rect width="3027" height="185" fill="#ffffff"/>
+<text x="376.8" y="86.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(a) Exemption. An issuer may offer or sell securities in reliance</text>
+<text x="376.8" y="106.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">on section 4(a)(6) of the Securities Act of 1933, provided that:</text>
+<rect data-fnid="4" data-value="4" class="lad-box lad-clickable" x="687.6" y="72.8" width="263.2" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<text data-fnid="4" x="819.2" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`issuer is eligible` OF issuer</text>
+<rect data-fnid="6" data-value="6" class="lad-box lad-clickable" x="994.8" y="72.8" width="427.8" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<text data-fnid="6" x="1208.7" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`offering is within the offering limit` OF offering</text>
+<rect data-fnid="8" data-value="8" class="lad-box lad-clickable" x="1466.6" y="72.8" width="506.2" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<text data-fnid="8" x="1719.8" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`investor is within the investment limit` OF investor, amount</text>
+<rect data-fnid="10" data-value="10" class="lad-box lad-clickable" x="2016.9" y="72.8" width="412.2" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<text data-fnid="10" x="2223.0" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`intermediary obligations are met` OF arrangement</text>
+<rect data-fnid="12" data-value="12" class="lad-box lad-clickable" x="2473.0" y="72.8" width="443.5" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<text data-fnid="12" x="2694.8" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`disclosure requirements are met` OF filing, offering</text>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="643.6,92.6 687.6,92.6" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="950.8,92.6 994.8,92.6" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="1422.6,92.6 1466.6,92.6" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="1972.9,92.6 2016.9,92.6" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="2429.0,92.6 2473.0,92.6" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="110.0,92.6 643.6,92.6" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,92.6 110.0,92.6" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="92.6" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="2916.6,92.6 2956.6,92.6" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="2956.6" cy="92.6" r="3.5" fill="#222"/>
+</svg>

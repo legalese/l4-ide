@@ -10,6 +10,13 @@ document levelled four criticisms at DMN, three of which turned out to be false.
 
 This page is the corrective. It is organised by claim, so you can check us.
 
+> **Companion.** [A Gap Analysis of Gap Analysis](dmn-analysis-prior-art.md) goes
+> narrow and deep on one question this page only touches: **who actually detects gaps
+> and overlaps** — the standard, the TCK, the vendors, and the algorithms. It is the
+> canonical copy for that material, and it retracts one claim made in the main
+> document. Same discipline as above: it separates what was read from what was only
+> found in metadata.
+
 > **A note on the shape of this field.** The most striking finding was not any
 > single paper. It was that the pieces of this puzzle sit in **separate rooms**.
 > The decision-table verification community (Vanthienen, PROLOGA), the BDD/formal-

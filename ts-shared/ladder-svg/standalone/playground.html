@@ -138,10 +138,13 @@
       .toolbar-epi input {
         margin: 0;
       }
+      /* A pan/zoom host clips rather than scrolls, and needs a definite height —
+         `flex: 1` + `min-height: 0` gives it one inside the column. */
       #ladder {
         padding: 22px 24px;
-        overflow: auto;
+        overflow: hidden;
         flex: 1;
+        min-height: 0;
       }
       /* the epistemic banner — says, in words, what reading the picture is under */
       #epi-note {
@@ -248,6 +251,10 @@
           <button id="collapse-all" type="button">collapse all</button>
           <button id="all-true" type="button">all true</button>
           <button id="reset" type="button">reset</button>
+          <span class="grp">view</span>
+          <button id="zoom-out" type="button">−</button>
+          <button id="zoom-in" type="button">+</button>
+          <button id="fit" type="button">fit</button>
         </div>
         <!-- The two EPISTEMIC knobs. Deliberately separate controls, because they are
              independent axes: `grounding` is the Just/Nothing of the four-cell default
