@@ -4529,11 +4529,38 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Every NAMED section with its kept, non-BKM member decides — each decide
   -- assigned to its INNERMOST named §. 'topDecls' flattens the tree, so this
   -- walks the module itself; the walk is the only consumer of the nesting.
+  --
+  -- The walk collects EVERY decide and the kept/dropped filters are applied
+  -- outside, because D-SVCEMPTY's first arm needs to see a § whose entire
+  -- membership was rule-date-rebind-dropped (§15.12) — a § the kept-only
+  -- table would render indistinguishable from one that never held a decide.
   sectionTable :: [(Text, [Unique])]
   sectionTable =
-    [ (nm, [u | (c, u) <- assigns, c == i])
-    | (i, nm) <- secs
+    [ ( nm
+      , [ u
+        | (c, u) <- sectionAssigns
+        , c == i
+        , Map.member u decideByUnique
+        , not (Set.member u bkmCandidateSet)
+        ]
+      )
+    | (i, nm) <- sectionNames
     ]
+
+  -- Aligned with 'sectionTable': the same §s, membership = rebind-dropped.
+  sectionRebindDropped :: [(Text, [Unique])]
+  sectionRebindDropped =
+    [ (nm, [u | (c, u) <- sectionAssigns, c == i, Set.member u rebindDroppedSet])
+    | (i, nm) <- sectionNames
+    ]
+
+  rebindDroppedSet :: Set Unique
+  rebindDroppedSet = Set.fromList
+    [u | (u, A.DroppedRuleDateRebind) <- Map.toList popVerdict.pvDropped]
+
+  sectionAssigns :: [(Int, Unique)]
+  sectionNames   :: [(Int, Text)]
+  (sectionAssigns, sectionNames) = (assigns, secs)
    where
     MkModule _ _ topSec = modul
     (assigns, secs, _) = goSec Nothing (0 :: Int) topSec
@@ -4547,15 +4574,7 @@ lowerModule opts modul@(MkModule _ uri _) =
               in (as <> as2, ss <> ss2, i2)
             Decide _ dd ->
               let u = getUnique (decideResolved dd)
-              in ( as
-                     <> [ (c, u)
-                        | Just c <- [cur']
-                        , Map.member u decideByUnique
-                        , not (Set.member u bkmCandidateSet)
-                        ]
-                 , ss
-                 , i
-                 )
+              in (as <> [(c, u) | Just c <- [cur']], ss, i)
             _ -> (as, ss, i)
       in foldl' step ([], secs0, idx') ds
 
@@ -4714,21 +4733,28 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   -- The final service NODES, assembled from the FINISHED decisions so the
   -- emitted member lists agree with the emitted edges (lazy — nothing on the
-  -- render path reads these).
-  serviceNodes :: [DrgNode]
-  serviceNodes =
-    [ NodeService MkDecisionService
-        { dsvId             = sid
-        , dsvName           = nm
-        , dsvFeelName       = feel
-        , dsvType           = case outputs of
-            [o] -> maybe DmnAny (.dcnType) (Map.lookup o finishedById)
-            _   -> DmnAny
-        , dsvOutputs        = outputs
-        , dsvEncapsulated   = encapsulated
-        , dsvInputDecisions = inputDecisions
-        , dsvInputData      = inputDataIds
-        }
+  -- render path reads these). A struct that fails the D5/§6.3.10 guards is
+  -- returned 'Left' so D-SVCEMPTY can say so — the skip used to be silent.
+  serviceStructResults :: [Either (Text, Int, Int, Int) DrgNode]
+  serviceStructResults =
+    [ -- probe D5: a service with no outputDecision is a KIE runtime throw and
+      -- a Camunda silence; §6.3.10: at least one of encapsulated /
+      -- inputDecisions SHALL be present. A § that cannot satisfy both emits
+      -- no service — loudly, via D-SVCEMPTY's second arm.
+      if null outputs || (null encapsulated && null inputDecisions)
+        then Left (nm, length outputs, length encapsulated, length inputDecisions)
+        else Right $ NodeService MkDecisionService
+          { dsvId             = sid
+          , dsvName           = nm
+          , dsvFeelName       = feel
+          , dsvType           = case outputs of
+              [o] -> maybe DmnAny (.dcnType) (Map.lookup o finishedById)
+              _   -> DmnAny
+          , dsvOutputs        = outputs
+          , dsvEncapsulated   = encapsulated
+          , dsvInputDecisions = inputDecisions
+          , dsvInputData      = inputDataIds
+          }
     | ((_, nm, us), feel, sid) <- zip3 finalServiceStructs svcFeelNames svcIds
     , let declaredIds = [did | u <- us, Just did <- [Map.lookup u decideByUnique]]
     , let declaredSet = Set.fromList declaredIds
@@ -4766,12 +4792,15 @@ lowerModule opts modul@(MkModule _ uri _) =
             ]
     , let inputDataIds = nubOrd
             [t | dec <- memberDecs, RequiredInput t <- dec.dcnRequirements]
-    -- probe D5: a service with no outputDecision is a KIE runtime throw and a
-    -- Camunda silence; §6.3.10: at least one of encapsulated/inputDecisions
-    -- SHALL be present. A § that cannot satisfy both emits no service.
-    , not (null outputs)
-    , not (null encapsulated && null inputDecisions)
     ]
+
+  serviceNodes :: [DrgNode]
+  serviceNodes = [n | Right n <- serviceStructResults]
+
+  -- (§ name, #outputs, #encapsulated, #inputDecisions) of every guard-failing
+  -- struct, for D-SVCEMPTY's second arm.
+  svcEmptySkips :: [(Text, Int, Int, Int)]
+  svcEmptySkips = [x | Left x <- serviceStructResults]
 
   finishedById :: Map Text Decision
   finishedById = Map.fromList
@@ -4833,6 +4862,47 @@ lowerModule opts modul@(MkModule _ uri _) =
          , Set.member sid emittedServiceIds
          , i `notElem`
              [ j | (uf, j) <- Map.toList svcInvocable, not (null (qualifyingCallers uf)) ]
+         ]
+      -- D-SVCEMPTY (§15.12's companion): one code, one severity, two message
+      -- forms (D-FIXTURE's precedent). Advisory, and the Advisory ⟹ Faithful
+      -- argument is discharged in FIDELITY-SEVERITY-AXIS-SPEC.md §5.2: the
+      -- per-decision loss is already carried (Lossy) by D-RULEDATE-UNBOUND,
+      -- and a service shell is grouping metadata (D-FLAVOR-NOSERVICE's
+      -- grouping-arm precedent). Elements are named by the §'s FEEL-folded
+      -- name, never by a service id the artifact does not contain.
+      --
+      -- Arm (i): a § whose ENTIRE decide membership was rebind-dropped. The
+      -- kept-only section table renders such a § indistinguishable from one
+      -- that never held a decide, which is exactly the silence this arm ends.
+      <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` has no emitted member decisions: its "
+                <> englishCount (length droppedUs) <> " member decide(s) "
+                <> Text.intercalate ", " (map (tick . droppedNameOf) droppedUs)
+                <> " were all dropped as rule-date-rebinding (D-RULEDATE-UNBOUND, \
+                   \§15.12), so no decisionService is emitted for it")
+             "nothing an engine needs: the grouping shell had no members left to group; \
+             \the members' own loss is carried by their D-RULEDATE-UNBOUND notes"
+         | ((nm, kept), (_, droppedUs)) <- zip sectionTable sectionRebindDropped
+         , null kept
+         , not (null droppedUs)
+         ]
+      -- Arm (ii): a struct with kept members that cannot satisfy §6.3.10's
+      -- decisionService shape. This skip existed before and was silent; the
+      -- note is new, the behaviour is not.
+      <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` cannot satisfy DMN 1.3 §6.3.10's \
+              \decisionService shape — at least one output decision, and at least one \
+              \encapsulated member or input decision; this one has " <> shapeText
+                <> " — so no decisionService is emitted for it (probe D5: a service \
+                   \with no outputDecision is a KIE runtime throw and a Camunda silence)")
+             "the § as a grouping unit: its member decisions are all emitted; only the \
+             \service shell is not"
+         | (nm, nOut, _nEnc, _nInp) <- svcEmptySkips
+         , let shapeText
+                 | nOut == 0 = "no output decision"
+                 | otherwise =
+                     tshow nOut <> " output(s) but no encapsulated member and no \
+                     \input decision"
          ]
 
   emittedServiceIds :: Set Text

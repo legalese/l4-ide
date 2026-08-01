@@ -2524,6 +2524,29 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         [n.code | n <- (dmnReport drg).notes, n.element == "the fee under the 2016 rules"]
           `shouldBe` ["D-RULEDATE-UNBOUND"]
 
+    describe "D-SVCEMPTY (the un-emitted decisionService, §15.12's companion)" $ do
+      let svcEmptyDrg = do
+            src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "svc-empty-ruledate.l4")
+            pure (drgAsCli "svc-empty-ruledate.l4" src)
+
+      it "emits NO decisionService and one Advisory per un-emitted §, two message forms" $ do
+        drg <- svcEmptyDrg
+        [s | NodeService s <- drg.drgNodes] `shouldBe` []
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
+        map (.severity) ns `shouldSatisfy` all (== Advisory)
+        -- arm (i): the § whose whole membership was rebind-dropped
+        [n | n <- ns, n.element == "pinned_scenarios"] `shouldSatisfy` \arm ->
+          length arm == 1
+            && all (Text.isInfixOf "rule-date-rebinding" . (.message)) arm
+        -- arm (ii): the kept-but-shapeless § (the previously silent D5 skip)
+        [n | n <- ns, n.element == "fees"] `shouldSatisfy` \arm ->
+          length arm == 1 && all (Text.isInfixOf "6.3.10" . (.message)) arm
+        length ns `shouldBe` 2
+
+      it "never lets D-FLAVOR-NOSERVICE name a service the artifact does not contain" $ do
+        drg <- svcEmptyDrg
+        [n | n <- (dmnReport drg).notes, n.code == "D-FLAVOR-NOSERVICE"] `shouldBe` []
+
     it "carries the @ref citation into the annotation column (§15.9)" $ do
       drg <- corpusDrg
       case (decisionNamed "offering maximum in a 12-month period" drg).dcnLogic of
