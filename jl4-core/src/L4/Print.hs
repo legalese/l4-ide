@@ -4,8 +4,10 @@ import Base
 import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
+import qualified L4.Lexer as Lexer
 import L4.Print.Columnar (Cell, Grid, DittoOpts, defaultDittoOpts, renderDittoGrid)
 import L4.Syntax
+import qualified L4.TypeCheck.Environment as TCEnv
 import qualified L4.TypeCheck.Types as TC
 
 import Data.Char
@@ -153,6 +155,34 @@ conjunctCells e = case e of
       let lt = prettyLayout l
       in (lt, [Just lt, Just op, Just (prettyLayout r)])
 
+-- | 'vcat' whose line breaks cannot be flattened away.
+--
+-- Prettyprinter's 'vcat'/'vsep' separators are @FlatAlt Line _@: inside a
+-- 'group' — which 'prettyConj' and 'printLetBinding' both introduce, and which
+-- @layoutPretty (LayoutOptions Unbounded)@ always resolves in favour of the
+-- flattened branch — they collapse to nothing (or to a space), jamming keywords
+-- together: @PARTY AliceMUST deliverWITHIN 5HENCE FULFILLEDLEST BREACH@. Those
+-- newlines are load-bearing for the layout parser, so every structural break in
+-- this module uses 'hardline', which 'flatten' turns into a failure and so
+-- forces 'group' to keep the vertical rendering.
+vcatHard :: [Doc ann] -> Doc ann
+vcatHard = concatWith (\ x y -> x <> hardline <> y)
+
+-- | Builtins that survive type checking as an @App@ of their own name, but
+-- whose surface syntax is a prefix KEYWORD rather than @f OF x@. 'carameliseNode'
+-- restores the operators listed in 'L4.Desugar.builtinUnaryFunctions' (only
+-- @NOT@); FETCH and ENV are desugared the same way but are not on that list, so
+-- the printer has to recognise them here or emit @ENV OF "HOME"@, which the
+-- lexer reads as the keyword ENV followed by a stray OF.
+prefixKeywordBuiltin :: RawName -> Maybe (Doc ann)
+prefixKeywordBuiltin r
+  | t == nameText TCEnv.fetchName = Just "FETCH"
+  | t == nameText TCEnv.envName   = Just "ENV"
+  | otherwise                     = Nothing
+  where
+    t = rawNameToText r
+    nameText = rawNameToText . rawName
+
 quotedName :: Name -> Text
 quotedName n =
     renderStrict
@@ -172,24 +202,68 @@ instance LayoutPrinter Name where
 instance LayoutPrinter Resolved where
   printWithLayout r = printWithLayout (getActual r)
 
+-- | The prefix spelling of a canonical mixfix name, if this is one.
+--
+-- The type checker resolves a mixfix call site (@3 \`plus\` 5@) to the
+-- operator's CANONICAL name — the slot/keyword pattern @_ plus _@ — while the
+-- DEFINITION keeps only the head keyword (@DECIDE plus a b IS …@, which is what
+-- 'L4.Mixfix' restructures the AppForm to). Printing the canonical name at the
+-- call site therefore emits an identifier that is defined nowhere: "I could not
+-- find a definition for the identifier @`_ plus _`@".
+--
+-- The head keyword is the first maximal run of non-slot tokens: @_ plus _@ →
+-- @plus@, @_ is eligible for _@ → @is eligible for@,
+-- @myif _ mythen _ myelse _@ → @myif@, @_ percent@ → @percent@. Measured
+-- against the parser on the four shapes in @mixfix-basic.l4@: @plus OF 3, 5@,
+-- @percent OF 50@, @`is eligible for` OF "a", "b"@ and @myif OF TRUE, 42, 0@
+-- all type-check against the mixfix definitions.
+--
+-- A name that is ONLY slots (the @_@ wildcard) is left alone.
+mixfixHeadKeyword :: Text -> Maybe Text
+mixfixHeadKeyword t = case Text.words t of
+  ws | "_" `elem` ws
+     , kws@(_ : _) <- takeWhile (/= "_") (dropWhile (== "_") ws)
+     -> Just (Text.unwords kws)
+  _ -> Nothing
+
 instance LayoutPrinter RawName where
   printWithLayout = \ case
-    NormalName t -> pretty $ quoteIfNeeded t
-    QualifiedName qs t -> pretty t <+> parens ("qualified at section" <+> pretty (Text.intercalate "." $ NE.toList qs))
+    NormalName t -> pretty $ quoteIfNeeded (fromMaybe t (mixfixHeadKeyword t))
+    -- Emit the section-qualified *syntax* (@`Section A`.sharedValue@), which is
+    -- what 'L4.Parser.qualifiedName' reads back. The former rendering
+    -- (@sharedValue (qualified at section Section A)@) was a debugging gloss
+    -- that no parser accepts, so any module using a cross-section reference
+    -- printed to unparseable source.
+    QualifiedName qs t ->
+      pretty (Text.intercalate "." (fmap quoteIfNeeded (NE.toList qs) <> [quoteIfNeeded t]))
     PreDef t -> pretty $ quoteIfNeeded t
 
 instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
   printWithLayout = \ case
     Type _ -> "TYPE"
+    -- A type application's arguments are COMMA-separated, so a nested
+    -- application flattens ambiguously: `PAIR OF PAIR OF NUMBER, NUMBER, PAIR
+    -- OF NUMBER, NUMBER` re-parses as a four-argument PAIR. The source keeps
+    -- them apart with layout; on one line only brackets will do. (Measured:
+    -- `PAIR OF (PAIR OF NUMBER, NUMBER), (PAIR OF NUMBER, NUMBER)` checks.)
     TyApp _ n ps -> printWithLayout n <> case ps of
       [] -> mempty
-      params@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap printWithLayout params))
+      params@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded params))
+    -- `FUNCTION FROM … AND … TO …` needs no brackets: its separators are
+    -- keywords, not commas, so a nested application cannot run past them.
     Fun _ args ty ->
       "FUNCTION FROM" <+> hsep (punctuate (space <> "AND") (fmap printWithLayout args))
         <+> "TO" <+> printWithLayout ty
     Forall _ vals ty -> "FOR ALL" <+> hsep (punctuate (space <> "AND") (fmap printWithLayout vals))
         <+> printWithLayout ty
     InfVar _ raw uniq -> printWithLayout raw <> pretty uniq
+
+  parensIfNeeded :: LayoutPrinterWithName a => Type' a -> Doc ann
+  parensIfNeeded t = case t of
+    Type _        -> printWithLayout t
+    TyApp _ _ []  -> printWithLayout t
+    InfVar{}      -> printWithLayout t
+    _             -> surround (printWithLayout t) "(" ")"
 
 -- | Render a type for user-facing display. Residual inference variables carry a
 -- global, edit-order-dependent id (e.g. @res184@, @A3@) — the 'InfVar' instance
@@ -246,6 +320,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (OptionallyNamedType a) where
   printWithLayout = \ case
     MkOptionallyNamedType _ _ ty ->
       printWithLayout ty
+  parensIfNeeded = \ case
+    MkOptionallyNamedType _ _ ty -> parensIfNeeded ty
 
 -- | Does this type mention an inference variable?
 --
@@ -289,9 +365,10 @@ instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
       printWithLayout a <+> "IS" <+> printWithLayout ty
         <> printTypically mTypically
     MkTypedName _ a ty mTypically (Just meansExpr) ->
-      printWithLayout a <+> "IS" <+> printWithLayout ty
-        <> printTypically mTypically <> line <>
-      indent 4 ("MEANS" <+> printWithLayout meansExpr)
+      align $ vcatHard
+        [ printWithLayout a <+> "IS" <+> printWithLayout ty <> printTypically mTypically
+        , indent 4 ("MEANS" <+> printWithLayout meansExpr)
+        ]
     where
       printTypically = \ case
         Nothing -> mempty
@@ -313,7 +390,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (GivenSig a) where
   printWithLayout = \ case
     MkGivenSig _ ns -> case ns of
       [] -> mempty
-      names@(_:_) -> "GIVEN" <+> align (vsep (fmap printWithLayout names))
+      names@(_:_) -> "GIVEN" <+> align (vcatHard (fmap printWithLayout names))
 
 instance LayoutPrinterWithName a => LayoutPrinter (GivethSig a) where
   printWithLayout = \ case
@@ -322,11 +399,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (GivethSig a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
   printWithLayout = \ case
     MkDeclare _ tySig appForm tyDecl  ->
-      -- `vcat` (not `fillCat`): under the Unbounded layout `fillCat`'s
-      -- separators render empty, jamming a non-empty GIVEN signature straight
-      -- onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not re-parse.
-      -- Mirrors the Decide instance below.
-      vcat
+      -- `vcatHard` (not `fillCat`, and not `vcat`): under the Unbounded layout
+      -- `fillCat`'s separators render empty, and a plain `vcat` flattens to the
+      -- same thing inside a `group`, jamming a non-empty GIVEN signature
+      -- straight onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not
+      -- re-parse. Mirrors the Decide instance below.
+      vcatHard
         [ printWithLayout tySig
         , "DECLARE" <+> printWithLayout appForm
         , indent 2 (printWithLayout tyDecl)
@@ -345,22 +423,24 @@ instance LayoutPrinterWithName a => LayoutPrinter (AppForm a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (Aka a) where
   printWithLayout = \ case
-    MkAka _ ns -> "AKA" <+> vsep (punctuate comma $ fmap printWithLayout ns)
+    -- `hsep`, not `vsep`: the alias list is comma-separated, so a line break
+    -- between aliases would leave a dangling comma for the layout parser.
+    MkAka _ ns -> "AKA" <+> hsep (punctuate comma $ fmap printWithLayout ns)
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypeDecl a) where
   printWithLayout = \ case
     RecordDecl _ _ fields  ->
-      vcat
+      vcatHard
         [ "HAS"
-        , indent 2 (vsep (fmap printWithLayout fields))
+        , indent 2 (vcatHard (fmap printWithLayout fields))
         ]
     EnumDecl _ enums ->
-      vcat
+      vcatHard
         [ "IS ONE OF"
-        , indent 2 (vsep (fmap printWithLayout enums))
+        , indent 2 (vcatHard (fmap printWithLayout enums))
         ]
     SynonymDecl _ t ->
-      vcat
+      vcatHard
         [ "IS"
         , indent 2 (printWithLayout t)
         ]
@@ -370,14 +450,19 @@ instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
     MkConDecl _ n fields  ->
       printWithLayout n <> case fields of
         [] -> mempty
-        _:_ -> space <> "HAS" <+> vsep (punctuate comma $ fmap printWithLayout fields)
+        -- One field per line, column-aligned and WITHOUT commas. A trailing
+        -- comma is not a separator the layout parser can see past here: it is
+        -- swallowed by the preceding field's own type-argument list
+        -- (`Node HAS left IS Tree OF a,` continues `OF a, …`), which is how
+        -- `datatypes.l4` printed source the parser rejected.
+        _:_ -> space <> "HAS" <+> align (vcatHard (fmap printWithLayout fields))
 
 instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
   printWithLayout = \ case
     MkAssume _ tySig appForm ty typically ->
-      -- `vcat` (not `fillCat`): see the Declare note above — `fillCat` jams a
-      -- non-empty GIVEN signature onto `ASSUME` under the Unbounded layout.
-      vcat
+      -- `vcatHard` (not `fillCat`): see the Declare note above — `fillCat` jams
+      -- a non-empty GIVEN signature onto `ASSUME` under the Unbounded layout.
+      vcatHard
         [ printWithLayout tySig
         , "ASSUME" <+> printWithLayout appForm <> case ty of
             Nothing -> mempty
@@ -390,7 +475,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
   printWithLayout = \ case
     MkDecide ann tySig appForm expr ->
-      vcat $
+      vcatHard $
         -- Re-emit the desc annotation: its leading keywords carry the
         -- @export/@nonexhaustive flags, so a printed module must round-trip it.
         -- 'l4 batch' re-typechecks the printed source; dropping the desc
@@ -418,7 +503,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
     -- are parsed with layout ('lmany'), so they must each go on their own
     -- (indented) line for the printed directive to round-trip through the
     -- parser (e.g. for @l4 batch@'s print-and-reparse of the module).
-    Contract _ e t stmts -> vcat $
+    Contract _ e t stmts -> vcatHard $
       ("#TRACE" <+> printWithLayout e <+> "AT" <+> printWithLayout t <+> "WITH") :
       map (indent 2 . printWithLayout) stmts
     Assert _ e ->
@@ -430,10 +515,17 @@ instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
 
 instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) where
   printWithLayout = \ case
+    -- An anonymous section carries no heading, so it adds no LEVEL either: its
+    -- children stay at `i`. Incrementing here pushed every top-level `§` in the
+    -- module out to `§§` (the module's root section is the anonymous one), and
+    -- section-qualified resolution is level-sensitive — `\`Beta\`.yes` stopped
+    -- resolving in the re-emitted `cross-section-qualified-additive.l4` for
+    -- exactly this reason, and re-resolved as soon as the headings were shifted
+    -- back by one.
     (i, MkSection _ Nothing _ ds)    ->
-      vcat (map (printWithLayout . (i + 1 ,)) ds)
+      vcatHard (map (printWithLayout . (i ,)) ds)
     (i, MkSection _ name maka ds) ->
-      vcat $
+      vcatHard $
         [ pretty (replicate i '§') <+>
           case maka of
             Nothing  -> maybe mempty printWithLayout name
@@ -467,22 +559,22 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       let
         conjunction = scanAnd e
       in
-        prettyConj "AND" (fmap printWithLayout conjunction)
+        prettyConj "AND" (fmap parensIfOpenTailed conjunction)
     e@Or{} ->
       let
         disjunction = scanOr e
       in
-        prettyConj "OR" (fmap printWithLayout disjunction)
+        prettyConj "OR" (fmap parensIfOpenTailed disjunction)
     e@RAnd{} ->
       let
         conjunction = scanRAnd e
       in
-        prettyConj "RAND" (fmap printWithLayout conjunction)
+        prettyConj "RAND" (fmap parensIfOpenTailed conjunction)
     e@ROr{} ->
       let
         disjunction = scanROr e
       in
-        prettyConj "ROR" (fmap printWithLayout disjunction)
+        prettyConj "ROR" (fmap parensIfOpenTailed disjunction)
     Implies    _ e1 e2 ->
       parensIfNeeded e1 <+> "IMPLIES" <+> parensIfNeeded e2
     Equals     _ e1 e2 ->
@@ -515,46 +607,68 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       printWithLayout n
     Lam        _ given expr ->
       printWithLayout given <+> "YIELD" <+> printWithLayout expr
+    -- FETCH/ENV survive type checking as ordinary applications of their builtin
+    -- names ('L4.TypeCheck.desugarUnaryOpToFunction'), and 'carameliseNode'
+    -- only un-desugars the operators in 'builtinUnaryFunctions'. Printing them
+    -- as applications yields `ENV OF "HOME"`, but ENV and FETCH are *keywords*
+    -- with a prefix grammar, so that never re-parses.
+    App        _ n [e] | Just kw <- prefixKeywordBuiltin (rawName (getName n)) ->
+      kw <+> parensIfNeeded e
     App        _ n es -> printWithLayout n <> case es of
       [] -> mempty
       exprs@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     AppNamed   _ n namedExpr _ ->
           printWithLayout n
       <+> "WITH"
-      <+> hang 2 (align (vcat (fmap printWithLayout namedExpr)))
+      <+> align (vcatHard (fmap printWithLayout namedExpr))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
         <+> "THEN" <+> parensIfNeeded then'
         <+> "ELSE" <+> parensIfNeeded else'
+    -- `hang 2`: every arm must be indented STRICTLY past the BRANCH keyword's
+    -- own column ('L4.Parser.multiWayIf' threads that column into each
+    -- 'parseGuardedExpr'), and `hang` measures from the keyword rather than
+    -- from the enclosing nesting level, so a BRANCH nested inside another
+    -- construct still indents relative to itself.
     MultiWayIf _ conds o ->
-      vcat $
+      hang 2 $ vcatHard $
         [ "BRANCH" ]
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
     Regulative _ (MkDeonton _ p a t f l) -> prettyObligation p a t f l
+    -- One branch per line, aligned, and WITHOUT the comma separator.
+    -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
+    -- `manyLines` over comma-separated groups: continuation lines must start at
+    -- EXACTLY the first branch's column, and a comma at end of line is instead
+    -- eaten by whatever comma-list the branch body ended in (`… THEN LIST x,`
+    -- continues the LIST). That pair of facts is smucclaw/l4-ide#932.
     Consider   _ expr branches ->
-      "CONSIDER" <+> printWithLayout expr <+> hang 2 (vsep $ punctuate comma (fmap printWithLayout branches))
+      hang 2 $ vcatHard $
+        ("CONSIDER" <+> printWithLayout expr) : fmap printWithLayout branches
 
     Lit        _ lit -> printWithLayout lit
     Percent    _ expr -> parensIfNeeded expr <+> "%"
     List       _ exprs ->
       "LIST" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     Where      _ e1 decls ->
-      vcat
+      align $ vcatHard
         [ indent 2 (printWithLayout e1)
         , "WHERE"
-        , indent 2 (vsep $ fmap printWithLayout decls)
+        , indent 2 (vcatHard $ fmap printWithLayout decls)
         ]
+    -- `align`: 'L4.Parser.letInExpr' indexes the bindings and the body off the
+    -- LET keyword's own column, so an inline LET (`10 PLUS (LET …`) must indent
+    -- relative to where LET actually sits, not to the enclosing statement.
     LetIn _ decls e1 ->
-      vcat
+      align $ vcatHard
         [ "LET"
-        , indent 2 (vsep $ fmap printLetBinding decls)
+        , indent 2 (vcatHard $ fmap printLetBinding decls)
         , "IN"
         , indent 2 (printWithLayout e1)
         ]
     Event _ MkEvent {timestamp, party, action} ->
-      vcat
+      align $ vcatHard
         [ "PARTY" <+> printWithLayout party
         , "DOES" <+> printWithLayout action
         , "AT" <+> printWithLayout timestamp -- TODO: better timestamp rendering
@@ -563,8 +677,16 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "FETCH" <+> printWithLayout e
     Env _ e ->
       "ENV" <+> printWithLayout e
+    -- One argument per line, indented past POST. 'L4.Parser.postExpr' reads
+    -- each of the three as a full `indentedExpr`, and on a single line the
+    -- first one's mixfix chain swallows the other two — leaving nothing for
+    -- argument 2, which then fails against whatever follows the POST. Measured:
+    -- `POST "url" "hdr" body` on one line is rejected, the same three tokens on
+    -- their own indented lines are accepted. `parensIfNeeded` in addition,
+    -- because an application argument (`JSONENCODE OF (…)`) needs brackets.
     Post _ e1 e2 e3 ->
-      "POST" <+> printWithLayout e1 <+> printWithLayout e2 <+> printWithLayout e3
+      hang 2 $ vcatHard
+        [ "POST", parensIfNeeded e1, parensIfNeeded e2, parensIfNeeded e3 ]
     Record _ mParty cell val isOfficial mHence ->
       (if isOfficial then "COMMIT" else "RECORD")
         <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
@@ -584,21 +706,93 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "BREACH" <>
         maybe mempty (\p -> " BY" <+> printWithLayout p) mParty <>
         maybe mempty (\r -> " BECAUSE" <+> printWithLayout r) mReason
+    -- An inert element is a bare string literal in boolean position; the
+    -- type checker is what turns it into an 'Inert' node, and it will do so
+    -- again on re-parse. `...` is NOT a prefix marker for one — it is the
+    -- infix AND operator ('TEllipsis'), so the old rendering printed a binary
+    -- operator with no left operand.
     Inert _ txt _ctx ->
-      "..." <+> dquotes (pretty txt)
+      surround (pretty $ escapeStringLiteral txt) "\"" "\""
 
   parensIfNeeded :: LayoutPrinter a => Expr a -> Doc ann
   parensIfNeeded e = case e of
     Lit{} -> printWithLayout e
     App _ _ [] -> printWithLayout e
     Var{} -> printWithLayout e
+    -- A BREACH with neither BY nor BECAUSE is a single keyword, i.e. an atom.
+    Breach _ Nothing Nothing -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
+
+-- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
+-- rendering has an OPEN TAIL — a comma list, a clause list, a binding group —
+-- that would otherwise swallow the connective that follows it.
+--
+-- @issuer is eligible OF plan AND rest@ re-parses as
+-- @issuer is eligible OF (plan AND rest)@: it still parses, and then fails type
+-- checking with the arguments transposed. That was the second half of
+-- smucclaw/l4-ide#932 — @l4 batch@ on @regcf-wizard.l4@ got past the parser
+-- only to be rejected by the checker. @PARTY … MUST … WITHIN …@ is the same
+-- shape for the regulative connectives: the obligation has no closing token, so
+-- a following @ROR@ reads as another of its own clauses.
+--
+-- Everything else is CLOSED — the binary operators bracket their own operands,
+-- @NOT@/projection/postfix bind tighter than a connective, literals and
+-- variables are atoms — and the parser's precedence table reassembles the chain
+-- correctly. Bracketing those too would be safe but is pure noise in every
+-- rendering this printer feeds: evaluation traces, @#EVAL@ output, ladder
+-- labels.
+parensIfOpenTailed :: LayoutPrinterWithName a => Expr a -> Doc ann
+parensIfOpenTailed e
+  -- Classify what will be PRINTED, not what is stored: `carameliseNode` turns
+  -- `App __GEQ__ [a, b]` back into `Geq a b`, and the printer applies it before
+  -- rendering. Without it every desugared operator looks like an application
+  -- and gets brackets it does not need (`(tranche AT LEAST 1) AND …`).
+  | openTailed (carameliseNode e) = surround (printWithLayout e) "(" ")"
+  | otherwise                     = printWithLayout e
+  where
+    openTailed = \ case
+      App _ _ (_:_) -> True  -- `f OF x, y` — comma-separated, open-ended
+      AppNamed{}    -> True  -- `R WITH a IS 1` — open field list
+      Concat{}      -> True  -- comma list
+      List{}        -> True  -- comma list
+      Consider{}    -> True  -- open branch list
+      MultiWayIf{}  -> True  -- open arm list
+      IfThenElse{}  -> True  -- the ELSE branch keeps consuming
+      Regulative{}  -> True  -- open WITHIN/HENCE/LEST clause list
+      Record{}      -> True  -- open HENCE continuation
+      ReadCell{}    -> True
+      LetIn{}       -> True  -- the IN body keeps consuming
+      Where{}       -> True  -- open local-declaration block
+      Lam{}         -> True  -- the YIELD body keeps consuming
+      Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
+      Breach{}      -> True  -- open BY/BECAUSE clauses
+      -- `NOT` prints its operand bare, so it inherits the operand's tail:
+      -- `NOT f OF x AND y` would re-associate to `NOT (f OF (x AND y))`.
+      Not _ e'      -> openTailed (carameliseNode e')
+      Post{}        -> True  -- three juxtaposed arguments
+      Event{}       -> True
+      _             -> False
 
 prettyObligation
   :: (LayoutPrinter p, LayoutPrinter a, LayoutPrinter t,  LayoutPrinter f, LayoutPrinter l)
   => p -> a ->  Maybe t -> Maybe f -> Maybe l -> Doc ann
+-- | @group (hang 2 …)@: an obligation prints on ONE line whenever it can.
+--
+-- Two constraints meet here. (1) 'L4.Parser.obligation' takes the PARTY
+-- keyword's own column as the threshold for the action pattern and the
+-- WITHIN/HENCE/LEST bodies, all of which must be indented strictly past it — a
+-- plain 'vcat' put them at the ENCLOSING nesting level, a column to the LEFT of
+-- PARTY whenever the obligation is not the leftmost thing on its line (the usual
+-- case: `HENCE RECORD "a" IS TRUE HENCE PARTY P`). (2) A @#TRACE@ directive is
+-- line-oriented, so a contract expression broken across lines loses its own
+-- @AT … WITH@.
+--
+-- 'group' satisfies (2): under the Unbounded layout the flattened branch always
+-- fits, so the obligation collapses to a single well-formed line. When an
+-- operand contains a hard break of its own (a nested CONSIDER, say) flattening
+-- fails and 'hang' satisfies (1) by indenting relative to PARTY.
 prettyObligation p a t f l =
-  vcat $
+  Prettyprinter.group $ hang 2 $ vsep $
     [ "PARTY" <+> printWithLayout p
     , printWithLayout a
     ]
@@ -606,8 +800,17 @@ prettyObligation p a t f l =
     <> mprint "HENCE" f
     <> mprint "LEST" l
 
+-- | @WITHIN@/@HENCE@/@LEST@ bodies are bracketed via 'parensIfNeeded'.
+--
+-- A nested obligation in a HENCE slot has no closing token, so its own optional
+-- HENCE/LEST clauses swallow the OUTER obligation's: printing
+-- @HENCE PARTY Bob MUST deliver WITHIN 10@ followed by the outer @LEST@ makes
+-- the inner obligation consume that LEST and then fail on its indentation. The
+-- corpus writes these parenthesised for the same reason
+-- (@HENCE (PARTY Bob MUST deliver WITHIN 10)@). Atoms — @FULFILLED@, a
+-- deadline literal — are left bare by 'parensIfNeeded'.
 mprint :: (Foldable t, LayoutPrinter a) => Doc ann -> t a -> [Doc ann]
-mprint kw = foldMap \x -> [kw <+> printWithLayout x]
+mprint kw = foldMap \x -> [kw <+> parensIfNeeded x]
 
 instance LayoutPrinterWithName n => LayoutPrinter (RAction n) where
   printWithLayout MkAction {modal, action, provided} = hsep $
@@ -657,12 +860,28 @@ instance LayoutPrinterWithName a => LayoutPrinter (Branch a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Pattern a) where
   printWithLayout = \ case
     PatVar _ n -> printWithLayout n
-    PatApp _ n pats -> printWithLayout n <> hang 2 case pats of
+    -- `hsep`, not `vsep`: under the Unbounded layout `vsep` always breaks, and
+    -- a constructor pattern's arguments then land at the enclosing nesting
+    -- level — to the left of the column 'L4.Parser.indentedPattern' demands.
+    -- Pattern arguments are juxtaposed atoms; one line is always well-formed.
+    --
+    -- `parensIfNeeded` on the arguments: constructor application in a pattern
+    -- is juxtaposition, so `PAIR (PAIR a b) (PAIR c d)` flattened to
+    -- `PAIR PAIR a b PAIR c d` still parses — as a six-argument application of
+    -- PAIR, which then fails arity checking. The corpus writes the brackets.
+    PatApp _ n pats -> printWithLayout n <> case pats of
       [] -> mempty
-      pats'@(_:_) -> space <> vsep (fmap printWithLayout pats')
-    PatCons _ patHead patTail -> printWithLayout patHead <+> "FOLLOWED BY" <+> printWithLayout patTail
+      pats'@(_:_) -> space <> hsep (fmap parensIfNeeded pats')
+    PatCons _ patHead patTail -> parensIfNeeded patHead <+> "FOLLOWED BY" <+> parensIfNeeded patTail
     PatExpr _ expr -> "EXACTLY" <+> printWithLayout expr
     PatLit _ lit -> printWithLayout lit
+
+  parensIfNeeded :: LayoutPrinterWithName a => Pattern a -> Doc ann
+  parensIfNeeded p = case p of
+    PatVar{}      -> printWithLayout p
+    PatLit{}      -> printWithLayout p
+    PatApp _ _ [] -> printWithLayout p
+    _             -> surround (printWithLayout p) "(" ")"
 
 instance LayoutPrinter Nlg where
   printWithLayout = \ case
@@ -888,12 +1107,26 @@ quoteIfNeeded n = case Text.uncons n of
     -- If the identifier doesn't start with alpha, it must be quoted
     -- (L4 lexer requires unquoted identifiers to start with alphabetic char)
     | not (isAlpha firstChar) -> quote n
+    -- A bare word that spells a reserved word lexes as that KEYWORD, not as a
+    -- name. The prelude's set-difference operator is literally named `LESS`
+    -- (the first word of `LESS THAN`) and its source spells it with backticks
+    -- for exactly this reason; dropping them printed `DECIDE LESS p q IS`,
+    -- which the parser rejects with "unexpected LESS, expecting identifier".
+    | Map.member n Lexer.keywords && n `notElem` keywordsUsableAsNames -> quote n
     -- Otherwise check if all chars are valid identifier chars
     | Text.all isIdentChar n -> n
     | otherwise -> quote n
   where
     -- Match lexer: identifiers can contain alphanumeric chars and underscores
     isIdentChar x = isAlphaNum x || x == '_'
+
+-- | Keywords the grammar ALSO accepts in name position, so they need no
+-- backticks. There is exactly one: 'L4.Parser.tyApp' reads a type head with
+-- @tokenAsName (TKeywords TKList) <|> name@, which is why every corpus type is
+-- spelled @LIST OF NUMBER@ and not @`LIST` OF NUMBER@. Grep 'tokenAsName' in
+-- the parser before adding to this list.
+keywordsUsableAsNames :: [Text.Text]
+keywordsUsableAsNames = ["LIST"]
 
 quote :: Text.Text -> Text.Text
 quote n = "`" <> n <> "`"

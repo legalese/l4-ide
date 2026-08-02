@@ -113,6 +113,28 @@ looked at is how a wrong answer becomes the expected answer.
 > now runs in CI on every event with no filter and no build, and names the missing files. If you are
 > reading this because that check failed, it has done its job.
 
+### 3.2 There are TWO printers, and they are guarded differently
+
+| printer                 | what it prints                       | its guard                                                  |
+| ----------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `Rules.ExactPrint`      | the concrete tokens, byte-for-byte   | `exactprint identity`, plus the per-file `*.ep.golden`     |
+| `L4.Print.prettyLayout` | the AST, re-rendered as fresh source | `prettyLayout round-trip (filter -> print -> parse; #932)` |
+
+`prettyLayout` is what **`l4 batch` and the REPL** re-emit a module through (`filterIdeDirectives`
+then print then re-run the front end), and what the DMN exporter falls back to for an expression it
+cannot lower. It used to have no test of its own at all, which is how it accumulated a printer that
+could not render its own corpus back into parseable source (smucclaw/l4-ide#932).
+
+The round-trip block in `jl4/tests/Main.hs` runs over **every file the golden suite type-checks** —
+`ok/**`, `legal/**` and `jl4-core/libraries/*.l4`, 299 files — and asserts three things per file:
+no inference-variable gensym reaches the output, the printed text re-parses, and the printed text
+re-type-checks. **There are no exclusions and no known-failure list**; if you need one, that is the
+signal to fix the printer instead.
+
+Debugging it: the output is thousands of columns wide, so set `JL4_PRETTY_DUMP_DIR=<dir>` and the
+whole emitted module is written to `<dir>/<name>.l4.pl.l4` — a plain `.l4` file you can run
+`l4 check` on.
+
 ---
 
 ## 4. Recording decisions

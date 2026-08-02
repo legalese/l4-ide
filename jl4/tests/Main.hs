@@ -3,6 +3,7 @@ module Main (main) where
 
 import Base
 import Control.Monad.Trans.Maybe
+import Data.Char (isAlphaNum)
 import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.List as List
@@ -16,7 +17,10 @@ import qualified L4.Export as Export
 import L4.JsonSchema (SchemaContext (..))
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
+import L4.DirectiveFilter (filterIdeDirectives)
+import L4.Parser (execProgramParserWithHintPass)
 import qualified L4.Parser.SrcSpan as JL4
+import L4.Print (prettyLayout)
 import L4.Syntax
 import qualified L4.TypeCheck as JL4
 
@@ -34,6 +38,7 @@ import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
 import Test.Hspec
+import Text.Read (readMaybe)
 import Test.Hspec.Golden
 import qualified Regex.Text as RE
 import qualified Data.CharSet as CharSet
@@ -106,6 +111,17 @@ main = do
       forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ExactPrintIdentity evalConfig inputFile
+    -- Invariant: the *other* printer round-trips too. `l4 batch` (and the REPL)
+    -- reconstruct a module by running the typechecked AST through
+    -- 'filterIdeDirectives' and 'prettyLayout', then re-parsing the result; if
+    -- that text does not parse, the command fails before it evaluates anything
+    -- (smucclaw/l4-ide#932). Unlike exactprint this path has no golden at all,
+    -- so it is asserted as a property over the whole corpus rather than on a
+    -- fixture: exactly the files the "ok files" block typechecks.
+    describe "prettyLayout round-trip (filter -> print -> parse; #932)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4PrettyLayoutRoundTrip evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
@@ -222,6 +238,109 @@ jl4ExactPrintIdentity evalConfig inputFile = do
           "\n  first difference at line " <> show i
             <> "\n  source:    " <> show s
             <> "\n  exactprint:" <> show o
+
+-- | Assert @parse (prettyLayout (filterIdeDirectives (typecheck f)))@ succeeds:
+-- the AST pretty-printer emits source the layout parser accepts. This is the
+-- exact pipeline of @jl4/app/L4/Cli/Batch.hs@ (typecheck, filter, print, write
+-- the text to @<file>.batchN.l4@, re-run the front end on it), so a failure here
+-- is a failure of @l4 batch@ on that file. We stop at the parser because the
+-- reported defect is a parser diagnostic; a stricter re-typecheck would fold in
+-- unrelated name-resolution questions.
+jl4PrettyLayoutRoundTrip :: JL4Lazy.EvalConfig -> FilePath -> IO ()
+jl4PrettyLayoutRoundTrip evalConfig inputFile = do
+  (errs, mtc) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+  case mtc of
+    Nothing ->
+      expectationFailure $
+        "typecheck produced no module for " <> inputFile <> ":\n"
+          <> Text.unpack (Text.unlines errs)
+    Just tc -> do
+      let printed = prettyLayout (filterIdeDirectives tc.module')
+          printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
+      -- Debugging affordance: prettyLayout output for a corpus module runs to
+      -- thousands of columns, so the inline excerpt below is rarely enough to
+      -- diagnose a layout failure. Point JL4_PRETTY_DUMP_DIR at a scratch
+      -- directory to get the whole emitted module written out for inspection
+      -- (it is then a plain .l4 file you can run `l4 check` on).
+      mDump <- lookupEnv "JL4_PRETTY_DUMP_DIR"
+      for_ mDump $ \d ->
+        Text.writeFile (d </> takeFileName inputFile <> ".pl.l4") printed
+      -- No gensym may reach the output. Every inference variable in the
+      -- type-checked module is rendered exactly as `seed <> uniq` by the
+      -- 'Type'' printer, so we can name the forbidden strings precisely rather
+      -- than pattern-matching on "looks like an identifier ending in digits" —
+      -- which would false-positive on `identity1`, `const1a`, `s24`.
+      let leaked = leakedInfVars tc.module' printed
+      unless (null leaked) $
+        expectationFailure $
+          "prettyLayout leaked an inference variable (gensym) for " <> inputFile
+            <> "\n--- leaked ---\n"
+            <> unlines [ "  " <> Text.unpack v | v <- leaked ]
+      case execProgramParserWithHintPass printUri printed of
+        Left perrs ->
+          expectationFailure $
+            "prettyLayout output did NOT re-parse for " <> inputFile
+              <> "\n--- parser errors ---\n"
+              <> show perrs
+              <> "\n--- printed (offending lines) ---\n"
+              <> Text.unpack (offending printed perrs)
+        -- Parsing is necessary but not sufficient: `l4 batch` re-runs the whole
+        -- front end on the printed text, and a printer that drops brackets can
+        -- produce source that parses into a DIFFERENT tree. (`f OF x AND y`
+        -- re-parses as `f OF (x AND y)`.) So the printed module must also
+        -- type-check, from the ORIGINAL file's directory, exactly as batch
+        -- places its `<file>.batchN.l4`.
+        Right _ -> do
+          let virtualPath = inputFile <> ".prettylayout.l4"
+          (errs2, mtc2) <- oneshotL4ActionAndErrors evalConfig virtualPath \_nfp -> do
+            let uri2 = normalizedFilePathToUri (toNormalizedFilePath virtualPath)
+            _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) printed
+            Shake.use Rules.SuccessfulTypeCheck uri2
+          case mtc2 of
+            Just tc2 | tc2.success -> pure ()
+            _ ->
+              expectationFailure $
+                "prettyLayout output re-parsed but did NOT type-check for " <> inputFile
+                  <> "\n--- checker errors ---\n"
+                  <> Text.unpack (Text.unlines (map sanitizeFilePaths errs2))
+  where
+    -- Show only the lines the parser complained about (plus one of context);
+    -- prettyLayout output for a corpus module is thousands of columns wide.
+    offending printed perrs =
+      let ls    = zip [1 :: Int ..] (Text.lines printed)
+          rows  = [ r | r <- errorRows (show perrs), r > 0 ]
+          keep  = [ (i, l) | (i, l) <- ls
+                  , any (\r -> i >= r - contextBefore && i <= r + contextAfter) rows ]
+          shown = if null keep then take 5 ls else keep
+      in Text.unlines [ Text.pack (show i) <> " | " <> Text.take 400 l | (i, l) <- shown ]
+    contextBefore = 18 :: Int
+    contextAfter  = 3 :: Int
+    -- Pull "line N" style row numbers out of the rendered error; a miss just
+    -- means we print the head of the document instead.
+    errorRows s =
+      [ n | w <- words (map (\c -> if c `elem` (":,()" :: String) then ' ' else c) s)
+          , Just n <- [readMaybe w] ]
+
+-- | The renderings of every inference variable in @m@ that occur as a whole
+-- token in @printed@.
+--
+-- 'L4.Print' renders @InfVar _ raw uniq@ as @raw <> uniq@; that is the exact
+-- string we forbid. Word-boundary matching keeps a legitimate identifier that
+-- merely ends in the same characters from counting (and, conversely, catches a
+-- gensym wherever it appears — binder annotation, GIVETH, nested type).
+leakedInfVars :: Module Resolved -> Text -> [Text]
+leakedInfVars m printed =
+  List.nub [ v | v <- renderings, v `elem` tokens ]
+  where
+    renderings =
+      [ rawNameToText raw <> Text.pack (show uniq)
+      | InfVar _ raw uniq <- toListOf (gplate @(Type' Resolved)) m
+      ]
+    tokens = Text.split (not . isTokenChar) printed
+    isTokenChar c = isAlphaNum c || c == '_'
 
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
