@@ -2363,6 +2363,123 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
 
         LogicContext _ -> expectationFailure "unexpected boxed context"
+
+    -- The OTHER date constructor (§15.4). `daydate.l4`:79-100 documents
+    -- `YMD y m d` as the recommended spelling for new code -- ISO order, and it
+    -- REFUSES an out-of-range component where `Date` silently rolls one -- and
+    -- the exporter used to punish exactly that: the recommended spelling
+    -- emitted raw L4 no engine can parse, where `Date d m y` for the same day
+    -- emitted `date("YYYY-MM-DD")`. `ymd-dates.l4` is the positive exhibit and
+    -- `not-ok/ymd-unfoldable-date.l4` is its negative control; these tests pin
+    -- the seam between them, which is a CALENDAR, not a range check.
+    describe "the YMD date-literal fold (§15.4)" $ do
+      let dayDrg body =
+            drgOf ("IMPORT daydate\nGIVETH A DATE\n`the day` MEANS " <> body <> "\n")
+          -- The rendered body, and the D-LITERALEXPR note keyed on it. Both,
+          -- always: a fold that changed the text without moving the severity
+          -- (or the reverse) would be half a repair, and the severity is what
+          -- 'literalFallback' derives FROM the fragment.
+          dayIs body feel = do
+            let drg = dayDrg body
+            case (decisionNamed "the day" drg).dcnLogic of
+              LogicLiteral e -> do
+                e.feText `shouldBe` feel
+                e.feFragment `shouldBe` SFeel
+              _ -> expectationFailure ("expected a boxed literal for: " <> Text.unpack body)
+            [n.severity | n <- (dmnReport drg).notes, n.code == "D-LITERALEXPR"]
+              `shouldBe` [Advisory]
+          dayRefuses body = do
+            let drg = dayDrg body
+            case (decisionNamed "the day" drg).dcnLogic of
+              LogicLiteral e -> do
+                e.feFragment `shouldBe` L4Verbatim
+                e.feText `shouldSatisfy` Text.isInfixOf "YMD"
+              _ -> expectationFailure ("expected a boxed literal for: " <> Text.unpack body)
+            [n.severity | n <- (dmnReport drg).notes, n.code == "D-LITERALEXPR"]
+              `shouldBe` [Blocking]
+
+      it "folds a YMD literal to a FEEL date, and drops to Advisory in doing so" $
+        dayIs "YMD 1983 1 1" "date(\"1983-01-01\")"
+
+      -- THE argument-order regression guard, and it is deliberately one test
+      -- rather than two: `Date` is little-endian and `YMD` is big-endian, so a
+      -- transposed arm in 'foldDateLiteral' would be silent unless the two
+      -- spellings of ONE day are asserted to agree. 2024-01-02 is chosen
+      -- because every component is a plausible day AND a plausible month.
+      it "reads YMD big-endian where Date is little-endian (same day, both ways)" $ do
+        dayIs "YMD 2024 1 2"  "date(\"2024-01-02\")"
+        dayIs "Date 2 1 2024" "date(\"2024-01-02\")"
+
+      -- A leap day is the cheapest proof the fold consults a calendar rather
+      -- than range-checking three numbers: 2024 was a leap year and 2023 was
+      -- not, and nothing about the digits says so.
+      it "folds a real leap day and refuses one that is not (a calendar, not a range)" $ do
+        dayIs "YMD 2024 2 29" "date(\"2024-02-29\")"
+        dayRefuses "YMD 2023 2 29"
+
+      -- The transposition ISO order exists to make visible. A fold that
+      -- range-checked `m` and `d` independently, or read the arguments in
+      -- `Date`'s order, would accept this as 2026-07-28.
+      it "refuses a day/month transposition rather than repairing it" $
+        dayRefuses "YMD 2026 28 7"
+
+      -- Unchanged, and correct: the fold is a LITERAL recogniser, so a
+      -- computed component has nothing to fold and evaluating it would be the
+      -- exporter running the program. Same treatment `Date 1 (month PLUS 6)
+      -- year` -- the idiom date arithmetic is written in -- already gets.
+      it "refuses a computed component" $
+        dayRefuses "YMD (1983 PLUS 40) 1 1"
+
+      it "keeps all three refusals in the negative fixture Blocking" $ do
+        drg <- notOkDrg "ymd-unfoldable-date.l4"
+        -- The OTHER notes on this fixture are D-INERT x3 and D-SVCEMPTY, which
+        -- are facts about a three-constant module with no consumers and not
+        -- about the fold; asserting on them here would make this test fail for
+        -- reasons it is not about.
+        [n.severity | n <- (dmnReport drg).notes, n.code == "D-LITERALEXPR"]
+          `shouldBe` replicate 3 Blocking
+        [n.severity | n <- (dmnReport drg).notes, n.severity == Blocking]
+          `shouldBe` replicate 3 Blocking
+        for_ ["the anniversary", "the impossible day", "the transposed day"] \nm ->
+          case (decisionNamed nm drg).dcnLogic of
+            LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
+            _ -> expectationFailure (Text.unpack nm <> " was not a boxed literal")
+
+      -- The WIDENING half, and the part that needed deliberate sign-off: a
+      -- `YMD`-dated law-time chain used to be a Blocking D-DATEDCHAIN with a
+      -- boolean-column fallback, and is now a UNIQUE interval table. Both arm
+      -- spellings are exercised -- `the transition day` is a NAMED constant
+      -- (the `tcDateConstants` hop, which only populates because nullary `YMD`
+      -- bodies now fold) and `YMD 1983 1 1` is a bare literal (the fold
+      -- itself).
+      it "lowers a YMD-dated law-time chain to a UNIQUE interval table" $ do
+        src <- Text.readFile (examplesRoot </> "dmn" </> "ymd-dates.l4")
+        let drg = drgAsCli "ymd-dates.l4" src
+        [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"] `shouldBe` []
+        case (decisionNamed "the filing fee" drg).dcnLogic of
+          LogicTable t -> do
+            t.dtHitPolicy `shouldBe` HitUnique
+            map (.icType) t.dtInputs `shouldBe` [DmnDate]
+            map (renderUnaryTest . headTest) t.dtRules `shouldBe`
+              [ ">= date(\"2026-01-01\")"
+              , "[date(\"1983-01-01\")..date(\"2026-01-01\"))"
+              , "< date(\"1983-01-01\")"
+              ]
+          _ -> expectationFailure "the YMD-dated chain did not become a table"
+        -- ...and the same three days as ORDINARY cell endpoints, off an input
+        -- date rather than the rule date.
+        case (decisionNamed "the regime that applies" drg).dcnLogic of
+          LogicTable t ->
+            map (renderUnaryTest . headTest) t.dtRules `shouldBe`
+              [ ">= date(\"2026-01-01\")"
+              , ">= date(\"2024-02-29\")"
+              , ">= date(\"1983-01-01\")"
+              , "-"
+              ]
+          _ -> expectationFailure "the input-date chain did not become a table"
+        -- The whole point of the exhibit: nothing in it is Blocking any more.
+        [n | n <- (dmnReport drg).notes, n.severity == Blocking] `shouldBe` []
+
     it "refuses duplicate dates by the same predicate (R10)" $ do
       drg <- notOkDrg "dated-chain-duplicate-date.l4"
       let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
@@ -3644,7 +3761,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 -- the corpus, @Regulation Crowdfunding (17 CFR Part 227)@ in this table, and
 -- @regcf@ from the CLI.
 --
--- Four subjects, and the difference between them is the whole point:
+-- The difference between the subjects is the whole point. The first three are
+-- described here; every subject added since carries its rationale at its own
+-- entry in the list below, which is where a new one should go too. (This
+-- paragraph said "Four subjects" while the list held more than twice that,
+-- which is how a reader learns to stop trusting a header.)
 --
 -- * @dmn\/reg-cf.l4@ is the SHAPE exhibit — five decisions chosen so the
 --   goldens show every outcome the exporter has, written module-level-scalar
@@ -3658,7 +3779,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 --   code. Both lower to a single-column @UNIQUE@ table over
 --   @RULES_EFFECTIVE_DATE@ with half-open date intervals, plus one downstream
 --   arithmetic decision so a date is shown driving a number driving a number.
---   It is the only subject with an engine leg whose cases FEED DATES.
+--   It and @dmn\/ymd-dates.l4@ are the subjects whose engine cases FEED DATES;
+--   they divide the date surface between them, this one by CONSTRUCTOR
+--   (@Date d m y@) and that one by the other constructor (@YMD y m d@).
 -- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
 --   decisions since the rule-version axis landed — written
 --   in the house @GIVEN@ + record style. It is here to be honest about what
@@ -3724,6 +3847,17 @@ goldenSubjects =
   , ( "dmn" </> "deontic-verdict.l4"
     , "deontic-verdict"
     , "the deontic-verdict exhibit"
+    )
+    -- The DATE-LITERAL exhibit (§15.4): `YMD y m d`, which `daydate.l4`
+    -- recommends for new code, in all three positions a folded date literal
+    -- can occupy -- a boxed literal body, a decision-table cell endpoint, and
+    -- a law-time interval endpoint. Its negative control is deliberately a
+    -- SEPARATE, non-golden fixture (`not-ok/ymd-unfoldable-date.l4`): a raw-L4
+    -- <literalExpression> makes zeebe-dmn refuse to parse the whole file, so a
+    -- module cannot both carry an unfoldable date and run on both engines.
+  , ( "dmn" </> "ymd-dates.l4"
+    , "ymd-dates"
+    , "the date-literal exhibit"
     )
   ]
 
