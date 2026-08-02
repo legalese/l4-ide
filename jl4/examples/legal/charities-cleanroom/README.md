@@ -253,3 +253,47 @@ What follows from that, honestly stated:
   leak to plug.
 
 Beyond that item, the encoding is independent.
+
+### Independent audit of that declaration, 2026-08-03
+
+A declaration of independence written by the party claiming it is a claim to check, not to trust.
+It was checked three ways, by a later agent, and it holds. **Verdict: INDEPENDENT.**
+
+**1. Tool-log audit — the encoding agent's complete transcript.** Its own session record
+(`subagents/workflows/wf_9cf770c9-fb4/agent-af5e8f039ecc93e14.jsonl`) contains 1 `Skill`, 1
+`WebFetch`, 1 `Read`, 29 `Bash`, 3 `Write` and 3 `Edit` calls, and nothing else. Enumerated in full,
+**not one of them names a path matching `*charit*` other than this directory** — no
+`paper/case-studies/`, no `jl4/experiments/jerseyCharities*`, no `part-3-charity-test.l4`, and no
+repo-wide grep or find for charity terms. Its only reads outside its own output are
+`regcf.l4` (a different statute, for house style), `prelude.l4` (for `all`/`any`), and
+`drafting-patterns.md`. Its only network fetches are two to `jerseylaw.je`. The single `Read` is
+`drafting-patterns.md`, matching the disclosure above; that file's only mentions of the corpus are
+two references to `part-6-use-of-terms.l4`, and it says nothing about Part 3.
+
+**2. Identifier audit — mechanical, both files.** `charity-test.l4` declares 175 distinct
+backticked identifiers, `part-3-charity-test.l4` declares 92. **Exactly four are shared**, and every
+one of the four is forced: `..` and `...` (the house-style OR/AND sugar), `all` (a prelude builtin),
+and `` `the advancement of education` `` (Art 6(1)(b) verbatim). **Zero unforced identifiers
+coincide.** Fuzzy comparison of the two files' comment prose returns 38 pairs above 0.62 similarity
+and every one is driven by shared _quotation of the statute_; the only shared analytical vocabulary
+is "gates" and "deems", applied to different provisions under taxonomies of different arity (the
+corpus's is two-way and puts (2)(e) in it; the cleanroom's is three-way and excludes it).
+
+**3. Behavioural audit.** The §8 diff oracle's four divergences (`COMPARISON.md` §1.3) include one,
+D1, on which the corpus takes the more obvious reading of Art 6(2)(e) and the cleanroom refuses it.
+A contaminated encoding does not disagree with its source at the point where the source is easier to
+believe.
+
+**Also re-measured, unchanged:** `l4 check` → exit 0, "Check succeeded."; `l4 run` → 102
+`#ASSERT`s, 102 evaluations, 102 `assertion satisfied`, 0 failed, 0 diagnostics above
+Information. Every one of the 62 statutory strings quoted inline in `charity-test.l4`, and all 80
+blockquote paragraphs in `SOURCE-EXTRACT.md`, were matched verbatim against a **fresh independent
+fetch** of `jerseylaw.je/laws/current/l_41_2014` (HTTP 200, 524 973 bytes — the same byte count the
+encoding agent recorded). **No fabricated quotation was found.** The §4 warning that `l4 run` exits
+0 with failing assertions was reproduced on a fresh mutant of the Art 6(1) disjunction (one `..`
+changed to `...`): exit 0, 91 satisfied, **11 failed**.
+
+**Two defects found and fixed forward**, neither affecting a result: `SOURCE-EXTRACT.md` §2 now
+records that `charity-test.l4` quotes only a subset of Art 2(4)/(6)/(7)'s limbs, which the module
+did not say; and `COMPARISON.md`'s fingerprint row 6 counted "carve-out" across four cleanroom files
+against one corpus file, and now states both denominators (9 vs 0 file-for-file).

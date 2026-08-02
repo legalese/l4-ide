@@ -62,6 +62,15 @@ not been textually amended. This matters for §"Temporal axis" in the README.
 
 ## Article 2 — Definition of entity and related terms (extract: paragraphs (4), (6), (7))
 
+Each paragraph is reproduced **in full** below. `charity-test.l4` carries only a **subset** of the
+limbs inline, and the elision is not marked there, so it is recorded here: 2(4) quotes (a), (d),
+(e), (g) of (a)–(g); 2(6) quotes (c), (d) of (a)–(d); 2(7) quotes (a), (b), (c), (e) of (a)–(e).
+Every limb the module does quote is verbatim; the omitted limbs are the vehicle types its scenarios
+do not exercise — court-approved fidéicommis, incorporated 1862 association, statutory body
+corporate, and relevant unincorporated entity. Since Article 2's dispatch fixes only _which_
+document or person the defined term picks out, and never varies the charity test's logic, the
+omission changes no answer; but a reader of the module alone would not know the lists were cut.
+
 ### 2(4) — "constitution"
 
 > (4) In this Law, unless the context otherwise requires, "constitution" in relation to an entity
