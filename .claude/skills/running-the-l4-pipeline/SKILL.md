@@ -34,11 +34,12 @@ Reach for this skill when the user wants to:
 
 1. **Run the demo** — "⟨body of law⟩: go" ("SEC Regulation Crowdfunding: go" is the historical example). That is a milestone-G1 replay run against the subject's committed corpus.
 2. **Resume an interrupted run** — a usage limit, a killed terminal, a machine that went to sleep. Re-entry is a digest comparison, not a memory, and every stage whose inputs are unchanged replays instead of re-running.
-3. **Understand a verdict** — what `G1 COMPLETE` means when nine of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
-4. **Grant or waive a human gate** — HG1 before the projections, HG2 before anything outward-facing.
-5. **Audit a run somebody else did** — recompute every verdict from the committed artifacts, with no build, no model and no network.
+3. **Run the de novo path** — "encode ⟨body of law⟩ from source". That is milestone G2: you fetch, sweep, encode and fork; the stages validate what you deposited. See [the G2 runbook](#the-g2-runbook--the-de-novo-path).
+4. **Understand a verdict** — what `G1 COMPLETE` means when nine of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
+5. **Grant or waive a human gate** — HG1 before the projections, HG2 before anything outward-facing.
+6. **Audit a run somebody else did** — recompute every verdict from the committed artifacts, with no build, no model and no network.
 
-It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative rules, choosing between `IS`/`MEANS`/`IF` — that is [`writing-l4-rules`](../writing-l4-rules/SKILL.md), and this pipeline's de novo encode stage is not built yet anyway. It is also the wrong tool for a one-off projection: if you want a single DMN out of a single file, run `l4 export` directly and skip all of this.
+It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative rules, choosing between `IS`/`MEANS`/`IF` — that is [`writing-l4-rules`](../writing-l4-rules/SKILL.md). This pipeline's de novo encode stage does not write L4 either; it checks the module you deposited (see the G2 runbook). It is also the wrong tool for a one-off projection: if you want a single DMN out of a single file, run `l4 export` directly and skip all of this.
 
 ---
 
@@ -167,7 +168,9 @@ node etc/go/lib/register-validate.mjs <fork-register|external-modifications|sour
 node etc/go/lib/register-validate.mjs --rules <schema>
 ```
 
-G2 work deposits three registers — the source bundle (P1), the external-modification register (P2), the fork register (P4) — and you write them, because no stage does. Their formats live in `specs/todo/single-instruction-demo/schemas/` and this validator is their oracle. Give it the peer files and the cross-file joins run; withhold one and the joins that needed it print `skip` with a reason rather than passing quietly. Fixtures under `schemas/fixtures/` show a valid and an invalid instance of each. Validate before you report anything about a register: several of the schemas' rules exist because one careful human sweep got them wrong.
+G2 work deposits three registers — the source bundle (P1), the external-modification register (P2), the fork register (P4) — and **you write them, because no stage does**. Their formats live in `specs/todo/single-instruction-demo/schemas/` and this validator is their oracle. Give it the peer files and the cross-file joins run; withhold one and the joins that needed it print `skip` with a reason rather than passing quietly. Fixtures under `schemas/fixtures/` show a valid and an invalid instance of each. Validate before you report anything about a register: several of the schemas' rules exist because one careful human sweep got them wrong.
+
+Calling this validator by hand is the fast inner loop. The **fact** is the receipt the stage writes — see the G2 runbook below.
 
 ### 10. Diff a de novo encoding against the corpus (G2 acceptance)
 
@@ -178,6 +181,86 @@ node etc/go/lib/denovo-diff.mjs run --map <surface-map.json> --out <dir>
 SPEC.md §8's comparator. It compares two encodings by **what they answer**, never by their text, over a battery seeded from the subject's cases file and perturbed one field at a time. You write the surface map — the declared pairing of decisions and fact slots, schema and fixture in the same `schemas/` directory — and the oracle's job is to disagree with your declaration behaviourally. Exit `1` means it found a divergence, which under §8 is the **better** result, not a failure.
 
 Two things it will not do for you. It **never triages** — every witness reads `UNTRIAGED`, and deciding whether a divergence is an encoding error, a genuine ambiguity or an improvement over the hand corpus is yours. And it cannot tell you about surface it never moved: read the report's **Sensitivity** table with its agreement counts, because a (pair, fact) leaf that was perturbed without ever changing an answer is one where agreement is silence, not evidence. Design and limits: `specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md`.
+
+---
+
+## The G2 runbook — the de novo path
+
+**The shape of every step below is the same: you produce an artifact, you deposit it where the sidecar says, you run the stage, and the receipt is the fact.** P1, P2, P3 and P4 do not fetch, search, encode or find forks — those need the network or a model, and the driver takes neither. Each of them validates a deposit and reports one of three things: `SKIPPED` because the deposit is not there (a missing prerequisite, not a defect), `DEGRADED` naming the rules that fired, or `PASS` over an artifact whose sha256 is on the row.
+
+Start by reading what the subject has and has not deposited:
+
+```bash
+etc/go/go.sh plan --milestone g2 --subject <id>
+```
+
+Every de novo row reads `present`, `absent` or `undeclared`. `undeclared` means the sidecar has no `denovo` section for that deposit — fix `etc/go/subjects/<id>/subject.json` first, because a stage cannot validate a file nobody named:
+
+```json
+"denovo": {
+  "bundle": "jl4/examples/legal/<id>/denovo/source-bundle.json",
+  "register": "jl4/examples/legal/<id>/denovo/external-modifications.json",
+  "fork_register": "jl4/examples/legal/<id>/denovo/fork-register.json",
+  "modules": ["jl4/examples/legal/<id>/denovo/<id>-denovo.l4"]
+}
+```
+
+Those paths need not exist — that is the point. `denovo.modules` **may not name a corpus module**: SPEC.md §8 compares the de novo encoding against the committed one, and a de novo module that _is_ the corpus makes the comparison an identity. The resolver refuses it.
+
+Then run the whole thing, or one stage at a time while you iterate:
+
+```bash
+etc/go/go.sh run --milestone g2 --subject <id> --only p1-ingest
+```
+
+### P1 — fetch with provenance
+
+Fetch the subject's source from its `source_url` and write a `source-bundle`. What the schema makes non-optional is what the BNA smoke run learned the hard way:
+
+- **Archive fallback.** legislation.gov.uk answered an AWS WAF challenge, and the run completed through Wayback captures. Record that as `retrieval_method: "archive"` with the `archive_url` — the schema requires the URL when the method is `archive`, and forbids it otherwise.
+- **The in-force banner**, in `in_force` — the "up to date with all changes known to be in force on or before ⟨date⟩" line, or a stated reason there is none. The Jersey charities fetch recorded "Showing the law from 16 October 2025 to Current" instead, which is the same field for a different jurisdiction's phrasing.
+- **The annotation inventory.** Amendment and modification markers (the UK's F1–F19 / C1–C5; a jurisdiction's endnote numbers) go in `documents[].annotations[]`, because P2 disposes of them one by one and P5 joins over them. Set `inventory_complete` honestly: `false` obliges you to say why in `inventory_note`, and `true` makes every marker something P2 must dispose of or fail.
+- **Integrity.** Either a `sha256` over the bytes you captured, with `local_path` so the validator can re-hash them, or an `archive_url` pinning an immutable capture. Neither is not an option.
+
+Quote hygiene is yours and nothing checks it: every string you later quote in the encoding should be extracted mechanically from this fetch, never reconstructed from memory. Deposit the bundle; run the stage; the receipt is the fact.
+
+### P2 — sweep, and record what you searched
+
+Search for what has happened to the text since it was printed: courts striking, staying or reading down a provision; the regulator's interpretive guidance (for the SEC, C&DIs, no-action letters, staff bulletins); proposed rules, the regulatory agenda, litigation in flight.
+
+**The `searches[]` section is the part people skip, and it is the part that matters.** SPEC.md §4 P2 requires the report to state what was searched, not only what was found — so a search records its scope, its date, and, required, what it does **not** cover. A sweep that found nothing and says so, with its searches enumerated, is a checked claim; a sweep that found nothing and enumerates nothing is an assumption wearing a register's clothes. The stage records `searches` and `entries` as metrics precisely so a reader can see which of the two you wrote.
+
+Then route every finding — binding / interpretive guidance / prospective — and dispose of every annotation the bundle's inventory declares. A binding modification disposed as `encoded` must name where it landed: a `rule_version_arm` (the provision stays encoded, marked inoperative on the rule-version axis, citing the striking authority) or a fork id. Interpretive guidance routes to a fork it opens or settles. An undated prospective change must be flagged as a currency risk with a reason.
+
+Deposit the register; run the stage; the receipt is the fact. Run it **after** P1's bundle exists, or the completeness join over the annotation inventory reports `skip` and the receipt says so.
+
+### P3 — encode
+
+This is [`writing-l4-rules`](../writing-l4-rules/SKILL.md)'s job, not this skill's, and the house rules are SPEC.md §4 P3's: inert style; `GIVEN` over `ASSUME` (unbound assumed terms stall `#EVAL`); `BRANCH` over `ELSE IF` chains; the shipped temporal mechanisms for rule versions, with an `@ref` citation on every dated arm. Encode from the **bundle**, not from the committed corpus — that independence is what the §8 diff is measuring, and reading the corpus destroys it silently and unrecoverably.
+
+Then deposit the module(s) at `denovo.modules` and run `p3-encode`. **Read what its PASS means before you rely on it.** The stage runs `l4 check` and nothing else: it proves the deposit is L4 the toolchain accepts. The two mechanisable house rules live in `p3-check`, which reads the subject's committed corpus — re-pointing it at a de novo deposit is unbuilt — and isomorphism, the actual deliverable, is HG1's. A module that typechecks and says something else entirely reaches the same PASS.
+
+### P4 — forks
+
+Open a fork wherever two readings of the source survive, and record it. R4 is ruled: a materialised fork is one field of an `Interpretation` record threaded as an ordinary `GIVEN`, and the register enforces that map 1:1 — two entries may not claim the same field. Every entry carries the readings, which one you took, and why; a live reading must cite the text that licenses it, and a non-live one must explain its rejection.
+
+`materialisation` is a discriminator, not an assumption. The two inventories anyone has actually produced — the BNA smoke's twelve and the Jersey charities cleanroom's twelve — resolved **every** ambiguity at encode time or delegated it to a fact-supplier, and materialised none. "Twelve forks, none materialised" is a real and interesting result, and the stage records the counts per class so the report can say it.
+
+Cross-reference P2: a fork an authority has already settled carries `settled_by` rather than presenting as open, and the `cross-refs-resolve` join checks that the id it cites is real. Deposit the register; run the stage; the receipt is the fact.
+
+### P5 — the adversarial gate
+
+`p5-gate` runs the mechanisable third of SPEC.md §4 P5's checklist — the cross-file joins, over all three deposits at once. It **SKIPs rather than passes** when a deposit is missing, because every join needs two of them and a validator run with one file present reports its joins as `skip` and exits 0, which would be a green receipt for a gate that checked nothing.
+
+Two of the five checks are discharged in `p3-check` (house style, temporal closure). **Two are yours**, and they ride on every receipt this stage writes, PASS included: fork-register completeness (unfalsifiable in principle — no procedure establishes that you found every ambiguity) and isomorphism spot-checks against the source. This stage's PASS is not the P5 gate; HG1 is. Do the adversarial review — the BNA run's own §2 ledger is the checklist worth copying: verify every provenance claim against the fetched source it cites, treating quotation marks and pinpoint cites as claims to be string-checked rather than decoration; for every negative assertion whose comment names a cause, check the cause is not overdetermined; and fix legal-fidelity defects by making the encoding match the statute, never by weakening a test.
+
+### §8 — the acceptance diff
+
+Write a surface map (`schemas/surface-map.schema.json`) declaring the pairing between the de novo encoding and the committed corpus, then run the oracle as in step 10 above. Exit `1` means it found a divergence, which is the **better** outcome. Triage each witness yourself; the script never will.
+
+### Reading a g2 verdict
+
+`g2 COMPLETE` means every g2 stage is accounted for. It does **not** mean a de novo run happened: `plan --milestone g2` names the stages that are not wired at g2, and SPEC.md §6's G2 acceptance is the §8 diff oracle, which no stage calls. A g2 run with every deposit absent reports five `SKIPPED` receipts and `COMPLETE`, which is completeness of accounting doing exactly its job — and `L4_GO_REQUIRED=1` turns each of those skips into exit 5, which is what CI should want.
 
 ---
 
@@ -200,7 +283,7 @@ That is the single largest simplification in this design and the first thing a l
 | P5 adversarial gate | its own condition is "as good as it can be", which is a judgement. Two of its five checks are joins over registers whose format landed 2026-08-02 — so those two are exit codes, and the judgement is the rest. |
 | §8 triage           | the diff is mechanical; classifying each disagreement as encoding error / genuine ambiguity / improvement over the hand corpus is not, and no diff outcome constitutes a fail.                                  |
 
-All four are **G2** work. R4 — the fork-representation ruling that gated them — was ruled 2026-08-02 (the `Interpretation` parameter), and the three registers those stages deposit into now have machine-readable schemas and a validator (`references/phases.md`, and `etc/go/lib/register-validate.mjs`). The stages themselves are still entry points that refuse with a named blocker — P1/P2 need the network, P4 needs an encoding. Run one directly to see it.
+All four are **G2** work, and all four are yours rather than the driver's. The stages exist and run: each validates the deposit you produced and reports `SKIPPED`/`DEGRADED`/`PASS` over it. What they cannot do is produce it — P1 and P2 need the network, P3 and P4 need a model — so the judgement above is the work and the stage is the acceptance condition. See the G2 runbook.
 
 ### What mid-tier models are for
 

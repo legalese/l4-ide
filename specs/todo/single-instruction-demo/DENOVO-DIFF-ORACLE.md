@@ -3,13 +3,15 @@
 **Status (2026-08-02): BUILT, not yet exercised by a real G2 run.** `etc/go/lib/denovo-diff.mjs`
 runs today and both of its self-tests are measured below (§7). What it has never seen is a second
 encoding: every measurement here is the committed Reg CF corpus against itself, or against a
-scratch copy of itself with one constant moved. **No pipeline stage calls it** — `p3-encode` and
-`p4-forks` are still scaffolded (`ORCHESTRATOR.md` §5.2), so nothing produces the de novo module
-this oracle exists to compare. Where this document disagrees with the tree, the tree wins.
+scratch copy of itself with one constant moved. **No pipeline stage calls it.** `p3-encode` and
+`p4-forks` stopped refusing on 2026-08-03 (`ORCHESTRATOR.md` §5.2), but what they do is VALIDATE a
+deposit an agent produced — they still do not produce the de novo module this oracle exists to
+compare, and invoking the oracle stays the agent's act (SKILL.md's G2 runbook). Where this document disagrees with the tree, the tree wins.
 
 What that means for SPEC.md §6's milestone list: G2's entry condition was "R4 ruled" (satisfied
-2026-08-02) and its acceptance is "the §8 diff oracle". The oracle now exists; the P1–P6 tooling
-that would give it something to compare does not.
+2026-08-02) and its acceptance is "the §8 diff oracle". The oracle now exists, and the P1–P5
+stages now have an acceptance condition each — but nothing in the pipeline WRITES a de novo
+encoding, so the oracle still has nothing of its own to compare.
 
 ---
 

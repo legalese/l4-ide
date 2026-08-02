@@ -1,9 +1,12 @@
 # `schemas/` — the machine-readable formats the de novo (G2) path uses
 
-**Status (2026-08-02): the formats are defined and validated; no pipeline stage writes one yet.**
-P1, P2 and P4 remain scaffolded (`etc/go/phases/p{1,2,4}-*.sh` still exit 3) — what changed is
-that "no machine-readable format exists" is no longer among their blockers. Each stage's
-_remaining_ blocker is stated in its own refusal text and in
+**Status (2026-08-03): the formats are defined and validated, and the P1/P2/P4 stages now VALIDATE
+a deposit written to them — no pipeline stage WRITES one, by design.** `etc/go/phases/p{1,2,4}-*.sh`
+each resolve the deposit path from the subject sidecar's `denovo` section and report `SKIPPED` when
+it is absent (a missing prerequisite), `DEGRADED` naming the rules that fired, or `PASS` over the
+hashed validator transcript. Producing a bundle, a sweep or a fork inventory needs the network or a
+model, which the orchestrator does not take; that half is the agent's, and the runbook is the G2
+section of `.claude/skills/running-the-l4-pipeline/SKILL.md`. See
 [`ORCHESTRATOR.md`](../ORCHESTRATOR.md) §5.2.
 
 | file                                 | stage | SPEC.md §4 deliverable                                                  |

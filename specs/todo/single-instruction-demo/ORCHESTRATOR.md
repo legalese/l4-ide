@@ -1,8 +1,10 @@
 # The `go` Orchestrator
 
-**Status (2026-08-02): PARTIALLY IMPLEMENTED — milestone G1 runs; G2 and everything downstream of
-it does not.** Written against `legalese/l4-ide` branch `mengwong/go-orchestrator`, cut from
-`origin/unstable` at `162e5070`, and verified by running it on this worktree.
+**Status (2026-08-03): PARTIALLY IMPLEMENTED — milestone G1 runs end to end; milestone G2 runs
+its deposit-validating half; everything downstream of G2 does not.** Written against
+`legalese/l4-ide` branch `mengwong/go-orchestrator`, cut from `origin/unstable` at `162e5070`,
+and verified by running it on this worktree; the G2 half was added on branch
+`mengwong/denovo-harnesses` and verified the same way.
 
 What that means precisely, in the present tense:
 
@@ -11,16 +13,26 @@ What that means precisely, in the present tense:
   emits conversion report v0. It refuses at HG1 unless a signature verifies or a waiver is
   recorded. The subject is resolved from a per-subject sidecar (§2.3), so the driver and phase
   scripts carry no Reg CF facts of their own.
-- **Seven stages are scaffolded and cannot run**: `p1-ingest`, `p2-sweep`, `p3-encode`,
-  `p4-forks`, `p5-gate`, `p8-verify`, `p10-publish`. Each is an entry point that prints what it
-  would do and what is blocking it, then exits 3. Since R4 was ruled (2026-08-02) the
-  encode/fork stages are blocked on engineering — the tooling is unbuilt. R5 is now ruled too
-  (2026-08-02, the ROBDD-first ladder), so `p8-verify` is engineering as well; and with R1
-  closed in full the same day (`legalese/canon`), `p10-publish` waits only on HG2 acts and
-  unbuilt tooling — no stage waits on an open ruling. §5 names each blocker.
-- **Milestone G2 is unbuilt.** `go.sh plan --milestone g2` refuses and says why: R4 is ruled but
-  none of the de novo _encoding_ tooling it unblocks exists yet. Its **acceptance comparator does**
-  exist, as of 2026-08-02: `etc/go/lib/denovo-diff.mjs` plus
+- **`etc/go/go.sh run --milestone g2 --subject <id>` runs its DEPOSIT-VALIDATING half, as of
+  2026-08-03.** `p1-ingest`, `p2-sweep`, `p3-encode`, `p4-forks` and `p5-gate` stopped refusing:
+  each is a real stage that validates a deposit an agent produced, with three outcomes —
+  `SKIPPED` when the deposit is not there (a missing prerequisite, not a defect), `DEGRADED`
+  naming every rule that fired, or `PASS` over an artifact whose sha256 is on the row. They do
+  **not** fetch, search, encode or find forks: those need the network or a model and this driver
+  takes neither, so producing the deposits is agent-side work the skill's G2 section owns. §5.2
+  is the per-stage table. **`g2 COMPLETE` means every g2 stage is accounted for, not that a de
+  novo run happened** — the §8 diff oracle, which is SPEC.md §6's G2 acceptance, is called by no
+  stage.
+- **Two stages are still scaffolded and cannot run**: `p8-verify` and `p10-publish`. Each is an
+  entry point that prints what it would do and what is blocking it, then exits 3. R5 is ruled
+  (2026-08-02, the ROBDD-first ladder), so `p8-verify` is engineering; and with R1 closed in
+  full the same day (`legalese/canon`), `p10-publish` waits only on HG2 acts and unbuilt
+  tooling — no stage waits on an open ruling. §5.2 names each blocker.
+- **Milestone G2's de novo half is not wired.** `p3-check`, `p6-tests` and every p7 leg read the
+  subject's COMMITTED corpus and goldens, so a g2 run does not execute them: measuring the replay
+  artifacts under a de novo label would be a false claim. `go.sh plan --milestone g2` prints
+  SPEC.md §4's full de novo order and marks each of them `NOT WIRED` with that reason.
+- **G2's acceptance comparator does exist**, as of 2026-08-02: `etc/go/lib/denovo-diff.mjs` plus
   `schemas/surface-map.schema.json`, designed in
   [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md). It is built and self-tested and has **never
   seen a second encoding** — no stage calls it, because nothing produces the module it would
@@ -50,9 +62,12 @@ etc/go/
 │                                assert-report (+selftest) · fidelity-counts ·
 │                                plan-shape · split-digraphs · known-defects ·
 │                                gate-payload · verify-run · register-validate ·
-│                                denovo-diff · phase-prelude.sh
-├── phases/                      p0 p3-check p6 p7×9 p9  (run) ·
-│                                p1 p2 p3-encode p4 p5 p8 p10  (refuse)
+│                                denovo-diff · phase-prelude.sh ·
+│                                deposit-prelude.sh (the G2 deposit contract,
+│                                in one file so the five stages cannot drift)
+├── phases/                      p0 p3-check p6 p7×9 p9  (G1, run) ·
+│                                p1 p2 p3-encode p4 p5     (G2, validate a
+│                                deposit — §5.2) · p8 p10  (refuse)
 └── report/                      render-report.mjs + template.md
 
 .claude/skills/running-the-l4-pipeline/
@@ -66,7 +81,9 @@ specs/todo/single-instruction-demo/
 │                                source-bundle · external-modifications ·
 │                                fork-register, each a JSON Schema plus x-rules,
 │                                with fixtures/ (valid + invalid per schema).
-│                                Defined and validated; NOTHING WRITES ONE YET.
+│                                Defined and validated. NOTHING IN THE PIPELINE
+│                                WRITES ONE — the G2 stages VALIDATE what an
+│                                agent deposited (§5.2).
 │                                Plus surface-map, which is an INPUT rather than
 │                                a deposit: the pairing the diff oracle consumes
 └── gate-allowed-signers         ssh allowed_signers — SHIPS WITH NO KEY, deliberately
@@ -225,8 +242,16 @@ no subject literals; everything subject-specific lives in `etc/go/subjects/<id>/
 - **`subject.json`** — the machine-readable descriptor: id, display name, legal citation, source
   entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check
   floors (`checks.min_dated_arms`, `checks.min_assertions` — these are _measurements_ of the
-  corpus, which is why they cannot be pipeline constants), and a `legs` object carrying one entry
-  per projection leg with its committed golden/cases/aux paths.
+  corpus, which is why they cannot be pipeline constants), a `legs` object carrying one entry
+  per projection leg with its committed golden/cases/aux paths, and an optional `denovo` object
+  declaring where the subject's G2 deposits live (`bundle`, `register`, `fork_register`,
+  `modules`). Those four paths' **existence is optional** — the same `x` kind as
+  `legs['p7-dmn'].cases` — because producing them is agent work, and a stage reports `SKIPPED`
+  with the path it was looking for rather than treating an unwritten deposit as a config error.
+  `denovo.modules` may not name a corpus module: SPEC.md §8's diff oracle compares the de novo
+  encoding against the committed one, so a de novo module that IS the corpus makes that
+  comparison an identity and G2 a restatement of G1. The resolver refuses it, and the selftest
+  proves the refusal.
 - **`pins.json`** — the CLI surface the stage table reads, measured against that subject's corpus
   (formerly `etc/go/PINS.json`).
 - **`known-defects.json`** — measured defects used as negative controls (formerly
@@ -364,35 +389,83 @@ keeps the latest few runs **and** every run holding a granted gate.
 | `p7-akn`       | shallow well-formedness                                                                                                                             | `UNVERIFIED`, declared `EXTRA`                                                                                                                                     |
 | `p9-report`    | section-presence over the rendered report                                                                                                           | reads the journal and nothing else                                                                                                                                 |
 
-### 5.2 Stages that are scaffolded and cannot run
+### 5.2 The de novo stages that validate a deposit, and the two that still refuse
 
-Each exits 3 after printing what it would do and what is blocking it. None is a member of any
+**What changed on 2026-08-03.** Five of the seven scaffolded stages stopped refusing. The move
+was not to take the network or to call a model — both fences stay exactly where §2.1 and §6.4 put
+them — but to **split each stage's deliverable from its acceptance condition** and keep only the
+half a script can hold. Fetching a statute, sweeping for what has happened to it, encoding it and
+finding its ambiguities are agent acts. Saying whether what came back is well formed, is about
+this subject, and joins against its peers is an exit code.
+
+So each of the five is now a real stage over a **deposit**, with three outcomes and no fourth:
+
+| deposit state                       | receipt                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| the sidecar declares no path for it | `SKIPPED`, naming the `denovo.*` key and the `subject.json` to add it to                                         |
+| declared, not on disk               | `SKIPPED` — a missing **prerequisite**, not a defect. `L4_GO_REQUIRED=1` makes it exit 5, which is what CI wants |
+| present                             | `PASS`/`structural` over a hashed artifact, or `DEGRADED` naming every rule that fired **against that file**     |
+
+| stage       | what its oracle reaches                                                                                                                                                                                                                                                                                                   | what it explicitly does not                                                                                                                                                                             |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `p1-ingest` | the bundle satisfies `schemas/source-bundle.schema.json` + `x-rules`; it is about this subject; every document is pinned by digest or by an immutable capture; a recorded digest is re-hashed against the file it names                                                                                                   | **retrieval**, which is an outward network act (§6.4). Whether the bundle is the _right_ text — right point in time, whole subject, every amendment layer — is HG1's                                    |
+| `p2-sweep`  | `searches[]` and `entries[]` agree in both directions; routing rules hold (a binding modification disposed `encoded` must name a rule-version arm or a fork); and, with the P1 bundle present, `annotation-inventory-disposed` — the BNA C2 defect (SMOKE-REPORT.md §3.5) as an exit code                                 | **searching**, and judging what a finding means. No procedure enumerates the searches that _should_ have run, so a register that searched nothing validates exactly as cleanly as one that searched all |
+| `p3-encode` | `l4 check` over every deposited module, and nothing else. For `l4 check` the exit code IS the oracle — only a typecheck error produces 1                                                                                                                                                                                  | isomorphism (HG1's), and the two mechanisable house rules: `p3-check` applies those to the COMMITTED corpus, and re-pointing it at a deposit is unbuilt                                                 |
+| `p4-forks`  | R4's 1:1 map between a materialised fork and an `Interpretation` field, both directions; the reading taken is one of the register's live readings; a live reading cites its licence, a non-live one explains itself; observable divergence names a witness; cross-references into P2 resolve                              | **finding the forks**, and **completeness** — unfalsifiable in principle and carried by HG1                                                                                                             |
+| `p5-gate`   | the cross-file joins over all three deposits at once, which is SPEC.md §4 P5's third check ("disposition of every P2 entry") as an exit code. It **SKIPs rather than passes** when a deposit is missing: every join needs two, and a run with one file present reports its joins `skip` and exits 0 — a PASS over nothing | **two of the five checks** — fork-register completeness and isomorphism spot-checks — which ride as `CARRIED BY HG1` notes on every receipt it writes, `PASS` included                                  |
+
+Two design decisions inside that are worth stating, because both were arrived at by measuring the
+wrong thing first:
+
+**A deposit's `subject` is checked before the validator runs.** Nothing in the three schemas ties
+a register to a body of law, so a BNA fork register deposited under the `regcf` sidecar validates
+perfectly and is about the wrong statute. The stage checks JSON-parseability, `kind` and `subject`
+itself, which also lets it keep the validator's exit 2 meaning "the SCHEMAS are unenforceable" —
+that is `BROKEN`, a repo defect — rather than conflating it with "this file is not JSON", which is
+a finding about the deposit.
+
+**Findings are attributed to the file they were reported against.** `register-validate.mjs`
+validates every file on its command line and its exit code is a total, so a clean source bundle
+sitting beside a broken fork register exits 1. Reading that total as a fact about the primary
+produced a measured falsehood: `p1-ingest` reporting "the source bundle does not satisfy its own
+format; rules that fired: at-least-one-live-reading, …", every one of which is a fork-register rule
+about a different file. The stage still goes `DEGRADED` — it cannot claim `PASS` over a validator
+run that exited 1 — but its reason now says the bundle is internally well formed and names the
+peer, by path, that is not.
+
+#### The two that still refuse
+
+Each exits 3 after printing what it would do and what is blocking it. Neither is a member of any
 milestone's declared stage list, so its absence cannot make a milestone `INCOMPLETE`.
 
-| stage         | blocker                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p1-ingest`   | **retrieval.** The bundle format landed 2026-08-02 (`schemas/source-bundle.schema.json` + `etc/go/lib/register-validate.mjs`), so "nothing to write into" is no longer true. What blocks: fetching the source is an outward network act this orchestrator does not perform (its one outward request is §6.4's loopback), so it is agent-side work the skill's G2 section owns; and no sidecar declares where a subject's bundle lives                            |
-| `p2-sweep`    | **searching.** The register format landed 2026-08-02 (`schemas/external-modifications.schema.json`), and its `searches[]` section makes "what was searched, not only what was found" a checked contract, so P5's "every entry disposed" now has a join. What blocks: it is a web-search stage and this orchestrator makes no outward network request except §6.4's loopback. Its honest future role is to validate the register the agent wrote, not to write it |
-| `p3-encode`   | the stage is unbuilt. R4 was its ruling blocker until 2026-08-02; the ruled `Interpretation` representation now waits on tooling, and the isomorphism judgement stays HG1's                                                                                                                                                                                                                                                                                      |
-| `p4-forks`    | **nothing to fork.** R4 ruled 2026-08-02 and the register format landed the same day (`schemas/fork-register.schema.json`, enforcing R4's 1:1 field map; its valid fixture is the BNA smoke's twelve ambiguities transcribed). What blocks: a fork is opened at a site in an encoding, and `p3-encode` produces none — the design note's own §6 says the same from the design side. Register _completeness_ stays unfalsifiable and is HG1's                     |
-| `p5-gate`     | its condition is explicitly a judgement; two of its five checks already run inside `p3-check`. The two register joins gained a format and a validator on 2026-08-02 — but there is still no P1/P2/P4 output to join over, and neither join was ever the judgement                                                                                                                                                                                                |
-| `p8-verify`   | R5 ruled 2026-08-02 (ROBDD first, fork-space sweep second, external MC last) — the blocker is now engineering: no CLI footing exposes the query-planner ROBDD to a script, and SPEC.md §6 gives P8 no pass condition yet. Gates nothing in G0–G4                                                                                                                                                                                                                 |
-| `p10-publish` | R1 ruled in full 2026-08-02 (`legalese/canon` + license + layout + public-with-inspectable-gates) and R2 ruled (probe done, PR #199); what remains is that the repo does not exist and every act that would change that is HG2's, plus unbuilt stage tooling                                                                                                                                                                                                     |
+| stage         | blocker                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `p8-verify`   | R5 ruled 2026-08-02 (ROBDD first, fork-space sweep second, external MC last) — the blocker is now engineering: no CLI footing exposes the query-planner ROBDD to a script, and SPEC.md §6 gives P8 no pass condition yet. Gates nothing in G0–G4             |
+| `p10-publish` | R1 ruled in full 2026-08-02 (`legalese/canon` + license + layout + public-with-inspectable-gates) and R2 ruled (probe done, PR #199); what remains is that the repo does not exist and every act that would change that is HG2's, plus unbuilt stage tooling |
 
-Until 2026-08-02 five of the seven were blocked on a ruling rather than on engineering — a
-deliberate stance: building against an unruled representation is building to be rewritten. With
-R4 and R5 ruled — and R1 closed in full the same day (`legalese/canon`) — no stage waits on an
-open ruling any more; everything remaining waits on
-tooling.
+#### What a `g2` run does NOT cover
 
-Three of those rows shed a blocker on 2026-08-02 without becoming runnable, and the distinction is
-worth keeping sharp. The de novo stages' deposit contracts — `schemas/source-bundle.schema.json`,
-`schemas/external-modifications.schema.json`, `schemas/fork-register.schema.json`, one validator
-at `etc/go/lib/register-validate.mjs`, fixtures and selftest coverage — now exist, so **"no
-machine-readable format exists" is false everywhere it was written**. What remains is not a
-format: P1 and P2 need the network, which is a fence this orchestrator deliberately does not
-open, and P4 needs an encoding that P3 does not yet produce. A defined format for an output
-nothing writes is progress on the interface, not on the stage.
+`p3-check`, `p6-tests` and every p7 leg are deliberately **not** in G2's declared stage list. They
+read the subject's committed corpus and its committed goldens; running them inside a g2 run would
+measure the replay artifacts and file the result under a de novo label — "the encoding typechecks",
+"its assertions hold" — about a module the de novo run never wrote. Re-pointing them at a
+`denovo.modules` deposit is unbuilt. `go.sh plan --milestone g2` prints SPEC.md §4's full de novo
+order with each of them marked `NOT WIRED` and the reason attached, because a plan that lists only
+what runs cannot tell a reader what is missing.
+
+`p9-report` **is** declared at g2: it reads `journal.ndjson` and nothing else, so it is correct for
+any milestone. HG1 gates it, per SPEC.md §7.3's "blocks P6 onward", and at g2 the gate binds to the
+digest of the **de novo deposit set** rather than the committed corpus — a waiver granted over the
+replay corpus says nothing about an encoding that did not exist when it was granted, and because
+`digestSet` records a missing file as `ABSENT` rather than skipping it, _depositing_ a bundle or a
+module re-opens the gate.
+
+The consequence for the milestone verdict, stated plainly so nobody has to infer it: **`g2
+COMPLETE` means every g2 stage is accounted for. It does not mean a de novo run happened.** A run
+with every deposit absent produces five `SKIPPED` receipts, each carrying a reason that appears in
+the report, and `COMPLETE` — which is §3.2's completeness-of-accounting doing exactly its job.
+SPEC.md §6's G2 acceptance is the §8 diff oracle, which no stage calls. The driver prints that
+sentence after every g2 verdict, and `L4_GO_REQUIRED=1` turns each of those skips into exit 5.
 
 ### 5.3 The `l4 run` workaround, and its expiry
 
@@ -610,6 +683,6 @@ decided:
 Not recorded at this document's first writing, and deliberately so: **R4 was then OPEN** —
 nothing in the orchestrator build ruled it, and the stages that depend on it refused rather than
 guessed. **Ruled 2026-08-02 during Meng's review of this PR** (R4-FORK-REPRESENTATION.md §7):
-the `Interpretation` parameter, extended to regulative rules. The scaffolded stages still
-refuse — their blocker is now unbuilt tooling, not an open ruling — and this change updates
-every refusal text that said otherwise.
+the `Interpretation` parameter, extended to regulative rules. That change updated every refusal
+text that said otherwise; the follow-on change (2026-08-03, §5.2) then took five of those seven
+stages out of the refusal set entirely, by keeping the half of each stage that a script can hold.
