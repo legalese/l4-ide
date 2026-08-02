@@ -93,7 +93,12 @@ for (const file of files) {
     if (!el || typeof el !== "object") return;
     if (el.id) ids.add(el.id);
     if (el.$type === "bpmn:SequenceFlow") flows.push(el);
-    else if (/^bpmn:(Task|.*Event|.*Gateway)$/.test(el.$type ?? ""))
+    // `.*Task`, not `Task`: the exporter emits <businessRuleTask> for a gateway
+    // wired to a DMN decision (PROCESS-TRACK.md §8.3), whose $type is
+    // `bpmn:BusinessRuleTask`. Under the old anchored `Task` alternative it was
+    // collected by nothing, so the diagram-interchange check below silently did
+    // not apply to it — a node could ship undrawn and this script would say OK.
+    else if (/^bpmn:(.*Task|.*Event|.*Gateway)$/.test(el.$type ?? ""))
       nodes.push(el);
     for (const [key, value] of Object.entries(el)) {
       if (key.startsWith("$")) continue;
