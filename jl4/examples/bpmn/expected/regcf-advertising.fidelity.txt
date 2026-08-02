@@ -1,7 +1,7 @@
 fidelity report — BPMN 2.0
-  [P-BRANCHGUARD] lossy — Split_0
-      The gateway's arms are selected by ‘`notice complies with Rule 204(b)` OF notice’, ‘NOT (`notice complies with Rule 204(b)` OF notice)’, written into each outgoing flow as an opaque conditionExpression: BPMN has no way to say that these exhaust the cases and cannot overlap, which is what the L4 IF/ELSE chain they came from does say.
-      lost: exhaustiveness and mutual exclusion as properties of the gateway — and whatever decision structure backed each condition, for which DMN, not BPMN, is the right home
+  [P-DMNWIRED] advisory — Split_0
+      The gateway's arms are decided by the DMN decision ‘notice complies with Rule 204(b)’ (id decision_notice_complies_with_rule_204_b) in model ‘SEC Regulation Crowdfunding — 17 CFR Part 227’, invoked by the businessRuleTask in front of it; each outgoing flow now tests that decision's answer (guard shape) rather than restating the L4 guard, which moves to the flow's <documentation>.
+      lost: nothing an engine needs, but the arms' exhaustiveness and mutual exclusion are now properties of the DMN table's hit policy rather than of this gateway, and BPMN still has no way to say so here
   [F1] blocking — Task_2
       A prohibition is not an activity at all and BPMN has no negative shape for one, so read literally this diagram instructs the reader to perform the very act the rule forbids.
       lost: the difference between a required act and a forbidden one; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force

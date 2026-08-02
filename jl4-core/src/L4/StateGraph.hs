@@ -33,6 +33,10 @@ module L4.StateGraph
   , Transition(..)
   , TransitionLabel(..)
   , TransitionType(..)
+  , BranchGuard(..)
+  , GuardAtom(..)
+  , branchGuardAtoms
+  , renderBranchGuard
     -- * Options
   , StateGraphOptions(..)
   , defaultStateGraphOptions
@@ -145,7 +149,59 @@ data TransitionLabel = TransitionLabel
   , labelAction   :: Text          -- ^ Action description
   , labelDeadline :: Maybe Text    -- ^ Temporal constraint (e.g., "30 days")
   , labelGuard    :: Maybe Text    -- ^ PROVIDED condition
+  , labelBranch   :: Maybe BranchGuard
+    -- ^ The @IF@-chain arm this edge came from, kept in pieces rather than only
+    -- as the flattened 'labelGuard' text.
+    --
+    -- __Only an @IF@ junction sets it__; a @RAND@ \/ @ROR@ branch edge and an
+    -- obligation's own @PROVIDED@ both leave it 'Nothing'. When it is set,
+    -- @'renderBranchGuard' == 'labelGuard'@ by construction, so nothing here
+    -- is a second, drift-prone spelling of the text — see 'guardedIfBranches'.
+    --
+    -- It exists because a consumer that has to /resolve/ a guard cannot work
+    -- from the flattened string: @PROCESS-TRACK.md@ §8.3's BPMN→DMN wiring has
+    -- to know which conjuncts are negations of the arms above, and which
+    -- @DECIDE@ each conjunct applies, and both facts are destroyed by
+    -- @intercalate " AND "@.
   } deriving (Eq, Show)
+
+-- | One conjunct of a 'BranchGuard': the condition as the reader sees it, plus
+-- the @DECIDE@ it applies when it is a bare application of one.
+--
+-- 'gaDecide' is a 'Unique' and not a name on purpose. The DMN backend resolves
+-- element names through its own @uniquifyIn@ scopes, so two decides whose names
+-- differ only in a way the sanitiser erases still get distinct ids; matching by
+-- text would silently pick the wrong one, and matching by 'Unique' cannot.
+data GuardAtom = MkGuardAtom
+  { gaText   :: Text          -- ^ @prettyLayout@ of the condition, un-negated
+  , gaDecide :: Maybe Unique  -- ^ the applied @DECIDE@, when the atom is one
+  } deriving (Eq, Show)
+
+-- | An @IF@-chain arm's guard, before it is flattened to text.
+--
+-- The n-th arm of @IF p THEN x ELSE IF q THEN y ELSE z@ is guarded by its own
+-- condition conjoined with the negation of every condition above it. 'bgPriors'
+-- is that list of conditions-above (each to be read /negated/) and 'bgOwn' is
+-- the arm's own condition — absent on the trailing @ELSE@, which is guarded by
+-- the accumulated negations alone.
+data BranchGuard = MkBranchGuard
+  { bgPriors :: [GuardAtom]
+  , bgOwn    :: Maybe GuardAtom
+  } deriving (Eq, Show)
+
+-- | Every conjunct of a branch guard, paired with whether it is negated.
+-- Priors first, own condition last — the order 'renderBranchGuard' prints them.
+branchGuardAtoms :: BranchGuard -> [(Bool, GuardAtom)]
+branchGuardAtoms bg =
+  [(True, a) | a <- bg.bgPriors] <> [(False, a) | Just a <- [bg.bgOwn]]
+
+-- | The flattened guard text — the single source of 'labelGuard'.
+renderBranchGuard :: BranchGuard -> Maybe Text
+renderBranchGuard bg = case branchGuardAtoms bg of
+  [] -> Nothing
+  as -> Just (Text.intercalate " AND " [render neg a | (neg, a) <- as])
+ where
+  render neg a = if neg then "NOT (" <> a.gaText <> ")" else a.gaText
 
 -- | Classification of transitions for rendering
 data TransitionType
@@ -231,6 +287,15 @@ lestArmWording _        Nothing  = noTriggerWording
 -- | The complete state graph for a contract
 data StateGraph = StateGraph
   { sgName         :: Text           -- ^ Name of the contract/rule
+  , sgDecide       :: Maybe Unique
+    -- ^ The @DECIDE@ this graph was extracted from. 'Nothing' only on a graph
+    -- built by hand (test fixtures); extraction always knows it, because
+    -- 'runExtraction' already needs it to recognise a self-recursive @HENCE@.
+    --
+    -- Kept so a consumer can ask the DMN backend what /this rule/ lowered to.
+    -- The name cannot answer that question: whether a decide survives into the
+    -- DRG at all depends on the population filter, and its emitted id depends
+    -- on collisions with its siblings.
   , sgStates       :: [ContractState]
   , sgTransitions  :: [Transition]
   , sgInitialState :: StateId
@@ -382,17 +447,32 @@ findRegulativeExpr expr = case expr of
 -- the obliged party makes; @IF@ is a branch the facts make. Worse, the
 -- rewriting loses any arm that imposes no duty (a bare @FULFILLED@ base case),
 -- because there is no obligation to hang a @PROVIDED@ on.
-guardedIfBranches :: Expr Resolved -> [(Maybe Text, Expr Resolved)]
+guardedIfBranches :: Expr Resolved -> [(BranchGuard, Expr Resolved)]
 guardedIfBranches = go []
  where
   go priors = \case
     IfThenElse _ c t e ->
-      let ct = prettyLayout c
-       in (conjoin (priors <> [ct]), t) : go (priors <> ["NOT (" <> ct <> ")"]) e
-    other -> [(conjoin priors, other)]
+      let a = atomOf c
+       in (MkBranchGuard {bgPriors = priors, bgOwn = Just a}, t)
+            : go (priors <> [a]) e
+    other -> [(MkBranchGuard {bgPriors = priors, bgOwn = Nothing}, other)]
 
-  conjoin [] = Nothing
-  conjoin ts = Just (Text.intercalate " AND " ts)
+  atomOf c = MkGuardAtom {gaText = prettyLayout c, gaDecide = guardHeadDecide c}
+
+-- | The @DECIDE@ a guard condition applies, when the condition /is/ one
+-- application and nothing more.
+--
+-- Deliberately shallow. @\`notice complies with Rule 204(b)\` OF notice@ is an
+-- 'App' whose head is the decide, and that is the whole of what a downstream
+-- resolver can honestly claim to have identified. A conjunction, a comparison,
+-- an explicit @NOT@ or a record projection all yield 'Nothing' — not because
+-- they could not be decomposed, but because the answer would then be "several
+-- decisions, combined somehow", which is not a thing a caller can invoke.
+guardHeadDecide :: Expr Resolved -> Maybe Unique
+guardHeadDecide = \case
+  App _ n _        -> Just (getUnique n)
+  AppNamed _ n _ _ -> Just (getUnique n)
+  _                -> Nothing
 
 -- | The id of the state every graph starts in.
 --
@@ -415,6 +495,7 @@ runExtraction self name expr =
       finalState = St.execState (extractExpr Nothing expr) initialState
   in StateGraph
        { sgName = name
+       , sgDecide = Just self
        , sgStates = reverse finalState.esStates
        , sgTransitions = reverse finalState.esTransitions
        , sgInitialState = initialStateId
@@ -493,6 +574,11 @@ extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
 extractFan kind mFromState branches =
   extractGuardedFan kind mFromState [(Nothing, b) | b <- branches]
 
+-- | 'extractGuardedFan' over @IF@ arms, whose guards are structured.
+extractIfFan :: Maybe StateId -> [(BranchGuard, Expr Resolved)] -> ExtractM ()
+extractIfFan mFromState branches =
+  extractGuardedFan OneOf mFromState [(Just g, b) | (g, b) <- branches]
+
 -- | Extract an @IF@ chain whose arms are regulative as a guarded @OneOf@
 -- junction. A chain none of whose arms is regulative is not a rule and
 -- produces nothing, so that an ordinary boolean conditional reached through a
@@ -500,14 +586,14 @@ extractFan kind mFromState branches =
 extractIf :: Maybe StateId -> Expr Resolved -> ExtractM ()
 extractIf mFromState expr
   | any (isJust . findRegulativeExpr . snd) branches =
-      extractGuardedFan OneOf mFromState branches
+      extractIfFan mFromState branches
   | otherwise = pure ()
  where
   branches = guardedIfBranches expr
 
 -- | As 'extractFan', with a guard attached to each branch edge.
 extractGuardedFan
-  :: FanKind -> Maybe StateId -> [(Maybe Text, Expr Resolved)] -> ExtractM ()
+  :: FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
 extractGuardedFan kind mFromState branches = do
   junction <- case mFromState of
     Just sid -> pure sid
@@ -516,7 +602,7 @@ extractGuardedFan kind mFromState branches = do
   traverse_ (uncurry (extractBranch junction)) branches
 
 -- | Extract one branch of a junction, wiring the junction to its entry state.
-extractBranch :: StateId -> Maybe Text -> Expr Resolved -> ExtractM ()
+extractBranch :: StateId -> Maybe BranchGuard -> Expr Resolved -> ExtractM ()
 extractBranch junction mGuard branch = do
   self <- St.gets (.esSelf)
   let label = fanLabel mGuard
@@ -563,13 +649,16 @@ branchStateName expr = case expr of
 -- a junction is a control point, not a task — but it may carry the condition
 -- that selects the branch, when the junction came from an @IF@ rather than
 -- from a @RAND@ \/ @ROR@.
-fanLabel :: Maybe Text -> TransitionLabel
+fanLabel :: Maybe BranchGuard -> TransitionLabel
 fanLabel mGuard = TransitionLabel
   { labelParty    = Nothing
   , labelModal    = Nothing
   , labelAction   = ""
   , labelDeadline = Nothing
-  , labelGuard    = mGuard
+  -- One source, not two: the text IS the rendering of the structure, so a
+  -- consumer reading either gets the same guard.
+  , labelGuard    = mGuard >>= renderBranchGuard
+  , labelBranch   = mGuard
   }
 
 -- | Extract an obligation as a state transition
@@ -593,6 +682,7 @@ extractDeonton mFromState MkDeonton{..} = do
         , labelAction   = actionText
         , labelDeadline = deadlineText
         , labelGuard    = guardText
+        , labelBranch   = Nothing
         }
 
       -- The caption for whichever LEST arm this obligation turns out to have.
@@ -608,6 +698,7 @@ extractDeonton mFromState MkDeonton{..} = do
         , labelAction   = lestArmWording action.modal due
         , labelDeadline = Nothing
         , labelGuard    = Nothing
+        , labelBranch   = Nothing
         }
 
       defaultToBreach = do
@@ -686,7 +777,7 @@ extractDeonton mFromState MkDeonton{..} = do
           extractDeonton (Just nextStateId) nextObl
 
         TargetSelf -> do
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
+          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing
           addTransition fromState initialStateId timeoutLabel LestTransition
 
         TargetOther -> do

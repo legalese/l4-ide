@@ -81,6 +81,14 @@ jobs:
               - 'etc/kie/**'
               - 'jl4/examples/bpmn/**'
               - 'jl4-core/src/L4/Bpmn/**'
+              # The DMN side is IN this filter since the BPMN->DMN wiring landed
+              # (PROCESS-TRACK.md 8.3). check-bpmn-dmn-refs.mjs resolves every
+              # businessRuleTask against jl4/examples/dmn/expected/*.dmn, and the
+              # ids it resolves against are minted in L4/Dmn/Lower.hs — so a
+              # rename on either could dangle a reference in a PR that touches no
+              # BPMN file at all, and without these lines nothing would notice.
+              - 'jl4/examples/dmn/expected/**'
+              - 'jl4-core/src/L4/Dmn/**'
             # specs/** must trigger doc checks too: a spec-only PR that skips
             # both this filter and 'haskell' never runs test-docs.sh or
             # prettier, so a broken link or unformatted file merges silently.
@@ -166,9 +174,33 @@ jobs:
       - name: Self-test the jBPM baseline comparator
         run: node etc/check-bpmn-kie-baseline.selftest.mjs
 
+      # Same argument again, for the BPMN->DMN resolver. Its only observed
+      # behaviour over the goldens is "OK" — no emitted file has a dangling
+      # reference — so without this it is indistinguishable from a resolver that
+      # says OK unconditionally. It breaks the real emitted pair six ways and
+      # asserts the objection, then twice more and asserts the silence.
+      - name: Self-test the BPMN->DMN reference resolver
+        run: node etc/check-bpmn-dmn-refs.selftest.mjs
+
       # The gate itself, over the emitted goldens.
       - name: Soundness-check the emitted BPMN
         run: node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
+
+      # PROCESS-TRACK.md 8.3's own gate: does every businessRuleTask name a
+      # decision the sibling emitted DMN actually declares? A dangling reference
+      # is the one defect this linkage can have that a reader cannot see — the
+      # diagram draws, the file parses, the delegation silently does nothing —
+      # so it is a hard error here and never a warning.
+      #
+      # The .dmn argument is required, not optional: handed no model, every
+      # reference would be unresolvable and reporting "0 of 0 checked, OK" is how
+      # a narrowed glob turns a gate into decoration. The script exits 2 rather
+      # than pass vacuously.
+      - name: Do the BPMN businessRuleTasks resolve in the emitted DMN?
+        run: |
+          node etc/check-bpmn-dmn-refs.mjs \
+            jl4/examples/bpmn/expected/*.bpmn \
+            jl4/examples/dmn/expected/regcf-corpus.dmn
 
       # K4: will Camunda Modeler open these? bpmn-moddle is what bpmn-js parses
       # with. Pinned, and never added to package.json or the lockfile.

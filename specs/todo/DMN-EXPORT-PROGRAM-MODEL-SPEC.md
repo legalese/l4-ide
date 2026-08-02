@@ -4250,8 +4250,8 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
   but a guarded chain of deontic arms no longer refuses wholesale — its GUARDS lower to a verdict
   decision table here, and only the obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) stay
   BPMN's. The verdict decision is designed as the stable interface the BPMN `businessRuleTask`
-  wiring consumes — that wiring is a named follow-up, see §16 and
-  `lexipedia-superset/PROCESS-TRACK.md` §8.3, not part of R13.)
+  wiring consumes — that wiring was a named follow-up, not part of R13, and **shipped 2026-08-02
+  on its own branch**; see §16.5 and `lexipedia-superset/PROCESS-TRACK.md` §8.3.)
 
 ---
 
@@ -5915,14 +5915,30 @@ keeps today's behaviour, pinned by the `deontic-verdict.l4` negative controls an
 in a **verdict-aware message form** (§7): the table always answers; the recursion it summarises is
 what could not be certified.
 
-### 16.5 The BPMN `businessRuleTask` wiring is OUT — named follow-up
+### 16.5 The BPMN `businessRuleTask` wiring was OUT of R13 — SHIPPED separately 2026-08-02
 
-The wiring (`lexipedia-superset/PROCESS-TRACK.md` §8.3) needs a StateGraph change to retain
+Scoped out of R13 rather than half-shipped, because it needs a StateGraph change to retain
 resolved guard-head identity, a Lower-to-BPMN emitted-id map, a vendor-namespace probe, the
-anonymous-guard-atom ruling §8.3 leaves open, and a jBPM baseline regeneration — none of which
+anonymous-guard-atom ruling §8.3 left open, and a jBPM baseline re-measurement — none of which
 shares a file with R13's diff. R13's verdict decision is deliberately the stable interface that
 follow-up consumes: fixed id (`decision_ongoing_reporting_obligation`), `typeRef="string"`,
-enumerated `outputValues`. Scoped out 2026-08-02 rather than half-shipped.
+enumerated `outputValues`.
+
+**BUILT the same day, on its own branch** (`mengwong/bpmn-dmn-wiring`). What it took from this
+side, recorded here because it is the only DMN-side change and a reader of §16 will want it:
+
+- `Decision` gained `dcnDecide :: Maybe Unique` — the `DECIDE` a decision was lowered from,
+  emitted **nowhere** in the XML. It exists so `L4.Bpmn.Wiring` can ask "what did this rule
+  become here?" and get an answer that survives both the module-wide `uniquifyIn` (§5.2) and the
+  population filter (§2.5.7): a re-derived `decision_<sanitised name>` would be a guess that is
+  usually right, which is the worst kind. Hydrators (§4.4) carry `Nothing`, having no source
+  decide.
+- Nothing else. The verdict interface was already what §16 says it is, and the BPMN side reads
+  the emitted `Drg` rather than re-lowering anything.
+
+The measured design — form G, no vendor namespace, no `--bpmn-flavor` axis, and why the _verdict_
+shape has to be tried before the _guard_ shape — is in `lexipedia-superset/PROCESS-TRACK.md` §8.3,
+which owns it.
 
 ### 16.6 Engine expectations (UNMEASURED at ruling time)
 

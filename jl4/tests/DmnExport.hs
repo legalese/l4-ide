@@ -19,7 +19,13 @@
 --      to a constant endpoint becomes a boolean column plus a located fidelity
 --      note, and a hit policy of @U@ is claimed only when the emitted /cells/
 --      can witness it — not merely when the L4 guards were exclusive.
-module DmnExport (spec) where
+-- __'drgAsCli' is exported__, and only to 'BpmnExport'. The BPMN goldens have
+-- to be lowered against the SAME decision graph the DMN goldens are, or the
+-- @businessRuleTask@ ids in one set of goldens would be checked against ids
+-- from a differently-configured lowering in the other. Sharing the helper is
+-- what makes that impossible; re-spelling it there is what would make it
+-- inevitable.
+module DmnExport (spec, drgAsCli) where
 
 import Base
 import qualified Base.Text as Text
@@ -3659,6 +3665,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           }
         decNode nm krs body = NodeDecision MkDecision
           { dcnId = "decision_" <> nm, dcnName = nm, dcnFeelName = nm
+          , dcnDecide = Nothing
           , dcnType = DmnNumber, dcnLogic = body
           , dcnRequirements = [], dcnKnowledgeReqs = krs
           }

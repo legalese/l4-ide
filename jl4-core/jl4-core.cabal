@@ -113,6 +113,7 @@ library
     L4.Bpmn.IR
     L4.Bpmn.Lower
     L4.Bpmn.Emit
+    L4.Bpmn.Wiring
     L4.Citations
     L4.Desugar
     L4.Diagnostic

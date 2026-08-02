@@ -1,7 +1,7 @@
 fidelity report — BPMN 2.0
-  [P-BRANCHGUARD] lossy — Split_0
-      The gateway's arms are selected by ‘`ongoing reporting obligation may terminate` OF status’, ‘NOT (`ongoing reporting obligation may terminate` OF status) AND `annual cycles` AT MOST 0’, ‘NOT (`ongoing reporting obligation may terminate` OF status) AND NOT (`annual cycles` AT MOST 0)’, written into each outgoing flow as an opaque conditionExpression: BPMN has no way to say that these exhaust the cases and cannot overlap, which is what the L4 IF/ELSE chain they came from does say.
-      lost: exhaustiveness and mutual exclusion as properties of the gateway — and whatever decision structure backed each condition, for which DMN, not BPMN, is the right home
+  [P-DMNWIRED] advisory — Split_0
+      The gateway's arms are decided by the DMN decision ‘ongoing reporting obligation’ (id decision_ongoing_reporting_obligation) in model ‘SEC Regulation Crowdfunding — 17 CFR Part 227’, invoked by the businessRuleTask in front of it; each outgoing flow now tests that decision's answer (verdict shape) rather than restating the L4 guard, which moves to the flow's <documentation>.
+      lost: nothing an engine needs, but the arms' exhaustiveness and mutual exclusion are now properties of the DMN table's hit policy rather than of this gateway, and BPMN still has no way to say so here
   [F1] blocking — Task_1
       MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
       lost: the deontic modality, which survives in the label and the <documentation> but has no notational force

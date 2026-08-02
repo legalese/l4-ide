@@ -45,6 +45,13 @@ module L4.Bpmn.IR
   , nodeWidth
   , nodeHeight
 
+    -- * The DMN linkage
+  , DmnCall (..)
+  , DmnWiring (..)
+  , WiredDecision (..)
+  , VerdictRow (..)
+  , droolsDmnLanguage
+
     -- * Diagram interchange
   , Diagram (..)
   , Shape (..)
@@ -62,6 +69,92 @@ module L4.Bpmn.IR
 import Base
 
 import L4.Interchange.Fidelity (FidelityReport)
+import L4.Syntax (Unique)
+
+--------------------------------------------------------------------------------
+-- The DMN linkage
+--------------------------------------------------------------------------------
+
+-- | The rule language a @\<businessRuleTask\>@ declares when it delegates to
+-- DMN.
+--
+-- __This is a plain BPMN 2.0 @implementation@ attribute, not a vendor
+-- extension__, and that is the point of choosing it. Its value is a URI naming
+-- a rule language; everything else the task needs — namespace, model, decision
+-- — travels in a standard @\<ioSpecification\>@. So the emitted file contains
+-- exactly one vendor-specific /string/ and zero vendor namespaces.
+--
+-- Measured 2026-08-02 against jbpm-bpmn2 7.74.1.Final on seven probe files
+-- (@specs\/todo\/lexipedia-superset\/PROCESS-TRACK.md@ §8.3): a bare
+-- @businessRuleTask@, a @camunda:decisionRef@, a @zeebe:calledDecision@ and a
+-- DMN @implementation@ URI + @\<import\>@ are each REJECTED, and this URI
+-- /with/ the three @dataInput@s is the only form accepted. @bpmn-moddle@
+-- accepts all seven, so it does not discriminate; jBPM does, and this is what
+-- it asks for.
+droolsDmnLanguage :: Text
+droolsDmnLanguage = "http://www.jboss.org/drools/dmn"
+
+-- | A resolved call from a @\<businessRuleTask\>@ to one decision in the
+-- sibling DMN model.
+--
+-- Every field is __copied from the emitted DRG__, never re-derived from the L4
+-- source. That is what makes a dangling reference unrepresentable rather than
+-- merely unlikely: 'L4.Bpmn.Wiring.wiringFromDrg' builds its table from
+-- 'L4.Dmn.IR.drgDecisions', so a decide the DMN population filter dropped is
+-- absent from the table and its gateway simply does not get wired.
+data DmnCall = MkDmnCall
+  { dmcNamespace :: !Text
+    -- ^ the DMN @\<definitions\>@ @\@namespace@
+  , dmcModel :: !Text
+    -- ^ the DMN @\<definitions\>@ @\@name@
+  , dmcDecision :: !Text
+    -- ^ the decision element's @\@name@ — its FEEL name, which is also what its
+    -- @\<variable\>@ is called and therefore what a gateway condition reads
+  , dmcLabel :: !Text
+    -- ^ the verbatim L4 name, for the task's own @\@name@
+  , dmcElementId :: !Text
+    -- ^ the decision element's @\@id@. Not part of the engine's
+    -- @(namespace, model, decision)@ lookup key; carried so the task's
+    -- @\<documentation\>@ can name the element a reader should open.
+  }
+  deriving stock (Eq, Show)
+
+-- | One row of a verdict decision's table, as the wiring needs to read it.
+--
+-- 'vrGuard' is the row's L4 source guard (@Just "OTHERWISE"@ on the catch-all)
+-- and exists so the arm↔row correspondence can be __checked__ rather than
+-- assumed positional. 'vrOutput' is the row's output entry as FEEL — already
+-- quoted, so it drops straight into a comparison.
+data VerdictRow = MkVerdictRow
+  { vrGuard :: !(Maybe Text)
+  , vrOutput :: !Text
+  }
+  deriving stock (Eq, Show)
+
+-- | What the DMN backend emitted for one @DECIDE@.
+data WiredDecision = MkWiredDecision
+  { wdId :: !Text
+  , wdName :: !Text
+  , wdFeelName :: !Text
+  , wdBoolean :: !Bool
+    -- ^ the decision's output is @boolean@, so a gateway may test it directly
+  , wdVerdict :: !(Maybe [VerdictRow])
+    -- ^ the rows of an enumerated-string decision table — the R13 verdict
+    -- shape. 'Nothing' for every other decision, including a string-typed one
+    -- with no enumerated domain, because without the domain there is no set of
+    -- values a gateway could exhaust.
+  }
+  deriving stock (Eq, Show)
+
+-- | Everything the process side needs to know about the decision side.
+--
+-- Keyed by 'Unique' rather than by name: see 'L4.StateGraph.GuardAtom'.
+data DmnWiring = MkDmnWiring
+  { dwNamespace :: !Text
+  , dwModel :: !Text
+  , dwDecisions :: !(Map Unique WiredDecision)
+  }
+  deriving stock (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- Options
@@ -87,13 +180,21 @@ data DeadlineUnitPolicy
   deriving stock (Eq, Show)
 
 -- | Knobs for lowering. Kept tiny on purpose; the CLI surface is Track S0's.
-newtype BpmnOptions = BpmnOptions
+data BpmnOptions = BpmnOptions
   { optDeadlineUnit :: DeadlineUnitPolicy
+  , optWiring :: Maybe DmnWiring
+    -- ^ What the DMN backend emitted for the same module, if it was run.
+    --
+    -- 'Nothing' is not a degraded mode, it is the honest one: with no DRG in
+    -- hand there is nothing a @businessRuleTask@ could point at, so every
+    -- gateway keeps its opaque @conditionExpression@ and @P-BRANCHGUARD@ keeps
+    -- reporting the loss. Supplying it is what discharges the loss, per
+    -- @specs\/todo\/lexipedia-superset\/PROCESS-TRACK.md@ §8.3.
   }
   deriving stock (Eq, Show)
 
 defaultBpmnOptions :: BpmnOptions
-defaultBpmnOptions = BpmnOptions {optDeadlineUnit = AssumeDays}
+defaultBpmnOptions = BpmnOptions {optDeadlineUnit = AssumeDays, optWiring = Nothing}
 
 --------------------------------------------------------------------------------
 -- Process structure
@@ -114,6 +215,12 @@ data NodeKind
     Gateway !GatewayKind !GatewayFlow
   | -- | @\<boundaryEvent\>@, always interrupting, attached to the named node.
     Boundary !Text !BoundaryTrigger
+  | -- | @\<businessRuleTask\>@ delegating a gateway's guard to a DMN decision.
+    --
+    -- The one node kind that is not motivated by the state graph alone: it
+    -- exists only where a 'DmnWiring' says the guard has a home in the emitted
+    -- DMN. See 'L4.Bpmn.Lower' and PROCESS-TRACK.md §8.3.
+    BusinessRule !DmnCall
   deriving stock (Eq, Show)
 
 data GatewayKind = ExclusiveGateway | ParallelGateway
@@ -163,6 +270,11 @@ data SequenceFlow = SequenceFlow
   , flowTo :: !Text
   , -- | @\<conditionExpression\>@, from a @PROVIDED@ guard.
     flowCondition :: !(Maybe Text)
+  , -- | @\<documentation\>@. Set where 'flowCondition' has been rewritten into
+    -- a test over a DMN decision's output, and holds the L4 text the condition
+    -- used to be — so the guard the drafter wrote is still in the file, in
+    -- prose, where nothing will try to evaluate it.
+    flowDoc :: !(Maybe Text)
   }
   deriving stock (Eq, Show)
 
@@ -274,6 +386,7 @@ nodeWidth = \case
   Boundary _ _ -> 36
   Gateway _ _ -> 50
   Task -> 100
+  BusinessRule _ -> 100
 
 nodeHeight :: NodeKind -> Int
 nodeHeight = \case
@@ -282,3 +395,4 @@ nodeHeight = \case
   Boundary _ _ -> 36
   Gateway _ _ -> 50
   Task -> 80
+  BusinessRule _ -> 80

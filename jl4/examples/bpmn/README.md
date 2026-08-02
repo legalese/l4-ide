@@ -60,6 +60,14 @@ Three things the extractor learned in the process, all visible in the goldens:
   what decided it". The guards are now `conditionExpression`s on the branch flows,
   and the new `P-BRANCHGUARD` note records what BPMN still cannot say about them:
   that they exhaust the cases and cannot overlap.
+- **A guarded gateway delegates to DMN.** Since 2026-08-02 (`PROCESS-TRACK.md` §8.3)
+  a gateway whose guards resolve to decisions in the *emitted* DMN gets a
+  `<businessRuleTask>` in front of it naming `(namespace, model, decision)`, and its
+  outgoing flows test that decision's answer instead of restating the L4 guard —
+  which moves to each flow's `<documentation>`. All three `regcf-*` goldens are wired;
+  `offering`, `handover` and `consultation` have no guarded gateway and are unchanged.
+  `P-BRANCHGUARD` is replaced by `P-DMNWIRED` where the wiring succeeds, and joined by
+  `P-NODMN` where a DMN was available and the gateway still could not be wired.
 
 Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
 
@@ -140,7 +148,8 @@ Each fixture produces two goldens under `expected/`:
   per target. Codes `F1`–`F5` are losses of the notation and cannot be fixed by
   writing more Haskell; codes `P-…` are this exporter's own doing — an
   approximation it made (`P-DEADLINE-UNIT`), a gateway it declined to invent
-  (`P-NOJOIN`), a guard it could only write as opaque text (`P-BRANCHGUARD`), or a
+  (`P-NOJOIN`), a guard it could only write as opaque text (`P-BRANCHGUARD`), a
+  guard it handed to DMN instead (`P-DMNWIRED`) or could not (`P-NODMN`), or a
   shape the `StateGraph` types permit that BPMN has no honest drawing for at all
   (`P-MULTI-HENCE`, `P-JUNCTION-OBLIGATION`, `P-CYCLE`).
   (DMN uses `D-…`, so a combined report never confuses the two.)
@@ -158,6 +167,21 @@ npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs \
 It reports parse errors, moddle warnings, unresolved references, boundary events
 without a trigger, and any flow node or sequence flow missing its diagram
 interchange. All six goldens parse with zero warnings.
+
+A third checker answers the question neither of the other two can — **does the
+`businessRuleTask` point at a decision that exists?** Zero install, zero
+dependencies, and it needs the DMN as well as the BPMN:
+
+```sh
+node etc/check-bpmn-dmn-refs.mjs jl4/examples/bpmn/expected/*.bpmn \
+                                 jl4/examples/dmn/expected/regcf-corpus.dmn
+```
+
+A dangling reference is a hard error, never a warning: it is the one defect this
+linkage can have that a reader cannot see, since the diagram still draws, the file
+still parses, and the delegation silently does nothing. Being handed no `.dmn` at
+all is also an error — with nothing to resolve against, every reference would
+"pass" vacuously. `etc/check-bpmn-dmn-refs.selftest.mjs` proves it can still fail.
 
 **It is not evidence that the diagram is right, and must never be cited as
 such.** It checks well-formedness, and well-formedness is exactly what a wrong
