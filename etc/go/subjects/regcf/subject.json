@@ -4,7 +4,15 @@
     "THIS body of law lives here; everything about the pipeline itself lives in",
     "etc/go/. Validated by etc/go/lib/subject.mjs, which refuses unknown keys",
     "and missing files. Free-prose idiosyncrasies live in NOTES.md, which no",
-    "script reads. All paths are repo-root-relative."
+    "script reads. All paths are repo-root-relative.",
+    "",
+    "'denovo' declares where this subject's G2 deposits live. Those paths'",
+    "EXISTENCE is optional and none of them is on this branch: producing them is",
+    "agent work (fetch, sweep, encode, fork), and the stages report SKIPPED with",
+    "a named reason until they appear. 'denovo.modules' may not name a corpus",
+    "module -- SPEC.md section 8's diff oracle compares the de novo encoding",
+    "AGAINST the committed one, so a de novo module that IS the corpus makes that",
+    "comparison an identity."
   ],
   "id": "regcf",
   "display_name": "SEC Regulation Crowdfunding",
@@ -17,6 +25,12 @@
   "checks": {
     "min_dated_arms": 2,
     "min_assertions": 20
+  },
+  "denovo": {
+    "bundle": "jl4/examples/legal/regcf/denovo/source-bundle.json",
+    "register": "jl4/examples/legal/regcf/denovo/external-modifications.json",
+    "fork_register": "jl4/examples/legal/regcf/denovo/fork-register.json",
+    "modules": ["jl4/examples/legal/regcf/denovo/regcf-denovo.l4"]
   },
   "legs": {
     "p7-dmn": {
