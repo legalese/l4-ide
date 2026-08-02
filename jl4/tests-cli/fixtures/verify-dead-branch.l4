@@ -1,0 +1,19 @@
+§ `VerifyDeadBranchFixture`
+
+-- Negative control: an OR limb that cannot hold in the context that reaches it.
+--
+-- `L4.Transform.simplify` puts the ladder body in CONJUNCTIVE normal form, so
+-- this reads as two clauses. Inside the second, the `NOT x` limb is dead,
+-- because the first clause already requires `x`. The rule means exactly
+-- `x AND y` and says so the long way.
+--
+-- The inner parentheses around `NOT x` are load-bearing: NOT binds LOOSER than
+-- OR here, so `NOT x OR y` parses as `NOT (x OR y)` and the fixture becomes an
+-- `unsat` (which is a different finding, and was what this file measured until
+-- the parentheses went in).
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `one limb is inoperative` IS
+  x AND ((NOT x) OR y)

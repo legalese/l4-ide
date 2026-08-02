@@ -1,0 +1,30 @@
+§ `VerifySeamFixture`
+
+-- Negative control for the seam families.
+--
+-- `l4 verify` reads a top-level IMPLIES as the rule's scope/requirement split,
+-- the same seam the ladder draws with two lamps, and asks after each verdict
+-- separately.
+
+-- (1) The scope is unsatisfiable: the rule reaches nobody, and is vacuously
+--     true for everybody. `vacuous-guard`.
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a rule that reaches nobody` IS
+  (x AND NOT x) IMPLIES y
+
+-- (2) Nothing within scope can meet the requirement: everyone the rule reaches
+--     is necessarily in breach. `unreachable-outcome`.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `everyone in scope is in breach` IS
+  x IMPLIES NOT x
+
+-- (3) The scope already entails the requirement, so nobody in scope can breach
+--     it. `unreachable-outcome`.
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a requirement that adds nothing` IS
+  (x AND y) IMPLIES x

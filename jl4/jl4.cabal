@@ -30,13 +30,16 @@ executable l4
   build-depends:
     jl4-core,
     jl4-lsp,
+    jl4-query-plan,
     aeson,
     bytestring,
     cassava,
+    containers,
     directory,
     filepath,
     hls-graph,
     lsp-types,
+    optics,
     process,
     text,
     time,
@@ -53,11 +56,13 @@ executable l4
     L4.Cli.Common
     L4.Cli.Export
     L4.Cli.Format
+    L4.Cli.Nlg
     L4.Cli.OpenFisca
     L4.Cli.Render
     L4.Cli.Run
     L4.Cli.StateGraph
     L4.Cli.Trace
+    L4.Cli.Verify
 
 executable jl4-schema
   import: defaults

@@ -14,6 +14,7 @@ import Options.Applicative
   , command
   , customExecParser
   , footer
+  , footerDoc
   , fullDesc
   , header
   , helper
@@ -24,6 +25,7 @@ import Options.Applicative
   , subparser
   )
 import qualified Options.Applicative as Options
+import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
@@ -31,11 +33,13 @@ import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
+import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
 import L4.Cli.Trace (TraceOptions, traceCmd, traceOptionsParser)
+import L4.Cli.Verify (VerifyOptions, propositionalBound, verifyCmd, verifyOptionsParser)
 
 ----------------------------------------------------------------------------
 -- Top-level command
@@ -52,6 +56,8 @@ data Command
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
+  | CmdNlg        NlgOptions
+  | CmdVerify     VerifyOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -91,6 +97,32 @@ commandParser =
       <> command "openfisca"
            (info (CmdOpenFisca <$> openFiscaOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
+      <> command "nlg"
+           (info (helper <*> (CmdNlg <$> nlgOptionsParser))
+             (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
+      -- `helper` here, and not on the older subcommands, is deliberate rather
+      -- than inconsistent-by-accident: `l4 <cmd> --help` answers
+      -- `Invalid option '--help'` for every subcommand that predates these two,
+      -- and this command's honesty about its own limits is delivered through
+      -- `footer`. A caveat nobody can reach is not a caveat. Extending `helper`
+      -- to the rest is a good idea and a separate change: the orchestrator's
+      -- p0-preflight pins CLI enumerations, and moving nine help surfaces at
+      -- once is not something to do inside a footing PR.
+      <> command "verify"
+           (info (helper <*> (CmdVerify <$> verifyOptionsParser))
+             (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
+               <> footerDoc (Just (verbatim propositionalBound))))
+
+-- | A footer that keeps the line breaks it was written with.
+--
+-- @footer@ takes a String and runs it through optparse-applicative's
+-- @paragraph@, which is @fillSep . words@: every newline becomes a space and
+-- the whole thing reflows into one wall of prose. For a caveat with five
+-- separately-quotable paragraphs that is a real loss — the text report and the
+-- @--help@ footer are the same string and must read the same way, because the
+-- run receipt points a reader at @--help@ for the full statement.
+verbatim :: String -> Pretty.Doc
+verbatim = Pretty.vsep . fmap Pretty.pretty . lines
 
 commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> commandParser)
@@ -134,6 +166,8 @@ main = do
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
+    CmdNlg        opts -> nlgCmd        opts
+    CmdVerify     opts -> verifyCmd     opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.
