@@ -218,7 +218,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_d_the_advancement_of_health_literal">
-      <text>false or (purpose.the_advancement_of_health or (false or purpose.the_prevention_or_relief_of_sickness_disease_or_human_suffering))</text>
+      <text>true and purpose.the_advancement_of_health or true and purpose.the_prevention_or_relief_of_sickness_disease_or_human_suffering</text>
     </literalExpression>
   </decision>
   <decision id="decision_e_the_saving_of_lives" name="e_the_saving_of_lives" label="(e) — the saving of lives">
@@ -236,7 +236,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_f_the_advancement_of_citizenship_or_community_development_literal">
-      <text>false or (purpose.the_advancement_of_citizenship_or_community_development or (false or (purpose.rural_or_urban_regeneration or (false or purpose.the_promotion_of_civic_responsibility_volunteering_the_voluntary_sector_or_the_effectiveness_or_efficiency_of_registered_charities))))</text>
+      <text>true and purpose.the_advancement_of_citizenship_or_community_development or (true and purpose.rural_or_urban_regeneration or true and purpose.the_promotion_of_civic_responsibility_volunteering_the_voluntary_sector_or_the_effectiveness_or_efficiency_of_registered_charities)</text>
     </literalExpression>
   </decision>
   <decision id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science" name="g_the_advancement_of_the_arts_heritage_culture_or_science" label="(g) — the advancement of the arts, heritage, culture or science">
@@ -254,7 +254,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_h_the_advancement_of_public_participation_in_sport_literal">
-      <text>true and (purpose.the_advancement_of_public_participation_in_sport and (true and purpose.sport_that_involves_physical_skill_and_exertion))</text>
+      <text>true and purpose.the_advancement_of_public_participation_in_sport and (true and purpose.sport_that_involves_physical_skill_and_exertion)</text>
     </literalExpression>
   </decision>
   <decision id="decision__2_d_the_recreational_facilities_restriction_is_satisfied" name="_2_d_the_recreational_facilities_restriction_is_satisfied" label="(2)(d) — the recreational-facilities restriction is satisfied">
@@ -263,7 +263,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision__2_d_the_recreational_facilities_restriction_is_satisfied_literal">
-      <text>false or (false or (purpose.primarily_intended_for_persons_who_have_need_of_them_by_reason_of_their_age_ill_health_disability_financial_hardship_or_other_disadvantage or (false or purpose.available_to_members_of_the_public_at_large_or_to_male_or_female_members_of_the_public_at_large)))</text>
+      <text>false or (true and purpose.primarily_intended_for_persons_who_have_need_of_them_by_reason_of_their_age_ill_health_disability_financial_hardship_or_other_disadvantage or true and purpose.available_to_members_of_the_public_at_large_or_to_male_or_female_members_of_the_public_at_large)</text>
     </literalExpression>
   </decision>
   <decision id="decision_i_the_provision_of_recreational_facilities_or_activities" name="i_the_provision_of_recreational_facilities_or_activities" label="(i) — the provision of recreational facilities or activities">
@@ -275,7 +275,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_i_the_provision_of_recreational_facilities_or_activities_literal">
-      <text>true and (purpose.the_provision_of_recreational_facilities_or_the_organisation_of_recreational_activities_with_the_object_of_improving_the_conditions_of_life_for_the_persons_for_whom_they_are_primarily_intended and _2_d_the_recreational_facilities_restriction_is_satisfied)</text>
+      <text>true and purpose.the_provision_of_recreational_facilities_or_the_organisation_of_recreational_activities_with_the_object_of_improving_the_conditions_of_life_for_the_persons_for_whom_they_are_primarily_intended and _2_d_the_recreational_facilities_restriction_is_satisfied</text>
     </literalExpression>
   </decision>
   <decision id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation" name="j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation" label="(j) — the advancement of human rights, conflict resolution or reconciliation">
@@ -320,7 +320,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_n_the_relief_of_those_in_need_literal">
-      <text>true and (true and purpose.the_relief_of_those_in_need_by_reason_of_age_ill_health_disability_financial_hardship_or_other_disadvantage)</text>
+      <text>true and purpose.the_relief_of_those_in_need_by_reason_of_age_ill_health_disability_financial_hardship_or_other_disadvantage and true</text>
     </literalExpression>
   </decision>
   <decision id="decision_o_the_advancement_of_animal_welfare" name="o_the_advancement_of_animal_welfare" label="(o) — the advancement of animal welfare">
@@ -338,7 +338,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_p_any_other_analogous_purpose_literal">
-      <text>false or (purpose.reasonably_regarded_as_analogous_to_any_of_the_purposes_listed_in_sub_paragraphs_a_to_o or (false or purpose.the_advancement_of_a_philosophical_belief_whether_or_not_involving_belief_in_a_god))</text>
+      <text>true and purpose.reasonably_regarded_as_analogous_to_any_of_the_purposes_listed_in_sub_paragraphs_a_to_o or true and purpose.the_advancement_of_a_philosophical_belief_whether_or_not_involving_belief_in_a_god</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_purpose_falls_within_paragraph_1" name="the_purpose_falls_within_paragraph_1" label="the purpose falls within paragraph (1)">
@@ -434,7 +434,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__7_2_b_the_section_of_the_public_question_was_reached_literal">
-      <text>false or (not(entity.the_public_benefit_finding.benefit_provided_to_a_section_of_the_public_only) or entity.the_public_benefit_finding.regard_had_to_the_question_required_by_Article_7_2_b)</text>
+      <text>not(entity.the_public_benefit_finding.benefit_provided_to_a_section_of_the_public_only) or entity.the_public_benefit_finding.regard_had_to_the_question_required_by_Article_7_2_b</text>
     </literalExpression>
   </decision>
   <decision id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit" name="_7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit" label="7(3)(a) — no charitable purpose was presumed to be for the public benefit">
@@ -494,7 +494,7 @@
       <requiredInput href="#input_purpose"/>
     </informationRequirement>
     <literalExpression id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_literal">
-      <text>true and (purpose.purely_ancillary_or_incidental_to_any_of_the_entity_s_charitable_purposes and (the_entity_has_at_least_one_charitable_purpose and not(_5_the_purpose_is_excluded_as_political)))</text>
+      <text>true and purpose.purely_ancillary_or_incidental_to_any_of_the_entity_s_charitable_purposes and (the_entity_has_at_least_one_charitable_purpose and not(_5_the_purpose_is_excluded_as_political))</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental" name="the_purpose_is_charitable_or_purely_ancillary_or_incidental" label="the purpose is charitable, or purely ancillary or incidental">
@@ -530,7 +530,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_literal">
-      <text>... "(a) all of its purposes are –" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)</text>
+      <text>... "(a)" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_entity_provides_or_intends_to_provide_public_benefit" name="the_entity_provides_or_intends_to_provide_public_benefit" label="the entity provides or intends to provide public benefit">
@@ -542,7 +542,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision_the_entity_provides_or_intends_to_provide_public_benefit_literal">
-      <text>false or (entity.the_public_benefit_finding.public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_provided_in_giving_effect_to_those_purposes or the_applicant_s_intention_limb)</text>
+      <text>entity.the_public_benefit_finding.public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_provided_in_giving_effect_to_those_purposes or the_applicant_s_intention_limb</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_applicant_s_intention_limb" name="the_applicant_s_intention_limb" label="the applicant&apos;s intention limb">
@@ -551,7 +551,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision_the_applicant_s_intention_limb_literal">
-      <text>true and (entity.an_applicant and entity.the_public_benefit_finding.public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_intended_to_be_provided_in_giving_effect_to_those_purposes)</text>
+      <text>entity.an_applicant and entity.the_public_benefit_finding.public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_intended_to_be_provided_in_giving_effect_to_those_purposes</text>
     </literalExpression>
   </decision>
   <decision id="decision__5_1_b_public_benefit" name="_5_1_b_public_benefit" label="5(1)(b) — public benefit">
@@ -566,7 +566,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__5_1_b_public_benefit_literal">
-      <text>true and (the_entity_provides_or_intends_to_provide_public_benefit and not(_7_3_b_the_entity_benefits_only_identified_natural_persons))</text>
+      <text>true and the_entity_provides_or_intends_to_provide_public_benefit and not(_7_3_b_the_entity_benefits_only_identified_natural_persons)</text>
     </literalExpression>
   </decision>
   <decision id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted" name="_5_2_direction_or_control_by_a_listed_person_is_expressly_permitted" label="5(2) — direction or control by a listed person is expressly permitted">
@@ -575,7 +575,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_literal">
-      <text>false or (false or (entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_Minister or (false or (entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_member_of_the_States_Assembly or (false or entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_any_equivalent_of_such_a_person_in_another_jurisdiction)))))</text>
+      <text>true and entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_Minister or (true and entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_member_of_the_States_Assembly or true and entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_any_equivalent_of_such_a_person_in_another_jurisdiction)</text>
     </literalExpression>
   </decision>
   <decision id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted" name="_5_2_governorship_by_a_listed_person_is_expressly_permitted" label="5(2) — governorship by a listed person is expressly permitted">
@@ -584,7 +584,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_literal">
-      <text>false or (false or (entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_a_Minister or (false or (entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_a_member_of_the_States_Assembly or (false or entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_any_equivalent_of_such_a_person_in_another_jurisdiction)))))</text>
+      <text>true and entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_a_Minister or (true and entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_a_member_of_the_States_Assembly or true and entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_any_equivalent_of_such_a_person_in_another_jurisdiction)</text>
     </literalExpression>
   </decision>
   <decision id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode" name="_5_2_a_listed_person_is_expressly_permitted_under_either_mode" label="5(2) — a listed person is expressly permitted under either mode">
@@ -599,7 +599,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_literal">
-      <text>false or (_5_2_direction_or_control_by_a_listed_person_is_expressly_permitted or _5_2_governorship_by_a_listed_person_is_expressly_permitted)</text>
+      <text>_5_2_direction_or_control_by_a_listed_person_is_expressly_permitted or _5_2_governorship_by_a_listed_person_is_expressly_permitted</text>
     </literalExpression>
   </decision>
   <decision id="decision__5_2_the_government_control_disqualification_applies" name="_5_2_the_government_control_disqualification_applies" label="5(2) — the government-control disqualification applies">
@@ -611,7 +611,7 @@
       <requiredInput href="#input_entity"/>
     </informationRequirement>
     <literalExpression id="decision__5_2_the_government_control_disqualification_applies_literal">
-      <text>true and (_5_2_a_listed_person_is_expressly_permitted_under_either_mode and (true and (entity.constitution.that_permission_extended_to_such_a_person_acting_in_that_capacity and (true and not(entity.specified_in_an_Order_under_Article_5_3_disapplying_paragraph_2)))))</text>
+      <text>true and _5_2_a_listed_person_is_expressly_permitted_under_either_mode and (entity.constitution.that_permission_extended_to_such_a_person_acting_in_that_capacity and (true and not(entity.specified_in_an_Order_under_Article_5_3_disapplying_paragraph_2)))</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_entity_meets_the_charity_test" name="the_entity_meets_the_charity_test" label="the entity meets the charity test">

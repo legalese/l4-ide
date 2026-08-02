@@ -128,7 +128,7 @@ KIE — `projections/evidence/kie.txt`:
 XSD    valid
 VALID  2 error(s), 0 warning(s)
        ERROR [ERR_COMPILING_FEEL] DMN: Error compiling FEEL expression 'any OF `the purpose is a charitable purpose`, (entity's purposes)' for name 'the_entity_has_at_least_one_charitable_purpose' on node 'the_entity_has_at_least_one_charitable_purpose': syntax error near 'OF' (DMN id: decision_the_entity_has_at_least_one_charitable_purpose_literal, Error compiling the referenced FEEL expression)
-       ERROR [ERR_COMPILING_FEEL] DMN: Error compiling FEEL expression '... "(a) all of its purposes are –" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)' for name '_5_1_a_all_of_its_purposes_are_charitable_or_ancillary' on node '_5_1_a_all_of_its_purposes_are_charitable_or_ancillary': syntax error near '..' (DMN id: decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_literal, Error compiling the referenced FEEL expression)
+       ERROR [ERR_COMPILING_FEEL] DMN: Error compiling FEEL expression '... "(a)" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)' for name '_5_1_a_all_of_its_purposes_are_charitable_or_ancillary' on node '_5_1_a_all_of_its_purposes_are_charitable_or_ancillary': syntax error near '..' (DMN id: decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_literal, Error compiling the referenced FEEL expression)
 BUILD  2 error(s) / 2 message(s)
 
 KIE 8.44.0.Final VERDICT: 1 file(s), 0 case(s), 4 error(s), 0 warning(s), 0/0 decision(s) SUCCEEDED, 0/0 value(s) as expected, 0/0 service output value(s) as expected   <<< FAILED
@@ -138,7 +138,7 @@ Camunda — `projections/evidence/camunda.txt`:
 
 ```
 PARSE  INVALID: FEEL expression: failed to parse expression 'any OF `the purpose is a charitable purpose`, (entity's purposes)': Expected (binaryComparison | between | instanceOf | in | "and" | "or" | end-of-input):1:5, found "OF `the pu"
-FEEL expression: failed to parse expression '... "(a) all of its purposes are –" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)': Expected (start-of-input | ifOp | forOp | quantifiedOp | disjunction):1:1, found "... \"(a) a"
+FEEL expression: failed to parse expression '... "(a)" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)': Expected (start-of-input | ifOp | forOp | quantifiedOp | disjunction):1:1, found "... \"(a)\" "
 
 Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 0 case(s), 0 parsed, 1 error(s), 0/0 decision(s) evaluated, 0/0 value(s) as expected   <<< FAILED
 ```
@@ -157,7 +157,7 @@ bodies replaced by hand**, and nothing else touched:
 | node                                              | emitted (raw L4)                                          | probe (FEEL)                                                     |
 | ------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
 | `the_entity_has_at_least_one_charitable_purpose`  | ``any OF `the purpose is a charitable purpose`, (entity's purposes)`` | `some p in entity.purposes satisfies the_purpose_is_a_charitable_purpose(purpose: p, …)` |
-| `_5_1_a_all_of_its_purposes_are_charitable_or_ancillary` | `... "(a) all of its purposes are –" AND all OF (GIVEN purpose IS purpose254 YIELD …)` | `every p in entity.purposes satisfies the_purpose_is_charitable_or_purely_ancillary_or_incidental` |
+| `_5_1_a_all_of_its_purposes_are_charitable_or_ancillary` | `... "(a)" AND all OF (GIVEN purpose IS purpose254 YIELD …)` | `every p in entity.purposes satisfies the_purpose_is_charitable_or_purely_ancillary_or_incidental` |
 
 It is a **probe, not an emitter output**, and it is committed only as evidence for what
 follows. Measured on the same 25-case file, verbatim:

@@ -187,22 +187,19 @@ DECLARE Entity HAS
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(a) — the prevention or relief of poverty` purpose MEANS
-        "(a) the prevention or relief of poverty;"
-    ... purpose's `the prevention or relief of poverty`
+        "(a)" ... purpose's `the prevention or relief of poverty`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(b)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(b) — the advancement of education` purpose MEANS
-        "(b) the advancement of education;"
-    ... purpose's `the advancement of education`
+        "(b)" ... purpose's `the advancement of education`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(c)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(c) — the advancement of religion` purpose MEANS
-        "(c) the advancement of religion;"
-    ... purpose's `the advancement of religion`
+        "(c)" ... purpose's `the advancement of religion`
 
 -- 6(2)(a) WIDENS head (d): "the advancement of health" includes "the
 -- prevention or relief of sickness, disease or human suffering". A widening,
@@ -213,17 +210,14 @@ GIVETH A BOOLEAN
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(d) — the advancement of health` purpose MEANS
-        "(d) the advancement of health;"
-    ..  purpose's `the advancement of health`
-    ..  "(2)(a) in paragraph (1)(d), \"the advancement of health\" includes the prevention or relief of sickness, disease or human suffering;"
-    ..  purpose's `the prevention or relief of sickness, disease or human suffering`
+        "(d)" ... purpose's `the advancement of health`
+    ..  "(2)(a)" ... purpose's `the prevention or relief of sickness, disease or human suffering`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(e)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(e) — the saving of lives` purpose MEANS
-        "(e) the saving of lives;"
-    ... purpose's `the saving of lives`
+        "(e)" ... purpose's `the saving of lives`
 
 -- 6(2)(b) WIDENS head (f) with two named inclusions. Same reasoning as (2)(a):
 -- rural regeneration and the promotion of the voluntary sector are distinct
@@ -233,19 +227,15 @@ GIVETH A BOOLEAN
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(f) — the advancement of citizenship or community development` purpose MEANS
-        "(f) the advancement of citizenship or community development;"
-    ..  purpose's `the advancement of citizenship or community development`
-    ..  "(2)(b)(i) rural or urban regeneration, and"
-    ..  purpose's `rural or urban regeneration`
-    ..  "(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities;"
-    ..  purpose's `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities`
+        "(f)" ... purpose's `the advancement of citizenship or community development`
+    ..  "(2)(b)(i)" ... purpose's `rural or urban regeneration`
+    ..  "(2)(b)(ii)" ... purpose's `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(g)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(g) — the advancement of the arts, heritage, culture or science` purpose MEANS
-        "(g) the advancement of the arts, heritage, culture or science;"
-    ... purpose's `the advancement of the arts, heritage, culture or science`
+        "(g)" ... purpose's `the advancement of the arts, heritage, culture or science`
 
 -- 6(2)(c) GATES head (h): it is a stipulative definition of "sport" INSIDE
 -- (1)(h), so an activity that is not sport in that sense cannot advance public
@@ -267,10 +257,8 @@ GIVETH A BOOLEAN
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(h) — the advancement of public participation in sport` purpose MEANS
-        "(h) the advancement of public participation in sport;"
-    ... purpose's `the advancement of public participation in sport`
-    ... "(2)(c) in paragraph (1)(h), \"sport\" means sport that involves physical skill and exertion;"
-    ... purpose's `sport that involves physical skill and exertion`
+        "(h)" ... purpose's `the advancement of public participation in sport`
+    ... "(2)(c)" ... purpose's `sport that involves physical skill and exertion`
 
 -- 6(2)(d) GATES head (i) with an express "applies only in relation to"
 -- restriction, whose own two limbs are disjoined ((i) OR (ii)).
@@ -279,46 +267,39 @@ GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(2)(d) — the recreational-facilities restriction is satisfied` purpose MEANS
         "(2)(d) paragraph (1)(i) applies only in relation to recreational facilities or activities that are –"
-    ..  "(i) primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage, or"
-    ..  purpose's `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage`
-    ..  "(ii) available to members of the public at large or to male or female members of the public at large;"
-    ..  purpose's `available to members of the public at large or to male or female members of the public at large`
+    ..  "(i)" ... purpose's `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage`
+    ..  "(ii)" ... purpose's `available to members of the public at large or to male or female members of the public at large`
 
 @ref Charities (Jersey) Law 2014, Articles 6(1)(i) and 6(2)(d)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(i) — the provision of recreational facilities or activities` purpose MEANS
-        "(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended;"
-    ... purpose's `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended`
+        "(i)" ... purpose's `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended`
     ... `(2)(d) — the recreational-facilities restriction is satisfied` purpose
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(j)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(j) — the advancement of human rights, conflict resolution or reconciliation` purpose MEANS
-        "(j) the advancement of human rights, conflict resolution or reconciliation;"
-    ... purpose's `the advancement of human rights, conflict resolution or reconciliation`
+        "(j)" ... purpose's `the advancement of human rights, conflict resolution or reconciliation`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(k)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(k) — the promotion of religious or racial harmony` purpose MEANS
-        "(k) the promotion of religious or racial harmony;"
-    ... purpose's `the promotion of religious or racial harmony`
+        "(k)" ... purpose's `the promotion of religious or racial harmony`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(l)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(l) — the promotion of equality and diversity` purpose MEANS
-        "(l) the promotion of equality and diversity;"
-    ... purpose's `the promotion of equality and diversity`
+        "(l)" ... purpose's `the promotion of equality and diversity`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(m)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(m) — the advancement of environmental protection or improvement` purpose MEANS
-        "(m) the advancement of environmental protection or improvement;"
-    ... purpose's `the advancement of environmental protection or improvement`
+        "(m)" ... purpose's `the advancement of environmental protection or improvement`
 
 -- AMBIGUITY A2 — 6(2)(e), "paragraph (1)(n) includes relief given by the
 -- provision of accommodation or care".
@@ -340,16 +321,14 @@ GIVETH A BOOLEAN
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(n) — the relief of those in need` purpose MEANS
-        "(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage;"
+        "(n)" ... purpose's `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage`
     ... "(2)(e) paragraph (1)(n) includes relief given by the provision of accommodation or care;"
-    ... purpose's `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage`
 
 @ref Charities (Jersey) Law 2014, Article 6(1)(o)
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(o) — the advancement of animal welfare` purpose MEANS
-        "(o) the advancement of animal welfare;"
-    ... purpose's `the advancement of animal welfare`
+        "(o)" ... purpose's `the advancement of animal welfare`
 
 -- 6(2)(f) DEEMS into head (p): philosophical belief is declared analogous to
 -- (1)(c), and (1)(p) admits anything analogous to (a)-(o). So the deeming
@@ -373,10 +352,8 @@ GIVETH A BOOLEAN
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(p) — any other analogous purpose` purpose MEANS
-        "(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)."
-    ..  purpose's `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`
-    ..  "(2)(f) for the purposes of paragraph (1)(p), the advancement of any philosophical belief (whether or not involving belief in a god) is analogous to the purpose set out in paragraph (1)(c)."
-    ..  purpose's `the advancement of a philosophical belief (whether or not involving belief in a god)`
+        "(p)" ... purpose's `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`
+    ..  "(2)(f)" ... purpose's `the advancement of a philosophical belief (whether or not involving belief in a god)`
 
 -- --- 6(1), the disjunction of the heads ------------------------------------
 
@@ -428,8 +405,7 @@ GIVETH A BOOLEAN
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
 `(5) — the purpose is excluded as political` purpose MEANS
-        "(5) The purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere, is neither a charitable purpose nor a purpose ancillary or incidental to a charitable purpose, irrespective of whether it would otherwise fall within paragraph (1) or Article 5(1)(a)(ii)."
-    ... purpose's `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`
+        "(5)" ... purpose's `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`
 
 @ref Charities (Jersey) Law 2014, Article 6 — read with Article 1
 GIVEN purpose IS A Purpose
@@ -471,8 +447,7 @@ DECIDE `the purpose is a charitable purpose` purpose IF
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `7(3)(b) — the entity benefits only identified natural persons` entity MEANS
-        "(3) The person determining the question must not – ... (b) treat one particular natural person or a group of identified natural persons as being a section of the public, and accordingly must not treat an entity that benefits only such a person or persons as providing public benefit."
-    ... entity's `the public benefit finding`'s `benefit provided only to one particular natural person or to a group of identified natural persons`
+        "(3)(b)" ... entity's `the public benefit finding`'s `benefit provided only to one particular natural person or to a group of identified natural persons`
 
 -- AMBIGUITY A7 — whether an "unduly restrictive" condition under 7(2)(b)
 -- DEFEATS public benefit.
@@ -506,16 +481,14 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `7(2)(b) — the section-of-the-public question was reached` entity MEANS
-        "if benefit is, or is likely to be, provided to a section of the public only,"
-    ..  NOT entity's `the public benefit finding`'s `benefit provided to a section of the public only`
+        NOT entity's `the public benefit finding`'s `benefit provided to a section of the public only`
     ..  entity's `the public benefit finding`'s `regard had to the question required by Article 7(2)(b)`
 
 @ref Charities (Jersey) Law 2014, Article 7(3)(a)
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `7(3)(a) — no charitable purpose was presumed to be for the public benefit` entity MEANS
-        "(3) The person determining the question must not – (a) presume any particular charitable purpose to be for the public benefit; or"
-    ... NOT entity's `the public benefit finding`'s `a particular charitable purpose presumed to be for the public benefit`
+        "(3)(a)" ... NOT entity's `the public benefit finding`'s `a particular charitable purpose presumed to be for the public benefit`
 
 -- AMBIGUITY A8 — the consequence of a determiner IGNORING a 7(2) consideration
 -- or breaching the 7(3)(a) no-presumption rule.
@@ -566,8 +539,7 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity, purpose IS A Purpose
 GIVETH A BOOLEAN
 `(ii) — the purpose is purely ancillary or incidental` entity purpose MEANS
-        "(ii) purposes that are purely ancillary or incidental to any of its charitable purposes; and"
-    ... purpose's `purely ancillary or incidental to any of the entity's charitable purposes`
+        "(ii)" ... purpose's `purely ancillary or incidental to any of the entity's charitable purposes`
     ... `the entity has at least one charitable purpose` entity
     ... NOT `(5) — the purpose is excluded as political` purpose
 
@@ -575,7 +547,7 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity, purpose IS A Purpose
 GIVETH A BOOLEAN
 `the purpose is charitable, or purely ancillary or incidental` entity purpose MEANS
-        "(i) charitable purposes, or"
+        "(i)"
     ..  `the purpose is a charitable purpose` purpose
     ..  `(ii) — the purpose is purely ancillary or incidental` entity purpose
 
@@ -597,9 +569,8 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `5(1)(a) — all of its purposes are charitable or ancillary` entity MEANS
-        "(a) all of its purposes are –"
-    ... all (GIVEN purpose YIELD `the purpose is charitable, or purely ancillary or incidental` entity purpose)
-            (entity's `purposes`)
+        "(a)" ... all (GIVEN purpose YIELD `the purpose is charitable, or purely ancillary or incidental` entity purpose)
+                      (entity's `purposes`)
 
 -- --- 5(1)(b): public benefit ------------------------------------------------
 
@@ -619,24 +590,21 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `the entity provides or intends to provide public benefit` entity MEANS
-        "it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree."
-    ..  entity's `the public benefit finding`'s `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes`
+        entity's `the public benefit finding`'s `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes`
     ..  `the applicant's intention limb` entity
 
 @ref Charities (Jersey) Law 2014, Article 5(1)(b)
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `the applicant's intention limb` entity MEANS
-        "(or, in the case of an applicant, provides or intends to provide)"
-    ... entity's `an applicant`
+        entity's `an applicant`
     ... entity's `the public benefit finding`'s `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes`
 
 @ref Charities (Jersey) Law 2014, Articles 5(1)(b) and 7(3)(b)
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `5(1)(b) — public benefit` entity MEANS
-        "(b) in giving effect to those purposes, it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree."
-    ... `the entity provides or intends to provide public benefit` entity
+        "(b)" ... `the entity provides or intends to provide public benefit` entity
     ... NOT `7(3)(b) — the entity benefits only identified natural persons` entity
 
 -- --- 5(2) and 5(3): the government-control carve-out ------------------------
@@ -665,32 +633,23 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `5(2) — direction or control by a listed person is expressly permitted` entity MEANS
-        "its constitution expressly permits its activities to be directed or otherwise controlled by"
-    ..  "(a) a Minister;"
-    ..  entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by a Minister`
-    ..  "(b) a member of the States Assembly; or"
-    ..  entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly`
-    ..  "(c) any equivalent of such a person in another jurisdiction,"
-    ..  entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction`
+        "(a)" ... entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by a Minister`
+    ..  "(b)" ... entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly`
+    ..  "(c)" ... entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction`
 
 @ref Charities (Jersey) Law 2014, Article 5(2)
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `5(2) — governorship by a listed person is expressly permitted` entity MEANS
-        "or any of its governors to be –"
-    ..  "(a) a Minister;"
-    ..  entity's `constitution`'s `express permission for any of the entity's governors to be a Minister`
-    ..  "(b) a member of the States Assembly; or"
-    ..  entity's `constitution`'s `express permission for any of the entity's governors to be a member of the States Assembly`
-    ..  "(c) any equivalent of such a person in another jurisdiction,"
-    ..  entity's `constitution`'s `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction`
+        "(a)" ... entity's `constitution`'s `express permission for any of the entity's governors to be a Minister`
+    ..  "(b)" ... entity's `constitution`'s `express permission for any of the entity's governors to be a member of the States Assembly`
+    ..  "(c)" ... entity's `constitution`'s `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction`
 
 @ref Charities (Jersey) Law 2014, Article 5(2)
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `5(2) — a listed person is expressly permitted under either mode` entity MEANS
-        "if its constitution expressly permits its activities to be directed or otherwise controlled by, or any of its governors to be –"
-    ..  `5(2) — direction or control by a listed person is expressly permitted` entity
+        `5(2) — direction or control by a listed person is expressly permitted` entity
     ..  `5(2) — governorship by a listed person is expressly permitted` entity
 
 -- 5(3) makes the whole of 5(2) defeasible by Ministerial Order. The Order
@@ -700,12 +659,9 @@ GIVETH A BOOLEAN
 GIVEN entity IS AN Entity
 GIVETH A BOOLEAN
 `5(2) — the government-control disqualification applies` entity MEANS
-        "(2) An entity that otherwise meets the charity test, nevertheless does not meet that test, despite paragraph (1), if its constitution expressly permits ..."
-    ... `5(2) — a listed person is expressly permitted under either mode` entity
-    ... "acting in that capacity."
+        "(2)" ... `5(2) — a listed person is expressly permitted under either mode` entity
     ... entity's `constitution`'s `that permission extended to such a person acting in that capacity`
-    ... "(3) The Minister may by Order disapply paragraph (2) in relation to any entity or description of entity specified in the Order."
-    ... NOT entity's `specified in an Order under Article 5(3) disapplying paragraph (2)`
+    ... "(3)" ... NOT entity's `specified in an Order under Article 5(3) disapplying paragraph (2)`
 
 -- --- The test ---------------------------------------------------------------
 

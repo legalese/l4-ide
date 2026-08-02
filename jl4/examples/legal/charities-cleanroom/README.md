@@ -3,10 +3,18 @@
 A cleanroom smoke test: the charity-test cluster of the **Charities (Jersey) Law 2014** (L.41/2014),
 encoded from the primary source in inert house style, with every interpretive choice registered.
 
+**Inert never shadows active** (Meng's enumeration-label ruling, 2026-08-03). Where an inert string
+merely restated the field beside it, the string is gone and only the statutory item's label survives,
+on its node's own line, joined by `...` — `` "(a)" ... purpose's `the prevention or relief of poverty` ``.
+Strings that carry something no active node carries stay whole: the Article 1 and Article 2(4)/(6)/(7)
+definitional chains (no operands at all), Article 6(2)(e) (deliberately no operand, ambiguity **A2**),
+and the Article 7(2)(a)/(b) considerations, which are the content of a cross-reference the operand
+names but does not state.
+
 | file                                     | what it is                                                                        |
 | ---------------------------------------- | --------------------------------------------------------------------------------- |
 | [`SOURCE-EXTRACT.md`](SOURCE-EXTRACT.md) | verbatim source text with fetch provenance and quote-hygiene statement            |
-| [`charity-test.l4`](charity-test.l4)     | the encoding — 1 472 lines, 45 `@ref` citations, 102 `#ASSERT`s                   |
+| [`charity-test.l4`](charity-test.l4)     | the encoding — 1 428 lines, 45 `@ref` citations, 102 `#ASSERT`s                   |
 | `README.md`                              | this file: article map, ambiguity register, run evidence, integrity declaration   |
 | [`PROJECTIONS.md`](PROJECTIONS.md)       | the DMN/BPMN projections, both engine verdicts, and the five exporter gaps found  |
 | [`charity-test.cases.json`](charity-test.cases.json) | 25 worlds × 40 decisions, every pin L4-evaluated                      |
