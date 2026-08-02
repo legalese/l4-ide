@@ -1,12 +1,18 @@
 # Lexipedia probe — `reg_cf_exemptions` and the surrounding site
 
-**Status: R2 probe, measured 2026-08-02; read-only; no contact was made.**
+**Status: R2 probe, measured 2026-08-02; read-only; no contact was made. Adversarially re-verified
+2026-08-02 by a second pass that re-fetched the load-bearing pages independently and re-derived
+every our-side figure from the tree.** That pass found four defects and fixed them forward; each is
+recorded inline as a _Verification correction_ block rather than silently overwritten — §1.4 (the
+`$107,000` count), §1.5 (the revision history), §2.5 (the charities element counts), and §5 (the
+number of live sites carrying our own stale `55`). Every other measured claim re-derived unchanged,
+including all verbatim quotations and all byte counts.
 
 Every external claim below carries a URL, a fetch date, and a quote or a machine-derived count.
-Every claim about *our* corpus is re-derived from this tree at the commit this file lands on, not
+Every claim about _our_ corpus is re-derived from this tree at the commit this file lands on, not
 recalled. Anything that could not be fetched is marked **UNMEASURED** and is not guessed.
 
-This is reconnaissance. It contains no sentence about what Lexipedia *should* do, and no plan for
+This is reconnaissance. It contains no sentence about what Lexipedia _should_ do, and no plan for
 contacting anyone: the pathway question — whether and how L4-derived artifacts might reach that
 wiki — is **Meng's conversation with Anson**, gate HG2, and is out of scope here.
 
@@ -66,10 +72,9 @@ Every dollar figure on the page, quoted verbatim from the raw source:
 **Citations.** The page carries **two** hyperlinks in the whole of its prose, both external, both in
 the Overview:
 
-> `[[https://www.sec.gov/education/smallbusiness/exemptofferings/regcrowdfunding|SEC Regulation Crowdfunding]]`
-> `[[https://www.wikidata.org/wiki/Q348303|Wikidata: Crowdfunding]]`
+> `[[https://www.sec.gov/education/smallbusiness/exemptofferings/regcrowdfunding|SEC Regulation Crowdfunding]]` > `[[https://www.wikidata.org/wiki/Q348303|Wikidata: Crowdfunding]]`
 
-The first is the SEC's small-business *education* landing page, not the regulation. There is **no
+The first is the SEC's small-business _education_ landing page, not the regulation. There is **no
 citation to 17 CFR Part 227 anywhere on the page** — no part number, no section number, no
 paragraph. Two rules are named in running prose without numbers of their own hierarchy:
 `"bad actor" rules (Rule 503 of Regulation Crowdfunding)` and `Rule 504 of Regulation D`; one statute
@@ -82,18 +87,18 @@ threshold on the page.
 
 ### 1.3 Freshness — mixed, and the mixture is the finding
 
-The page is not uniformly stale. It carries *some* 2021 and 2022 changes and not others.
+The page is not uniformly stale. It carries _some_ 2021 and 2022 changes and not others.
 
-| Amendment | Carried on their page? | Evidence |
-|---|---|---|
-| 2021 offering limit → $5,000,000 (Rel. 33-10884) | **yes** | "up to $5 million in a 12-month period" |
-| 2021 accredited-investor carve-out (Rel. 33-10884) | **yes** | "Accredited investors have no limits" |
-| 2021 "lesser of" → **"greater of"** measure (Rel. 33-10884) | **no** | still "5% of **the lesser** of annual income or net worth", twice |
-| 2022 financial-statement tiers → $124,000 / $618,000 (Rel. 33-11098) | **yes** | "up to $124,000", "between $124,000 and $618,000" |
-| 2022 investor cut point → $124,000 (same release, instr. 2.a) | **no** | still "$107,000", twice |
-| 2022 investor floor → $2,500 (same release, instr. 2.a) | **no** | still "$2,200" |
+| Amendment                                                            | Carried on their page? | Evidence                                                          |
+| -------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------- |
+| 2021 offering limit → $5,000,000 (Rel. 33-10884)                     | **yes**                | "up to $5 million in a 12-month period"                           |
+| 2021 accredited-investor carve-out (Rel. 33-10884)                   | **yes**                | "Accredited investors have no limits"                             |
+| 2021 "lesser of" → **"greater of"** measure (Rel. 33-10884)          | **no**                 | still "5% of **the lesser** of annual income or net worth", twice |
+| 2022 financial-statement tiers → $124,000 / $618,000 (Rel. 33-11098) | **yes**                | "up to $124,000", "between $124,000 and $618,000"                 |
+| 2022 investor cut point → $124,000 (same release, instr. 2.a)        | **no**                 | still "$107,000", twice                                           |
+| 2022 investor floor → $2,500 (same release, instr. 2.a)              | **no**                 | still "$2,200"                                                    |
 
-So the **same release**, on the **same day**, moved figures the page updated *and* figures it did
+So the **same release**, on the **same day**, moved figures the page updated _and_ figures it did
 not. This is the internal inconsistency our `README.md` §3.3 already records: `$107,000` in their
 group 3 sits beside `$124,000` in their group 4, and the two moved in lockstep by separate
 amendatory instructions of Release 33-11098 (87 FR 57394, 57398).
@@ -104,7 +109,7 @@ the arithmetic: an investor with $60,000 income and $200,000 net worth is limite
 the rule in force, and to $3,000 under the rule as the page states it.
 
 **Why the staleness is not explained by age.** From `do=revisions`, fetched 2026-08-02, the prose
-section is *recent*:
+section is _recent_:
 
 > `2026/02/10 16:23 reg_cf_exemptions – Added structured metadata per Lexipedia BPMN Model Metadata Standard (Tier 1 required + select Tier 2/3/4 fields). Restructured page with Overview, Detailed Requirements, and BPMN Model sections. admin +1.4 KB`
 
@@ -117,20 +122,20 @@ was written correctly and then aged.
 **Correction, logged deliberately.** The first tool-summarised fetch of this page reported "an
 embedded Base64-encoded BPMN diagram". That is **wrong**, and the raw bytes disprove it: the BPMN
 travels as **plain inline XML** inside a `<bpmnio type="bpmn">` block, not base64. The same
-summarised fetch also missed that the rendered HTML contains a *second*, DMN-shaped XML blob. Raw
+summarised fetch also missed that the rendered HTML contains a _second_, DMN-shaped XML blob. Raw
 inspection resolves that too — see below. Both errors are recorded here rather than quietly fixed,
 because they are exactly the failure mode this probe exists to avoid.
 
 Machine-derived properties of their Reg CF BPMN (from the raw source, 2026-08-02):
 
-| property | value |
-|---|---|
-| `<bpmnio>` blocks on the page | 1, `type="bpmn"` |
-| `isExecutable` | `"false"` |
-| `<businessRuleTask>` | **0** |
-| `<conditionExpression>` | **0** |
-| tasks / exclusive gateways / start / end | 9 / 3 / 1 / 1 |
-| DMN on this page | **none** |
+| property                                 | value            |
+| ---------------------------------------- | ---------------- |
+| `<bpmnio>` blocks on the page            | 1, `type="bpmn"` |
+| `isExecutable`                           | `"false"`        |
+| `<businessRuleTask>`                     | **0**            |
+| `<conditionExpression>`                  | **0**            |
+| tasks / exclusive gateways / start / end | 9 / 3 / 1 / 1    |
+| DMN on this page                         | **none**         |
 
 Three observations about the diagram itself, all from element names in the raw XML:
 
@@ -142,25 +147,47 @@ Three observations about the diagram itself, all from element names in the raw X
    `name="Offering Limit Check"`, which flows into a task `name="Check Investor Limits"`. The
    offering limit was already checked upstream at `task1 name="Check Offering Limit"`.
 3. **The branch labels carry the stale figure too.** The sequence flows are labelled
-   `name="Income/Net Worth &#60; $107,000"` and `name="Income/Net Worth &#62;= $107,000"` — so
-   `$107,000` appears on the page a **third** time, inside the diagram, where a reader correcting
-   the prose would not think to look. The diagram and the prose are two hand-maintained copies of
-   one number with nothing linking them.
+   `name="Income/Net Worth &#60; $107,000"` (raw line 141) and
+   `name="Income/Net Worth &#62;= $107,000"` (raw line 143) — so `$107,000` appears on the page
+   **four** times in all: twice in the prose (raw lines 22 and 24) and twice more inside the
+   diagram, where a reader correcting the prose would not think to look. The diagram and the prose
+   are hand-maintained copies of one number with nothing linking them.
+
+   > _Verification correction, 2026-08-02._ An earlier draft of this section said "a **third**
+   > time", counting the two flow labels as one. `grep -c` on the raw source gives **4** occurrences
+   > of the string `$107,000`. The corrected count is four; every downstream figure in §5.1 and §5.2
+   > uses four.
 
 **The DMN blob in the rendered HTML is not content.** The rendered page contains DMN XML with
 `decision id="dish-decision"`, `"season"`, `"guestCount"` and rules returning `"Spareribs"`,
 `"Light salad"`, `"Steak"`. That is the stock dmn-js demo model, shipped inside the editor
 **toolbar's** "Add a DMN diagram" insert template — it appears in the `var toolbar = [...]`
-JavaScript on *every* page of the wiki, including pages that do not exist. It is not on the Reg CF
+JavaScript on _every_ page of the wiki, including pages that do not exist. It is not on the Reg CF
 page's content. Verified by `do=export_raw`, which contains no DMN.
 
 ### 1.5 Authorship signals
 
-From `do=revisions`, fetched 2026-08-02: **every** revision of this page is attributed to `admin`,
-except one `2026/01/05 20:27 … external edit 127.0.0.1`. Fifteen revisions are visible, from
-`2024/11/12 17:36` to `2026/06/19 23:28`. Ten of them carry the summary `[Edit diagram]`, which is
-the `bpmnio` WYSIWYG editor's automatic summary — i.e. most of the page's history is diagram
-fiddling, not prose revision.
+From `do=revisions`, fetched 2026-08-02: **eighteen** revision rows are listed, from
+`2024/10/14 12:56` to `2026/06/19 23:28`. **Fourteen** are attributed to `admin`; **four** read
+`external edit 127.0.0.1` — `2026/01/05 20:27`, `2024/11/04 19:45`, and both `2024/10/14 12:58`
+rows — and, notably, so does the page's **creation**:
+
+> `2024/10/14 12:56 reg_cf_exemptions – created - external edit 127.0.0.1 +12.2 KB`
+
+Ten rows carry the summary `[Edit diagram]`, which is the `bpmnio` WYSIWYG editor's automatic
+summary — i.e. most of the page's history is diagram fiddling, not prose revision.
+
+`external edit … 127.0.0.1` is what DokuWiki records when a page's `.txt` file changes on disk
+outside the wiki UI, with no logged-in user. That is the **same signature** as the
+`process:je:charities-2014` namespace (§2.5). It is a shared _mechanism_, not evidence of a shared
+_source_: a filesystem write, an import script, and a server-side maintenance job all record
+identically. See §6.1 — origin remains **UNMEASURED** for both.
+
+> _Verification correction, 2026-08-02._ An earlier draft said "fifteen revisions … from
+> `2024/11/12 17:36`", and "every revision … except one `127.0.0.1`". Re-extracting the `<li>` rows
+> from the fetched `do=revisions` HTML gives **18** rows, an earliest of `2024/10/14 12:56`, and
+> **four** `127.0.0.1` rows. The creation row was the one missed, and it is the most consequential
+> of them.
 
 Footer, quoted from the rendered page:
 
@@ -193,27 +220,26 @@ which documents it in their own words:
 > Editing is done through simple text markup — no special software required."
 
 Headings are `====== … ======` down to `== … ==`; tables are `^ header ^` / `| cell |`; lists are
-two-space-indented `*` and `-`. Note the inversion their guide flags explicitly — *more* equals
-signs means a *higher*-level heading, the opposite of MediaWiki.
+two-space-indented `*` and `-`. Note the inversion their guide flags explicitly — _more_ equals
+signs means a _higher_-level heading, the opposite of MediaWiki.
 
 ### 2.3 Plugins in evidence
 
 Detected from asset paths, `JSINFO` plugin config, and syntax actually used in raw page sources
 (all 2026-08-02):
 
-| plugin | evidence |
-|---|---|
-| **bpmnio** | `<bpmnio type="bpmn">` / `type="dmn"` syntax; assets `/lib/plugins/bpmnio/images/toolbar/{bpmn_add,dmn_add,picker}.png`; CSS classes `plugin-bpmnio`, `plugin-bpmnio icon-large` |
-| **struct** | `JSINFO.plugins.struct = {"isPageEditor":false,…}`; `define` page uses `struct_schema "process"` and links `https://www.dokuwiki.org/plugin:struct` |
-| **bureaucracy** (or equivalent `<form>` handler) | `define` page contains `<form> action template define_templates:process_stub …</form>` blocks |
-| **vshare** | `JSINFO.plugins.vshare` with a youtube/vimeo/… regex table; `start` uses `{{youtube>2rnyY7xew7c?}}` |
-| **mermaid** | `/lib/plugins/mermaid/mermaid.css`; page JS does `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.esm.min.mjs'` |
-| **move** | `JSINFO.move_renameokay`, `JSINFO.move_allowrename` |
+| plugin                                           | evidence                                                                                                                                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **bpmnio**                                       | `<bpmnio type="bpmn">` / `type="dmn"` syntax; assets `/lib/plugins/bpmnio/images/toolbar/{bpmn_add,dmn_add,picker}.png`; CSS classes `plugin-bpmnio`, `plugin-bpmnio icon-large` |
+| **struct**                                       | `JSINFO.plugins.struct = {"isPageEditor":false,…}`; `define` page uses `struct_schema "process"` and links `https://www.dokuwiki.org/plugin:struct`                              |
+| **bureaucracy** (or equivalent `<form>` handler) | `define` page contains `<form> action template define_templates:process_stub …</form>` blocks                                                                                    |
+| **vshare**                                       | `JSINFO.plugins.vshare` with a youtube/vimeo/… regex table; `start` uses `{{youtube>2rnyY7xew7c?}}`                                                                              |
+| **mermaid**                                      | `/lib/plugins/mermaid/mermaid.css`; page JS does `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.esm.min.mjs'`                                           |
+| **move**                                         | `JSINFO.move_renameokay`, `JSINFO.move_allowrename`                                                                                                                              |
 
 The `bpmnio` toolbar templates disclose the embedded editor versions:
 
-> `exporter="bpmn-js (https://demo.bpmn.io)" exporterVersion="18.3.1"`
-> `exporter="dmn-js (https://demo.bpmn.io/dmn)" exporterVersion="17.0.2"`
+> `exporter="bpmn-js (https://demo.bpmn.io)" exporterVersion="18.3.1"` > `exporter="dmn-js (https://demo.bpmn.io/dmn)" exporterVersion="17.0.2"`
 
 and the DMN template declares `xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"` — **DMN 1.3**.
 
@@ -223,7 +249,7 @@ This is a mechanical observation about the plugin, not a proposal.
 
 The `bpmnio` plugin takes the **XML inline in the page source**, wrapped in
 `<bpmnio type="bpmn">…</bpmnio>` or `<bpmnio type="dmn">…</bpmnio>`. There is no file attachment, no
-`{{media}}` reference, and no external URL involved: the diagram *is* wiki text, versioned in the
+`{{media}}` reference, and no external URL involved: the diagram _is_ wiki text, versioned in the
 page's own revision history, and editable both as markup and through the embedded bpmn-js/dmn-js
 WYSIWYG canvas (which is what produces the `[Edit diagram]` revision summaries). Consequences that
 follow directly:
@@ -276,13 +302,11 @@ dmn-appeal  dmn-terms
 **This is the Charities (Jersey) Law 2014 — the same statute as our own case study at
 `paper/case-studies/charities-jersey-2014/`.** Its `start` page reads:
 
-> `====== Charities (Jersey) Law 2014 — process register ======`
-> `//Business Process (BPMN 2.0) · Jurisdiction: Jersey (Channel Islands) · Statute: Charities (Jersey) Law 2014 (L.41/2014)//`
+> `====== Charities (Jersey) Law 2014 — process register ======` > `//Business Process (BPMN 2.0) · Jurisdiction: Jersey (Channel Islands) · Statute: Charities (Jersey) Law 2014 (L.41/2014)//`
 
 and `dmn-charity-test` reads:
 
-> `//DMN 1.3 decision requirement diagram · Jurisdiction: Jersey · Statute: Charities (Jersey) Law 2014//`
-> `Decision-requirement diagram for the charity test. \`PurposeClassification\` (Art 6) and \`PublicBenefit\` (Art 7) feed \`CharityTest\` (Art 5).`
+> `//DMN 1.3 decision requirement diagram · Jurisdiction: Jersey · Statute: Charities (Jersey) Law 2014//` > `Decision-requirement diagram for the charity test. \`PurposeClassification\` (Art 6) and \`PublicBenefit\` (Art 7) feed \`CharityTest\` (Art 5).`
 
 The correspondence to our tree is close. Our `paper/case-studies/charities-jersey-2014/part-3-charity-test.l4`
 header (lines 5-41) sets out the same three-tier shape and the same two carve-outs — Art 6(5)
@@ -294,21 +318,28 @@ both:
 
 Machine-derived properties of these pages, unlike the Reg CF page:
 
-| property | `process:je:charities-2014:charity-test` | `…:dmn-charity-test` |
-|---|---|---|
-| `<bpmnio>` blocks | 1, `type="bpmn"` | 1, `type="dmn"` |
-| `isExecutable` | `"false"` | — |
-| `<businessRuleTask>` | **6** | — |
-| `<conditionExpression>` | 4 (`meetsCharityTest == True` / `== False`) | — |
-| `<decisionTable>` / `<rule>` | — | 3 / 28 |
-| `hitPolicy` | — | `FIRST` (all three) |
-| `<inputData>` | — | **0** |
+| property                     | `process:je:charities-2014:charity-test`    | `…:dmn-charity-test` |
+| ---------------------------- | ------------------------------------------- | -------------------- |
+| `<bpmnio>` blocks            | 1, `type="bpmn"`                            | 1, `type="dmn"`      |
+| `isExecutable`               | `"false"`                                   | —                    |
+| `<businessRuleTask>`         | **3** (`r_class`, `r_pb`, `r_test`)         | —                    |
+| `<conditionExpression>`      | 2 (`meetsCharityTest == True` / `== False`) | —                    |
+| `<decisionTable>` / `<rule>` | —                                           | 3 / 28               |
+| `hitPolicy`                  | —                                           | `FIRST` (all three)  |
+| `<inputData>`                | —                                           | **0**                |
+
+> _Verification correction, 2026-08-02._ An earlier draft of this table reported **6** > `businessRuleTask`s and **4** `conditionExpression`s. Those were counts of the bare element
+> _name_, which matches the closing tag as well as the opening one. Counting opening tags
+> (`<bpmn:businessRuleTask[ >]`) gives **3** and **2**. The DMN-side counts (`<decisionTable>` 3,
+> `<rule>` 28, `<inputData>` 0) were already opening-tag counts and are unchanged. The three
+> `businessRuleTask` ids are `r_class`, `r_pb`, `r_test` — one per `decisionRef:` documentation
+> string, which is the consistency check that caught the doubling.
 
 **Two precise qualifications, because they matter and are easy to overstate:**
 
 1. The BPMN↔DMN link is **prose inside a `<documentation>` element, not a machine-readable
    attribute.** The raw XML carries `<bpmn:businessRuleTask id="r_class" name="Classify each purpose
-   (Art 6) [multi-instance]">` whose `<bpmn:documentation>` text is the literal string
+(Art 6) [multi-instance]">` whose `<bpmn:documentation>` text is the literal string
    `decisionRef: Decision_PurposeClassification`. There is **no `decisionRef` XML attribute** and no
    `camunda:` namespace on the page. A human can follow the reference; an engine cannot.
 2. **Attribution and authorship are UNMEASURED.** The namespace contains **no** occurrence of
@@ -334,7 +365,7 @@ Everything in this section was **readable while logged out**.
 - **Registration is open and self-service.** `?id=start&do=register` (HTTP 200, 2026-08-02) renders
   a working form — Username, Real name, E-Mail — with the text
   `"Fill in all the information below to create a new account in this wiki."` No invitation code and
-  no approval step is mentioned on the form. *(The form was read, not submitted.)*
+  no approval step is mentioned on the form. _(The form was read, not submitted.)_
 - **Their Quick Start Guide states editing requires an account**, in its own words:
   > "To edit pages on Lexipedia, you need a registered account. Click **Register** in the top-right
   > corner of any page, fill in the form, and you're ready to go."
@@ -347,17 +378,17 @@ Everything in this section was **readable while logged out**.
   > "Every process and case page is backed by a [[https://www.dokuwiki.org/plugin:struct|Struct]]
   > schema (**process**, **case**, or **law**) that defines the structured fields shown in each
   > page's Quick Facts table."
-  Its two `<form>` blocks target `define_templates:process_stub` and a case stub. There is also a
-  by-hand route: *"Prefer to build it by hand instead? Copy the [[sample_entry|Sample Entry]]
-  template directly."*
+  > Its two `<form>` blocks target `define_templates:process_stub` and a case stub. There is also a
+  > by-hand route: _"Prefer to build it by hand instead? Copy the [[sample_entry|Sample Entry]]
+  > template directly."_
 - **`refine` lists work-in-progress pages by name**, including `[[reg_cf_exemptions|Reg CF
-  Exemptions]]`, under the heading `What "Refining" Looks Like`, whose bullets include
-  *"Add or finish a BPMN/DMN diagram"* and *"Add or fix citations and legal references"*.
+Exemptions]]`, under the heading `What "Refining" Looks Like`, whose bullets include
+  _"Add or finish a BPMN/DMN diagram"_ and _"Add or fix citations and legal references"_.
 - **`groups` (Community Guidelines)** is linked from the front page and self-describes as
-  *"how we collaborate (a work in progress)"*.
+  _"how we collaborate (a work in progress)"_.
 - **`?do=recent`** and **`?do=index`** are both readable logged out.
-- **Governance/ownership**, from the front page: *"Built by the
-  [[https://www.centerforcivic.org/|Center for Civic Innovation]]"*, with sponsors listed as
+- **Governance/ownership**, from the front page: _"Built by the
+  [[https://www.centerforcivic.org/|Center for Civic Innovation]]"_, with sponsors listed as
   Sartography & SpiffWorkflow, LexDAO, Center for Civic Innovation, and Naptha.AI.
 
 **Not visible without an account (UNMEASURED):** whether editing is rate-limited or moderated; how
@@ -378,13 +409,13 @@ dedicated licence page. Quoted verbatim from the rendered `reg_cf_exemptions` pa
 The accompanying link resolves to `creativecommons.org/licenses/by-sa/4.0/deed.en`, and the footer
 badge is `/lib/images/license/button/cc-by-sa.png`. The identical footer appears on
 `?id=start`, `?do=register`, `?do=recent`, and the charities namespace pages — i.e. it is the
-wiki-wide default, and the `"Except where otherwise noted"` clause means a page *could* in principle
+wiki-wide default, and the `"Except where otherwise noted"` clause means a page _could_ in principle
 carry a different licence. **No such per-page override was observed on any page fetched**, and none
 appears on `reg_cf_exemptions`.
 
 **Our side, re-derived from this tree:** `LICENSE` at the repo root is the **Apache License 2.0**,
-`Copyright 2025 Singapore Management University`. `README.md:108` states: *"L4 is published under the
-[Apache-2.0 License](LICENSE)."* Note this differs from the "our prose is CC-BY" framing the probe
+`Copyright 2025 Singapore Management University`. `README.md:108` states: _"L4 is published under the
+[Apache-2.0 License](LICENSE)."_ Note this differs from the "our prose is CC-BY" framing the probe
 brief used — measured, the whole repo including its prose is under Apache-2.0. That does not change
 the direction of the constraint below, but the licence name should be stated correctly downstream.
 
@@ -401,7 +432,7 @@ the direction of the constraint below, but the licence name should be stated cor
 - **What this does not restrict.** US federal regulatory text is not subject to copyright, so every
   CFR passage quoted inline in `regcf.l4` is unencumbered and does not come from their page —
   `regcf.l4:39-42` already records that the quotations are taken from the eCFR at the 2026-07-23
-  issue date and that *"Nothing here was taken from the mirrored wiki page"*. Facts and thresholds
+  issue date and that _"Nothing here was taken from the mirrored wiki page"_. Facts and thresholds
   are likewise not copyrightable; **their expression of them is.**
 
 ### 4.2 Consequence for the G4 comparison note: own words, with quotation
@@ -434,48 +465,51 @@ named, not from memory or from prose that might itself have drifted.
 
 Re-derived counts, `jl4/examples/legal/regcf/regcf.l4`:
 
-| measurement | command | value |
-|---|---|---|
-| lines | `wc -l regcf.l4` | **1236** |
-| `#ASSERT` directives | `grep -c '^#ASSERT'` | **70** (0 inside comments) |
-| `#TRACE` directives | `grep -c '^#TRACE'` | **7** |
-| `#EVAL` directives | `grep -c '^#EVAL'` | **1** |
-| `@ref` citations | `grep -c '@ref'` | **67** |
-| DMN engine cases | `len(json['cases'])` in `jl4/examples/dmn/regcf-corpus.cases.json` | **16** |
+| measurement          | command                                                            | value                      |
+| -------------------- | ------------------------------------------------------------------ | -------------------------- |
+| lines                | `wc -l regcf.l4`                                                   | **1236**                   |
+| `#ASSERT` directives | `grep -c '^#ASSERT'`                                               | **70** (0 inside comments) |
+| `#TRACE` directives  | `grep -c '^#TRACE'`                                                | **7**                      |
+| `#EVAL` directives   | `grep -c '^#EVAL'`                                                 | **1**                      |
+| `@ref` citations     | `grep -c '@ref'`                                                   | **67**                     |
+| DMN engine cases     | `len(json['cases'])` in `jl4/examples/dmn/regcf-corpus.cases.json` | **16**                     |
 
-> **Two drifts in our own documentation, found while re-deriving and not yet fixed.**
-> `PROJECTIONS.md:3` calls `regcf.l4` "the 992-line formalisation"; it is **1236** lines.
-> `README.md` §4 reports *"55 assertions, all satisfied"*; the file now carries **70** `#ASSERT`
-> directives, and `regcf-corpus.cases.json`'s own note records a 2026-08-02 run of
-> *"140/140 assertions satisfied"* on a copy with the relocated fixtures. Both figures are stale
+> **Two drifts in our own documentation, found while re-deriving and not yet fixed.** > `PROJECTIONS.md:3` calls `regcf.l4` "the 992-line formalisation"; it is **1236** lines.
+> `README.md:266` reports _"55 assertions, all satisfied"_; the file now carries **70** `#ASSERT`
+> directives. That `55` has **three** live sites, not one — `README.md:266`, a comment at
+> `regcf.l4:1128` (_"The 55 assertions above are deliberately left unpinned"_), and the same comment
+> reproduced in the golden `tests/regcf.ep.golden:1128`. A fix that touches only the README leaves
+> two copies asserting the old count, and the golden must move with the source. Additionally,
+> `regcf-corpus.cases.json`'s own note records a 2026-08-02 run of
+> _"140/140 assertions satisfied"_ on a copy with the relocated fixtures. Both figures are stale
 > prose about a tree that moved. Recording here; the fix belongs in a PR that touches those files.
 > (This probe is read-only as to lexipedia, not as to our own docs — but the fix is out of its
 > scope, and asserting a corrected number without running `l4` would be guessing.)
 
 ### 5.1 The diff table
 
-| Dimension | Lexipedia `reg_cf_exemptions` (fetched 2026-08-02) | Our `regcf.l4` corpus (re-derived 2026-08-02) |
-|---|---|---|
-| **Scope** | 8 requirement groups, prose | the **same** 8 groups, deliberately (`regcf.l4:16-27`) — scope is matched by construction, so scope is not the axis of difference |
-| **Size** | 75 lines of prose + 215 lines of BPMN XML | 1236 lines |
-| **Offering limit** | `$5 million` | `$5,000,000`, dated 2021-03-15, prior value `$1,070,000`, prior-prior `$1,000,000` (`regcf.l4:133-140`) |
-| **Investor cut point** | `$107,000` (superseded 2022-09-20) | `$124,000` since 2022-09-20; `$107,000` 2017-04-12→2022-09-19; `$100,000` from 2016-05-16 (`regcf.l4:144-152`) |
-| **Investor floor** | `$2,200` (superseded) | `$2,500` / `$2,200` / `$2,000`, each dated (`regcf.l4:156-161`) |
-| **Per-investor cap** | not stated as a distinct parameter | `$124,000` / `$107,000` / `$100,000`, its own binding with its own `@ref` (`regcf.l4:165-171`) |
-| **Measure (i)/(ii)** | "**the lesser** of annual income or net worth" — the pre-2021-03-15 rule | "the **greater** of" since 2021-03-15; the shape change is modelled, not just the numbers (README §3.1) |
-| **Fin-stmt tiers** | `$124,000` / `$618,000`; third boundary absent | `$124,000` / `$618,000` / **`$1,235,000`**, all dated (`regcf.l4:175-201`); the first-time-issuer relief is bounded (README §3.4) |
-| **Reporting exits** | 3 of 5 (reporting company, repurchase, liquidation) | all 5, incl. **300 holders** (b)(2) and **$10,000,000 assets** (b)(3), with boundary tests 299/300 and 10,000,000/10,000,001 (README §3.7) |
-| **Eligibility limbs** | 5 of 6 conditions of Rule 100(b) | all 6, incl. **(b)(5) delinquent filer** with a dedicated fixture (README §3.6) |
-| **Deadlines** | `21 days`, `one year` only | plus `120 days` (Form C-AR), `5 business days` ×2 (C-TR, C-U), each with a citation (README §2) |
-| **Substantive errors** | Rule 504 aggregation stated backwards (README §3.5); advertising notice missing a permitted content item (README §3.8); accredited carve-out stated undated (README §3.9) | 9 divergences itemised with citation and arithmetic in README §3 |
-| **Citations** | 2 hyperlinks (an SEC education page + Wikidata); 3 rules named in prose; **0 pin-cites to 17 CFR** | **67 `@ref`** citations; every threshold carries its CFR paragraph *and* its Federal Register amending instruction (README §2, 16 rows) |
-| **Law-time / rule versions** | **none** — no effective date appears in the page body | 4 dated regimes on the rule-version axis — **2016-05-16, 2017-04-12, 2021-03-15, 2022-09-20** (`regcf.l4:47-64`), every constant answering under `EVAL UNDER RULES EFFECTIVE AT` for any date back to commencement; pre-commencement dates are a curated **refusal**, not an answer |
-| **Deontics** | prose "must" / "may not"; no formal obligation | 3 regulative rules — `advertising restriction`, `ongoing reporting obligation`, `resale restriction` — with PARTY/MUST/WITHIN/HENCE/LEST, residuated by 7 `#TRACE`s (README §4, §6.2) |
-| **Executability** | BPMN `isExecutable="false"`, 0 `businessRuleTask`, 0 `conditionExpression`, no DMN | 67 DMN decisions incl. 9 decision tables, 10 BKMs (3 more tables inside), 7 decisionServices, 15 inputData; **evaluates on two independent engines** over 16 cases — KIE 8.44.0.Final 1072/1072 decisions and values, Camunda 8.7.6 (zeebe-dmn) 1072/1072 (`PROJECTIONS.md` §1, CI-gated) |
-| **Tests** | none | **70** `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`; a case on each side of **every** numeric threshold (README §4 table) |
-| **Single-sourcing** | `$107,000` appears **3×** — twice in prose, once in the diagram's flow labels — as three independent strings | every figure bound **once**; the DMN, dmnmd, BPMN, ladder figures and deployed API are all cut from the same file (`PROJECTIONS.md` §0) |
-| **Known losses, declared** | none stated | 0 blocking / 21 lossy / 125 advisory fidelity findings, itemised by code (`PROJECTIONS.md` §1) — incl. `D-RULEDATE-UNBOUND` ×15, the scoped rule-dates a DRG cannot express |
-| **Provenance** | 15 revisions, all `admin` or `127.0.0.1`; no sourcing note | sources pinned to eCFR at the 2026-07-23 issue date, cross-checked against amending releases (`regcf.l4:39-42`) |
+| Dimension                    | Lexipedia `reg_cf_exemptions` (fetched 2026-08-02)                                                                                                                        | Our `regcf.l4` corpus (re-derived 2026-08-02)                                                                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scope**                    | 8 requirement groups, prose                                                                                                                                               | the **same** 8 groups, deliberately (`regcf.l4:16-27`) — scope is matched by construction, so scope is not the axis of difference                                                                                                                                                         |
+| **Size**                     | 75 lines of prose + 215 lines of BPMN XML                                                                                                                                 | 1236 lines                                                                                                                                                                                                                                                                                |
+| **Offering limit**           | `$5 million`                                                                                                                                                              | `$5,000,000`, dated 2021-03-15, prior value `$1,070,000`, prior-prior `$1,000,000` (`regcf.l4:133-140`)                                                                                                                                                                                   |
+| **Investor cut point**       | `$107,000` (superseded 2022-09-20)                                                                                                                                        | `$124,000` since 2022-09-20; `$107,000` 2017-04-12→2022-09-19; `$100,000` from 2016-05-16 (`regcf.l4:144-152`)                                                                                                                                                                            |
+| **Investor floor**           | `$2,200` (superseded)                                                                                                                                                     | `$2,500` / `$2,200` / `$2,000`, each dated (`regcf.l4:156-161`)                                                                                                                                                                                                                           |
+| **Per-investor cap**         | not stated as a distinct parameter                                                                                                                                        | `$124,000` / `$107,000` / `$100,000`, its own binding with its own `@ref` (`regcf.l4:165-171`)                                                                                                                                                                                            |
+| **Measure (i)/(ii)**         | "**the lesser** of annual income or net worth" — the pre-2021-03-15 rule                                                                                                  | "the **greater** of" since 2021-03-15; the shape change is modelled, not just the numbers (README §3.1)                                                                                                                                                                                   |
+| **Fin-stmt tiers**           | `$124,000` / `$618,000`; third boundary absent                                                                                                                            | `$124,000` / `$618,000` / **`$1,235,000`**, all dated (`regcf.l4:175-201`); the first-time-issuer relief is bounded (README §3.4)                                                                                                                                                         |
+| **Reporting exits**          | 3 of 5 (reporting company, repurchase, liquidation)                                                                                                                       | all 5, incl. **300 holders** (b)(2) and **$10,000,000 assets** (b)(3), with boundary tests 299/300 and 10,000,000/10,000,001 (README §3.7)                                                                                                                                                |
+| **Eligibility limbs**        | 5 of 6 conditions of Rule 100(b)                                                                                                                                          | all 6, incl. **(b)(5) delinquent filer** with a dedicated fixture (README §3.6)                                                                                                                                                                                                           |
+| **Deadlines**                | `21 days`, `one year` only                                                                                                                                                | plus `120 days` (Form C-AR), `5 business days` ×2 (C-TR, C-U), each with a citation (README §2)                                                                                                                                                                                           |
+| **Substantive errors**       | Rule 504 aggregation stated backwards (README §3.5); advertising notice missing a permitted content item (README §3.8); accredited carve-out stated undated (README §3.9) | 9 divergences itemised with citation and arithmetic in README §3                                                                                                                                                                                                                          |
+| **Citations**                | 2 hyperlinks (an SEC education page + Wikidata); 3 rules named in prose; **0 pin-cites to 17 CFR**                                                                        | **67 `@ref`** citations; every threshold carries its CFR paragraph _and_ its Federal Register amending instruction (README §2, 16 rows)                                                                                                                                                   |
+| **Law-time / rule versions** | **none** — no effective date appears in the page body                                                                                                                     | 4 dated regimes on the rule-version axis — **2016-05-16, 2017-04-12, 2021-03-15, 2022-09-20** (`regcf.l4:47-64`), every constant answering under `EVAL UNDER RULES EFFECTIVE AT` for any date back to commencement; pre-commencement dates are a curated **refusal**, not an answer       |
+| **Deontics**                 | prose "must" / "may not"; no formal obligation                                                                                                                            | 3 regulative rules — `advertising restriction`, `ongoing reporting obligation`, `resale restriction` — with PARTY/MUST/WITHIN/HENCE/LEST, residuated by 7 `#TRACE`s (README §4, §6.2)                                                                                                     |
+| **Executability**            | BPMN `isExecutable="false"`, 0 `businessRuleTask`, 0 `conditionExpression`, no DMN                                                                                        | 67 DMN decisions incl. 9 decision tables, 10 BKMs (3 more tables inside), 7 decisionServices, 15 inputData; **evaluates on two independent engines** over 16 cases — KIE 8.44.0.Final 1072/1072 decisions and values, Camunda 8.7.6 (zeebe-dmn) 1072/1072 (`PROJECTIONS.md` §1, CI-gated) |
+| **Tests**                    | none                                                                                                                                                                      | **70** `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`; a case on each side of **every** numeric threshold (README §4 table)                                                                                                                                                                           |
+| **Single-sourcing**          | `$107,000` appears **4×** — twice in prose, twice in the diagram's flow labels — as four independent strings                                                              | every figure bound **once**; the DMN, dmnmd, BPMN, ladder figures and deployed API are all cut from the same file (`PROJECTIONS.md` §0)                                                                                                                                                   |
+| **Known losses, declared**   | none stated                                                                                                                                                               | 0 blocking / 21 lossy / 125 advisory fidelity findings, itemised by code (`PROJECTIONS.md` §1) — incl. `D-RULEDATE-UNBOUND` ×15, the scoped rule-dates a DRG cannot express                                                                                                               |
+| **Provenance**               | 18 revisions — 14 `admin`, 4 `127.0.0.1` including the creation; no sourcing note                                                                                         | sources pinned to eCFR at the 2026-07-23 issue date, cross-checked against amending releases (`regcf.l4:39-42`)                                                                                                                                                                           |
 
 ### 5.2 The comparison that is not about coverage
 
@@ -483,8 +517,9 @@ On **coverage of the eight groups**, the gap is real but bounded — they state 
 limbs and 3 of 5 reporting exits, and miss one tier boundary. A diligent editor could close that in
 an afternoon of prose edits.
 
-What no prose edit closes is the **third `$107,000`**. Their figure lives in the prose twice and in
-the diagram's `sequenceFlow` labels once, as three unrelated strings; ours is one binding with one
+What no prose edit closes is the **`$107,000` in the diagram**. Their figure lives in the prose
+twice and in the diagram's `sequenceFlow` labels twice, as four unrelated strings; ours is one
+binding with one
 citation and one set of dated arms, and the DMN, BPMN and wizard all read it. That is the claim
 `PROJECTIONS.md` opens with, and this probe measured it rather than assuming it: their 2022 update
 reached their group 4 and not their group 3 or their diagram, which is exactly the failure a
@@ -499,7 +534,10 @@ Stated honestly. Each item is account-gated, admin-gated, or simply not determin
 1. **Who authored `process:je:charities-2014`, and from what source.** The single most consequential
    unknown found. The pages mirror our Jersey case study's structure and carve-outs (§2.5) and
    carry **no attribution to L4 or this repo**, but their revision history shows only
-   `127.0.0.1` — a server-local write with no username. Read-only access cannot distinguish a
+   `127.0.0.1` — a server-local write with no username. The Reg CF page's **own creation** carries
+   the same signature (§1.5), which weakens rather than strengthens any inference from it: whatever
+   `127.0.0.1` means on this wiki, it is a routine occurrence there and not a marker peculiar to the
+   charities namespace. Read-only access cannot distinguish a
    filesystem/API import from an independent encoding of a public statute. **G4 must not assert an
    origin on this evidence.** Resolving it needs either the wiki's own admin/user records or a
    direct answer — and any direct question is gate HG2's, not this probe's.
@@ -512,13 +550,13 @@ Stated honestly. Each item is account-gated, admin-gated, or simply not determin
    tag is unversioned (§2.1). Only the embedded bpmn-js/dmn-js versions are known.
 4. **Whether `?do=recent`'s spam is being cleaned, and by whom.** We measured creation
    (fifteen spam pages on 2026-07-30) but deletions do not appear in the default recent-changes
-   view, so the *net* trend is UNMEASURED. Do not characterise the wiki as unmaintained on this
+   view, so the _net_ trend is UNMEASURED. Do not characterise the wiki as unmaintained on this
    evidence — the charities namespace was written three days earlier.
 5. **Editorial policy.** Whether new pages are reviewed, whether machine-generated contributions are
    welcome or restricted, and whether `groups` (self-described as "a work in progress") states
    anything binding. Not answerable from the page.
 6. **Whether their BPMN would round-trip.** We can see the plugin accepts inline XML from bpmn-js
-   18.3.1 (§2.4), but whether *our* exporter's output survives that editor's normalisation is a
+   18.3.1 (§2.4), but whether _our_ exporter's output survives that editor's normalisation is a
    thing to test locally against those versions — not something to claim from a fetch.
 7. **Any non-public Reg CF material.** `?do=index` and `?do=recent` show only what is public; a
    draft or a restricted namespace would not appear.
