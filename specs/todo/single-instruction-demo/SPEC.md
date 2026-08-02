@@ -296,10 +296,17 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   `EVAL UNDER RULES EFFECTIVE AT`). (2) **layout: class/instance** — the generic "⟨body of
   law⟩: go" template (the subject-sidecar shape: descriptor + pins + known-defects + NOTES.md)
   is the class; each encoding job is an instance expected to veer, with its divergences recorded
-  in its own sidecar files rather than by forking the template. (3) **license: permissive**,
-  keeping the open-core → freemium-enrichment pathway; the exact license _class_
-  (software-style vs content-style) was under discussion at this writing. **Still open:** repo
-  name + org confirmation; the license instrument.
+  in its own sidecar files rather than by forking the template. (3) **license — ANSWERED in full 2026-08-02
+  (Meng): Apache-2.0 + carried source-terms + optional CC-BY on prose.** Apache-2.0 on
+  everything we author (encodings, cases, schemas, harnesses — the patent grant and NOTICE
+  machinery are why it beats MIT here); quoted statutory text carries its own terms through
+  per-subject SOURCE-LICENSE notes (US federal material is public domain, 17 U.S.C. §105 + the
+  edicts doctrine; UK material rides under OGL v3, whose attribution lands in NOTICE — OGL v3
+  declares itself CC-BY-4.0-compatible and is a content license in structure); prose artifacts
+  (conversion reports, commentary, comparison notes) may carry CC-BY-4.0 in addition, so they
+  flow one-way into BY-SA wikis (lexipedia is CC BY-SA 4.0, measured 2026-08-02) without
+  ShareAlike ever reaching the encodings. The open-core → freemium-enrichment pathway stays
+  open by construction. **Still open:** repo name + org confirmation — the last R1 dimension.
 - **R2 — lexipedia compatibility**: **ANSWERED 2026-08-02 (Meng), as a three-step pathway:**
   **probe now** (read-only: their DokuWiki format, contribution route, licensing — measured
   2026-08-02: the site is CC BY-SA 4.0, so a comparison note must be written in our own words
