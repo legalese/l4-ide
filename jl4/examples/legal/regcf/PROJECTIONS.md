@@ -302,8 +302,10 @@ Six decisions, four carriers each, all projected through the LSP from the corpus
   left-to-right with no wrap. The root decision — Rule 100(a)'s five conditions, plus a 118-char
   chapeau riding the wire — is a strip **16× wider than tall**. That is the picture a reader most
   wants and the one the notation handles worst.
-- **Leaf labels never wrap.** Rule 501(a)(4)'s field name is 291 characters _because it is the
-  CFR's own sentence_; it prints at 304 and occupies ≈2380 px in a single box.
+- **Leaf labels never wrap.** Rule 501(a)(4)'s field name is 288 characters _because it is the
+  CFR's own sentence_; it prints at 301 and occupies 2387.8 px in a single box. (291/304 before the
+  clitic ruling dropped its leading `is `; the box figure read "≈2380 px" and was measured at 2411.4
+  when re-derived on 2026-08-03, so it is now the number the SVG actually carries.)
 - **A leading run of inert prose merges into one heading.** So in `regcf-resale-exceptions` the
   chapeau and caption **(1)** become one text element, while (2)(3)(4) sit over their own rungs — and
   a reader takes "(1) To the issuer of the securities" for preamble.
@@ -391,7 +393,7 @@ across deployments (`McpServer.hs:403-423`). `jl4-service/README.md` says otherw
 Sanitisation round-trips in all four combinations — spaced or hyphenated in the **path**, spaced or
 hyphenated in the **keys** — all returning `10000`. It survives because all 49 façade fields
 sanitise to ≤ 43 characters with no within-record collision. Exporting the **corpus** directly would
-have broken it: 23 of its 41 field names exceed the 60-character cap (longest 288), and `227.503(a)`
+have broken it: 23 of its 41 field names exceed the 60-character cap (longest 285), and `227.503(a)`
 and `227.201` both truncate to `section-227`.
 
 ---

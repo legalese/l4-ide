@@ -352,7 +352,7 @@ Honest list. Nothing below is hidden behind a `TRUE`.
 5. **The bad-actor disqualification is one boolean.** Rule 503(a) is a substantial
    sub-regime (covering categories of person, look-back periods, and a reasonable-care
    exception). It collapses to
-   `is subject to a disqualification as specified in section 227.503(a)`. Deliberate: their
+   `subject to a disqualification as specified in section 227.503(a)`. Deliberate: their
    page also collapses it to one bullet. Expanding it is Track C1 work, not C0.
 
 6. **Rule 100(a)(4)'s proviso is documented but not enforced structurally.** The statute
