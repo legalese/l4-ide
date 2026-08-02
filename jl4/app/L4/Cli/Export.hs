@@ -74,8 +74,9 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
+import L4.Bpmn.Wiring (wiringFromDrg)
 import L4.Dmn.Emit (emitDrg)
-import L4.Dmn.IR (DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
+import L4.Dmn.IR (Drg, DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Annotation (rangeOf)
@@ -394,8 +395,19 @@ targetFlagName = \case
 -- The decision side
 ----------------------------------------------------------------------------
 
-exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
-exportDmn opts tcRes = do
+-- | Lower the module to a decision graph, exactly as @--to=dmn@ would.
+--
+-- Named and shared because __both__ targets need it: the DMN emitters obviously,
+-- and @--to=bpmn@ because PROCESS-TRACK.md §8.3's @businessRuleTask@ has to name
+-- the decision ids the DMN backend actually emitted. Re-deriving those on the
+-- process side is the failure this factoring exists to prevent — see
+-- "L4.Bpmn.Wiring".
+--
+-- It does not decide whether the result is worth emitting: a module with no
+-- decisions is an error for @--to=dmn@ and a non-event for @--to=bpmn@, so that
+-- judgement stays with the callers.
+dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO Drg
+dmnDrgFor opts tcRes = do
   -- FIXTURE(d)'s importer view (§2.5.7, OPEN-5): a sibling-directory scan.
   -- Textual and conservative-keep: an occurrence of a decide's name anywhere
   -- in an importing sibling counts as an external reference, so over-matching
@@ -446,6 +458,11 @@ exportDmn opts tcRes = do
             , dloExternalRefNames = externalRefs
             }
           tcRes.module'
+  pure drg
+
+exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
+exportDmn opts tcRes = do
+  drg <- dmnDrgFor opts tcRes
   when (null (drgDecisions drg)) do
     hPutStrLn stderr
       "No decisions found in module — nothing to export as DMN \
@@ -467,8 +484,16 @@ exportDmn opts tcRes = do
 exportBpmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportBpmn opts tcRes = do
   sg <- selectGraph opts.exportRule (extractStateGraphs tcRes.module')
+  -- The same lowering @--to=dmn@ would perform, run for its NAMES rather than
+  -- its XML: a gateway is wired only to a decision this graph actually contains
+  -- (PROCESS-TRACK.md §8.3). Unconditional — a module with no decisions yields
+  -- an empty table, which wires nothing and reports nothing, which is right.
+  drg <- dmnDrgFor opts tcRes
   let policy = fromMaybe AssumeDays opts.exportDeadlineUnit
-      bx = stateGraphToBpmn (BpmnOptions {optDeadlineUnit = policy}) sg
+      bx =
+        stateGraphToBpmn
+          (BpmnOptions {optDeadlineUnit = policy, optWiring = Just (wiringFromDrg drg)})
+          sg
   emitArtifact opts (renderBpmn bx)
   pure bx.bxFidelity
 

@@ -318,7 +318,17 @@ stateGraphToBpmn opts sg =
     -- about — and until the extractor could see an @IF@-headed rule at all,
     -- there was no shape here to report on.
     branchGuardFindings =
-      [ MkFidelityNote
+      [ note
+      | gw <- take 1 gatewayNodes
+      , guards@(_ : _) <- [mapMaybe (.transLabel.labelGuard) (defaultsOf sid)]
+      , note <- case Map.lookup sid wiredGateways of
+          Just (Right wg) -> [wiredNote gw wg]
+          Just (Left why) -> [opaqueNote gw guards, noDmnNote gw why]
+          Nothing -> [opaqueNote gw guards]
+      ]
+
+    opaqueNote gw guards =
+      MkFidelityNote
         { code = "P-BRANCHGUARD"
         , severity = Lossy
         , element = gw.nodeId
@@ -335,9 +345,54 @@ stateGraphToBpmn opts sg =
             \gateway — and whatever decision structure backed each condition, \
             \for which DMN, not BPMN, is the right home"
         }
-      | gw <- take 1 gatewayNodes
-      , guards@(_ : _) <- [mapMaybe (.transLabel.labelGuard) (defaultsOf sid)]
-      ]
+
+    -- The endgame §8.3 named, reached. Advisory, not Lossy: the arms no longer
+    -- carry law text an engine has to guess at, and the structure behind them
+    -- is in the sibling artifact rather than nowhere. What it does NOT claim is
+    -- that nothing was lost — the residual is stated, because a note that says
+    -- "fixed" where a reader can still be surprised is worse than none.
+    wiredNote gw wg =
+      MkFidelityNote
+        { code = "P-DMNWIRED"
+        , severity = Advisory
+        , element = gw.nodeId
+        , range = Nothing
+        , message =
+            "The gateway's arms are decided by the DMN decision \8216"
+              <> wg.wgCall.dmcLabel
+              <> "\8217 (id "
+              <> wg.wgCall.dmcElementId
+              <> ") in model \8216"
+              <> wg.wgCall.dmcModel
+              <> "\8217, invoked by the businessRuleTask in front of it; each \
+                 \outgoing flow now tests that decision's answer ("
+              <> wg.wgShape
+              <> " shape) rather than restating the L4 guard, which moves to \
+                 \the flow's <documentation>."
+        , lost =
+            "nothing an engine needs, but the arms' exhaustiveness and mutual \
+            \exclusion are now properties of the DMN table's hit policy rather \
+            \than of this gateway, and BPMN still has no way to say so here"
+        }
+
+    -- Why a gateway that HAS a DMN to wire to was not wired to it. Lossy in its
+    -- own right: the reader was entitled to the linkage and did not get it, and
+    -- the reason is the thing that would otherwise be silent.
+    noDmnNote gw why =
+      MkFidelityNote
+        { code = "P-NODMN"
+        , severity = Lossy
+        , element = gw.nodeId
+        , range = Nothing
+        , message =
+            "This gateway's guards were NOT delegated to the emitted DMN: "
+              <> why
+              <> ". The conditionExpressions above stay opaque L4 text."
+        , lost =
+            "the BPMN\8594DMN linkage for this gateway; the decision structure \
+            \behind these guards is somewhere in the DMN artifact, but nothing \
+            \in this file says where"
+        }
 
     danglingFindings =
       [ MkFidelityNote
@@ -423,7 +478,7 @@ stateGraphToBpmn opts sg =
   -- parts exist.
   chainFlows :: [Edge]
   chainFlows =
-    [ (a.nodeId, b.nodeId, Nothing)
+    [ plainEdge a.nodeId b.nodeId Nothing
     | (_, c) <- chains
     , (a, b) <- zip c.scNodes (drop 1 c.scNodes)
     ]
@@ -440,14 +495,14 @@ stateGraphToBpmn opts sg =
       let sid = s.stateId
           (henceSrc, lestSrc) = raceArms (modalAt sid) (taskOf sid) (boundaryOf sid)
           hence =
-            [ (src, tgt, t.transLabel.labelGuard)
+            [ plainEdge src tgt t.transLabel.labelGuard
             | t <- outOf sid
             , t.transType == HenceTransition
             , Just src <- [henceSrc]
             , Just tgt <- [entryOf t.transTo]
             ]
           lest =
-            [ (src, tgt, Nothing)
+            [ plainEdge src tgt Nothing
             | t <- outOf sid
             , t.transType == LestTransition
             , Just src <- [lestSrc]
@@ -460,9 +515,15 @@ stateGraphToBpmn opts sg =
           -- tests the condition that decided which arm applied. Dropping it
           -- (which is what this did until 2026-07-27) turns a fact-driven
           -- exclusive gateway into a free choice.
+          --
+          -- Where the gateway is wired to a DMN decision (§8.3) the guard is
+          -- rewritten into a test over that decision's output and the L4 text
+          -- moves to the flow's <documentation>. 'armEdge' is the only place
+          -- that choice is made, so a wired and an unwired arm cannot end up
+          -- disagreeing about which text is which.
           branches =
-            [ (src, tgt, t.transLabel.labelGuard)
-            | t <- defaultsOf sid
+            [ armEdge sid src tgt i t
+            | (i, t) <- zip [0 ..] (defaultsOf sid)
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]
             ]
@@ -484,7 +545,7 @@ stateGraphToBpmn opts sg =
           -- there is nothing here to follow and this synthesis is guessing. See
           -- the NOTE at that site; fixing it retires this whole branch.
           lapses =
-            [ (src, tgt, Nothing)
+            [ plainEdge src tgt Nothing
             | t <- outOf sid
             , t.transType == HenceTransition
             , Just src <- [lapseOf sid]
@@ -502,15 +563,16 @@ stateGraphToBpmn opts sg =
   numberFlows = go Set.empty
    where
     go _ [] = []
-    go used ((src, tgt, cond) : rest) =
-      let wanted = "Flow_" <> src <> "__" <> tgt
+    go used (e : rest) =
+      let wanted = "Flow_" <> e.edFrom <> "__" <> e.edTo
           fid = disambiguate used wanted (1 :: Int)
        in SequenceFlow
             { flowId = fid
             , flowName = ""
-            , flowFrom = src
-            , flowTo = tgt
-            , flowCondition = cond
+            , flowFrom = e.edFrom
+            , flowTo = e.edTo
+            , flowCondition = e.edCond
+            , flowDoc = e.edDoc
             }
             : go (Set.insert fid used) rest
     disambiguate used wanted n
@@ -518,16 +580,221 @@ stateGraphToBpmn opts sg =
       | otherwise = disambiguate used (wanted <> "_" <> Text.pack (show n)) (n + 1)
 
   ------------------------------------------------------------------
+  -- Pass 3: the DMN wiring (PROCESS-TRACK.md §8.3)
+  ------------------------------------------------------------------
+
+  -- What each guarded gateway resolved to, when a 'DmnWiring' was supplied:
+  -- 'Right' a call and its arm conditions, or 'Left' the reason it was refused.
+  -- Absent from the map means the question does not arise — no wiring in hand,
+  -- or a gateway that did not come from an @IF@ and so has no guard to delegate.
+  --
+  -- __The refusal is the design, not a fallback.__ Every way this can fail ends
+  -- here rather than in a guessed decision name, which is why a dangling
+  -- @businessRuleTask@ cannot be emitted: there is no code path that mints one
+  -- from anything but a 'WiredDecision' the DRG actually contains.
+  wiredGateways :: Map StateId (Either Text WiredGateway)
+  wiredGateways =
+    Map.fromList
+      [ (s.stateId, wireGateway w s.stateId)
+      | w <- maybeToList opts.optWiring
+      , s <- sg.sgStates
+      , isJust (gatewayOf s.stateId)
+      , any (isJust . (.transLabel.labelBranch)) (defaultsOf s.stateId)
+      ]
+
+  -- Two shapes, in priority order, and a refusal below them.
+  --
+  -- __Verdict before guard, and the order is load-bearing.__ The Reg CF
+  -- reporting rule's second arm is guarded by @`annual cycles` AT MOST 0@,
+  -- which is a comparison and not a call, so it has no decision of its own and
+  -- the guard shape cannot resolve it. The verdict shape does not need it to:
+  -- §16's verdict lowering has already consumed that atom as a /column/ of the
+  -- decision table, and what the gateway reads is the table's answer. Trying
+  -- the guard shape first would refuse a rule the verdict shape wires cleanly.
+  wireGateway :: DmnWiring -> StateId -> Either Text WiredGateway
+  wireGateway w sid = case verdictShape w arms of
+    Right wg -> Right wg
+    Left vWhy -> case guardShape w arms of
+      Right wg -> Right wg
+      Left gWhy -> Left (vWhy <> "; and " <> gWhy)
+   where
+    arms = defaultsOf sid
+
+  -- Design V: the rule's OWN decide is an enumerated-string decision, so each
+  -- arm becomes a comparison against the verdict that arm produces.
+  --
+  -- The arm↔row correspondence is __checked, not assumed__. Both sequences come
+  -- from the same @IF@ chain in the same order, so a positional zip would be
+  -- right today; but "right today" is how an exporter starts emitting a
+  -- confidently mislabelled arm the day one side reorders. Each arm's own
+  -- condition must equal its row's recorded L4 guard, and the trailing @ELSE@
+  -- must line up with the table's @OTHERWISE@ row. Any mismatch refuses the
+  -- whole gateway rather than wiring the arms that happened to agree.
+  verdictShape :: DmnWiring -> [Transition] -> Either Text WiredGateway
+  verdictShape w arms = do
+    u <- maybe (Left "the rule has no DECIDE to look up") Right sg.sgDecide
+    wd <-
+      maybe (Left "the rule's own DECIDE is not an emitted DMN decision") Right $
+        Map.lookup u w.dwDecisions
+    rows <-
+      maybe
+        ( Left
+            ( "`" <> wd.wdName
+                <> "` is emitted, but not as a decision table with an enumerated \
+                   \string output, so it has no verdicts for the arms to compare against"
+            )
+        )
+        Right
+        wd.wdVerdict
+    unless (length rows == length arms) $
+      Left
+        ( "`" <> wd.wdName <> "` has " <> Text.show (length rows) <> " rule(s) against the \
+          \gateway's " <> Text.show (length arms) <> " arm(s)"
+        )
+    conds <- traverse (uncurry (armVerdict wd)) (zip arms rows)
+    pure MkWiredGateway {wgCall = callTo w wd, wgConds = conds, wgShape = "verdict"}
+   where
+    armVerdict wd t row = do
+      bg <-
+        maybe (Left "an arm did not come from an IF chain") Right t.transLabel.labelBranch
+      case (bg.bgOwn, row.vrGuard) of
+        (Just a, Just g)
+          | a.gaText == g -> Right (test wd row)
+        (Nothing, Just "OTHERWISE") -> Right (test wd row)
+        _ ->
+          Left
+            ( "the arm guarded by \8216"
+                <> fromMaybe "OTHERWISE" (fmap (.gaText) bg.bgOwn)
+                <> "\8217 does not line up with the decision table row for \8216"
+                <> fromMaybe "(no guard)" row.vrGuard
+                <> "\8217"
+            )
+    test wd row = wd.wdFeelName <> " = " <> row.vrOutput
+
+  -- Design G: every conjunct of every arm applies the SAME emitted boolean
+  -- decision, so each arm becomes that decision's variable, negated or not.
+  --
+  -- __One decision per gateway, in v1.__ A @businessRuleTask@ invokes one
+  -- decision; an @IF@ chain whose arms test two different predicates would need
+  -- two tasks and a rule for ordering them, and nothing in the corpus asks for
+  -- that yet. Refusing says so instead of emitting the first of two and
+  -- silently leaving the other guard unbacked.
+  guardShape :: DmnWiring -> [Transition] -> Either Text WiredGateway
+  guardShape w arms = do
+    atomss <-
+      for arms \t ->
+        branchGuardAtoms
+          <$> maybe (Left "an arm did not come from an IF chain") Right t.transLabel.labelBranch
+    for_ (concat atomss) \(_, a) ->
+      when (isNothing a.gaDecide) $
+        Left
+          ( "the guard \8216" <> a.gaText
+              <> "\8217 is not a bare application of a DECIDE, so no single decision backs it"
+          )
+    u <- case nubOrd [u | (_, a) <- concat atomss, Just u <- [a.gaDecide]] of
+      [u] -> Right u
+      [] -> Left "the gateway's arms carry no guard at all"
+      us ->
+        Left
+          ( "the gateway's arms test " <> Text.show (length us)
+              <> " different decisions, and one businessRuleTask invokes one decision"
+          )
+    wd <-
+      maybe (Left "the guard's DECIDE is not an emitted DMN decision") Right $
+        Map.lookup u w.dwDecisions
+    unless wd.wdBoolean $
+      Left ("`" <> wd.wdName <> "` is not boolean, so an arm cannot test it directly")
+    conds <- for atomss \as -> case as of
+      [] -> Left "one arm carries no guard at all"
+      _ -> Right (Text.intercalate " and " [readAs wd neg | (neg, _) <- as])
+    pure MkWiredGateway {wgCall = callTo w wd, wgConds = conds, wgShape = "guard"}
+   where
+    readAs wd neg
+      | neg = "not(" <> wd.wdFeelName <> ")"
+      | otherwise = wd.wdFeelName
+
+  callTo :: DmnWiring -> WiredDecision -> DmnCall
+  callTo w wd =
+    MkDmnCall
+      { dmcNamespace = w.dwNamespace
+      , dmcModel = w.dwModel
+      , dmcDecision = wd.wdFeelName
+      , dmcLabel = wd.wdName
+      , dmcElementId = wd.wdId
+      }
+
+  wiredAt :: StateId -> Maybe WiredGateway
+  wiredAt sid = either (const Nothing) Just =<< Map.lookup sid wiredGateways
+
+  -- The id of the @businessRuleTask@ standing in front of a wired gateway.
+  decideIdFor :: StateId -> Text
+  decideIdFor sid = "Decide_" <> Text.pack (show sid)
+
+  -- One arm's edge. Wired: the trivial test, with the L4 text demoted to
+  -- documentation. Unwired: exactly what it always was.
+  armEdge :: StateId -> Text -> Text -> Int -> Transition -> Edge
+  armEdge sid src tgt i t = case wiredAt sid of
+    Just wg
+      | Just cond <- listToMaybe (drop i wg.wgConds) ->
+          MkEdge
+            { edFrom = src
+            , edTo = tgt
+            , edCond = Just cond
+            , edDoc = t.transLabel.labelGuard
+            }
+    _ -> plainEdge src tgt t.transLabel.labelGuard
+
+  -- Insert each wired gateway's @businessRuleTask@ and route every arrival
+  -- through it.
+  --
+  -- __After the join pass, deliberately.__ 'addJoin' redirects arrivals onto a
+  -- converging gateway it has just created, and one of those arrivals may be
+  -- the flow into a gateway being wired here. Running last means "every edge
+  -- that ends at this gateway" is a question with a final answer; running first
+  -- would leave a join pointing straight past the decision task at the gateway
+  -- behind it.
+  --
+  -- The @HENCE \<this rule\>@ renewal loop goes through the task too, and that
+  -- is the semantics, not a side effect: each cycle re-asks the decision. The
+  -- gateway's own arity changes as a result — Reg CF's reporting gateway was
+  -- 2-in\/3-out and becomes 1-in\/3-out — and 'withGatewayDirections', which
+  -- runs after this, restates @gatewayDirection@ accordingly.
+  wireDecisions :: ([FlowNode], [Edge]) -> ([FlowNode], [Edge])
+  wireDecisions = foldl' one `flip` [s.stateId | s <- sg.sgStates]
+   where
+    one (nodes, edges) sid = case (wiredAt sid, gatewayOf sid) of
+      (Just wg, Just gw) ->
+        let did = decideIdFor sid
+            node =
+              FlowNode
+                { nodeId = did
+                , nodeName = wg.wgCall.dmcLabel
+                , nodeKind = BusinessRule wg.wgCall
+                , nodeDoc = Just (decideDoc wg.wgCall)
+                , nodeLane = Nothing
+                }
+            redirect e
+              | e.edTo == gw = e {edTo = did}
+              | otherwise = e
+         in ( nodes <> [node]
+            , map redirect edges <> [plainEdge did gw Nothing]
+            )
+      _ -> (nodes, edges)
+
+  ------------------------------------------------------------------
   -- Joins for RAND
   ------------------------------------------------------------------
 
-  allFlows = numberFlows joinedEdges
+  allFlows = numberFlows wiredEdges
 
   -- Last, because @gatewayDirection@ is the one attribute that describes the
   -- rest of the file rather than its own node: it cannot be settled until every
-  -- edge — including the ones 'addJoin' redirects — is final.
+  -- edge — including the ones 'addJoin' redirects and the ones 'wireDecisions'
+  -- reroutes — is final.
   allNodes :: [FlowNode]
-  allNodes = withGatewayDirections allFlows rawNodes
+  allNodes = withGatewayDirections allFlows wiredNodes
+
+  (wiredNodes, wiredEdges) = wireDecisions (rawNodes, joinedEdges)
 
   (rawNodes, joinedEdges, joinFindings) =
     foldl' addJoin (baseNodes, chainFlows <> transitionFlows, []) allOfJunctions
@@ -594,10 +861,10 @@ stateGraphToBpmn opts sg =
             Left reason -> declineWith reason
             Right proven ->
               let jid = joinIdFor junction
-                  claimed = Set.fromList [(a, b) | (a, b, _) <- proven]
-                  redirect (edgeFrom, edgeTo, cond)
-                    | Set.member (edgeFrom, edgeTo) claimed = (edgeFrom, jid, cond)
-                    | otherwise = (edgeFrom, edgeTo, cond)
+                  claimed = Set.fromList [(e.edFrom, e.edTo) | e <- proven]
+                  redirect e
+                    | Set.member (e.edFrom, e.edTo) claimed = e {edTo = jid}
+                    | otherwise = e
                   joinNode =
                     FlowNode
                       { nodeId = jid
@@ -610,7 +877,7 @@ stateGraphToBpmn opts sg =
                       , nodeLane = Nothing
                       }
                in ( nodes <> [joinNode]
-                  , map redirect edges <> [(jid, tgt, Nothing)]
+                  , map redirect edges <> [plainEdge jid tgt Nothing]
                   , finds
                   )
       _ -> declineWith cannotReason
@@ -627,14 +894,14 @@ stateGraphToBpmn opts sg =
     -- Edges by which one branch arrives at the join point.
     arrivalsOf r tgt b =
       let interior = interiorOf r b
-       in [e | e@(eFrom, eTo, _) <- edges, eTo == tgt, nodesInside interior eFrom]
+       in [e | e <- edges, e.edTo == tgt, nodesInside interior e.edFrom]
 
     -- Exactly one unconditional arrival per branch, or the reason it failed.
     tokenProof r tgt = traverse (check . arrivalsOf r tgt) branches
      where
       check = \case
-        [e@(_, _, Nothing)] -> Right e
-        [(_, _, Just _)] ->
+        [e] | isNothing e.edCond -> Right e
+        [_] ->
           Left
             "one of its branches reaches the join through a conditional flow, \
             \which may never fire, so a parallel join could wait for a token \
@@ -1010,10 +1277,57 @@ gatewayFlowFor ins outs = case (ins > 1, outs > 1) of
   (False, True) -> Diverging
   (False, False) -> Unspecified
 
--- | A sequence flow before it has an id: source node, target node, and the
--- condition (if any) from a @PROVIDED@ guard. Ids are assigned last, after the
--- join pass has finished moving targets around.
-type Edge = (Text, Text, Maybe Text)
+-- | A sequence flow before it has an id. Ids are assigned last, after the join
+-- pass has finished moving targets around and the wiring pass has finished
+-- inserting nodes in front of gateways.
+--
+-- A record rather than the tuple it used to be, because it grew a second
+-- @Maybe Text@ and two adjacent optional strings of different meanings is a
+-- footgun a field name costs nothing to remove.
+data Edge = MkEdge
+  { edFrom :: !Text
+  , edTo :: !Text
+  , -- | the @conditionExpression@ to emit
+    edCond :: !(Maybe Text)
+  , -- | @documentation@: the L4 guard text, where 'edCond' has replaced it
+    edDoc :: !(Maybe Text)
+  }
+  deriving stock (Eq, Show)
+
+-- | An edge carrying whatever guard the source graph gave it, with no
+-- documentation — the shape every edge had before the DMN wiring existed.
+plainEdge :: Text -> Text -> Maybe Text -> Edge
+plainEdge src tgt cond =
+  MkEdge {edFrom = src, edTo = tgt, edCond = cond, edDoc = Nothing}
+
+-- | A guarded gateway that resolved to a DMN decision: the call to make, and
+-- one condition per outgoing arm, in arm order.
+data WiredGateway = MkWiredGateway
+  { wgCall :: DmnCall
+  , wgConds :: [Text]
+  , -- | @"verdict"@ or @"guard"@ — which of §8.3's two shapes matched, for the
+    -- fidelity note. A reader who is told only "wired" cannot tell whether the
+    -- arms compare against an enumerated answer or test a boolean, and those
+    -- discharge different amounts of @P-BRANCHGUARD@.
+    wgShape :: Text
+  }
+  deriving stock (Eq, Show)
+
+-- | What a @businessRuleTask@'s @\<documentation\>@ says.
+--
+-- The engine reads the three @dataInput@s; a person reads this. It names the
+-- element id as well as the decision, because the id is what a reader searches
+-- the sibling @.dmn@ for and it is not otherwise anywhere in the BPMN file.
+decideDoc :: DmnCall -> Text
+decideDoc c =
+  "Delegated to the DMN decision \8216"
+    <> c.dmcLabel
+    <> "\8217 (id "
+    <> c.dmcElementId
+    <> ") in model \8216"
+    <> c.dmcModel
+    <> "\8217. The gateway's outgoing flows test this decision's answer; the L4 \
+       \guard each of them came from is on the flow itself."
 
 -- | The nodes one state contributes, in drawing order.
 data StateChain = StateChain
