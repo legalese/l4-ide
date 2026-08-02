@@ -1,12 +1,17 @@
-// Validate emitted DMN 1.3 XML by parsing it with `dmn-moddle` -- the moddle
-// descriptor Camunda's own DMN tooling (dmn-js / dmn-migrate) is built on. This
-// is a real check, not a well-formedness check: dmn-moddle knows the DMN 1.3
-// metamodel, so it reports unknown elements, unknown attributes, and children
-// that do not belong to the type they appear under.
+// Validate emitted DMN 1.3 XML in two layers:
+//
+//   1. WELL-FORMEDNESS -- a dependency-free lexical scan (plus `xmllint --noout`
+//      when it is on PATH), in front of moddle. See the block above
+//      `wellFormed` for why this cannot be left to moddle (smucclaw#937).
+//   2. THE METAMODEL -- `dmn-moddle`, the moddle descriptor Camunda's own DMN
+//      tooling (dmn-js / dmn-migrate) is built on. dmn-moddle knows the DMN 1.3
+//      metamodel, so it reports unknown elements, unknown attributes, and
+//      children that do not belong to the type they appear under.
 //
 // It does NOT check XSD sequence order, and it does not execute anything. Read
-// "0 warnings" as "every element and attribute we emitted is one DMN 1.3
-// defines, in a place it is allowed to be", not as "Camunda will import this".
+// "0 warnings" as "this file is well-formed XML, and every element and attribute
+// we emitted is one DMN 1.3 defines, in a place it is allowed to be", not as
+// "Camunda will import this".
 //
 // Run WITHOUT installing anything into the repo (package.json and the lockfile
 // are deliberately left alone):
@@ -106,11 +111,228 @@ async function targets() {
     .map((f) => join(defaultDir, f));
 }
 
+// ---------------------------------------------------------------------------
+// Well-formedness, in front of moddle (smucclaw/l4-ide#937)
+//
+// dmn-moddle is NOT a well-formedness backstop, and its `OK` was being read as
+// one throughout CI and the go pipeline. Measured 2026-08-03: a DMN file with
+// `--` inside an XML comment makes xmllint exit 1, Camunda refuse with "Unable
+// to parse model" and KIE exit 1 -- while this script printed
+// `OK -- 40 decision(s), 0 warnings`, because moddle's parser is lenient about
+// comment contents.
+//
+// Two legs, deliberately both:
+//
+//   * `wellFormed` below is a dependency-free scanner that runs EVERYWHERE, so
+//     the gate's strictness does not depend on what happens to be installed on
+//     the machine. It is minimal by design -- it checks the lexical rules a
+//     lenient parser skips (comment contents, tag matching, attribute quoting
+//     and duplication, reference syntax, single root) and does NOT validate
+//     namespaces, DTDs or character classes.
+//   * `xmllint --noout` runs IN ADDITION when it is on PATH, as the reference
+//     implementation. It is never required: ubuntu runners do not all ship
+//     libxml2-utils, and a gate that silently weakens on a missing binary is
+//     the exact failure #937 is about.
+//
+// A well-formedness failure is fatal for the file: moddle is not consulted,
+// because "OK" past this point would be the false claim again.
+// ---------------------------------------------------------------------------
+
+const NAME_START = /[A-Za-z_:]/;
+const NAME_CHAR = /[-A-Za-z0-9._:]/;
+
+function lineOf(xml, i) {
+  let line = 1;
+  for (let k = 0; k < i && k < xml.length; k++) if (xml[k] === "\n") line++;
+  return line;
+}
+
+// Returns [] when well-formed, else a list of "line N: message" strings. Stops
+// at the first structural error -- past one, positions are noise.
+function wellFormed(xml) {
+  const err = (i, msg) => [`line ${lineOf(xml, i)}: ${msg}`];
+  const stack = [];
+  let rootSeen = false;
+  let i = 0;
+
+  const readName = (k) => {
+    if (k >= xml.length || !NAME_START.test(xml[k])) return null;
+    let j = k + 1;
+    while (j < xml.length && NAME_CHAR.test(xml[j])) j++;
+    return [xml.slice(k, j), j];
+  };
+
+  // `&name;`, `&#123;`, `&#xAB;` -- anything else is a bare ampersand.
+  const checkRefs = (text, at) => {
+    for (let k = 0; k < text.length; k++) {
+      if (text[k] !== "&") continue;
+      const semi = text.indexOf(";", k);
+      const body = semi < 0 ? "" : text.slice(k + 1, semi);
+      const ok =
+        semi > k + 1 &&
+        (/^#[0-9]+$/.test(body) ||
+          /^#[xX][0-9a-fA-F]+$/.test(body) ||
+          (NAME_START.test(body[0]) &&
+            [...body].every((c) => NAME_CHAR.test(c))));
+      if (!ok) return err(at + k, "bare '&' or malformed entity reference");
+      k = semi;
+    }
+    return [];
+  };
+
+  while (i < xml.length) {
+    const lt = xml.indexOf("<", i);
+    if (lt < 0) {
+      const tail = xml.slice(i);
+      if (stack.length && tail.trim()) return err(i, "text after last tag");
+      const e = checkRefs(tail, i);
+      if (e.length) return e;
+      break;
+    }
+    const text = xml.slice(i, lt);
+    if (!stack.length && text.trim() && rootSeen)
+      return err(i, "character data outside the root element");
+    const e = checkRefs(text, i);
+    if (e.length) return e;
+    i = lt;
+
+    if (xml.startsWith("<!--", i)) {
+      const end = xml.indexOf("-->", i + 4);
+      if (end < 0) return err(i, "unterminated comment");
+      const body = xml.slice(i + 4, end);
+      // XML 1.0 §2.5: the comment's content may not contain `--`, and may not
+      // end with `-`. This is the #937 case, and the one moddle waves through.
+      const dd = body.indexOf("--");
+      if (dd >= 0) return err(i + 4 + dd, "double hyphen within comment");
+      if (body.endsWith("-")) return err(end, "comment ends with '-'");
+      i = end + 3;
+      continue;
+    }
+    if (xml.startsWith("<![CDATA[", i)) {
+      const end = xml.indexOf("]]>", i + 9);
+      if (end < 0) return err(i, "unterminated CDATA section");
+      if (!stack.length) return err(i, "CDATA outside the root element");
+      i = end + 3;
+      continue;
+    }
+    if (xml.startsWith("<?", i)) {
+      const end = xml.indexOf("?>", i + 2);
+      if (end < 0) return err(i, "unterminated processing instruction");
+      if (xml.startsWith("<?xml", i) && i !== 0)
+        return err(
+          i,
+          "XML declaration must be the first thing in the document",
+        );
+      i = end + 2;
+      continue;
+    }
+    if (xml.startsWith("<!", i)) {
+      // DOCTYPE and friends: not modelled beyond bracket balance.
+      let depth = 0;
+      let j = i + 2;
+      for (; j < xml.length; j++) {
+        if (xml[j] === "[") depth++;
+        else if (xml[j] === "]") depth--;
+        else if (xml[j] === ">" && depth <= 0) break;
+      }
+      if (j >= xml.length) return err(i, "unterminated declaration");
+      i = j + 1;
+      continue;
+    }
+
+    const closing = xml[i + 1] === "/";
+    const nm = readName(i + (closing ? 2 : 1));
+    if (!nm) return err(i, "'<' not followed by a tag name");
+    const [name, afterName] = nm;
+    let j = afterName;
+
+    if (closing) {
+      while (j < xml.length && /\s/.test(xml[j])) j++;
+      if (xml[j] !== ">") return err(j, `malformed end tag </${name}`);
+      const open = stack.pop();
+      if (open === undefined) return err(i, `unmatched end tag </${name}>`);
+      if (open !== name)
+        return err(i, `end tag </${name}> does not match <${open}>`);
+      i = j + 1;
+      continue;
+    }
+
+    const seen = new Set();
+    for (;;) {
+      while (j < xml.length && /\s/.test(xml[j])) j++;
+      if (j >= xml.length) return err(i, `unterminated start tag <${name}`);
+      if (xml[j] === ">" || xml.startsWith("/>", j)) break;
+      const an = readName(j);
+      if (!an) return err(j, `malformed attribute in <${name}>`);
+      const [attr, afterAttr] = an;
+      if (seen.has(attr))
+        return err(j, `duplicate attribute '${attr}' on <${name}>`);
+      seen.add(attr);
+      let k = afterAttr;
+      while (k < xml.length && /\s/.test(xml[k])) k++;
+      if (xml[k] !== "=") return err(k, `attribute '${attr}' has no value`);
+      k++;
+      while (k < xml.length && /\s/.test(xml[k])) k++;
+      const q = xml[k];
+      if (q !== '"' && q !== "'")
+        return err(k, `attribute '${attr}' value is not quoted`);
+      const close = xml.indexOf(q, k + 1);
+      if (close < 0)
+        return err(k, `unterminated value for attribute '${attr}'`);
+      const value = xml.slice(k + 1, close);
+      if (value.includes("<"))
+        return err(k, `'<' in the value of attribute '${attr}'`);
+      const re = checkRefs(value, k + 1);
+      if (re.length) return re;
+      j = close + 1;
+    }
+
+    if (!stack.length) {
+      if (rootSeen) return err(i, "more than one root element");
+      rootSeen = true;
+    }
+    if (xml.startsWith("/>", j)) {
+      i = j + 2;
+    } else {
+      stack.push(name);
+      i = j + 1;
+    }
+  }
+
+  if (stack.length)
+    return [
+      `unclosed element${stack.length > 1 ? "s" : ""}: <${stack.join(">, <")}>`,
+    ];
+  if (!rootSeen) return ["no root element"];
+  return [];
+}
+
+const haveXmllint =
+  spawnSync("xmllint", ["--version"], { encoding: "utf8" }).status === 0;
+
 const moddle = new DmnModdle();
 let failed = 0;
 
 for (const file of await targets()) {
   const xml = await readFile(file, "utf8");
+
+  const lex = wellFormed(xml);
+  const lint = haveXmllint
+    ? spawnSync("xmllint", ["--noout", file], { encoding: "utf8" })
+    : null;
+  if (lex.length || (lint && lint.status !== 0)) {
+    console.error(
+      `FAIL  ${file}  (not well-formed XML; moddle not consulted)\n` +
+        lex.map((m) => `       ${m}`).join("\n") +
+        (lint && lint.status !== 0
+          ? (lex.length ? "\n" : "") +
+            `       xmllint: ${(lint.stderr || "").trim().split("\n").slice(0, 3).join("\n       ")}`
+          : ""),
+    );
+    failed++;
+    continue;
+  }
+
   let result;
   try {
     result = await moddle.fromXML(xml, "dmn:Definitions");
