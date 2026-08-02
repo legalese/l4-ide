@@ -49,12 +49,28 @@ jobs:
         id: filter
         with:
           filters: |
+            # `.github/workflows/pr-checks.yml` appears in five filters below,
+            # for the reason the mlir one has always given: this file IS the
+            # definition of those jobs, so a change to it must re-run them or it
+            # merges unmeasured. That was not academic — the merge-queue cache
+            # fix for smucclaw/l4-ide#911 edits the cache steps of the haskell,
+            # typescript, dmn-engines and bpmn jobs, and on the filters as they
+            # stood NONE of those four jobs would have run on the PR that made
+            # the edit. `prettier --check .` lives in the typescript job, so the
+            # workflow file's own formatting gate was unreachable from a
+            # workflow-only PR too.
+            #
+            # The price is that a workflow-only PR now costs a full Haskell
+            # build + WASM build. That is the same trade the `.mjs`, `etc/**`
+            # and `.claude/**` entries below already bought, each after a PR
+            # that ran zero jobs.
             haskell:
               - '**/*.hs'
               - '**/*.cabal'
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
+              - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
               - '**/*.tsx'
@@ -72,6 +88,9 @@ jobs:
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+              # Hosts `prettier --check .`, which is the only gate on this
+              # file's own formatting. See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
             # The BPMN interchange checkers and their fixtures. Kept as its own
             # filter so the (zero-dependency, node-only) soundness gate runs
             # when a fixture changes, which no other filter would catch:
@@ -90,6 +109,8 @@ jobs:
               # BPMN file at all, and without these lines nothing would notice.
               - 'jl4/examples/dmn/expected/**'
               - 'jl4-core/src/L4/Dmn/**'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
             # specs/** must trigger doc checks too: a spec-only PR that skips
             # both this filter and 'haskell' never runs test-docs.sh or
             # prettier, so a broken link or unformatted file merges silently.
@@ -134,6 +155,8 @@ jobs:
               - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
               # The engine-intersection triple: likewise hand-written.
               - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
 
   # ============================================
   # BPMN interchange: soundness gate over the emitted fixtures
