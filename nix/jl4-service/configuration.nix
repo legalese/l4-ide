@@ -31,6 +31,11 @@
       default = {
         classic = ../../jl4/experiments/classic;
         thailand-cosmetics = ../../jl4/experiments/thailand-cosmetics;
+        # The Reg CF corpus (Track C, C2c). Verified against the pre-seed script
+        # below: copying the WHOLE directory is safe — the loader takes the two
+        # .l4 files and ignores `figures/`, `tests/`, `README.md` and
+        # `PROJECTIONS.md`, reporting `exportCount: 6` from `regcf-wizard.l4`.
+        regcf = ../../jl4/examples/legal/regcf;
       };
       description = ''
         Bundles to pre-seed into the store on startup.
