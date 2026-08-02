@@ -1564,6 +1564,482 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 }
 // ===== END denovo-diff-oracle checks ========================================
 
+// ===== BEGIN de-novo deposit-stage checks (owner: denovo-harnesses agent) ====
+//
+// The G2 stages p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate stopped
+// refusing: each is now a real stage that VALIDATES a deposit an agent produced,
+// because fetching, searching, encoding and fork-finding all need the network or
+// a model and this orchestrator takes neither. That gives every one of them
+// three outcomes, and all three are checked here — a stage whose only exercised
+// path is "deposit absent, SKIPPED" is indistinguishable from the refusal it
+// replaced.
+//
+// The stages are driven DIRECTLY rather than through go.sh, because CI's Go
+// Orchestrator job builds no `l4` and go.sh refuses to run without one. p1, p2,
+// p4 and p5 need no binary at all; only p3-encode does, and its binary-dependent
+// path skips with a named reason.
+{
+  const {
+    mkdirSync: mkd,
+    writeFileSync: wr,
+    readFileSync: rd,
+    existsSync: ex,
+    rmSync,
+  } = await import("node:fs");
+  const REPO = resolve(HERE, "../..");
+  const T = mkdtempSync(resolve(tmpdir(), "l4-go-denovo-"));
+  const DEP = resolve(T, "deposits");
+  mkd(DEP, { recursive: true });
+
+  const FX = resolve(
+    REPO,
+    "specs/todo/single-instruction-demo/schemas/fixtures",
+  );
+  // The shipped fixtures are about the BNA. A deposit carries its own `subject`
+  // and the stages refuse one that is about a different body of law, so the
+  // copies are re-subjected here — which is also what makes check 9 meaningful.
+  const deposit = (fixture, name, subject = "smoke") => {
+    const j = JSON.parse(rd(resolve(FX, fixture), "utf8"));
+    j.subject = subject;
+    const p = resolve(DEP, name);
+    wr(p, JSON.stringify(j, null, 2) + "\n");
+    return p;
+  };
+  const BUNDLE = deposit("source-bundle.valid.json", "bundle.json");
+  const REGISTER = deposit(
+    "external-modifications.valid.json",
+    "register.json",
+  );
+  const FORKS = deposit("fork-register.valid.json", "forks.json");
+  const BAD_FORKS = deposit("fork-register.invalid.json", "forks.bad.json");
+  const BNA_FORKS = deposit(
+    "fork-register.valid.json",
+    "forks.bna.json",
+    "bna",
+  );
+
+  const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
+
+  // --- 1. the sidecar's `denovo` section ------------------------------------
+  const sidecars = resolve(T, "subjects");
+  const mkSidecar = (id, denovo, corpus = CORPUS) => {
+    const d = resolve(sidecars, id);
+    mkd(d, { recursive: true });
+    wr(
+      resolve(d, "subject.json"),
+      JSON.stringify({
+        id,
+        display_name: "Selftest Subject",
+        citation: "n/a",
+        source_url: "https://example.invalid/",
+        corpus: { main: corpus },
+        checks: { min_dated_arms: 0, min_assertions: 0 },
+        legs: {},
+        ...(denovo ? { denovo } : {}),
+      }),
+    );
+    wr(resolve(d, "pins.json"), "{}");
+    wr(resolve(d, "known-defects.json"), "{}");
+    wr(resolve(d, "NOTES.md"), "selftest fixture\n");
+    return d;
+  };
+  const subjectRun = (id) =>
+    spawnSync("node", [resolve(HERE, "lib/subject.mjs"), id], {
+      encoding: "utf8",
+      env: { ...process.env, L4_GO_SUBJECTS_DIR: sidecars },
+    });
+
+  mkSidecar("smoke", {
+    bundle: BUNDLE,
+    register: REGISTER,
+    fork_register: FORKS,
+    modules: [resolve(DEP, "smoke.l4")],
+  });
+  {
+    const r = subjectRun("smoke");
+    check(
+      "a sidecar's denovo section resolves to GO_S_DENOVO_* paths whose existence is NOT required",
+      r.status === 0 &&
+        r.stdout.includes(`GO_S_DENOVO_BUNDLE='${BUNDLE}'`) &&
+        r.stdout.includes(`GO_S_DENOVO_REGISTER='${REGISTER}'`) &&
+        r.stdout.includes(`GO_S_DENOVO_FORKS='${FORKS}'`) &&
+        r.stdout.includes(
+          `GO_S_DENOVO_MODULES='${resolve(DEP, "smoke.l4")}'`,
+        ) &&
+        !ex(resolve(DEP, "smoke.l4")),
+    );
+  }
+  {
+    mkSidecar("badkey", { bundle: BUNDLE, surprise: "x" });
+    const r = subjectRun("badkey");
+    check(
+      "an unknown key inside denovo is refused, naming the allowed set",
+      r.status === 2 && /denovo: unknown key 'surprise'/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("selfdiff", { modules: ["jl4/examples/legal/regcf/regcf.l4"] });
+    const r = subjectRun("selfdiff");
+    check(
+      "a denovo module that IS the corpus is refused — SPEC.md §8's diff would be an identity",
+      r.status === 2 && /also a corpus module/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("nodenovo", null);
+    const r = subjectRun("nodenovo");
+    check(
+      "omitting denovo entirely is legal, and every GO_S_DENOVO_* comes back empty",
+      r.status === 0 &&
+        r.stdout.includes("GO_S_DENOVO_BUNDLE=''") &&
+        r.stdout.includes("GO_S_DENOVO_MODULES=''"),
+    );
+  }
+
+  // --- 2. driving one stage, and reading the row it wrote --------------------
+  let runSeq = 0;
+  const stage = (name, over = {}) => {
+    const run = resolve(T, `run${++runSeq}`);
+    mkd(resolve(run, "artifacts"), { recursive: true });
+    const r = spawnSync("bash", [resolve(HERE, `phases/${name}.sh`)], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GO_ROOT: REPO,
+        GO_RUN: run,
+        GO_STAGE: name,
+        GO_INPUTS_DIGEST: "sha256:selftest",
+        GO_FIXED_NOW: "2025-01-31T00:00:00Z",
+        GO_S_ID: "smoke",
+        GO_S_DIR: resolve(sidecars, "smoke"),
+        GO_S_CITATION: "n/a",
+        GO_S_CORPUS: CORPUS,
+        GO_S_DENOVO_BUNDLE: "",
+        GO_S_DENOVO_REGISTER: "",
+        GO_S_DENOVO_FORKS: "",
+        GO_S_DENOVO_MODULES: "",
+        L4_GO_REQUIRED: "0",
+        ...over,
+      },
+    });
+    const jp = resolve(run, "journal.ndjson");
+    const rows = ex(jp)
+      ? rd(jp, "utf8")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map((l) => JSON.parse(l))
+      : [];
+    const row = rows.filter((x) => x.kind === "stage_end").pop() ?? null;
+    return { exit: r.status, stdout: r.stdout, stderr: r.stderr, row, rows };
+  };
+  const ALL = {
+    GO_S_DENOVO_BUNDLE: BUNDLE,
+    GO_S_DENOVO_REGISTER: REGISTER,
+    GO_S_DENOVO_FORKS: FORKS,
+  };
+
+  // --- 3. deposit present: the stage validates it and PASSes -----------------
+  for (const [name, key] of [
+    ["p1-ingest", "GO_S_DENOVO_BUNDLE"],
+    ["p2-sweep", "GO_S_DENOVO_REGISTER"],
+    ["p4-forks", "GO_S_DENOVO_FORKS"],
+  ]) {
+    const s = stage(name, ALL);
+    check(
+      `${name} over a valid deposit PASSes with a structural oracle over a hashed artifact`,
+      s.exit === 0 &&
+        s.row?.status === "PASS" &&
+        s.row?.oracle?.class === "structural" &&
+        s.row?.oracle?.exit === 0 &&
+        (s.row?.artifacts ?? []).length === 1 &&
+        !!s.row.artifacts[0].sha256,
+    );
+    check(
+      `${name} records how many peers its joins could see, and how many joins were skipped`,
+      s.row?.metrics?.peers_present === "2" &&
+        s.row?.metrics?.joins_skipped === "0" &&
+        Number(s.row?.metrics?.rules_checked) > 0,
+    );
+    void key;
+  }
+  check(
+    "p2-sweep records the sweep's own non-vacuity figures, so 'searched nothing' is readable from the journal",
+    (() => {
+      const m = stage("p2-sweep", ALL).row?.metrics ?? {};
+      return m.searches !== undefined && m.entries !== undefined;
+    })(),
+  );
+  check(
+    "p4-forks records the fork counts per materialisation class, not just a total",
+    (() => {
+      const m = stage("p4-forks", ALL).row?.metrics ?? {};
+      return (
+        Number(m.forks) === 12 &&
+        m.materialised !== undefined &&
+        m.settled_by_authority !== undefined
+      );
+    })(),
+  );
+
+  // --- 4. deposit absent, and undeclared: SKIPPED with a NAMED reason --------
+  {
+    const s = stage("p1-ingest", {
+      ...ALL,
+      GO_S_DENOVO_BUNDLE: resolve(DEP, "never-written.json"),
+    });
+    check(
+      "a declared-but-undeposited bundle is SKIPPED as a missing prerequisite, not refused as a defect",
+      s.exit === 0 &&
+        s.row?.status === "SKIPPED" &&
+        /has not been produced yet/.test(s.row.reason) &&
+        /agent work/.test(s.row.reason),
+    );
+  }
+  {
+    const s = stage("p2-sweep", ALL, {});
+    void s;
+    const t = stage("p2-sweep", { ...ALL, GO_S_DENOVO_REGISTER: "" });
+    check(
+      "a subject that declares no denovo.register is SKIPPED naming the key and the file to add it to",
+      t.exit === 0 &&
+        t.row?.status === "SKIPPED" &&
+        /declares no denovo\.register/.test(t.row.reason) &&
+        /subject\.json/.test(t.row.reason),
+    );
+  }
+  {
+    const s = stage("p4-forks", {
+      ...ALL,
+      GO_S_DENOVO_FORKS: resolve(DEP, "never-written.json"),
+      L4_GO_REQUIRED: "1",
+    });
+    check(
+      "an absent deposit is FATAL under L4_GO_REQUIRED=1 — a G2 run that skipped every deposit is not a G2 run",
+      s.exit === 5 && s.row?.status === "SKIPPED",
+    );
+  }
+
+  // --- 5. deposit invalid: DEGRADED, naming the rule ------------------------
+  {
+    const s = stage("p4-forks", { ...ALL, GO_S_DENOVO_FORKS: BAD_FORKS });
+    check(
+      "an invalid fork register is DEGRADED, and the reason NAMES the rules that fired against it",
+      s.exit === 1 &&
+        s.row?.status === "DEGRADED" &&
+        /taken-names-a-live-reading/.test(s.row.reason) &&
+        /interpretation-fields-unique/.test(s.row.reason),
+    );
+    // The errexit regression, pinned. `set -e` restored inside the shared helper
+    // is shell-global, so it re-enabled errexit in the CALLER, whose next act
+    // was to read the helper's non-zero return — and the stage died before
+    // writing anything. Measured: exit 1, empty journal, no row at all.
+    check(
+      "a DEGRADED de novo stage still WRITES its receipt (the errexit leak that produced an empty journal)",
+      s.rows.length > 0 && s.row !== null,
+    );
+  }
+  {
+    // Peer attribution. The validator's exit code is a total over every file on
+    // its command line, so a clean bundle beside a broken fork register exits 1
+    // — and reading that as a fact about the bundle produced a measured
+    // falsehood: p1-ingest naming fifteen fork-register rules as the bundle's.
+    const s = stage("p1-ingest", { ...ALL, GO_S_DENOVO_FORKS: BAD_FORKS });
+    check(
+      "a clean bundle beside a broken peer is DEGRADED, but its reason does not blame the bundle",
+      s.exit === 1 &&
+        s.row?.status === "DEGRADED" &&
+        /internally well formed/.test(s.row.reason) &&
+        /no rule fired against it/.test(s.row.reason),
+    );
+    check(
+      "and the peer's rules are attributed to the peer, by path",
+      s.row.reason.includes(BAD_FORKS) &&
+        /taken-names-a-live-reading/.test(s.row.reason),
+    );
+  }
+  {
+    const s = stage("p4-forks", { ...ALL, GO_S_DENOVO_FORKS: BNA_FORKS });
+    check(
+      "a deposit about a different body of law is refused — nothing in the three schemas ties a register to a subject",
+      s.exit === 1 &&
+        s.row?.status === "DEGRADED" &&
+        /is about subject "bna", but this run is about "smoke"/.test(
+          s.row.reason,
+        ),
+    );
+  }
+  {
+    const notJson = resolve(DEP, "not.json");
+    wr(notJson, "{ this is not json\n");
+    const s = stage("p1-ingest", { ...ALL, GO_S_DENOVO_BUNDLE: notJson });
+    check(
+      "an unparseable deposit is a finding about the DEPOSIT (DEGRADED), never BROKEN about the harness",
+      s.exit === 1 &&
+        s.row?.status === "DEGRADED" &&
+        /is not valid JSON/.test(s.row.reason),
+    );
+  }
+
+  // --- 6. p5-gate: the joins, and the two halves it does not hold ------------
+  {
+    const s = stage("p5-gate", { ...ALL, GO_S_DENOVO_FORKS: "" });
+    const notes = (s.row?.notes ?? []).map((n) => n.text).join("\n");
+    check(
+      "p5-gate SKIPs when a deposit is missing rather than passing over joins that could not run",
+      s.exit === 0 &&
+        s.row?.status === "SKIPPED" &&
+        /a PASS for a gate that checked nothing/.test(s.row.reason),
+    );
+    check(
+      "and it states its two HG1-carried halves even on the SKIP",
+      /fork-register completeness/.test(notes) &&
+        /isomorphism spot-checks/.test(notes),
+    );
+  }
+  {
+    const s = stage("p5-gate", ALL);
+    const notes = (s.row?.notes ?? []).map((n) => n.text).join("\n");
+    check(
+      "p5-gate over all three deposits PASSes the mechanisable joins with every peer present",
+      s.exit === 0 &&
+        s.row?.status === "PASS" &&
+        s.row?.oracle?.class === "structural" &&
+        s.row?.metrics?.joins_skipped === "0",
+    );
+    check(
+      "and its PASS says, on the receipt, that it is NOT the P5 gate",
+      /CARRIED BY HG1 — fork-register completeness/.test(notes) &&
+        /CARRIED BY HG1 — isomorphism spot-checks/.test(notes) &&
+        /this PASS is NOT the P5 gate/.test(notes),
+    );
+  }
+
+  // --- 7. p3-encode ---------------------------------------------------------
+  {
+    const s = stage("p3-encode");
+    check(
+      "p3-encode with no denovo.modules is SKIPPED naming the key",
+      s.exit === 0 &&
+        s.row?.status === "SKIPPED" &&
+        /declares no denovo\.modules/.test(s.row.reason),
+    );
+  }
+  {
+    const s = stage("p3-encode", {
+      GO_S_DENOVO_MODULES: resolve(DEP, "never-written.l4"),
+    });
+    check(
+      "p3-encode with a declared-but-undeposited module is SKIPPED, naming which module",
+      s.exit === 0 &&
+        s.row?.status === "SKIPPED" &&
+        /has not been deposited yet/.test(s.row.reason) &&
+        s.row.reason.includes("never-written.l4"),
+    );
+  }
+  {
+    const l4 = process.env.L4;
+    if (!l4 || !ex(l4)) {
+      skip(
+        "p3-encode typechecks a deposited module",
+        "$L4 is unset or missing (CI's Go Orchestrator job builds no binary)",
+      );
+    } else {
+      const good = resolve(DEP, "good.l4");
+      wr(
+        good,
+        "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\n`is positive` x MEANS x > 0\n",
+      );
+      const s = stage("p3-encode", { GO_S_DENOVO_MODULES: good });
+      check(
+        "p3-encode over a deposited module that typechecks PASSes, and says on the row what it did not check",
+        s.exit === 0 &&
+          s.row?.status === "PASS" &&
+          s.row?.oracle?.class === "structural" &&
+          (s.row.notes ?? []).some((n) => /isomorphic/.test(n.text)) &&
+          (s.row.notes ?? []).some((n) => /BRANCH over ELSE IF/.test(n.text)),
+      );
+      const bad = resolve(DEP, "bad.l4");
+      wr(
+        bad,
+        "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\n`is broken` x MEANS x > \n",
+      );
+      const t = stage("p3-encode", { GO_S_DENOVO_MODULES: bad });
+      check(
+        "p3-encode is capable of red: a module that does not typecheck is DEGRADED",
+        t.exit === 1 &&
+          t.row?.status === "DEGRADED" &&
+          Number(t.row.metrics.typecheck_failures) === 1,
+      );
+    }
+  }
+
+  // --- 8. the plan stops refusing -------------------------------------------
+  {
+    const r = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "plan",
+        "--milestone",
+        "g2",
+        "--subject",
+        "smoke",
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, L4_GO_SUBJECTS_DIR: sidecars },
+      },
+    );
+    check(
+      "go.sh plan --milestone g2 no longer refuses, and prints SPEC.md §4's full de novo order",
+      r.status === 0 &&
+        [
+          "p1-ingest",
+          "p2-sweep",
+          "p3-encode",
+          "p3-check",
+          "p4-forks",
+          "p5-gate",
+          "p9-report",
+        ].every((s) => r.stdout.includes(s)),
+    );
+    check(
+      "the plan states each deposit's presence, and marks the stages that are NOT wired at g2",
+      /p1-ingest\s+-\s+present/.test(r.stdout) &&
+        /p3-check\s+NOT WIRED/.test(r.stdout) &&
+        /p6-tests\s+NOT WIRED/.test(r.stdout),
+    );
+    check(
+      "and it refuses to let 'g2 COMPLETE' be read as 'a de novo run happened'",
+      /does NOT mean a de novo run happened/.test(r.stdout) &&
+        /§8 diff oracle/.test(r.stdout),
+    );
+    const t = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "plan",
+        "--milestone",
+        "g2",
+        "--subject",
+        "nodenovo",
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, L4_GO_SUBJECTS_DIR: sidecars },
+      },
+    );
+    check(
+      "a subject with no denovo section plans cleanly, every deposit reading 'undeclared'",
+      t.status === 0 && (t.stdout.match(/undeclared/g) ?? []).length >= 4,
+    );
+  }
+
+  rmSync(T, { recursive: true, force: true });
+}
+// ===== END de-novo deposit-stage checks =====================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );
