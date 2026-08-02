@@ -867,29 +867,31 @@ foldDateLiteral oracle e = case e of
     , d >= 1, d <= 31, m >= 1, m <= 12 ->
         fromGregorianValid y (fromInteger m) (fromInteger d)
   -- ISO order, and there is no builtin `Unique` to match on: `YMD` is a library
-  -- DECIDE (@daydate.l4@), not a `TypeCheck.Environment` builtin, so the type
-  -- check below is carrying the whole weight of "this really is a date".
+  -- DECIDE (@daydate.l4@), not a `TypeCheck.Environment` builtin. So the head
+  -- test is PROVENANCE — 'fromDaydate', below — and not the name it is spelled
+  -- with.
   --
-  -- What it does NOT carry is "this is /daydate's/ date function", and that
-  -- residual is worth naming because the comment above could be read as though
-  -- the guard were airtight. A module that defines its OWN three-@NUMBER@ ->
-  -- @DATE@ function named @YMD@, with other semantics, folds to the components
-  -- as written. MEASURED 2026-08-02, @YMD y m d MEANS DATE_FROM_DMY d m (y PLUS
-  -- 1)@ with @YMD 2024 1 2@: this emits @date("2024-01-02")@ while @l4 run@
-  -- answers @DATE OF 2, 1, 2025@.
+  -- __Why provenance, and not name + type__ (smucclaw\/l4-ide#933, fixed here;
+  -- \#196 documented this instead of fixing it, and the note it left is the
+  -- paragraph this one replaces). @oracleType oracle e == DmnDate@ proves the
+  -- application IS a date; it does not prove it is /daydate's/ date function. A
+  -- module that defines its own three-@NUMBER@ -> @DATE@ function named @YMD@
+  -- with other semantics used to fold to the components as written. MEASURED
+  -- 2026-08-02: @YMD y m d MEANS DATE_FROM_DMY d m (y PLUS 1)@ applied to
+  -- @YMD 2024 1 2@ emitted @date("2024-01-02")@ while @l4 run@ answered
+  -- @DATE OF 2, 1, 2025@ — a silent wrong answer in an exporter whose stance is
+  -- refuse-loudly-or-render-faithfully. The identical probe against a locally
+  -- redefined @Date@ produced a byte-identical disagreement, so the @Date@ arm
+  -- above carried the same hole and takes the same fix; #196 widened it from one
+  -- name to two rather than opening it.
   --
-  -- Left as-is, deliberately, on three measured grounds. (1) It is NOT new: the
-  -- @Date@ arm above name-matches past its `Unique` in exactly the same way, and
-  -- the identical probe against a locally-redefined @Date@ produces the identical
-  -- disagreement -- so this arm widens a pre-existing hole from one name to two
-  -- rather than opening one. (2) The trigger requires NOT importing @daydate@:
-  -- with the import present the redefinition is an ambiguity error and export
-  -- never runs ("There are multiple definitions for the identifier YMD ... and I
-  -- do not have sufficient information to make a choice between them"). (3) A
-  -- transposed argument order specifically cannot reach here, structurally: a
-  -- little-endian date puts the year in the day slot, where @d <= 31@ declines it.
-  -- Closing it properly means checking PROVENANCE rather than name, which changes
-  -- the @Date@ path too and belongs in its own change.
+  -- Two bounds on the blast radius, both measured, both still true. Importing
+  -- @daydate@ makes such a redefinition an ambiguity typecheck error, so export
+  -- never runs — the hole was reachable only from modules that do NOT import
+  -- @daydate@, and those are exactly the ones that now fall through to the
+  -- raw-L4 path. And a transposed argument order cannot reach here structurally:
+  -- a little-endian date puts the year in the day slot, where @d <= 31@ declines
+  -- it.
   App _ r [yE, mE, dE]
     | ymdHead r
     , oracleType oracle e == DmnDate
@@ -902,11 +904,35 @@ foldDateLiteral oracle e = case e of
  where
   dateHead r =
     getUnique r == TC.dateFromDMYUnique
-      || nameOf r `elem` ["Date", "Days to date"]
-      || unqualifiedNameToText (getActual r) `elem` ["Date", "Days to date"]
-  ymdHead r =
-    nameOf r `elem` ["YMD", "Year month day"]
-      || unqualifiedNameToText (getActual r) `elem` ["YMD", "Year month day"]
+      || (fromDaydate r && named r ["Date", "Days to date"])
+  ymdHead r = fromDaydate r && named r ["YMD", "Year month day"]
+  named r ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
+
+-- | Provenance: does this reference resolve to a definition in the @daydate@
+-- library?
+--
+-- The counterpart, for the one head that has a builtin `Unique`, is
+-- @getUnique r == TC.'TC.dateFromDMYUnique'@ in 'foldDateLiteral'. @Date@ and
+-- @YMD@ have no builtin `Unique` — they are library @DECIDE@s — so the question
+-- "is this /daydate's/ date function" has to be asked of where the definition
+-- LIVES. A `Resolved` carries the defining occurrence's `Unique`, and a
+-- `Unique` carries the `NormalizedUri` of the module that minted it, so the
+-- answer is exact for the thing that matters: a same-named function defined
+-- anywhere else resolves to a different module and declines.
+--
+-- Matched on the URI's BASENAME rather than its full path, because the same
+-- library is reached under several spellings — a @file://@ path under
+-- @JL4_LIBRARY_PATH@, the repo's own @jl4-core\/libraries@, or the embedded
+-- copy seeded into the VFS under the @jl4-embedded@ scheme (see the resolution
+-- order in CLAUDE.md §5). Every one of them ends in @daydate.l4@, and nothing
+-- else does: a user module that shadows @YMD@ lives in its own file, and one
+-- that shadows it while ALSO being called @daydate.l4@ is the library, by
+-- resolution.
+fromDaydate :: Resolved -> Bool
+fromDaydate r =
+  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') uriText == "daydate.l4"
+ where
+  uriText = (fromNormalizedUri (getUnique r).moduleUri).getUri
 
 intLitOf :: Expr Resolved -> Maybe Integer
 intLitOf = \case

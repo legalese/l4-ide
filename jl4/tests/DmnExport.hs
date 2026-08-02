@@ -2436,6 +2436,43 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       it "refuses a computed component" $
         dayRefuses "YMD (1983 PLUS 40) 1 1"
 
+      -- smucclaw/l4-ide#933. The head test is PROVENANCE, not name + type: a
+      -- module that defines its OWN `YMD`/`Date` (and therefore does NOT import
+      -- daydate, or the redefinition would be an ambiguity error and export
+      -- would never run) must fall through to the raw-L4 path.
+      --
+      -- The shadow used here is daydate's semantics off by one year, which is
+      -- what makes the old behaviour a SILENT wrong answer rather than a noisy
+      -- one: name + type both agreed, the fold read the components as written,
+      -- and the artifact said 2024-01-02 where `l4 run` says DATE OF 2, 1, 2025.
+      -- Both arms are asserted, because #196 widened the hole from `Date` to
+      -- `YMD` rather than opening it.
+      let shadowDrg ctor params body =
+            drgOf
+              ( "IMPORT prelude\nGIVEN " <> params <> "\nGIVETH A DATE\n"
+                  <> ctor <> " MEANS DATE_FROM_DMY d m (y PLUS 1)\n"
+                  <> "GIVETH A DATE\n`the day` MEANS " <> body <> "\n"
+              )
+          shadowRefuses ctor params body = do
+            let drg = shadowDrg ctor params body
+            case (decisionNamed "the day" drg).dcnLogic of
+              LogicLiteral e -> do
+                e.feFragment `shouldBe` L4Verbatim
+                e.feText `shouldSatisfy` Text.isInfixOf ctor
+              _ -> expectationFailure ("expected a boxed literal for: " <> Text.unpack body)
+
+      it "refuses a locally-defined YMD that shadows daydate's (#933)" $
+        shadowRefuses
+          "YMD"
+          "y IS A NUMBER, m IS A NUMBER, d IS A NUMBER"
+          "YMD 2024 1 2"
+
+      it "refuses a locally-defined Date that shadows daydate's (#933)" $
+        shadowRefuses
+          "Date"
+          "d IS A NUMBER, m IS A NUMBER, y IS A NUMBER"
+          "Date 2 1 2024"
+
       it "keeps all three refusals in the negative fixture Blocking" $ do
         drg <- notOkDrg "ymd-unfoldable-date.l4"
         -- The OTHER notes on this fixture are D-INERT x3 and D-SVCEMPTY, which
