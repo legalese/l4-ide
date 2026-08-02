@@ -101,7 +101,7 @@ suite of those two goldens would have shown nothing at all.
 
 ### What jBPM makes of the four directions
 
-Worth recording, because it is the reason the corrected golden is *still*
+Worth recording, because it was the reason the corrected golden was *still*
 rejected and the reason the correction is still right. The same fixture, run
 with only `gatewayDirection` changed (`etc/check-bpmn-kie.sh`, jbpm-bpmn2
 7.74.1.Final, JDK 17.0.20):
@@ -114,9 +114,21 @@ with only `gatewayDirection` changed (`etc/check-bpmn-kie.sh`, jbpm-bpmn2
 | `Unspecified` | `Unknown gateway direction: Unspecified`                                          |
 
 The `Unspecified` row was measured 2026-08-01, on
-`../expected/regcf-reporting.bpmn` itself (2 incoming, 3 outgoing) rather than
-on this fixture; the same run reproduced the `Diverging` and `Converging`
-refusals verbatim on the real file, so the table holds for both shapes. It was
+`../expected/regcf-reporting.bpmn` **as it then stood** (2 incoming, 3 outgoing)
+rather than on this fixture; the same run reproduced the `Diverging` and
+`Converging` refusals verbatim on the real file, so the table holds for both
+shapes.
+
+> **That golden no longer has a 2-in gateway** — measured 2026-08-02. The
+> BPMN→DMN wiring (`specs/todo/lexipedia-superset/PROCESS-TRACK.md` §8.3) put a
+> `businessRuleTask` in front of it, which absorbed both arrivals, so `Split_0`
+> there is now a plain 1-in/3-out `Diverging` and jBPM has stopped complaining
+> about it. The table above is unaffected — it is a fact about jBPM, not about
+> that file — and `mislabelled-gateway-direction.bpmn` is unaffected, being
+> hand-written and still carrying the contradiction it exists to carry. What
+> changed is only that jBPM's objection to `regcf-reporting.bpmn` moved one node
+> upstream (`Decide_0`, same "more than one incoming connection"), which
+> `PROCESS-TRACK.md` §8.1 records as class (a′). It was
 measured because an attribute-level fix for the golden's rejection — emit
 `Unspecified` where `Mixed` is computed, on the theory that the XSD default
 would pass where the unimplemented value did not — had been planned, and the
