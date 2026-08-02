@@ -1070,6 +1070,14 @@ data LocalShadowing
 -- and @jl4\/experiments\/environmental-quality-review-act-7.l4@ (locals named
 -- after computed selectors). Locals must keep winning absolutely at bare
 -- occurrences; only the label position changes.
+--
+-- The price, stated because the corpus does not pay it and so no measurement
+-- will surface it: a local that IS a function of the selector's exact type at
+-- a label was previously resolved (to the local) and is now AMBIGUOUS —
+-- @GIVEN amount IS A FUNCTION FROM Money TO NUMBER@ over a @Money@ with an
+-- @amount@ field, at @m's amount@, has two candidates in one 'typeKey' group.
+-- Accepted: that source is genuinely ambiguous. Recorded in
+-- @specs\/done\/SECTION-LEXICAL-SCOPING-SPEC.md@ §12 FIX A′.
 resolveProjectionLabel :: Name -> Check (Resolved, Type' Resolved)
 resolveProjectionLabel n =
   resolveTermFilteredIn LocalsSpareSelectors False (const True) (const True) n pure

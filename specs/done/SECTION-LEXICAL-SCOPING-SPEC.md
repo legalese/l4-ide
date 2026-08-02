@@ -2,11 +2,18 @@
 > via PR [smucclaw/l4-ide#50](https://github.com/smucclaw/l4-ide/pull/50) (commits
 > `29ace1c8`, `a6ac3e7a`), CI green (Haskell Build & Test: SUCCESS). `resolveTerm'` /
 > `resolveType` (`jl4-core/src/L4/TypeCheck/Types.hs`) implement lexical section-proximity
-> resolution exactly as specified in §3-§4, and all three §12 hardening fixes (FIX A/B/C)
-> are present verbatim with matching regression tests (`jl4/examples/ok/section-scoping-
+> resolution exactly as specified in §3-§4, and the §12 hardening fixes are present
+> verbatim with matching regression tests (`jl4/examples/ok/section-scoping-
 param-not-shadowed.l4`, `section-scoping-forward-ref.l4`,
 > `jl4/examples/not-ok/tc/section-scoping-import-collision.l4`). Resolves
 > [smucclaw/l4-ide#85](https://github.com/smucclaw/l4-ide/issues/85).
+>
+> **Amended 2026-08-03**: §12 carried **three** fixes (A/B/C) when this header was
+> written and now carries **four** — FIX A′ was added for
+> [smucclaw/l4-ide#930](https://github.com/smucclaw/l4-ide/issues/930), with regression
+> test `jl4/examples/ok/section-scoping-projection-label.l4`. The count is corrected here
+> rather than left to drift, because a header that says "all three" is how a reader
+> concludes a fourth is not real.
 
 # Section Lexical Scoping Specification
 
@@ -679,6 +686,40 @@ regression examples for each. (FIX A′ was added 2026-08-03, after the first th
   selectors): three files broken to fix one. The label-position fix changes exactly one file in
   the tree — `jl4/experiments/patterns_and_idioms.l4`, red → green — with every other diagnostic
   byte-identical across all 726 `.l4` files (`l4 check` sweep, before/after).
+
+  **Re-measured 2026-08-03 with a stronger instrument, and what it cost.** A `l4 check` sweep
+  can only see diagnostics, so it cannot see a resolution that silently changes an _answer_. The
+  fix was therefore re-measured with a whole-tree `l4 run` sweep (base `16adc022` binary vs the
+  branch binary, all 725 `.l4` files present on both sides, full stdout+stderr diffed). Result:
+  **exactly the same one file changes**, `patterns_and_idioms.l4`, red → green — the `#EVAL`s
+  past the former error now evaluate (25, TRUE, …) and the `__GT__` cascade is gone. Five further
+  files differ between any two runs because they make live HTTP calls (UUIDs, AWS trace ids); no
+  other file's evaluated output moves. `l4 check` wall time is unchanged on the five
+  collision-heaviest files (±0.02s), so the extra candidates do not reopen #929.
+
+  **The over-reach the sweep cannot show, because the tree does not contain it.** FIX A′ is a
+  real narrowing of FIX A, and it has a price at the language level even though the corpus does
+  not pay it today. A local that IS a function of the selector's exact type at a label used to
+  resolve definitely to the local; it is now ambiguous. Measured:
+
+  ```
+  DECLARE Money HAS amount IS A NUMBER
+  GIVEN amount IS A FUNCTION FROM Money TO NUMBER
+        m      IS A Money
+  GIVETH A NUMBER
+  `via local fn` MEANS m's amount
+  ```
+
+  On base `16adc022` this checks and `\`via local fn\` doubler (Money 5)`evaluates to the
+local's answer. On this branch it reports "There are multiple definitions for the identifier
+amount …`amount (predefined) of type FUNCTION FROM Money TO NUMBER`/`amount (defined at
+  …:6:9-15)`" — same `typeKey`, so type-direction cannot discriminate, exactly as in the
+`pattern-matching-wildcard-shadow.l4`case above. This is the accepted price of FIX A′ and not
+a defect: writing`base's l`when`l` is a local function of the base's type is a genuinely
+  ambiguous thing to write, and the workaround (rename, or apply the local prefix-style) is
+  local. It is recorded because the "exactly one file changes" measurement is about **this**
+  corpus, and a reader who takes it as "this change is free" will be surprised by the first
+  higher-order parameter named after a field.
 
 - **FIX B — proximity before type-grouping (`jl4/examples/ok/section-scoping-forward-ref.l4`).**
   A forward reference to a not-yet-inferred un-annotated `DECIDE` has a wildcard (`InfVar`)
