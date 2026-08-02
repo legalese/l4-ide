@@ -869,6 +869,27 @@ foldDateLiteral oracle e = case e of
   -- ISO order, and there is no builtin `Unique` to match on: `YMD` is a library
   -- DECIDE (@daydate.l4@), not a `TypeCheck.Environment` builtin, so the type
   -- check below is carrying the whole weight of "this really is a date".
+  --
+  -- What it does NOT carry is "this is /daydate's/ date function", and that
+  -- residual is worth naming because the comment above could be read as though
+  -- the guard were airtight. A module that defines its OWN three-@NUMBER@ ->
+  -- @DATE@ function named @YMD@, with other semantics, folds to the components
+  -- as written. MEASURED 2026-08-02, @YMD y m d MEANS DATE_FROM_DMY d m (y PLUS
+  -- 1)@ with @YMD 2024 1 2@: this emits @date("2024-01-02")@ while @l4 run@
+  -- answers @DATE OF 2, 1, 2025@.
+  --
+  -- Left as-is, deliberately, on three measured grounds. (1) It is NOT new: the
+  -- @Date@ arm above name-matches past its `Unique` in exactly the same way, and
+  -- the identical probe against a locally-redefined @Date@ produces the identical
+  -- disagreement -- so this arm widens a pre-existing hole from one name to two
+  -- rather than opening one. (2) The trigger requires NOT importing @daydate@:
+  -- with the import present the redefinition is an ambiguity error and export
+  -- never runs ("There are multiple definitions for the identifier YMD ... and I
+  -- do not have sufficient information to make a choice between them"). (3) A
+  -- transposed argument order specifically cannot reach here, structurally: a
+  -- little-endian date puts the year in the day slot, where @d <= 31@ declines it.
+  -- Closing it properly means checking PROVENANCE rather than name, which changes
+  -- the @Date@ path too and belongs in its own change.
   App _ r [yE, mE, dE]
     | ymdHead r
     , oracleType oracle e == DmnDate
