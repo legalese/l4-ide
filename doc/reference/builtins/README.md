@@ -118,14 +118,28 @@ Example (see [temporal-acceptance.l4](https://github.com/legalese/l4-ide/blob/ma
 #EVAL `VALUE AT` (Date 4 7 1776) (GIVEN d YIELD d)
 ```
 
-The `EVAL ...` builtins re-evaluate an expression under an altered temporal context, then restore the original context. The first argument is a date/time **serial number** (see `DATE_SERIAL`, `DATETIME_SERIAL`); the second is the expression to evaluate.
+The `EVAL ...` builtins re-evaluate an expression under an altered temporal context, then restore the original context. The first argument is a `DATE` (build one with `Date d m y` from the `daydate` library); the second is the expression to evaluate.
 
-| Function                        | Signature        | Description                                                                  |
-| ------------------------------- | ---------------- | ---------------------------------------------------------------------------- |
-| `EVAL AS OF SYSTEM TIME`        | `NUMBER → a → a` | Evaluate as if the system (transaction) time were the given serial timestamp |
-| `EVAL UNDER VALID TIME`         | `NUMBER → a → a` | Evaluate with the valid time set to the given date serial                    |
-| `EVAL UNDER RULES EFFECTIVE AT` | `NUMBER → a → a` | Evaluate under the version of the rules effective at the given date          |
-| `EVAL UNDER RULES ENCODED AT`   | `NUMBER → a → a` | Evaluate under the rules as they were encoded (known) at the given timestamp |
+| Function                        | Signature      | Description                                                                 |
+| ------------------------------- | -------------- | --------------------------------------------------------------------------- |
+| `EVAL AS OF SYSTEM TIME`        | `DATE → a → a` | Evaluate as if the system (transaction) time were midnight UTC on that date |
+| `EVAL UNDER VALID TIME`         | `DATE → a → a` | Evaluate with the valid time (fact time) set to the given date              |
+| `EVAL UNDER RULES EFFECTIVE AT` | `DATE → a → a` | Evaluate under the version of the rules effective at the given date         |
+| `EVAL UNDER RULES ENCODED AT`   | `DATE → a → a` | Evaluate under the rules as they were encoded (known) at the given date     |
+
+**The pin is deep.** The expression is evaluated to normal form — the whole
+structure the evaluator would print, not just its outermost constructor — while
+the altered context is in force, and the result is snapshotted out of the scope,
+so nothing re-derives it afterwards. `VALUE AT` works the same way. Two
+consequences worth knowing:
+
+- A **closure** returned from under a pin is not covered: applying it later
+  reads the ambient context. Apply it inside the pin instead.
+- The pin is therefore **strict** in its argument's structure: a field nothing
+  demands is still evaluated.
+
+See `jl4/examples/ok/temporal-pin-deep.l4` and the ruling in
+`specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.1.
 
 For regulative traces, `WAIT UNTIL` produces a synthetic event that matches no party or action and is only relevant for its timestamp — use it to advance time in an event list:
 
