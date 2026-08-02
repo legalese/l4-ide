@@ -3,8 +3,9 @@
 **Status (2026-08-02): PARTIALLY IMPLEMENTED — milestone G1 runs; the de novo path does not.**
 `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every
 reachable projection and emits conversion report v0; the seven de novo and publish stages are
-scaffolded entry points that refuse with a named blocker, five of them because a ruling here is
-still open. The orchestrator's own present-tense inventory is
+scaffolded entry points that refuse with a named blocker. With R4 ruled (2026-08-02), the
+encode/fork stages' blocker is unbuilt tooling; only P8 (R5) and P10 (R1/R2) still wait on open
+rulings. The orchestrator's own present-tense inventory is
 [ORCHESTRATOR.md](./ORCHESTRATOR.md); §5 below still names what does not exist (BKM emission, the
 ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo — and P8's component row
 inventories nothing, pending R5). §5 is the verified inventory and §6 is the gap register.
@@ -122,7 +123,9 @@ Deliverable: the forks themselves, in L4, plus a fork register naming the ambigu
 each fork interprets — cross-referenced against P2's external-modification register, so a fork
 an authority has already settled carries that resolution rather than presenting as open. Where
 world knowledge supports a sensible default, preload it as a `TYPICALLY` metadata default (the
-feature is merged — PR #92). Representation of forks is an open design question (R4).
+feature is merged — PR #92). Representation of forks is ruled (R4, ANSWERED 2026-08-02): one
+`Interpretation` record parameter, fork register entries mapping 1:1 to its fields — see
+[R4-FORK-REPRESENTATION.md](./R4-FORK-REPRESENTATION.md).
 
 ### P5 — Adversarial gate
 
@@ -139,7 +142,11 @@ code.
 
 Comprehensive scenario tests: common cases, edge cases, and — for every ambiguity fork — cases
 that **discriminate between the interpretations**, so a reviewer sees exactly where and how
-much the readings diverge. The test carrier (`#EVAL` goldens, `l4 batch`, or jl4-service
+much the readings diverge. Under R4's ruled representation this takes the two property classes
+of R4-FORK-REPRESENTATION.md §4: **agreement** properties asserted `∀ interp` (where all
+readings concur, the answer is interpretation-independent), and **divergence witnesses**
+(searched fact patterns where two readings disagree, minimised and pinned as named cases, each
+citing its fork-register entry). The test carrier (`#EVAL` goldens, `l4 batch`, or jl4-service
 replay) is chosen at implementation time; measure which carriers support the GIVEN-record house
 style before committing to one.
 
@@ -189,26 +196,26 @@ and licensing admit it (R2). Publication is outward-facing and human-gated (§7.
 Verified against unstable @ `a94a8f1d` (post-#178) and `gh` on 2026-07-31. "Merged" means on
 unstable now.
 
-| component                  | state                                                                                                                                                                                                                                                                                                                                                             |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reg CF corpus (hand-built) | `jl4/examples/legal/regcf/regcf.l4`, 1,236 lines, temporally closed (PR #172) — the diff oracle for the de novo run (§8)                                                                                                                                                                                                                                          |
-| temporal rule versions     | `EVAL UNDER RULES EFFECTIVE AT` + dated `BRANCH` merged and CI-covered; design in `TEMPORAL-RULE-VERSION-DESIGN.md`                                                                                                                                                                                                                                               |
-| BPMN export                | `l4 export --to bpmn`, byte-golden in `l4-cli-test`                                                                                                                                                                                                                                                                                                               |
-| DMN export                 | `l4 export --to dmn` / `dmn-md`; itemDefinitions (PR #175), engine-intersection fixtures (PR #176), law-time (PR #178) all merged; two-engine CI                                                                                                                                                                                                                  |
-| DMN executability          | MAYBE→typeRef + NOTHING lowering merged in #175 (§11-R8); hydration for computed fields + MAYBE→null (R8-d′) + isJust recognition delivered as **PR #180** (MERGED to unstable — emitted hydrators 44/44 on both engines); BKM emission (DMN spec Phase 5, sequenced after the Phase 4 un-lifting analysis) **not started** — the load-bearing gap                |
-| ladder diagrams            | Steps 1 and 3 merged; Step 2 half-merged (metrics done, theming + leaf-wrapping open); Step 4 + S6 pan/zoom + S8 palette = PR #177 (MERGED to unstable); Step 5 (the side-by-side IDE toggle) unstarted; the default flip is Step 7, gated on 6a — E1 critical path 1→3→4→5→6a→7                                                                                  |
-| state-graph / trace dumps  | `l4 state-graph` (DOT only, to stdout) + `l4 trace` (dot\|png\|svg) merged                                                                                                                                                                                                                                                                                        |
-| LTS visualizer proper      | **not built** — the P2 visualiser sits behind two falsification experiments and three preconditions (`lexipedia-superset/LTS-VISUALISER.md` §0), and `StateGraph` as shipped is explicitly not its scaffold (its Q8). A gap for G3; interim = state-graph DOT through external graphviz                                                                           |
-| MCP via jl4-service        | MCP server merged in tree (`jl4-service/src/McpServer.hs`, `WebMCPPage.hs`); a live deployment serving other corpus modules as MCP tools is reported by Meng (2026-07-31), not verifiable from this repo; Reg CF joins in P7                                                                                                                                      |
-| web wizard / query planner | wizard exports merged (PR #162; the law-time control added by PR #172); deploy legs outstanding per `lexipedia-superset/SPEC.md`; `QUESTION-ORDERING-SPEC.md`                                                                                                                                                                                                     |
-| TYPICALLY defaults         | `TYPICALLY-DEFAULTS-SPEC.md` **and** the metadata-only implementation both merged (PR #92, 53dda002, 2026-07-08) — in this worktree's base                                                                                                                                                                                                                        |
-| TNR round-trip             | prototype on unpushed local branch `nlg-roundtrip` (`specs/todo/tnr-prototype/`, incl. `tnr_proto.py`; ~28 files, ~5.6k lines over unstable)                                                                                                                                                                                                                      |
-| inert-style guidance       | repo skill `.claude/skills/writing-l4-rules/` (inert guidance in `drafting-patterns.md`); fuller treatment in the user-level `l4` skill                                                                                                                                                                                                                           |
-| adversarial workflows      | proven pattern (#175, #176, #178 merged; #177 built the same way and since merged); not yet packaged as a reusable pipeline stage                                                                                                                                                                                                                                 |
-| P8 verifier toolchain      | not inventoried here — R5 asks which existing machinery or external tool goes first                                                                                                                                                                                                                                                                               |
-| P2 sweep tooling           | no repo component needed — agent web search; the register format is defined in P2 itself                                                                                                                                                                                                                                                                          |
-| orchestrator ("go")        | **milestone G1 runs today** — `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every reachable projection and emits report v0; seven stages (P1, P2, P3-encode, P4, P5, P8, P10) are scaffolded and refuse with a named blocker, and G2 is unbuilt pending R4. Present-tense inventory: [ORCHESTRATOR.md](./ORCHESTRATOR.md) |
-| corpus-of-law repo         | **does not exist** (R1)                                                                                                                                                                                                                                                                                                                                           |
+| component                  | state                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reg CF corpus (hand-built) | `jl4/examples/legal/regcf/regcf.l4`, 1,236 lines, temporally closed (PR #172) — the diff oracle for the de novo run (§8)                                                                                                                                                                                                                                                                                                 |
+| temporal rule versions     | `EVAL UNDER RULES EFFECTIVE AT` + dated `BRANCH` merged and CI-covered; design in `TEMPORAL-RULE-VERSION-DESIGN.md`                                                                                                                                                                                                                                                                                                      |
+| BPMN export                | `l4 export --to bpmn`, byte-golden in `l4-cli-test`                                                                                                                                                                                                                                                                                                                                                                      |
+| DMN export                 | `l4 export --to dmn` / `dmn-md`; itemDefinitions (PR #175), engine-intersection fixtures (PR #176), law-time (PR #178) all merged; two-engine CI                                                                                                                                                                                                                                                                         |
+| DMN executability          | MAYBE→typeRef + NOTHING lowering merged in #175 (§11-R8); hydration for computed fields + MAYBE→null (R8-d′) + isJust recognition delivered as **PR #180** (MERGED to unstable — emitted hydrators 44/44 on both engines); BKM emission (DMN spec Phase 5, sequenced after the Phase 4 un-lifting analysis) **not started** — the load-bearing gap                                                                       |
+| ladder diagrams            | Steps 1 and 3 merged; Step 2 half-merged (metrics done, theming + leaf-wrapping open); Step 4 + S6 pan/zoom + S8 palette = PR #177 (MERGED to unstable); Step 5 (the side-by-side IDE toggle) unstarted; the default flip is Step 7, gated on 6a — E1 critical path 1→3→4→5→6a→7                                                                                                                                         |
+| state-graph / trace dumps  | `l4 state-graph` (DOT only, to stdout) + `l4 trace` (dot\|png\|svg) merged                                                                                                                                                                                                                                                                                                                                               |
+| LTS visualizer proper      | **not built** — the P2 visualiser sits behind two falsification experiments and three preconditions (`lexipedia-superset/LTS-VISUALISER.md` §0), and `StateGraph` as shipped is explicitly not its scaffold (its Q8). A gap for G3; interim = state-graph DOT through external graphviz                                                                                                                                  |
+| MCP via jl4-service        | MCP server merged in tree (`jl4-service/src/McpServer.hs`, `WebMCPPage.hs`); a live deployment serving other corpus modules as MCP tools is reported by Meng (2026-07-31), not verifiable from this repo; Reg CF joins in P7                                                                                                                                                                                             |
+| web wizard / query planner | wizard exports merged (PR #162; the law-time control added by PR #172); deploy legs outstanding per `lexipedia-superset/SPEC.md`; `QUESTION-ORDERING-SPEC.md`                                                                                                                                                                                                                                                            |
+| TYPICALLY defaults         | `TYPICALLY-DEFAULTS-SPEC.md` **and** the metadata-only implementation both merged (PR #92, 53dda002, 2026-07-08) — in this worktree's base                                                                                                                                                                                                                                                                               |
+| TNR round-trip             | prototype on unpushed local branch `nlg-roundtrip` (`specs/todo/tnr-prototype/`, incl. `tnr_proto.py`; ~28 files, ~5.6k lines over unstable)                                                                                                                                                                                                                                                                             |
+| inert-style guidance       | repo skill `.claude/skills/writing-l4-rules/` (inert guidance in `drafting-patterns.md`); fuller treatment in the user-level `l4` skill                                                                                                                                                                                                                                                                                  |
+| adversarial workflows      | proven pattern (#175, #176, #178 merged; #177 built the same way and since merged); not yet packaged as a reusable pipeline stage                                                                                                                                                                                                                                                                                        |
+| P8 verifier toolchain      | not inventoried here — R5 asks which existing machinery or external tool goes first                                                                                                                                                                                                                                                                                                                                      |
+| P2 sweep tooling           | no repo component needed — agent web search; the register format is defined in P2 itself                                                                                                                                                                                                                                                                                                                                 |
+| orchestrator ("go")        | **milestone G1 runs today** — `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every reachable projection and emits report v0; seven stages (P1, P2, P3-encode, P4, P5, P8, P10) are scaffolded and refuse with a named blocker; R4 is ruled (2026-08-02) so G2's blocker is now unbuilt tooling, not an open ruling. Present-tense inventory: [ORCHESTRATOR.md](./ORCHESTRATOR.md) |
+| corpus-of-law repo         | **does not exist** (R1)                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## 6. Gaps → milestones
 
@@ -221,7 +228,8 @@ unstable now.
   Discharged 2026-08-02: PR #194 landed the corpus cases file, and the leg now reports `PASS`
   with oracle class `execution` on both engines (ORCHESTRATOR.md §5.4).
 - **G2 — de novo run.** P1–P6 executed from the SEC source by agents; acceptance = the §8
-  diff oracle. Entry: fork representation ruled (R4).
+  diff oracle. Entry condition satisfied 2026-08-02: fork representation ruled (R4, the
+  `Interpretation` parameter). The P1–P6 tooling itself remains to be built.
 - **G3 — execution parity.** Every P7 leg executes: BKM emission (DMN spec Phase 5, with
   whatever of Phase 4 it needs — the owning spec sequences them) landed and the corpus DMN
   runs on both engines (**done 2026-08-02** — PRs #188 + #194, measured in ORCHESTRATOR.md
@@ -294,13 +302,14 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   what §6's "only if the report says so in Blocking terms" already implied; (d) the two human
   gates are detached SSH signatures over a journal-derived payload, with `--waive GATE="reason"`
   as the recorded alternative — there is no unrecorded way past a gate.
-- **R4 — ambiguity-fork representation**: parallel `DECIDE`s in one module, sibling modules
-  per interpretation, or annotation-gated variants? Interacts with the wizard and DMN legs
-  (each fork is a distinct decision surface). **Design note drafted 2026-08-01 at Meng's
-  direction — [R4-FORK-REPRESENTATION.md](./R4-FORK-REPRESENTATION.md): a fourth shape, the
+- **R4 — ambiguity-fork representation**: **ANSWERED 2026-08-02, see
+  [R4-FORK-REPRESENTATION.md](./R4-FORK-REPRESENTATION.md) §7.** Meng adopted the
   `Interpretation` record parameter (public interface + private per-reading implementations,
-  exhaustiveness-checked delegation, exhaustive sweep over the fork space). Awaiting Meng's
-  ruling; R4 remains OPEN until then.**
+  exhaustiveness-checked delegation, exhaustive sweep over the fork space) over the three shapes
+  this ruling originally listed (parallel `DECIDE`s, sibling modules, annotation-gated variants),
+  and extended it to regulative rules: rules tend to be returned by `MEANS` functions anyway,
+  so the `interp` argument threads through the scope of the deontic chain. Ruled, not built — the P1–P5 tooling
+  remains scaffolded.
 - **R5 — P8 toolchain**: which verifier first (the in-compiler exhaustiveness machinery, the
   query-planner ROBDD for unsat/dead-branch detection, an external model checker)? Stretch;
   does not gate G0–G4.

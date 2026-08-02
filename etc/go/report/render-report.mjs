@@ -302,7 +302,7 @@ function encodingSection() {
     out.push(
       absent(
         "SPEC.md §P3/§P4 require what the encoding decided, including every ambiguity fork and every externally-settled resolution.",
-        "`p3-encode` and `p4-forks` are entry points that refuse — G2 entry is gated on ruling R4, which is open — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
+        "`p3-encode` and `p4-forks` are entry points that refuse — the de novo tooling is unbuilt (R4 itself was ruled 2026-08-02; see R4-FORK-REPRESENTATION.md) — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
       ),
     );
   if (r) {

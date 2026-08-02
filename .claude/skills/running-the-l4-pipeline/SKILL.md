@@ -177,7 +177,7 @@ That is the single largest simplification in this design and the first thing a l
 | P5 adversarial gate | its own condition is "as good as it can be", which is a judgement three of whose five checks are joins over registers that have no format yet.                                 |
 | §8 triage           | the diff is mechanical; classifying each disagreement as encoding error / genuine ambiguity / improvement over the hand corpus is not, and no diff outcome constitutes a fail. |
 
-All four are **G2** work, and G2 entry is gated on ruling R4, which is open. Today they are entry points that refuse with a named blocker. Run one directly to see it.
+All four are **G2** work. R4 — the fork-representation ruling that gated them — was ruled 2026-08-02 (the `Interpretation` parameter), but the tooling is unbuilt: today they are entry points that refuse with a named blocker. Run one directly to see it.
 
 ### What mid-tier models are for
 

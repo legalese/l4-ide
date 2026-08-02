@@ -12,10 +12,12 @@ What that means precisely, in the present tense:
   recorded.
 - **Seven stages are scaffolded and cannot run**: `p1-ingest`, `p2-sweep`, `p3-encode`,
   `p4-forks`, `p5-gate`, `p8-verify`, `p10-publish`. Each is an entry point that prints what it
-  would do and what is blocking it, then exits 3. Five of the seven are blocked on an open
-  ruling, not on engineering. §5 names each blocker.
-- **Milestone G2 is unbuilt.** `go.sh plan --milestone g2` refuses and says why: SPEC.md §6 gates
-  G2 entry on ruling **R4**, which is open. The §8 diff oracle does not exist either.
+  would do and what is blocking it, then exits 3. Since R4 was ruled (2026-08-02) the
+  encode/fork stages are blocked on engineering — the tooling is unbuilt — while `p8-verify`
+  (R5) and `p10-publish` (R1/R2) still wait on open rulings. §5 names each blocker.
+- **Milestone G2 is unbuilt.** `go.sh plan --milestone g2` refuses and says why: R4 is ruled
+  but none of the de novo tooling it unblocks exists yet. The §8 diff oracle does not exist
+  either.
 - **This document owns the orchestrator's own decisions.** The pipeline it serves is
   [SPEC.md](./SPEC.md); per-projection rulings stay in their own specs. Where this document
   disagrees with the tree, **the tree wins**.
@@ -314,18 +316,20 @@ keeps the latest few runs **and** every run holding a granted gate.
 Each exits 3 after printing what it would do and what is blocking it. None is a member of any
 milestone's declared stage list, so its absence cannot make a milestone `INCOMPLETE`.
 
-| stage         | blocker                                                                                                                                                                                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p1-ingest`   | **R4** open (G2 entry), and no bundle schema or manifest format is defined anywhere in SPEC.md (grepped 2026-08-02: `bundle` occurs once, in §4's P1 deliverable; `manifest` not at all) — nothing to write into, no acceptance condition          |
-| `p2-sweep`    | it is a web-search stage and this orchestrator makes no outward network request except the loopback deployment; and the external-modification register has no machine-readable format, so P5's "every entry disposed" cannot be checked            |
-| `p3-encode`   | **R4** open — encoding against an unruled fork representation is writing to be rewritten                                                                                                                                                           |
-| `p4-forks`    | **R4** open, and the design note's own §6 says no code changes until the encode phase runs; the fork register has no format either                                                                                                                 |
-| `p5-gate`     | its condition is explicitly a judgement; two of its five checks already run inside `p3-check`, and two of the remaining three join over registers that do not exist                                                                                |
-| `p8-verify`   | **R5** open, no CLI footing at all; SPEC.md §5's `P8 verifier toolchain` row inventories nothing ("not inventoried here — R5 asks which existing machinery or external tool goes first") and §6 gives it no pass condition. Gates nothing in G0–G4 |
-| `p10-publish` | **R1** open (owner: Meng), **R2** open, and every outward-facing act here is HG2's                                                                                                                                                                 |
+| stage         | blocker                                                                                                                                                                                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `p1-ingest`   | no bundle schema or manifest format is defined anywhere in SPEC.md (grepped 2026-08-02: `bundle` occurs once, in §4's P1 deliverable; `manifest` not at all) — nothing to write into, no acceptance condition. (R4, formerly listed here, was ruled 2026-08-02) |
+| `p2-sweep`    | it is a web-search stage and this orchestrator makes no outward network request except the loopback deployment; and the external-modification register has no machine-readable format, so P5's "every entry disposed" cannot be checked                         |
+| `p3-encode`   | the stage is unbuilt. R4 was its ruling blocker until 2026-08-02; the ruled `Interpretation` representation now waits on tooling, and the isomorphism judgement stays HG1's                                                                                     |
+| `p4-forks`    | R4 ruled 2026-08-02, and the design note's own §6 says no code changes until the encode phase runs; the fork register still has no machine-readable format (the BNA smoke's register shape, PR #195, is the leading candidate)                                  |
+| `p5-gate`     | its condition is explicitly a judgement; two of its five checks already run inside `p3-check`, and two of the remaining three join over registers that do not exist                                                                                             |
+| `p8-verify`   | **R5** open, no CLI footing at all; SPEC.md §5's `P8 verifier toolchain` row inventories nothing ("not inventoried here — R5 asks which existing machinery or external tool goes first") and §6 gives it no pass condition. Gates nothing in G0–G4              |
+| `p10-publish` | **R1** open (owner: Meng), **R2** open, and every outward-facing act here is HG2's                                                                                                                                                                              |
 
-Five of the seven are blocked on a ruling rather than on engineering. That is deliberate: building
-against an unruled representation is building to be rewritten.
+Until 2026-08-02 five of the seven were blocked on a ruling rather than on engineering — a
+deliberate stance: building against an unruled representation is building to be rewritten. With
+R4 ruled, only `p8-verify` (R5) and `p10-publish` (R1/R2) still wait on rulings; the rest wait on
+tooling.
 
 ### 5.3 The `l4 run` workaround, and its expiry
 
@@ -375,7 +379,18 @@ value(s) as expected, 224/224 service output value(s) as expected`; Camunda 8.7.
 
 ## 6. The gates
 
-SPEC.md §7.3 defines exactly two, and this implements both.
+SPEC.md §7.3 defines exactly two, and this implements both. What each one **means**, before the
+mechanism: **HG1 is a human domain expert certifying isomorphism** — someone has read the
+inert-style L4 against the source regulation, section by section, and signs that it says what the
+law says. That judgement has no checkable form, which is why it is a gate and not an oracle.
+**HG2 is Meng authorizing a specific outward-facing act** — creating the corpus repo, publishing
+the report, any lexipedia contact. Different certifier, different question, different namespace.
+The ssh-signature mechanism below exists for one reason: **an agent can verify a signature and
+cannot make one**, so no agent — however convinced it is of its own encoding — can grant itself
+either approval by signature. HG1 can additionally be waived, but only on the record and bound to
+the corpus digest (§6.2) — circumvention is undeniable, not impossible — and HG2 cannot be waived
+at all. The reader-facing treatment of both gates is
+`.claude/skills/running-the-l4-pipeline/references/gates.md`.
 
 ### 6.1 Mechanism
 
@@ -489,17 +504,17 @@ drifts on its first execution.
 
 ## 8. Deliberately not built
 
-| not built                                                              | why                                                                                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a workflow runtime (`agent()`/`pipeline()`/`parallel()`/`loopUntil()`) | those primitives are declared in `build-dmnmd-to-l4.workflow.js`'s header and defined **nowhere** in the tree — `grep` for `pipeline(` matches only that file. Bash dispatch plus a conductor reading the skill is what "deterministic and resumable" actually requires             |
-| `loopUntil`-style retry-until-green                                    | it is the precise anti-pattern for this stance: rerunning a projection until a regex matches is how `DEGRADED` becomes `PASS`. Banned in the skill, with the reason stated                                                                                                          |
-| the de novo path and the §8 diff oracle                                | **R4** is open. Building fork tooling against an unruled representation is building to be rewritten                                                                                                                                                                                 |
-| P8 verification                                                        | **R5** open, gates nothing in G0–G4, and there is zero CLI footing. A leg here would be pure `UNVERIFIED`                                                                                                                                                                           |
-| the corpus-of-law repo and the lexipedia probe                         | **R1**/**R2** open, both HG2                                                                                                                                                                                                                                                        |
-| a `regcf-corpus.cases.json`                                            | **discharged 2026-08-02** — PR #194 landed the file (16 dated cases, expected values L4-evaluated), meeting the condition §5.4 named. "Not built _here_" stays true: the orchestrator consumes the committed file and still never writes one                                        |
-| patching `l4` for `--fail-on-assert`                                   | the right fix; needs `cabal build`, which this orchestrator never runs. Top upstream ask, shipped as a workaround with an expiry tripwire                                                                                                                                           |
-| machine-readable fork and external-modification registers              | SPEC.md defines neither format anywhere, and P5's "every entry disposed" (§4, P5) cannot be checked without them. They are P2/P4's deliverables and both stages are blocked on R4; defining them before the ruling would be defining a shape for a representation nobody has chosen |
-| commits or pushes by the orchestrator                                  | matches `build-dmnmd-to-l4.workflow.js`'s `policy: { commit: false, push: false }`                                                                                                                                                                                                  |
+| not built                                                              | why                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a workflow runtime (`agent()`/`pipeline()`/`parallel()`/`loopUntil()`) | those primitives are declared in `build-dmnmd-to-l4.workflow.js`'s header and defined **nowhere** in the tree — `grep` for `pipeline(` matches only that file. Bash dispatch plus a conductor reading the skill is what "deterministic and resumable" actually requires                        |
+| `loopUntil`-style retry-until-green                                    | it is the precise anti-pattern for this stance: rerunning a projection until a regex matches is how `DEGRADED` becomes `PASS`. Banned in the skill, with the reason stated                                                                                                                     |
+| the de novo path and the §8 diff oracle                                | **R4** was open when this was written (ruled 2026-08-02 — the `Interpretation` parameter, extended to regulative rules); building the tooling is now unblocked lap-two work, sequenced behind the encode phase per the design note's §6                                                        |
+| P8 verification                                                        | **R5** open, gates nothing in G0–G4, and there is zero CLI footing. A leg here would be pure `UNVERIFIED`                                                                                                                                                                                      |
+| the corpus-of-law repo and the lexipedia probe                         | **R1**/**R2** open, both HG2                                                                                                                                                                                                                                                                   |
+| a `regcf-corpus.cases.json`                                            | **discharged 2026-08-02** — PR #194 landed the file (16 dated cases, expected values L4-evaluated), meeting the condition §5.4 named. "Not built _here_" stays true: the orchestrator consumes the committed file and still never writes one                                                   |
+| patching `l4` for `--fail-on-assert`                                   | the right fix; needs `cabal build`, which this orchestrator never runs. Top upstream ask, shipped as a workaround with an expiry tripwire                                                                                                                                                      |
+| machine-readable fork and external-modification registers              | SPEC.md defines neither format anywhere, and P5's "every entry disposed" (§4, P5) cannot be checked without them. They are P2/P4's deliverables; R4 is now ruled (2026-08-02), so defining them is unblocked — the BNA smoke's emergent register shape (PR #195) is the candidate to formalise |
+| commits or pushes by the orchestrator                                  | matches `build-dmnmd-to-l4.workflow.js`'s `policy: { commit: false, push: false }`                                                                                                                                                                                                             |
 
 ---
 
@@ -529,5 +544,9 @@ decided:
   rewritten as the complete emitted set, each column summing to its heading. Also §6: the
   "not a defect" dismissal of the CLI-reproducibility finding is retracted in place (D1).
 
-Not recorded, and deliberately: **R4 remains OPEN.** Nothing in this change rules it, and the
-stages that depend on it refuse rather than guess.
+Not recorded at this document's first writing, and deliberately so: **R4 was then OPEN** —
+nothing in the orchestrator build ruled it, and the stages that depend on it refused rather than
+guessed. **Ruled 2026-08-02 during Meng's review of this PR** (R4-FORK-REPRESENTATION.md §7):
+the `Interpretation` parameter, extended to regulative rules. The scaffolded stages still
+refuse — their blocker is now unbuilt tooling, not an open ruling — and this change updates
+every refusal text that said otherwise.

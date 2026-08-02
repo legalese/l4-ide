@@ -27,7 +27,7 @@ SPEC.md §7.3 defines exactly two human gates in this pipeline. Everything else 
 
 What it certifies: a domain expert has read the inert-style L4 against the source regulation and is satisfied it is isomorphic. That is SPEC.md §4's P3 deliverable — "isomorphic — a domain expert can review it against the regulation section by section" — and it is the judgement no oracle reaches, which is why SPEC.md §7.3 makes it a gate rather than a checker.
 
-In the driver, HG1 blocks `p6-tests` and everything after it, which is every projection and the report.
+In the driver, HG1 blocks `p6-tests`, every projection leg, and the report (`p9-report`); `p10-publish` is HG2's.
 
 **HG2 — anything outward-facing.**
 

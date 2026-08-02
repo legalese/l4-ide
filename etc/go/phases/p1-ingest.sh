@@ -24,8 +24,8 @@ WHAT IT WOULD DO
   and the COVID-19 temporary rules.
 
 BLOCKER
-  SPEC.md §6 gates G2 entry on ruling R4 (ambiguity-fork representation),
-  which is OPEN in SPEC.md §9. Independently, NO bundle schema or manifest
+  R4 (ambiguity-fork representation) was ruled 2026-08-02, so no ruling
+  blocks G2 entry from this side any more. What blocks: NO bundle schema or manifest
   format is defined anywhere in SPEC.md -- grepped 2026-08-02, 'bundle'
   occurs once, in §4's P1 deliverable ("a source bundle with provenance"),
   and 'manifest' not at all -- so there is nothing for an ingest stage to

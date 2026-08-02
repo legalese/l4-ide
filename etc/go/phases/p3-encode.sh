@@ -23,10 +23,12 @@ WHAT IT WOULD DO
   BRANCH over ELSE IF chains, and an @ref FR citation on every dated arm.
 
 BLOCKER
-  SPEC.md §6 gates G2 entry on ruling R4, which is OPEN. R4 chooses how
-  ambiguity forks are represented; the R4-FORK-REPRESENTATION.md design note
-  proposes one Interpretation record threaded as an ordinary GIVEN, and
-  until that is ruled, an encoding stage would be writing to be rewritten.
+  This stage is unbuilt. R4 was ruled 2026-08-02 (R4-FORK-REPRESENTATION.md
+  §7): one Interpretation record threaded as an ordinary GIVEN, public
+  interface delegating to private per-reading implementations — extended to
+  regulative rules, whose MEANS-returned values take the same argument. The
+  representation is decided; the encoding tooling that writes it is not
+  built.
   Also unmechanisable by construction: SPEC.md §4's P3 stage names the
   deliverable as 'isomorphic -- a domain expert can review it against the
   regulation section by section', which has no checkable form and is carried

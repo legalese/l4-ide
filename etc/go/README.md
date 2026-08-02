@@ -1,4 +1,9 @@
-# `etc/go/` — the "SEC Regulation Crowdfunding: go" orchestrator
+# `etc/go/` — the "⟨body of law⟩: go" pipeline orchestrator
+
+One instruction names a subject; the pipeline takes it from source text through an L4
+encoding to every projection, gate and conversion report. `--subject regcf` (SEC Regulation
+Crowdfunding) is the inaugural, replay-milestone subject, not the scope — the BNA smoke test
+(PR #195) is the same pipeline pointed at a different statute.
 
 Everything here has an exit code. Everything that is a judgement lives in the
 skill at `.claude/skills/running-the-l4-pipeline/`. Scripts never call a model;

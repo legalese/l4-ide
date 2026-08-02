@@ -1,10 +1,15 @@
 # R4 — representing interpretation forks: the `Interpretation` parameter
 
-**Status: DRAFT design note, written 2026-08-01 at Meng's direction, developing the shape he
-proposed ("a public interface to the decision that takes GIVEN interpretationChoice … delegate to
-… private implementation … quickcheck over all choices"). R4 in [SPEC.md](./SPEC.md) §9 remains
-OPEN until Meng rules on this note; nothing below is built.** The worked example uses real Reg CF
-material but is illustrative, not committed corpus code.
+**Status: RULED 2026-08-02 — Meng adopted this design ("It sounds like you're happy with my
+Interface -> Interpretation -> Implementation design. If you're happy with it let's go ahead"),
+including §2's "why this beats" analysis, and extended it to regulative rules (§7). R4 in
+[SPEC.md](./SPEC.md) §9 is ANSWERED citing this note. The design is ruled, not built: no fork
+tooling exists yet, and §6's change list is discharged in the same change that records this.**
+The worked example uses real Reg CF material but is illustrative, not committed corpus code.
+
+(Earlier status: DRAFT design note, written 2026-08-01 at Meng's direction, developing the shape
+he proposed — "a public interface to the decision that takes GIVEN interpretationChoice …
+delegate to … private implementation … quickcheck over all choices".)
 
 ---
 
@@ -103,10 +108,14 @@ rule.
 
 ## 5. Boundaries, stated honestly
 
-- **v1 scope is constitutive forks** (`DECIDE`s). A reading that changes a regulative rule's
-  deadline or bearer can thread `interp` through the expressions a `PARTY … MUST … WITHIN`
-  mentions, but a fork in the _rule structure itself_ (different HENCE/LEST topology per reading)
-  has no design here yet; if P4 finds one in Reg CF, it comes back as an R4 amendment.
+- **v1 scope was drafted as constitutive forks** (`DECIDE`s) only, with structural regulative
+  forks deferred. **The ruling widened this** (see §7): regulative rules tend to be returned by
+  `MEANS` functions (in L4 they are first-class `DEONTIC` values — regcf.l4:633, :706), so the
+  same public-interface shape applies — the public rule takes `interp`, `CONSIDER`s the relevant
+  field, and delegates to per-reading private rule definitions, each of which may carry a
+  different HENCE/LEST topology; the `interp` binder is in scope for the whole deontic chain. (The original text read: "a fork in the _rule structure itself_ … has no design
+  here yet; if P4 finds one in Reg CF, it comes back as an R4 amendment." The amendment arrived
+  with the ruling itself.)
 - **Interpretation-dependent _types_ are out**: a fork that changes a `DECLARE`'s shape is a
   sibling-module case after all; expected to be rare, none known in Reg CF.
 - **Fork-space growth is multiplicative** across independent fields; the agreement/divergence
@@ -117,4 +126,31 @@ rule.
 
 SPEC.md §9 R4 flips to ANSWERED citing this note; P4's deliverable language gains "fork register
 entries map 1:1 to `Interpretation` fields"; P6 gains the two property classes; no code changes
-until the demo's encode phase runs.
+until the demo's encode phase runs. **All discharged 2026-08-02 in the change that recorded the
+ruling** (plus the sites §6 did not anticipate: the scaffolded phase scripts' refusal texts, the
+`go.sh plan --milestone g2` message, the report renderer's ABSENT explanation, and the skill —
+each said "R4 is open" and now says what actually blocks: the tooling is unbuilt.)
+
+## 7. The ruling (Meng, 2026-08-02)
+
+Adopted as proposed, §2's comparative analysis included. One extension, in substance his words:
+**regulative rules reuse this architecture.** Regulative rules tend to be returned by `MEANS`
+functions anyway, so there is room to give an `Interpretation` argument, and that argument
+threads through the scope of the deontic chain. This supersedes §5's constitutive-only boundary
+(amended in place above).
+
+(Elaboration, ours, verified against the tree 2026-08-02: the delegating `CONSIDER` sits in
+expression position selecting between whole `DEONTIC` values — the pattern `GIVETH A DEONTIC …
+MEANS` already uses, regcf.l4:633/:706 — so per-reading HENCE/LEST topology needs no extra
+machinery. Confirmed by typecheck and a `#TRACE` run of a minimal public rule
+`GIVEN interp … GIVETH A DEONTIC Actor Action` whose `CONSIDER` arms carry different
+PARTY/MUST/WITHIN and a HENCE recursing with `interp` in scope; the LEST slot is the same
+continuation position syntactically and was not separately executed.)
+
+Two boundaries survive the ruling unchanged (our reading): interpretation-dependent _types_ stay
+out (sibling-module case), and fork-space growth is still managed by the agreement/divergence
+split, with the fork register as the reviewed artifact.
+
+(Not part of the ruling — editors' note: the BNA smoke test's emergent register format — site +
+both readings + which taken + why, PR #195, SMOKE-REPORT.md — is the leading candidate for the
+machine-readable fork-register schema P4 owes. That schema remains undecided.)

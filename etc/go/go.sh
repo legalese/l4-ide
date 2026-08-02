@@ -165,11 +165,11 @@ stages_for() {
     g1) printf '%s\n' "${G1_STAGES[@]}" ;;
     g2)
       echo "go.sh: milestone g2 is UNBUILT." >&2
-      echo "  SPEC.md §6 gates G2 entry on ruling R4 (ambiguity-fork representation), which" >&2
-      echo "  is OPEN. The de novo stages p1-ingest, p2-sweep, p3-encode, p4-forks, p5-gate" >&2
-      echo "  and the §8 diff oracle exist as entry points that refuse; run one directly to" >&2
-      echo "  see its blocker. Building fork tooling against an unruled representation is" >&2
-      echo "  building to be rewritten." >&2
+      echo "  R4 (ambiguity-fork representation) was ruled 2026-08-02 — the Interpretation" >&2
+      echo "  parameter, R4-FORK-REPRESENTATION.md §7 — but none of the de novo tooling it" >&2
+      echo "  unblocks exists yet. The stages p1-ingest, p2-sweep, p3-encode, p4-forks," >&2
+      echo "  p5-gate and the §8 diff oracle exist as entry points that refuse; run one" >&2
+      echo "  directly to see its blocker." >&2
       return 3
       ;;
     *)

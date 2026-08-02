@@ -6,7 +6,7 @@ What each stage of the single-instruction pipeline is for, what it deposits as i
 
 - The pipeline itself: `specs/todo/single-instruction-demo/SPEC.md`
 - What runs today, in the present tense: `specs/todo/single-instruction-demo/ORCHESTRATOR.md`
-- The fork-representation design note P4 is waiting on: `specs/todo/single-instruction-demo/R4-FORK-REPRESENTATION.md`
+- The fork representation P4 builds to (R4, ruled 2026-08-02): `specs/todo/single-instruction-demo/R4-FORK-REPRESENTATION.md`
 
 ---
 
@@ -57,15 +57,15 @@ Seven stages exist as entry points and cannot run. Each prints what it would do 
 
 | stage         | blocker                                                                                                                                                                                                                                                                                     |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p1-ingest`   | G2 entry is gated on **R4**, which is open. Independently, no bundle schema or manifest format is defined anywhere in SPEC.md, so there is nothing for an ingest stage to write into and no acceptance condition to check it against.                                                       |
+| `p1-ingest`   | no bundle schema or manifest format is defined anywhere in SPEC.md, so there is nothing for an ingest stage to write into and no acceptance condition to check it against (R4, formerly a blocker here, was ruled 2026-08-02).                                                              |
 | `p2-sweep`    | Two blockers. It is a web-search stage, and this orchestrator makes no outward network request except the loopback deployment in the MCP leg. And SPEC.md defines no machine-readable external-modification register anywhere — without one, P5's "every entry disposed" cannot be checked. |
-| `p3-encode`   | **R4** is open, so an encoding stage would be writing to be rewritten.                                                                                                                                                                                                                      |
-| `p4-forks`    | **R4** is open, and the design note's own §6 says no code changes until the demo's encode phase runs. The fork register has no machine-readable format either.                                                                                                                              |
+| `p3-encode`   | the stage is unbuilt; **R4** was ruled 2026-08-02, so what remains is engineering, plus the isomorphism judgement HG1 owns.                                                                                                                                                                 |
+| `p4-forks`    | **R4** ruled 2026-08-02; the design note's own §6 says no code changes until the demo's encode phase runs, and the fork register still has no machine-readable format (PR #195's register shape is the candidate).                                                                          |
 | `p5-gate`     | Its condition is explicitly a judgement. Two of its five checks already run inside `p3-check`; the other three are not mechanisable and two of them join over registers that do not exist yet. A script cannot hold this gate — the skill's checklist and HG1 do.                           |
 | `p8-verify`   | **R5** is open (which verifier goes first), there is no CLI footing at all, SPEC.md §5's `P8 verifier toolchain` row inventories nothing and §6 gives it no pass condition. A stage here would be pure `UNVERIFIED` by construction. P8 gates nothing in G0–G4.                             |
 | `p10-publish` | **R1** is open and owned by Meng: the corpus-of-law repository has no name, org, license or layout, and `jl4/examples/` is explicitly not its home. **R2** is open and needs a read-only probe first. Every outward-facing act here is HG2's.                                               |
 
-The pattern is worth naming: **five of the seven are blocked on an open ruling, not on engineering.** Building against an unruled representation is building to be rewritten, and the design's refusal to do that is deliberate rather than incidental.
+The pattern is worth naming: **a stage blocked on an open ruling refuses rather than guesses** — building against an unruled representation is building to be rewritten, and the design's refusal to do that is deliberate rather than incidental. Until 2026-08-02 that covered five of the seven; with R4 ruled, only `p8-verify` (R5) and `p10-publish` (R1/R2) still wait on rulings, and the rest wait on tooling.
 
 ---
 
