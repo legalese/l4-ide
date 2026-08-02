@@ -242,9 +242,21 @@ boolean-returning `DECIDE`s can be visualized — anything else is a `400`, as i
 any decision whose ladder exceeds `--max-ladder-nodes` (see [Resource
 Limits](#resource-limits)).
 
-The `atomId` on each ladder leaf **is** a key of `query-plan`'s `impactByAtomId`,
-and **is** accepted as a binding key in `arguments`. Fetch the diagram once, then
-post answers keyed by what the diagram calls its leaves.
+Ladder leaves and `query-plan` atoms are now in **one** `atomId` namespace. Every
+`atomId` the plan reports — in `ranked`, `stillNeeded`, `asks[].atoms`, and as a
+key of `impactByAtomId` — appears on the diagram, and **is** accepted as a binding
+key in `arguments`. Fetch the diagram once, then post answers keyed by what the
+diagram calls its leaves.
+
+> **The containment runs one way.** Every plan atom is a ladder leaf; not every
+> ladder leaf is a plan atom. The standing exception is the boolean **arguments of
+> an `App`**: the visualiser draws them, but `vizExprToBoolExpr` compiles the whole
+> application to a single BDD variable and does not descend, so the arguments are
+> not atoms, carry no `impactByAtomId` entry, and binding one does nothing. That
+> was true before this change and is still true; what changed is that they now keep
+> a UUID instead of being rewritten to a bare decimal that a client could not tell
+> apart from a `unique` binding key. `QueryPlanSpec`'s
+> `atom identity, across shapes` group pins both the containment and its exception.
 
 > **An atomId names a QUESTION, not a node.** It is a UUID5 over
 > `"function | label | refs"`, so two occurrences of one condition — which a

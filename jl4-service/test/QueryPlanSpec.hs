@@ -28,6 +28,7 @@ import qualified L4.Decision.QueryPlan as QP
 import qualified Language.LSP.Protocol.Types as LSP
 
 import L4.Syntax (RawName (..))
+import qualified TestData as TD
 
 
 -- ----------------------------------------------------------------------------
@@ -282,6 +283,7 @@ spec = do
   describe "TYPICALLY question ordering (end-to-end)" typicallyOrderingTests
   describe "ladder node budget" ladderBudgetTests
   describe "atom identity" atomIdentityTests
+  describe "atom identity, across shapes" atomIdentityShapeTests
 
 
 -- | Atom identity: one bug wearing two faces.
@@ -701,3 +703,185 @@ agreementTests = do
     testAgreement "complies" "compliant" impliesL4 [("upper", True), ("side", True), ("glazed", True), ("shut", True)]
     testAgreement "in breach" "compliant" impliesL4 [("upper", True), ("side", True), ("shut", False)]
     testAgreement "requirement met, scope open" "compliant" impliesL4 [("glazed", True), ("shut", True)]
+
+
+-- ----------------------------------------------------------------------------
+-- Atom identity, across shapes
+-- ----------------------------------------------------------------------------
+
+-- | Record projections. Every ref carries a @path@, and the two atomId minters
+-- render a path differently at the root — the visualiser as a numeric
+-- @rootUnique@, the planner as the parameter's LABEL — so this is the shape where
+-- the two namespaces are furthest apart before reconciliation.
+projectionsL4 :: Text
+projectionsL4 = [i|
+DECLARE Person HAS
+    age IS A NUMBER
+    citizen IS A BOOLEAN
+    resident IS A BOOLEAN
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE eligible IF p's citizen AND p's resident AND p's age GREATER THAN 18
+|]
+
+-- | A decision over @WHERE@-defined sub-decisions. 'L4.Viz.Ladder.varLeaf'
+-- expands a local @MEANS@ through 'lookupLocalDecideBody', so the leaves that
+-- reach the planner are the expansion's, not the names the drafter wrote — and
+-- the expansion duplicates @a@, which makes a twin out of ordinary drafting
+-- rather than out of a fixture built to produce one.
+whereDefinedL4 :: Text
+whereDefinedL4 = [i|
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE outer IF `left side` OR (`right side` AND c)
+ WHERE
+    `left side` MEANS a AND b
+
+    `right side` MEANS a OR b
+|]
+
+-- | One predicate applied twice to DIFFERENT arguments. The two applications must
+-- NOT be twins: an atomId is a hash of the rendered call, so @`both of` a b@ and
+-- @`both of` b a@ are two questions, not one.
+repeatedCallsL4 :: Text
+repeatedCallsL4 = [i|
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both of` x y IF x AND y
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `repeated calls` IF (`both of` a b) OR (`both of` b a)
+|]
+
+-- | The mirror of 'repeatedCallsL4': the SAME call written twice, which must be
+-- one question over several occurrences.
+sameCallTwiceL4 :: Text
+sameCallTwiceL4 = [i|
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both of` x y IF x AND y
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `same call twice` IF (`both of` a b AND c) OR (`both of` a b AND NOT c)
+|]
+
+-- | A twin that straddles the @IMPLIES@ seam. The seam is handed to the planner
+-- INTACT (see 'LSP.L4.Viz.QueryPlan.vizExprToBoolExpr'), so scope and requirement
+-- are separate roots; a question asked on both sides must still be one question.
+impliesTwinL4 :: Text
+impliesTwinL4 = [i|
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `implies twin` IF (n GREATER THAN 5) IMPLIES ((n GREATER THAN 5) AND p)
+|]
+
+-- | The one atomId invariant that holds for EVERY shape, in the direction a client
+-- consumes it: everything the planner names must be findable on the picture.
+--
+-- The converse does NOT hold and is not asserted — see
+-- 'appChildrenAreNotPlanAtoms'.
+planIdsAreOnTheLadder :: String -> Text -> Text -> Spec
+planIdsAreOnTheLadder nm fnName src = it ("plan ids are all on the ladder: " <> nm) do
+  cache <- serviceCache fnName src
+  let plan = svcQPNamed fnName cache []
+      ladderIds = List.nub (ladderAtomIdsOf cache.ladderInfo)
+      planIds = List.nub [a.atomId | a <- plan.ranked]
+  planIds `shouldSatisfy` (not . null)
+  filter (`notElem` ladderIds) planIds `shouldBe` []
+  filter (`notElem` ladderIds) (Map.keys plan.impactByAtomId) `shouldBe` []
+
+-- | Face 2 stated as a property rather than as one fixture: for EVERY atomId the
+-- plan reports, binding that atomId must take every @unique@ answering to it out
+-- of the decision's support. Under the old last-wins inversion this fails on any
+-- shape with a twin — measured red on three of the ten shapes below.
+bindsEveryOccurrence :: String -> Text -> Text -> Spec
+bindsEveryOccurrence nm fnName src = it ("binding an atomId reaches every occurrence: " <> nm) do
+  cache <- serviceCache fnName src
+  let plan0 = svcQPNamed fnName cache []
+      groups = Map.toList (Map.fromListWith (<>) [(a.atomId, [a.unique]) | a <- plan0.ranked])
+  groups `shouldSatisfy` (not . null)
+  let leftovers =
+        [ (aid, b, us, [s.unique | s <- planB.stillNeeded, s.unique `elem` us])
+        | (aid, us0) <- groups
+        , let us = List.nub us0
+        , b <- [True, False]
+        , let planB = svcQPNamed fnName cache [(aid, b)]
+        , any (\s -> s.unique `elem` us) planB.stillNeeded
+        ]
+  leftovers `shouldBe` []
+
+atomIdentityShapeTests :: Spec
+atomIdentityShapeTests = do
+  planIdsAreOnTheLadder "record projections" "eligible" projectionsL4
+  planIdsAreOnTheLadder "WHERE-defined decides" "outer" whereDefinedL4
+  planIdsAreOnTheLadder "repeated calls, different arguments" "repeated calls" repeatedCallsL4
+  planIdsAreOnTheLadder "the same call twice" "same call twice" sameCallTwiceL4
+  planIdsAreOnTheLadder "a twin across the IMPLIES seam" "implies twin" impliesTwinL4
+  planIdsAreOnTheLadder "an App over booleans" "app leaf" appOfBooleansL4
+  planIdsAreOnTheLadder "WHERE + App, the shape of a real rule" "vermin_and_rodent" TD.rodentAndVerminJL4
+
+  bindsEveryOccurrence "record projections" "eligible" projectionsL4
+  bindsEveryOccurrence "WHERE-defined decides" "outer" whereDefinedL4
+  bindsEveryOccurrence "repeated calls, different arguments" "repeated calls" repeatedCallsL4
+  bindsEveryOccurrence "the same call twice" "same call twice" sameCallTwiceL4
+  bindsEveryOccurrence "a twin across the IMPLIES seam" "implies twin" impliesTwinL4
+  bindsEveryOccurrence "an App over booleans" "app leaf" appOfBooleansL4
+  bindsEveryOccurrence "WHERE + App, the shape of a real rule" "vermin_and_rodent" TD.rodentAndVerminJL4
+  bindsEveryOccurrence "the twin fixture" "twins" twinLeavesL4
+  bindsEveryOccurrence "a flat conjunction" "compute_qualifies" threeWayAndL4
+  bindsEveryOccurrence "an IMPLIES rule" "compliant" impliesL4
+
+  it "one predicate applied to different arguments is two questions, not one" do
+    cache <- serviceCache "repeated calls" repeatedCallsL4
+    let plan = svcQPNamed "repeated calls" cache []
+    length (List.nub [a.atomId | a <- plan.ranked]) `shouldBe` 2
+
+  it "the same call written twice is ONE question" do
+    cache <- serviceCache "same call twice" sameCallTwiceL4
+    twinAtomIdOf (svcQPNamed "same call twice" cache []).ranked `shouldSatisfy` Maybe.isJust
+
+  -- The bound on the claim above, stated so it cannot quietly widen. An @App@'s
+  -- boolean ARGUMENTS are drawn on the ladder (the visualiser renders them, and
+  -- `l4-ladder-visualizer` turns them into child nodes) but they are not BDD
+  -- variables: 'vizExprToBoolExpr' compiles the whole application to one @BVar@
+  -- and does not descend. So they are not in the atomId map, are not plan atoms,
+  -- and are not answerable — before this change or after it. They keep the
+  -- visualiser's UUID, which is what makes them distinguishable from an atom
+  -- rather than colliding with the decimal `unique` binding key.
+  it "an App's boolean arguments are ladder leaves but NOT plan atoms" do
+    cache <- serviceCache "app leaf" appOfBooleansL4
+    let plan = svcQPNamed "app leaf" cache []
+        ladderIds = List.nub (ladderAtomIdsOf cache.ladderInfo)
+        planIds = List.nub [a.atomId | a <- plan.ranked]
+        ladderOnly = filter (`notElem` planIds) ladderIds
+    -- Two arguments, `a` and `b`, drawn under the App and absent from the plan.
+    length ladderOnly `shouldBe` 2
+    -- They are still UUIDs, not bare uniques: the fallback must not downgrade.
+    filter (not . looksLikeUuid) ladderOnly `shouldBe` []
+
+  -- The only atomIds committed anywhere in this repo are the four in
+  -- `ts-shared/ladder-core/test/fixtures/may-purchase-alcohol.viz.json`, a viz
+  -- payload captured from a live jl4-lsp. They are the ANNOTATED ids, so this
+  -- change must leave them exactly where they are; if it ever moves them, the TS
+  -- consumer test breaks in a repo that this suite cannot see.
+  it "the atomIds committed in the ladder-core TS fixture are unmoved" do
+    src <- Text.pack <$> readFile "../jl4/examples/ok/typically-basic.l4"
+    (info, vizState, _params) <- lspCache "may purchase alcohol" src
+    let annotated = List.sort (List.nub (ladderAtomIdsOf (LspQP.annotateLadderWithAtomIds info vizState)))
+    annotated
+      `shouldBe` [ "6326bf0e-555f-51cc-8c60-8f958d7825c5"
+                 , "a5cd464e-b7c1-5e50-9afd-6965842b9386"
+                 , "e5ac8240-0124-50f5-a0be-b3fdd4cee33b"
+                 , "f94522fa-cdea-5274-944d-99fdb5ba24c8"
+                 ]

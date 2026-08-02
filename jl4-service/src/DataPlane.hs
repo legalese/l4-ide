@@ -381,10 +381,21 @@ queryPlanHandler' deployId fnName fnArgs = do
 -- registry, and only boolean-returning DECIDEs visualize (anything else is the
 -- 400 raised by 'buildDecisionQueryCacheFromCompiled').
 --
--- The @atomId@ on each ladder leaf IS a key of
--- @QueryPlanResponse.impactByAtomId@, and IS accepted as a binding key by
+-- Ladder leaves and query-plan atoms are in ONE @atomId@ namespace: every atomId
+-- the plan reports is on the diagram, and IS accepted as a binding key by
 -- @query-plan@. That is the whole point of the route: fetch the diagram once,
 -- then post answers keyed by what the diagram calls them.
+--
+-- The containment runs one way, and only one way. Every plan atom is a ladder
+-- leaf; NOT every ladder leaf is a plan atom. The standing exception is the
+-- boolean arguments of an @App@ — 'vizExprToBoolExpr' compiles the application to
+-- one BDD variable and does not descend, so its arguments are drawn but are not
+-- atoms, have no @impactByAtomId@ entry, and binding one does nothing. Unchanged
+-- by this fix in substance; changed only in that such a leaf now keeps a UUID
+-- rather than being rewritten to a bare decimal indistinguishable from a @unique@
+-- binding key. @QueryPlanSpec@'s @atom identity, across shapes@ group pins both
+-- the containment and the exception, over seven shapes including record
+-- projections, WHERE-expansion and the IMPLIES seam.
 --
 -- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were UUID5
 -- over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ rendered each

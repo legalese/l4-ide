@@ -663,16 +663,31 @@ Three things the deploy showed that reading the types would not have:
    | `impact[…].support[].atomId`   | 2   | same two                                     |
    | `impactByAtomId` keys          | 2   | same two                                     |
 
-   Intersection of `GET /ladder` with the planner's atoms: **2 of 2**, where it was 0 of 2.
-   `a87d9b26-…` is the id the issue body reports for `issuer is eligible` on the *query-plan*
-   side — so the ladder converged onto the planner's namespace and not the reverse, which is the
-   right direction: an `atomId` must survive a redeploy, and the planner's is the only one of the
-   two that does not embed a compilation-order `unique`. Binding it end-to-end now moves the
-   decision: `determined` `null → false`, `verdict` `Undetermined → Fails`, `stillNeeded`
-   `2 → 0`.
+   Intersection of `GET /ladder` with the planner's atoms: **2 of 2**, where it was 0 of 2. Both
+   ids in the issue body reproduce exactly, on `unique=4`
+   (`` `issuer is eligible` OF (`issuer profile from` OF plan) ``):
+
+   | surface       | before                                  | after                                   |
+   | ------------- | --------------------------------------- | --------------------------------------- |
+   | `GET /ladder` | `64e895d0-1863-5f26-bb2b-63ef440b85d3`  | `a87d9b26-bfef-5b0b-9c22-d77d103f93a9`  |
+   | `query-plan`  | `a87d9b26-bfef-5b0b-9c22-d77d103f93a9`  | unchanged                               |
+
+   So the ladder converged onto the planner's namespace and not the reverse, which is the right
+   direction: an `atomId` must survive a redeploy, and the planner's is the only one of the two
+   that does not embed a compilation-order `unique`. Nothing on the planner's side moved — across
+   `/query-plan`, only the **values** of `impactByAtomId` change, and only for atomIds that name
+   more than one occurrence; `impact`, `ranked`, `stillNeeded`, `asks` and `inputs` are
+   byte-identical before and after. Binding the ladder's id end-to-end now moves the decision:
+   `determined` `null → false`, `verdict` `Undetermined → Fails`, `stillNeeded` `2 → 0`.
 
    A ladder-embedded wizard can therefore join the two surfaces on `atomId`, which is the join
    the shapes invite.
+
+   **Not fixed, and still worth having.** The issue asks for two things — one namespace, *or*
+   a loud refusal of unknown binding keys, "ideally both". Only the first landed. A binding keyed
+   by a string that names no atom is still accepted with a `200` and silently ignored (measured:
+   `{"deadbeef-0000-5000-8000-000000000000": false}` → `200`, `stillNeeded` unchanged at 2). The
+   class of bug that produced #935 can therefore still be introduced silently by a client typo.
 
 ### 7.4 Defects found in `jl4-service` while deploying
 

@@ -362,11 +362,15 @@ curl -X POST http://HOST/deployments -F id=regcf -F sources=@/tmp/regcf.zip
   deployed module's own section tree and does not follow `IMPORT`. A façade cannot work around it:
   a wrapper calling an imported rule is an `App`, not a `Regulative`. Unfixed; whether an importing
   module "owns" an imported rule for extraction purposes is a design question of its own.
-- **The atom ids do not line up, and the disagreement is internal to one response.** In a single
-  `/query-plan` payload, `impact[…].support[].atomId` and the embedded `ladder` field's node ids
-  have an **empty intersection** (measured: 2 ids each, 0 shared). The embedded ladder does agree
-  with the standalone `/ladder` endpoint. So a client cannot join "what would change if this were
-  false" onto the picture it is drawing.
+- **~~The atom ids do not line up~~ — FIXED 2026-08-03, upstream `smucclaw/l4-ide#935`.** As first
+  measured here, a single `/query-plan` payload's `impact[…].support[].atomId` and its own embedded
+  `ladder` field's node ids had an **empty intersection** (2 ids each, 0 shared), so a client could
+  not join "what would change if this were false" onto the picture it was drawing — and, worse,
+  posting a binding keyed by a ladder `atomId` returned `200` and silently changed nothing.
+  Re-measured on this bundle against a loopback service, `can this company raise`: the intersection
+  is **2 of 2**, and the ids the ladder converged onto (`a87d9b26-…`, `6cfcd833-…`) are the
+  planner's own, unchanged — it is the ladder that moved. `README.md` §7.3 item 3 carries the full
+  before/after table.
 - **A properly single-sourced façade has a boring ladder.** `asks: []`, `inputs: []`, two leaves —
   because both leaves are `App`s over records that the ladder cannot see through. Making the ladder
   interesting would mean restating the statutory connectives in the façade, i.e. reintroducing the
