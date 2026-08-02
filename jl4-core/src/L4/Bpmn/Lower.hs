@@ -699,6 +699,28 @@ stateGraphToBpmn opts sg =
           ( "the gateway's arms test " <> Text.show (length us)
               <> " different decisions, and one businessRuleTask invokes one decision"
           )
+    -- __One decide is not yet one question.__ A 'Unique' says which @DECIDE@ a
+    -- guard applies, not what it applies it TO, and the conditions below map
+    -- every atom onto the same decision variable. So @conforms a@ in one arm
+    -- and @conforms b@ in the next — one decide, two questions — would lower
+    -- the second arm to @not(conforms) and conforms@, a contradiction asserting
+    -- that a perfectly reachable obligation can never be reached. (Measured, on
+    -- the fixture in @jl4\/tests\/BpmnExport.hs@, before this check existed.)
+    --
+    -- The DMN tiering rule happens to prevent the CLI reaching this today: two
+    -- call sites lift the decide to a @businessKnowledgeModel@, which is never
+    -- in the wiring table. That is a fact about the /other/ backend, and a
+    -- silently wrong diagram is not a thing to leave resting on one.
+    case nubOrd [a.gaText | (_, a) <- concat atomss] of
+      [_] -> Right ()
+      qs ->
+        Left
+          ( "the gateway's arms apply one decision to " <> Text.show (length qs)
+              <> " different arguments (\8216"
+              <> Text.intercalate "\8217, \8216" qs
+              <> "\8217), which are different questions, and one businessRuleTask \
+                 \answers one"
+          )
     wd <-
       maybe (Left "the guard's DECIDE is not an emitted DMN decision") Right $
         Map.lookup u w.dwDecisions

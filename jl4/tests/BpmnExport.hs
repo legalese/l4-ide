@@ -15,6 +15,7 @@ module BpmnExport (spec) where
 import Base
 import qualified Base.Text as Text
 import Control.Exception (evaluate)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import GHC.Clock (getMonotonicTime)
 import System.FilePath ((</>))
@@ -217,6 +218,45 @@ opaqueDeadlineSrc =
   , "  WITHIN grace"
   , "  HENCE FULFILLED"
   , "  LEST BREACH BY Alice BECAUSE \"late\""
+  ]
+
+-- | Two arms of one @IF@ chain guarded by the /same/ @DECIDE@ applied to
+-- /different/ arguments.
+--
+-- The guard shape identifies a decision by 'Unique', and a @Unique@ says which
+-- decide, not which question: @conforms a@ and @conforms b@ are one decide and
+-- two questions. Collapsing them onto one decision variable would make the
+-- second arm read @not(conforms) and conforms@ — a contradiction the diagram
+-- would assert in FEEL, on a rule whose second arm is perfectly reachable.
+--
+-- Reached through the CLI this shape is currently unreachable, and by an
+-- accident of the /other/ backend: two call sites lift @conforms@ to a
+-- @businessKnowledgeModel@ (measured — a probe of exactly this source exports
+-- @bkm_the_notice_conforms@ and no decision), and a BKM is never in the wiring
+-- table. That is a fact about the DMN tiering rule and not about this exporter,
+-- so the refusal is asserted here directly against a hand-built wiring rather
+-- than left to a coincidence to maintain.
+sameDecideTwoArgsSrc :: [Text]
+sameDecideTwoArgsSrc =
+  [ "DECLARE Notice HAS"
+  , "  `is conforming` IS A BOOLEAN"
+  , ""
+  , "GIVEN n IS A Notice"
+  , "GIVETH A BOOLEAN"
+  , "`conforms` n MEANS n's `is conforming`"
+  , ""
+  , "GIVETH A Notice"
+  , "`the first notice` MEANS Notice WITH `is conforming` IS TRUE"
+  , ""
+  , "GIVETH A Notice"
+  , "`the second notice` MEANS Notice WITH `is conforming` IS FALSE"
+  , ""
+  , "`two args` MEANS"
+  , "  IF `conforms` `the first notice`"
+  , "  THEN PARTY Alice MUST pay WITHIN 3"
+  , "  ELSE IF `conforms` `the second notice`"
+  , "       THEN PARTY Bob MUST deliver WITHIN 5"
+  , "       ELSE PARTY Carol MUST notify WITHIN 7"
   ]
 
 --------------------------------------------------------------------------------
@@ -1623,6 +1663,50 @@ spec = do
       conds `shouldSatisfy` all (Text.isPrefixOf "ongoing_reporting_obligation = \"")
       findingsFor "P-BRANCHGUARD" bx `shouldBe` []
       length (findingsFor "P-DMNWIRED" bx) `shouldBe` 1
+
+    -- One decide is not yet one question. See 'sameDecideTwoArgsSrc': the
+    -- wiring is hand-built here because the CLI cannot currently reach this
+    -- shape, and the reason it cannot is a rule in the OTHER backend.
+    it "the guard shape refuses one decide applied to two different arguments" $ do
+      let g = graphNamed "two args" sameDecideTwoArgsSrc
+          guardDecides =
+            nubOrd
+              [ u
+              | t <- g.sgTransitions
+              , Just bg <- [t.transLabel.labelBranch]
+              , (_, a) <- branchGuardAtoms bg
+              , Just u <- [a.gaDecide]
+              ]
+          asBoolDecision u =
+            ( u
+            , MkWiredDecision
+                { wdId = "decision_conforms"
+                , wdName = "conforms"
+                , wdFeelName = "conforms"
+                , wdBoolean = True
+                , wdVerdict = Nothing
+                }
+            )
+          w =
+            MkDmnWiring
+              { dwNamespace = "ns"
+              , dwModel = "m"
+              , dwDecisions = Map.fromList (map asBoolDecision guardDecides)
+              }
+          bx = stateGraphToBpmn defaultBpmnOptions {optWiring = Just w} g
+      -- The premise: ONE decide backs both arms, so the "different decisions"
+      -- refusal cannot be what saves this — if this is ever 2, the test has
+      -- stopped exercising what it was written for.
+      -- Measured before the check existed, so the failure this pins is not
+      -- hypothetical: the three arms lowered to "conforms",
+      -- "not(conforms) and conforms" and "not(conforms) and not(conforms)" —
+      -- the second a contradiction, so the diagram said Bob's obligation was
+      -- unreachable, which the source does not say.
+      length guardDecides `shouldBe` 1
+      callsOf bx `shouldBe` []
+      case findingsFor "P-NODMN" bx of
+        [n] -> n.message `shouldSatisfy` Text.isInfixOf "different arguments"
+        ns -> expectationFailure ("expected one P-NODMN, got " <> show (length ns))
 
     it "the guard shape: the arms are the decision, negated and not" $ do
       bx <- withDmn "advertising restriction"

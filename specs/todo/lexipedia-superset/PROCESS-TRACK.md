@@ -349,6 +349,25 @@ different predicates: a `businessRuleTask` invokes one decision, and two tasks p
 rule is a design nothing in the corpus asks for. The refusal says so rather than wiring the first
 predicate and leaving the second silently unbacked. **NOT BUILT**, by choice, not by oversight.
 
+**And one decision is not yet one question — added 2026-08-02 by the verify pass, with the defect
+measured first.** A `Unique` says which `DECIDE` a guard applies, not what it applies it _to_, and
+the guard shape maps every atom of every arm onto the same decision variable. So
+``IF `conforms` a THEN … ELSE IF `conforms` b THEN …`` — one decide, two questions — lowered arm
+2 to `not(conforms) and conforms`: a **contradiction**, silently asserting that a perfectly
+reachable obligation can never be reached. Measured on that fixture before the check existed; the
+three arms came out `conforms` / `not(conforms) and conforms` / `not(conforms) and not(conforms)`.
+The guard shape now refuses unless every atom naming the decision is the _same atom text_, and
+names the differing arguments.
+
+Nothing in the corpus moved — all three wired goldens have exactly one distinct guard atom, so the
+check is byte-neutral there. What it removes is a dependency on the _other_ backend: the CLI could
+not reach the shape anyway, because two call sites lift the decide to a `businessKnowledgeModel`
+(measured: a probe of that source exports `bkm_the_notice_conforms` and no decision) and a BKM is
+never in the wiring table. That is a fact about the DMN tiering rule, and a silently wrong diagram
+is not a thing to leave resting on one. The test therefore builds the wiring by hand rather than
+through `wiringFromDrg`, since a coincidence cannot be regression-tested through the pipeline it
+is a coincidence of.
+
 #### Why a dangling `decisionRef` is unrepresentable
 
 The naming coordination the 2026-08-01 sketch called for ("the BPMN side must consume the names
