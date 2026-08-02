@@ -151,6 +151,16 @@ Two boundaries survive the ruling unchanged (our reading): interpretation-depend
 out (sibling-module case), and fork-space growth is still managed by the agreement/divergence
 split, with the fork register as the reviewed artifact.
 
-(Not part of the ruling — editors' note: the BNA smoke test's emergent register format — site +
-both readings + which taken + why, PR #195, SMOKE-REPORT.md — is the leading candidate for the
-machine-readable fork-register schema P4 owes. That schema remains undecided.)
+(Not part of the ruling — editors' note, updated 2026-08-02: the BNA smoke test's emergent
+register format — site + both readings + which taken + why, PR #195, SMOKE-REPORT.md — was the
+leading candidate for the machine-readable fork-register schema P4 owes, and it is what got
+formalised. **That schema now exists**:
+[`schemas/fork-register.schema.json`](./schemas/fork-register.schema.json), validated by
+`etc/go/lib/register-validate.mjs`, with the BNA's twelve rows transcribed as its valid fixture.
+Three things those rows forced, which the §1 sketch above does not show: a `materialisation`
+discriminator, because not every registered fork becomes an `Interpretation` field — ten of the
+twelve were resolved at encode time and two delegated to the fact-supplier, so requiring the
+field unconditionally would have recorded none of them; a `kind` discriminator, because A12 is an
+ambiguity of encoding placement rather than of the statutory words; and a `resolved` status
+alongside open/settled/demoted, because a reading taken on the encoder's own argument is neither
+still open nor settled by any authority.)

@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legalese.com/l4/schemas/source-bundle.schema.json",
+  "title": "Source bundle",
+  "description": "P1's deliverable (SPEC.md §4): 'a source bundle with provenance (URL, retrieval date, FR cites) that P3 encodes from and P9 cites'. Two things the BNA smoke run forced beyond that sentence. (1) The bundle distinguishes the documents RETRIEVED from the artifact ASSEMBLED: legislation.gov.uk sat behind an AWS WAF challenge and the text came from Wayback captures of the same URLs, so the bytes P3 encodes from are ours while the bytes we hash upstream are not — 'assembled' carries the digest that is checkable and each document says how it was reached. (2) Documents carry their annotation inventory (the BNA's F1-F19 textual-amendment and C1-C5 modification markers), because P2 disposes over that inventory and P5 joins on the disposition table; a bundle that keeps only the words loses what the next stage is checked against.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "bundle_version",
+    "subject",
+    "citation",
+    "retrieved",
+    "documents"
+  ],
+  "properties": {
+    "kind": { "const": "source-bundle" },
+    "bundle_version": { "const": 1 },
+    "subject": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "The subject sidecar id under etc/go/subjects/ — the bundle-level link the other two registers join on."
+    },
+    "citation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The body of law as a whole, matching the sidecar's subject.json citation."
+    },
+    "retrieved": {
+      "type": "string",
+      "format": "date",
+      "description": "When the bundle was assembled; documents carry their own retrieval dates."
+    },
+    "note": { "type": "string", "minLength": 1 },
+    "in_force": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "as_of", "document"],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The publisher's own currency banner, verbatim. It is evidence, not our summary of it."
+        },
+        "as_of": { "type": "string", "format": "date" },
+        "document": { "type": "string", "minLength": 1 }
+      }
+    },
+    "in_force_absent_reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required when the source publishes no currency statement. Silence about currency and a source that states none are different facts."
+    },
+    "assembled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local_path", "sha256"],
+      "description": "The provenance-headed artifact P3 encodes from and P9 cites. Its digest is checked against the file when the file is present.",
+      "properties": {
+        "local_path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/document" }
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "title",
+        "citation",
+        "url",
+        "retrieved",
+        "retrieval_method",
+        "integrity"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$" },
+        "role": {
+          "enum": [
+            "current",
+            "historical",
+            "amendment",
+            "instrument",
+            "guidance",
+            "corroboration",
+            "scholarship"
+          ],
+          "description": "'corroboration' is the BNA's CLML XML capture: not a source of the encoded text, but the independent copy that proved the Wayback rendering had not drifted. 'scholarship' exists because a pinpoint cite to a paper is a claim P5 string-checks (SMOKE-REPORT.md §3.3, a fabricated pinpoint caught only by fetching the paper) — so the paper belongs in the bundle, not in a footnote."
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "citation": {
+          "type": "string",
+          "minLength": 1,
+          "description": "FR cite or the jurisdiction's equivalent."
+        },
+        "url": { "type": "string", "minLength": 1 },
+        "retrieved": { "type": "string", "format": "date" },
+        "retrieval_method": {
+          "enum": ["direct", "archive", "manual"],
+          "description": "Recorded because it bears on what the bytes are worth. The BNA run reached nothing directly."
+        },
+        "archive_url": { "type": "string", "minLength": 1 },
+        "archive_timestamp": {
+          "type": "string",
+          "pattern": "^[0-9]{14}$",
+          "description": "Wayback-style YYYYMMDDhhmmss, which is what makes an archived capture immutably identifiable."
+        },
+        "integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "sha256_absent_reason": { "type": "string", "minLength": 1 },
+            "local_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Repo-root-relative. When present and the file exists, the digest is verified against it."
+            }
+          }
+        },
+        "covers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "description": "The date range of law this document states, for rule-version work. Either endpoint may be null for open-ended; both keys are required so 'open-ended' cannot be spelled the same way as 'nobody filled it in'.",
+          "properties": {
+            "from": { "type": ["string", "null"], "format": "date" },
+            "to": { "type": ["string", "null"], "format": "date" }
+          }
+        },
+        "covers_absent_reason": { "type": "string", "minLength": 1 },
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/annotation_group" },
+          "description": "The publisher's annotation apparatus, preserved because P2's disposition table joins on it."
+        }
+      }
+    },
+    "annotation_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "markers", "inventory_complete"],
+      "properties": {
+        "scheme": {
+          "enum": [
+            "amendment",
+            "modification",
+            "commencement",
+            "extent",
+            "editorial"
+          ]
+        },
+        "markers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" }
+        },
+        "inventory_complete": {
+          "type": "boolean",
+          "description": "True asserts the list is the publisher's complete set for this document, and turns on the cross-file rule that every marker must be disposed. False keeps the register honest without pretending to a completeness nobody established."
+        },
+        "inventory_note": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "x-rules": [
+    {
+      "id": "document-ids-unique",
+      "description": "No two documents share an id."
+    },
+    {
+      "id": "archive-method-requires-archive-url",
+      "description": "retrieval_method 'archive' requires archive_url; the other methods forbid it. An archived retrieval whose capture URL is lost is not reproducible."
+    },
+    {
+      "id": "integrity-digest-or-immutable-capture",
+      "description": "Exactly one of integrity.sha256 and integrity.sha256_absent_reason; and where the digest is absent the document must carry an archive_url, so every document is pinned either by its bytes or by an immutable capture."
+    },
+    {
+      "id": "digest-matches-local-file",
+      "description": "Where integrity.local_path is given and the file exists, its sha256 must match. Where the file does not exist the check is reported as skipped, naming the path — a register may be written against files that land in a later change."
+    },
+    {
+      "id": "assembled-digest-matches",
+      "description": "The same check for the assembled artifact."
+    },
+    {
+      "id": "covers-or-absent-reason",
+      "description": "Exactly one of covers and covers_absent_reason."
+    },
+    {
+      "id": "covers-range-ordered",
+      "description": "covers.from is not after covers.to."
+    },
+    {
+      "id": "in-force-or-absent-reason",
+      "description": "Exactly one of in_force and in_force_absent_reason, and in_force.document names a document of this bundle."
+    },
+    {
+      "id": "annotation-markers-unique-within-document",
+      "description": "One marker, one meaning, per document."
+    },
+    {
+      "id": "incomplete-inventory-explains",
+      "description": "inventory_complete false requires an inventory_note saying what is missing or why completeness was not established."
+    },
+    {
+      "id": "peer-subjects-agree",
+      "peer": "any",
+      "description": "All files given in one invocation name the same subject."
+    }
+  ]
+}

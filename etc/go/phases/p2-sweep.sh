@@ -23,15 +23,28 @@ WHAT IT WOULD DO
   regulatory agenda; litigation in flight. Route each finding as binding /
   interpretive guidance / prospective, and record provenance for every one.
 
+NO LONGER BLOCKING (was, until 2026-08-02)
+  The register format now exists:
+    specs/todo/single-instruction-demo/schemas/external-modifications.schema.json
+  with a validator (etc/go/lib/register-validate.mjs external-modifications
+  <file> [peers]) and worked fixtures under schemas/fixtures/. It carries a
+  searches[] section, so SPEC.md §4 P2's "the report states what was
+  searched, not only what was found" is a checked contract: a search records
+  its scope, its date and — required — what it does NOT cover. P5's "every
+  entry disposed" now has something to join over, including a cross-file
+  completeness check against the source bundle's annotation inventory, which
+  is the BNA C2 defect (SMOKE-REPORT.md §3.5) turned into an exit code.
+
 BLOCKER
-  Two blockers. (1) The sweep is a web-search stage and this orchestrator
-  makes no outward network requests except the loopback deployment in
-  p7-mcp.sh; a search stage would be the second, and it needs its own
-  decision. (2) SPEC.md defines NO machine-readable external-modification
-  register anywhere — without one, P5's 'every entry disposed' (SPEC.md §4,
-  P5) cannot be checked. specs/todo/single-instruction-demo/schemas/external-
-  modification-register.schema.json does NOT exist: that directory is empty,
-  and this blocker used to claim the schema shipped.
+  SEARCHING. The sweep is a web-search stage, and this orchestrator makes no
+  outward network request except the loopback jl4-service deployment in
+  p7-mcp.sh (ORCHESTRATOR.md §6.4). Widening that fence is a decision, not
+  an implementation detail. Performing the sweep -- and judging what a
+  finding means -- is agent-side work owned by the G2 section of the skill
+  at .claude/skills/running-the-l4-pipeline/; this stage's honest future
+  role is to VALIDATE the register the agent wrote, not to write it.
+  Second, no subject sidecar declares where its register lives, so this
+  stage has a format but no path.
 
 Nothing was written and no receipt was recorded.
 MSG

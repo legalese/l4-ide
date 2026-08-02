@@ -160,6 +160,25 @@ etc/go/go.sh verify --run-id <run-id> --gates
 
 This re-reads the journal, re-hashes every artifact a receipt names, checks that each granted gate was recorded before the first stage it gates began — counting `stage_end` as well as `stage_begin`, so gated work run outside the driver is caught — and recomputes the milestone verdict. No build, no model, no network. It is the one check the agent that did the run cannot pre-satisfy, and it is what makes the run's claims worth anything to a second party.
 
+### 9. Validate any register you wrote by hand
+
+```bash
+node etc/go/lib/register-validate.mjs <fork-register|external-modifications|source-bundle> <file> [peer-file ...]
+node etc/go/lib/register-validate.mjs --rules <schema>
+```
+
+G2 work deposits three registers — the source bundle (P1), the external-modification register (P2), the fork register (P4) — and you write them, because no stage does. Their formats live in `specs/todo/single-instruction-demo/schemas/` and this validator is their oracle. Give it the peer files and the cross-file joins run; withhold one and the joins that needed it print `skip` with a reason rather than passing quietly. Fixtures under `schemas/fixtures/` show a valid and an invalid instance of each. Validate before you report anything about a register: several of the schemas' rules exist because one careful human sweep got them wrong.
+
+### 10. Diff a de novo encoding against the corpus (G2 acceptance)
+
+```bash
+node etc/go/lib/denovo-diff.mjs run --map <surface-map.json> --out <dir>
+```
+
+SPEC.md §8's comparator. It compares two encodings by **what they answer**, never by their text, over a battery seeded from the subject's cases file and perturbed one field at a time. You write the surface map — the declared pairing of decisions and fact slots, schema and fixture in the same `schemas/` directory — and the oracle's job is to disagree with your declaration behaviourally. Exit `1` means it found a divergence, which under §8 is the **better** result, not a failure.
+
+Two things it will not do for you. It **never triages** — every witness reads `UNTRIAGED`, and deciding whether a divergence is an encoding error, a genuine ambiguity or an improvement over the hand corpus is yours. And it cannot tell you about surface it never moved: read the report's **Sensitivity** table with its agreement counts, because a (pair, fact) leaf that was perturbed without ever changing an answer is one where agreement is silence, not evidence. Design and limits: `specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md`.
+
 ---
 
 ## Delegating the phases
@@ -174,14 +193,14 @@ That is the single largest simplification in this design and the first thing a l
 
 ### What needs frontier reasoning
 
-| stage               | why it cannot be a script                                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P3 encode           | "isomorphic — a domain expert can review it section by section against the regulation" has no mechanical form. It is SPEC.md §4's P3 deliverable and SPEC.md §7.3's HG1.       |
-| P4 forks            | fork-register **completeness** is unfalsifiable in principle: no procedure establishes that you found every ambiguity.                                                         |
-| P5 adversarial gate | its own condition is "as good as it can be", which is a judgement three of whose five checks are joins over registers that have no format yet.                                 |
-| §8 triage           | the diff is mechanical; classifying each disagreement as encoding error / genuine ambiguity / improvement over the hand corpus is not, and no diff outcome constitutes a fail. |
+| stage               | why it cannot be a script                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P3 encode           | "isomorphic — a domain expert can review it section by section against the regulation" has no mechanical form. It is SPEC.md §4's P3 deliverable and SPEC.md §7.3's HG1.                                        |
+| P4 forks            | fork-register **completeness** is unfalsifiable in principle: no procedure establishes that you found every ambiguity.                                                                                          |
+| P5 adversarial gate | its own condition is "as good as it can be", which is a judgement. Two of its five checks are joins over registers whose format landed 2026-08-02 — so those two are exit codes, and the judgement is the rest. |
+| §8 triage           | the diff is mechanical; classifying each disagreement as encoding error / genuine ambiguity / improvement over the hand corpus is not, and no diff outcome constitutes a fail.                                  |
 
-All four are **G2** work. R4 — the fork-representation ruling that gated them — was ruled 2026-08-02 (the `Interpretation` parameter), but the tooling is unbuilt: today they are entry points that refuse with a named blocker. Run one directly to see it.
+All four are **G2** work. R4 — the fork-representation ruling that gated them — was ruled 2026-08-02 (the `Interpretation` parameter), and the three registers those stages deposit into now have machine-readable schemas and a validator (`references/phases.md`, and `etc/go/lib/register-validate.mjs`). The stages themselves are still entry points that refuse with a named blocker — P1/P2 need the network, P4 needs an encoding. Run one directly to see it.
 
 ### What mid-tier models are for
 

@@ -82,7 +82,11 @@ if (existsSync(refDir)) {
     // A fenced block in a reference is allowed only if it contains no command
     // that would run something. Explaining a shape is fine; instructing is not.
     for (const block of text.match(/```[\s\S]*?```/g) ?? []) {
-      if (/\b(etc\/go\/go\.sh|cabal|npm run|npx)\b/.test(block)) {
+      if (
+        /(\betc\/go\/go\.sh\b|\bcabal\b|\bnpm run\b|\bnpx\b|node etc\/go\/)/.test(
+          block,
+        )
+      ) {
         problems.push(
           `references/${f} contains a runnable command in a fenced block; command lines belong in SKILL.md so there is only one copy to keep true`,
         );
