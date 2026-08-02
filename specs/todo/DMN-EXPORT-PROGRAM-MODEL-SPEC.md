@@ -3171,7 +3171,8 @@ decision(s) evaluated, 67/67 value(s) as expected`. (Before: `PARSE INVALID` on 
    > _(The `67 decisions / 67 pins` cases-file description and the `1 case(s) … 67/67` banners
    > above are the measurement at that commit and stand as history. Later the same day, R-C —
    > §15.12.1 — relocated the 15 dropped rule-date fixtures into `regcf-corpus.cases.json` as
-   > dated cases; the current measured banners read `16 case(s) … 1072/1072` on both engines, and
+   > dated cases, and on 2026-08-03 four seed cases closed the two inert leaves the §8 diff oracle
+   > reported; the current measured banners read `20 case(s) … 1340/1340` on both engines, and
    > are quoted [E] there.)_
 
    **What this costs, stated plainly:** the emitted DRG no longer records that the recursion
@@ -5538,8 +5539,8 @@ as expected, 14/14 service output value(s) as expected` (the last clause is the 
 >
 > _(The `1 case(s) … 67/67` banners above are the measurement at that commit and stand as
 > history. Later the same day, R-C — §15.12.1 — relocated the 15 dropped rule-date fixtures into
-> the cases file as dated cases; the current measured banners read `16 case(s) … 1072/1072`, and
-> are quoted [E] there.)_
+> the cases file as dated cases, and on 2026-08-03 four seed cases were added; the current
+> measured banners read `20 case(s) … 1340/1340`, and are quoted [E] there.)_
 
 > **The blocking total falls by only 8 net, because 15 new Blocking notes appear — and that is the
 > point.** The complaint this section answers is that the report was _silent_ about law time; making
@@ -5804,15 +5805,18 @@ date arguments is now buildable, not hypothetical. That is the elaboration this 
 
 **The relocation duty this creates, discharged [E].** If the harness owns the dates, the dropped
 fixtures' truths must actually live in the harness — otherwise R12 quietly deleted 15 measured
-facts. `jl4/examples/dmn/regcf-corpus.cases.json` now carries 16 cases: the base world plus 15
-dated cases, one per dropped fixture, each pinning all 67 decisions to L4-evaluated ground truth
-(the file's note block records every derivation, including why the λ-lifted closure binding —
-§6.2's `name: name` — is exactly what makes global-inputData delivery equivalent to the fixture's
-per-call question). **[E] MEASURED 2026-08-02, both harnesses, verbatim:** KIE 8.44.0.Final:
-`1 file(s), 16 case(s), 0 error(s), 0 warning(s), 1072/1072 decision(s) SUCCEEDED, 1072/1072
-value(s) as expected, 224/224 service output value(s) as expected`; Camunda 8.7.6 (zeebe-dmn):
-`1 file(s), 16 case(s), 1 parsed, 0 error(s), 1072/1072 decision(s) evaluated, 1072/1072 value(s)
-as expected`. CI-gated at those counts (`.github/workflows/pr-checks.yml`, dmn-engines;
+facts. `jl4/examples/dmn/regcf-corpus.cases.json` carries those 15 dated cases, one per dropped fixture,
+alongside the base world — and, since 2026-08-03, four seed cases that close the two structurally
+inert leaves PR legalese#197's §8 diff oracle reported. Twenty in all, each pinning all 67
+decisions to L4-evaluated ground truth (the file's note block records every derivation, including
+why the λ-lifted closure binding — §6.2's `name: name` — is exactly what makes global-inputData
+delivery equivalent to the fixture's per-call question). **[E] MEASURED 2026-08-03, both
+harnesses, verbatim:** KIE 8.44.0.Final:
+`1 file(s), 20 case(s), 0 error(s), 0 warning(s), 1340/1340 decision(s) SUCCEEDED, 1340/1340
+value(s) as expected, 280/280 service output value(s) as expected`; Camunda 8.7.6 (zeebe-dmn):
+`1 file(s), 20 case(s), 1 parsed, 0 error(s), 1340/1340 decision(s) evaluated, 1340/1340 value(s)
+as expected`. (At 16 cases, before the seeds, the same artifact measured `1072/1072` and
+`224/224`.) CI-gated at those counts (`.github/workflows/pr-checks.yml`, dmn-engines;
 `jl4/tests-cli/Main.hs` corpus legs).
 
 **The successor ladder, if intra-model cross-regime reference ever arrives.** Grandfather clauses,
@@ -5954,5 +5958,5 @@ banners: KIE `VALID clean` / `BUILD clean` / `67/67 decision(s) SUCCEEDED, 67/67
 expected`; Camunda `1 parsed` / `67/67 decision(s) evaluated, 67/67 value(s) as expected`. The
 prediction above held, with one pin corrected under measurement (`the_over_limit_investor_case_
 qualifies` — the λ-lift closure binding, recorded in the cases file and §15.7). (Those are the
-single-base-case banners; after R-C's relocation cases — §15.12.1 — the same artifact measures
-`16 case(s) … 1072/1072` on both engines.)
+single-base-case banners; after R-C's relocation cases — §15.12.1 — and the 2026-08-03 seed
+cases, the same artifact measures `20 case(s) … 1340/1340` on both engines.)

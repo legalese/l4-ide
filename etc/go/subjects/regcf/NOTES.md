@@ -42,9 +42,10 @@ here in the same change that moved it — a stale idiosyncrasy note misleads the
 - **The COVID-19 temporary rules (Rule 201(z)/(bb), 2020-05-04 through 2022-08-28) are
   deliberately NOT modelled** — a curated refusal in the corpus: inside that window the encoding
   answers with an explicit "not modelled here" value rather than guessing.
-- The DMN cases file (16 dated cases, PR #194) has **L4-evaluated expected values, never
-  hand-typed** — that is the "earned green" condition under which the DMN leg's engine branch
-  runs at all.
+- The DMN cases file (20 cases as of 2026-08-03: the 16 PR #194 landed, plus the 4 seeds that
+  close the total-assets and restricted-period leaves the §8 diff oracle reported inert) has
+  **L4-evaluated expected values, never hand-typed** — that is the "earned green" condition under
+  which the DMN leg's engine branch runs at all.
 
 ## Deontic spine
 
