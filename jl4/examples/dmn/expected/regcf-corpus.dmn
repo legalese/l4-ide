@@ -1873,7 +1873,7 @@
           </outputEntry>
         </rule>
         <rule id="bkm_financial_statements_required_r4">
-          <description>NOT offering's `the issuer has previously sold securities in reliance on section 4(a)(6)` AND (`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`</description>
+          <description>(NOT offering's `the issuer has previously sold securities in reliance on section 4(a)(6)`) AND (`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`</description>
           <inputEntry id="bkm_financial_statements_required_r4_i1">
             <text>-</text>
           </inputEntry>

@@ -268,6 +268,17 @@ jl4PrettyLayoutRoundTrip evalConfig inputFile = do
       mDump <- lookupEnv "JL4_PRETTY_DUMP_DIR"
       for_ mDump $ \d ->
         Text.writeFile (d </> takeFileName inputFile <> ".pl.l4") printed
+      -- Second affordance, for the property this one does NOT assert:
+      -- EVALUATION equality. `JL4_EVALDIFF=1` writes the UNFILTERED print (the
+      -- directives kept, so `#EVAL`/`#ASSERT` still fire) next to each source
+      -- file, at `<file>.evaldiff.l4`. Next to it, and not in a scratch dir,
+      -- because a printed module has to resolve the same IMPORTs. Then
+      -- `l4 run` both and compare the `Result:` blocks; see CLAUDE.md §3.2 for
+      -- the loop and the cleanup, which you MUST run — these files are inside
+      -- the corpus globs and a later run would try to golden them.
+      mEvalDiff <- lookupEnv "JL4_EVALDIFF"
+      for_ mEvalDiff $ \_ ->
+        Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout tc.module')
       -- No gensym may reach the output. Every inference variable in the
       -- type-checked module is rendered exactly as `seed <> uniq` by the
       -- 'Type'' printer, so we can name the forbidden strings precisely rather

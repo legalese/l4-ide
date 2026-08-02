@@ -219,11 +219,57 @@ instance LayoutPrinter Resolved where
 -- all type-check against the mixfix definitions.
 --
 -- A name that is ONLY slots (the @_@ wildcard) is left alone.
+--
+-- The leading\/trailing-slot guard is what keeps this from rewriting a name the
+-- AUTHOR wrote. A backtick-quoted identifier may contain anything printable
+-- (@L4.Lexer.quotedIdentifier@), so @`a _ b`@ is a perfectly ordinary function
+-- name with the same word shape as a canonical pattern; without the guard it
+-- printed as @a@, which silently renames it and collides with any real @a@ in
+-- scope. Measured: @`a _ b` OF n@ alongside @a OF n@ round-tripped correctly
+-- before the mixfix repair and failed after it with "multiple definitions for
+-- the identifier a".
+--
+-- The guard costs nothing, because a canonical name that a CALL SITE can carry
+-- always has a slot at one end: 'L4.Mixfix.buildCanonicalNameFromKeywords' — the
+-- only reconstruction the type checker performs at a use — emits
+-- @_ kw _ kw _@ for a param-first pattern and @kw _ kw _@ for a keyword-first
+-- one. Both end in @_@. A @kw _ kw@ circumfix is unreachable for the same
+-- reason, and indeed does not type-check today: @`mag` n `stop` MEANS …@ is
+-- read as a one-argument @mag@ applied to two arguments.
+--
+-- KNOWN BOUND. Two operators that share a head keyword, an arity and an
+-- argument type vector print to the same text and the module then fails to
+-- re-check with "There are multiple definitions for the identifier". The corpus
+-- witness is @ok/mixfix-garden-path.l4@ — @tax on _ item costing _ as GST in _@
+-- beside @tax on _ item costing _ as VAT in _@ — and it only stays green
+-- because both call sites live in @#EVAL@ directives, which
+-- 'L4.DirectiveFilter.filterIdeDirectives' strips before @l4 batch@ prints. It
+-- is a LOUD failure, and it is not a regression: before the head-keyword repair
+-- the same file printed @`_ tax on _ item costing _ as VAT in _`@, an
+-- identifier defined nowhere.
+--
+-- Re-emitting the SURFACE form instead (interleaving the arguments back into
+-- the pattern, @`tax on` c `item costing` p `as GST in` k@) was built and
+-- MEASURED, and it does not work: a DEFINITION prints from its restructured
+-- AppForm, i.e. @DECIDE andop a b c IS …@, so the printed module registers a
+-- plain n-ary function and no longer has the later keywords to match against.
+-- @ok/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went from evaluating to 1006
+-- to failing resolution outright. Call sites and definitions have to agree, and
+-- the head keyword is the only spelling both can produce. A real fix needs the
+-- mixfix registry ('L4.Mixfix.MixfixRegistry', already threaded into
+-- 'L4.Export.Document' by 'mixfixHeadingsFromRegistry') to reach the printer.
 mixfixHeadKeyword :: Text -> Maybe Text
-mixfixHeadKeyword t = case Text.words t of
+mixfixHeadKeyword t = case mixfixSlots t of
+  Just ws | kws@(_ : _) <- takeWhile (/= "_") (dropWhile (== "_") ws)
+          -> Just (Text.unwords kws)
+  _ -> Nothing
+
+-- | The word list of a canonical mixfix name, if @t@ is shaped like one.
+mixfixSlots :: Text -> Maybe [Text]
+mixfixSlots t = case Text.words t of
   ws | "_" `elem` ws
-     , kws@(_ : _) <- takeWhile (/= "_") (dropWhile (== "_") ws)
-     -> Just (Text.unwords kws)
+     , listToMaybe ws == Just "_" || listToMaybe (reverse ws) == Just "_"
+     -> Just ws
   _ -> Nothing
 
 instance LayoutPrinter RawName where
@@ -687,16 +733,22 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Post _ e1 e2 e3 ->
       hang 2 $ vcatHard
         [ "POST", parensIfNeeded e1, parensIfNeeded e2, parensIfNeeded e3 ]
+    -- The genitive clitic is lexed as the literal string @'s@
+    -- ('L4.Lexer.TGenitive'), and the parser spells the ledger qualifiers
+    -- @<party>'s@ and @OFFICIAL's@ the same way. These three sites emitted an
+    -- upper-case @'S@, which is not that token: every recipient-qualified
+    -- RECORD/COMMIT/RECALL printed to source the lexer rejects with
+    -- @unexpected '''@. (The 'Proj' instance above already had it right.)
     Record _ mParty cell val isOfficial mHence ->
       (if isOfficial then "COMMIT" else "RECORD")
-        <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
+        <> maybe mempty (\p -> space <> printWithLayout p <> "'s") mParty
         <+> printWithLayout cell <+> "IS" <+> printWithLayout val
         <> maybe mempty (\k -> " HENCE" <+> printWithLayout k) mHence
     ReadCell _ mParty isOfficial mode cell ->
       "RECALL"
         <> (case mode of RecallAll -> " ALL"; RecallLast -> mempty)
-        <> (if isOfficial then " OFFICIAL'S" else mempty)
-        <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
+        <> (if isOfficial then " OFFICIAL's" else mempty)
+        <> maybe mempty (\p -> space <> printWithLayout p <> "'s") mParty
         <+> printWithLayout cell
     Concat _ exprs ->
       "CONCAT" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
@@ -735,8 +787,29 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
 -- shape for the regulative connectives: the obligation has no closing token, so
 -- a following @ROR@ reads as another of its own clauses.
 --
--- Everything else is CLOSED — the binary operators bracket their own operands,
--- @NOT@/projection/postfix bind tighter than a connective, literals and
+-- A conjunct that is ITSELF a logical connective is the second reason, and it
+-- is not about open tails at all — it is about grouping. @scanAnd@\/@scanOr@
+-- flatten only their OWN operator, so an @And@ reaching this function is
+-- necessarily nested inside an @Or@ (or a regulative chain), and vice versa;
+-- printing it bare hands the grouping back to the parser's precedence table,
+-- which does not agree with the tree. Measured, before this clause:
+--
+--   * @(TRUE OR FALSE) AND FALSE@ and @TRUE OR (FALSE AND FALSE)@ printed to
+--     the SAME string, @TRUE OR FALSE AND FALSE@, so the first re-parsed as the
+--     second and flipped from FALSE to TRUE;
+--   * @(NOT TRUE) OR TRUE@ printed as @NOT TRUE OR TRUE@, which the parser
+--     reads as @NOT (TRUE OR TRUE)@ — TRUE became FALSE;
+--   * @(FALSE IMPLIES FALSE) AND FALSE@ likewise.
+--
+-- That is a SILENT wrong answer rather than a diagnostic: @ok/logic.l4@ went
+-- from @LIST TRUE, TRUE, FALSE, FALSE@ to @LIST TRUE, TRUE, TRUE, TRUE@ and an
+-- assertion in @legal/regcf/regcf.l4@ went from satisfied to failed, both
+-- through @l4 batch@, with no error anywhere. Comparisons (@EQUALS@,
+-- @GREATER THAN@, …) were measured SAFE in the same harness and stay bare, so
+-- the corpus's @`mkt cap` GREATER THAN … AND …@ does not grow noise.
+--
+-- Everything else is CLOSED — the remaining binary operators bracket their own
+-- operands, projection\/postfix bind tighter than a connective, literals and
 -- variables are atoms — and the parser's precedence table reassembles the chain
 -- correctly. Bracketing those too would be safe but is pure noise in every
 -- rendering this printer feeds: evaluation traces, @#EVAL@ output, ladder
@@ -751,6 +824,13 @@ parensIfOpenTailed e
   | otherwise                     = printWithLayout e
   where
     openTailed = \ case
+      -- Grouping, not tails: a connective nested in a chain of a DIFFERENT
+      -- connective. See the note above — bare, these re-associate silently.
+      And{}         -> True
+      Or{}          -> True
+      RAnd{}        -> True
+      ROr{}         -> True
+      Implies{}     -> True
       App _ _ (_:_) -> True  -- `f OF x, y` — comma-separated, open-ended
       AppNamed{}    -> True  -- `R WITH a IS 1` — open field list
       Concat{}      -> True  -- comma list
@@ -766,9 +846,11 @@ parensIfOpenTailed e
       Lam{}         -> True  -- the YIELD body keeps consuming
       Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
       Breach{}      -> True  -- open BY/BECAUSE clauses
-      -- `NOT` prints its operand bare, so it inherits the operand's tail:
-      -- `NOT f OF x AND y` would re-associate to `NOT (f OF (x AND y))`.
-      Not _ e'      -> openTailed (carameliseNode e')
+      -- `NOT` binds LOOSER than the connectives, not tighter: measured,
+      -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
+      -- conjunct is always bracketed — inheriting the operand's tail was not
+      -- enough, and `(NOT TRUE) OR TRUE` silently became `NOT (TRUE OR TRUE)`.
+      Not{}         -> True
       Post{}        -> True  -- three juxtaposed arguments
       Event{}       -> True
       _             -> False
@@ -1131,25 +1213,36 @@ keywordsUsableAsNames = ["LIST"]
 quote :: Text.Text -> Text.Text
 quote n = "`" <> n <> "`"
 
-scanOp :: (forall r. Expr a -> (r, Expr a -> Expr a -> r) -> r) -> Expr a -> [Expr a]
-scanOp match e = match e ([e], \e1 e2 -> scanOp match e1 <> scanOp match e2)
+-- | Flatten a chain of one associative connective into its operands.
+--
+-- The match runs on @carameliseNode e@, not on @e@: a chain the type checker
+-- left as @App __AND__ [a, b]@ does not match the @And@ constructor, so an
+-- un-caramelised scan peeled exactly one level and handed the REST back as a
+-- single operand. That was invisible while conjuncts printed bare; once
+-- 'parensIfOpenTailed' started bracketing a nested connective (which it must —
+-- see the note there) it turned @a AND b AND c AND d@ into
+-- @a AND (b AND (c AND d))@, bracketing an associative nest that needs none.
+-- Caramelising as we descend flattens the chain properly, so the only operand
+-- that can still BE a connective is one of a genuinely different kind.
+scanOp :: HasName a => (forall r. Expr a -> (r, Expr a -> Expr a -> r) -> r) -> Expr a -> [Expr a]
+scanOp match e = match (carameliseNode e) ([e], \e1 e2 -> scanOp match e1 <> scanOp match e2)
 
-scanOr :: Expr a -> [Expr a]
+scanOr :: HasName a => Expr a -> [Expr a]
 scanOr = scanOp \case
   Or _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
 
-scanAnd :: Expr a -> [Expr a]
+scanAnd :: HasName a => Expr a -> [Expr a]
 scanAnd = scanOp \case
   And _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
 
-scanROr :: Expr a -> [Expr a]
+scanROr :: HasName a => Expr a -> [Expr a]
 scanROr = scanOp \case
   ROr _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
 
-scanRAnd :: Expr a -> [Expr a]
+scanRAnd :: HasName a => Expr a -> [Expr a]
 scanRAnd = scanOp \case
   RAnd _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
