@@ -1,0 +1,43 @@
+`a British citizen by virtue of subsection (1) or (2)` with `Peter`
+`a British citizen by virtue of subsection (1) or (2)` with `a child born in the United Kingdom on` with `YMD` with 1983, 1 and 1, `FALSE`, `TRUE` and `FALSE`
+not `a British citizen by virtue of subsection (1) or (2)` with `a child born in the United Kingdom on` with `YMD` with 1982, 12 and 31, `TRUE`, `FALSE` and `FALSE`
+not `a British citizen by virtue of subsection (1) or (2)` with `the child of visitors`
+`a British citizen by virtue of subsection (1) or (2)` with `a child born in a qualifying territory on` with `YMD` with 2002, 5 and 21, `FALSE`, `TRUE` and `FALSE`
+not `a British citizen by virtue of subsection (1) or (2)` with `a child born in a qualifying territory on` with `YMD` with 2002, 5 and 20, `FALSE`, `TRUE` and `FALSE`
+`a British citizen by virtue of subsection (1A)` with `a child born in the United Kingdom on` with `YMD` with 2010, 1 and 13, `FALSE`, `FALSE` and `TRUE`
+not `a British citizen by virtue of subsection (1A)` with `a child born in the United Kingdom on` with `YMD` with 2010, 1 and 12, `FALSE`, `FALSE` and `TRUE`
+`a British citizen by virtue of subsection (1A)` with `a child born in a qualifying territory on` with `YMD` with 2012, 3 and 1, `FALSE`, `FALSE` and `TRUE`
+`a British citizen by virtue of subsection (1A)` with `the forces child`
+not `a British citizen by virtue of subsection (1A)` with `a child born in the United Kingdom on` with `YMD` with 2015, 6 and 1, `FALSE`, `FALSE` and `FALSE`
+`deemed by subsection (2) to satisfy subsection (1)` with `the foundling`
+`a British citizen by virtue of subsection (1) or (2)` with `the foundling`
+not `a British citizen by virtue of subsection (1) or (2)` with `the rebutted foundling`
+not `deemed by subsection (2) to satisfy subsection (1)` with `a foundling found on` with `YMD` with 1982, 6 and 1, `TRUE` and `FALSE`
+`entitled to be registered under subsection (3)` with `the child of visitors`
+not `entitled to be registered under subsection (3)` with `a child of visitors born on` with `YMD` with 2012, 5 and 10, `TRUE`, `FALSE` and `FALSE`
+not `entitled to be registered under subsection (3)` with `a child of visitors born on` with `YMD` with 2012, 5 and 10, `FALSE`, `FALSE` and `TRUE`
+not `entitled to be registered under subsection (3)` with `Peter`
+not `entitled to be registered under subsection (3)` with `Peter with the subsection (3) limbs satisfied`
+`entitled to be registered under subsection (3A)` with `a child of visitors born on` with `YMD` with 2012, 5 and 10, `FALSE`, `TRUE` and `TRUE`
+not `entitled to be registered under subsection (3A)` with `a child of visitors born on` with `YMD` with 2005, 5 and 10, `FALSE`, `TRUE` and `TRUE`
+not `entitled to be registered under subsection (3A)` with `a child of visitors born on` with `YMD` with 2012, 5 and 10, `FALSE`, `TRUE` and `FALSE`
+`entitled to be registered under subsection (4)` with `the ten-year lead case`
+not `entitled to be registered under subsection (4)` with `a ten-year applicant born on` with `YMD` with 1995, 3 and 1, 91, `TRUE`, `FALSE` and `TRUE`
+`entitled to be registered under subsection (4)` with `a ten-year applicant born on` with `YMD` with 1995, 3 and 1, 91, `TRUE`, `TRUE` and `TRUE`
+not `entitled to be registered under subsection (4)` with `a ten-year applicant born on` with `YMD` with 1995, 3 and 1, 90, `FALSE`, `FALSE` and `TRUE`
+`entitled to be registered under subsection (4)` with `the applicant of bad character`
+`registration may be granted` with `the ten-year lead case` and `entitled to be registered under subsection (4)` with `the ten-year lead case`
+not `registration may be granted` with `the applicant of bad character` and `entitled to be registered under subsection (4)` with `the applicant of bad character`
+`a British citizen by virtue of subsection (5)` with `a United Kingdom adoption order on` with `YMD` with 2004, 7 and 1, `TRUE`, `TRUE` and `FALSE`
+not `a British citizen by virtue of subsection (5)` with `a United Kingdom adoption order on` with `YMD` with 2004, 7 and 1, `FALSE`, `TRUE` and `FALSE`
+`a British citizen by virtue of subsection (5)` with `a Convention adoption on` with `YMD` with 2006, 2 and 1, `TRUE` and `TRUE`
+not `a British citizen by virtue of subsection (5)` with `a Convention adoption on` with `YMD` with 2006, 2 and 1, `TRUE` and `FALSE`
+`a British citizen by virtue of subsection (5)` with `a Gibraltar adoption order case`
+not `1(5)(a) — a court order authorising the adoption` with `a pre-appointed-day Gibraltar order case`
+not `a British citizen by virtue of subsection (5)` with `an adoption of a person already a British citizen`
+`a British citizen notwithstanding cesser of the order — subsection (6)` with `a United Kingdom adoption order on` with `YMD` with 2004, 7 and 1, `TRUE`, `TRUE` and `TRUE`
+not `a British citizen notwithstanding cesser of the order — subsection (6)` with `a United Kingdom adoption order on` with `YMD` with 2004, 7 and 1, `FALSE`, `TRUE` and `TRUE`
+`section 1 outcome at birth` with `Peter`
+`section 1 outcome at birth` with `Peter` is equal to `a British citizen from birth under subsection (1)`
+`section 1 outcome at birth` with `the forces child` is equal to `a British citizen from birth under subsection (1A)`
+`section 1 outcome at birth` with `the child of visitors` is equal to `not a British citizen from birth under section 1`
