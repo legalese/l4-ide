@@ -43,12 +43,12 @@ table, which is exactly what the page can already do. The thing a page cannot do
 So **M5 depends on C2**, and SPEC.md §5's M5 row has been corrected from `C1, C3, S2, S3`
 to `C1, C2, C3, S2, S3`. See §6.3 and finding **F5** in §9.
 
-| ID     | SPEC.md's line            | Reality on `unstable`, 2026-07-29                                                                                                                                                                                                                                                   |
-| ------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **C0** | Mirror their eight groups | **Built.** 992 lines, 55 `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`, all green, four goldens, in CI. Five of eight groups complete                                                                                                                                                          |
-| **C1** | Four superset moves       | **Complete (2026-07-29).** Formula, deadlines and the resale deontic landed inside C0; the rule-version axis landed on `mengwong/regcf-rule-version` — seven dated constants, both dated shapes, R2 floor refusal, banded COVID refusal, pinned by the rule-version assertion group |
-| **C2** | Citizen wizard            | **C2a built** — `regcf-wizard.l4` landed in PR #162 (`65681a0a`): 749 lines, 5 `@export`, 55 `@desc`, four goldens, in CI. No rule-date question yet (gated on C1; §3.3 last row) and `TYPICALLY` still 0; C2b/C2c not started. **M5 depends on this**                              |
-| **C3** | Scenario tests            | **Not started.** 55 boundary assertions exist; none is a party's scenario, and nothing gates a failure                                                                                                                                                                              |
+| ID     | SPEC.md's line            | Reality on `unstable`, 2026-07-29                                                                                                                                                                                                                                                                                                                                                     |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C0** | Mirror their eight groups | **Built.** 992 lines, 55 `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`, all green, four goldens, in CI. Five of eight groups complete                                                                                                                                                                                                                                                            |
+| **C1** | Four superset moves       | **Complete (2026-07-29).** Formula, deadlines and the resale deontic landed inside C0; the rule-version axis landed on `mengwong/regcf-rule-version` — seven dated constants, both dated shapes, R2 floor refusal, banded COVID refusal, pinned by the rule-version assertion group                                                                                                   |
+| **C2** | Citizen wizard            | **C2a + C2b built; C2c prepared, not performed** (re-measured 2026-08-02). `regcf-wizard.l4` is 779 lines with **6** `@export` and 57 `@desc` — the rule-date question exists as `investment limit under the rules effective on`, so §3.3's last row is discharged. `TYPICALLY` is still **0**, corpus-wide. The frontend is `ts-apps/regcf-wizard`; see §3.6. **M5 depends on this** |
+| **C3** | Scenario tests            | **Not started.** 55 boundary assertions exist; none is a party's scenario, and nothing gates a failure                                                                                                                                                                                                                                                                                |
 
 Provenance: `jl4/examples/legal/regcf/regcf.l4` (992 lines; cut in `4c6a385d`,
 `6ddbc68c`, `10e74b95`, then grown by PR #162's projection triage) and
@@ -746,14 +746,14 @@ predicates, which is exactly the shape the ROBDD wants.
 
 ### 3.3 What the corpus must provide
 
-| Need                       | Why                                                                                                                                                            | Reg CF today                                                                                                                                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`@desc` on every field** | The only source of question text                                                                                                                               | **0.** And Reg CF field names are verbatim statutory prose — the one at `regcf.l4:161` is 184 characters — so every one needs plain English                                     |
-| **`@export`**              | Schema, evaluation and query-plan all key off it                                                                                                               | **0.** `tests/regcf.schema.golden` reads `No @export annotations found in file`                                                                                                 |
-| **A boolean top-level**    | `/query-plan` 400s otherwise                                                                                                                                   | **Have** — `regcf.l4:642-649`                                                                                                                                                   |
-| **`TYPICALLY` priors**     | v2 info-gain ordering; on **boolean binders only** — `QUESTION-ORDERING-SPEC.md:96` names mapping `age TYPICALLY 18` to `P(age >= 18)` as the correctness trap | **0.** Corpus-wide, `TYPICALLY` appears only in `ok/typically-basic.l4` and four `not-ok` fixtures. **No legal corpus uses it.** Reg CF would be its first real use             |
-| **Textual statute order**  | `collectVarOrder` is first-occurrence DFS, so the ROBDD variable order _is_ reading order — a free isomorphism                                                 | **Have.** Do not reorder to "tidy"                                                                                                                                              |
-| **The rule date as input** | §2.4's parameterised façade — **and the bearer of the M5 argument**, since criterion 3 (arbitrary inputs) is invisible in a golden file                        | new. **Gated on temporal closure** (§2.4 trap 5): the boolean top level reads all seven constants that have ever moved, so all seven must be dated before this question is safe |
+| Need                       | Why                                                                                                                                                            | Reg CF today                                                                                                                                                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`@desc` on every field** | The only source of question text                                                                                                                               | **0.** And Reg CF field names are verbatim statutory prose — the one at `regcf.l4:161` is 184 characters — so every one needs plain English                                                                                        |
+| **`@export`**              | Schema, evaluation and query-plan all key off it                                                                                                               | **0.** `tests/regcf.schema.golden` reads `No @export annotations found in file`                                                                                                                                                    |
+| **A boolean top-level**    | `/query-plan` 400s otherwise                                                                                                                                   | **Have** — `regcf.l4:642-649`                                                                                                                                                                                                      |
+| **`TYPICALLY` priors**     | v2 info-gain ordering; on **boolean binders only** — `QUESTION-ORDERING-SPEC.md:96` names mapping `age TYPICALLY 18` to `P(age >= 18)` as the correctness trap | **0.** Corpus-wide, `TYPICALLY` appears only in `ok/typically-basic.l4` and four `not-ok` fixtures. **No legal corpus uses it.** Reg CF would be its first real use                                                                |
+| **Textual statute order**  | `collectVarOrder` is first-occurrence DFS, so the ROBDD variable order _is_ reading order — a free isomorphism                                                 | **Have.** Do not reorder to "tidy"                                                                                                                                                                                                 |
+| **The rule date as input** | §2.4's parameterised façade — **and the bearer of the M5 argument**, since criterion 3 (arbitrary inputs) is invisible in a golden file                        | **Have**, as of C2a: `investment limit under the rules effective on` takes `rule date IS A DATE`. Temporal closure landed first, so the gate below was cleared, not bypassed. ~~new. **Gated on temporal closure** (§2.4 trap 5)~~ |
 
 ### 3.4 What the service must expose — all of it already exists
 
@@ -774,14 +774,20 @@ Two findings the whole programme should take, not just C2:
   `Backend/DecisionQueryPlan.hs:224-226` says a UI that switches on `determined` "will
   sooner or later tell someone they complied with a rule that never reached them".
 
-Deployment: `nix/jl4-service/configuration.nix:29-39` hardcodes two pre-seeded bundles
+Deployment: `nix/jl4-service/configuration.nix` used to hardcode two pre-seeded bundles
 (`classic`, `thailand-cosmetics`); prod `jl4.legalese.com/service/health` reports
 `ready:2, total:2`, dev reports 4. **Neither `housing-wizard` nor `regcf` is deployed
-anywhere.** Shipping is a one-line `bundles` addition plus a rebuild, or a `POST /deployments`
-upload. CORS is permissive (`Application.hs:168-172`); the binding constraint is the
-wizard's own `<meta>` CSP `connect-src`, currently pinned to `http://localhost:8080`.
+anywhere — that is still true.** A `regcf-wizard` nginx module is imported and contributes the
+`regcf` bundle, but both sit under the module's `mkIf`, the module defaults to off, and no
+rebuild has been run; see §3.6. CORS is permissive (`Application.hs:168-172`); the
+binding constraint is the wizard's own `<meta>` CSP `connect-src` — pinned to
+`http://localhost:8080` in `housing-wizard`, and a list including the loopback and Legalese
+origins in `regcf-wizard`, where same-origin serving makes `'self'` sufficient in production.
 
 ### 3.5 Reuse vs build
+
+_Written before C2b. Every item under "Must build" below is now built; **§3.6** records what
+was built, four wire facts this survey did not have, and where C2c stops._
 
 **Reuse as-is.** The five-part façade recipe; the generic schema→widget renderer
 (`ts-apps/housing-wizard/src/lib/schema/{types,classify,build-tree,form-logic,labels}.ts`
@@ -802,6 +808,95 @@ deployment. Also: `toArguments`'s return type (`form-logic.ts:97-101`) is cast t
 Two known traps: `l4 batch` is **unusable with a spaced backtick entry-point name** (its
 wrapper codegen mis-parses `` `assess …` `` as five identifiers,
 `housing-act-citizen-wizard-demo.md:167-169`); and stringified numbers are a verified 422.
+
+### 3.6 What C2b built, and where C2c stops — 2026-08-02
+
+`ts-apps/regcf-wizard` (SvelteKit SPA, `adapter-static`, no SSR). It re-implements no law:
+every figure, sentence and citation is a field of a response from `jl4-service` evaluating
+`regcf-wizard.l4`. `check` / `lint` / `test` / `build` are green (47 unit tests), and the app
+was exercised against a **loopback** `jl4-service` on `127.0.0.1` — never against a deployed
+host.
+
+**The entry page is a hub, not a questionnaire.** The corpus exports five decision surfaces
+for two audiences; one linear form would ask a founder about resale restrictions and an
+investor about audited financials. The **ladder is embedded in the entry page** (SPEC.md §7,
+G3) — static on the hub, interactive inside the step-by-step surface, both via the PR #177
+`LadderController`.
+
+The static half is **machine-verified in a real browser** (headless Chrome over the built app
+on a loopback preview, 2026-08-02), which the build itself could not do: the hub issues exactly
+one service call, `GET …/can this company raise/ladder`, and mounts one `<svg>` with
+`viewBox="0 0 1062 180"` rendering at 685×116, holding 2 `rect.lad-box` and 3
+`polyline.lad-wire`, whose two `<text>` nodes are the endpoint's `name.label` fields verbatim.
+That last equality is the load-bearing one — it is what distinguishes the corpus's own picture
+from a plausible placeholder, and it is the check to repeat if the embed is ever reworked. One
+CSP violation is logged per load (`style-src-attr`, from SvelteKit's own `#svelte-announcer`,
+no visible effect); the earlier claim that the app ships zero inline `style=` attributes was
+wrong and has been corrected in `svelte.config.js`. Interaction, pan/zoom and the R8 override
+toggle still need hands — see the app README's gate.
+
+**Progressive disclosure.** §3.5 recorded that this "does not exist client-side at all — the
+backend loop is finished and unexercised". It is now exercised, over
+`POST …/can this company raise/query-plan`: one question at a time, in the service's `ranked`
+order restricted to `stillNeeded`, stopping the moment the **verdict** settles. Measured: with
+limb 1 bound false the response is `verdict:"Fails", stillNeeded:[]`, so limb 2 is never put —
+the observable difference from a form. The client switches on `verdict`, never on `determined`
+(§3.4's warning, and `determined` is `null` for four of the six verdicts).
+
+**Four wire facts this build establishes, none of them in the earlier survey.**
+
+1. **A ladder exists only for a `DECIDE` returning `BOOLEAN`.** `GET …/{fn}/ladder` is 200 for
+   `can this company raise` and 400 for the other five exports. Record-returning answer
+   surfaces have no picture, by construction.
+2. **`unique`, not `atomId`, joins the ladder to the query plan.** The two payloads carry
+   different UUIDv5s for the same atom, and binding by the ladder's atomId returns 200 and
+   silently changes nothing. Detail and the pinning test in EMBEDDABLE.md §5.1.
+3. **A scalar return is not wrapped under its return-type name.** A record arrives as
+   `{"value":{"RaiseAssessment":{…}}}`; the `NUMBER`-returning law-time export arrives as
+   `{"value":7500}`. A client that always peeled a wrapper would read the number as `undefined`.
+4. **An L4 `DATE` parameter reaches the wire as `{"type":"string","format":"date"}`**, and the
+   root node of a **two-parameter** export emits **no `propertyOrder`** — only
+   `required:["rule date","facts"]`. Ordering by `Object.keys` would put the four investor
+   questions ahead of the date they are to be judged against, inverting R8's own derivation.
+   `toArguments`'s `{situation: FormState}` cast (§3.5's last note) is generalised accordingly.
+
+**R8, discharged.** The investor surface asks a fact date, derives the rule date from it,
+**discloses** the derivation ("Applying the rules in force on 1 June 2016, because that is
+when the investment was made"), and offers an override that pins law-time independently and
+says so instead. Three calls, one form: the citation-carrying prose from
+`investment limit check`, and two comparable numbers from the law-time export asked at two
+explicit rule dates. Live, for one investor (income $150,000, net worth $80,000, invested $0,
+not accredited): **2016-06-01 → $4,000, 2018-01-01 → $4,000, 2022-09-20 → $7,500,
+2023-01-01 → $7,500.** No regime table lives client-side; the page compares, the engine
+explains.
+
+**C2c stops before the deploy.** Committed and inert: `nix/regcf-wizard/package.nix` (the SPA
+build, `BASE_PATH` + `VITE_JL4_BASE_URL` baked in), `nix/regcf-wizard/configuration.nix` (an
+nginx location at `/regcf/` **and** the `regcf` bundle, both under one `mkIf`, with `enable`
+defaulting to false), and the import in `nix/configuration.nix`. The bundle half is verified by
+replicating `jl4-service`'s `ExecStartPre` — copying the whole corpus directory into a store
+and starting the service, which reported `exportCount: 6` and `ready:1, total:1`, ignoring
+`figures/`, `tests/` and the two `.md` files. Same-origin serving means the app's CSP
+`connect-src 'self'` already covers the service, so **no CSP edit is needed to deploy**.
+
+**The bundle was gated during review, and the reason generalises.** As first written, `regcf`
+sat in `services.jl4-service.bundles`'s **default**. Every host imports `nix/configuration.nix`
+— `jl4-demo`, `jl4-dev`, and `jl4-aws-2505`, which is `jl4.legalese.com` — so the corpus would
+have been pre-seeded and served publicly by the next `nixos-rebuild switch` performed for any
+unrelated reason, with nobody having enabled the wizard and no deploy having been authorised.
+The rule this yields for the whole programme: **a feature's corpus is contributed inside the
+feature's own `mkIf`, never into a shared default**, so that `enable = true` is the single act
+that publishes anything. Doing that needed one module-system correction — `bundles` now carries
+an empty default with the base two moved to a `config` definition, because an `attrsOf` option
+merges definitions but discards its default the moment anything defines it, so the naive gated
+version would have silently dropped `classic` and `thailand-cosmetics`.
+
+Two things are true and must not be read past: **the nix expressions have not been evaluated**
+(there is no `nix` in the environment they were written in — they are reviewed by eye against
+`nix/jl4-web`, and that is all), and **no `nixos-rebuild` has been run**. Nothing is served
+anywhere as a result of this work. The remaining act is one line —
+`services.regcf-wizard.enable = true;` — plus
+`nixos-rebuild switch --flake .#jl4-dev --target-host root@dev.jl4.legalese.com`.
 
 ---
 
@@ -1252,8 +1347,8 @@ its 2016/2017 rows are the guard against re-dropping the 2017-04-12 boundary.
 | 5      | **C0-e** — the composed `RAND` contract                                                                                                              | 3, 4         | **yes** — and it unblocks **P0**                                  |
 | 6      | **C3** — `regcf-scenarios.l4`, party-grouped, rule-date-pinned, K-a/b/c only                                                                         | 1, 5         | **yes**; the _gate_ needs (a) or (b) — see **R5**                 |
 | 7      | **C2a** — `regcf-wizard.l4` façade, `@desc`, two exports, `TYPICALLY`, the rule-date question                                                        | 1, 1b, 2, 2b | **yes**                                                           |
-| 8      | **C2b** — frontend answer layer + progressive disclosure + **the applied-rule-date disclosure** (R8)                                                 | 7            | **yes** — backend finished                                        |
-| 9      | **C2c** — deploy to `dev.jl4.legalese.com`                                                                                                           | 7            | one-line nix change                                               |
+| 8      | **C2b** — frontend answer layer + progressive disclosure + **the applied-rule-date disclosure** (R8)                                                 | 7            | **DONE 2026-08-02** — `ts-apps/regcf-wizard`; §3.6                |
+| 9      | **C2c** — deploy to `dev.jl4.legalese.com`                                                                                                           | 7            | **PREPARED, NOT PERFORMED** — §3.6; the module defaults to off    |
 | —      | Phase 2 `@effective` ergonomics; `l4 diff-eval`                                                                                                      | —            | **not built.** C1 does not wait for either                        |
 
 **M5 = steps 1, 1b, 2, 2b, 6, 7, 8, 9.** Steps 1-2b are the arithmetic; 7-9 are the argument. A
