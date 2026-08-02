@@ -381,19 +381,23 @@ queryPlanHandler' deployId fnName fnArgs = do
 -- registry, and only boolean-returning DECIDEs visualize (anything else is the
 -- 400 raised by 'buildDecisionQueryCacheFromCompiled').
 --
--- KNOWN GAP, inherited and deliberately not changed here: the @atomId@ carried
--- on each ladder leaf is NOT in the same namespace as the keys of
--- @QueryPlanResponse.impactByAtomId@, so a client cannot join the two. Both are
--- UUID5 over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ renders
--- each ref as its numeric @rootUnique@ over the atom's /direct/ ref set, while
--- @L4.Decision.QueryPlan.atomIdByUnique@ renders it as the ref's /label/ over
--- the /transitive closure/. They therefore differ for every atom with a
--- non-empty ref set — which is every ordinary leaf. @jl4-lsp@ reconciles them
--- by calling @LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds@ before serving
--- the ladder (see @LSP.L4.Actions@); jl4-service never has. Fixing it is a
--- one-line change in 'buildDecisionQueryCacheFromCompiled' that would also
--- change the existing @query-plan@ payload, so it is left as a separate
--- decision. 'IntegrationSpec' pins the current behaviour.
+-- The @atomId@ on each ladder leaf IS a key of
+-- @QueryPlanResponse.impactByAtomId@, and IS accepted as a binding key by
+-- @query-plan@. That is the whole point of the route: fetch the diagram once,
+-- then post answers keyed by what the diagram calls them.
+--
+-- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were UUID5
+-- over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ rendered each
+-- ref as its numeric @rootUnique@ over the atom's /direct/ ref set while
+-- @L4.Decision.QueryPlan.atomIdByUnique@ rendered it as the ref's /label/ over
+-- the /transitive closure/, so they disagreed for every atom with a non-empty
+-- ref set — which is every ordinary leaf — and a binding keyed by a ladder
+-- atomId was accepted with a 200 and did nothing at all. @jl4-lsp@ had always
+-- reconciled them by calling @LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds@
+-- before serving the ladder (see @LSP.L4.Actions@); jl4-service now does the
+-- same in 'buildDecisionQueryCacheFromCompiled', so both surfaces and both
+-- products agree. 'IntegrationSpec' pins it, including the end-to-end claim that
+-- such a binding moves @determined@.
 ladderHandler :: DeploymentId -> Text -> AppM VizExpr.RenderAsLadderInfo
 ladderHandler deployId fnName = do
   logger <- asks (.logger)

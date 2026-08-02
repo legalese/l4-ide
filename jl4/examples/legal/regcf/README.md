@@ -645,12 +645,34 @@ Three things the deploy showed that reading the types would not have:
    façade, which is the duplication the whole exercise exists to avoid. The six-limb picture
    already exists, cut from the corpus itself, at `figures/regcf-rule-100b.svg`.
 
-3. **The `atomId`s do not line up, and the disagreement is internal to one response.** In a
-   single `/query-plan` payload the ids under `impact[…].support[].atomId` and the ids in its own
-   embedded `ladder` field have an **empty intersection** (measured: two ids each, none shared).
-   The embedded ladder does agree with the standalone `/ladder` endpoint, so the split is between
-   the query planner's atoms and the ladder's nodes. This is the `KNOWN GAP` pinned in
-   `jl4-service/README.md`; it reproduces here exactly.
+3. **The `atomId`s did not line up, and the disagreement was internal to one response — FIXED
+   2026-08-03.** As first measured here, a single `/query-plan` payload's ids under
+   `impact[…].support[].atomId` and the ids in its own embedded `ladder` field had an **empty
+   intersection** (two ids each, none shared); the embedded ladder agreed with the standalone
+   `/ladder`, so the split was between the query planner's atoms and the ladder's nodes. That
+   became upstream `smucclaw/l4-ide#935`, because it is worse than an inconvenience: posting a
+   binding keyed by a ladder `atomId` returned `200` and silently changed nothing.
+
+   Re-measured on this bundle against a loopback service built from
+   `legalese/l4-ide@mengwong/ladder-atomid-embed`, `can this company raise`, 6 exports:
+
+   | surface                        | ids | value                                        |
+   | ------------------------------ | --- | -------------------------------------------- |
+   | `GET /ladder`                  | 2   | `a87d9b26-…`, `6cfcd833-…`                   |
+   | embedded `ladder` in the POST  | 2   | same two                                     |
+   | `impact[…].support[].atomId`   | 2   | same two                                     |
+   | `impactByAtomId` keys          | 2   | same two                                     |
+
+   Intersection of `GET /ladder` with the planner's atoms: **2 of 2**, where it was 0 of 2.
+   `a87d9b26-…` is the id the issue body reports for `issuer is eligible` on the *query-plan*
+   side — so the ladder converged onto the planner's namespace and not the reverse, which is the
+   right direction: an `atomId` must survive a redeploy, and the planner's is the only one of the
+   two that does not embed a compilation-order `unique`. Binding it end-to-end now moves the
+   decision: `determined` `null → false`, `verdict` `Undetermined → Fails`, `stillNeeded`
+   `2 → 0`.
+
+   A ladder-embedded wizard can therefore join the two surfaces on `atomId`, which is the join
+   the shapes invite.
 
 ### 7.4 Defects found in `jl4-service` while deploying
 
