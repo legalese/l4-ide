@@ -634,8 +634,8 @@ lexical binding.
 
 ## 12. Hardening fixes (2026-07) and residual notes
 
-Three defects in the initial resolve-time proximity filter were fixed; see the
-regression examples for each.
+Four defects in the initial resolve-time proximity filter were fixed; see the
+regression examples for each. (FIX A′ was added 2026-08-03, after the first three.)
 
 - **FIX A — locals beat sections (`jl4/examples/ok/section-scoping-param-not-shadowed.l4`).**
   Function parameters, `WHERE`/`LET` bindings and pattern variables are lexical LOCALs and
@@ -644,6 +644,41 @@ regression examples for each.
   (`CheckEnv.localBindings`, populated by `extendKnownMany`; section/top-level bindings use
   the non-marking `extendKnownGlobalMany`) and are given ABSOLUTE priority in `resolveTerm'`
   / `resolveType` before any section-proximity ranking.
+
+- **FIX A′ — a local does not shadow a selector at a projection LABEL
+  (`jl4/examples/ok/section-scoping-projection-label.l4`, added 2026-08-03 for
+  [smucclaw/l4-ide#930](https://github.com/smucclaw/l4-ide/issues/930)).**
+  FIX A's absolute priority was applied at every occurrence of the name, including the `l` of a
+  projection `base's l`. `'s` desugars to an application of the label to the base
+  (`inferRecordProjection`, `TypeCheck.hs`), so the label is always a function; a local that
+  happens to share a field's name is not. `GIVEN amount IS A Money` over a `Money` with an
+  `amount` field therefore resolved the label to the parameter and reported
+  _"You are trying to apply amount (predefined) of type Money (which is not a function) to 1
+  argument here"_ — well-typed-looking source, no hint that a namespace collision was the cause.
+
+  **The rule now asserted.** At an ordinary occurrence a local still shadows every same-named
+  binding, unchanged. At a projection-label occurrence
+  (`resolveProjectionLabel` / `LocalsSpareSelectors`, `TypeCheck/Types.hs`) the locals-only
+  restriction additionally keeps record selectors and data constructors, and ordinary
+  type-directed overload resolution decides: the local's non-function type fails `matchFunTy`,
+  so the selector wins at the label and the local wins everywhere else.
+
+  Note the issue's title states the precedence backwards. The parameter was not losing to a
+  predefined name — it was _winning_, in the one position where it cannot be meant.
+  "`amount (predefined)`" is only `prettyResolvedWithRange` rendering a `GIVEN` binder that
+  carries no source range on its `getOriginal`; a `WHERE` binding in the same position renders
+  "`amount (defined at …)`" and fails identically.
+
+  **Why not fix it once in `resolveTermFiltered` for every occurrence** (sparing
+  selectors/constructors from the locals filter unconditionally, mirroring FIX B's
+  value-bindings-on-both-ends restriction): measured on this tree, that turns a bare occurrence
+  of such a name into an ambiguity. It breaks `jl4/examples/ok/pattern-matching-wildcard-shadow.l4`
+  (a `WHEN active` pattern binder against the same-typed `active` constructor — same `typeKey`,
+  so type-direction cannot discriminate), `jl4/experiments/dogs.l4` and
+  `jl4/experiments/environmental-quality-review-act-7.l4` (locals named after computed
+  selectors): three files broken to fix one. The label-position fix changes exactly one file in
+  the tree — `jl4/experiments/patterns_and_idioms.l4`, red → green — with every other diagnostic
+  byte-identical across all 726 `.l4` files (`l4 check` sweep, before/after).
 
 - **FIX B — proximity before type-grouping (`jl4/examples/ok/section-scoping-forward-ref.l4`).**
   A forward reference to a not-yet-inferred un-annotated `DECIDE` has a wildcard (`InfVar`)

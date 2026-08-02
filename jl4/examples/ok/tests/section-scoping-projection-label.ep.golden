@@ -1,0 +1,62 @@
+-- Regression test for lexical section scoping — FIX A′ (smucclaw/l4-ide#930).
+--
+-- FIX A gives an in-scope lexical LOCAL (a GIVEN parameter, a WHERE/LET
+-- binding, a pattern variable) ABSOLUTE priority over every same-named
+-- binding. At the LABEL of a projection `base's label` that is wrong: `'s`
+-- desugars to an application of the label to the base, so the label is always
+-- a function, and a local that happens to share a field's name is not. The
+-- label resolution therefore spares record selectors and data constructors
+-- (`LocalsSpareSelectors`); type-directed overload resolution then picks the
+-- selector at the label position and the local everywhere else.
+--
+-- Pre-fix, every DECIDE below failed to typecheck with
+--
+--     You are trying to apply
+--       amount (predefined) of type Money
+--     (which is not a function) to 1 argument here.
+--
+-- This shape is not exotic: the corpus house style threads a record as one
+-- GIVEN parameter, and the clitic idiom names that parameter after the record,
+-- so `amount's amount` is what the style produces.
+
+DECLARE Money
+    HAS amount   IS A NUMBER
+        currency IS A STRING
+
+-- 1. The parameter and the field share a name: `amount's amount`.
+GIVEN amount IS A Money
+GIVETH A BOOLEAN
+`is significant` MEANS amount's amount > 1000
+
+-- 2. The collision is on the LABEL only — the base is a differently-named
+--    local, and a same-named local of a DIFFERENT type is in scope.
+GIVEN amount IS A NUMBER
+      m      IS A Money
+GIVETH A BOOLEAN
+`exceeds floor` MEANS m's amount > amount
+
+-- 3. A WHERE binding named after the field it projects.
+GIVEN m IS A Money
+GIVETH A BOOLEAN
+`exceeds default floor` MEANS m's amount > amount
+    WHERE
+        amount MEANS 5
+
+-- 4. The base is named after the record and the label is a different field:
+--    this already worked, and must keep working.
+GIVEN amount IS A Money
+GIVETH A BOOLEAN
+`is sgd` MEANS amount's currency EQUALS "SGD"
+
+-- 5. Locals still win absolutely at a BARE occurrence: inside `shadowed`, the
+--    parameter `amount` is the Money record, not the selector.
+GIVEN amount IS A Money
+GIVETH A STRING
+shadowed MEANS amount's currency
+
+#EVAL `is significant` (Money 2000 "SGD")          -- TRUE
+#EVAL `is significant` (Money 10 "SGD")            -- FALSE
+#EVAL `exceeds floor` 1 (Money 2 "SGD")            -- TRUE
+#EVAL `exceeds default floor` (Money 2 "SGD")      -- FALSE
+#EVAL `is sgd` (Money 1 "SGD")                     -- TRUE
+#EVAL shadowed (Money 1 "USD")                     -- "USD"

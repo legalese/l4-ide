@@ -2713,8 +2713,11 @@ inferExpr' g =
         inferRecordProjection projAnn projE projL = do
           -- Handling this similar to App.
           --
-          -- 1.
-          (rl, pt) <- resolveTerm projL
+          -- 1. The label resolves under 'LocalsSpareSelectors': an in-scope
+          -- local of the same name does not get to shadow the field's selector
+          -- here (smucclaw/l4-ide#930). Everywhere else locals still win
+          -- absolutely — see 'resolveProjectionLabel'.
+          (rl, pt) <- resolveProjectionLabel projL
           t <- instantiate pt
 
           -- 2. - 5.
