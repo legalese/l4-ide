@@ -391,7 +391,7 @@ const MILESTONE_GLOSS = {
 };
 const VERDICT_GLOSS = {
   COMPLETE:
-    "COMPLETE means every declared stage has a receipt, no receipt is BROKEN, every non-PASS receipt carries a reason that appears below, and every gate is signed or explicitly waived. It is completeness of accounting, NOT greenness: legs below report NOT-EXECUTABLE, DEGRADED and NOT-REGENERATED, and each says why.",
+    "COMPLETE means every declared stage has a receipt, no receipt is BROKEN, every non-PASS receipt carries a reason that appears below, and every gate is signed or explicitly waived. It is completeness of accounting, NOT greenness: legs below may report NOT-EXECUTABLE, DEGRADED or NOT-REGENERATED, and each says why.",
   INCOMPLETE:
     "INCOMPLETE means a declared stage has no receipt, or a non-PASS receipt gave no reason. The gaps are listed below.",
   GATE: "GATE means a human gate was not satisfied and the run refused to continue past it.",

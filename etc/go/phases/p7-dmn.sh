@@ -1,26 +1,31 @@
 #!/usr/bin/env bash
 # P7 — the DMN leg.
 #
-# THE STATUS THIS LEG REPORTS AT G1 IS `NOT-EXECUTABLE`, AND THAT IS CORRECT.
+# THE STATUS THIS LEG REPORTS DEPENDS ON WHETHER THE CORPUS CASES FILE EXISTS.
 #
-# R0 ("the execution is the exhibit") makes non-execution a DEFECT, not a
-# caveat, and SPEC.md §6 permits it at G1 *only if the report says so in
-# Blocking terms*. This script is what makes the report say so.
+# Until 2026-08-02 it reported `NOT-EXECUTABLE`, and that was correct then: R0
+# ("the execution is the exhibit") makes non-execution a DEFECT, not a caveat,
+# and SPEC.md §6 permits it at G1 *only if the report says so in Blocking
+# terms*. No cases file existed for the CORPUS DMN — only the 101-line toy's
+# jl4/examples/dmn/reg-cf.cases.json — and writing cases against 80 boxed
+# literal expressions that could not evaluate would have manufactured a green
+# the artifact had not earned.
 #
-# Why it cannot execute, measured: the two engine harnesses
-# (etc/kie-dmn-check/run.sh, etc/camunda-dmn-check/run.sh) both require
-# `--cases CASES.json`, and there is no cases file for the CORPUS DMN in the
-# tree. The only Reg-CF cases file, jl4/examples/dmn/reg-cf.cases.json, belongs
-# to the 101-line toy, which is what CI's 25/25 step runs. Writing cases for a
-# DMN whose 80 boxed literal expressions cannot evaluate would manufacture a
-# green the artifact has not earned; that is Phase 5 BKM work.
+# PR #194 (unstable 4122355a, 2026-08-02) discharged that: fidelity went
+# 95 blocking → 0 and jl4/examples/dmn/regcf-corpus.cases.json landed with 16
+# dated cases whose expected values are L4-evaluated. With that file present,
+# the branch at the bottom of this script executes the emitted DMN on BOTH
+# engine harnesses and the leg's oracle class rises to `execution`.
 
 if [[ "${1:-}" == "--inputs" ]]; then
   printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}" \
     "$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.dmn" \
     "$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.fidelity.txt" \
     "$GO_ROOT/etc/validate-dmn.mjs" \
-    "$GO_ROOT/etc/go/lib/canon-diff.mjs"
+    "$GO_ROOT/etc/go/lib/canon-diff.mjs" \
+    "$GO_ROOT/jl4/examples/dmn/regcf-corpus.cases.json" \
+    "$GO_ROOT/etc/kie-dmn-check/run.sh" \
+    "$GO_ROOT/etc/camunda-dmn-check/run.sh"
   exit 0
 fi
 

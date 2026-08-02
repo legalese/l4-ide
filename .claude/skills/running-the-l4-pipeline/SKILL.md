@@ -87,14 +87,14 @@ A G1 run reports something like:
 p0-preflight: PASS
 p3-check:     DEGRADED
 p6-tests:     PASS
-p7-dmn:       NOT-EXECUTABLE
+p7-dmn:       PASS
 p7-bpmn:      DEGRADED
 p7-tnr:       NOT-REGENERATED
 p7-akn:       UNVERIFIED
 go: VERDICT: g1 COMPLETE
 ```
 
-That is a **successful** run. `COMPLETE` means every declared stage has a receipt, nothing is `BROKEN`, every non-`PASS` receipt carries a reason that appears in the report, and every gate is signed or explicitly waived. It is completeness of accounting, not greenness — which is exactly what SPEC.md §6 asks for when it permits a non-executable DMN at G1 _only if the report says so in Blocking terms_.
+That is a **successful** run. `COMPLETE` means every declared stage has a receipt, nothing is `BROKEN`, every non-`PASS` receipt carries a reason that appears in the report, and every gate is signed or explicitly waived. It is completeness of accounting, not greenness. (Until 2026-08-02 the `p7-dmn` row here read `NOT-EXECUTABLE` — permitted at G1 only because the report said so in Blocking terms, per SPEC.md §6; PR #194's corpus cases file flipped it to `PASS` with oracle class `execution`.)
 
 **Key idioms:**
 
@@ -190,7 +190,7 @@ Mechanical transforms, golden regeneration, formatting, and reading harness outp
 ✘  "Run the G1 pipeline and tell me whether the DMN projection is good."
 ```
 
-The second question has no answer the run can give. The DMN leg reports `NOT-EXECUTABLE` because no cases file exists for the corpus DMN; whether that artifact is _good_ is a judgement about DMN Phase 5, not an output of this run.
+The second question has no answer the run can give. The DMN leg's `PASS` proves the emitted DMN executed on both engines over the committed cases and agreed; whether the artifact is _good_ — whether its 21 lossy findings are acceptable losses — is a judgement, not an output of this run.
 
 ---
 
@@ -247,6 +247,9 @@ The rule is that a reason is written for the person who reads the report a year 
 ```
 
 The first sentence can be checked by someone who disagrees with it. The second cannot be checked by anyone, which means it is not a status — it is a mood.
+
+(The ✔ example was `p7-dmn`'s real reason until PR #194 landed the corpus cases file on
+2026-08-02; the leg now passes. The sentence stays because its checkability is the point.)
 
 ---
 

@@ -216,15 +216,16 @@ unstable now.
 - **G1 — replay run. BUILT 2026-08-02; see [ORCHESTRATOR.md](./ORCHESTRATOR.md) §1 for the
   measured run.** The orchestrator drives the **existing** corpus through every currently-green
   projection and emits conversion report v0. No de novo encoding. Entry condition (PR #177 and
-  PR #180 landed) is satisfied — both merged to `unstable`. DMN may still be non-executable at
-  G1 **only if** the report says so in Blocking terms; it is, and the report does: no cases file
-  exists for the corpus DMN, so neither engine harness can be pointed at it, and the leg reports
-  `NOT-EXECUTABLE` with that as its named blocker.
+  PR #180 landed) is satisfied — both merged to `unstable`. DMN may be non-executable at
+  G1 **only if** the report says so in Blocking terms — which was the leg's state as built.
+  Discharged 2026-08-02: PR #194 landed the corpus cases file, and the leg now reports `PASS`
+  with oracle class `execution` on both engines (ORCHESTRATOR.md §5.4).
 - **G2 — de novo run.** P1–P6 executed from the SEC source by agents; acceptance = the §8
   diff oracle. Entry: fork representation ruled (R4).
 - **G3 — execution parity.** Every P7 leg executes: BKM emission (DMN spec Phase 5, with
   whatever of Phase 4 it needs — the owning spec sequences them) landed and the corpus DMN
-  runs on both engines; the BPMN leg meets its acceptance bar and wires to the emitted DMN
+  runs on both engines (**done 2026-08-02** — PRs #188 + #194, measured in ORCHESTRATOR.md
+  §1); the BPMN leg meets its acceptance bar and wires to the emitted DMN
   (`lexipedia-superset/PROCESS-TRACK.md` §8 — engine execution of the process is a non-goal
   there); wizard deployed; ladders embedded in the entry (the framework-free
   ladder-svg controller from PR #177 suffices — the IDE toggle/flip, E1 Steps 5→6a→7, is not

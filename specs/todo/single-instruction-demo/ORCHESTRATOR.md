@@ -61,33 +61,37 @@ so a skill-only PR previously ran zero jobs.
 
 ## 1. Measured results — one G1 run on this worktree
 
-Run id `<UTC-date>-97b15013-001` (the digest names the corpus), subject `regcf`, HG1 waived, clock pinned to
-`2025-01-31T00:00:00Z`. Every figure below is a `metrics` value on a `stage_end` row of
+Run id `<UTC-date>-97b15013-002` (the digest names the corpus), subject `regcf`, HG1 waived, clock pinned to
+`2025-01-31T00:00:00Z`. Measured twice: first on this branch's own tree, then re-measured
+2026-08-02 after merging `origin/unstable` at `8d84c797` — which carries PR #194, the change that
+made the corpus DMN executable — into this branch. The table shows the re-measurement; exactly one
+row moved (`p7-dmn`, `NOT-EXECUTABLE` → `PASS`, §5.4). Every figure below is a `metrics` value on a `stage_end` row of
 `journal.ndjson`; none was typed. That was not true when this table was first written: the nine
 `ELSE IF` sites lived only in `artifacts/p3-check.txt`, which the journal names by path and sha256
 — and a sha256 is not invertible, so the one bare figure in the table was the one figure nobody
 could get back out of the journal it was said to come from. `p3-check` now records
 `else_if_sites`, `dated_arms` and `min_dated_arms` as metrics.
 
-| stage          | status              | oracle class | why                                                                                                                                                                                                                                               |
-| -------------- | ------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p0-preflight` | PASS                | structural   | CLI enumerations and the module's regulative-rule names match `PINS.json` as sets; every checker in the pin exists; the failing-`#ASSERT` tripwire still exits 0                                                                                  |
-| `p3-check`     | DEGRADED            | —            | both modules typecheck and all 2 matched dated arms carry an `@ref` (floor: 2); nine `ELSE IF` sites remain against P3's BRANCH-over-`ELSE IF` house rule                                                                                         |
-| `p6-tests`     | PASS                | execution    | the corpus's own `#ASSERT` directives all hold, read out of `results[]`                                                                                                                                                                           |
-| `p7-dmn`       | **NOT-EXECUTABLE**  | —            | reproduces the golden and passes interchange; no engine can be pointed at it                                                                                                                                                                      |
-| `p7-dmn-md`    | DEGRADED            | —            | reproduces the golden; lossy by construction, and no engine executes markdown                                                                                                                                                                     |
-| `p7-bpmn`      | DEGRADED            | —            | all three processes reproduce their goldens and pass soundness + interchange; the mandated BPMN→DMN wiring is not built                                                                                                                           |
-| `p7-ladder`    | SKIPPED             | —            | `JL4_LSP_CMD` unset, or `tsx` not installed in the checkout                                                                                                                                                                                       |
-| `p7-lts`       | PASS (INTERIM)      | structural   | `digraph` count equals the regulative-rule count the BPMN discovery call independently reports                                                                                                                                                    |
-| `p7-mcp`       | SKIPPED             | —            | zip built and hashed; no loopback `jl4-service` configured. With one — measured 2026-08-02 against a prebuilt service on `127.0.0.1:18099` — this leg reaches `PASS`/`execution`: 6 corpus tools, matching the 6 functions the deployment reports |
-| `p7-tnr`       | **NOT-REGENERATED** | —            | no `l4` subcommand emits NLG; the goldens come from `cabal test`                                                                                                                                                                                  |
-| `p7-wizard`    | DEGRADED            | —            | the plan is well formed and is not the interview query plan                                                                                                                                                                                       |
-| `p7-akn`       | UNVERIFIED (EXTRA)  | —            | Akoma Ntoso emitted; well-formedness is the only oracle and it cannot license PASS                                                                                                                                                                |
-| `p9-report`    | PASS                | structural   | every section SPEC.md §P9 requires is present                                                                                                                                                                                                     |
-| **milestone**  | **G1 COMPLETE**     |              |                                                                                                                                                                                                                                                   |
+| stage          | status              | oracle class | why                                                                                                                                                                                                                                                                                    |
+| -------------- | ------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `p0-preflight` | PASS                | structural   | CLI enumerations and the module's regulative-rule names match `PINS.json` as sets; every checker in the pin exists; the failing-`#ASSERT` tripwire still exits 0                                                                                                                       |
+| `p3-check`     | DEGRADED            | —            | both modules typecheck and all 2 matched dated arms carry an `@ref` (floor: 2); nine `ELSE IF` sites remain against P3's BRANCH-over-`ELSE IF` house rule                                                                                                                              |
+| `p6-tests`     | PASS                | execution    | the corpus's own `#ASSERT` directives all hold, read out of `results[]`                                                                                                                                                                                                                |
+| `p7-dmn`       | **PASS**            | execution    | executed by both engines over the committed 16-case file: KIE `1072/1072 value(s) as expected, 224/224 service output value(s) as expected`, Camunda `1072/1072 value(s) as expected`; fidelity 0 blocking / 21 lossy / 125 advisory; golden reproduced modulo the D1 canonicalisation |
+| `p7-dmn-md`    | DEGRADED            | —            | reproduces the golden; lossy by construction, and no engine executes markdown                                                                                                                                                                                                          |
+| `p7-bpmn`      | DEGRADED            | —            | all three processes reproduce their goldens and pass soundness + interchange; the mandated BPMN→DMN wiring is not built                                                                                                                                                                |
+| `p7-ladder`    | SKIPPED             | —            | `JL4_LSP_CMD` unset, or `tsx` not installed in the checkout                                                                                                                                                                                                                            |
+| `p7-lts`       | PASS (INTERIM)      | structural   | `digraph` count equals the regulative-rule count the BPMN discovery call independently reports                                                                                                                                                                                         |
+| `p7-mcp`       | SKIPPED             | —            | zip built and hashed; no loopback `jl4-service` configured. With one — measured 2026-08-02 against a prebuilt service on `127.0.0.1:18099` — this leg reaches `PASS`/`execution`: 6 corpus tools, matching the 6 functions the deployment reports                                      |
+| `p7-tnr`       | **NOT-REGENERATED** | —            | no `l4` subcommand emits NLG; the goldens come from `cabal test`                                                                                                                                                                                                                       |
+| `p7-wizard`    | DEGRADED            | —            | the plan is well formed and is not the interview query plan                                                                                                                                                                                                                            |
+| `p7-akn`       | UNVERIFIED (EXTRA)  | —            | Akoma Ntoso emitted; well-formedness is the only oracle and it cannot license PASS                                                                                                                                                                                                     |
+| `p9-report`    | PASS                | structural   | every section SPEC.md §P9 requires is present                                                                                                                                                                                                                                          |
+| **milestone**  | **G1 COMPLETE**     |              |                                                                                                                                                                                                                                                                                        |
 
-Four of the thirteen are `PASS`. `G1 COMPLETE` with the other nine non-green is the intended
-outcome, not a lowered bar — see §3.
+Five of the thirteen are `PASS` — four as first measured, plus `p7-dmn`, which flipped from
+`NOT-EXECUTABLE` when PR #194 landed the corpus cases file (§5.4). `G1 COMPLETE` with the other
+eight non-green is the intended outcome, not a lowered bar — see §3.
 
 ### 1.1 Three defects this build measured, which are findings in their own right
 
@@ -125,8 +129,10 @@ Fixing the golden runner and retracting the two claims is the natural companion 
 this change, because it touches Haskell and this branch does not build.
 
 **D2 — PROJECTIONS.md stated a fidelity heading, a per-code table and two line counts that its own
-artifacts contradicted.** Measured 2026-08-02: the fidelity report holds 95 blocking / 21 lossy /
-54 advisory while §"Fidelity" said 114 / 46 / 18; the per-code table said `D-LITERALEXPR` 89 /
+artifacts contradicted.** Measured 2026-08-02 on the pre-#194 tree — after PR #194 the corpus
+fidelity is 0 / 21 / 125, and the merge of `unstable` into this branch resolved PROJECTIONS.md to
+that state; the figures below are the history of the repair, not current values. As measured then:
+the fidelity report held 95 blocking / 21 lossy / 54 advisory while §"Fidelity" said 114 / 46 / 18; the per-code table said `D-LITERALEXPR` 89 /
 `D-RENAME` 37 against an actual 80 / 11; and `regcf.l4` was given as 992 lines in the opening
 sentence and 1,241 lines in §2, against an actual 1,236 (SPEC.md §5 repeated the 1,241).
 
@@ -292,7 +298,7 @@ keeps the latest few runs **and** every run holding a granted gate.
 | `p0-preflight` | discovery calls vs `PINS.json`, plus checker existence, plus the `l4 run` tripwire                                                                  | pins are **narrow** — four CLI enumerations and the module's rule names, not a hash of `l4 --help`. A tripwire that fires on an unrelated help reflow gets deleted |
 | `p3-check`     | `l4 check` ×2, `ELSE IF` absence, `@ref` per dated arm                                                                                              | the third house rule — isomorphism against the source — is recorded as unverified and carried by HG1, never omitted                                                |
 | `p6-tests`     | `results[]` parsed out of `l4 run --json`, plus a floor on the assertion count                                                                      | the exit code is **not** the oracle; see §5.3                                                                                                                      |
-| `p7-dmn`       | canonicalise-then-diff vs golden + `etc/validate-dmn.mjs`                                                                                           | `NOT-EXECUTABLE`; see §5.4                                                                                                                                         |
+| `p7-dmn`       | canonicalise-then-diff vs golden + `etc/validate-dmn.mjs` + both engine harnesses over the committed cases file                                     | `PASS`/`execution` since 2026-08-02; see §5.4                                                                                                                      |
 | `p7-dmn-md`    | canonicalise-then-diff vs golden                                                                                                                    | `DEGRADED` by construction                                                                                                                                         |
 | `p7-bpmn`      | byte-diff vs goldens + soundness + interchange                                                                                                      | `DEGRADED`: the mandated DMN wiring is unbuilt                                                                                                                     |
 | `p7-ladder`    | regenerate, then `git diff` over the committed figures must be **empty**                                                                            | a non-empty diff means the committed figures were stale, which is a fail and never a pass. The run never commits                                                   |
@@ -344,19 +350,26 @@ says so, with the three steps.
 Patching `l4` itself is the right fix and `CORPUS-TRACK.md` already proposes it. It needs
 `cabal build`, and this orchestrator does not build. Recorded as the top upstream ask.
 
-### 5.4 Why the DMN leg cannot execute, and why no cases file was written
+### 5.4 The DMN leg: `NOT-EXECUTABLE` until 2026-08-02, `PASS`/`execution` after
 
+**As first built,** this leg reported `NOT-EXECUTABLE`, for a reason kept on the record:
 `etc/kie-dmn-check/run.sh` and `etc/camunda-dmn-check/run.sh` both require
-`--cases CASES.json`. There is no cases file for the **corpus** DMN in the tree; the only Reg CF
-cases file, `jl4/examples/dmn/reg-cf.cases.json`, belongs to the 101-line toy, and that is what
-CI's 25/25 step runs.
+`--cases CASES.json`, and no cases file existed for the **corpus** DMN — the only Reg CF
+cases file, `jl4/examples/dmn/reg-cf.cases.json`, belongs to the 101-line toy that
+CI's 25/25 step runs. Writing cases against a DMN whose 80 boxed literal expressions could not
+evaluate would have manufactured a green the artifact had not earned; that was DMN Phase 5 (BKM
+emission) work, and `NOT-EXECUTABLE` with a named blocker was the true status — R0 makes it a
+defect rather than a caveat.
 
-Writing cases against a DMN whose 80 boxed literal expressions cannot evaluate would manufacture a
-green the artifact has not earned. That file is DMN Phase 5 (BKM emission) work, tracked in
-`specs/todo/DMN-PHASE5-BUILD-PLAN.md`. Until then, `NOT-EXECUTABLE` with a named blocker is the
-true status, and R0 makes it a defect rather than a caveat. The phase script already contains the
-engine-harness branch, so the leg's class rises from `differential` to `execution` the day the
-cases file appears.
+**Discharged by PR #194** (merged to `unstable` 2026-08-02 as `4122355a`): Phase 5 BKM emission
+plus the R-A/R-B/R-C rulings took the corpus fidelity from 95 blocking to 0, and
+`jl4/examples/dmn/regcf-corpus.cases.json` landed carrying 16 dated cases whose expected values
+are **L4-evaluated, not hand-typed** — exactly the "earned green" condition the paragraph above
+named. The phase script's engine-harness branch, written in advance for this day, now runs, and
+the leg's class rose from `differential` to `execution`. Measured on run
+`2026-08-02-97b15013-002`: KIE 8.44.0.Final `16 case(s), 0 error(s), 0 warning(s), 1072/1072
+value(s) as expected, 224/224 service output value(s) as expected`; Camunda 8.7.6 (zeebe-dmn)
+`1072/1072 value(s) as expected`.
 
 ---
 
@@ -483,7 +496,7 @@ drifts on its first execution.
 | the de novo path and the §8 diff oracle                                | **R4** is open. Building fork tooling against an unruled representation is building to be rewritten                                                                                                                                                                                 |
 | P8 verification                                                        | **R5** open, gates nothing in G0–G4, and there is zero CLI footing. A leg here would be pure `UNVERIFIED`                                                                                                                                                                           |
 | the corpus-of-law repo and the lexipedia probe                         | **R1**/**R2** open, both HG2                                                                                                                                                                                                                                                        |
-| a `regcf-corpus.cases.json`                                            | see §5.4. It would manufacture a green the artifact has not earned                                                                                                                                                                                                                  |
+| a `regcf-corpus.cases.json`                                            | **discharged 2026-08-02** — PR #194 landed the file (16 dated cases, expected values L4-evaluated), meeting the condition §5.4 named. "Not built _here_" stays true: the orchestrator consumes the committed file and still never writes one                                        |
 | patching `l4` for `--fail-on-assert`                                   | the right fix; needs `cabal build`, which this orchestrator never runs. Top upstream ask, shipped as a workaround with an expiry tripwire                                                                                                                                           |
 | machine-readable fork and external-modification registers              | SPEC.md defines neither format anywhere, and P5's "every entry disposed" (§4, P5) cannot be checked without them. They are P2/P4's deliverables and both stages are blocked on R4; defining them before the ruling would be defining a shape for a representation nobody has chosen |
 | commits or pushes by the orchestrator                                  | matches `build-dmnmd-to-l4.workflow.js`'s `policy: { commit: false, push: false }`                                                                                                                                                                                                  |
@@ -508,7 +521,9 @@ decided:
   "#177 open" at line 135, and `R4-FORK-REPRESENTATION.md` still read "PR #185 (open at this
   writing)". #185 was never mentioned in SPEC.md at all, so the earlier version of this bullet
   claimed a repair with no target.
-- **PROJECTIONS.md** — D2 above: the fidelity heading 114/46/18 → 95/21/54; the §1 element counts
+- **PROJECTIONS.md** — D2 above (superseded in part: PR #194 subsequently moved the fidelity
+  heading again, to 0/21/125, and the `unstable` merge resolved PROJECTIONS.md to that state — the
+  arrows below record what _this branch's_ repair did at the time): the fidelity heading 114/46/18 → 95/21/54; the §1 element counts
   102/91/68/202 → 92/80/37/189; both stale `regcf.l4` line counts → 1,236; the dmnmd figures; and —
   in this change, because the first pass corrected only the cited cells — BOTH per-code tables
   rewritten as the complete emitted set, each column summing to its heading. Also §6: the
