@@ -61,6 +61,11 @@ is the corpus.
 
 ### Fidelity: 0 blocking, 21 lossy, 125 advisory (measured 2026-08-02)
 
+Re-derive every number in this section — the heading AND every row of the table — with
+`node etc/go/lib/fidelity-counts.mjs jl4/examples/dmn/expected/regcf-corpus.fidelity.txt --json`,
+whose `codes` object is exactly the × column below. The table is the whole emitted set: its three
+severity columns sum to the heading, which is the arithmetic that catches a stale row.
+
 | Code                 | ×   | Severity | What it means here                                                                                                             |
 | -------------------- | --- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `D-LITERALEXPR`      | 64  | advisory | not a guarded chain, so a boxed literal expression, not a table — the expression is FEEL and an engine evaluates it              |

@@ -1,0 +1,44 @@
+{
+  "_comment": [
+    "The CLI surface the stage table reads, and nothing else.",
+    "",
+    "Deliberately NOT a hash of `l4 --help`: any unrelated CLI change — a new",
+    "subcommand, a reworded flag, a help reflow — would fire a BROKEN verdict on",
+    "an otherwise fine run, and a tripwire that cries wolf gets deleted. These",
+    "four enumerations and the module's regulative rule names are the only CLI",
+    "facts etc/go/phases/*.sh depend on.",
+    "",
+    "Recovered by probing, not by reading help text: `l4 <cmd> --help` answers",
+    "`Invalid option '--help'` for every subcommand, so a deliberately-bad enum",
+    "value whose error message lists the accepted set is the only discovery",
+    "route that exists. See etc/go/lib/discover.mjs.",
+    "",
+    "Measured 2026-08-02 against the prebuilt binary at",
+    "l4wt/corpus-style/dist-newstyle/.../x/l4/build/l4/l4, on",
+    "jl4/examples/legal/regcf/regcf.l4.",
+    "",
+    "NOTE on `akn`: render --format accepts akn (Akoma Ntoso 3.0) and the",
+    "command's own description does not mention it. The p7-akn leg depends on a",
+    "surface no help text advertises, which is why it is pinned here."
+  ],
+  "measured_on": "2026-08-02",
+  "measured_against": "jl4/examples/legal/regcf/regcf.l4",
+  "enums": {
+    "export_to": ["dmn", "dmn-md", "bpmn"],
+    "export_flavor": ["camunda", "kie"],
+    "export_fail_on": ["none", "blocking", "lossy", "advisory"],
+    "render_format": ["json", "plan", "text", "html", "akn"]
+  },
+  "regulative_rules": [
+    "advertising restriction",
+    "ongoing reporting obligation",
+    "resale restriction"
+  ],
+  "checkers_that_must_exist": [
+    "etc/validate-dmn.mjs",
+    "etc/validate-bpmn.mjs",
+    "etc/check-bpmn-soundness.mjs",
+    "etc/check-bpmn-kie.sh",
+    "etc/check-bpmn-kie-baseline.mjs"
+  ]
+}
