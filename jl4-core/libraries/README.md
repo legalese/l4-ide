@@ -109,7 +109,7 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 - **`YMD` function** (in `daydate.l4`) - **Recommended** way to construct DATE values from components
 
   - `YMD 1990 3 15` - from year, month, day (ISO 8601 order)
-  - Delegates to `Date day month year`, so behaviour is identical; only the argument order differs. Prefer it because big-endian order is harder to transpose. Note it does **not** validate: a transposed `YMD 1990 15 3` silently overflows month 15 into 1991-03-03 rather than erroring.
+  - _Builds_ through `Date day month year`, but it does **not** behave identically: it round-trips the components back out of the candidate date and REFUSES anything that did not survive. Prefer it on two grounds — big-endian order is harder to transpose, and a transposition that happens anyway is caught. **Corrected 2026-08-02**: this line used to say `YMD` "does **not** validate: a transposed `YMD 1990 15 3` silently overflows month 15 into 1991-03-03". That is `Date`'s behaviour, not `YMD`'s, and it contradicted the two other paragraphs in this same file (above, and under _What `YMD` did and did not change_) that say `YMD` bounds-checks. Measured with the built `l4` binary: `#EVAL YMD 1990 15 3` → `` `YMD refused an out-of-range month or day` ``, while `#EVAL Date 3 15 1990` → `DATE OF 3, 3, 1991`.
 
 - **`Date` function** (in `daydate.l4`) - supported little-endian constructor, used throughout existing corpora
 
