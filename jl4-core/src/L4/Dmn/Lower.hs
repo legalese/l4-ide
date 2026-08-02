@@ -820,8 +820,8 @@ constantOf ctx = \case
   e | Just d <- foldDateLiteral (oracleOf ctx) e -> Just (VDate d)
   _                      -> Nothing
 
--- | The 'Day' a @Date d m y@ application denotes, when every component is an
--- integer literal and the three name a real calendar day.
+-- | The 'Day' a @Date d m y@ or @YMD y m d@ application denotes, when every
+-- component is an integer literal and the three name a real calendar day.
 --
 -- __A refusal, not a repair.__ @Date@ is LENIENT: @daydate.l4@:52-56 computes
 -- @DATE_FROM_SERIAL (jan1serial + monthDays + day - 1)@, so @Date 32 1 2024@
@@ -829,9 +829,28 @@ constantOf ctx = \case
 -- artifact that the source does not obviously say, so an out-of-range component
 -- falls through to the existing path instead, which is honest.
 --
--- @YMD@ (@daydate.l4@:83-118) is deliberately NOT folded: its body is an
--- @IF ... THEN candidate ELSE \<ASSUME bottom\>@, so a naive structural match
--- would silently drop the refusal arm.
+-- __@YMD@ folds too, and the two refusals coincide.__ An earlier version of
+-- this comment said @YMD@ was "deliberately NOT folded" because its body is an
+-- @IF ... THEN candidate ELSE \<ASSUME bottom\>@ and a structural match would
+-- silently drop the refusal arm. That reasoning does not survive reading the
+-- library: @YMD@'s refusal arm (@daydate.l4@:79-118) fires exactly when the
+-- component round-trip through the lenient @Date@ fails, i.e. exactly when
+-- @(y, m, d)@ is not a real calendar day — which is exactly when
+-- 'fromGregorianValid' returns 'Nothing' and this fold already declines. The
+-- refusal and the fold have the SAME domain, so folding cannot drop it:
+-- @YMD 2023 2 29@ and @YMD 2026 28 7@ still fall through to the raw-L4 path,
+-- because there is no day for either to denote.
+--
+-- Folding it is what the library asks for — @daydate.l4@:79-100 documents
+-- @YMD@ as the recommended constructor for new code, on ISO-order grounds —
+-- and refusing it meant that a module written the recommended way emitted raw
+-- L4 that no engine can parse where the same date spelled @Date d m y@ emitted
+-- @date("YYYY-MM-DD")@.
+--
+-- __Note the argument order.__ @Date@ is little-endian (@d m y@) and @YMD@ is
+-- big-endian (@y m d@); the two arms below bind their components in opposite
+-- order on purpose, and a transposition here would be silent — hence the
+-- paired assertion in "DmnExport"'s @YMD 2024 1 2@ / @Date 2 1 2024@ test.
 --
 -- Prior art for the same predicate, on the NLG side:
 -- "L4.Export.Document"'s @dateFromArgs@ (:1307-1315), reached from :1229.
@@ -847,12 +866,26 @@ foldDateLiteral oracle e = case e of
     , Just y <- intLitOf yE
     , d >= 1, d <= 31, m >= 1, m <= 12 ->
         fromGregorianValid y (fromInteger m) (fromInteger d)
+  -- ISO order, and there is no builtin `Unique` to match on: `YMD` is a library
+  -- DECIDE (@daydate.l4@), not a `TypeCheck.Environment` builtin, so the type
+  -- check below is carrying the whole weight of "this really is a date".
+  App _ r [yE, mE, dE]
+    | ymdHead r
+    , oracleType oracle e == DmnDate
+    , Just y <- intLitOf yE
+    , Just m <- intLitOf mE
+    , Just d <- intLitOf dE
+    , d >= 1, d <= 31, m >= 1, m <= 12 ->
+        fromGregorianValid y (fromInteger m) (fromInteger d)
   _ -> Nothing
  where
   dateHead r =
     getUnique r == TC.dateFromDMYUnique
       || nameOf r `elem` ["Date", "Days to date"]
       || unqualifiedNameToText (getActual r) `elem` ["Date", "Days to date"]
+  ymdHead r =
+    nameOf r `elem` ["YMD", "Year month day"]
+      || unqualifiedNameToText (getActual r) `elem` ["YMD", "Year month day"]
 
 intLitOf :: Expr Resolved -> Maybe Integer
 intLitOf = \case
@@ -1371,9 +1404,10 @@ datedChain ctx preds rows = case rows.grOtherwise of
 
   badDateReason e =
     "has date `" <> oneLine (prettyLayout e)
-      <> "`, which is not a foldable date constant (only `Date d m y` over three \
-         \integer literals, or a nullary decision whose body is one, is folded; \
-         \`YMD` and computed dates are not)"
+      <> "`, which is not a foldable date constant (only `Date d m y` or \
+         \`YMD y m d` over three integer literals, or a nullary decision whose \
+         \body is one, is folded; computed dates, and components that do not \
+         \name a real calendar day, are not)"
 
   -- One hop through the module's named date constants, then the literal fold.
   constantDay e = case e of
@@ -1840,7 +1874,8 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- this backend DOES emit (@not@, @modulo@, @max@, @min@, @concatenate@) are
     -- constructed here by name and never routed through this case.
     -- ...with one exception, and it is a LITERAL rather than a call: `Date d m
-    -- y` over three integer literals denotes a day, and FEEL can spell a day.
+    -- y` (and `YMD y m d`) over three integer literals denotes a day, and FEEL
+    -- can spell a day.
     -- `date("YYYY-MM-DD")` is DMN 1.3 grammar rule 21's `date time literal` and
     -- rule 33's `simple literal`, so the fragment claim is SFeel, not FullFeel.
     --
