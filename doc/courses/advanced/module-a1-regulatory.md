@@ -66,13 +66,13 @@ First, encode the definitions and types:
 § `Structural Layer - Definitions`
 
 -- Article 2(10): "misconduct" includes mismanagement or misapplication
-DECLARE MisconductType IS ONE OF
+DECLARE `Misconduct Type` IS ONE OF
     Mismanagement
     Misapplication
-    OtherMisconduct HAS description IS A STRING
+    `other misconduct` HAS `the description` IS A STRING
 
 -- Schedule 1: Charitable purposes (13 statutory heads)
-DECLARE CharitablePurpose IS ONE OF
+DECLARE `Charitable Purpose` IS ONE OF
     `prevention or relief of poverty`
     `advancement of education`
     `advancement of religion`
@@ -85,60 +85,60 @@ DECLARE CharitablePurpose IS ONE OF
     `relief of those in need`
     `advancement of animal welfare`
     `purposes analogous to charitable purposes`
-    `other charitable purpose` HAS description IS A STRING
+    `other charitable purpose` HAS `the description` IS A STRING
 
 -- Article 2: Governor definition
 DECLARE Governor HAS
-    name IS A STRING
-    dateOfBirth IS A DATE
-    address IS A STRING
-    isBankrupt IS A BOOLEAN
-    convictions IS A LIST OF Conviction
+    `the name` IS A STRING
+    `the date of birth` IS A DATE
+    `the address` IS A STRING
+    `is bankrupt` IS A BOOLEAN
+    `the convictions` IS A LIST OF Conviction
 
 -- Core financial information (Regulation 1, Core Info Regs 2018)
-DECLARE CoreFinancialInfo HAS
-    income IS A Money
-    expenditure IS A Money
-    openingAssets IS A Money
-    closingAssets IS A Money
-    otherAssets IS A LIST OF Asset
+DECLARE `Core Financial Information` HAS
+    `the income` IS A Money
+    `the expenditure` IS A Money
+    `the opening assets` IS A Money
+    `the closing assets` IS A Money
+    `the other assets` IS A LIST OF Asset
 
 -- Register sections
-DECLARE RegisterSection IS ONE OF
-    GeneralSection
-    RestrictedSection
+DECLARE `Register Section` IS ONE OF
+    `the general section`
+    `the restricted section`
 
 -- Charity status
-DECLARE CharityStatus IS ONE OF
+DECLARE `Charity Status` IS ONE OF
     Pending
     Active
     Suspended HAS
-        reason IS A STRING
-        date IS A DATE
+        `the reason` IS A STRING
+        `the date` IS A DATE
     Deregistered HAS
-        reason IS A STRING
-        date IS A DATE
-        isRetrospective IS A BOOLEAN
+        `the reason` IS A STRING
+        `the date` IS A DATE
+        `is retrospective` IS A BOOLEAN
 
 -- Main charity record
-DECLARE RegisteredCharity HAS
-    name IS A STRING
-    registrationNumber IS A STRING
-    section IS A RegisterSection
-    status IS A CharityStatus
-    constitution IS A STRING
-    purposes IS A LIST OF CharitablePurpose
-    publicBenefitStatement IS A STRING
-    governors IS A LIST OF Governor
-    financials IS A CoreFinancialInfo
-    registrationDate IS A DATE
+DECLARE `Registered Charity` HAS
+    `the name` IS A STRING
+    `the registration number` IS A STRING
+    `the register section` IS A `Register Section`
+    `the status` IS A `Charity Status`
+    `the constitution` IS A STRING
+    `the purposes` IS A LIST OF `Charitable Purpose`
+    `the public benefit statement` IS A STRING
+    `the governors` IS A LIST OF Governor
+    `the financials` IS A `Core Financial Information`
+    `the registration date` IS A DATE
 ```
 
 ### Key Principle: Glossary-First
 
 Notice how we encode the statutory glossary (Article 2) as types. This:
 
-1. **Prevents ambiguity** - `MisconductType` has exactly three variants
+1. **Prevents ambiguity** - `Misconduct Type` has exactly three variants
 2. **Enables validation** - Can only use defined purposes
 3. **Documents the source** - Comments link to legislation
 
@@ -210,10 +210,10 @@ you do not need mixed-actor event driving.
 
 -- Actors in the regulatory system
 DECLARE Actor IS ONE OF
-    CharityActor HAS charity IS A RegisteredCharity
-    GovernorActor HAS governor IS A Governor
-    CommissionerActor
-    ApplicantActor HAS applicant IS A Applicant
+    `the charity` HAS `the charity record` IS A `Registered Charity`
+    `the governor` HAS `the governor record` IS A Governor
+    `the Commissioner`
+    `the applicant` HAS `the applicant record` IS A Applicant
 
 -- Actions that can be performed
 DECLARE Action IS ONE OF
@@ -221,14 +221,14 @@ DECLARE Action IS ONE OF
     `file annual return`
     `report change of particulars`
     `report reportable matter` HAS
-        matter IS A ReportableMatter
+        `the matter` IS A `Reportable Matter`
     -- Commissioner powers
     `demand information`
     `issue Required Steps Notice`
     `suspend governor` HAS
-        reason IS A STRING
+        `the reason` IS A STRING
     `deregister charity` HAS
-        reason IS A STRING
+        `the reason` IS A STRING
     -- Governor obligations
     `act in best interests`
     `report conviction`
@@ -245,12 +245,12 @@ Each statutory rule becomes a function:
 -- Article 13(7)-(10) + Timing Order 2019
 -- "A registered charity must file an annual return within 2 months of year end"
 
-GIVEN charity IS A RegisteredCharity
+GIVEN charity IS A `Registered Charity`
 GIVETH A DEONTIC Actor Action
 `annual return obligation` MEANS
-    IF charity's status EQUALS Active
+    IF charity's `the status` EQUALS Active
     THEN
-        PARTY CharityActor charity
+        PARTY `the charity` charity
         MUST `file annual return`
         WITHIN 60  -- 2 months ≈ 60 days
         HENCE FULFILLED
@@ -260,10 +260,10 @@ GIVETH A DEONTIC Actor Action
 -- B-RSN-01: Commissioner's Power to Issue Notice
 -- Article 27(1)-(4)
 
-GIVEN charity IS A RegisteredCharity
+GIVEN charity IS A `Registered Charity`
 GIVETH A DEONTIC Actor Action
 `Commissioner may issue notice` MEANS
-    PARTY CommissionerActor
+    PARTY `the Commissioner`
     MAY `issue Required Steps Notice`
     HENCE `charity must comply with notice` charity
 ```
@@ -289,48 +289,48 @@ Track what happens when actions occur:
 § `Event Layer - State Transitions`
 
 -- Events that change the register
-DECLARE RegisterEvent IS ONE OF
-    CharityRegistered HAS
-        charity IS A RegisteredCharity
-        date IS A DATE
-    CharityMovedToRestricted HAS
-        charity IS A RegisteredCharity
-        date IS A DATE
-    CharityDeregistered HAS
-        charity IS A RegisteredCharity
-        reason IS A STRING
-        date IS A DATE
-        isRetrospective IS A BOOLEAN
-    AnnualReturnFiled HAS
-        charity IS A RegisteredCharity
-        year IS A NUMBER
-        wasLate IS A BOOLEAN
-    RequiredStepsNoticeIssued HAS
-        charity IS A RegisteredCharity
-        noticeId IS A STRING
-        deadline IS A DATE
-    GovernorSuspended HAS
-        governor IS A Governor
-        charity IS A RegisteredCharity
-        reason IS A STRING
-        period IS A NUMBER
+DECLARE `Register Event` IS ONE OF
+    `charity registered` HAS
+        `the charity record` IS A `Registered Charity`
+        `the date` IS A DATE
+    `charity moved to restricted` HAS
+        `the charity record` IS A `Registered Charity`
+        `the date` IS A DATE
+    `charity deregistered` HAS
+        `the charity record` IS A `Registered Charity`
+        `the reason` IS A STRING
+        `the date` IS A DATE
+        `is retrospective` IS A BOOLEAN
+    `annual return filed` HAS
+        `the charity record` IS A `Registered Charity`
+        `the year` IS A NUMBER
+        `was late` IS A BOOLEAN
+    `Required Steps Notice issued` HAS
+        `the charity record` IS A `Registered Charity`
+        `the notice id` IS A STRING
+        `the deadline` IS A DATE
+    `governor suspended` HAS
+        `the governor record` IS A Governor
+        `the charity record` IS A `Registered Charity`
+        `the reason` IS A STRING
+        `the period` IS A NUMBER
 
 -- Effect of events on register
-GIVEN event IS A RegisterEvent
+GIVEN event IS A `Register Event`
 GIVETH A STRING  -- Describes the effect
 `event effect` MEANS
     CONSIDER event
-    WHEN CharityRegistered c d THEN
+    WHEN `charity registered` c d THEN
         "New active entry created in register"
-    WHEN CharityDeregistered c r d retro THEN
+    WHEN `charity deregistered` c r d retro THEN
         IF retro
         THEN "Entry moved to historic; registration void from earlier date"
         ELSE "Entry moved to historic"
-    WHEN AnnualReturnFiled c y late THEN
+    WHEN `annual return filed` c y late THEN
         IF late
         THEN "Annual return logged with late flag"
         ELSE "Annual return logged"
-    WHEN RequiredStepsNoticeIssued c nid deadline THEN
+    WHEN `Required Steps Notice issued` c nid deadline THEN
         "Notice reference stored under Art 8(3)(k)"
     OTHERWISE "Register updated"
 ```
@@ -347,7 +347,7 @@ Legislation often cross-references between sections. Model these explicitly:
 -- - Article 7 (public benefit)
 -- - Regulations (core financial info)
 
-GIVEN charity IS A RegisteredCharity
+GIVEN charity IS A `Registered Charity`
 GIVETH A BOOLEAN
 DECIDE `meets charity test` IF
     `has charitable purposes` charity              -- Schedule 1
@@ -356,7 +356,7 @@ DECIDE `meets charity test` IF
     AND `has complete financial info` charity      -- Core Info Regs
 
 -- Article 7: Public benefit factors
-GIVEN charity IS A RegisteredCharity
+GIVEN charity IS A `Registered Charity`
 GIVETH A BOOLEAN
 DECIDE `provides public benefit` IF
     `has identifiable benefit` charity             -- Art 7(2)(a)
@@ -375,18 +375,18 @@ Legislation changes over time. Track versions:
 -- R&O 27/2025 added "advancement of animal welfare"
 
 -- Model with effective dates:
-DECLARE PurposeWithDate HAS
-    purpose IS A CharitablePurpose
-    effectiveFrom IS A DATE
+DECLARE `Dated Purpose` HAS
+    `the purpose` IS A `Charitable Purpose`
+    `effective from` IS A DATE
 
 -- Check if purpose was valid at a given date
-GIVEN purpose IS A CharitablePurpose
-      asOfDate IS A DATE
+GIVEN purpose IS A `Charitable Purpose`
+      `the reference date` IS A DATE
 GIVETH A BOOLEAN
 DECIDE `purpose valid at date` IF
     -- Animal welfare only valid from 2025
     IF purpose EQUALS `advancement of animal welfare`
-    THEN asOfDate >= Date 1 1 2025
+    THEN `the reference date` >= Date 1 1 2025
     ELSE TRUE  -- Other purposes valid from 2014
 ```
 
@@ -406,26 +406,26 @@ Encode this statutory requirement:
 
 ```l4
 -- Reportable matters under Article 19(1)
-DECLARE ReportableMatter IS ONE OF
+DECLARE `Reportable Matter` IS ONE OF
     Bankruptcy HAS
-        date IS A DATE
-    DirectorDisqualification HAS
-        date IS A DATE
-        jurisdiction IS A STRING
-    DishonestConviction HAS
-        description IS A STRING
-        date IS A DATE
+        `the date` IS A DATE
+    `director disqualification` HAS
+        `the date` IS A DATE
+        `the jurisdiction` IS A STRING
+    `dishonest conviction` HAS
+        `the description` IS A STRING
+        `the date` IS A DATE
 
 -- B-GOV-02: Governor reporting obligation
 GIVEN governor IS A Governor
-      matter IS A ReportableMatter
+      matter IS A `Reportable Matter`
 GIVETH A DEONTIC Actor Action
 `governor reporting obligation` MEANS
-    PARTY GovernorActor governor
+    PARTY `the governor` governor
     MUST `report reportable matter` matter
     WITHIN 14  -- "as soon as practicable" interpreted as 14 days
     HENCE FULFILLED
-    LEST `commissioner may suspend` governor
+    LEST `Commissioner may suspend` governor
 ```
 
 </details>

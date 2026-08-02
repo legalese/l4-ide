@@ -252,15 +252,33 @@ See [datetime.md](datetime.md) for full documentation.
 
 ### currency
 
-ISO 4217 currency handling. Uses integer minor units (cents) to avoid floating-point issues. Key functions: `Money minorUnits code`, `major to minor units`, `add money`, `multiply money`. Supports USD, EUR, GBP, JPY, SGD, and others.
+ISO 4217 currency handling. Uses integer minor units (cents) to avoid floating-point issues. Key functions: `Money minorUnits code`, `major to minor units`, `add money`, `multiply money`, and the comparison suite (`money equal`, `money greater than`, `money less than`, `money at least`, `money at most`). Supports USD, EUR, GBP, JPY, SGD, and others.
 
 **Status:** Prototype. API may change. See [currency.md](currency.md).
 
 ### legal-persons
 
-Legal entity types, identity documents, and capacity checks. Key functions: `age in years`, `is adult birthDate jurisdictionCode`, `can enter contract`, `is beneficial owner`. Includes corporate entity types and jurisdiction-aware majority age.
+Legal entity types, identity documents, and capacity checks. Key functions: `age in years`, `is adult birthDate jurisdictionCode`, `can enter contract`, `is beneficial owner`. Includes corporate entity types and jurisdiction-aware majority age. Import with `` IMPORT `legal-persons` `` (backticks required).
 
 **Status:** Prototype. API may change. See [legal-persons.md](legal-persons.md).
+
+### jurisdiction
+
+ISO 3166 country and subdivision codes: alpha-2/alpha-3/numeric constants for 20 major countries, US state / Canadian province / UK constituent-country codes, format validators (`is valid ISO 3166-1 alpha-2`, `is valid ISO 3166-1 alpha-3`, `is valid ISO 3166-2`), name lookups, and alpha-2 ↔ alpha-3 conversions returning `EITHER STRING STRING`.
+
+**Status:** Prototype. API may change. See [jurisdiction.md](jurisdiction.md).
+
+### holdings
+
+Debt and equity ownership for cap tables: security/debt type codes, `ownership percentage`, `liquidation preference`, `preferred payout`, `vested shares`, `shares from convertible`, `shares from SAFE`, `accrued interest`, `fully diluted shares`, `post-money valuation`, `pre-money valuation`, and temporal helpers (`is active at`, `has matured`).
+
+**Status:** Prototype. API may change. See [holdings.md](holdings.md).
+
+### excel-date
+
+Excel-compatible date math: serial conversion in the 1900 (with leap-bug handling) and 1904 systems, `ExcelDays`, `DATEDIF`, `ExcelDays360`, `ExcelYearFrac`, `ExcelEDate`/`ExcelEOMonth`, and `ExcelWorkday`/`ExcelNetworkDays`. Import with `` IMPORT `excel-date` `` (backticks required).
+
+See [excel-date.md](excel-date.md).
 
 ---
 

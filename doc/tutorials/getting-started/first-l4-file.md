@@ -132,6 +132,8 @@ cabal run l4 -- run eligibility.l4
 
 This validates the file and reports any errors.
 
+> **Getting the `l4` CLI:** it is built from this repository with `cabal build jl4:l4` (see the repo [README](../../../README.md) for toolchain setup). For installation details and the full command set, see [Using the l4 CLI](l4-cli.md).
+
 ### Option C: REPL
 
 ```bash
@@ -246,5 +248,5 @@ DECIDE `is eligible` IF ...
 ## Next Steps
 
 - [Encoding Legislation](encoding-legislation.md) - Turn legal text into L4
-- [Common Patterns](common-patterns.md) - Frequently used L4 patterns
+- [Common Patterns](../../reference/patterns/common-patterns.md) - Frequently used L4 patterns
 - [Foundation Course Module 1](../../courses/foundation/module-1-first-rule.md) - Learn more about legal rules

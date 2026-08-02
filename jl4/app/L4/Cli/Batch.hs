@@ -42,6 +42,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
+import Data.Char (isAlpha, isAlphaNum)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
@@ -558,7 +559,7 @@ generateBatchWrapper funName params inputJson
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
         , ""
-        , "#EVAL " <> funName
+        , "#EVAL " <> quoteIdent funName
         ]
   | otherwise =
       Text.unlines
@@ -582,7 +583,7 @@ generateInputRecord params = Text.unlines $
     formatField (idx, (name, mty)) =
       let fieldIndent = if idx == 0 then "  " else ", "
           tyText      = maybe "A NUMBER" prettyLayout mty
-      in fieldIndent <> name <> " IS " <> tyText
+      in fieldIndent <> quoteIdent name <> " IS " <> tyText
 
 generateDecoder :: Text
 generateDecoder = Text.unlines
@@ -615,8 +616,20 @@ generateEvalDirective funName params = Text.unlines
   , "    WHEN LEFT error THEN NOTHING"
   ]
   where
-    functionCall = funName <> " " <> Text.unwords (map mkArgAccess params)
-    mkArgAccess (name, _) = "(args's " <> name <> ")"
+    functionCall = quoteIdent funName <> " " <> Text.unwords (map mkArgAccess params)
+    mkArgAccess (name, _) = "(args's " <> quoteIdent name <> ")"
+
+-- | Quote an identifier in backticks when it isn't a plain identifier
+-- (e.g. exported names and parameters written in natural language with
+-- spaces), so the generated wrapper parses.
+quoteIdent :: Text -> Text
+quoteIdent name
+  | isPlain   = name
+  | otherwise = "`" <> name <> "`"
+  where
+    isPlain = case Text.uncons name of
+      Just (c, _) -> isAlpha c && Text.all (\x -> isAlphaNum x || x == '_') name
+      Nothing     -> False
 
 extractParamsFromExport :: ExportedFunction -> [(Text, Maybe (Type' Resolved))]
 extractParamsFromExport ef =

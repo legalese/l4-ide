@@ -79,26 +79,26 @@ Keywords are reserved words that form the structure of L4 programs.
 
 For expressing legal obligations, permissions, and prohibitions.
 
-| Keyword       | Purpose                               | Reference                          |
-| ------------- | ------------------------------------- | ---------------------------------- |
-| **PARTY**     | Declares a legal party                | [PARTY](regulative/PARTY.md)       |
-| **MUST**      | Obligation (deontic necessity)        | [MUST](regulative/MUST.md)         |
-| **MAY**       | Permission (deontic possibility)      | [MAY](regulative/MAY.md)           |
-| **SHANT**     | Prohibition                           | [SHANT](regulative/SHANT.md)       |
-| **DO**        | Optionality (deontic possibility)     | [REGULATIVE](regulative/README.md) |
-| **DOES**      | Action verb in directive              | [REGULATIVE](regulative/README.md) |
-| **EXACTLY**   | Exact value matching on action        | [REGULATIVE](regulative/README.md) |
-| **WITHIN**    | Temporal deadline (relative)          | [REGULATIVE](regulative/README.md) |
-| **HENCE**     | Consequence on fulfillment            | [REGULATIVE](regulative/README.md) |
-| **LEST**      | Consequence on breach                 | [REGULATIVE](regulative/README.md) |
-| **BREACH**    | Terminal violation state              | [REGULATIVE](regulative/README.md) |
-| **FULFILLED** | Terminal success state                | [REGULATIVE](regulative/README.md) |
-| **BECAUSE**   | Justification or reason for breach    | [BECAUSE](regulative/BECAUSE.md)   |
-| **PROVIDED**  | Guard condition on action             | [REGULATIVE](regulative/README.md) |
-| **AT**        | Temporal specification                | [REGULATIVE](regulative/README.md) |
-| **RAND**      | Parallel AND of obligations           | [REGULATIVE](regulative/README.md) |
-| **ROR**       | Parallel OR of obligations            | [REGULATIVE](regulative/README.md) |
-| **BEFORE**    | Temporal deadline (absolute, planned) | [REGULATIVE](regulative/README.md) |
+| Keyword       | Purpose                            | Reference                          |
+| ------------- | ---------------------------------- | ---------------------------------- |
+| **PARTY**     | Declares a legal party             | [PARTY](regulative/PARTY.md)       |
+| **MUST**      | Obligation (deontic necessity)     | [MUST](regulative/MUST.md)         |
+| **MAY**       | Permission (deontic possibility)   | [MAY](regulative/MAY.md)           |
+| **SHANT**     | Prohibition                        | [SHANT](regulative/SHANT.md)       |
+| **MUST NOT**  | Prohibition (synonym for SHANT)    | [SHANT](regulative/SHANT.md)       |
+| **DO**        | Optionality (deontic possibility)  | [REGULATIVE](regulative/README.md) |
+| **DOES**      | Action verb in directive           | [REGULATIVE](regulative/README.md) |
+| **EXACTLY**   | Exact value matching on action     | [REGULATIVE](regulative/README.md) |
+| **WITHIN**    | Temporal deadline (relative)       | [REGULATIVE](regulative/README.md) |
+| **HENCE**     | Consequence on fulfillment         | [REGULATIVE](regulative/README.md) |
+| **LEST**      | Consequence on breach              | [REGULATIVE](regulative/README.md) |
+| **BREACH**    | Terminal violation state           | [REGULATIVE](regulative/README.md) |
+| **FULFILLED** | Terminal success state             | [REGULATIVE](regulative/README.md) |
+| **BECAUSE**   | Justification or reason for breach | [BECAUSE](regulative/BECAUSE.md)   |
+| **PROVIDED**  | Guard condition on action          | [REGULATIVE](regulative/README.md) |
+| **AT**        | Temporal specification             | [REGULATIVE](regulative/README.md) |
+| **RAND**      | Parallel AND of obligations        | [REGULATIVE](regulative/README.md) |
+| **ROR**       | Parallel OR of obligations         | [REGULATIVE](regulative/README.md) |
 
 ### Arithmetic Keywords
 
@@ -149,10 +149,13 @@ For complete documentation, see **[Types Reference](types/README.md)**.
 
 ### Special Types
 
-| Type         | Description       |
-| ------------ | ----------------- |
-| **TYPE**     | The kind of types |
-| **FUNCTION** | Function types    |
+| Type          | Description                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| **TYPE**      | The kind of types                                                                                |
+| **FUNCTION**  | Function types                                                                                   |
+| **DEONTIC**   | Regulative rule type `DEONTIC party action` — see [DEONTIC](regulative/DEONTIC.md)               |
+| **PROVISION** | Deprecated alias for DEONTIC                                                                     |
+| **EVENT**     | Event type `EVENT party action` consumed by regulative traces — see [EVENT](regulative/EVENT.md) |
 
 ---
 
@@ -326,14 +329,15 @@ Compiler directives for testing and evaluation.
 
 Metadata annotations for documentation and generation.
 
-| Annotation | Purpose                          |
-| ---------- | -------------------------------- |
-| `@desc`    | Human-readable description       |
-| `@nlg`     | Natural language generation hint |
-| `@ref`     | Cross-reference to legal source  |
-| `@ref-src` | Source reference                 |
-| `@ref-map` | Reference mapping                |
-| `@export`  | Mark for export                  |
+| Annotation        | Purpose                                                       |
+| ----------------- | ------------------------------------------------------------- |
+| `@desc`           | Human-readable description                                    |
+| `@nlg`            | Natural language generation hint                              |
+| `@ref`            | Cross-reference to legal source                               |
+| `@ref-src`        | Source reference                                              |
+| `@ref-map`        | Reference mapping                                             |
+| `@export`         | Mark a function for export/deployment                         |
+| `@export default` | Mark the default exported function (entry point of a service) |
 
 ---
 
@@ -355,7 +359,23 @@ Metadata annotations for documentation and generation.
 
 ---
 
-## Concepts
+## Concepts & Terms
+
+Conceptual vocabulary used throughout the L4 documentation.
+
+| Term                    | Meaning                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Regulative rule**     | A rule that regulates behaviour: it says who MUST, MAY, or SHANT do what, by when, and with what consequences. Expressed with PARTY/MUST/MAY/SHANT and typed as [DEONTIC](regulative/DEONTIC.md).             |
+| **Constitutive rule**   | A rule that defines or computes something (definitions, classifications, calculations) rather than regulating behaviour. Expressed with DECIDE/MEANS.                                                         |
+| **Deontic modality**    | The mode of a regulative rule: obligation (MUST), permission (MAY), or prohibition (SHANT/MUST NOT).                                                                                                          |
+| **Defeasibility**       | The property that a general rule can be overridden by exceptions ("unless...", "notwithstanding..."). In L4 this is modeled explicitly, e.g. with UNLESS or guarded branches.                                 |
+| **Mixfix**              | A function definition style in which parameters are interleaved with the words of the function name (e.g. ``borrower `pays` lender``), letting expressions read like natural language.                        |
+| **Isomorphism**         | The design goal that L4 code mirrors the structure of the legal source text (legal text ↔ code), so each clause of the statute or contract maps to an identifiable piece of code, and vice versa.            |
+| **Residual obligation** | What remains of a contract after some events have been processed: the not-yet-discharged obligations that still bind the parties (the DEONTIC value returned by EVALTRACE / `#TRACE`).                        |
+| **Reparation**          | A secondary obligation that arises when a primary obligation is breached (e.g. a penalty payment), expressed with a LEST clause that contains a further regulative rule instead of a bare BREACH.             |
+| **Exhaustiveness**      | Whether a CONSIDER pattern match covers all constructors of the scrutinee's type. The typechecker warns on missing and redundant branches — see [CONSIDER](control-flow/CONSIDER.md#exhaustiveness-checking). |
+
+### Actors and Actions
 
 Key concepts in L4 legal modeling, alphabetically ordered.
 

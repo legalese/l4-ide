@@ -382,6 +382,10 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+-- | Typechecks cleanly, then THROWS when its @#EVAL@ is evaluated.
+evalCrashFixture :: FilePath
+evalCrashFixture = fixtureDir </> "eval-crash.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -711,6 +715,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , evalCrashFixture
        , breachTraceFixture, breachInputsFixture
        , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
        , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
@@ -784,6 +789,27 @@ spec bin = do
     it "returns ok=false in JSON on a typecheck error" $ do
       env <- jsonEnvelope bin ["run", errorFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
+
+    -- Ruled by Meng 2026-08-01: a crashed #EVAL must be loud. Before the
+    -- ruling this exited 0 with the crash buried in the output, and nothing
+    -- pinned it either way.
+    it "fails when a #EVAL crashes during evaluation" $
+      expectFail bin ["run", evalCrashFixture]
+
+    it "returns ok=false in JSON when a #EVAL crashes" $ do
+      env <- jsonEnvelope bin ["run", evalCrashFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 1
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Guards the reason as well as the outcome: the fixture must fail because
+    -- it CRASHED, not because it failed to typecheck (which would make the two
+    -- assertions above pass for the wrong reason). It also pins the asymmetry —
+    -- the crash rule belongs to `l4 run`, which evaluates; `l4 check`, which
+    -- does not, is unaffected.
+    it "still typechecks the crashing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", evalCrashFixture] "Check succeeded."
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."

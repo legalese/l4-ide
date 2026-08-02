@@ -1,5 +1,7 @@
 # Module 2: Legal Entities and Relationships
 
+**Prerequisites:** Modules 0–1
+
 In this module, you'll learn how to model structured legal entities using L4's type system.
 
 ## Learning Objectives
@@ -30,7 +32,7 @@ The complete working example:
 DECLARE `Registered Charity`
     HAS `the charity's name` IS A STRING
         `the registration number` IS A STRING
-        `the registration date` IS A Date
+        `the registration date` IS A DATE
         `the charity's address` IS A STRING
         `the charity's purposes` IS A LIST OF Purpose
 ```
@@ -127,7 +129,7 @@ The general pattern is:
 
 - `CONSIDER expression`
 - `WHEN pattern THEN result` (one for each variant)
-- `OTHERWISE defaultResult` (optional catch-all)
+- `OTHERWISE default result` (optional catch-all)
 
 ---
 
@@ -145,12 +147,12 @@ The `elem` function (from prelude) checks if an item is in a list.
 
 ### Possessive Syntax
 
-Use `'s` to access record fields:
+Use `'s` to access record fields. Using the `Registered Charity` type declared above:
 
 ```l4
-charity's name              -- the name field
-charity's registrationNumber -- the registration number
-charity's governors         -- the list of governors
+charity's `the charity's name`        -- the name field
+charity's `the registration number`   -- the registration number field
+charity's `the charity's purposes`    -- the list of purposes
 ```
 
 ### Chained Access
@@ -158,8 +160,8 @@ charity's governors         -- the list of governors
 Access nested fields by chaining:
 
 ```l4
-company's account's `bank name`
--- Gets the bank name field of the account field of company
+company's `the bank account`'s `the bank name`
+-- Gets the bank name field of the bank account field of company
 ```
 
 ### Function Application Alternative
@@ -167,7 +169,7 @@ company's account's `bank name`
 You can also write field access as function application:
 
 ```l4
-name charity              -- same as: charity's name
+`the charity's name` charity    -- same as: charity's `the charity's name`
 ```
 
 This is useful in complex expressions.
@@ -180,12 +182,12 @@ Types can contain other types:
 
 ```l4
 DECLARE `Bank Account`
-    HAS `bank name` IS A STRING
-        `account number` IS A STRING
+    HAS `the bank name` IS A STRING
+        `the account number` IS A STRING
 
 DECLARE Company
-    HAS name IS A STRING
-        account IS A `Bank Account`
+    HAS `the company name` IS A STRING
+        `the bank account` IS A `Bank Account`
 ```
 
 ---
@@ -196,8 +198,8 @@ When something can be one of several different types:
 
 ```l4
 DECLARE `Legal Entity` IS ONE OF
-    Individual HAS person IS A Person
-    Corporation HAS company IS A Company
+    Individual HAS `the person` IS A Person
+    Corporation HAS `the company` IS A Company
 ```
 
 A `Legal Entity` can be an individual or corporation—each with different data.
@@ -209,15 +211,15 @@ GIVEN entity IS A `Legal Entity`
 GIVETH A STRING
 `the entity's name` MEANS
     CONSIDER entity
-    WHEN Individual p THEN p's `the person's name`
-    WHEN Corporation c THEN c's name
+    WHEN Individual person THEN person's `the person's name`
+    WHEN Corporation company THEN company's `the company name`
 ```
 
 ---
 
 ## Real-World Example: Charity Registration
 
-For a complete charity registration system with types, see [module-6-examples.l4](module-6-examples.l4) in the capstone module.
+For a complete charity registration system with types, see [module-7-examples.l4](module-7-examples.l4) in the capstone module.
 
 ---
 
@@ -263,13 +265,61 @@ alice MEANS Person "Alice" 30 TRUE
 
 Define types for a simple contract with parties and an amount.
 
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE Contract
+    HAS `the first party` IS A STRING
+        `the second party` IS A STRING
+        `the contract amount` IS A NUMBER
+
+`the consulting contract` MEANS Contract "Acme Corp" "Jane Smith" 5000
+
+#EVAL `the consulting contract`'s `the contract amount`
+```
+
+</details>
+
 ### Exercise 2: Employment Status Enumeration
 
 Define an enumeration for employment status (full-time, part-time, contractor, terminated).
 
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Employment Status` IS ONE OF
+    `full time`
+    `part time`
+    contractor
+    terminated
+```
+
+</details>
+
 ### Exercise 3: Pattern Matching
 
 Write a function that returns a person's employment description based on their status.
+
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN status IS A `Employment Status`
+GIVETH A STRING
+`the employment description` MEANS
+    CONSIDER status
+    WHEN `full time` THEN "employed full time"
+    WHEN `part time` THEN "employed part time"
+    WHEN contractor THEN "engaged as a contractor"
+    WHEN terminated THEN "no longer employed"
+
+#EVAL `the employment description` `full time`
+#EVAL `the employment description` contractor
+```
+
+</details>
 
 ---
 

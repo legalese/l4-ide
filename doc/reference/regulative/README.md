@@ -13,9 +13,10 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | [MUST](MUST.md)   | Obligation (required)     |
 | [MAY](MAY.md)     | Permission (allowed)      |
 | [SHANT](SHANT.md) | Prohibition (forbidden)   |
+| MUST NOT          | Synonym for SHANT         |
 | DO                | Possibility (optionality) |
 
-**[DEONTIC](DEONTIC.md)** - Regulative Type
+**Types:** **[DEONTIC](DEONTIC.md)** - the regulative rule type; **[EVENT](EVENT.md)** - the event type consumed by traces
 
 ### Rule Structure
 
@@ -470,9 +471,11 @@ saleContract MEANS
 - **[PARTY](PARTY.md)** - Party declarations
 - **[MUST](MUST.md)** - Obligations
 - **[MAY](MAY.md)** - Permissions
-- **[SHANT](SHANT.md)** - Prohibitions
+- **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)
+- **[DEONTIC](DEONTIC.md)** - The regulative rule type
+- **[EVENT](EVENT.md)** - The event type consumed by traces
 
 ## See Also
 
-- **[Foundation Course: Regulative Rules](../../courses/foundation/module-5-regulative.md)** - Tutorial
+- **[Foundation Course: Regulative Rules](../../courses/foundation/module-6-regulative.md)** - Tutorial
 - **[Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md)** - Conceptual overview

@@ -1,8 +1,6 @@
 # Common L4 Patterns
 
-Frequently used L4 patterns with working examples.
-
-**Prerequisites:** Basic L4 knowledge
+Reference of frequently used basic L4 patterns with working examples: type declarations, predicates, list operations, conditionals, and simple regulative rules. For more advanced structures (progressive brackets, mixfix, statutory isomorphism, nested scoping), see [Advanced Patterns](README.md).
 
 ---
 
@@ -27,7 +25,7 @@ DECLARE Address
 
 DECLARE Person
     HAS name IS A STRING
-        address IS A Address
+        address IS AN Address
 ```
 
 ### Enumeration (Fixed Choices)
@@ -44,7 +42,7 @@ DECLARE Status IS ONE OF
 ```l4
 DECLARE PaymentStatus IS ONE OF
     Pending
-    Paid HAS date IS A Date
+    Paid HAS date IS A DATE
              amount IS A NUMBER
     Rejected HAS reason IS A STRING
 ```
@@ -87,7 +85,7 @@ GIVEN principal IS A NUMBER
       rate IS A NUMBER
       years IS A NUMBER
 GIVETH A NUMBER
-`compound interest` MEANS principal * (`power` (1 + rate) years)
+`compound interest` MEANS principal * (EXPONENT (1 + rate) years)
 ```
 
 ### Function with WHERE
@@ -102,7 +100,7 @@ GIVETH A NUMBER
         r MEANS loan's rate / 12
         n MEANS loan's months
         payment MEANS p * (r * factor) / (factor - 1)
-        factor MEANS `power` (1 + r) n
+        factor MEANS EXPONENT (1 + r) n
 ```
 
 ### Pattern Matching Function
@@ -125,8 +123,8 @@ GIVETH A STRING
 `payment description` MEANS
     CONSIDER payment
     WHEN Pending THEN "Awaiting payment"
-    WHEN Paid d a THEN CONCAT "Paid " (SHOW a) " on " (SHOW d)
-    WHEN Rejected r THEN CONCAT "Rejected: " r
+    WHEN Paid d a THEN CONCAT "Paid ", TOSTRING a, " on ", TOSTRING d
+    WHEN Rejected r THEN CONCAT "Rejected: ", r
 ```
 
 ---
@@ -138,7 +136,7 @@ GIVETH A STRING
 ```l4
 numbers MEANS LIST 1, 2, 3, 4, 5
 names MEANS LIST "Alice", "Bob", "Charlie"
-empty MEANS LIST
+`no numbers` MEANS EMPTY
 ```
 
 ### Check if List is Empty
@@ -215,17 +213,20 @@ GIVETH A STRING
     ELSE "adult"
 ```
 
-### Nested Conditions
+### Multi-Way Conditions
+
+Prefer `BRANCH` over nested IF/ELSE chains:
 
 ```l4
 GIVEN score IS A NUMBER
 GIVETH A STRING
 `grade` MEANS
-    IF score >= 90 THEN "A"
-    ELSE IF score >= 80 THEN "B"
-    ELSE IF score >= 70 THEN "C"
-    ELSE IF score >= 60 THEN "D"
-    ELSE "F"
+    BRANCH
+        IF score >= 90 THEN "A"
+        IF score >= 80 THEN "B"
+        IF score >= 70 THEN "C"
+        IF score >= 60 THEN "D"
+        OTHERWISE "F"
 ```
 
 ### Conditional in Context
@@ -252,7 +253,7 @@ DECIDE amount IS
 ### Simple Obligation
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `delivery obligation` MEANS
     PARTY Seller
     MUST `deliver goods`
@@ -264,7 +265,7 @@ GIVETH DEONTIC Party Action
 ### Permission
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `inspection right` MEANS
     PARTY Buyer
     MAY `inspect goods`
@@ -274,7 +275,7 @@ GIVETH DEONTIC Party Action
 ### Prohibition
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `confidentiality clause` MEANS
     PARTY Employee
     SHANT `disclose confidential information`
@@ -285,7 +286,7 @@ GIVETH DEONTIC Party Action
 ### Chained Obligations
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `sale contract` MEANS
     PARTY Seller
     MUST `deliver goods`
@@ -302,7 +303,7 @@ GIVETH DEONTIC Party Action
 ### Conditional Obligation
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `conditional payment` MEANS
     PARTY Buyer
     MUST `pay` amount PROVIDED amount > 0
@@ -314,7 +315,7 @@ GIVETH DEONTIC Party Action
 ### Parallel Obligations (RAND)
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `mutual obligations` MEANS
     (PARTY Seller MUST `deliver` WITHIN 14 HENCE FULFILLED LEST BREACH)
     RAND
@@ -324,7 +325,7 @@ GIVETH DEONTIC Party Action
 ### Alternative Paths (ROR)
 
 ```l4
-GIVETH DEONTIC Party Action
+GIVETH A DEONTIC Party Action
 `delivery options` MEANS
     (PARTY Seller MUST `ship goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
     ROR
@@ -366,11 +367,13 @@ GIVETH A BOOLEAN
     AND m1's currency EQUALS m2's currency
 ```
 
+See also the [currency library](../libraries/currency.md) for ISO 4217 currency handling.
+
 ---
 
 ## Date Patterns
 
-### Using daydate Library
+### Using the daydate Library
 
 ```l4
 IMPORT daydate
@@ -386,20 +389,22 @@ expiryDate MEANS YMD 2025 12 31
 -- written correctly in day-month-year order it is `Date 31 12 2025`.
 
 -- Compare dates
-GIVEN d1 IS A Date
-      d2 IS A Date
+GIVEN d1 IS A DATE
+      d2 IS A DATE
 GIVETH A BOOLEAN
-`is before` MEANS dateBefore d1 d2
+`comes first` MEANS d1 `is before` d2
 ```
 
 ### Days Between Dates
 
 ```l4
-GIVEN start IS A Date
-      end IS A Date
+GIVEN start IS A DATE
+      end IS A DATE
 GIVETH A NUMBER
-`days between` MEANS daysBetween start end
+`days between` MEANS Day end MINUS Day start
 ```
+
+See the [daydate library](../libraries/daydate.md) for the full date toolkit.
 
 ---
 
@@ -408,8 +413,8 @@ GIVETH A NUMBER
 ### Unit Test with #EVAL
 
 ```l4
-#EVAL `is adult` (Person "Test" 18)  -- TRUE
-#EVAL `is adult` (Person "Test" 17)  -- FALSE
+#EVAL `is adult` (Person "Test" 18 "test@example.com")  -- TRUE
+#EVAL `is adult` (Person "Test" 17 "test@example.com")  -- FALSE
 ```
 
 ### Integration Test with #TRACE
@@ -425,9 +430,9 @@ GIVETH A NUMBER
 
 ```l4
 -- Test boundaries
-#EVAL `is adult` (Person "Edge" 18)   -- TRUE (exactly at boundary)
-#EVAL `is adult` (Person "Edge" 17)   -- FALSE (just below)
-#EVAL `is adult` (Person "Edge" 19)   -- TRUE (just above)
+#EVAL `is adult` (Person "Edge" 18 "e@example.com")   -- TRUE (exactly at boundary)
+#EVAL `is adult` (Person "Edge" 17 "e@example.com")   -- FALSE (just below)
+#EVAL `is adult` (Person "Edge" 19 "e@example.com")   -- TRUE (just above)
 ```
 
 ---
@@ -494,6 +499,7 @@ DECLARE Person
 | `GIVEN ... GIVETH ... DECIDE` | Define a function       |
 | `CONSIDER ... WHEN`           | Pattern matching        |
 | `IF ... THEN ... ELSE`        | Conditional expression  |
+| `BRANCH`                      | Multi-way conditions    |
 | `PARTY ... MUST`              | Create obligation       |
 | `PARTY ... MAY`               | Create permission       |
 | `PARTY ... SHANT`             | Create prohibition      |
@@ -504,8 +510,10 @@ DECLARE Person
 
 ---
 
-## Next Steps
+## See Also
 
-- [Foundation Course](../../courses/foundation/README.md) - Learn concepts systematically
-- [Advanced Course](../../courses/advanced/README.md) - Complex patterns
-- [Reference](../../reference/README.md) - Complete language reference
+- [Advanced Patterns](README.md) - Progressive brackets, mixfix, statutory isomorphism, nested scoping
+- [Functions Reference](../functions/README.md) - GIVEN, GIVETH, MEANS, DECIDE, WHERE
+- [Types Reference](../types/README.md) - DECLARE, HAS, IS ONE OF, LIST, MAYBE
+- [Regulative Reference](../regulative/README.md) - PARTY, MUST, MAY, SHANT, HENCE, LEST
+- [Reference Home](../README.md) - Complete language reference

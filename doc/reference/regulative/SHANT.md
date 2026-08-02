@@ -13,6 +13,8 @@ PARTY partyName SHANT action WITHIN deadline
 
 SHANT expresses a legal prohibition - something a party must NOT do. If the party performs the forbidden action, breach occurs.
 
+**Synonym:** `MUST NOT` parses to exactly the same prohibition as SHANT, so `PARTY Employee MUST NOT disclose` and `PARTY Employee SHANT disclose` are interchangeable. Use whichever mirrors the source text.
+
 ## Examples
 
 **Example file:** [shant-example.l4](shant-example.l4)

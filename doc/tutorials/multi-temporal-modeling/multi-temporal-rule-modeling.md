@@ -6,7 +6,7 @@ time axes L4 tracks while doing it.
 **Audience:** Advanced legal engineers modeling amendments, effective
 dates, or transitional provisions.
 
-**Prerequisites:** Basic L4 knowledge ([Your First L4 File](../getting-started/first-l4-file.md)); some familiarity with dates ([Common Patterns](../getting-started/common-patterns.md) covers the `daydate` library).
+**Prerequisites:** Basic L4 knowledge ([Your First L4 File](../getting-started/first-l4-file.md)); some familiarity with dates ([Common Patterns](../../reference/patterns/common-patterns.md) covers the `daydate` library).
 
 **Complete example:** [gst-rate-change-example.l4](gst-rate-change-example.l4)
 
@@ -317,5 +317,5 @@ AT` by hand) is planned but not yet implemented.
 ## Next Steps
 
 - [`TEMPORAL-RULE-VERSION-DESIGN.md`](../../../specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md) — the full design rationale and decision log behind this feature, for readers who want the "why" in depth.
-- [Common Patterns](../getting-started/common-patterns.md) — the `daydate` library used alongside these builtins in the example.
+- [Common Patterns](../../reference/patterns/common-patterns.md) — the `daydate` library used alongside these builtins in the example.
 - [Encoding Legislation](../getting-started/encoding-legislation.md) — general technique for translating legal text into L4, if you haven't already.

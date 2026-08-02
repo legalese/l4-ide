@@ -1,4 +1,4 @@
-## Prelude Libarary
+# Prelude Library
 
 The prelude can be imported into every L4 program with `IMPORT prelude` and provides foundational functions for working with lists, Maybe types, Booleans, and more.
 
@@ -38,7 +38,7 @@ The prelude can be imported into every L4 program with `IMPORT prelude` and prov
 - `foldr` / `foldl` - Fold (reduce) a list
 - `sum` - Sum of numbers
 - `product` - Product of numbers
-- `maximum` / `minimum` - Largest/smallest element
+- `maximum` / `minimum` - Largest/smallest element. Both also have overloads for `LIST OF MAYBE NUMBER`: `NOTHING` entries are ignored, and an empty or all-`NOTHING` list yields `NOTHING`
 - `and` / `or` - Logical aggregation
 - `all` / `any` - Check if all/any satisfy predicate
 
@@ -135,7 +135,7 @@ the dedicated [negation-as-failure](negation-as-failure.md) library.
 - `id` - Identity function
 - `const` - Constant function
 - `even` / `odd` - Number parity
-- `max` / `min` - Maximum/minimum of two values
+- `max` / `min` - Maximum/minimum of two values. The `MAYBE NUMBER` overloads treat `NOTHING` as absent: the other value wins, and only `max NOTHING NOTHING` / `min NOTHING NOTHING` give `NOTHING`
 - `TBD` - Polymorphic placeholder
 
 ### Example: Using Prelude Functions

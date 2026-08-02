@@ -1,4 +1,6 @@
-# Module 5: Regulative Rules
+# Module 6: Regulative Rules
+
+**Prerequisites:** Modules 1–5
 
 In this module, you'll learn how to model legal obligations, permissions, and prohibitions—the core of contract and regulatory law.
 
@@ -39,7 +41,7 @@ A DEONTIC value represents an obligation, permission, or prohibition. It has:
 
 The complete working example:
 
-[module-5-examples.l4](module-5-examples.l4)
+[module-6-examples.l4](module-6-examples.l4)
 
 ### Defining Actor and Action Types
 
@@ -47,15 +49,15 @@ First, define who can act and what actions exist:
 
 ```l4
 -- Who can act
-DECLARE Person IS ONE OF
-    Buyer
-    Seller
+DECLARE `Contract Party` IS ONE OF
+    `the buyer`
+    `the seller`
 
 -- What actions exist
-DECLARE Action IS ONE OF
-    `deliver goods`
-    `pay invoice` HAS amount IS A NUMBER
-    `inspect goods`
+DECLARE `Sale Action` IS ONE OF
+    `deliver the goods`
+    `pay the invoice` HAS amount IS A NUMBER
+    `inspect the goods`
 ```
 
 ---
@@ -63,23 +65,23 @@ DECLARE Action IS ONE OF
 ## Creating Obligations with MUST
 
 ```l4
-GIVETH A DEONTIC Person Action
+GIVETH A DEONTIC `Contract Party` `Sale Action`
 `the delivery obligation` MEANS
-    PARTY Seller
-    MUST `deliver goods`
+    PARTY `the seller`
+    MUST `deliver the goods`
     WITHIN 14
     HENCE FULFILLED
     LEST BREACH
 ```
 
-| Part                             | Meaning                                                       |
-| -------------------------------- | ------------------------------------------------------------- |
-| `GIVETH A DEONTIC Person Action` | Returns a deontic value with Person actors and Action actions |
-| `PARTY Seller`                   | The seller has this obligation                                |
-| `` MUST `deliver goods` ``       | They must deliver goods                                       |
-| `WITHIN 14`                      | Within 14 days                                                |
-| `HENCE FULFILLED`                | If they do, the obligation is fulfilled                       |
-| `LEST BREACH`                    | If they don't, it's a breach                                  |
+| Part                                                  | Meaning                                               |
+| ----------------------------------------------------- | ----------------------------------------------------- |
+| `` GIVETH A DEONTIC `Contract Party` `Sale Action` `` | Returns a deontic value with these actors and actions |
+| `` PARTY `the seller` ``                              | The seller has this obligation                        |
+| `` MUST `deliver the goods` ``                        | They must deliver goods                               |
+| `WITHIN 14`                                           | Within 14 days                                        |
+| `HENCE FULFILLED`                                     | If they do, the obligation is fulfilled               |
+| `LEST BREACH`                                         | If they don't, it's a breach                          |
 
 ---
 
@@ -88,10 +90,10 @@ GIVETH A DEONTIC Person Action
 Permissions don't create breaches if unused:
 
 ```l4
-GIVETH A DEONTIC Person Action
+GIVETH A DEONTIC `Contract Party` `Sale Action`
 `the inspection right` MEANS
-    PARTY Buyer
-    MAY `inspect goods`
+    PARTY `the buyer`
+    MAY `inspect the goods`
     HENCE FULFILLED
 ```
 
@@ -101,15 +103,15 @@ Note: MAY doesn't need LEST because not exercising a permission isn't a breach.
 
 ## Creating Prohibitions with SHANT
 
-Prohibitions say what must NOT happen:
+Prohibitions say what must NOT happen. From the wedding vows example in [module-6-examples.l4](module-6-examples.l4):
 
 ```l4
-GIVETH A DEONTIC Employee EmployeeAction
-`the confidentiality clause` MEANS
-    PARTY Employee1
-    SHANT `disclose confidential information`
+GIVETH A DEONTIC Spouse Vow
+`the fidelity clause` MEANS
+    PARTY Spouse1
+    SHANT `be unfaithful`
     HENCE FULFILLED
-    LEST BREACH
+    LEST BREACH BY Spouse1 BECAUSE "was unfaithful"
 ```
 
 `SHANT` is equivalent to "shall not" or "must not."
@@ -121,18 +123,21 @@ GIVETH A DEONTIC Employee EmployeeAction
 Real contracts have sequences of obligations. Use HENCE to chain them:
 
 ```l4
-GIVETH A DEONTIC Person Action
-`the sale contract` MEANS
-    PARTY Seller
-    MUST `deliver goods`
+GIVETH A DEONTIC `Contract Party` `Sale Action`
+`the complete sale contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
     WITHIN 14
     HENCE
-        PARTY Buyer
-        MUST `pay invoice` 1000
+        PARTY `the buyer`
+        MUST `pay the invoice` 1000
         WITHIN 30
         HENCE FULFILLED
         LEST BREACH
-    LEST BREACH
+    LEST
+        PARTY `the seller`
+        MAY `cancel the order`
+        HENCE BREACH
 ```
 
 This creates a chain:
@@ -149,15 +154,15 @@ This creates a chain:
 LEST specifies what happens on non-compliance:
 
 ```l4
-GIVETH A DEONTIC Person Action
-`the late payment contract` MEANS
-    PARTY Buyer
-    MUST `pay invoice` 1000
+GIVETH A DEONTIC `Contract Party` `Sale Action`
+`the payment with late fee` MEANS
+    PARTY `the buyer`
+    MUST `pay the invoice` 1000
     WITHIN 30
     HENCE FULFILLED
     LEST
-        PARTY Buyer
-        MUST `pay invoice` 1100  -- 10% late fee
+        PARTY `the buyer`
+        MUST `pay the invoice` 1100  -- 10% late fee
         WITHIN 14
         HENCE FULFILLED
         LEST BREACH
@@ -172,8 +177,8 @@ This gives the buyer a second chance with a penalty before reaching breach.
 Add conditions to obligations:
 
 ```l4
-PARTY Buyer
-MUST `pay invoice` amount PROVIDED amount >= 100
+PARTY `the buyer`
+MUST `pay the invoice` amount PROVIDED amount >= 100
 WITHIN 30
 HENCE FULFILLED
 LEST BREACH
@@ -188,9 +193,9 @@ LEST BREACH
 Use `RAND` (regulative AND) for obligations that must all be fulfilled:
 
 ```l4
-(PARTY Seller MUST `deliver goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
+(PARTY `the seller` MUST `deliver the goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
 RAND
-(PARTY Buyer MUST `pay invoice` 1000 WITHIN 30 HENCE FULFILLED LEST BREACH)
+(PARTY `the buyer` MUST `pay the invoice` 1000 WITHIN 30 HENCE FULFILLED LEST BREACH)
 ```
 
 Both obligations must be fulfilled for the contract to be fulfilled.
@@ -204,9 +209,9 @@ its own `HENCE`/`LEST` consequences — there is no shared trailing `LEST` outsi
 `ROR`:
 
 ```l4
-(PARTY Seller MUST `deliver goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
+(PARTY `the seller` MUST `deliver the goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
 ROR
-(PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED LEST BREACH)
+(PARTY `the seller` MUST `arrange a pickup` WITHIN 7 HENCE FULFILLED LEST BREACH)
 ```
 
 The seller can choose either option.
@@ -220,24 +225,26 @@ The seller can choose either option.
 ### Basic Trace
 
 ```l4
-#TRACE `the sale contract` AT 0 WITH
-    PARTY Seller DOES `deliver goods` AT 10
-    PARTY Buyer DOES `pay invoice` 1000 AT 25
+#TRACE `the complete sale contract` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 10
+    PARTY `the buyer` DOES `pay the invoice` 1000 AT 35
 ```
 
 This simulates:
 
 - Start at day 0
 - Seller delivers at day 10 (within 14-day deadline ✓)
-- Buyer pays at day 25 (within 30-day deadline ✓)
+- Buyer pays at day 35 (25 days after delivery—within the 30-day deadline ✓)
+
+Note that a `WITHIN` deadline starts running when its obligation becomes active: the buyer's 30 days count from the delivery on day 10.
 
 Result: `FULFILLED`
 
 ### Breach Scenario
 
 ```l4
-#TRACE `the sale contract` AT 0 WITH
-    PARTY Seller DOES `deliver goods` AT 20  -- Late! Deadline was 14
+#TRACE `the delivery obligation` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 20  -- Late! Deadline was 14
 ```
 
 Result: `BREACH` (seller delivered late)
@@ -350,18 +357,21 @@ The graph makes complex contracts easier to understand.
 
 ```l4
 -- ✅ Good: Clear, descriptive types
-DECLARE ContractParty IS ONE OF Landlord, Tenant
-DECLARE LeaseAction IS ONE OF
-    `pay rent` HAS amount IS A NUMBER
-    `maintain property`
+DECLARE `Lease Party` IS ONE OF
+    `the landlord`
+    `the tenant`
+
+DECLARE `Lease Action` IS ONE OF
+    `pay the rent` HAS amount IS A NUMBER
+    `maintain the property`
     `provide access`
-    `terminate lease`
+    `terminate the lease`
 ```
 
 ### 2. Use BREACH BY for Clear Blame
 
 ```l4
-LEST BREACH BY Seller BECAUSE "failed to deliver on time"
+LEST BREACH BY `the seller` BECAUSE "failed to deliver on time"
 ```
 
 ### 3. Consider All Paths
@@ -386,16 +396,16 @@ HENCE FULFILLED
 
 ```l4
 -- Happy path
-#TRACE contract AT 0 WITH
-    PARTY Seller DOES `deliver` AT 5
-    PARTY Buyer DOES `pay` AT 20
+#TRACE `the complete sale contract` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 5
+    PARTY `the buyer` DOES `pay the invoice` 1000 AT 20
 
 -- Late delivery
-#TRACE contract AT 0 WITH
-    PARTY Seller DOES `deliver` AT 20
+#TRACE `the complete sale contract` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 20
 
 -- No action
-#TRACE contract AT 0 WITH
+#TRACE `the complete sale contract` AT 0 WITH
     -- Empty: what happens at deadline?
 ```
 
@@ -407,34 +417,125 @@ HENCE FULFILLED
 
 Write a regulative rule: "The employee must submit a timesheet within 7 days."
 
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Employment Party` IS ONE OF
+    `the employee`
+    `the employer`
+
+DECLARE `Employment Action` IS ONE OF
+    `submit the timesheet`
+
+GIVETH A DEONTIC `Employment Party` `Employment Action`
+`the timesheet obligation` MEANS
+    PARTY `the employee`
+    MUST `submit the timesheet`
+    WITHIN 7
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `the timesheet obligation` AT 0 WITH
+    PARTY `the employee` DOES `submit the timesheet` AT 5
+```
+
+</details>
+
 ### Exercise 2: Chained Obligations
 
 Write a contract: "Buyer must pay deposit within 7 days. After deposit, seller must deliver within 14 days."
+
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Sale Party` IS ONE OF
+    `the buyer`
+    `the seller`
+
+DECLARE `Deposit Action` IS ONE OF
+    `pay the deposit`
+    `deliver the goods`
+
+GIVETH A DEONTIC `Sale Party` `Deposit Action`
+`the deposit contract` MEANS
+    PARTY `the buyer`
+    MUST `pay the deposit`
+    WITHIN 7
+    HENCE
+        PARTY `the seller`
+        MUST `deliver the goods`
+        WITHIN 14
+        HENCE FULFILLED
+        LEST BREACH
+    LEST BREACH
+
+#TRACE `the deposit contract` AT 0 WITH
+    PARTY `the buyer` DOES `pay the deposit` AT 3
+    PARTY `the seller` DOES `deliver the goods` AT 12
+```
+
+</details>
 
 ### Exercise 3: Permission and Prohibition
 
 Write rules for: "Tenant may have pets. Tenant shall not smoke indoors."
 
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Lease Party` IS ONE OF
+    `the tenant`
+    `the landlord`
+
+DECLARE `Lease Action` IS ONE OF
+    `keep a pet`
+    `smoke indoors`
+
+GIVETH A DEONTIC `Lease Party` `Lease Action`
+`the pet permission` MEANS
+    PARTY `the tenant`
+    MAY `keep a pet`
+    HENCE FULFILLED
+
+GIVETH A DEONTIC `Lease Party` `Lease Action`
+`the smoking prohibition` MEANS
+    PARTY `the tenant`
+    SHANT `smoke indoors`
+    HENCE FULFILLED
+    LEST BREACH BY `the tenant` BECAUSE "smoked indoors"
+
+#TRACE `the pet permission` AT 0 WITH
+    PARTY `the tenant` DOES `keep a pet` AT 1
+
+#TRACE `the smoking prohibition` AT 0 WITH
+    PARTY `the tenant` DOES `smoke indoors` AT 10
+```
+
+</details>
+
 ---
 
 ## Summary
 
-| Concept              | Syntax                                      |
-| -------------------- | ------------------------------------------- |
-| Obligation           | `PARTY actor MUST action`                   |
-| Permission           | `PARTY actor MAY action`                    |
-| Prohibition          | `PARTY actor SHANT action`                  |
-| Deadline             | `WITHIN days`                               |
-| Compliance result    | `HENCE nextObligation` or `HENCE FULFILLED` |
-| Non-compliance       | `LEST consequence` or `LEST BREACH`         |
-| Condition            | `PROVIDED condition`                        |
-| Parallel obligations | `obligation1 RAND obligation2`              |
-| Alternative paths    | `obligation1 ROR obligation2`               |
-| Simulate             | `#TRACE rule AT startTime WITH events`      |
-| Event                | `PARTY actor DOES action AT time`           |
+| Concept              | Syntax                                       |
+| -------------------- | -------------------------------------------- |
+| Obligation           | `PARTY actor MUST action`                    |
+| Permission           | `PARTY actor MAY action`                     |
+| Prohibition          | `PARTY actor SHANT action`                   |
+| Deadline             | `WITHIN days`                                |
+| Compliance result    | `HENCE next obligation` or `HENCE FULFILLED` |
+| Non-compliance       | `LEST consequence` or `LEST BREACH`          |
+| Condition            | `PROVIDED condition`                         |
+| Parallel obligations | `obligation1 RAND obligation2`               |
+| Alternative paths    | `obligation1 ROR obligation2`                |
+| Simulate             | `#TRACE rule AT start time WITH events`      |
+| Event                | `PARTY actor DOES action AT time`            |
 
 ---
 
 ## What's Next?
 
-In [Module 6: Putting It Together](module-6-capstone.md), you'll build a complete legal model combining everything you've learned.
+In [Module 7: Putting It Together](module-7-capstone.md), you'll build a complete legal model combining everything you've learned.

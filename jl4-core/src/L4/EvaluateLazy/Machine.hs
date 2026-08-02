@@ -1898,8 +1898,17 @@ matchGivens' ns f rs = do
         RuntimeTypeError "given signatures' values' lengths do not match"
 
 matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-matchBranches scrutinee _env [] =
-  userException (NonExhaustivePatterns scrutinee)
+matchBranches scrutinee _env [] = do
+  -- The scrutinee has been forced by the failed branch matches, so we can
+  -- usually show the actual value in the error instead of a heap reference.
+  thunk <- readThunk scrutinee
+  userException $ NonExhaustivePatterns case thunk of
+    WHNF val          -> Right val
+    -- A context-dependent cache still holds the value the branches were
+    -- matched against, so it names the scrutinee just as well as a plain
+    -- 'WHNF'; we are inside that very force, so it cannot be stale here.
+    WHNFWhen _ val _ _ -> Right val
+    Unevaluated{}     -> Left scrutinee
 matchBranches _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
   continueExpr env e
 matchBranches scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do

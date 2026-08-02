@@ -48,7 +48,7 @@ A common split: a build-time key with `l4:rules` + `l4:read` to (re)generate cli
 ### Inspect the spec
 
 ```bash
-curl https://{orgSlug}.legalese.cloud/{deploymentId}/openapi.json \
+curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/openapi.json \
   -H "Authorization: Bearer sk_..."
 ```
 
@@ -73,7 +73,7 @@ openapi-generator-cli generate \
 curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/<rule-operation> \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
-  -d '{ "applicant": { "age": 40, "risk score": 0.8 } }'
+  -d '{ "applicant": { "age": 40, "risk-score": 0.8 } }'
 ```
 
 The exact path and request shape for each rule come straight from the spec.
