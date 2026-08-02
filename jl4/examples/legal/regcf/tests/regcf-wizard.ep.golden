@@ -111,7 +111,7 @@ GIVETH A NUMBER
 DECLARE RaisePlan HAS
     `organized in the United States`            IS A BOOLEAN @desc Is your company organized under, and subject to, the laws of a US State or territory, or the District of Columbia?
     `already files Exchange Act reports`        IS A BOOLEAN @desc Does your company already file reports with the SEC under section 13 or section 15(d) of the Securities Exchange Act of 1934?
-    `is an investment company`                  IS A BOOLEAN @desc Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?
+    `an investment company`                     IS A BOOLEAN @desc Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?
     `has a bad actor disqualification`          IS A BOOLEAN @desc Is your company, or anyone covered by the rule, subject to a bad-actor disqualification? Get advice before answering: this is a regime in its own right.
     `behind on past Reg CF annual reports`      IS A BOOLEAN @desc Have you raised under Regulation Crowdfunding before and missed an annual report in the two years since?
     `has no specific business plan`             IS A BOOLEAN @desc Does your company lack a specific business plan, or is its plan to merge with or acquire a company it has not yet identified?
@@ -120,7 +120,7 @@ DECLARE RaisePlan HAS
     `has raised under Reg CF before`            IS A BOOLEAN @desc Has your company ever sold securities under Regulation Crowdfunding before?
 
 DECLARE InvestorFacts HAS
-    `is an accredited investor`                   IS A BOOLEAN @desc Are you an accredited investor, as Rule 501 of Regulation D defines that term?
+    `an accredited investor`                      IS A BOOLEAN @desc Are you an accredited investor, as Rule 501 of Regulation D defines that term?
     `your annual income`                          IS A NUMBER  @desc Your annual income, in dollars
     `your net worth`                              IS A NUMBER  @desc Your net worth, in dollars
     `invested under Reg CF in the last 12 months` IS A NUMBER  @desc How much have you already invested under Regulation Crowdfunding in the last 12 months, across every company, in dollars?
@@ -183,10 +183,10 @@ GIVETH AN IssuerProfile
     IssuerProfile WITH
         -- No rule reads `name`; fixed rather than asked.
         name                                                                                                         IS "the company"
-        `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS plan's `organized in the United States`
-        `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`   IS plan's `already files Exchange Act reports`
-        `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS plan's `is an investment company`
-        `is subject to a disqualification as specified in section 227.503(a)`                                         IS plan's `has a bad actor disqualification`
+        `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS plan's `organized in the United States`
+        `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS plan's `already files Exchange Act reports`
+        `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS plan's `an investment company`
+        `subject to a disqualification as specified in section 227.503(a)`                                       IS plan's `has a bad actor disqualification`
         `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS plan's `behind on past Reg CF annual reports`
         `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS plan's `has no specific business plan`
 
@@ -206,21 +206,21 @@ GIVEN facts IS AN InvestorFacts
 GIVETH AN InvestorProfile
 `investor profile from` facts MEANS
     InvestorProfile WITH
-        name                                               IS "you"
-        `is an accredited investor as defined in Rule 501` IS facts's `is an accredited investor`
-        `annual income`                                    IS facts's `your annual income`
-        `net worth`                                        IS facts's `your net worth`
+        name                                            IS "you"
+        `an accredited investor as defined in Rule 501` IS facts's `an accredited investor`
+        `annual income`                                 IS facts's `your annual income`
+        `net worth`                                     IS facts's `your net worth`
         `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS facts's `invested under Reg CF in the last 12 months`
 
 GIVEN holding IS A ResaleFacts
 GIVETH A Transfer
 `transfer from` holding MEANS
     Transfer WITH
-        `days since the securities were issued`                    IS holding's `days since issue`
-        `is to the issuer of the securities`                       IS holding's `selling back to the issuer`
-        `is to an accredited investor`                             IS holding's `buyer is an accredited investor`
-        `is as part of an offering registered with the Commission` IS holding's `part of a registered offering`
-        `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS holding's `family transfer death or divorce`
+        `days since the securities were issued`                 IS holding's `days since issue`
+        `to the issuer of the securities`                       IS holding's `selling back to the issuer`
+        `to an accredited investor`                             IS holding's `buyer is an accredited investor`
+        `as part of an offering registered with the Commission` IS holding's `part of a registered offering`
+        `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS holding's `family transfer death or divorce`
 
 GIVEN filer IS A ReportingFacts
 GIVETH A ReportingStatus
@@ -249,10 +249,10 @@ GIVEN x IS A NUMBER
 GIVETH AN InvestorProfile
 `an investor with income and net worth both` x MEANS
     InvestorProfile WITH
-        name                                               IS "probe"
-        `is an accredited investor as defined in Rule 501` IS FALSE
-        `annual income`                                    IS x
-        `net worth`                                        IS x
+        name                                            IS "probe"
+        `an accredited investor as defined in Rule 501` IS FALSE
+        `annual income`                                 IS x
+        `net worth`                                     IS x
         `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS 0
 
 -- One dollar below the cut point, so limb (i) governs.
@@ -398,14 +398,14 @@ GIVETH A NUMBER
 GIVEN facts IS AN InvestorFacts
 GIVETH A MAYBE NUMBER
 `limit if any for` facts MEANS
-    IF   facts's `is an accredited investor`
+    IF   facts's `an accredited investor`
     THEN NOTHING
     ELSE JUST (`limit for` facts)
 
 GIVEN facts IS AN InvestorFacts
 GIVETH A MAYBE NUMBER
 `still investable for` facts MEANS
-    IF   facts's `is an accredited investor`
+    IF   facts's `an accredited investor`
     THEN NOTHING
     ELSE JUST (`never below zero`
                   ((`limit for` facts) MINUS facts's `invested under Reg CF in the last 12 months`))
@@ -413,7 +413,7 @@ GIVETH A MAYBE NUMBER
 GIVEN facts IS AN InvestorFacts
 GIVETH A STRING
 `which limb for` facts MEANS
-    IF   facts's `is an accredited investor`
+    IF   facts's `an accredited investor`
     THEN "None. Rule 100(a)(2) bites only where the purchaser is not an accredited investor — a carve-out added on 2021-03-15."
     ELSE IF   `either annual income or net worth is less than the cut point` (`investor profile from` facts)
          THEN "17 CFR 227.100(a)(2)(i)"
@@ -422,7 +422,7 @@ GIVETH A STRING
 GIVEN facts IS AN InvestorFacts
 GIVETH A STRING
 `how the limit is worked out for` facts MEANS
-    IF   facts's `is an accredited investor`
+    IF   facts's `an accredited investor`
     THEN CONCAT "You are an accredited investor, so Regulation Crowdfunding sets no limit on what you may invest (17 CFR 227.100(a)(2), as amended with effect from 2021-03-15). The figure shown is what your limit would be if you were not: ",
                 (`dollars` (`limit for` facts)), "."
     ELSE IF   `either annual income or net worth is less than the cut point` (`investor profile from` facts)
@@ -566,7 +566,7 @@ GIVEN facts IS AN InvestorFacts @desc Your income, your net worth, and what you 
 GIVETH AN InvestmentLimitAnswer
 DECIDE `investment limit check` IS
     InvestmentLimitAnswer WITH
-        `you have no limit`      IS facts's `is an accredited investor`
+        `you have no limit`      IS facts's `an accredited investor`
         `your 12 month limit`    IS `limit if any for` facts
         `you have already used`  IS facts's `invested under Reg CF in the last 12 months`
         `you can still invest`   IS `still investable for` facts
@@ -629,7 +629,7 @@ DECIDE `can this company raise` IS
 `a clean plan` MEANS RaisePlan WITH
     `organized in the United States`            IS TRUE
     `already files Exchange Act reports`        IS FALSE
-    `is an investment company`                  IS FALSE
+    `an investment company`                     IS FALSE
     `has a bad actor disqualification`          IS FALSE
     `behind on past Reg CF annual reports`      IS FALSE
     `has no specific business plan`             IS FALSE
@@ -642,7 +642,7 @@ DECIDE `can this company raise` IS
 `a delinquent plan` MEANS RaisePlan WITH
     `organized in the United States`            IS TRUE
     `already files Exchange Act reports`        IS FALSE
-    `is an investment company`                  IS FALSE
+    `an investment company`                     IS FALSE
     `has a bad actor disqualification`          IS FALSE
     `behind on past Reg CF annual reports`      IS TRUE
     `has no specific business plan`             IS FALSE
@@ -655,7 +655,7 @@ DECIDE `can this company raise` IS
 `an over-limit plan` MEANS RaisePlan WITH
     `organized in the United States`            IS TRUE
     `already files Exchange Act reports`        IS FALSE
-    `is an investment company`                  IS FALSE
+    `an investment company`                     IS FALSE
     `has a bad actor disqualification`          IS FALSE
     `behind on past Reg CF annual reports`      IS FALSE
     `has no specific business plan`             IS FALSE
@@ -666,19 +666,19 @@ DECIDE `can this company raise` IS
 -- README §3.1's investor: $60,000 income, $200,000 net worth. Limit $10,000
 -- under the rule in force; $3,000 under the rule the mirrored page states.
 `the README 3.1 investor` MEANS InvestorFacts WITH
-    `is an accredited investor`                   IS FALSE
+    `an accredited investor`                      IS FALSE
     `your annual income`                          IS 60000
     `your net worth`                              IS 200000
     `invested under Reg CF in the last 12 months` IS 0
 
 `a wealthy investor` MEANS InvestorFacts WITH
-    `is an accredited investor`                   IS FALSE
+    `an accredited investor`                      IS FALSE
     `your annual income`                          IS 3000000
     `your net worth`                              IS 3000000
     `invested under Reg CF in the last 12 months` IS 0
 
-`an accredited investor` MEANS InvestorFacts WITH
-    `is an accredited investor`                   IS TRUE
+`an accredited purchaser` MEANS InvestorFacts WITH
+    `an accredited investor`                      IS TRUE
     `your annual income`                          IS 60000
     `your net worth`                              IS 200000
     `invested under Reg CF in the last 12 months` IS 9000
@@ -772,7 +772,7 @@ DECIDE `can this company raise` IS
 #EVAL `raise check` `an over-limit plan`
 #EVAL `investment limit check` `the README 3.1 investor`
 #EVAL `investment limit check` `a wealthy investor`
-#EVAL `investment limit check` `an accredited investor`
+#EVAL `investment limit check` `an accredited purchaser`
 #EVAL `resale check` `a restricted holding`
 #EVAL `resale check` `a holding sold to an accredited buyer`
 #EVAL `reporting exit check` `a filer who may stop`
