@@ -424,6 +424,31 @@ itself, which also lets it keep the validator's exit 2 meaning "the SCHEMAS are 
 that is `BROKEN`, a repo defect — rather than conflating it with "this file is not JSON", which is
 a finding about the deposit.
 
+**The receipts reach the report, and so do their hedges.** This was found by measuring the
+sentence at the end of this subsection rather than trusting it. It claimed each of the five
+`SKIPPED` receipts carries "a reason that appears in the report"; measured on a real run, three
+did. `render-report.mjs` rendered `p1-ingest`, `p2-sweep` and `p3-encode`, named `p4-forks` only
+inside an ABSENT string, and had no site for `p5-gate` at all. Two further silences rode along:
+the de novo sections printed `status — reason` and nothing else, so a `PASS` — whose `reason` is
+`null` by design, because `verdict.mjs`'s rule 3 demands a reason only of a non-`PASS` — rendered
+as the literal `**PASS** — null`, and every oracle `because`, metric and note was dropped on the
+floor.
+
+The notes are the load-bearing part, which is why this counts as more than a rendering bug. A de
+novo `PASS` is a narrow structural claim, and everything it does **not** establish lives in those
+notes — `p1-ingest`'s "whether the bundle is the RIGHT text is unverified", `p5-gate`'s two
+`CARRIED BY HG1` halves, which §5.2 above requires to ride on every receipt "`PASS` included".
+They did ride on the receipt. They did not reach the one artifact a human reads, which made the
+claim about the receipt true and the claim about the reader false. All five receipts now render
+whole — status, reason, oracle, metrics, notes — and six selftests hold it there, each measured
+red against the previous renderer.
+
+The same pass retensed the renderer's own ABSENT prose, which commit `e10a64f2` had missed because
+it corrected the documents and not the output: on **every** `g1` run the report printed that
+`p1-ingest`, `p2-sweep` and `p4-forks` "are entry points that refuse" and that "the de novo tooling
+is unbuilt". Those stages had stopped refusing. A `g1` report now says only that they are not
+declared at that milestone, which is the true reason they are silent there.
+
 **Findings are attributed to the file they were reported against.** `register-validate.mjs`
 validates every file on its command line and its exit code is a total, so a clean source bundle
 sitting beside a broken fork register exits 1. Reading that total as a fact about the primary

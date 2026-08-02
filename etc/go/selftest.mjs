@@ -2038,6 +2038,175 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   rmSync(T, { recursive: true, force: true });
 }
+
+// --- the de novo receipts must reach the REPORT, not only the journal -------
+//
+// ORCHESTRATOR.md §5.2 asserts that a g2 run's five SKIPPED receipts each carry
+// "a reason that appears in the report". Measured on a real run, three did:
+// `render-report.mjs` rendered p1/p2/p3-encode and named p4-forks only inside a
+// stale ABSENT string, while p5-gate had no site at all. Two further silences
+// rode along — the de novo sections printed `status — reason` and nothing else,
+// so a PASS (whose `reason` is null by design) rendered as the literal
+// `**PASS** — null`, and every oracle `because`, metric and note was dropped.
+//
+// Those notes are the load-bearing part. A de novo PASS is a narrow structural
+// claim and everything it does NOT establish lives in the notes: p1-ingest's
+// "whether the bundle is the RIGHT text is unverified", p5-gate's two
+// `CARRIED BY HG1` halves. Rendering the status without them converts a hedged
+// claim into a bare green in the one artifact a human actually reads.
+process.stdout.write("\n-- de novo receipts in the report --\n");
+{
+  const { rmSync } = await import("node:fs");
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-denovoreport-"));
+  const j = resolve(d, "journal.ndjson");
+  append(j, {
+    kind: "run_begin",
+    run_id: "denovo-report-test",
+    milestone: "g2",
+    subject: "fixture-subject",
+    declared_stages: [
+      "p1-ingest",
+      "p2-sweep",
+      "p3-encode",
+      "p4-forks",
+      "p5-gate",
+    ],
+  });
+  append(
+    j,
+    base({
+      stage: "p1-ingest",
+      status: "PASS",
+      reason: null,
+      oracle: {
+        cmd: "register-validate source-bundle …",
+        exit: 0,
+        class: "structural",
+        because: "«P1-BECAUSE»",
+      },
+      notes: [{ text: "«P1-NOTE»", author: "phase-script", verified: false }],
+    }),
+  );
+  append(
+    j,
+    base({
+      stage: "p2-sweep",
+      status: "SKIPPED",
+      reason: "«P2-REASON»",
+      artifacts: [],
+      oracle: null,
+    }),
+  );
+  append(
+    j,
+    base({
+      stage: "p3-encode",
+      status: "SKIPPED",
+      reason: "«P3-REASON»",
+      artifacts: [],
+      oracle: null,
+    }),
+  );
+  append(
+    j,
+    base({
+      stage: "p4-forks",
+      status: "SKIPPED",
+      reason: "«P4-REASON»",
+      artifacts: [],
+      oracle: null,
+    }),
+  );
+  append(
+    j,
+    base({
+      stage: "p5-gate",
+      status: "PASS",
+      reason: null,
+      oracle: {
+        cmd: "register-validate … ×3",
+        exit: 0,
+        class: "structural",
+        because: "«P5-BECAUSE»",
+      },
+      notes: [
+        {
+          text: "«P5-HG1-COMPLETENESS»",
+          author: "phase-script",
+          verified: false,
+        },
+        {
+          text: "«P5-HG1-ISOMORPHISM»",
+          author: "phase-script",
+          verified: false,
+        },
+      ],
+    }),
+  );
+  append(j, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+  const r = spawnSync("node", [resolve(HERE, "report/render-report.mjs"), d], {
+    encoding: "utf8",
+  });
+  const md =
+    r.status === 0 ? readFileSync(resolve(d, "report.md"), "utf8") : "";
+  check(
+    "every de novo receipt's reason reaches the report — all five, not three",
+    ["«P2-REASON»", "«P3-REASON»", "«P4-REASON»"].every((s) => md.includes(s)),
+  );
+  check(
+    "p4-forks and p5-gate have their own rendered blocks, not just a mention in ABSENT prose",
+    /\*\*Ambiguity forks:\*\*/.test(md) &&
+      /\*\*Adversarial gate \(mechanisable half\):\*\* PASS/.test(md),
+  );
+  check(
+    "a PASS receipt renders without the literal 'null' its absent reason used to print",
+    /\*\*PASS\*\*/.test(md) && !/\bnull\b/.test(md),
+  );
+  check(
+    "a de novo PASS carries its oracle's `because` into the report, not just its status",
+    md.includes("«P1-BECAUSE»") && md.includes("«P5-BECAUSE»"),
+  );
+  check(
+    "and its notes — everything the PASS does NOT establish — reach the reader too",
+    md.includes("«P1-NOTE»") &&
+      md.includes("«P5-HG1-COMPLETENESS»") &&
+      md.includes("«P5-HG1-ISOMORPHISM»"),
+  );
+  // The retensing that commit e10a64f2 did to the docs and missed in the one
+  // place a reader sees: the renderer's own ABSENT prose still said these
+  // stages "refuse" and that the de novo tooling "is unbuilt", printed on
+  // EVERY g1 run.
+  const g1 = mkdtempSync(resolve(tmpdir(), "l4-go-g1report-"));
+  const gj = resolve(g1, "journal.ndjson");
+  append(gj, {
+    kind: "run_begin",
+    run_id: "g1-report-test",
+    milestone: "g1",
+    subject: "fixture-subject",
+    declared_stages: ["p6-tests"],
+  });
+  append(gj, base({ stage: "p6-tests", status: "PASS", reason: null }));
+  append(gj, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+  const gr = spawnSync(
+    "node",
+    [resolve(HERE, "report/render-report.mjs"), g1],
+    {
+      encoding: "utf8",
+    },
+  );
+  const gmd =
+    gr.status === 0
+      ? readFileSync(resolve(g1, "report.md"), "utf8")
+      : "«unrendered»";
+  check(
+    "a g1 report no longer claims the de novo stages refuse, or that their tooling is unbuilt",
+    !/entry point that refuses/.test(gmd) &&
+      !/de novo tooling is unbuilt/.test(gmd) &&
+      /not declared at this milestone/.test(gmd),
+  );
+  rmSync(d, { recursive: true, force: true });
+  rmSync(g1, { recursive: true, force: true });
+}
 // ===== END de-novo deposit-stage checks =====================================
 
 process.stdout.write(
