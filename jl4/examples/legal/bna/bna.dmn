@@ -1,0 +1,1295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_british_nationality_act_1981_section_1_acquisition_by_birth_or_adoption" name="British Nationality Act 1981, section 1 — Acquisition by birth or adoption" namespace="https://legalese.com/l4/dmn/british_nationality_act_1981_section_1_acquisition_by_birth_or_adoption" exporter="jl4">
+  <itemDefinition id="itemdef_personprofile" name="PersonProfile">
+    <itemComponent id="itemdef_personprofile_c1" name="name">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c2" name="born_in_the_United_Kingdom" label="born in the United Kingdom">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c3" name="born_in_a_qualifying_territory" label="born in a qualifying territory">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c4" name="date_of_birth" label="date of birth">
+      <typeRef>date</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c5" name="father_or_mother_a_British_citizen_at_the_time_of_the_birth" label="father or mother a British citizen at the time of the birth">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c6" name="father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth" label="father or mother settled in the United Kingdom or the territory of birth at the time of the birth">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c7" name="father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth" label="father or mother a member of the armed forces at the time of the birth">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c8" name="found_abandoned_as_a_new_born_infant_in_the_United_Kingdom" label="found abandoned as a new-born infant in the United Kingdom">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c9" name="found_abandoned_as_a_new_born_infant_in_a_qualifying_territory" label="found abandoned as a new-born infant in a qualifying territory">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c10" name="date_found_abandoned" label="date found abandoned">
+      <typeRef>date</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c11" name="the_contrary_shown_rebutting_the_subsection_2_presumption" label="the contrary shown, rebutting the subsection (2) presumption">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c12" name="a_British_citizen_under_section_10A" label="a British citizen under section 10A">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c13" name="while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom" label="while a minor, father or mother became a British citizen or became settled in the United Kingdom">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c14" name="while_a_minor_father_or_mother_became_a_member_of_the_armed_forces" label="while a minor, father or mother became a member of the armed forces">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c15" name="while_a_minor_an_application_made_for_registration_as_a_British_citizen" label="while a minor, an application made for registration as a British citizen">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c16" name="an_application_for_registration_made_after_attaining_the_age_of_ten_years" label="an application for registration made after attaining the age of ten years">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c17" name="greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life" label="greatest number of days absent from the United Kingdom in any one of the first ten years of life">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c18" name="the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled" label="the Secretary of State treats the subsection (4) residence requirement as fulfilled">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_personprofile_c19" name="of_good_character_where_the_good_character_requirement_applies" label="of good character, where the good character requirement applies">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_adoptioncase" name="AdoptionCase">
+    <itemComponent id="itemdef_adoptioncase_c1" name="the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption" label="the adopted person a minor on the date of the order or adoption">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c2" name="the_adopted_person_already_a_British_citizen" label="the adopted person already a British citizen">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c3" name="an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption" label="an order of a court in the United Kingdom authorising the adoption">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c4" name="an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption" label="an order of a court in a qualifying territory authorising the adoption">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c5" name="a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom" label="a Convention adoption effected under the law of a country or territory outside the United Kingdom">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c6" name="date_of_the_order_or_Convention_adoption" label="date of the order or Convention adoption">
+      <typeRef>date</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c7" name="the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date" label="the adopter or, in a joint adoption, one of the adopters a British citizen on that date">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c8" name="the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date" label="the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_adoptioncase_c9" name="the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise" label="the order or Convention adoption since ceased to have effect, whether on annulment or otherwise">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_birthoutcome" name="BirthOutcome">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"a British citizen from birth under subsection (1)","a British citizen from birth under subsection (1A)","not a British citizen from birth under section 1"</text>
+    </allowedValues>
+  </itemDefinition>
+  <inputData id="input_person" name="person">
+    <variable id="input_person_var" name="person" typeRef="PersonProfile"/>
+  </inputData>
+  <inputData id="input_entitled_under_subsection_3_3a_or_4" name="entitled_under_subsection_3_3A_or_4" label="entitled under subsection (3), (3A) or (4)">
+    <variable id="input_entitled_under_subsection_3_3a_or_4_var" name="entitled_under_subsection_3_3A_or_4" label="entitled under subsection (3), (3A) or (4)" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_adoption" name="adoption">
+    <variable id="input_adoption_var" name="adoption" typeRef="AdoptionCase"/>
+  </inputData>
+  <decision id="decision_commencement" name="commencement">
+    <variable id="decision_commencement_var" name="commencement" typeRef="date"/>
+    <literalExpression id="decision_commencement_literal">
+      <text>YMD OF 1983, 1, 1</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_appointed_day" name="the_appointed_day" label="the appointed day">
+    <variable id="decision_the_appointed_day_var" name="the_appointed_day" label="the appointed day" typeRef="date"/>
+    <literalExpression id="decision_the_appointed_day_literal">
+      <text>YMD OF 2002, 5, 21</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_relevant_day" name="the_relevant_day" label="the relevant day">
+    <variable id="decision_the_relevant_day_var" name="the_relevant_day" label="the relevant day" typeRef="date"/>
+    <literalExpression id="decision_the_relevant_day_literal">
+      <text>YMD OF 2010, 1, 13</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_permitted_days_of_absence_in_each_of_the_first_ten_years" name="permitted_days_of_absence_in_each_of_the_first_ten_years" label="permitted days of absence in each of the first ten years">
+    <variable id="decision_permitted_days_of_absence_in_each_of_the_first_ten_years_var" name="permitted_days_of_absence_in_each_of_the_first_ten_years" label="permitted days of absence in each of the first ten years" typeRef="number"/>
+    <literalExpression id="decision_permitted_days_of_absence_in_each_of_the_first_ten_years_literal">
+      <text>90</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_born_in_the_united_kingdom_after_commencement" name="born_in_the_United_Kingdom_after_commencement" label="born in the United Kingdom after commencement">
+    <variable id="decision_born_in_the_united_kingdom_after_commencement_var" name="born_in_the_United_Kingdom_after_commencement" label="born in the United Kingdom after commencement" typeRef="boolean"/>
+    <informationRequirement id="decision_born_in_the_united_kingdom_after_commencement_ir1">
+      <requiredDecision href="#decision_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision_born_in_the_united_kingdom_after_commencement_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_born_in_the_united_kingdom_after_commencement_literal">
+      <text>person.born_in_the_United_Kingdom and person.date_of_birth &gt;= commencement</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day" name="born_in_a_qualifying_territory_on_or_after_the_appointed_day" label="born in a qualifying territory on or after the appointed day">
+    <variable id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_var" name="born_in_a_qualifying_territory_on_or_after_the_appointed_day" label="born in a qualifying territory on or after the appointed day" typeRef="boolean"/>
+    <informationRequirement id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+      <requiredDecision href="#decision_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_literal">
+      <text>person.born_in_a_qualifying_territory and person.date_of_birth &gt;= the_appointed_day</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_born_in_the_united_kingdom_or_a_qualifying_territory" name="born_in_the_United_Kingdom_or_a_qualifying_territory" label="born in the United Kingdom or a qualifying territory">
+    <variable id="decision_born_in_the_united_kingdom_or_a_qualifying_territory_var" name="born_in_the_United_Kingdom_or_a_qualifying_territory" label="born in the United Kingdom or a qualifying territory" typeRef="boolean"/>
+    <informationRequirement id="decision_born_in_the_united_kingdom_or_a_qualifying_territory_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_born_in_the_united_kingdom_or_a_qualifying_territory_literal">
+      <text>person.born_in_the_United_Kingdom or person.born_in_a_qualifying_territory</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day" name="born_in_the_United_Kingdom_on_or_after_the_relevant_day" label="born in the United Kingdom on or after the relevant day">
+    <variable id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_var" name="born_in_the_United_Kingdom_on_or_after_the_relevant_day" label="born in the United Kingdom on or after the relevant day" typeRef="boolean"/>
+    <informationRequirement id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_ir1">
+      <requiredDecision href="#decision_the_relevant_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_literal">
+      <text>person.born_in_the_United_Kingdom and person.date_of_birth &gt;= the_relevant_day</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day" name="_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day" label="1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day">
+    <variable id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_var" name="_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day" label="1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day" typeRef="boolean"/>
+    <informationRequirement id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+      <requiredDecision href="#decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+      <requiredDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_literal">
+      <text>born_in_the_United_Kingdom_after_commencement or born_in_a_qualifying_territory_on_or_after_the_appointed_day</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_1_a_father_or_mother_a_british_citizen" name="_1_1_a_father_or_mother_a_British_citizen" label="1(1)(a) — father or mother a British citizen">
+    <variable id="decision__1_1_a_father_or_mother_a_british_citizen_var" name="_1_1_a_father_or_mother_a_British_citizen" label="1(1)(a) — father or mother a British citizen" typeRef="boolean"/>
+    <informationRequirement id="decision__1_1_a_father_or_mother_a_british_citizen_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_1_a_father_or_mother_a_british_citizen_literal">
+      <text>true and person.father_or_mother_a_British_citizen_at_the_time_of_the_birth</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory" name="_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory" label="1(1)(b) — father or mother settled in the United Kingdom or that territory">
+    <variable id="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory_var" name="_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory" label="1(1)(b) — father or mother settled in the United Kingdom or that territory" typeRef="boolean"/>
+    <informationRequirement id="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory_literal">
+      <text>true and person.father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled" name="_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled" label="1(1) — at the time of the birth his father or mother is a citizen or settled">
+    <variable id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_var" name="_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled" label="1(1) — at the time of the birth his father or mother is a citizen or settled" typeRef="boolean"/>
+    <informationRequirement id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir1">
+      <requiredDecision href="#decision__1_1_a_father_or_mother_a_british_citizen"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir2">
+      <requiredDecision href="#decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_literal">
+      <text>_1_1_a_father_or_mother_a_British_citizen or _1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth" name="_1_1_satisfied_on_the_actual_facts_of_the_birth" label="1(1) — satisfied on the actual facts of the birth">
+    <variable id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_var" name="_1_1_satisfied_on_the_actual_facts_of_the_birth" label="1(1) — satisfied on the actual facts of the birth" typeRef="boolean"/>
+    <informationRequirement id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir1">
+      <requiredDecision href="#decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir2">
+      <requiredDecision href="#decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_literal">
+      <text>true and (_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day and _1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_found_abandoned_in_the_united_kingdom_after_commencement" name="found_abandoned_in_the_United_Kingdom_after_commencement" label="found abandoned in the United Kingdom after commencement">
+    <variable id="decision_found_abandoned_in_the_united_kingdom_after_commencement_var" name="found_abandoned_in_the_United_Kingdom_after_commencement" label="found abandoned in the United Kingdom after commencement" typeRef="boolean"/>
+    <informationRequirement id="decision_found_abandoned_in_the_united_kingdom_after_commencement_ir1">
+      <requiredDecision href="#decision_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision_found_abandoned_in_the_united_kingdom_after_commencement_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_found_abandoned_in_the_united_kingdom_after_commencement_literal">
+      <text>person.found_abandoned_as_a_new_born_infant_in_the_United_Kingdom and person.date_found_abandoned &gt;= commencement</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day" name="found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day" label="found abandoned in a qualifying territory on or after the appointed day">
+    <variable id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_var" name="found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day" label="found abandoned in a qualifying territory on or after the appointed day" typeRef="boolean"/>
+    <informationRequirement id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+      <requiredDecision href="#decision_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_literal">
+      <text>person.found_abandoned_as_a_new_born_infant_in_a_qualifying_territory and person.date_found_abandoned &gt;= the_appointed_day</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time" name="_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time" label="1(2) — found abandoned in the United Kingdom or a qualifying territory in time">
+    <variable id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_var" name="_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time" label="1(2) — found abandoned in the United Kingdom or a qualifying territory in time" typeRef="boolean"/>
+    <informationRequirement id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir1">
+      <requiredDecision href="#decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir2">
+      <requiredDecision href="#decision_found_abandoned_in_the_united_kingdom_after_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_literal">
+      <text>found_abandoned_in_the_United_Kingdom_after_commencement or found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_deemed_by_subsection_2_to_satisfy_subsection_1" name="deemed_by_subsection_2_to_satisfy_subsection_1" label="deemed by subsection (2) to satisfy subsection (1)">
+    <variable id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_var" name="deemed_by_subsection_2_to_satisfy_subsection_1" label="deemed by subsection (2) to satisfy subsection (1)" typeRef="boolean"/>
+    <informationRequirement id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_ir1">
+      <requiredDecision href="#decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time"/>
+    </informationRequirement>
+    <informationRequirement id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_literal">
+      <text>true and (_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time and (not(person.the_contrary_shown_rebutting_the_subsection_2_presumption) and (true and true)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2" name="a_British_citizen_by_virtue_of_subsection_1_or_2" label="a British citizen by virtue of subsection (1) or (2)">
+    <variable id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_var" name="a_British_citizen_by_virtue_of_subsection_1_or_2" label="a British citizen by virtue of subsection (1) or (2)" typeRef="boolean"/>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir1">
+      <requiredDecision href="#decision__1_1_satisfied_on_the_actual_facts_of_the_birth"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir2">
+      <requiredDecision href="#decision_deemed_by_subsection_2_to_satisfy_subsection_1"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_literal">
+      <text>_1_1_satisfied_on_the_actual_facts_of_the_birth or deemed_by_subsection_2_to_satisfy_subsection_1</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_british_citizen_by_virtue_of_subsection_1a" name="a_British_citizen_by_virtue_of_subsection_1A" label="a British citizen by virtue of subsection (1A)">
+    <variable id="decision_a_british_citizen_by_virtue_of_subsection_1a_var" name="a_British_citizen_by_virtue_of_subsection_1A" label="a British citizen by virtue of subsection (1A)" typeRef="boolean"/>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_1a_ir1">
+      <requiredDecision href="#decision_born_in_the_united_kingdom_or_a_qualifying_territory"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_1a_ir2">
+      <requiredDecision href="#decision_the_relevant_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_1a_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_british_citizen_by_virtue_of_subsection_1a_literal">
+      <text>true and (born_in_the_United_Kingdom_or_a_qualifying_territory and (person.date_of_birth &gt;= the_relevant_day and person.father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a" name="not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A" label="not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A">
+    <variable id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_var" name="not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A" label="not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A" typeRef="boolean"/>
+    <informationRequirement id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir1">
+      <requiredDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1_or_2"/>
+    </informationRequirement>
+    <informationRequirement id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir2">
+      <requiredDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_literal">
+      <text>not(a_British_citizen_by_virtue_of_subsection_1_or_2) and (not(a_British_citizen_by_virtue_of_subsection_1A) and not(person.a_British_citizen_under_section_10A))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled" name="_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled" label="1(3)(a) — father or mother becomes a British citizen or settled">
+    <variable id="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled_var" name="_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled" label="1(3)(a) — father or mother becomes a British citizen or settled" typeRef="boolean"/>
+    <informationRequirement id="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled_literal">
+      <text>true and person.while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_3_b_an_application_is_made_while_a_minor" name="_1_3_b_an_application_is_made_while_a_minor" label="1(3)(b) — an application is made while a minor">
+    <variable id="decision__1_3_b_an_application_is_made_while_a_minor_var" name="_1_3_b_an_application_is_made_while_a_minor" label="1(3)(b) — an application is made while a minor" typeRef="boolean"/>
+    <informationRequirement id="decision__1_3_b_an_application_is_made_while_a_minor_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_3_b_an_application_is_made_while_a_minor_literal">
+      <text>true and person.while_a_minor_an_application_made_for_registration_as_a_British_citizen</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_entitled_to_be_registered_under_subsection_3" name="entitled_to_be_registered_under_subsection_3" label="entitled to be registered under subsection (3)">
+    <variable id="decision_entitled_to_be_registered_under_subsection_3_var" name="entitled_to_be_registered_under_subsection_3" label="entitled to be registered under subsection (3)" typeRef="boolean"/>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3_ir1">
+      <requiredDecision href="#decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3_ir2">
+      <requiredDecision href="#decision__1_3_b_an_application_is_made_while_a_minor"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3_ir3">
+      <requiredDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3_ir4">
+      <requiredDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3_ir5">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_entitled_to_be_registered_under_subsection_3_literal">
+      <text>true and (born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled and _1_3_b_an_application_is_made_while_a_minor)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces" name="_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces" label="1(3A)(a) — father or mother becomes a member of the armed forces">
+    <variable id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces_var" name="_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces" label="1(3A)(a) — father or mother becomes a member of the armed forces" typeRef="boolean"/>
+    <informationRequirement id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces_literal">
+      <text>true and person.while_a_minor_father_or_mother_became_a_member_of_the_armed_forces</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_3a_b_an_application_is_made_while_a_minor" name="_1_3A_b_an_application_is_made_while_a_minor" label="1(3A)(b) — an application is made while a minor">
+    <variable id="decision__1_3a_b_an_application_is_made_while_a_minor_var" name="_1_3A_b_an_application_is_made_while_a_minor" label="1(3A)(b) — an application is made while a minor" typeRef="boolean"/>
+    <informationRequirement id="decision__1_3a_b_an_application_is_made_while_a_minor_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_3a_b_an_application_is_made_while_a_minor_literal">
+      <text>true and person.while_a_minor_an_application_made_for_registration_as_a_British_citizen</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_entitled_to_be_registered_under_subsection_3a" name="entitled_to_be_registered_under_subsection_3A" label="entitled to be registered under subsection (3A)">
+    <variable id="decision_entitled_to_be_registered_under_subsection_3a_var" name="entitled_to_be_registered_under_subsection_3A" label="entitled to be registered under subsection (3A)" typeRef="boolean"/>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3a_ir1">
+      <requiredDecision href="#decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3a_ir2">
+      <requiredDecision href="#decision__1_3a_b_an_application_is_made_while_a_minor"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3a_ir3">
+      <requiredDecision href="#decision_born_in_the_united_kingdom_on_or_after_the_relevant_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3a_ir4">
+      <requiredDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_3a_ir5">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_entitled_to_be_registered_under_subsection_3a_literal">
+      <text>true and (born_in_the_United_Kingdom_on_or_after_the_relevant_day and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces and _1_3A_b_an_application_is_made_while_a_minor)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_4_application_made_after_attaining_the_age_of_ten_years" name="_1_4_application_made_after_attaining_the_age_of_ten_years" label="1(4) — application made after attaining the age of ten years">
+    <variable id="decision__1_4_application_made_after_attaining_the_age_of_ten_years_var" name="_1_4_application_made_after_attaining_the_age_of_ten_years" label="1(4) — application made after attaining the age of ten years" typeRef="boolean"/>
+    <informationRequirement id="decision__1_4_application_made_after_attaining_the_age_of_ten_years_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_4_application_made_after_attaining_the_age_of_ten_years_literal">
+      <text>true and person.an_application_for_registration_made_after_attaining_the_age_of_ten_years</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years" name="_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years" label="1(4) — absences within the ninety-day ceiling in each of the first ten years">
+    <variable id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_var" name="_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years" label="1(4) — absences within the ninety-day ceiling in each of the first ten years" typeRef="boolean"/>
+    <informationRequirement id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_ir1">
+      <requiredDecision href="#decision_permitted_days_of_absence_in_each_of_the_first_ten_years"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_literal">
+      <text>true and person.greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life &lt;= permitted_days_of_absence_in_each_of_the_first_ten_years</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled" name="_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled" label="1(7) — the Secretary of State treats the residence requirement as fulfilled">
+    <variable id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled_var" name="_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled" label="1(7) — the Secretary of State treats the residence requirement as fulfilled" typeRef="boolean"/>
+    <informationRequirement id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled_ir1">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled_literal">
+      <text>true and person.the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_4_the_residence_requirement_met_or_treated_as_met" name="_1_4_the_residence_requirement_met_or_treated_as_met" label="1(4) — the residence requirement met or treated as met">
+    <variable id="decision__1_4_the_residence_requirement_met_or_treated_as_met_var" name="_1_4_the_residence_requirement_met_or_treated_as_met" label="1(4) — the residence requirement met or treated as met" typeRef="boolean"/>
+    <informationRequirement id="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir1">
+      <requiredDecision href="#decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir2">
+      <requiredDecision href="#decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_4_the_residence_requirement_met_or_treated_as_met_literal">
+      <text>_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years or _1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_entitled_to_be_registered_under_subsection_4" name="entitled_to_be_registered_under_subsection_4" label="entitled to be registered under subsection (4)">
+    <variable id="decision_entitled_to_be_registered_under_subsection_4_var" name="entitled_to_be_registered_under_subsection_4" label="entitled to be registered under subsection (4)" typeRef="boolean"/>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_4_ir1">
+      <requiredDecision href="#decision__1_4_application_made_after_attaining_the_age_of_ten_years"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_4_ir2">
+      <requiredDecision href="#decision__1_4_the_residence_requirement_met_or_treated_as_met"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_4_ir3">
+      <requiredDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_4_ir4">
+      <requiredDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_entitled_to_be_registered_under_subsection_4_ir5">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_entitled_to_be_registered_under_subsection_4_literal">
+      <text>true and (born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_4_application_made_after_attaining_the_age_of_ten_years and _1_4_the_residence_requirement_met_or_treated_as_met)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_registration_may_be_granted" name="registration_may_be_granted" label="registration may be granted">
+    <variable id="decision_registration_may_be_granted_var" name="registration_may_be_granted" label="registration may be granted" typeRef="boolean"/>
+    <informationRequirement id="decision_registration_may_be_granted_ir1">
+      <requiredInput href="#input_entitled_under_subsection_3_3a_or_4"/>
+    </informationRequirement>
+    <informationRequirement id="decision_registration_may_be_granted_ir2">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <literalExpression id="decision_registration_may_be_granted_literal">
+      <text>entitled_under_subsection_3_3A_or_4 and person.of_good_character_where_the_good_character_requirement_applies</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day" name="order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day" label="order of a court in a qualifying territory on or after the appointed day">
+    <variable id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_var" name="order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day" label="order of a court in a qualifying territory on or after the appointed day" typeRef="boolean"/>
+    <informationRequirement id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+      <requiredDecision href="#decision_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_literal">
+      <text>adoption.an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption and adoption.date_of_the_order_or_Convention_adoption &gt;= the_appointed_day</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_5_a_a_court_order_authorising_the_adoption" name="_1_5_a_a_court_order_authorising_the_adoption" label="1(5)(a) — a court order authorising the adoption">
+    <variable id="decision__1_5_a_a_court_order_authorising_the_adoption_var" name="_1_5_a_a_court_order_authorising_the_adoption" label="1(5)(a) — a court order authorising the adoption" typeRef="boolean"/>
+    <informationRequirement id="decision__1_5_a_a_court_order_authorising_the_adoption_ir1">
+      <requiredDecision href="#decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_5_a_a_court_order_authorising_the_adoption_ir2">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_5_a_a_court_order_authorising_the_adoption_literal">
+      <text>false or (adoption.an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption or order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_5_b_adopted_under_a_convention_adoption" name="_1_5_b_adopted_under_a_Convention_adoption" label="1(5)(b) — adopted under a Convention adoption">
+    <variable id="decision__1_5_b_adopted_under_a_convention_adoption_var" name="_1_5_b_adopted_under_a_Convention_adoption" label="1(5)(b) — adopted under a Convention adoption" typeRef="boolean"/>
+    <informationRequirement id="decision__1_5_b_adopted_under_a_convention_adoption_ir1">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_5_b_adopted_under_a_convention_adoption_literal">
+      <text>true and adoption.a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected" name="_1_5_an_order_is_made_or_a_Convention_adoption_is_effected" label="1(5) — an order is made or a Convention adoption is effected">
+    <variable id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_var" name="_1_5_an_order_is_made_or_a_Convention_adoption_is_effected" label="1(5) — an order is made or a Convention adoption is effected" typeRef="boolean"/>
+    <informationRequirement id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir1">
+      <requiredDecision href="#decision__1_5_a_a_court_order_authorising_the_adoption"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir2">
+      <requiredDecision href="#decision__1_5_b_adopted_under_a_convention_adoption"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir3">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_literal">
+      <text>_1_5_a_a_court_order_authorising_the_adoption or _1_5_b_adopted_under_a_Convention_adoption</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen" name="the_adopted_person_a_minor_and_not_already_a_British_citizen" label="the adopted person a minor and not already a British citizen">
+    <variable id="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen_var" name="the_adopted_person_a_minor_and_not_already_a_British_citizen" label="the adopted person a minor and not already a British citizen" typeRef="boolean"/>
+    <informationRequirement id="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen_ir1">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen_literal">
+      <text>adoption.the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption and not(adoption.the_adopted_person_already_a_British_citizen)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen" name="_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen" label="1(5A)(a) — the adopter, or one joint adopter, a British citizen">
+    <variable id="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen_var" name="_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen" label="1(5A)(a) — the adopter, or one joint adopter, a British citizen" typeRef="boolean"/>
+    <informationRequirement id="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen_ir1">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen_literal">
+      <text>true and adoption.the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_5a_b_habitual_residence_in_a_convention_case" name="_1_5A_b_habitual_residence_in_a_Convention_case" label="1(5A)(b) — habitual residence, in a Convention case">
+    <variable id="decision__1_5a_b_habitual_residence_in_a_convention_case_var" name="_1_5A_b_habitual_residence_in_a_Convention_case" label="1(5A)(b) — habitual residence, in a Convention case" typeRef="boolean"/>
+    <informationRequirement id="decision__1_5a_b_habitual_residence_in_a_convention_case_ir1">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_5a_b_habitual_residence_in_a_convention_case_literal">
+      <text>false or (not(adoption.a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom) or adoption.the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption" name="_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption" label="1(5A) — the requirements are met on the date of the order or adoption">
+    <variable id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_var" name="_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption" label="1(5A) — the requirements are met on the date of the order or adoption" typeRef="boolean"/>
+    <informationRequirement id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir1">
+      <requiredDecision href="#decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir2">
+      <requiredDecision href="#decision__1_5a_b_habitual_residence_in_a_convention_case"/>
+    </informationRequirement>
+    <informationRequirement id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir3">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_literal">
+      <text>true and (_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen and _1_5A_b_habitual_residence_in_a_Convention_case)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_british_citizen_by_virtue_of_subsection_5" name="a_British_citizen_by_virtue_of_subsection_5" label="a British citizen by virtue of subsection (5)">
+    <variable id="decision_a_british_citizen_by_virtue_of_subsection_5_var" name="a_British_citizen_by_virtue_of_subsection_5" label="a British citizen by virtue of subsection (5)" typeRef="boolean"/>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_5_ir1">
+      <requiredDecision href="#decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_5_ir2">
+      <requiredDecision href="#decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_5_ir3">
+      <requiredDecision href="#decision_the_adopted_person_a_minor_and_not_already_a_british_citizen"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_by_virtue_of_subsection_5_ir4">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_british_citizen_by_virtue_of_subsection_5_literal">
+      <text>true and (the_adopted_person_a_minor_and_not_already_a_British_citizen and (_1_5_an_order_is_made_or_a_Convention_adoption_is_effected and _1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6" name="a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6" label="a British citizen notwithstanding cesser of the order — subsection (6)">
+    <variable id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_var" name="a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6" label="a British citizen notwithstanding cesser of the order — subsection (6)" typeRef="boolean"/>
+    <informationRequirement id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_ir1">
+      <requiredDecision href="#decision_a_british_citizen_by_virtue_of_subsection_5"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_ir2">
+      <requiredInput href="#input_adoption"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_literal">
+      <text>true and a_British_citizen_by_virtue_of_subsection_5</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_section_1_outcome_at_birth" name="section_1_outcome_at_birth" label="section 1 outcome at birth">
+    <variable id="decision_section_1_outcome_at_birth_var" name="section_1_outcome_at_birth" label="section 1 outcome at birth" typeRef="BirthOutcome"/>
+    <informationRequirement id="decision_section_1_outcome_at_birth_ir1">
+      <requiredDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1_or_2"/>
+    </informationRequirement>
+    <informationRequirement id="decision_section_1_outcome_at_birth_ir2">
+      <requiredDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_section_1_outcome_at_birth_ir3">
+      <requiredInput href="#input_person"/>
+    </informationRequirement>
+    <decisionTable id="decision_section_1_outcome_at_birth_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="section 1 outcome at birth">
+      <input id="decision_section_1_outcome_at_birth_i1" label="`a British citizen by virtue of subsection (1) or (2)` OF person">
+        <inputExpression id="decision_section_1_outcome_at_birth_i1_expr" typeRef="boolean">
+          <text>a_British_citizen_by_virtue_of_subsection_1_or_2</text>
+        </inputExpression>
+      </input>
+      <input id="decision_section_1_outcome_at_birth_i2" label="`a British citizen by virtue of subsection (1A)` OF person">
+        <inputExpression id="decision_section_1_outcome_at_birth_i2_expr" typeRef="boolean">
+          <text>a_British_citizen_by_virtue_of_subsection_1A</text>
+        </inputExpression>
+      </input>
+      <output id="decision_section_1_outcome_at_birth_o1">
+        <outputValues>
+          <text>"a British citizen from birth under subsection (1)","a British citizen from birth under subsection (1A)","not a British citizen from birth under section 1"</text>
+        </outputValues>
+      </output>
+      <rule id="decision_section_1_outcome_at_birth_r1">
+        <description>`a British citizen by virtue of subsection (1) or (2)` OF person</description>
+        <inputEntry id="decision_section_1_outcome_at_birth_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_section_1_outcome_at_birth_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_section_1_outcome_at_birth_r1_o1">
+          <text>"a British citizen from birth under subsection (1)"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_section_1_outcome_at_birth_r2">
+        <description>`a British citizen by virtue of subsection (1A)` OF person</description>
+        <inputEntry id="decision_section_1_outcome_at_birth_r2_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_section_1_outcome_at_birth_r2_i2">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="decision_section_1_outcome_at_birth_r2_o1">
+          <text>"a British citizen from birth under subsection (1A)"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_section_1_outcome_at_birth_r3">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_section_1_outcome_at_birth_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_section_1_outcome_at_birth_r3_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_section_1_outcome_at_birth_r3_o1">
+          <text>"not a British citizen from birth under section 1"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decisionService id="service_common_timing_predicates" name="Common_timing_predicates" label="Common timing predicates">
+    <variable id="service_common_timing_predicates_var" name="Common_timing_predicates" label="Common timing predicates" typeRef="Any"/>
+    <outputDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    <outputDecision href="#decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    <outputDecision href="#decision_born_in_the_united_kingdom_or_a_qualifying_territory"/>
+    <outputDecision href="#decision_born_in_the_united_kingdom_on_or_after_the_relevant_day"/>
+    <inputDecision href="#decision_commencement"/>
+    <inputDecision href="#decision_the_appointed_day"/>
+    <inputDecision href="#decision_the_relevant_day"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsection_1_birth_in_the_united_kingdom_or_a_qualifying_territory" name="Subsection_1_birth_in_the_United_Kingdom_or_a_qualifying_territory" label="Subsection (1) — birth in the United Kingdom or a qualifying territory">
+    <variable id="service_subsection_1_birth_in_the_united_kingdom_or_a_qualifying_territory_var" name="Subsection_1_birth_in_the_United_Kingdom_or_a_qualifying_territory" label="Subsection (1) — birth in the United Kingdom or a qualifying territory" typeRef="boolean"/>
+    <outputDecision href="#decision__1_1_satisfied_on_the_actual_facts_of_the_birth"/>
+    <encapsulatedDecision href="#decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    <encapsulatedDecision href="#decision__1_1_a_father_or_mother_a_british_citizen"/>
+    <encapsulatedDecision href="#decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory"/>
+    <encapsulatedDecision href="#decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled"/>
+    <inputDecision href="#decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    <inputDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsection_2_the_foundling_presumption" name="Subsection_2_the_foundling_presumption" label="Subsection (2) — the foundling presumption">
+    <variable id="service_subsection_2_the_foundling_presumption_var" name="Subsection_2_the_foundling_presumption" label="Subsection (2) — the foundling presumption" typeRef="boolean"/>
+    <outputDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1_or_2"/>
+    <encapsulatedDecision href="#decision_found_abandoned_in_the_united_kingdom_after_commencement"/>
+    <encapsulatedDecision href="#decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    <encapsulatedDecision href="#decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time"/>
+    <encapsulatedDecision href="#decision_deemed_by_subsection_2_to_satisfy_subsection_1"/>
+    <inputDecision href="#decision_commencement"/>
+    <inputDecision href="#decision_the_appointed_day"/>
+    <inputDecision href="#decision__1_1_satisfied_on_the_actual_facts_of_the_birth"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsection_1a_the_armed_forces_route" name="Subsection_1A_the_armed_forces_route" label="Subsection (1A) — the armed-forces route">
+    <variable id="service_subsection_1a_the_armed_forces_route_var" name="Subsection_1A_the_armed_forces_route" label="Subsection (1A) — the armed-forces route" typeRef="boolean"/>
+    <outputDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1a"/>
+    <inputDecision href="#decision_born_in_the_united_kingdom_or_a_qualifying_territory"/>
+    <inputDecision href="#decision_the_relevant_day"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_the_subsection_3_3a_and_4_chapeau_not_already_a_citizen" name="The_subsection_3_3A_and_4_chapeau_not_already_a_citizen" label="The subsection (3), (3A) and (4) chapeau — not already a citizen">
+    <variable id="service_the_subsection_3_3a_and_4_chapeau_not_already_a_citizen_var" name="The_subsection_3_3A_and_4_chapeau_not_already_a_citizen" label="The subsection (3), (3A) and (4) chapeau — not already a citizen" typeRef="boolean"/>
+    <outputDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    <inputDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1_or_2"/>
+    <inputDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1a"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsection_3_registration_after_a_parent_becomes_a_citizen_or_settled" name="Subsection_3_registration_after_a_parent_becomes_a_citizen_or_settled" label="Subsection (3) — registration after a parent becomes a citizen or settled">
+    <variable id="service_subsection_3_registration_after_a_parent_becomes_a_citizen_or_settled_var" name="Subsection_3_registration_after_a_parent_becomes_a_citizen_or_settled" label="Subsection (3) — registration after a parent becomes a citizen or settled" typeRef="boolean"/>
+    <outputDecision href="#decision_entitled_to_be_registered_under_subsection_3"/>
+    <encapsulatedDecision href="#decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled"/>
+    <encapsulatedDecision href="#decision__1_3_b_an_application_is_made_while_a_minor"/>
+    <inputDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    <inputDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsection_3a_registration_after_a_parent_joins_the_armed_forces" name="Subsection_3A_registration_after_a_parent_joins_the_armed_forces" label="Subsection (3A) — registration after a parent joins the armed forces">
+    <variable id="service_subsection_3a_registration_after_a_parent_joins_the_armed_forces_var" name="Subsection_3A_registration_after_a_parent_joins_the_armed_forces" label="Subsection (3A) — registration after a parent joins the armed forces" typeRef="boolean"/>
+    <outputDecision href="#decision_entitled_to_be_registered_under_subsection_3a"/>
+    <encapsulatedDecision href="#decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces"/>
+    <encapsulatedDecision href="#decision__1_3a_b_an_application_is_made_while_a_minor"/>
+    <inputDecision href="#decision_born_in_the_united_kingdom_on_or_after_the_relevant_day"/>
+    <inputDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsection_4_registration_on_ten_years_residence_and_the_subsection_7_dispensation" name="Subsection_4_registration_on_ten_years_residence_and_the_subsection_7_dispensation" label="Subsection (4) — registration on ten years&apos; residence, and the subsection (7) dispensation">
+    <variable id="service_subsection_4_registration_on_ten_years_residence_and_the_subsection_7_dispensation_var" name="Subsection_4_registration_on_ten_years_residence_and_the_subsection_7_dispensation" label="Subsection (4) — registration on ten years&apos; residence, and the subsection (7) dispensation" typeRef="boolean"/>
+    <outputDecision href="#decision_entitled_to_be_registered_under_subsection_4"/>
+    <encapsulatedDecision href="#decision__1_4_application_made_after_attaining_the_age_of_ten_years"/>
+    <encapsulatedDecision href="#decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years"/>
+    <encapsulatedDecision href="#decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled"/>
+    <encapsulatedDecision href="#decision__1_4_the_residence_requirement_met_or_treated_as_met"/>
+    <inputDecision href="#decision_permitted_days_of_absence_in_each_of_the_first_ten_years"/>
+    <inputDecision href="#decision_born_in_the_united_kingdom_after_commencement"/>
+    <inputDecision href="#decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <decisionService id="service_subsections_5_5a_and_6_acquisition_by_adoption" name="Subsections_5_5A_and_6_acquisition_by_adoption" label="Subsections (5), (5A) and (6) — acquisition by adoption">
+    <variable id="service_subsections_5_5a_and_6_acquisition_by_adoption_var" name="Subsections_5_5A_and_6_acquisition_by_adoption" label="Subsections (5), (5A) and (6) — acquisition by adoption" typeRef="boolean"/>
+    <outputDecision href="#decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6"/>
+    <encapsulatedDecision href="#decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day"/>
+    <encapsulatedDecision href="#decision__1_5_a_a_court_order_authorising_the_adoption"/>
+    <encapsulatedDecision href="#decision__1_5_b_adopted_under_a_convention_adoption"/>
+    <encapsulatedDecision href="#decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected"/>
+    <encapsulatedDecision href="#decision_the_adopted_person_a_minor_and_not_already_a_british_citizen"/>
+    <encapsulatedDecision href="#decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen"/>
+    <encapsulatedDecision href="#decision__1_5a_b_habitual_residence_in_a_convention_case"/>
+    <encapsulatedDecision href="#decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption"/>
+    <encapsulatedDecision href="#decision_a_british_citizen_by_virtue_of_subsection_5"/>
+    <inputDecision href="#decision_the_appointed_day"/>
+    <inputData href="#input_adoption"/>
+  </decisionService>
+  <decisionService id="service_the_section_1_outcome_at_birth_as_one_total_answer" name="The_section_1_outcome_at_birth_as_one_total_answer" label="The section 1 outcome at birth, as one total answer">
+    <variable id="service_the_section_1_outcome_at_birth_as_one_total_answer_var" name="The_section_1_outcome_at_birth_as_one_total_answer" label="The section 1 outcome at birth, as one total answer" typeRef="BirthOutcome"/>
+    <outputDecision href="#decision_section_1_outcome_at_birth"/>
+    <inputDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1_or_2"/>
+    <inputDecision href="#decision_a_british_citizen_by_virtue_of_subsection_1a"/>
+    <inputData href="#input_person"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_british_nationality_act_1981_section_1_acquisition_by_birth_or_adoption_diagram" name="British Nationality Act 1981, section 1 — Acquisition by birth or adoption">
+      <dmndi:DMNShape id="input_person_shape" dmnElementRef="input_person">
+        <dc:Bounds x="60" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_entitled_under_subsection_3_3a_or_4_shape" dmnElementRef="input_entitled_under_subsection_3_3a_or_4">
+        <dc:Bounds x="280" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_adoption_shape" dmnElementRef="input_adoption">
+        <dc:Bounds x="500" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_commencement_shape" dmnElementRef="decision_commencement">
+        <dc:Bounds x="60" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_appointed_day_shape" dmnElementRef="decision_the_appointed_day">
+        <dc:Bounds x="280" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_relevant_day_shape" dmnElementRef="decision_the_relevant_day">
+        <dc:Bounds x="500" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_permitted_days_of_absence_in_each_of_the_first_ten_years_shape" dmnElementRef="decision_permitted_days_of_absence_in_each_of_the_first_ten_years">
+        <dc:Bounds x="720" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_born_in_the_united_kingdom_or_a_qualifying_territory_shape" dmnElementRef="decision_born_in_the_united_kingdom_or_a_qualifying_territory">
+        <dc:Bounds x="940" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_1_a_father_or_mother_a_british_citizen_shape" dmnElementRef="decision__1_1_a_father_or_mother_a_british_citizen">
+        <dc:Bounds x="1160" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory_shape" dmnElementRef="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory">
+        <dc:Bounds x="1380" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled_shape" dmnElementRef="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled">
+        <dc:Bounds x="1600" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_3_b_an_application_is_made_while_a_minor_shape" dmnElementRef="decision__1_3_b_an_application_is_made_while_a_minor">
+        <dc:Bounds x="1820" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces_shape" dmnElementRef="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces">
+        <dc:Bounds x="2040" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_3a_b_an_application_is_made_while_a_minor_shape" dmnElementRef="decision__1_3a_b_an_application_is_made_while_a_minor">
+        <dc:Bounds x="2260" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_4_application_made_after_attaining_the_age_of_ten_years_shape" dmnElementRef="decision__1_4_application_made_after_attaining_the_age_of_ten_years">
+        <dc:Bounds x="2480" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled_shape" dmnElementRef="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled">
+        <dc:Bounds x="2700" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_registration_may_be_granted_shape" dmnElementRef="decision_registration_may_be_granted">
+        <dc:Bounds x="2920" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_5_b_adopted_under_a_convention_adoption_shape" dmnElementRef="decision__1_5_b_adopted_under_a_convention_adoption">
+        <dc:Bounds x="3140" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen_shape" dmnElementRef="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen">
+        <dc:Bounds x="3360" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen_shape" dmnElementRef="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen">
+        <dc:Bounds x="3580" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_5a_b_habitual_residence_in_a_convention_case_shape" dmnElementRef="decision__1_5a_b_habitual_residence_in_a_convention_case">
+        <dc:Bounds x="3800" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_born_in_the_united_kingdom_after_commencement_shape" dmnElementRef="decision_born_in_the_united_kingdom_after_commencement">
+        <dc:Bounds x="60" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_shape" dmnElementRef="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day">
+        <dc:Bounds x="280" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_shape" dmnElementRef="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day">
+        <dc:Bounds x="500" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_shape" dmnElementRef="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled">
+        <dc:Bounds x="720" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_found_abandoned_in_the_united_kingdom_after_commencement_shape" dmnElementRef="decision_found_abandoned_in_the_united_kingdom_after_commencement">
+        <dc:Bounds x="940" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_shape" dmnElementRef="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day">
+        <dc:Bounds x="1160" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_british_citizen_by_virtue_of_subsection_1a_shape" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1a">
+        <dc:Bounds x="1380" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_shape" dmnElementRef="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years">
+        <dc:Bounds x="1600" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_shape" dmnElementRef="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day">
+        <dc:Bounds x="1820" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_shape" dmnElementRef="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption">
+        <dc:Bounds x="2040" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_shape" dmnElementRef="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day">
+        <dc:Bounds x="60" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_shape" dmnElementRef="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time">
+        <dc:Bounds x="280" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_4_the_residence_requirement_met_or_treated_as_met_shape" dmnElementRef="decision__1_4_the_residence_requirement_met_or_treated_as_met">
+        <dc:Bounds x="500" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_5_a_a_court_order_authorising_the_adoption_shape" dmnElementRef="decision__1_5_a_a_court_order_authorising_the_adoption">
+        <dc:Bounds x="720" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_shape" dmnElementRef="decision__1_1_satisfied_on_the_actual_facts_of_the_birth">
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_shape" dmnElementRef="decision_deemed_by_subsection_2_to_satisfy_subsection_1">
+        <dc:Bounds x="280" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_shape" dmnElementRef="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected">
+        <dc:Bounds x="500" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_shape" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1_or_2">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_british_citizen_by_virtue_of_subsection_5_shape" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_5">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_shape" dmnElementRef="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_shape" dmnElementRef="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_section_1_outcome_at_birth_shape" dmnElementRef="decision_section_1_outcome_at_birth">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_entitled_to_be_registered_under_subsection_3_shape" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_entitled_to_be_registered_under_subsection_3a_shape" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3a">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_entitled_to_be_registered_under_subsection_4_shape" dmnElementRef="decision_entitled_to_be_registered_under_subsection_4">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_common_timing_predicates_shape" dmnElementRef="service_common_timing_predicates">
+        <dc:Bounds x="40" y="840" width="1100" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsection_1_birth_in_the_united_kingdom_or_a_qualifying_territory_shape" dmnElementRef="service_subsection_1_birth_in_the_united_kingdom_or_a_qualifying_territory">
+        <dc:Bounds x="40" y="520" width="1540" height="600"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsection_2_the_foundling_presumption_shape" dmnElementRef="service_subsection_2_the_foundling_presumption">
+        <dc:Bounds x="40" y="360" width="1320" height="600"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsection_1a_the_armed_forces_route_shape" dmnElementRef="service_subsection_1a_the_armed_forces_route">
+        <dc:Bounds x="1360" y="840" width="220" height="120"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_the_subsection_3_3a_and_4_chapeau_not_already_a_citizen_shape" dmnElementRef="service_the_subsection_3_3a_and_4_chapeau_not_already_a_citizen">
+        <dc:Bounds x="40" y="200" width="220" height="120"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsection_3_registration_after_a_parent_becomes_a_citizen_or_settled_shape" dmnElementRef="service_subsection_3_registration_after_a_parent_becomes_a_citizen_or_settled">
+        <dc:Bounds x="40" y="40" width="1980" height="1080"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsection_3a_registration_after_a_parent_joins_the_armed_forces_shape" dmnElementRef="service_subsection_3a_registration_after_a_parent_joins_the_armed_forces">
+        <dc:Bounds x="260" y="40" width="2200" height="1080"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsection_4_registration_on_ten_years_residence_and_the_subsection_7_dispensation_shape" dmnElementRef="service_subsection_4_registration_on_ten_years_residence_and_the_subsection_7_dispensation">
+        <dc:Bounds x="480" y="40" width="2420" height="1080"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_subsections_5_5a_and_6_acquisition_by_adoption_shape" dmnElementRef="service_subsections_5_5a_and_6_acquisition_by_adoption">
+        <dc:Bounds x="260" y="200" width="3740" height="920"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_the_section_1_outcome_at_birth_as_one_total_answer_shape" dmnElementRef="service_the_section_1_outcome_at_birth_as_one_total_answer">
+        <dc:Bounds x="480" y="200" width="220" height="120"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_born_in_the_united_kingdom_after_commencement_ir1_edge" dmnElementRef="decision_born_in_the_united_kingdom_after_commencement_ir1">
+        <di:waypoint x="150" y="1020"/>
+        <di:waypoint x="150" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_born_in_the_united_kingdom_after_commencement_ir2_edge" dmnElementRef="decision_born_in_the_united_kingdom_after_commencement_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1_edge" dmnElementRef="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+        <di:waypoint x="370" y="1020"/>
+        <di:waypoint x="370" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2_edge" dmnElementRef="decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="370" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_born_in_the_united_kingdom_or_a_qualifying_territory_ir1_edge" dmnElementRef="decision_born_in_the_united_kingdom_or_a_qualifying_territory_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1030" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_ir1_edge" dmnElementRef="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_ir1">
+        <di:waypoint x="590" y="1020"/>
+        <di:waypoint x="590" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_ir2_edge" dmnElementRef="decision_born_in_the_united_kingdom_on_or_after_the_relevant_day_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="590" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1_edge" dmnElementRef="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+        <di:waypoint x="370" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2_edge" dmnElementRef="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+        <di:waypoint x="150" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir3_edge" dmnElementRef="decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_a_father_or_mother_a_british_citizen_ir1_edge" dmnElementRef="decision__1_1_a_father_or_mother_a_british_citizen_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1250" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory_ir1_edge" dmnElementRef="decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1470" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir1_edge" dmnElementRef="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir1">
+        <di:waypoint x="1250" y="1020"/>
+        <di:waypoint x="810" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir2_edge" dmnElementRef="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir2">
+        <di:waypoint x="1470" y="1020"/>
+        <di:waypoint x="810" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir3_edge" dmnElementRef="decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="810" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir1_edge" dmnElementRef="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir1">
+        <di:waypoint x="810" y="860"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir2_edge" dmnElementRef="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir2">
+        <di:waypoint x="150" y="700"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir3_edge" dmnElementRef="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_found_abandoned_in_the_united_kingdom_after_commencement_ir1_edge" dmnElementRef="decision_found_abandoned_in_the_united_kingdom_after_commencement_ir1">
+        <di:waypoint x="150" y="1020"/>
+        <di:waypoint x="1030" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_found_abandoned_in_the_united_kingdom_after_commencement_ir2_edge" dmnElementRef="decision_found_abandoned_in_the_united_kingdom_after_commencement_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1030" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1_edge" dmnElementRef="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+        <di:waypoint x="370" y="1020"/>
+        <di:waypoint x="1250" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2_edge" dmnElementRef="decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1250" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir1_edge" dmnElementRef="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir1">
+        <di:waypoint x="1250" y="860"/>
+        <di:waypoint x="370" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir2_edge" dmnElementRef="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir2">
+        <di:waypoint x="1030" y="860"/>
+        <di:waypoint x="370" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir3_edge" dmnElementRef="decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="370" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_ir1_edge" dmnElementRef="decision_deemed_by_subsection_2_to_satisfy_subsection_1_ir1">
+        <di:waypoint x="370" y="700"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_ir2_edge" dmnElementRef="decision_deemed_by_subsection_2_to_satisfy_subsection_1_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir1_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir1">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir2_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir2">
+        <di:waypoint x="370" y="540"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir3_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1_or_2_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_1a_ir1_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1a_ir1">
+        <di:waypoint x="1030" y="1020"/>
+        <di:waypoint x="1470" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_1a_ir2_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1a_ir2">
+        <di:waypoint x="590" y="1020"/>
+        <di:waypoint x="1470" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_1a_ir3_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_1a_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1470" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir1_edge" dmnElementRef="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir2_edge" dmnElementRef="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir2">
+        <di:waypoint x="1470" y="860"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir3_edge" dmnElementRef="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled_ir1_edge" dmnElementRef="decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1690" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_3_b_an_application_is_made_while_a_minor_ir1_edge" dmnElementRef="decision__1_3_b_an_application_is_made_while_a_minor_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1910" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3_ir1_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3_ir1">
+        <di:waypoint x="1690" y="1020"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3_ir2_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3_ir2">
+        <di:waypoint x="1910" y="1020"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3_ir3_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3_ir3">
+        <di:waypoint x="150" y="860"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3_ir4_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3_ir4">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3_ir5_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3_ir5">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces_ir1_edge" dmnElementRef="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="2130" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_3a_b_an_application_is_made_while_a_minor_ir1_edge" dmnElementRef="decision__1_3a_b_an_application_is_made_while_a_minor_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="2350" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3a_ir1_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3a_ir1">
+        <di:waypoint x="2130" y="1020"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3a_ir2_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3a_ir2">
+        <di:waypoint x="2350" y="1020"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3a_ir3_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3a_ir3">
+        <di:waypoint x="590" y="860"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3a_ir4_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3a_ir4">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_3a_ir5_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_3a_ir5">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_4_application_made_after_attaining_the_age_of_ten_years_ir1_edge" dmnElementRef="decision__1_4_application_made_after_attaining_the_age_of_ten_years_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="2570" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_ir1_edge" dmnElementRef="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_ir1">
+        <di:waypoint x="810" y="1020"/>
+        <di:waypoint x="1690" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_ir2_edge" dmnElementRef="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="1690" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled_ir1_edge" dmnElementRef="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled_ir1">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="2790" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir1_edge" dmnElementRef="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir1">
+        <di:waypoint x="1690" y="860"/>
+        <di:waypoint x="590" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir2_edge" dmnElementRef="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir2">
+        <di:waypoint x="2790" y="1020"/>
+        <di:waypoint x="590" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir3_edge" dmnElementRef="decision__1_4_the_residence_requirement_met_or_treated_as_met_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="590" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_4_ir1_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_4_ir1">
+        <di:waypoint x="2570" y="1020"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_4_ir2_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_4_ir2">
+        <di:waypoint x="590" y="700"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_4_ir3_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_4_ir3">
+        <di:waypoint x="150" y="860"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_4_ir4_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_4_ir4">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_entitled_to_be_registered_under_subsection_4_ir5_edge" dmnElementRef="decision_entitled_to_be_registered_under_subsection_4_ir5">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_registration_may_be_granted_ir1_edge" dmnElementRef="decision_registration_may_be_granted_ir1">
+        <di:waypoint x="370" y="1180"/>
+        <di:waypoint x="3010" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_registration_may_be_granted_ir2_edge" dmnElementRef="decision_registration_may_be_granted_ir2">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="3010" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1_edge" dmnElementRef="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_ir1">
+        <di:waypoint x="370" y="1020"/>
+        <di:waypoint x="1910" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2_edge" dmnElementRef="decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day_ir2">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="1910" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5_a_a_court_order_authorising_the_adoption_ir1_edge" dmnElementRef="decision__1_5_a_a_court_order_authorising_the_adoption_ir1">
+        <di:waypoint x="1910" y="860"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5_a_a_court_order_authorising_the_adoption_ir2_edge" dmnElementRef="decision__1_5_a_a_court_order_authorising_the_adoption_ir2">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5_b_adopted_under_a_convention_adoption_ir1_edge" dmnElementRef="decision__1_5_b_adopted_under_a_convention_adoption_ir1">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="3230" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir1_edge" dmnElementRef="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir1">
+        <di:waypoint x="810" y="700"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir2_edge" dmnElementRef="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir2">
+        <di:waypoint x="3230" y="1020"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir3_edge" dmnElementRef="decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected_ir3">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen_ir1_edge" dmnElementRef="decision_the_adopted_person_a_minor_and_not_already_a_british_citizen_ir1">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="3450" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen_ir1_edge" dmnElementRef="decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen_ir1">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="3670" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5a_b_habitual_residence_in_a_convention_case_ir1_edge" dmnElementRef="decision__1_5a_b_habitual_residence_in_a_convention_case_ir1">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="3890" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir1_edge" dmnElementRef="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir1">
+        <di:waypoint x="3670" y="1020"/>
+        <di:waypoint x="2130" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir2_edge" dmnElementRef="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir2">
+        <di:waypoint x="3890" y="1020"/>
+        <di:waypoint x="2130" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir3_edge" dmnElementRef="decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption_ir3">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="2130" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_5_ir1_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_5_ir1">
+        <di:waypoint x="590" y="540"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_5_ir2_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_5_ir2">
+        <di:waypoint x="2130" y="860"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_5_ir3_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_5_ir3">
+        <di:waypoint x="3450" y="1020"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_by_virtue_of_subsection_5_ir4_edge" dmnElementRef="decision_a_british_citizen_by_virtue_of_subsection_5_ir4">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_ir1_edge" dmnElementRef="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_ir2_edge" dmnElementRef="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6_ir2">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_section_1_outcome_at_birth_ir1_edge" dmnElementRef="decision_section_1_outcome_at_birth_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_section_1_outcome_at_birth_ir2_edge" dmnElementRef="decision_section_1_outcome_at_birth_ir2">
+        <di:waypoint x="1470" y="860"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_section_1_outcome_at_birth_ir3_edge" dmnElementRef="decision_section_1_outcome_at_birth_ir3">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

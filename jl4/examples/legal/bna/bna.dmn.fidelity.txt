@@ -1,0 +1,136 @@
+fidelity report — dmnmd
+  [D-MD-NODRG] blocking — definitions_british_nationality_act_1981_section_1_acquisition_by_birth_or_adoption
+      dmnmd is a table format, not a graph: the 87 information requirement(s) between these decisions have no markdown form
+      lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NOLITERAL] blocking — decision_commencement
+      `commencement` is a formula (YMD OF 1983, 1, 1), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_appointed_day
+      `the appointed day` is a formula (YMD OF 2002, 5, 21), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_relevant_day
+      `the relevant day` is a formula (YMD OF 2010, 1, 13), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_permitted_days_of_absence_in_each_of_the_first_ten_years
+      `permitted days of absence in each of the first ten years` is a formula (90), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_born_in_the_united_kingdom_after_commencement
+      `born in the United Kingdom after commencement` is a formula (person.born_in_the_United_Kingdom and person.date_of_birth >= commencement), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day
+      `born in a qualifying territory on or after the appointed day` is a formula (person.born_in_a_qualifying_territory and person.date_of_birth >= the_appointed_day), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_born_in_the_united_kingdom_or_a_qualifying_territory
+      `born in the United Kingdom or a qualifying territory` is a formula (person.born_in_the_United_Kingdom or person.born_in_a_qualifying_territory), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_born_in_the_united_kingdom_on_or_after_the_relevant_day
+      `born in the United Kingdom on or after the relevant day` is a formula (person.born_in_the_United_Kingdom and person.date_of_birth >= the_relevant_day), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day
+      `1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day` is a formula (born_in_the_United_Kingdom_after_commencement or born_in_a_qualifying_territory_on_or_after_the_appointed_day), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_1_a_father_or_mother_a_british_citizen
+      `1(1)(a) — father or mother a British citizen` is a formula (true and person.father_or_mother_a_British_citizen_at_the_time_of_the_birth), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory
+      `1(1)(b) — father or mother settled in the United Kingdom or that territory` is a formula (true and person.father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled
+      `1(1) — at the time of the birth his father or mother is a citizen or settled` is a formula (_1_1_a_father_or_mother_a_British_citizen or _1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_1_satisfied_on_the_actual_facts_of_the_birth
+      `1(1) — satisfied on the actual facts of the birth` is a formula (true and (_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day and _1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_found_abandoned_in_the_united_kingdom_after_commencement
+      `found abandoned in the United Kingdom after commencement` is a formula (person.found_abandoned_as_a_new_born_infant_in_the_United_Kingdom and person.date_found_abandoned >= commencement), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day
+      `found abandoned in a qualifying territory on or after the appointed day` is a formula (person.found_abandoned_as_a_new_born_infant_in_a_qualifying_territory and person.date_found_abandoned >= the_appointed_day), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time
+      `1(2) — found abandoned in the United Kingdom or a qualifying territory in time` is a formula (found_abandoned_in_the_United_Kingdom_after_commencement or found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_deemed_by_subsection_2_to_satisfy_subsection_1
+      `deemed by subsection (2) to satisfy subsection (1)` is a formula (true and (_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time and (not(person.the_contrary_shown_rebutting_the_subsection_2_presumption) and (true and true)))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_a_british_citizen_by_virtue_of_subsection_1_or_2
+      `a British citizen by virtue of subsection (1) or (2)` is a formula (_1_1_satisfied_on_the_actual_facts_of_the_birth or deemed_by_subsection_2_to_satisfy_subsection_1), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_a_british_citizen_by_virtue_of_subsection_1a
+      `a British citizen by virtue of subsection (1A)` is a formula (true and (born_in_the_United_Kingdom_or_a_qualifying_territory and (person.date_of_birth >= the_relevant_day and person.father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a
+      `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` is a formula (not(a_British_citizen_by_virtue_of_subsection_1_or_2) and (not(a_British_citizen_by_virtue_of_subsection_1A) and not(person.a_British_citizen_under_section_10A))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled
+      `1(3)(a) — father or mother becomes a British citizen or settled` is a formula (true and person.while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_3_b_an_application_is_made_while_a_minor
+      `1(3)(b) — an application is made while a minor` is a formula (true and person.while_a_minor_an_application_made_for_registration_as_a_British_citizen), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_entitled_to_be_registered_under_subsection_3
+      `entitled to be registered under subsection (3)` is a formula (true and (born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled and _1_3_b_an_application_is_made_while_a_minor)))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces
+      `1(3A)(a) — father or mother becomes a member of the armed forces` is a formula (true and person.while_a_minor_father_or_mother_became_a_member_of_the_armed_forces), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_3a_b_an_application_is_made_while_a_minor
+      `1(3A)(b) — an application is made while a minor` is a formula (true and person.while_a_minor_an_application_made_for_registration_as_a_British_citizen), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_entitled_to_be_registered_under_subsection_3a
+      `entitled to be registered under subsection (3A)` is a formula (true and (born_in_the_United_Kingdom_on_or_after_the_relevant_day and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces and _1_3A_b_an_application_is_made_while_a_minor)))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_4_application_made_after_attaining_the_age_of_ten_years
+      `1(4) — application made after attaining the age of ten years` is a formula (true and person.an_application_for_registration_made_after_attaining_the_age_of_ten_years), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years
+      `1(4) — absences within the ninety-day ceiling in each of the first ten years` is a formula (true and person.greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life <= permitted_days_of_absence_in_each_of_the_first_ten_years), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled
+      `1(7) — the Secretary of State treats the residence requirement as fulfilled` is a formula (true and person.the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_4_the_residence_requirement_met_or_treated_as_met
+      `1(4) — the residence requirement met or treated as met` is a formula (_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years or _1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_entitled_to_be_registered_under_subsection_4
+      `entitled to be registered under subsection (4)` is a formula (true and (born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_4_application_made_after_attaining_the_age_of_ten_years and _1_4_the_residence_requirement_met_or_treated_as_met)))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_registration_may_be_granted
+      `registration may be granted` is a formula (entitled_under_subsection_3_3A_or_4 and person.of_good_character_where_the_good_character_requirement_applies), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day
+      `order of a court in a qualifying territory on or after the appointed day` is a formula (adoption.an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption and adoption.date_of_the_order_or_Convention_adoption >= the_appointed_day), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_5_a_a_court_order_authorising_the_adoption
+      `1(5)(a) — a court order authorising the adoption` is a formula (false or (adoption.an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption or order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_5_b_adopted_under_a_convention_adoption
+      `1(5)(b) — adopted under a Convention adoption` is a formula (true and adoption.a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected
+      `1(5) — an order is made or a Convention adoption is effected` is a formula (_1_5_a_a_court_order_authorising_the_adoption or _1_5_b_adopted_under_a_Convention_adoption), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_adopted_person_a_minor_and_not_already_a_british_citizen
+      `the adopted person a minor and not already a British citizen` is a formula (adoption.the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption and not(adoption.the_adopted_person_already_a_British_citizen)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen
+      `1(5A)(a) — the adopter, or one joint adopter, a British citizen` is a formula (true and adoption.the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_5a_b_habitual_residence_in_a_convention_case
+      `1(5A)(b) — habitual residence, in a Convention case` is a formula (false or (not(adoption.a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom) or adoption.the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption
+      `1(5A) — the requirements are met on the date of the order or adoption` is a formula (true and (_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen and _1_5A_b_habitual_residence_in_a_Convention_case)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_a_british_citizen_by_virtue_of_subsection_5
+      `a British citizen by virtue of subsection (5)` is a formula (true and (the_adopted_person_a_minor_and_not_already_a_British_citizen and (_1_5_an_order_is_made_or_a_Convention_adoption_is_effected and _1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6
+      `a British citizen notwithstanding cesser of the order — subsection (6)` is a formula (true and a_British_citizen_by_virtue_of_subsection_5), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-CELLSYNTAX] blocking — decision_section_1_outcome_at_birth
+      rule decision_section_1_outcome_at_birth_r1 has a cell dmnmd cannot read (an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_section_1_outcome_at_birth
+      rule decision_section_1_outcome_at_birth_r2 has a cell dmnmd cannot read (an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL), so this table is omitted
+      lost: the whole table
