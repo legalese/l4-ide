@@ -23,6 +23,7 @@
         <bpmn:flowNodeRef>Split_0</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Decide_0</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
@@ -42,75 +43,121 @@
     <bpmn:endEvent id="End_3" name="Breach">
       <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
+    <bpmn:businessRuleTask id="Decide_0" name="notice complies with Rule 204(b)" implementation="http://www.jboss.org/drools/dmn">
+      <bpmn:documentation>Delegated to the DMN decision ‘notice complies with Rule 204(b)’ (id decision_notice_complies_with_rule_204_b) in model ‘SEC Regulation Crowdfunding — 17 CFR Part 227’. The gateway&apos;s outgoing flows test this decision&apos;s answer; the L4 guard each of them came from is on the flow itself.</bpmn:documentation>
+      <bpmn:ioSpecification id="IO_Decide_0">
+        <bpmn:dataInput id="Decide_0_namespaceInput" name="namespace" />
+        <bpmn:dataInput id="Decide_0_modelInput" name="model" />
+        <bpmn:dataInput id="Decide_0_decisionInput" name="decision" />
+        <bpmn:inputSet id="InputSet_Decide_0">
+          <bpmn:dataInputRefs>Decide_0_namespaceInput</bpmn:dataInputRefs>
+          <bpmn:dataInputRefs>Decide_0_modelInput</bpmn:dataInputRefs>
+          <bpmn:dataInputRefs>Decide_0_decisionInput</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Decide_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DIA_Decide_0_namespace">
+        <bpmn:targetRef>Decide_0_namespaceInput</bpmn:targetRef>
+        <bpmn:assignment id="Assign_Decide_0_namespace">
+          <bpmn:from xsi:type="bpmn:tFormalExpression">https://legalese.com/l4/dmn/sec_regulation_crowdfunding_17_cfr_part_227</bpmn:from>
+          <bpmn:to xsi:type="bpmn:tFormalExpression">Decide_0_namespaceInput</bpmn:to>
+        </bpmn:assignment>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataInputAssociation id="DIA_Decide_0_model">
+        <bpmn:targetRef>Decide_0_modelInput</bpmn:targetRef>
+        <bpmn:assignment id="Assign_Decide_0_model">
+          <bpmn:from xsi:type="bpmn:tFormalExpression">SEC Regulation Crowdfunding — 17 CFR Part 227</bpmn:from>
+          <bpmn:to xsi:type="bpmn:tFormalExpression">Decide_0_modelInput</bpmn:to>
+        </bpmn:assignment>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataInputAssociation id="DIA_Decide_0_decision">
+        <bpmn:targetRef>Decide_0_decisionInput</bpmn:targetRef>
+        <bpmn:assignment id="Assign_Decide_0_decision">
+          <bpmn:from xsi:type="bpmn:tFormalExpression">notice_complies_with_Rule_204_b</bpmn:from>
+          <bpmn:to xsi:type="bpmn:tFormalExpression">Decide_0_decisionInput</bpmn:to>
+        </bpmn:assignment>
+      </bpmn:dataInputAssociation>
+    </bpmn:businessRuleTask>
+    <bpmn:sequenceFlow id="Flow_Start_0__Decide_0" sourceRef="Start_0" targetRef="Decide_0" />
     <bpmn:sequenceFlow id="Flow_Split_0__End_1" sourceRef="Split_0" targetRef="End_1">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">`notice complies with Rule 204(b)` OF notice</bpmn:conditionExpression>
+      <bpmn:documentation>`notice complies with Rule 204(b)` OF notice</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">notice_complies_with_Rule_204_b</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_Split_0__Task_2" sourceRef="Split_0" targetRef="Task_2">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT (`notice complies with Rule 204(b)` OF notice)</bpmn:conditionExpression>
+      <bpmn:documentation>NOT (`notice complies with Rule 204(b)` OF notice)</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">not(notice_complies_with_Rule_204_b)</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_Boundary_2__End_1" sourceRef="Boundary_2" targetRef="End_1" />
     <bpmn:sequenceFlow id="Flow_Task_2__End_3" sourceRef="Task_2" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Decide_0__Split_0" sourceRef="Decide_0" targetRef="Split_0" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_advertising_restriction">
       <bpmndi:BPMNShape id="Shape_Participant_advertising_restriction" bpmnElement="Participant_advertising_restriction" isHorizontal="true">
-        <dc:Bounds x="130" y="80" width="770" height="440" />
+        <dc:Bounds x="130" y="80" width="950" height="440" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_1_Issuer" bpmnElement="Lane_1_Issuer" isHorizontal="true">
-        <dc:Bounds x="160" y="80" width="740" height="160" />
+        <dc:Bounds x="160" y="80" width="920" height="160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
-        <dc:Bounds x="160" y="240" width="740" height="280" />
+        <dc:Bounds x="160" y="240" width="920" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
         <dc:Bounds x="232" y="282" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
-        <dc:Bounds x="405" y="275" width="50" height="50" />
+        <dc:Bounds x="585" y="275" width="50" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_1" bpmnElement="End_1">
-        <dc:Bounds x="772" y="282" width="36" height="36" />
+        <dc:Bounds x="952" y="282" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_2" bpmnElement="Task_2">
-        <dc:Bounds x="560" y="100" width="100" height="80" />
+        <dc:Bounds x="740" y="100" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Boundary_2" bpmnElement="Boundary_2">
-        <dc:Bounds x="614" y="162" width="36" height="36" />
+        <dc:Bounds x="794" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
-        <dc:Bounds x="772" y="402" width="36" height="36" />
+        <dc:Bounds x="952" y="402" width="36" height="36" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
+      <bpmndi:BPMNShape id="Shape_Decide_0" bpmnElement="Decide_0">
+        <dc:Bounds x="380" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Decide_0" bpmnElement="Flow_Start_0__Decide_0">
         <di:waypoint x="268" y="300" />
         <di:waypoint x="314" y="300" />
-        <di:waypoint x="405" y="300" />
+        <di:waypoint x="380" y="300" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__End_1" bpmnElement="Flow_Split_0__End_1">
-        <di:waypoint x="455" y="300" />
-        <di:waypoint x="494" y="300" />
-        <di:waypoint x="494" y="360" />
-        <di:waypoint x="674" y="360" />
+        <di:waypoint x="635" y="300" />
         <di:waypoint x="674" y="300" />
-        <di:waypoint x="772" y="300" />
+        <di:waypoint x="674" y="360" />
+        <di:waypoint x="854" y="360" />
+        <di:waypoint x="854" y="300" />
+        <di:waypoint x="952" y="300" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_2" bpmnElement="Flow_Split_0__Task_2">
-        <di:waypoint x="455" y="300" />
-        <di:waypoint x="520" y="300" />
-        <di:waypoint x="520" y="140" />
-        <di:waypoint x="560" y="140" />
+        <di:waypoint x="635" y="300" />
+        <di:waypoint x="700" y="300" />
+        <di:waypoint x="700" y="140" />
+        <di:waypoint x="740" y="140" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Boundary_2__End_1" bpmnElement="Flow_Boundary_2__End_1">
-        <di:waypoint x="632" y="198" />
-        <di:waypoint x="700" y="198" />
-        <di:waypoint x="700" y="300" />
-        <di:waypoint x="772" y="300" />
+        <di:waypoint x="812" y="198" />
+        <di:waypoint x="880" y="198" />
+        <di:waypoint x="880" y="300" />
+        <di:waypoint x="952" y="300" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_2__End_3" bpmnElement="Flow_Task_2__End_3">
-        <di:waypoint x="660" y="140" />
-        <di:waypoint x="726" y="140" />
-        <di:waypoint x="726" y="420" />
-        <di:waypoint x="772" y="420" />
+        <di:waypoint x="840" y="140" />
+        <di:waypoint x="906" y="140" />
+        <di:waypoint x="906" y="420" />
+        <di:waypoint x="952" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Decide_0__Split_0" bpmnElement="Flow_Decide_0__Split_0">
+        <di:waypoint x="480" y="300" />
+        <di:waypoint x="494" y="300" />
+        <di:waypoint x="585" y="300" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

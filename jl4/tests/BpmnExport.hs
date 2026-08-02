@@ -25,9 +25,13 @@ import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR
 import L4.Bpmn.Lower (stateGraphToBpmn)
+import L4.Bpmn.Wiring (wiringFromDrg)
+import L4.Dmn.IR (Decision (..), Drg (..), drgDecisions)
 import L4.Interchange.Fidelity
 import L4.StateGraph
 import L4.Syntax (DeonticModal (..))
+
+import DmnExport (drgAsCli)
 
 import qualified Paths_jl4
 
@@ -246,13 +250,23 @@ edge src dst ty act =
           , labelAction = act
           , labelDeadline = Nothing
           , labelGuard = Nothing
+          , labelBranch = Nothing
           }
     , transType = ty
     }
 
 byHand :: Text -> [ContractState] -> [Transition] -> StateGraph
 byHand nm ss ts =
-  StateGraph {sgName = nm, sgStates = ss, sgTransitions = ts, sgInitialState = 0}
+  StateGraph
+    { sgName = nm
+    -- These fixtures are graph SHAPES, built without a module behind them, so
+    -- there is no DECIDE to name — and nothing here is about the DMN wiring,
+    -- which 'defaultBpmnOptions' leaves off.
+    , sgDecide = Nothing
+    , sgStates = ss
+    , sgTransitions = ts
+    , sgInitialState = 0
+    }
 
 -- | Two HENCE arms out of one state. Both leave the same task, neither carries
 -- a condition, and BPMN reads that as an implicit AND-split.
@@ -339,6 +353,7 @@ enclosedJoinGraph :: StateGraph
 enclosedJoinGraph =
   StateGraph
     { sgName = "inner join first"
+    , sgDecide = Nothing
     , sgStates =
         [ node 1 "inner split" IntermediateState AllOf
         , node 0 "start" InitialState Linear
@@ -372,6 +387,7 @@ wideFanGraph :: Int -> StateGraph
 wideFanGraph n =
   StateGraph
     { sgName = "wide fan"
+    , sgDecide = Nothing
     , sgStates =
         node 0 "start" InitialState OneOf
           : [node i ("branch " <> Text.textShow i) IntermediateState Linear | i <- [1 .. n]]
@@ -394,6 +410,7 @@ wideGraph :: Int -> Int -> StateGraph
 wideGraph lanes len =
   StateGraph
     { sgName = "wide"
+    , sgDecide = Nothing
     , sgStates =
         node 0 "start" InitialState Linear
           : [node i ("step " <> Text.textShow i) IntermediateState Linear | i <- [1 .. len - 1]]
@@ -684,14 +701,15 @@ graphWithDeadline :: Text -> StateGraph
 graphWithDeadline due =
   StateGraph
     { sgName = "unit"
+    , sgDecide = Nothing
     , sgStates =
         [ ContractState 0 "initial" InitialState Linear
         , ContractState 1 "Fulfilled" TerminalFulfilled Linear
         , ContractState 2 "Breach" TerminalBreach Linear
         ]
     , sgTransitions =
-        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing) HenceTransition
-        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing) LestTransition
+        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing Nothing) HenceTransition
+        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing) LestTransition
         ]
     , sgInitialState = 0
     }
@@ -763,7 +781,7 @@ spec = do
       map (mentions "P3D") assumed `shouldBe` [True, False]
 
     it "refuses the assumption under RefuseToGuess, and says so" $ do
-      let strict = exportOf (BpmnOptions {optDeadlineUnit = RefuseToGuess}) "late" lestSrc
+      let strict = exportOf (defaultBpmnOptions {optDeadlineUnit = RefuseToGuess}) "late" lestSrc
       map (.nodeKind) (boundaries strict)
         `shouldBe` [ Boundary "Task_0" (WhenCondition "3")
                    , Boundary "Task_2" (WhenCondition "1")
@@ -1526,6 +1544,127 @@ spec = do
       crossings bx `shouldBe` []
       verticalMerges bx `shouldBe` []
 
+  -- PROCESS-TRACK.md §8.3. The goldens byte-compare the wiring; these say what
+  -- it is that they are comparing, and — the part that matters — they are the
+  -- tests that would still fail if the exporter were wrong in the interesting
+  -- ways: re-deriving a decision id it never looked up, wiring a gateway whose
+  -- arms do not line up with the table's rows, or quietly wiring nothing while
+  -- the fidelity report still claimed a loss it no longer has.
+  describe "the DMN wiring (PROCESS-TRACK.md §8.3)" $ do
+    let regcf = "legal" </> "regcf" </> "regcf.l4"
+
+        wiredExport ruleName wiring = do
+          dataDir <- Paths_jl4.getDataDir
+          src <- Text.readFile (dataDir </> "examples" </> regcf)
+          case [g | g <- graphsOf src, g.sgName == ruleName] of
+            [] -> error ("no state graph named " <> show ruleName)
+            (g : _) ->
+              pure (stateGraphToBpmn defaultBpmnOptions {optWiring = wiring} g)
+
+        withDmn ruleName = do
+          dataDir <- Paths_jl4.getDataDir
+          src <- Text.readFile (dataDir </> "examples" </> regcf)
+          wiredExport ruleName (Just (wiringFromDrg (drgAsCli regcf src)))
+
+        callsOf bx = [c | n <- bx.bxProcess.procNodes, BusinessRule c <- [n.nodeKind]]
+        condsFrom nid bx =
+          [c | f <- bx.bxProcess.procFlows, f.flowFrom == nid, Just c <- [f.flowCondition]]
+
+    -- WITHOUT a wiring nothing may change. This is what keeps the other three
+    -- goldens byte-identical, and it is asserted rather than inferred from
+    -- their diffs, because "no diff" is also what a wiring that silently did
+    -- nothing would produce.
+    it "no wiring supplied: no businessRuleTask, and P-BRANCHGUARD still reports" $ do
+      bx <- wiredExport "advertising restriction" Nothing
+      callsOf bx `shouldBe` []
+      length (findingsFor "P-BRANCHGUARD" bx) `shouldBe` 1
+      findingsFor "P-DMNWIRED" bx `shouldBe` []
+      findingsFor "P-NODMN" bx `shouldBe` []
+
+    it "an EMPTY wiring refuses, and says which decision it wanted" $ do
+      let empty' = MkDmnWiring {dwNamespace = "ns", dwModel = "m", dwDecisions = mempty}
+      bx <- wiredExport "advertising restriction" (Just empty')
+      callsOf bx `shouldBe` []
+      -- the loss is still reported AND the refusal is explained
+      length (findingsFor "P-BRANCHGUARD" bx) `shouldBe` 1
+      case findingsFor "P-NODMN" bx of
+        [n] -> n.message `shouldSatisfy` Text.isInfixOf "not an emitted DMN decision"
+        ns -> expectationFailure ("expected one P-NODMN, got " <> show (length ns))
+
+    -- The anti-dangle property, stated as a property. Every field of the call
+    -- has to be findable in the DRG it came from; nothing may be synthesised
+    -- from the L4 name.
+    it "every emitted call names something the DRG actually contains" $ do
+      dataDir <- Paths_jl4.getDataDir
+      src <- Text.readFile (dataDir </> "examples" </> regcf)
+      let drg = drgAsCli regcf src
+          names = [d.dcnFeelName | d <- drgDecisions drg]
+          ids = [d.dcnId | d <- drgDecisions drg]
+      forM_ ["ongoing reporting obligation", "advertising restriction", "resale restriction"] \r -> do
+        bx <- withDmn r
+        case callsOf bx of
+          [c] -> do
+            c.dmcNamespace `shouldBe` drg.drgNamespace
+            c.dmcModel `shouldBe` drg.drgName
+            c.dmcDecision `shouldSatisfy` (`elem` names)
+            c.dmcElementId `shouldSatisfy` (`elem` ids)
+          cs -> expectationFailure (Text.unpack r <> ": expected one call, got " <> show (length cs))
+
+    it "the verdict shape: one arm per table row, each testing its own verdict" $ do
+      bx <- withDmn "ongoing reporting obligation"
+      [c] <- pure (callsOf bx)
+      c.dmcDecision `shouldBe` "ongoing_reporting_obligation"
+      -- Three arms, three DISTINCT verdicts. A positional zip that had drifted
+      -- would still produce three conditions; three that are not distinct, or
+      -- that do not name this decision, is what drift looks like.
+      let conds = condsFrom "Split_0" bx
+      length conds `shouldBe` 3
+      length (nubOrd conds) `shouldBe` 3
+      conds `shouldSatisfy` all (Text.isPrefixOf "ongoing_reporting_obligation = \"")
+      findingsFor "P-BRANCHGUARD" bx `shouldBe` []
+      length (findingsFor "P-DMNWIRED" bx) `shouldBe` 1
+
+    it "the guard shape: the arms are the decision, negated and not" $ do
+      bx <- withDmn "advertising restriction"
+      [c] <- pure (callsOf bx)
+      c.dmcDecision `shouldBe` "notice_complies_with_Rule_204_b"
+      sort (condsFrom "Split_0" bx)
+        `shouldBe` sort
+          [ "notice_complies_with_Rule_204_b"
+          , "not(notice_complies_with_Rule_204_b)"
+          ]
+
+    -- The L4 guard is not deleted, it is demoted. A wiring that dropped it
+    -- would pass every assertion above.
+    it "the L4 guard survives as documentation on the flow it used to condition" $ do
+      bx <- withDmn "ongoing reporting obligation"
+      let docs = [d | f <- bx.bxProcess.procFlows, f.flowFrom == "Split_0", Just d <- [f.flowDoc]]
+      length docs `shouldBe` 3
+      docs `shouldSatisfy` any (Text.isInfixOf "`annual cycles` AT MOST 0")
+
+    -- Every arrival, including the renewal loop. Drawing the task in front of
+    -- only the first arrival would leave the loop re-entering the gateway with
+    -- a stale answer, which no checker in the repo would notice.
+    it "every flow into the gateway is rerouted through the task" $ do
+      bx <- withDmn "ongoing reporting obligation"
+      [c] <- pure (callsOf bx)
+      c.dmcLabel `shouldBe` "ongoing reporting obligation"
+      [f | f <- bx.bxProcess.procFlows, f.flowTo == "Split_0"] `shouldSatisfy` \fs ->
+        map (.flowFrom) fs == ["Decide_0"]
+      length [f | f <- bx.bxProcess.procFlows, f.flowTo == "Decide_0"] `shouldBe` 2
+
+    -- gatewayDirection is a claim about the edges (see 'withGatewayDirections'),
+    -- and the wiring moved the edges. If this is ever `Mixed` again, either the
+    -- reroute stopped covering every arrival or the direction stopped being
+    -- recomputed after it.
+    it "the rerouted gateway is Diverging, not Mixed" $ do
+      bx <- withDmn "ongoing reporting obligation"
+      [ n.nodeKind
+        | n <- bx.bxProcess.procNodes
+        , n.nodeId == "Split_0"
+        ]
+        `shouldBe` [Gateway ExclusiveGateway Diverging]
+
   describe "golden" $ forM_ goldenCases \(stem, ruleName, out) -> do
     it (out <> " lowers to stable XML") $
       goldenCase stem ruleName out ".bpmn" \_ bx -> renderBpmn bx
@@ -1570,7 +1709,14 @@ spec = do
     let sg = case [g | g <- graphsOf src, g.sgName == ruleName] of
           (g : _) -> g
           [] -> error (srcPath <> ": no state graph named " <> show ruleName)
-        bx = stateGraphToBpmn defaultBpmnOptions sg
+        -- The CLI lowers the module to DMN and hands the BPMN side the result
+        -- (jl4/app/L4/Cli/Export.hs, 'dmnDrgFor'), so the goldens must too, or
+        -- they would pin an exporter nobody runs. 'drgAsCli' is DmnExport's own
+        -- helper, imported rather than copied — see its export list.
+        bx =
+          stateGraphToBpmn
+            defaultBpmnOptions {optWiring = Just (wiringFromDrg (drgAsCli srcPath src))}
+            sg
     pure
       Golden
         { output = render sg bx
