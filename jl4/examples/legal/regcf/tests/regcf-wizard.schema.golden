@@ -10,6 +10,10 @@
                     "description": "How much do you want to raise, in dollars? Use the largest amount you would accept, not your target.",
                     "type": "number"
                 },
+                "an investment company": {
+                    "description": "Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?",
+                    "type": "boolean"
+                },
                 "behind on past Reg CF annual reports": {
                     "description": "Have you raised under Regulation Crowdfunding before and missed an annual report in the two years since?",
                     "type": "boolean"
@@ -26,10 +30,6 @@
                     "description": "Has your company ever sold securities under Regulation Crowdfunding before?",
                     "type": "boolean"
                 },
-                "is an investment company": {
-                    "description": "Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?",
-                    "type": "boolean"
-                },
                 "organized in the United States": {
                     "description": "Is your company organized under, and subject to, the laws of a US State or territory, or the District of Columbia?",
                     "type": "boolean"
@@ -42,7 +42,7 @@
             "required": [
                 "organized in the United States",
                 "already files Exchange Act reports",
-                "is an investment company",
+                "an investment company",
                 "has a bad actor disqualification",
                 "behind on past Reg CF annual reports",
                 "has no specific business plan",

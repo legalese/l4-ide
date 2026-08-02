@@ -47,16 +47,16 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] advisory — decision_days_in_the_resale_restricted_period  (main.l4:238:46-49)
       `days in the resale restricted period` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_1_not_organized_under_state_or_territorial_law  (main.l4:260:9-261:141)
+  [D-LITERALEXPR] advisory — decision_b_1_not_organized_under_state_or_territorial_law  (main.l4:260:9-261:138)
       `(b)(1) — not organized under State or territorial law` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_2_an_exchange_act_reporting_company  (main.l4:267:9-268:125)
+  [D-LITERALEXPR] advisory — decision_b_2_an_exchange_act_reporting_company  (main.l4:267:9-268:122)
       `(b)(2) — an Exchange Act reporting company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_3_an_investment_company  (main.l4:274:9-275:134)
+  [D-LITERALEXPR] advisory — decision_b_3_an_investment_company  (main.l4:274:9-275:131)
       `(b)(3) — an investment company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_4_subject_to_a_bad_actor_disqualification  (main.l4:281:9-282:87)
+  [D-LITERALEXPR] advisory — decision_b_4_subject_to_a_bad_actor_disqualification  (main.l4:281:9-282:84)
       `(b)(4) — subject to a bad-actor disqualification` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-LITERALEXPR] advisory — decision_b_5_delinquent_in_ongoing_annual_reports  (main.l4:290:9-291:204)
@@ -83,7 +83,7 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] advisory — decision_aggregate_amount_sold_to_this_investor_including_this_transaction  (main.l4:427:9-428:49)
       `aggregate amount sold to this investor including this transaction` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_accredited_investor_carve_out_applies_to  (main.l4:439:9-440:70)
+  [D-LITERALEXPR] advisory — decision_the_accredited_investor_carve_out_applies_to  (main.l4:439:9-440:67)
       `the accredited-investor carve-out applies to` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-LITERALEXPR] advisory — bkm_investor_is_within_the_investment_limit  (main.l4:447:9-450:44)
@@ -140,7 +140,7 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] advisory — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:735:9-736:108)
       `transfer is within the one-year restricted period` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:742:9-750:313)
+  [D-LITERALEXPR] advisory — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:742:9-750:310)
       `transfer falls within an exception in Rule 501(a)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-LITERALEXPR] advisory — decision_transfer_is_permitted  (main.l4:756:8-757:68)
@@ -221,7 +221,7 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-FIXTURE] advisory — a reporting status with  (main.l4:866:1-876:112)
       `a reporting status with` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a transfer at  (main.l4:878:1-886:307)
+  [D-FIXTURE] advisory — a transfer at  (main.l4:878:1-886:304)
       `a transfer at` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
   [D-FIXTURE] advisory — a conforming notice  (main.l4:992:1-997:167)

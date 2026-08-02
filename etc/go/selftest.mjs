@@ -1196,9 +1196,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   check(
     "the DMN field-name sanitiser still matches the committed cases file",
     ddSanitise(
-      "is subject to a disqualification as specified in section 227.503(a)",
-    ) ===
-      "is_subject_to_a_disqualification_as_specified_in_section_227_503_a" &&
+      "subject to a disqualification as specified in section 227.503(a)",
+    ) === "subject_to_a_disqualification_as_specified_in_section_227_503_a" &&
       ddSanitise(
         "aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months",
       ) ===
