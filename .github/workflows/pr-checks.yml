@@ -209,13 +209,24 @@ jobs:
           etc/go/go.sh plan --milestone g1 | tee /tmp/plan.txt
           grep -q 'p0-preflight' /tmp/plan.txt
           grep -q 'entry points that exist and refuse' /tmp/plan.txt
+          etc/go/go.sh plan --milestone g2 | tee /tmp/plan-g2.txt
+          grep -q 'p1-ingest' /tmp/plan-g2.txt
+          grep -q 'NOT WIRED' /tmp/plan-g2.txt
+          grep -q 'does NOT mean a de novo run happened' /tmp/plan-g2.txt
 
-      # Every scaffolded stage must refuse with exit 3 and name its blocker.
-      # A stage that exits 0 while doing nothing is the failure this whole
-      # design exists to prevent.
-      - name: Every scaffolded stage refuses loudly
+      # Every stage that is STILL scaffolded must refuse with exit 3 and name its
+      # blocker. A stage that exits 0 while doing nothing is the failure this
+      # whole design exists to prevent.
+      #
+      # p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they
+      # are real stages now, each validating a deposit an agent produced, and
+      # their three outcomes (absent -> SKIPPED, invalid -> DEGRADED naming the
+      # rule, valid -> PASS) are exercised in etc/go/selftest.mjs, which this job
+      # already runs. Removing them here without that coverage would have deleted
+      # the only check they had.
+      - name: Every still-scaffolded stage refuses loudly
         run: |
-          for s in p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p10-publish; do
+          for s in p8-verify p10-publish; do
             out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0; a scaffolded stage must refuse"; exit 1; }
             rc=$?
             [ "$rc" = "3" ] || { echo "::error::$s exited $rc, expected 3"; exit 1; }
