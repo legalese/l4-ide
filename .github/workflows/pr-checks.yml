@@ -187,9 +187,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       # Proves the status lattice can still say no: every status producible, PASS
       # rejected with a null, failing, or WEAK oracle, a BROKEN receipt unable to
@@ -287,9 +291,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       # Proves the gate can still FAIL, by asserting every fixture in
       # jl4/examples/bpmn/unsound/ is caught on the specific property it exists
@@ -509,12 +517,26 @@ jobs:
       # `npm cache is not found` on merge_group run 30760823299 — after which it
       # wrote 111 MB into its own doomed ref. 28 such entries were live on
       # 2026-08-02, 1.89 GB, 20 of them never read once.
+      #
+      # BOTH inputs have to be turned off, and this is the only setup-node in
+      # the file that needs both. setup-node@v5's restore is:
+      #
+      #   if (cache && isCacheFeatureAvailable()) { restoreCache(cache, …) }
+      #   else if (resolvedPackageManager && packagemanagercache) { restoreCache(…) }
+      #
+      # `cache: npm` alone reaches the first branch; leaving `cache` empty falls
+      # through to the second, where `package-manager-cache` defaults to TRUE and
+      # auto-detects npm anyway. Disabling only one of the two does nothing —
+      # which is what the first cut of this change did, caught by the resolved
+      # inputs GitHub echoes into the log (`package-manager-cache: true`) rather
+      # than by reading the action.
       - name: Use Node.js
         uses: actions/setup-node@v5
         with:
           cache-dependency-path: package-lock.json
           node-version: "24.x"
           cache: ${{ github.event_name != 'merge_group' && 'npm' || '' }}
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       - run: npm ci
       - run: npm run build
@@ -1340,9 +1362,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
       - name: Pure parity-gate classify + verdict semantics
         run: node jl4-mlir/scripts/parity-gate.test.mjs
       - name: Other jl4-mlir pure node tests (untested in CI today)
@@ -1506,9 +1532,13 @@ jobs:
         run: |
           cabal update
           cabal build jl4-mlir jl4-service
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
       # --- run the harness with EXPLICIT in-repo corpus (default list is broken) ---
       - name: Run differential parity harness
         run: |
