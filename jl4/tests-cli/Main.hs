@@ -2138,6 +2138,22 @@ spec bin = do
       sout `shouldSatisfy` ("PROPOSITIONAL" `isInfixOf`)
       sout `shouldSatisfy` ("--no-coalesce-atoms" `isInfixOf`)
 
+    -- The run receipt sends a reader to `--help` for the FULL statement of the
+    -- bound, so `--help` has to render it the way it was written. Plain
+    -- `footer` does not: it is `fillSep . words`, which eats every newline and
+    -- delivers five separately-quotable paragraphs as one 30-line wall. The
+    -- heading is the cheapest discriminator — under reflow it runs straight
+    -- into the sentence after it.
+    it "renders that bound as paragraphs, not as one reflowed wall" $ do
+      Output _ sout _ <- runL4 bin ["verify", "--help"]
+      let heading = "WHAT A CLEAN RUN PROVES, AND WHAT IT DOES NOT"
+      unless (any ((== heading) . dropWhile (== ' ')) (lines sout)) $
+        expectationFailure
+          ( "the bound's heading should stand on its own line; optparse's\n\
+            \`footer` reflows it into the following sentence. Got:\n"
+              ++ sout
+          )
+
     it "emits a well-shaped JSON envelope with ok=true on a clean module" $ do
       env <- jsonEnvelope bin ["verify", verifyCleanFixture, "--format", "json"]
       objField env "ok" `shouldBe` Just (Bool True)

@@ -14,6 +14,7 @@ import Options.Applicative
   , command
   , customExecParser
   , footer
+  , footerDoc
   , fullDesc
   , header
   , helper
@@ -24,6 +25,7 @@ import Options.Applicative
   , subparser
   )
 import qualified Options.Applicative as Options
+import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
@@ -109,7 +111,18 @@ commandParser =
       <> command "verify"
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
-               <> footer propositionalBound))
+               <> footerDoc (Just (verbatim propositionalBound))))
+
+-- | A footer that keeps the line breaks it was written with.
+--
+-- @footer@ takes a String and runs it through optparse-applicative's
+-- @paragraph@, which is @fillSep . words@: every newline becomes a space and
+-- the whole thing reflows into one wall of prose. For a caveat with five
+-- separately-quotable paragraphs that is a real loss — the text report and the
+-- @--help@ footer are the same string and must read the same way, because the
+-- run receipt points a reader at @--help@ for the full statement.
+verbatim :: String -> Pretty.Doc
+verbatim = Pretty.vsep . fmap Pretty.pretty . lines
 
 commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> commandParser)
