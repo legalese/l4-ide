@@ -285,7 +285,19 @@ R-numbers are scoped to this document (house precedent: the DMN spec has its own
 lexipedia-superset spec its K-series). Cross-references from elsewhere should say "SI-Rn".
 
 - **R0 — ANSWERED 2026-07-31**: the execution is the exhibit (§2).
-- **R1 — corpus-of-law repository**: name, org, license, layout. Owner: Meng.
+- **R1 — corpus-of-law repository**: name, org, license, layout. Owner: Meng. **PARTIALLY
+  ANSWERED 2026-08-02 (Meng), three of five dimensions:** (1) **visibility: PUBLIC from day
+  one** — with draft-status markers per subject, **inspectable HG1/HG2** (the gate grants —
+  signature files, waiver records, `gate-allowed-signers` — are in-repo artifacts a reader can
+  verify with `ssh-keygen -Y verify`, which the gate machinery already supports), and **version
+  numbering** (the encoding's version; orthogonal to the law-time axis, which stays
+  `EVAL UNDER RULES EFFECTIVE AT`). (2) **layout: class/instance** — the generic "⟨body of
+  law⟩: go" template (the subject-sidecar shape: descriptor + pins + known-defects + NOTES.md)
+  is the class; each encoding job is an instance expected to veer, with its divergences recorded
+  in its own sidecar files rather than by forking the template. (3) **license: permissive**,
+  keeping the open-core → freemium-enrichment pathway; the exact license _class_
+  (software-style vs content-style) was under discussion at this writing. **Still open:** repo
+  name + org confirmation; the license instrument.
 - **R2 — lexipedia compatibility**: probe their DokuWiki format, contribution route, and
   licensing; fallback is the comparison note in P9. Needs a read-only probe first; any contact
   is HG2.
