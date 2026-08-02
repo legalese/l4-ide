@@ -9,7 +9,8 @@ What that means precisely, in the present tense:
 - **`etc/go/go.sh run --milestone g1 --subject regcf` runs end to end today.** It drives the
   committed Reg CF corpus through every reachable projection, records a receipt per stage, and
   emits conversion report v0. It refuses at HG1 unless a signature verifies or a waiver is
-  recorded.
+  recorded. The subject is resolved from a per-subject sidecar (§2.3), so the driver and phase
+  scripts carry no Reg CF facts of their own.
 - **Seven stages are scaffolded and cannot run**: `p1-ingest`, `p2-sweep`, `p3-encode`,
   `p4-forks`, `p5-gate`, `p8-verify`, `p10-publish`. Each is an entry point that prints what it
   would do and what is blocking it, then exits 3. Since R4 was ruled (2026-08-02) the
@@ -29,18 +30,19 @@ What that means precisely, in the present tense:
 ```
 etc/go/
 ├── go.sh                        the only entry point; dispatch, gates, resumability
-├── PINS.json                    the CLI surface the stage table reads
-├── known-defects.json           measured defects, used as negative controls
 ├── selftest.mjs                 proof the lattice can still refuse
 ├── check-skill-drift.mjs        the skill's command set vs go.sh's dispatch table
 ├── gate-request.sh              prints the payload a human signs
 ├── gate-verify.sh               ssh-keygen -Y verify; the default-deny check
 ├── README.md                    usage, exit codes, environment, common errors
+├── subjects/                    one sidecar directory per body of law (§2.3)
+│   └── regcf/                   subject.json · pins.json · known-defects.json ·
+│                                NOTES.md
 ├── lib/                         verdict · ledger · receipt · probe · digest ·
-│                                discover · canon-diff · assert-report (+selftest) ·
-│                                fidelity-counts · plan-shape · split-digraphs ·
-│                                known-defects · gate-payload · verify-run ·
-│                                phase-prelude.sh
+│                                discover · subject · canon-diff ·
+│                                assert-report (+selftest) · fidelity-counts ·
+│                                plan-shape · split-digraphs · known-defects ·
+│                                gate-payload · verify-run · phase-prelude.sh
 ├── phases/                      p0 p3-check p6 p7×9 p9  (run) ·
 │                                p1 p2 p3-encode p4 p5 p8 p10  (refuse)
 └── report/                      render-report.mjs + template.md
@@ -76,7 +78,7 @@ could get back out of the journal it was said to come from. `p3-check` now recor
 
 | stage          | status              | oracle class | why                                                                                                                                                                                                                                                                                    |
 | -------------- | ------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p0-preflight` | PASS                | structural   | CLI enumerations and the module's regulative-rule names match `PINS.json` as sets; every checker in the pin exists; the failing-`#ASSERT` tripwire still exits 0                                                                                                                       |
+| `p0-preflight` | PASS                | structural   | CLI enumerations and the module's regulative-rule names match the subject's `pins.json` as sets; every checker in the pin exists; the failing-`#ASSERT` tripwire still exits 0                                                                                                         |
 | `p3-check`     | DEGRADED            | —            | both modules typecheck and all 2 matched dated arms carry an `@ref` (floor: 2); nine `ELSE IF` sites remain against P3's BRANCH-over-`ELSE IF` house rule                                                                                                                              |
 | `p6-tests`     | PASS                | execution    | the corpus's own `#ASSERT` directives all hold, read out of `results[]`                                                                                                                                                                                                                |
 | `p7-dmn`       | **PASS**            | execution    | executed by both engines over the committed 16-case file: KIE `1072/1072 value(s) as expected, 224/224 service output value(s) as expected`, Camunda `1072/1072 value(s) as expected`; fidelity 0 blocking / 21 lossy / 125 advisory; golden reproduced modulo the D1 canonicalisation |
@@ -198,6 +200,41 @@ Every G1 stage is deterministic: a binary is invoked, an oracle runs, a receipt 
 is the largest simplification in the design and the first thing a later reader will be tempted to
 undo, so it is written down here as well as in the skill.
 
+### 2.3 The subject sidecar
+
+A second boundary, orthogonal to skill/script: **the pipeline owns every mechanism; the subject
+sidecar owns every fact about one body of law.** The driver, libraries and phase scripts contain
+no subject literals; everything subject-specific lives in `etc/go/subjects/<id>/`, four files:
+
+- **`subject.json`** — the machine-readable descriptor: id, display name, legal citation, source
+  entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check
+  floors (`checks.min_dated_arms`, `checks.min_assertions` — these are _measurements_ of the
+  corpus, which is why they cannot be pipeline constants), and a `legs` object carrying one entry
+  per projection leg with its committed golden/cases/aux paths.
+- **`pins.json`** — the CLI surface the stage table reads, measured against that subject's corpus
+  (formerly `etc/go/PINS.json`).
+- **`known-defects.json`** — measured defects used as negative controls (formerly
+  `etc/go/known-defects.json`).
+- **`NOTES.md`** — free-prose idiosyncrasies of the corpus, read by humans and the skill and
+  **never by scripts**. Different legal sources have idiosyncratic pipeline variations; the prose
+  half of those variations goes here, so the machinery stays generic.
+
+`etc/go/lib/subject.mjs` resolves a subject id to exported `GO_S_*` environment variables, and
+validates refuse-by-default: an unknown key anywhere in the descriptor is an error, and a leg
+entry naming a missing golden is a hard error naming the path (the one carve-out is
+`legs['p7-dmn'].cases`, whose _absence on disk_ is the p7-dmn leg's designed `NOT-EXECUTABLE`
+story rather than a configuration error). An unknown subject exits 2 listing the available
+sidecars and the recipe for adding one. Both refusals are selftest-covered.
+
+**The `legs` object is the leg declaration.** `go.sh` declares `p0-preflight`, `p3-check`,
+`p6-tests` and `p9-report` for every subject, and a p7 stage iff `legs` has its entry; the
+wizard-dependent halves of p0/p3/p6/p7-mcp engage iff `corpus.wizard` is present. This is what
+keeps the §3.2 milestone rule honest across subjects: a future subject with no wizard and no
+regulative rules (so no bpmn/lts legs and no NLG goldens) omits those entries, and `COMPLETE`
+still means every stage _that subject declares_ is accounted for — not that its sidecar faked
+nine legs. The BNA corpus (PR #195, unmerged) will slot in as exactly such a sidecar; it is
+deliberately not created here, because its corpus is not on this branch.
+
 ---
 
 ## 3. The status lattice, and why `COMPLETE` is not `green`
@@ -297,7 +334,7 @@ keeps the latest few runs **and** every run holding a granted gate.
 
 | stage          | oracle                                                                                                                                              | notes                                                                                                                                                              |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `p0-preflight` | discovery calls vs `PINS.json`, plus checker existence, plus the `l4 run` tripwire                                                                  | pins are **narrow** — four CLI enumerations and the module's rule names, not a hash of `l4 --help`. A tripwire that fires on an unrelated help reflow gets deleted |
+| `p0-preflight` | discovery calls vs the subject's `pins.json`, plus checker existence, plus the `l4 run` tripwire                                                    | pins are **narrow** — four CLI enumerations and the module's rule names, not a hash of `l4 --help`. A tripwire that fires on an unrelated help reflow gets deleted |
 | `p3-check`     | `l4 check` ×2, `ELSE IF` absence, `@ref` per dated arm                                                                                              | the third house rule — isomorphism against the source — is recorded as unverified and carried by HG1, never omitted                                                |
 | `p6-tests`     | `results[]` parsed out of `l4 run --json`, plus a floor on the assertion count                                                                      | the exit code is **not** the oracle; see §5.3                                                                                                                      |
 | `p7-dmn`       | canonicalise-then-diff vs golden + `etc/validate-dmn.mjs` + both engine harnesses over the committed cases file                                     | `PASS`/`execution` since 2026-08-02; see §5.4                                                                                                                      |
@@ -401,7 +438,7 @@ of every stage so far. `gate-request.sh` builds and prints it; the human signs o
 `ssh-keygen -Y verify` against `gate-allowed-signers`. **Agents can verify and cannot sign.**
 
 Two consequences follow from binding to content rather than issuing a token: a post-gate edit
-re-opens the gate (touch `regcf.l4` and the payload changes), and re-running is cheap (HG1 over an
+re-opens the gate (touch a corpus file and the payload changes), and re-running is cheap (HG1 over an
 unchanged corpus is effectively a standing signature). `gate-verify.sh` rebuilds the payload from
 the journal every time, so a stale payload file on disk can never be what gets verified.
 
@@ -489,11 +526,11 @@ is HG2's.
 
 ## 7. Three ways this rots, and the counterweight
 
-| rot                                                                              | mechanism                                                                   | counterweight                                                                                                                                                                                                                                                                                                   |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| the lattice collapses to PASS/FAIL, because eight statuses feel like bureaucracy | one edit in `verdict.mjs`                                                   | `etc/go/selftest.mjs` constructs a receipt for each status, asserts `PASS` is refused with a null, failing, **weak-class**, or artifact-less oracle, and asserts a `BROKEN` receipt cannot yield a `COMPLETE` milestone. CI-gated by the new `go:` filter                                                       |
-| measured numbers get transcribed into report prose and go stale                  | somebody pastes a figure into the template                                  | `report/template.md` contains **no** literal measurement, and `render-report.mjs` refuses to render one: any digit-run outside a small allowlist of spec coordinates is a template defect (exit 4), and an unresolved placeholder is too. Fidelity counts are parsed by `lib/fidelity-counts.mjs`, never typed  |
-| the stage table drifts from the CLI and harness reality                          | a renamed checker, a new `--to` target, `--fail-on-assert` finally shipping | `p0-preflight` re-derives the four enumerations and the module's rule names **by discovery call** and compares them as sets, so a rename fails loudly naming the exact strings; it existence-checks every checker in `PINS.json`; and the failing-`#ASSERT` tripwire fires the day the workaround becomes wrong |
+| rot                                                                              | mechanism                                                                   | counterweight                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the lattice collapses to PASS/FAIL, because eight statuses feel like bureaucracy | one edit in `verdict.mjs`                                                   | `etc/go/selftest.mjs` constructs a receipt for each status, asserts `PASS` is refused with a null, failing, **weak-class**, or artifact-less oracle, and asserts a `BROKEN` receipt cannot yield a `COMPLETE` milestone. CI-gated by the new `go:` filter                                                                     |
+| measured numbers get transcribed into report prose and go stale                  | somebody pastes a figure into the template                                  | `report/template.md` contains **no** literal measurement, and `render-report.mjs` refuses to render one: any digit-run outside a small allowlist of spec coordinates is a template defect (exit 4), and an unresolved placeholder is too. Fidelity counts are parsed by `lib/fidelity-counts.mjs`, never typed                |
+| the stage table drifts from the CLI and harness reality                          | a renamed checker, a new `--to` target, `--fail-on-assert` finally shipping | `p0-preflight` re-derives the four enumerations and the module's rule names **by discovery call** and compares them as sets, so a rename fails loudly naming the exact strings; it existence-checks every checker in the subject's `pins.json`; and the failing-`#ASSERT` tripwire fires the day the workaround becomes wrong |
 
 A fourth was added after the first run: `check-skill-drift.mjs` compares the skill's documented
 command set against `go.sh`'s dispatch table in **both** directions and refuses a runnable command

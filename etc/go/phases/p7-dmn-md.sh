@@ -9,33 +9,37 @@
 # is real; the artifact's usefulness is not what it measures.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}" \
-    "$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.dmn.md" \
-    "$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.md.fidelity.txt" \
+  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+    "$GO_S_DMNMD_GOLDEN" \
+    "$GO_S_DMNMD_FIDELITY_GOLDEN" \
     "$GO_ROOT/etc/go/lib/canon-diff.mjs"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-OUT="$GO_OUT/regcf-corpus.dmn.md"
-GOLDEN="$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.dmn.md"
-GOLDEN_FID="$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.md.fidelity.txt"
+GOLDEN="$GO_S_DMNMD_GOLDEN"
+GOLDEN_FID="$GO_S_DMNMD_FIDELITY_GOLDEN"
+# The regenerated artifact lands under the golden's own basename, so the diff
+# reads name-against-name.
+OUT="$GO_OUT/$(basename "$GOLDEN")"
 DIFFLOG="$GO_OUT/p7-dmn-md.canon-diff.txt"
 
 set +e
-"$L4" export "$GO_CORPUS" --to dmn-md -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn-md.fidelity.stderr"
+"$L4" export "$GO_S_CORPUS" --to dmn-md -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn-md.fidelity.stderr"
 RC=$?
 set -e
 [[ $RC -eq 0 ]] || go_broken "l4 export --to dmn-md exited $RC on a module that typechecks"
 cat "$GO_OUT/p7-dmn-md.fidelity.stderr"
 
-# `-o out.dmn.md --fidelity-report` writes the sibling report next to it.
-FID="$GO_OUT/regcf-corpus.md.fidelity.txt"
-[[ -f "$FID" ]] || FID="$GO_OUT/regcf-corpus.dmn.fidelity.txt"
+# `-o out.dmn.md --fidelity-report` writes the sibling report next to it,
+# under either of the two stem spellings the exporter has used.
+STEM="${OUT%.dmn.md}"
+FID="$STEM.md.fidelity.txt"
+[[ -f "$FID" ]] || FID="$STEM.dmn.fidelity.txt"
 
 set +e
-L4_GO_SOURCE_BASENAME="$(basename "$GO_CORPUS")" node "$GO_LIB/canon-diff.mjs" "$OUT" "$GOLDEN" --report "$DIFFLOG"
+L4_GO_SOURCE_BASENAME="$(basename "$GO_S_CORPUS")" node "$GO_LIB/canon-diff.mjs" "$OUT" "$GOLDEN" --report "$DIFFLOG"
 DIFF_RC=$?
 set -e
 

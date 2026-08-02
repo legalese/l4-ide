@@ -14,17 +14,17 @@
 # verdict no matter what it reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}"
+  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-OUT="$GO_OUT/regcf.akn.xml"
+OUT="$GO_OUT/$GO_S_ID.akn.xml"
 LOG="$GO_OUT/p7-akn.txt"
 
 set +e
-"$L4" render "$GO_CORPUS" --format akn -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
+"$L4" render "$GO_S_CORPUS" --format akn -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
 RC=$?
 set -e
 if [[ $RC -ne 0 ]]; then
@@ -37,7 +37,7 @@ fi
 
 # Well-formedness only. There is no Akoma Ntoso schema in this repo and no
 # checker for one, so nothing here says the document is VALID AKN, let alone
-# that it says what 17 CFR Part 227 says.
+# that it says what the source regulation says.
 set +e
 node -e '
   const fs = require("node:fs");
@@ -63,7 +63,7 @@ if [[ $WF_RC -ne 0 ]]; then
 fi
 
 go_receipt --status UNVERIFIED \
-  --reason "an Akoma Ntoso 3.0 document was emitted and is well formed at the shallow level checked here (declaration, AKN namespace, one balanced root). It is UNVERIFIED because well-formedness is the only oracle available: this repo carries no AKN schema and no AKN checker, so nothing establishes that the document is schema-valid, let alone that it says what 17 CFR Part 227 says. etc/go/lib/verdict.mjs bars a wellformedness-class oracle from PASS for exactly this reason." \
+  --reason "an Akoma Ntoso 3.0 document was emitted and is well formed at the shallow level checked here (declaration, AKN namespace, one balanced root). It is UNVERIFIED because well-formedness is the only oracle available: this repo carries no AKN schema and no AKN checker, so nothing establishes that the document is schema-valid, let alone that it says what $GO_S_CITATION says. etc/go/lib/verdict.mjs bars a wellformedness-class oracle from PASS for exactly this reason." \
   --artifact "$OUT" --artifact "$LOG" \
   --metric "bytes=$(wc -c <"$OUT" | tr -d ' ')" \
   --label "EXTRA" \

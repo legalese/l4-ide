@@ -32,7 +32,7 @@ export const CANONICALISATIONS = [
   {
     id: "D1-golden-runner-source-uri",
     because:
-      "jl4/tests/DmnExport.hs:3212 — `drgFlavoredWith = drgGeneral emptyVFS id` typechecks the golden with an EMPTY virtual file system, so no source URI reaches the @ref renderer and provenance renders the placeholder `main.l4`. The CLI has a real file path and renders `regcf.l4`. The exporter output is identical in every other byte.",
+      "jl4/tests/DmnExport.hs:3212 — `drgFlavoredWith = drgGeneral emptyVFS id` typechecks the golden with an EMPTY virtual file system, so no source URI reaches the @ref renderer and provenance renders the placeholder `main.l4`. The CLI has a real file path and renders the real source basename. The exporter output is identical in every other byte.",
     delete_when:
       "the golden runner threads the real source path (a VFS seeded with the fixture, or drgAsCli's path plumbed into drgGeneral) and jl4/examples/dmn/expected/*.dmn are regenerated carrying real basenames. At that point this entry MUST be deleted; until then, this leg's diff does not prove the two files are byte-identical, only that they agree modulo the placeholder.",
     contradicts: [

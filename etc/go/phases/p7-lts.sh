@@ -12,18 +12,18 @@
 # the compiler have to agree on that number. MEASURED 2026-08-02: 3 and 3.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/split-digraphs.mjs"
+  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/split-digraphs.mjs"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-DOT="$GO_OUT/regcf.state-graph.dot"
+DOT="$GO_OUT/$GO_S_ID.state-graph.dot"
 SPLITDIR="$GO_OUT/state-graphs"
 LOG="$GO_OUT/p7-lts.txt"
 
 set +e
-"$L4" state-graph "$GO_CORPUS" >"$DOT" 2>"$GO_OUT/p7-lts.stderr"
+"$L4" state-graph "$GO_S_CORPUS" >"$DOT" 2>"$GO_OUT/p7-lts.stderr"
 RC=$?
 set -e
 if [[ $RC -ne 0 ]]; then
@@ -35,7 +35,7 @@ if [[ $RC -ne 0 ]]; then
 fi
 
 # The independent count: the BPMN discovery call.
-mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_CORPUS")
+mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS")
 EXPECT=${#RULES[@]}
 
 set +e
@@ -65,7 +65,7 @@ if command -v dot >/dev/null 2>&1; then
 fi
 
 go_receipt --status PASS \
-  --oracle-cmd "node etc/go/lib/split-digraphs.mjs regcf.state-graph.dot --expect $EXPECT" \
+  --oracle-cmd "node etc/go/lib/split-digraphs.mjs $(basename "$DOT") --expect $EXPECT" \
   --oracle-exit 0 \
   --oracle-class structural \
   --oracle-because "the number of digraph blocks the state-graph emitter produces is cross-checked against the number of regulative rules the BPMN exporter's discovery call independently reports; two separate compiler paths agree on $EXPECT. This is stronger than 'the file is non-empty', which would be a presence oracle and could not license PASS." \

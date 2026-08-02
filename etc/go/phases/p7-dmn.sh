@@ -11,19 +11,25 @@
 # literal expressions that could not evaluate would have manufactured a green
 # the artifact had not earned.
 #
-# PR #194 (unstable 4122355a, 2026-08-02) discharged that: fidelity went
-# 95 blocking → 0 and jl4/examples/dmn/regcf-corpus.cases.json landed with 16
-# dated cases whose expected values are L4-evaluated. With that file present,
-# the branch at the bottom of this script executes the emitted DMN on BOTH
-# engine harnesses and the leg's oracle class rises to `execution`.
+# PR #194 (unstable 4122355a, 2026-08-02) discharged that for the inaugural
+# subject: fidelity went 95 blocking → 0 and a corpus cases file landed with
+# 16 dated cases whose expected values are L4-evaluated. With the subject's
+# cases file present, the branch at the bottom of this script executes the
+# emitted DMN on BOTH engine harnesses and the leg's oracle class rises to
+# `execution`.
+#
+# The golden, fidelity golden and cases file come from the subject sidecar
+# (subject.json, legs['p7-dmn']); the cases path is declared there even when
+# the file does not exist yet, because its ABSENCE is this leg's designed
+# NOT-EXECUTABLE story rather than a configuration error.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}" \
-    "$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.dmn" \
-    "$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.fidelity.txt" \
+  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+    "$GO_S_DMN_GOLDEN" \
+    "$GO_S_DMN_FIDELITY_GOLDEN" \
     "$GO_ROOT/etc/validate-dmn.mjs" \
     "$GO_ROOT/etc/go/lib/canon-diff.mjs" \
-    "$GO_ROOT/jl4/examples/dmn/regcf-corpus.cases.json" \
+    "$GO_S_DMN_CASES" \
     "$GO_ROOT/etc/kie-dmn-check/run.sh" \
     "$GO_ROOT/etc/camunda-dmn-check/run.sh"
   exit 0
@@ -31,22 +37,24 @@ fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-OUT="$GO_OUT/regcf-corpus.dmn"
-GOLDEN="$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.dmn"
-GOLDEN_FID="$GO_ROOT/jl4/examples/dmn/expected/regcf-corpus.fidelity.txt"
+GOLDEN="$GO_S_DMN_GOLDEN"
+GOLDEN_FID="$GO_S_DMN_FIDELITY_GOLDEN"
+CASES="$GO_S_DMN_CASES"
+# The regenerated artifact lands under the golden's own basename, so the diff
+# reads name-against-name.
+OUT="$GO_OUT/$(basename "$GOLDEN")"
 DIFFLOG="$GO_OUT/p7-dmn.canon-diff.txt"
-CASES="$GO_ROOT/jl4/examples/dmn/regcf-corpus.cases.json"
 
 # --- 1. regenerate -----------------------------------------------------------
 set +e
-"$L4" export "$GO_CORPUS" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
+"$L4" export "$GO_S_CORPUS" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
 EXPORT_RC=$?
 set -e
 [[ $EXPORT_RC -eq 0 ]] || go_broken "l4 export --to dmn exited $EXPORT_RC on a module that typechecks"
 cat "$GO_OUT/p7-dmn.fidelity.stderr"
 
 # `--fidelity-report` with `-o out.dmn` writes a sibling out.fidelity.txt.
-FID="$GO_OUT/regcf-corpus.fidelity.txt"
+FID="${OUT%.dmn}.fidelity.txt"
 
 # --- 2. differential oracle against the committed golden --------------------
 # NOT a bare byte-diff: that is red on day one and the cause is a defect in the
@@ -54,10 +62,10 @@ FID="$GO_OUT/regcf-corpus.fidelity.txt"
 # canonicalisation carries its `because` (DmnExport.hs:3212) and the condition
 # for its own deletion.
 set +e
-L4_GO_SOURCE_BASENAME="$(basename "$GO_CORPUS")" \
+L4_GO_SOURCE_BASENAME="$(basename "$GO_S_CORPUS")" \
   node "$GO_LIB/canon-diff.mjs" "$OUT" "$GOLDEN" --report "$DIFFLOG"
 DIFF_RC=$?
-L4_GO_SOURCE_BASENAME="$(basename "$GO_CORPUS")" \
+L4_GO_SOURCE_BASENAME="$(basename "$GO_S_CORPUS")" \
   node "$GO_LIB/canon-diff.mjs" "$FID" "$GOLDEN_FID" --report "$GO_OUT/p7-dmn.fidelity.canon-diff.txt"
 FID_DIFF_RC=$?
 set -e
@@ -95,7 +103,7 @@ fi
 if [[ $EXECUTABLE -eq 0 ]]; then
   go_receipt --status NOT-EXECUTABLE \
     --reason "the DMN regenerates identically to the committed golden (after the D1 canonicalisation) and passes the dmn-moddle interchange gate, and it CANNOT BE EXECUTED: neither engine harness can be pointed at it, because no cases file for the corpus DMN exists. This is a Blocking line in the conversion report, which is the only condition under which SPEC.md §6 permits G1 to proceed. R0 makes it a defect, not a caveat." \
-    --blocker "no $CASES exists. etc/kie-dmn-check/run.sh and etc/camunda-dmn-check/run.sh both require --cases CASES.json; the only Reg-CF cases file in the tree, jl4/examples/dmn/reg-cf.cases.json, belongs to the 101-line toy. Writing cases against $BLOCKING boxed literal expressions that cannot evaluate would manufacture a green the artifact has not earned — that is DMN Phase 5 (BKM emission) work, tracked in specs/todo/DMN-PHASE5-BUILD-PLAN.md." \
+    --blocker "no $CASES exists. etc/kie-dmn-check/run.sh and etc/camunda-dmn-check/run.sh both require --cases CASES.json, and the subject's sidecar declares that path without the file existing yet. Writing cases against $BLOCKING boxed literal expressions that cannot evaluate would manufacture a green the artifact has not earned — that is DMN Phase 5 (BKM emission) work, tracked in specs/todo/DMN-PHASE5-BUILD-PLAN.md." \
     --artifact "$OUT" --artifact "$FID" --artifact "$DIFFLOG" --artifact "$GO_OUT/p7-dmn.validate.txt" \
     --metric "blocking=$BLOCKING" --metric "lossy=$LOSSY" --metric "advisory=$ADVISORY" \
     --metric "canonicalisations=D1-golden-runner-source-uri"

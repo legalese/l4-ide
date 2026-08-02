@@ -2,9 +2,10 @@
 // Parse a `--fidelity-report` file into severity and code counts.
 //
 // The counts are PARSED, never typed. `jl4/examples/legal/regcf/PROJECTIONS.md`
-// carries "114 blocking, 46 lossy, 18 advisory" against an exporter that emits
-// different figures, because those numbers were transcribed once and never
-// re-measured. This module is why the go report cannot repeat that.
+// once carried "114 blocking, 46 lossy, 18 advisory" against an exporter that
+// emitted different figures, because those numbers were transcribed once and
+// never re-measured (repaired since — ORCHESTRATOR.md §1.1 D2 is the history).
+// This module is why the go report cannot repeat that failure.
 //
 // Usage: node etc/go/lib/fidelity-counts.mjs FIDELITY.txt [--json]
 // Output (default): "<blocking> <lossy> <advisory>" on one line, for `read`.

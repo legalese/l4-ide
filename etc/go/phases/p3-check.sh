@@ -11,7 +11,7 @@
 # checkable in principle, and it is RECORDED as unverified rather than omitted.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "$GO_WIZARD" "${BASH_SOURCE[0]}"
+  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}"
   exit 0
 fi
 
@@ -23,8 +23,13 @@ FINDINGS=0
 
 note() { echo "$*" | tee -a "$LOG"; }
 
+# The subject's module set: the corpus proper, plus the wizard companion when
+# the sidecar declares one.
+declare -a MODULES=("$GO_S_CORPUS")
+[[ -n "${GO_S_WIZARD:-}" ]] && MODULES+=("$GO_S_WIZARD")
+
 # --- 1. typecheck ------------------------------------------------------------
-for f in "$GO_CORPUS" "$GO_WIZARD"; do
+for f in "${MODULES[@]}"; do
   set +e
   "$L4" check "$f" --fixed-now "$GO_FIXED_NOW" >>"$LOG" 2>&1
   rc=$?
@@ -36,14 +41,14 @@ done
 # --- 2. house style: BRANCH over ELSE IF ------------------------------------
 # P3's house rules name `BRANCH` over `ELSE IF` chains. Comment lines are
 # excluded: the corpus discusses the rule in prose in several places.
-ELSEIF=$(grep -nE '^[[:space:]]*[^-[:space:]].*\bELSE[[:space:]]+IF\b|^[[:space:]]*ELSE[[:space:]]+IF\b' "$GO_CORPUS" "$GO_WIZARD" || true)
+ELSEIF=$(grep -nE '^[[:space:]]*[^-[:space:]].*\bELSE[[:space:]]+IF\b|^[[:space:]]*ELSE[[:space:]]+IF\b' "${MODULES[@]}" || true)
 ELSEIF_N=$(printf '%s' "$ELSEIF" | grep -c . || true)
 if [[ -n "$ELSEIF" ]]; then
   note "FINDING: $ELSEIF_N ELSE IF site(s), against P3's BRANCH-over-ELSE-IF house rule:"
   note "$ELSEIF"
   FINDINGS=$((FINDINGS + 1))
 else
-  note "house style: no ELSE IF chain in either file"
+  note "house style: no ELSE IF chain in any module"
 fi
 
 # --- 3. temporal closure: an @ref on every dated arm ------------------------
@@ -62,11 +67,11 @@ fi
 # findings, including comment prose and every #EVAL line. A check that cries
 # wolf is worse than no check, so it is stated precisely or not at all.
 #
-# Negative control, run 2026-08-02: deleting the `@ref` at regcf.l4:472 makes
-# the check report both arms of `the rule date is inside the COVID-19 temporary
-# rules window` (lines 475, 476). It is capable of red.
+# Negative control, run 2026-08-02 on the inaugural subject: deleting one
+# `@ref` makes the check report both arms of the declaration that lost it.
+# The subject's NOTES.md records the exact site. It is capable of red.
 COUNTFILE="$GO_OUT/p3-dated-arms.count"
-UNREFD=$(node - "$COUNTFILE" "$GO_CORPUS" "$GO_WIZARD" <<'NODEEOF'
+UNREFD=$(node - "$COUNTFILE" "${MODULES[@]}" <<'NODEEOF'
 const fs = require("node:fs");
 const bad = [];
 let armCount = 0;
@@ -105,12 +110,11 @@ DATED_ARMS=$(cat "$COUNTFILE" 2>/dev/null || echo 0)
 # armCount 0, `l4 check` still exit 0.
 #
 # So a zero, or a drop below the known population, is a finding about the
-# MATCHER and is reported as one. The pin is the corpus's own measured count:
-# regcf.l4 has 5 `RULES EFFECTIVE DATE` sites of which 2 are dated arms (the
-# other 3 are comment prose ×2 and one parameterised `AT LEAST amendment`);
-# regcf-wizard.l4 has 1, a comment. Raise MIN_DATED_ARMS when the corpus gains
-# arms; do not lower it to make this pass.
-MIN_DATED_ARMS=2
+# MATCHER and is reported as one. The floor is the subject's own measured
+# dated-arm count, pinned in its sidecar (subject.json, checks.min_dated_arms)
+# with the population census in the sidecar's NOTES.md. Raise the floor when
+# the corpus gains arms; do not lower it to make this pass.
+MIN_DATED_ARMS="$GO_S_MIN_DATED_ARMS"
 
 if [[ -n "$UNREFD" ]]; then
   note "FINDING: dated arms with no @ref anywhere in their own declaration block:"
@@ -130,7 +134,7 @@ fi
 # --- 4. the half that is not checkable, recorded rather than omitted --------
 note ""
 note "NOT CHECKED HERE, and not checkable in principle:"
-note "  P3's 'isomorphic — a domain expert can review it against the regulation"
+note "  P3's 'isomorphic — a domain expert can review it against $GO_S_CITATION"
 note "  section by section'. That is a judgement. SPEC.md §7.3 carries it as HG1."
 note "  This stage's PASS means the two automatable house rules hold and the"
 note "  module typechecks. It does not mean the encoding is faithful."
@@ -149,11 +153,12 @@ if [[ $FINDINGS -gt 0 ]]; then
   exit "$GO_EXIT_FINDING"
 fi
 
+ORACLE_CHECKS="$(for f in "${MODULES[@]}"; do printf 'l4 check %s && ' "$(basename "$f")"; done)"
 go_receipt \
   --status PASS \
-  --oracle-cmd "l4 check regcf.l4 && l4 check regcf-wizard.l4 && no ELSE IF chain && an @ref inside the declaration block of every dated arm, over at least $MIN_DATED_ARMS matched arms" \
+  --oracle-cmd "${ORACLE_CHECKS}no ELSE IF chain && an @ref inside the declaration block of every dated arm, over at least $MIN_DATED_ARMS matched arms" \
   --oracle-exit 0 \
   --oracle-class structural \
   --oracle-because "typechecking is the compiler's own verdict on the module; the two grep checks are the mechanisable half of P3's house rules, and the dated-arm floor stops the second one passing over an empty matched set. Faithfulness to the source regulation is NOT covered and is carried by HG1." \
   --artifact "$LOG" "${METRICS[@]}" \
-  --note "isomorphism against 17 CFR Part 227 is unverified by this stage and is HG1's subject"
+  --note "isomorphism against $GO_S_CITATION is unverified by this stage and is HG1's subject"

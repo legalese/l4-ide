@@ -42,15 +42,20 @@
 #      count to equal the function count the deployment itself reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "$GO_WIZARD" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/known-defects.json"
+  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-ZIP="$GO_OUT/regcf-deployable.zip"
+ZIP="$GO_OUT/$GO_S_ID-deployable.zip"
 LOG="$GO_OUT/p7-mcp.txt"
 : >"$LOG"
+
+# The subject's module set: the corpus proper, plus the wizard companion when
+# the sidecar declares one. Both go into the deployable zip.
+declare -a MODULES=("$GO_S_CORPUS")
+[[ -n "${GO_S_WIZARD:-}" ]] && MODULES+=("$GO_S_WIZARD")
 
 # Bounds on a LOOPBACK service: how long an accepted deployment may take to
 # finish compiling, and how long any single HTTP call may take.
@@ -67,9 +72,9 @@ HTTP_TIMEOUT_S=15
 SERVICE_OWN_TOOLS="list_files read_file search_identifier search_text"
 
 # --- 1. the local half, which always runs ------------------------------------
-command -v zip >/dev/null 2>&1 || go_skip "zip is not on PATH; the deployable surface is a zip of regcf.l4 + regcf-wizard.l4 (PROJECTIONS.md §0 row 5)"
+command -v zip >/dev/null 2>&1 || go_skip "zip is not on PATH; the deployable surface is a zip of the subject's module set (${MODULES[*]##*/})"
 rm -f "$ZIP"
-(cd "$(dirname "$GO_CORPUS")" && zip -q -r "$ZIP" "$(basename "$GO_CORPUS")" "$(basename "$GO_WIZARD")") >>"$LOG" 2>&1
+(cd "$(dirname "$GO_S_CORPUS")" && zip -q -r "$ZIP" "${MODULES[@]##*/}") >>"$LOG" 2>&1
 [[ -f "$ZIP" ]] || go_broken "zip reported success but produced no $ZIP"
 echo "built deployable surface: $ZIP ($(wc -c <"$ZIP" | tr -d ' ') bytes)" | tee -a "$LOG"
 
@@ -148,7 +153,7 @@ if [[ $HEALTH_RC -ne 0 ]]; then
   exit "$GO_EXIT_CLEAN"
 fi
 
-DEPLOY_ID="regcf-$GO_RUNID"
+DEPLOY_ID="$GO_S_ID-$GO_RUNID"
 RESP="$GO_OUT/p7-mcp.deploy.json"
 set +e
 curl -sS --max-time 30 -o "$RESP" -w '%{http_code}' \
@@ -254,7 +259,7 @@ echo "tools/list → $TOOLS tool(s), $CORPUS_TOOLS from the module: $TOOL_NAMES"
 # how many functions it compiled — so that is the number the tool list must meet.
 if [[ "$FUNCTIONS" -lt 1 || "$CORPUS_TOOLS" -ne "$FUNCTIONS" ]]; then
   go_receipt --status DEGRADED \
-    --reason "the deployment is ready and .mcp answered, but the module's tools are not all there: the deployment reports $FUNCTIONS compiled function(s) while tools/list enumerates $TOOLS tool(s), of which $CORPUS_TOOLS are not jl4-service's own generic file-browsing tools ($SERVICE_OWN_TOOLS). Corpus tools found: $TOOL_NAMES. Zero here means the wizard module did not deploy — regcf.l4 carries no @export by design and the exports live in regcf-wizard.l4. A non-zero mismatch means the service's generic tool set has moved and the pin in this script is stale." \
+    --reason "the deployment is ready and .mcp answered, but the module's tools are not all there: the deployment reports $FUNCTIONS compiled function(s) while tools/list enumerates $TOOLS tool(s), of which $CORPUS_TOOLS are not jl4-service's own generic file-browsing tools ($SERVICE_OWN_TOOLS). Corpus tools found: $TOOL_NAMES. Zero here usually means the module carrying the subject's @export surface did not deploy — see the subject's NOTES.md for which module that is. A non-zero mismatch means the service's generic tool set has moved and the pin in this script is stale." \
     --artifact "$ZIP" --artifact "$LOG" --artifact "$MCP" $([[ -f "$STATUS" ]] && echo --artifact "$STATUS") \
     --metric "deployment_id=$DEPLOY_ID" --metric "functions=$FUNCTIONS" \
     --metric "tools=$TOOLS" --metric "corpus_tools=$CORPUS_TOOLS"

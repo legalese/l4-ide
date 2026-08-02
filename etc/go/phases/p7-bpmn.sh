@@ -13,25 +13,26 @@
 #
 # The rule names are DISCOVERED, not transcribed: `l4 export FILE --to bpmn`
 # with no --rule exits 1 and enumerates them. The rule -> output-filename map
-# below is a REPO convention, not a CLI fact, so it is written down — and its
-# key set is asserted equal to the discovered set, so a rename fails loudly
-# naming the exact strings rather than silently emitting under a new name.
+# is a REPO convention, not a CLI fact, so it is written down — in the subject
+# sidecar (subject.json, legs['p7-bpmn'].rules), read here via the resolver —
+# and its key set is asserted equal to the discovered set, so a rename fails
+# loudly naming the exact strings rather than silently emitting under a new
+# name.
 #
 # On the jBPM baseline: etc/check-bpmn-kie-baseline.mjs compares against
-# etc/bpmn-kie-baseline.txt, which covers the WHOLE committed BPMN corpus
-# (consultation, handover, offering, and the three Reg CF processes). A run that
-# emits only the three Reg CF processes therefore always reports the other three
-# as NOT CHECKED and exits 1 — measured. So the baseline comparator is CI's gate
-# over the committed goldens and is not this leg's oracle. What this leg
-# establishes instead is that its output IS those goldens, byte for byte, which
-# is what makes CI's verdict apply to it.
+# etc/bpmn-kie-baseline.txt, which covers the WHOLE committed BPMN corpus. A
+# run that emits only this subject's processes therefore always reports the
+# others as NOT CHECKED and exits 1 — measured. So the baseline comparator is
+# CI's gate over the committed goldens and is not this leg's oracle. What this
+# leg establishes instead is that its output IS those goldens, byte for byte,
+# which is what makes CI's verdict apply to it.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}" \
-    "$GO_ROOT/etc/check-bpmn-soundness.mjs" "$GO_ROOT/etc/validate-bpmn.mjs" \
-    "$GO_ROOT/jl4/examples/bpmn/expected/regcf-advertising.bpmn" \
-    "$GO_ROOT/jl4/examples/bpmn/expected/regcf-reporting.bpmn" \
-    "$GO_ROOT/jl4/examples/bpmn/expected/regcf-resale.bpmn"
+  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+    "$GO_ROOT/etc/check-bpmn-soundness.mjs" "$GO_ROOT/etc/validate-bpmn.mjs"
+  while IFS=$'\t' read -r _rule stem; do
+    [[ -n "$stem" ]] && printf '%s\n' "$GO_S_BPMN_EXPECTED_DIR/$stem.bpmn"
+  done < <(node "$(dirname "${BASH_SOURCE[0]}")/../lib/subject.mjs" "$GO_SUBJECT" bpmn-rules)
   exit 0
 fi
 
@@ -40,21 +41,21 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 LOG="$GO_OUT/p7-bpmn.txt"
 : >"$LOG"
 
-# rule name -> the committed golden's basename (PROJECTIONS.md §0 row 3).
-declare -A RULE_FILE=(
-  ["advertising restriction"]="regcf-advertising"
-  ["ongoing reporting obligation"]="regcf-reporting"
-  ["resale restriction"]="regcf-resale"
-)
+# rule name -> the committed golden's basename, from the subject sidecar.
+declare -A RULE_FILE=()
+while IFS=$'\t' read -r rule stem; do
+  [[ -n "$rule" ]] && RULE_FILE["$rule"]="$stem"
+done < <(node "$GO_LIB/subject.mjs" "$GO_SUBJECT" bpmn-rules)
+[[ ${#RULE_FILE[@]} -gt 0 ]] || go_broken "the subject sidecar declares the p7-bpmn leg but its rules map came back empty"
 
-# --- 0. discovery, then set-equality against the map above ------------------
-mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_CORPUS")
+# --- 0. discovery, then set-equality against the sidecar's map --------------
+mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS")
 [[ ${#RULES[@]} -gt 0 ]] || go_broken "the BPMN discovery call enumerated no regulative rules; the CLI's discovery shape changed"
 
 DISCOVERED="$(printf '%s\n' "${RULES[@]}" | sort)"
 MAPPED="$(printf '%s\n' "${!RULE_FILE[@]}" | sort)"
 if [[ "$DISCOVERED" != "$MAPPED" ]]; then
-  go_broken "the module's regulative rules have moved. Discovered: [$(echo "$DISCOVERED" | tr '\n' '|')] but this stage maps: [$(echo "$MAPPED" | tr '\n' '|')]. Update the RULE_FILE map in $(basename "${BASH_SOURCE[0]}") and the committed goldens together."
+  go_broken "the module's regulative rules have moved. Discovered: [$(echo "$DISCOVERED" | tr '\n' '|')] but the subject sidecar maps: [$(echo "$MAPPED" | tr '\n' '|')]. Update legs['p7-bpmn'].rules in $GO_S_DIR/subject.json and the committed goldens together."
 fi
 echo "discovered ${#RULES[@]} regulative rule(s), matching the golden map: ${RULES[*]}" | tee -a "$LOG"
 
@@ -65,7 +66,7 @@ for rule in "${RULES[@]}"; do
   stem="${RULE_FILE[$rule]}"
   out="$GO_OUT/$stem.bpmn"
   set +e
-  "$L4" export "$GO_CORPUS" --to bpmn --rule "$rule" -o "$out" --fidelity-report >>"$LOG" 2>&1
+  "$L4" export "$GO_S_CORPUS" --to bpmn --rule "$rule" -o "$out" --fidelity-report >>"$LOG" 2>&1
   rc=$?
   set -e
   [[ $rc -eq 0 ]] || go_broken "l4 export --to bpmn --rule '$rule' exited $rc"
@@ -74,7 +75,7 @@ for rule in "${RULES[@]}"; do
   # --- 2. differential oracle against the committed golden ------------------
   # MEASURED 2026-08-02: byte-identical, no canonicalisation needed — BPMN does
   # not carry the @ref source positions that make the DMN leg need one.
-  golden="$GO_ROOT/jl4/examples/bpmn/expected/$stem.bpmn"
+  golden="$GO_S_BPMN_EXPECTED_DIR/$stem.bpmn"
   if cmp -s "$out" "$golden"; then
     echo "$stem.bpmn: byte-identical to the committed golden" | tee -a "$LOG"
   else
@@ -82,7 +83,7 @@ for rule in "${RULES[@]}"; do
     diff "$out" "$golden" >>"$LOG" 2>&1 || true
     DIFFS=$((DIFFS + 1))
   fi
-  gfid="$GO_ROOT/jl4/examples/bpmn/expected/$stem.fidelity.txt"
+  gfid="$GO_S_BPMN_EXPECTED_DIR/$stem.fidelity.txt"
   if [[ -f "$gfid" && -f "$GO_OUT/$stem.fidelity.txt" ]]; then
     cmp -s "$GO_OUT/$stem.fidelity.txt" "$gfid" || {
       echo "$stem.fidelity.txt: DIFFERS from $gfid" | tee -a "$LOG"

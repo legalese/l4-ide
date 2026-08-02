@@ -15,7 +15,7 @@
 #
 #   Usage:  etc/go/go.sh <command> [options]
 #
-#     run     --milestone g1 --subject regcf [--run-id ID] [--through STAGE]
+#     run     --milestone g1 --subject ID [--run-id ID] [--through STAGE]
 #             [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
 #
 #             HG1 is the only waivable gate. HG2 guards anything outward-facing
@@ -46,12 +46,16 @@ PHASES="$GO_ROOT/etc/go/phases"
 LIB="$GO_ROOT/etc/go/lib"
 
 # --- the stage table --------------------------------------------------------
-# G1's declared stages, in order. `p9-report` is last: the report reads the
-# journal, so it must run after everything that writes to it.
-G1_STAGES=(
-  p0-preflight
-  p3-check
-  p6-tests
+# G1's declared stages, in order. p0-preflight, p3-check, p6-tests and
+# p9-report are always declared; each p7 leg is declared iff the subject's
+# sidecar (etc/go/subjects/<id>/subject.json) has an entry for it in `legs`.
+# That is what keeps COMPLETE honest for a subject that has, say, no wizard
+# and no regulative rules: its sidecar omits those legs, so their absence
+# cannot make the milestone INCOMPLETE and their presence is never faked.
+# `p9-report` is last: the report reads the journal, so it must run after
+# everything that writes to it. G1_STAGES is assembled after subject
+# resolution below.
+P7_LEG_ORDER=(
   p7-dmn
   p7-dmn-md
   p7-bpmn
@@ -61,7 +65,6 @@ G1_STAGES=(
   p7-tnr
   p7-wizard
   p7-akn
-  p9-report
 )
 
 # Stages that exist as entry points and cannot run. Each refuses with exit 3 and
@@ -71,7 +74,9 @@ UNIMPLEMENTED_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p1
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
-gated_by_HG1="p6-tests p7-dmn p7-dmn-md p7-bpmn p7-ladder p7-lts p7-mcp p7-tnr p7-wizard p7-akn p9-report"
+# gated_by_HG1 is assembled after subject resolution: P6 onward means p6-tests,
+# every declared p7 leg, and p9-report.
+gated_by_HG1=""
 gated_by_HG2="p10-publish"
 
 usage() {
@@ -89,7 +94,7 @@ CMD="${1:-help}"
 shift || true
 
 MILESTONE="g1"
-SUBJECT="regcf"
+SUBJECT=""
 RUN_ID=""
 THROUGH=""
 ONLY=""
@@ -147,18 +152,43 @@ RUNDIR_BASE="${L4_GO_RUNDIR:-${TMPDIR:-/tmp}/l4-go}"
 FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
 
 # --- subject resolution -----------------------------------------------------
-case "$SUBJECT" in
-  regcf)
-    GO_CORPUS="$GO_ROOT/jl4/examples/legal/regcf/regcf.l4"
-    GO_WIZARD="$GO_ROOT/jl4/examples/legal/regcf/regcf-wizard.l4"
-    ;;
-  *)
-    echo "go.sh: subject '$SUBJECT' is not implemented." >&2
-    echo "  SPEC.md scopes the demo to 17 CFR Part 227 (Reg CF) only; the subject is a" >&2
-    echo "  parameter but nothing beyond Reg CF gates acceptance. Only 'regcf' resolves." >&2
-    exit 2
-    ;;
-esac
+# With no --subject, the sole sidecar under etc/go/subjects/ is the default;
+# once a second subject exists, naming one becomes mandatory — a silent
+# default among several would make a run about an unnamed body of law.
+if [[ -z "$SUBJECT" ]]; then
+  mapfile -t _SUBJECTS < <(node "$LIB/subject.mjs" --list)
+  if [[ ${#_SUBJECTS[@]} -eq 1 && -n "${_SUBJECTS[0]}" ]]; then
+    SUBJECT="${_SUBJECTS[0]}"
+  else
+    die_usage "--subject is required (available: ${_SUBJECTS[*]:-none}; see etc/go/subjects/)"
+  fi
+fi
+
+# Everything the pipeline knows about ONE body of law lives in its sidecar,
+# etc/go/subjects/<id>/. The resolver validates the descriptor (unknown keys
+# refused, referenced goldens must exist) and prints shell-safe GO_S_* lines;
+# an unknown subject exits 2 listing the available sidecars and the recipe for
+# adding one. The eval is safe because subject.mjs single-quotes every value.
+SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT")" || exit 2
+eval "$SUBJECT_ENV"
+export "${!GO_S_@}"
+
+# The subject's corpus file set: main module, plus the wizard module when the
+# sidecar declares one. Used for the corpus digest that gates bind to.
+declare -a GO_CORPUS_FILES=("$GO_S_CORPUS")
+[[ -n "${GO_S_WIZARD:-}" ]] && GO_CORPUS_FILES+=("$GO_S_WIZARD")
+
+# Assemble the declared stage list and the HG1 set from the sidecar's legs.
+G1_STAGES=(p0-preflight p3-check p6-tests)
+gated_by_HG1="p6-tests"
+for s in "${P7_LEG_ORDER[@]}"; do
+  if [[ " $GO_S_LEGS " == *" $s "* ]]; then
+    G1_STAGES+=("$s")
+    gated_by_HG1="$gated_by_HG1 $s"
+  fi
+done
+G1_STAGES+=(p9-report)
+gated_by_HG1="$gated_by_HG1 p9-report"
 
 stages_for() {
   case "$1" in
@@ -316,7 +346,7 @@ EOF
   # rows bind to it so a waiver granted over one corpus does not silently cover
   # a later edit.
   local corpus_digest corpus_sha8
-  corpus_digest=$(node "$LIB/digest.mjs" "$GO_CORPUS" "$GO_WIZARD")
+  corpus_digest=$(node "$LIB/digest.mjs" "${GO_CORPUS_FILES[@]}")
   corpus_sha8=$(printf '%s' "$corpus_digest" | sed 's/^sha256://' | cut -c1-8)
   local RUN
   if [[ -n "$RUN_ID" ]]; then
@@ -356,7 +386,7 @@ EOF
   l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
   export GO_L4_PATH="$l4_path" GO_L4_SHA="$l4_sha"
 
-  export GO_ROOT GO_CORPUS GO_WIZARD
+  export GO_ROOT
   export GO_RUN="$RUN" GO_RUNID="$RUN_ID" GO_SUBJECT="$SUBJECT" GO_MILESTONE="$MILESTONE"
   export GO_FIXED_NOW="$FIXED_NOW"
 

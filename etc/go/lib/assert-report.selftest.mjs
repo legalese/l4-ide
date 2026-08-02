@@ -6,9 +6,11 @@
 // has not been shown to be capable of red.
 //
 // The two envelopes below are REAL captures from the prebuilt `l4` binary on
-// 2026-08-02, then mutated. The green one is the shape `l4 run regcf.l4 --json`
-// actually emits; the red one is the shape a failing `#ASSERT` actually emits —
-// note `"ok": true` and process exit 0 in BOTH.
+// 2026-08-02, then mutated (the source basenames are generalised to
+// `corpus.l4`; the capture came from the inaugural subject's corpus). The
+// green one is the shape `l4 run <module> --json` actually emits; the red one
+// is the shape a failing `#ASSERT` actually emits — note `"ok": true` and
+// process exit 0 in BOTH.
 //
 //   node etc/go/lib/assert-report.selftest.mjs
 // Exit: 0 the checker objects when it should and does not when it should not.
@@ -24,13 +26,13 @@ const check = (name, cond) => {
 // --- captured green: three passing assertions and a value ---------------------
 const green = {
   diagnostics: [],
-  file: "/…/regcf.l4",
+  file: "/…/corpus.l4",
   ok: true,
   results: [
-    { kind: "assertion", range: "regcf.l4:890:1-50", value: true },
-    { kind: "assertion", range: "regcf.l4:891:1-52", value: true },
-    { kind: "assertion", range: "regcf.l4:892:1-52", value: true },
-    { kind: "value", range: "regcf.l4:900:1-20", value: 12 },
+    { kind: "assertion", range: "corpus.l4:890:1-50", value: true },
+    { kind: "assertion", range: "corpus.l4:891:1-52", value: true },
+    { kind: "assertion", range: "corpus.l4:892:1-52", value: true },
+    { kind: "value", range: "corpus.l4:900:1-20", value: 12 },
   ],
 };
 
@@ -71,7 +73,7 @@ const mutations = [
     (e) =>
       e.results.push({
         kind: "error",
-        range: "regcf.l4:1:1-1",
+        range: "corpus.l4:1:1-1",
         value: "Division by zero",
       }),
   ],
@@ -80,7 +82,7 @@ const mutations = [
     (e) =>
       e.results.push({
         kind: "error",
-        range: "regcf.l4:2:1-1",
+        range: "corpus.l4:2:1-1",
         value: "Stuck",
       }),
   ],

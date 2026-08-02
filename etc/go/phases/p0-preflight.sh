@@ -8,7 +8,7 @@
 # nonsense rather than a finding.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "$GO_WIZARD" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/PINS.json"
+  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_PINS"
   exit 0
 fi
 
@@ -34,14 +34,15 @@ node "$GO_LIB/probe.mjs" >"$PROBES"
 # --- 3. the CLI surface the stage table reads -------------------------------
 # Narrow by design: four enumerations plus the module's regulative rule names,
 # recovered by discovery calls. NOT a hash of `l4 --help` — that fires on any
-# unrelated reflow, and a tripwire that cries wolf gets deleted.
+# unrelated reflow, and a tripwire that cries wolf gets deleted. The pin file
+# is the subject's own: it was measured against that subject's corpus.
 set +e
-node "$GO_LIB/discover.mjs" check "$GO_CORPUS" "$GO_ROOT/etc/go/PINS.json" >"$PINLOG" 2>&1
+node "$GO_LIB/discover.mjs" check "$GO_S_CORPUS" "$GO_S_PINS" >"$PINLOG" 2>&1
 PIN_EXIT=$?
 set -e
 cat "$PINLOG"
 if [[ $PIN_EXIT -ne 0 ]]; then
-  go_broken "the CLI surface the stage table depends on has moved; see $PINLOG. Re-verify etc/go/phases/*.sh against the new surface, then update etc/go/PINS.json."
+  go_broken "the CLI surface the stage table depends on has moved; see $PINLOG. Re-verify etc/go/phases/*.sh against the new surface, then update $GO_S_PINS."
 fi
 
 # --- 4. every checker a later stage will invoke must exist -------------------
@@ -50,11 +51,11 @@ while read -r c; do
   [[ -n "$c" ]] || continue
   [[ -e "$GO_ROOT/$c" ]] || MISSING="$MISSING $c"
 done < <(node -e '
-  const p = require("'"$GO_ROOT"'/etc/go/PINS.json");
+  const p = require("'"$GO_S_PINS"'");
   process.stdout.write((p.checkers_that_must_exist||[]).join("\n"));
 ')
 if [[ -n "$MISSING" ]]; then
-  go_broken "checkers named in PINS.json are missing from the tree:$MISSING"
+  go_broken "checkers named in $GO_S_PINS are missing from the tree:$MISSING"
 fi
 
 # --- 5. the upgrade tripwire for the `l4 run` workaround --------------------
@@ -86,22 +87,29 @@ EOF
 fi
 
 # --- 6. record ---------------------------------------------------------------
-CORPUS_SHA="$(node "$GO_LIB/digest.mjs" "$GO_CORPUS")"
-WIZARD_SHA="$(node "$GO_LIB/digest.mjs" "$GO_WIZARD")"
-RULES="$(node "$GO_LIB/discover.mjs" rules "$GO_CORPUS" | tr '\n' ';')"
+CORPUS_SHA="$(node "$GO_LIB/digest.mjs" "$GO_S_CORPUS")"
+METRICS=(--metric "corpus_sha_$(basename "$GO_S_CORPUS")=$CORPUS_SHA")
+if [[ -n "${GO_S_WIZARD:-}" ]]; then
+  WIZARD_SHA="$(node "$GO_LIB/digest.mjs" "$GO_S_WIZARD")"
+  METRICS+=(--metric "corpus_sha_$(basename "$GO_S_WIZARD")=$WIZARD_SHA")
+fi
+# The rule-name discovery only applies to a subject whose sidecar pins
+# regulative rules; a purely constitutive corpus has none to discover.
+if node -e 'process.exit(require("'"$GO_S_PINS"'").regulative_rules ? 0 : 1)'; then
+  RULES="$(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS" | tr '\n' ';')"
+  METRICS+=(--metric "regulative_rules=$RULES")
+fi
 
 go_receipt \
   --status PASS \
-  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_CORPUS") etc/go/PINS.json && every checker in PINS.json exists && the failing-#ASSERT tripwire still exits 0" \
+  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_CORPUS") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire still exits 0" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "the four CLI enumerations and the module's regulative rule names are recovered by discovery calls and compared as SETS against PINS.json, so a rename fails loudly naming the exact strings; the tripwire independently confirms the l4-run workaround is still needed" \
+  --oracle-because "the four CLI enumerations and the module's regulative rule names are recovered by discovery calls and compared as SETS against the subject's pins.json, so a rename fails loudly naming the exact strings; the tripwire independently confirms the l4-run workaround is still needed" \
   --artifact "$PROBES" \
   --artifact "$PINLOG" \
   --artifact "$GO_OUT/tripwire.json" \
-  --metric "corpus_sha_$(basename "$GO_CORPUS")=$CORPUS_SHA" \
-  --metric "corpus_sha_$(basename "$GO_WIZARD")=$WIZARD_SHA" \
+  "${METRICS[@]}" \
   --metric "l4_binary=$L4_PATH" \
   --metric "l4_binary_sha=$L4_SHA" \
-  --metric "fixed_now=$GO_FIXED_NOW" \
-  --metric "regulative_rules=$RULES"
+  --metric "fixed_now=$GO_FIXED_NOW"

@@ -18,10 +18,10 @@ cat >&2 <<'MSG'
 p1-ingest: SCAFFOLDED AND CANNOT RUN.
 
 WHAT IT WOULD DO
-  Retrieve 17 CFR Part 227 from the SEC entry point through eCFR, with
-  provenance (URL, retrieval date, FR citations), covering the 2016
-  adoption, the 2017 and 2022 inflation adjustments, the 2021 amendments,
-  and the COVID-19 temporary rules.
+  Retrieve the subject's source text from its declared entry point
+  (subject.json: source_url, e.g. the eCFR page the citation names), with
+  provenance (URL, retrieval date, citations), covering the adoption and
+  every subsequent amendment layer.
 
 BLOCKER
   R4 (ambiguity-fork representation) was ruled 2026-08-02, so no ruling

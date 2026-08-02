@@ -9,7 +9,8 @@
 // The cross-check that makes it structural: the number of `digraph` blocks must
 // equal the number of regulative rules the BPMN discovery call independently
 // reports. Two different code paths in the compiler have to agree about how
-// many regulative rules the module has. MEASURED 2026-08-02 on regcf.l4: 3 and 3.
+// many regulative rules the module has. MEASURED 2026-08-02 on the inaugural
+// subject's corpus (the Reg CF encoding): 3 and 3.
 //
 // Usage:  node etc/go/lib/split-digraphs.mjs GRAPH.dot --expect N [--out DIR]
 // Exit:   0 count matches · 1 count differs · 2 usage

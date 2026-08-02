@@ -11,17 +11,17 @@
 # outcome: "the plan parses" is not "the wizard asks the right questions".
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_WIZARD" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/known-defects.json"
+  printf '%s\n' "$GO_S_WIZARD" "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-PLAN="$GO_OUT/regcf-wizard.plan.json"
+PLAN="$GO_OUT/$(basename "$GO_S_WIZARD" .l4).plan.json"
 LOG="$GO_OUT/p7-wizard.txt"
 
 set +e
-"$L4" render "$GO_WIZARD" --format plan -o "$PLAN" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
+"$L4" render "$GO_S_WIZARD" --format plan -o "$PLAN" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
 RC=$?
 set -e
 [[ $RC -eq 0 ]] || go_broken "l4 render --format plan exited $RC on a module that typechecks"
@@ -38,7 +38,7 @@ cat "$LOG"
 
 case $DEFECT_RC in
   4)
-    echo "::error::a defect recorded in etc/go/known-defects.json no longer reproduces. Delete the entry; a stale negative control is a lie about what this leg measures." >&2
+    echo "::error::a defect recorded in $GO_S_KNOWN_DEFECTS no longer reproduces. Delete the entry; a stale negative control is a lie about what this leg measures." >&2
     go_broken "a known-defect negative control stopped reproducing; see $LOG"
     ;;
   2) go_broken "known-defects.mjs usage error" ;;

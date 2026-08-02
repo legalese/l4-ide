@@ -67,7 +67,7 @@ HG2 uses the same mechanism in namespace `l4-go-gate-hg2`, so an HG1 signature c
 
 The payload is a digest of what the run has done, not a token that says "approved". Two consequences follow, and both are load-bearing:
 
-**A post-gate edit re-opens the gate.** Touch `regcf.l4` after HG1 is granted and the corpus sha changes, so the rebuilt payload no longer matches the signed one, so `gate-verify.sh` refuses. The approval covered a specific encoding and stops covering it the moment the encoding moves.
+**A post-gate edit re-opens the gate.** Touch any corpus file — regcf's `regcf.l4`, say — after HG1 is granted and the corpus sha changes, so the rebuilt payload no longer matches the signed one, so `gate-verify.sh` refuses. The approval covered a specific encoding and stops covering it the moment the encoding moves.
 
 **Re-running is cheap.** HG1 over an unchanged corpus is effectively a _standing_ signature: the payload is the same, so the same signature keeps verifying, run after run, until something it covered changes.
 

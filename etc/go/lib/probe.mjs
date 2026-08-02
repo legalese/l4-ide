@@ -59,7 +59,7 @@ export const PROBES = {
     return {
       present: !!p,
       path: p,
-      needed_by: ["p7-ladder (npm run demo:regcf)"],
+      needed_by: ["p7-ladder (the subject's ladder npm script)"],
     };
   },
   mvn: () => {

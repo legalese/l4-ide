@@ -1,11 +1,13 @@
 ---
 name: running-the-l4-pipeline
-description: Drives the single-instruction demo pipeline — the run that takes a body of law from source through an L4 encoding to every projection, gate and conversion report — by dispatching `etc/go/go.sh` and supplying the judgements no script can make. Use when the user says "SEC Regulation Crowdfunding: go" or names another subject the same way, asks to replay the corpus through its projections, asks what a run's verdict or a `DEGRADED`/`NOT-EXECUTABLE` status means, asks to grant or waive a human gate (`HG1`/`HG2`), or asks to resume a run that was interrupted.
+description: Drives the single-instruction demo pipeline — the run that takes a body of law from source through an L4 encoding to every projection, gate and conversion report — by dispatching `etc/go/go.sh` and supplying the judgements no script can make. Use when the user issues "⟨body of law⟩: go" — "SEC Regulation Crowdfunding: go" is the historical example, and any other subject named the same way counts — asks to replay a subject's corpus through its projections, asks what a run's verdict or a `DEGRADED`/`NOT-EXECUTABLE` status means, asks to grant or waive a human gate (`HG1`/`HG2`), or asks to resume a run that was interrupted.
 ---
 
 # Running the L4 Pipeline
 
-The instruction is one line — **"SEC Regulation Crowdfunding: go"** — and it names a pipeline of ten stages that carries a body of law from its source, through an isomorphic L4 encoding, through ambiguity forks and tests and an adversarial gate, out to seven projections, a conversion report and publication. The pipeline is specified in `specs/todo/single-instruction-demo/SPEC.md`. Its driver is `etc/go/go.sh`. This skill is the entry point that maps the instruction to the driver and then does the part the driver cannot: judging.
+The instruction is one line — **"⟨body of law⟩: go"** (historically, "SEC Regulation Crowdfunding: go") — and it names a pipeline of ten stages that carries that body of law from its source, through an isomorphic L4 encoding, through ambiguity forks and tests and an adversarial gate, out to seven projections, a conversion report and publication. The pipeline is specified in `specs/todo/single-instruction-demo/SPEC.md`. Its driver is `etc/go/go.sh`. This skill is the entry point that maps the instruction to the driver and then does the part the driver cannot: judging.
+
+The pipeline is subject-generic; the subject's idiosyncrasies are not. Everything specific to one body of law — which corpus modules and projection legs it declares, its pins, its known defects, its house-rule exceptions and temporal cliffs — lives in a **sidecar** at `etc/go/subjects/<subject>/`, resolved by `etc/go/lib/subject.mjs`. **Read `etc/go/subjects/<subject>/NOTES.md` before running** — it carries that subject's idiosyncrasies, and nothing in this skill repeats them.
 
 **Canonical documentation** — always authoritative for what actually runs today:
 
@@ -30,7 +32,7 @@ That spec states, in the present tense and against a named commit, which stages 
 
 Reach for this skill when the user wants to:
 
-1. **Run the demo** — "SEC Regulation Crowdfunding: go", or any subject named the same way. That is a milestone-G1 replay run against the committed corpus.
+1. **Run the demo** — "⟨body of law⟩: go" ("SEC Regulation Crowdfunding: go" is the historical example). That is a milestone-G1 replay run against the subject's committed corpus.
 2. **Resume an interrupted run** — a usage limit, a killed terminal, a machine that went to sleep. Re-entry is a digest comparison, not a memory, and every stage whose inputs are unchanged replays instead of re-running.
 3. **Understand a verdict** — what `G1 COMPLETE` means when nine of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
 4. **Grant or waive a human gate** — HG1 before the projections, HG2 before anything outward-facing.
@@ -64,13 +66,15 @@ etc/go/go.sh plan --milestone g1
 
 This prints the declared stages in order, which human gate blocks each one, and — separately — the entry points that exist and refuse. Nothing is executed. Read it first when you are unsure what the run is about to touch.
 
+The declared stage set is the subject descriptor's, not the pipeline's: a projection leg runs iff the subject's `subject.json` declares it, so two subjects' plans — and their `COMPLETE` verdicts — may cover different stage sets.
+
 ### 3. Run the milestone
 
 ```bash
 etc/go/go.sh run --milestone g1 --subject regcf
 ```
 
-Today the only subject that resolves is `regcf`: SPEC.md scopes the demo to 17 CFR Part 227 and nothing beyond it gates acceptance. The run will stop at HG1 and exit 3 — see step 5.
+(`--subject regcf` here is the worked example throughout this skill.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. `regcf` is the only sidecar committed today; BNA's arrives with PR #195. The run will stop at HG1 and exit 3 — see step 5.
 
 **Key idioms:**
 
@@ -81,7 +85,7 @@ Today the only subject that resolves is `regcf`: SPEC.md scopes the demo to 17 C
 
 ### 4. Read the statuses, and resist the urge to make them green
 
-A G1 run reports something like:
+A G1 run reports one row per declared stage. What the regcf sidecar's G1 run measures, as a worked example:
 
 ```
 p0-preflight: PASS
@@ -190,7 +194,7 @@ Mechanical transforms, golden regeneration, formatting, and reading harness outp
 ✘  "Run the G1 pipeline and tell me whether the DMN projection is good."
 ```
 
-The second question has no answer the run can give. The DMN leg's `PASS` proves the emitted DMN executed on both engines over the committed cases and agreed; whether the artifact is _good_ — whether its 21 lossy findings are acceptable losses — is a judgement, not an output of this run.
+The second question has no answer the run can give. The DMN leg's `PASS` proves the emitted DMN executed on both engines over the subject's committed cases and agreed; whether the artifact is _good_ — whether its lossy findings (21 of them, in the regcf run) are acceptable losses — is a judgement, not an output of this run.
 
 ---
 
@@ -257,8 +261,8 @@ The first sentence can be checked by someone who disagrees with it. The second c
 
 - **`go.sh: L4 is unset`** — point `L4` at a prebuilt binary. The orchestrator will not build one, and adding a `cabal` call to make this go away will corrupt somebody else's build.
 - **`GATE HG1: REFUSED — no signer is enrolled`** — the shipped state. `specs/todo/single-instruction-demo/gate-allowed-signers` carries no public key. Enrol one, or waive with a reason.
-- **`the CLI surface the stage table depends on has moved`** (exit 4) — a discovery call returned a set that differs from `etc/go/PINS.json`, and the message names the exact strings. Re-verify the phase scripts against the new surface, then update the pin. Do not update the pin first.
-- **`X NO LONGER REPRODUCES`** (exit 4) — a measured defect used as a negative control has been fixed. Delete the entry from `etc/go/known-defects.json`. A stale negative control turns a genuine improvement into a permanent red.
+- **`the CLI surface the stage table depends on has moved`** (exit 4) — a discovery call returned a set that differs from the subject's pins (`etc/go/subjects/<subject>/pins.json`), and the message names the exact strings. Re-verify the phase scripts against the new surface, then update the pin. Do not update the pin first.
+- **`X NO LONGER REPRODUCES`** (exit 4) — a measured defect used as a negative control has been fixed. Delete the entry from the subject's `known-defects.json`. A stale negative control turns a genuine improvement into a permanent red.
 - **`receipt.mjs: REFUSED the receipt for stage …`** (exit 4) — a phase script tried to write a status its evidence does not support. The message lists which rule it broke. This is a defect in the phase script, never a finding about the corpus.
 - **A stage re-ran that you expected to replay** — one of its declared inputs changed. `etc/go/go.sh status` shows the receipt count per stage.
 - **The report says the chain does not verify** — something other than `receipt.mjs` wrote to `journal.ndjson`. The run's findings are no longer evidence of anything; start a fresh run.
@@ -275,6 +279,6 @@ The first sentence can be checked by someone who disagrees with it. The second c
 
 `etc/go/README.md`
 
-`jl4/examples/legal/regcf/PROJECTIONS.md`
+`etc/go/subjects/<subject>/NOTES.md` — the subject's own idiosyncrasies; regcf's corpus additionally carries `jl4/examples/legal/regcf/PROJECTIONS.md`
 
 The spec files are ground truth over anything written in this skill. If a command in here has drifted from `etc/go/go.sh`, believe `etc/go/go.sh help` — and fix this file in the same change that revealed the drift, because a stale entry here is worse than a missing one.

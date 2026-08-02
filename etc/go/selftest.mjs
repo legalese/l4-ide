@@ -16,7 +16,13 @@
 // reason rather than passing silently.
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,7 +36,6 @@ import {
 import { CANONICALISATIONS } from "./lib/canon-diff.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = resolve(HERE, "../..");
 
 let failures = 0;
 let skips = 0;
@@ -247,7 +252,7 @@ append(journal, {
   subject: "t",
   declared_stages: ["a"],
 });
-const rec = append(journal, base({ stage: "a" }));
+append(journal, base({ stage: "a" }));
 append(journal, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
 check("a freshly written chain verifies", verify(journal).ok === true);
 
@@ -321,7 +326,7 @@ process.stdout.write("\n-- the gate payload --\n");
     kind: "run_begin",
     run_id: "payload-test",
     milestone: "g1",
-    subject: "regcf",
+    subject: "fixture-subject",
     repo_head: "abc",
     tree_state: "clean",
     fixed_now: "2025-01-31T00:00:00Z",
@@ -331,7 +336,7 @@ process.stdout.write("\n-- the gate payload --\n");
     j,
     base({
       stage: "p0-preflight",
-      metrics: { "corpus_sha_regcf.l4": "sha256:aaa" },
+      metrics: { "corpus_sha_fixture.l4": "sha256:aaa" },
     }),
   );
   const payload = () =>
@@ -345,7 +350,7 @@ process.stdout.write("\n-- the gate payload --\n");
       stage: "p0-preflight",
       oracle: null,
       replayed_from: real.hash,
-      metrics: { "corpus_sha_regcf.l4": "sha256:aaa" },
+      metrics: { "corpus_sha_fixture.l4": "sha256:aaa" },
     }),
   );
   const after = payload();
@@ -381,7 +386,7 @@ process.stdout.write("\n-- gate ordering --\n");
     kind: "run_begin",
     run_id: "order-test",
     milestone: "g1",
-    subject: "regcf",
+    subject: "fixture-subject",
     declared_stages: ["p6-tests"],
     gated_stages: JSON.stringify({ HG1: ["p6-tests"], HG2: ["p10-publish"] }),
   });
@@ -414,7 +419,7 @@ process.stdout.write("\n-- gate ordering --\n");
     kind: "run_begin",
     run_id: "order-ok",
     milestone: "g1",
-    subject: "regcf",
+    subject: "fixture-subject",
     declared_stages: ["p6-tests"],
     gated_stages: JSON.stringify({ HG1: ["p6-tests"] }),
   });
@@ -463,6 +468,93 @@ check(
   })(),
 );
 
+// ------------------------------------------------- 3d. the subject resolver
+process.stdout.write("\n-- the subject resolver --\n");
+
+// The fixture subject is whatever sidecars actually exist — read through the
+// resolver's own --list, never a hardcoded id, so this file stays green when a
+// second subject lands.
+const SUBJECTS = execFileSync(
+  "node",
+  [resolve(HERE, "lib/subject.mjs"), "--list"],
+  { encoding: "utf8" },
+)
+  .trim()
+  .split("\n")
+  .filter(Boolean);
+check("at least one subject sidecar exists", SUBJECTS.length >= 1);
+const FIXTURE_SUBJECT = SUBJECTS[0];
+
+{
+  // Every declared sidecar must resolve cleanly.
+  for (const s of SUBJECTS) {
+    const r = spawnSync("node", [resolve(HERE, "lib/subject.mjs"), s], {
+      encoding: "utf8",
+    });
+    check(
+      `sidecar '${s}' resolves and exports GO_S_* lines`,
+      r.status === 0 && /^GO_S_ID='/m.test(r.stdout),
+    );
+  }
+}
+{
+  // An unknown subject is refused with the available list and the recipe.
+  const r = spawnSync(
+    "node",
+    [resolve(HERE, "lib/subject.mjs"), "no-such-subject"],
+    { encoding: "utf8" },
+  );
+  check(
+    "an unknown subject exits 2 and lists the available sidecars",
+    r.status === 2 &&
+      /Available subject\(s\)/.test(r.stderr) &&
+      SUBJECTS.every((s) => r.stderr.includes(s)) &&
+      /To add one/.test(r.stderr),
+  );
+}
+{
+  // A descriptor naming a nonexistent golden is refused, naming the path.
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-badsubject-"));
+  const bad = resolve(d, "bad");
+  mkdirSync(bad);
+  const desc = JSON.parse(
+    readFileSync(
+      resolve(HERE, "subjects", FIXTURE_SUBJECT, "subject.json"),
+      "utf8",
+    ),
+  );
+  desc.id = "bad";
+  desc.legs["p7-dmn"].golden = "jl4/does/not/exist.dmn";
+  writeFileSync(resolve(bad, "subject.json"), JSON.stringify(desc));
+  const r = spawnSync("node", [resolve(HERE, "lib/subject.mjs"), "bad"], {
+    encoding: "utf8",
+    env: { ...process.env, L4_GO_SUBJECTS_DIR: d },
+  });
+  check(
+    "a descriptor naming a nonexistent golden is refused (exit 2, path named)",
+    r.status === 2 && r.stderr.includes("jl4/does/not/exist.dmn"),
+  );
+  // And the control: an unknown KEY is refused too, so validation is
+  // refuse-by-default rather than existence-only.
+  const desc2 = JSON.parse(
+    readFileSync(
+      resolve(HERE, "subjects", FIXTURE_SUBJECT, "subject.json"),
+      "utf8",
+    ),
+  );
+  desc2.id = "bad";
+  desc2.surprise_key = true;
+  writeFileSync(resolve(bad, "subject.json"), JSON.stringify(desc2));
+  const r2 = spawnSync("node", [resolve(HERE, "lib/subject.mjs"), "bad"], {
+    encoding: "utf8",
+    env: { ...process.env, L4_GO_SUBJECTS_DIR: d },
+  });
+  check(
+    "a descriptor with an unknown key is refused",
+    r2.status === 2 && /unknown key 'surprise_key'/.test(r2.stderr),
+  );
+}
+
 // ------------------------------------------------------------- 4. the driver
 process.stdout.write("\n-- the driver --\n");
 
@@ -495,7 +587,7 @@ if (!process.argv.includes("--with-driver")) {
     "--milestone",
     "g1",
     "--subject",
-    "regcf",
+    FIXTURE_SUBJECT,
     "--waive",
     "HG1=selftest",
   ]);
@@ -508,7 +600,15 @@ if (!process.argv.includes("--with-driver")) {
     .filter((r) => r.kind === "run_end")
     .pop()?.verdict;
 
-  go(["run", "--milestone", "g1", "--subject", "regcf", "--run-id", runId]);
+  go([
+    "run",
+    "--milestone",
+    "g1",
+    "--subject",
+    FIXTURE_SUBJECT,
+    "--run-id",
+    runId,
+  ]);
   const all = read(j).filter((r) => r.kind === "stage_end");
   const secondPass = all.slice(firstPass.length);
   const verdict2 = read(j)
@@ -593,7 +693,7 @@ if (!process.argv.includes("--with-driver")) {
         "--milestone",
         "g1",
         "--subject",
-        "regcf",
+        FIXTURE_SUBJECT,
         "--run-id",
         runId,
       ],
@@ -623,7 +723,7 @@ if (!process.argv.includes("--with-driver")) {
         "--milestone",
         "g1",
         "--subject",
-        "regcf",
+        FIXTURE_SUBJECT,
         "--through",
         "p0-preflight",
         "--waive",
@@ -684,7 +784,7 @@ check(
       kind: "run_begin",
       run_id: "gone-test",
       milestone: "g1",
-      subject: "regcf",
+      subject: "fixture-subject",
       declared_stages: ["p7-dmn"],
     });
     append(
@@ -740,9 +840,9 @@ check(
     if (!c) return true; // the entry was deleted, which is the goal
     const before =
       "<text>a (main.l4:1:1-2:3) and a REAL difference here</text>";
-    const after = c.apply(before, { actualBasename: "regcf.l4" });
+    const after = c.apply(before, { actualBasename: "subject.l4" });
     return (
-      after === "<text>a (regcf.l4:1:1-2:3) and a REAL difference here</text>"
+      after === "<text>a (subject.l4:1:1-2:3) and a REAL difference here</text>"
     );
   })(),
 );

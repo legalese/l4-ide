@@ -6,7 +6,7 @@
 # The payload is derived from the journal, not typed: it names the run, the
 # repo HEAD, and the sha256 of every corpus file and prerequisite receipt the
 # gate is being asked to bless. Signing it therefore binds the approval to
-# CONTENT — touch regcf.l4 after HG1 and the digest changes, the signature no
+# CONTENT — touch a corpus file after HG1 and the digest changes, the signature no
 # longer verifies, and P7 refuses again.
 #
 # The signature is made OUT OF BAND, with a key that never enters the worktree:

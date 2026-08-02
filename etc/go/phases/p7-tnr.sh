@@ -5,10 +5,10 @@
 #
 # There is no `l4` subcommand that emits NLG prose. `l4 render --format text`
 # produces a formatted document, which is a different thing. The committed
-# golden jl4/examples/legal/regcf/tests/regcf.nlg.golden is produced IN-PROCESS
-# by the Haskell test suite (jl4/tests/Main.hs, `jl4NlgAnnotationsGolden`,
-# writing `<stem>.nlg.golden`), which requires `cabal test jl4:jl4-test` — and
-# this orchestrator never builds.
+# goldens (subject.json, legs['p7-tnr']) are produced IN-PROCESS by the
+# Haskell test suite (jl4/tests/Main.hs, `jl4NlgAnnotationsGolden`, writing
+# `<stem>.nlg.golden`), which requires `cabal test jl4:jl4-test` — and this
+# orchestrator never builds.
 #
 # So the status is NOT-REGENERATED: the artifact exists in the tree, the report
 # cites its sha256 and where it came from, and states plainly that this run did
@@ -16,16 +16,15 @@
 # and different from SKIPPED (the machine lacks a tool).
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_CORPUS" "${BASH_SOURCE[0]}" \
-    "$GO_ROOT/jl4/examples/legal/regcf/tests/regcf.nlg.golden" \
-    "$GO_ROOT/jl4/examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+    "$GO_S_TNR_GOLDEN" ${GO_S_TNR_WIZARD_GOLDEN:+"$GO_S_TNR_WIZARD_GOLDEN"}
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-GOLDEN="$GO_ROOT/jl4/examples/legal/regcf/tests/regcf.nlg.golden"
-WGOLDEN="$GO_ROOT/jl4/examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+declare -a GOLDENS=("$GO_S_TNR_GOLDEN")
+[[ -n "${GO_S_TNR_WIZARD_GOLDEN:-}" ]] && GOLDENS+=("$GO_S_TNR_WIZARD_GOLDEN")
 LOG="$GO_OUT/p7-tnr.txt"
 
 {
@@ -37,7 +36,7 @@ LOG="$GO_OUT/p7-tnr.txt"
   echo "formatted document, which is not the prose round-trip SPEC.md §P7 names."
   echo
   echo "The committed goldens and where they come from:"
-  for f in "$GOLDEN" "$WGOLDEN"; do
+  for f in "${GOLDENS[@]}"; do
     if [[ -f "$f" ]]; then
       echo "  ${f#"$GO_ROOT"/}"
       echo "    sha256 $(node "$GO_LIB/digest.mjs" "$f")"
@@ -53,8 +52,7 @@ LOG="$GO_OUT/p7-tnr.txt"
 } | tee "$LOG"
 
 ARTS=(--artifact "$LOG")
-[[ -f "$GOLDEN" ]] && ARTS+=(--artifact "$GOLDEN")
-[[ -f "$WGOLDEN" ]] && ARTS+=(--artifact "$WGOLDEN")
+for f in "${GOLDENS[@]}"; do [[ -f "$f" ]] && ARTS+=(--artifact "$f"); done
 
 go_receipt --status NOT-REGENERATED \
   --reason "the NLG goldens exist in the tree and this run did not produce them. Their sha256 and originating commit are recorded in $LOG so the report can cite what it is actually showing, rather than implying the prose was regenerated from the current corpus." \
