@@ -229,7 +229,7 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
   task. This is the single most important sentence on the page, because the wiki's hand-drawn BPMN
   has the same defect and no note.
 - **No deadline is a timer.** `P-DEADLINE` fires on **every** boundary event. The corpus binds each
-  period once (`regcf.l4:215-238`) and every consumer reads the binding, so a deadline is a _name_,
+  period once (`regcf.l4:227-250`) and every consumer reads the binding, so a deadline is a _name_,
   and BPMN cannot make a timer out of a name. Inlining `5` and `120` would draw prettier diagrams by
   reintroducing exactly the duplication the corpus exists to remove. **The single-sourcing that
   makes the L4 good is what costs the timer.**

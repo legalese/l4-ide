@@ -67,19 +67,26 @@ absent from a figure still passes, and layout is not checked at all. Run
 
 | Slug                         | Decision (`regcf.l4`)                                  | Scene       | Longest leaf |
 | ---------------------------- | ------------------------------------------------------- | ----------- | ------------ |
-| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:297)              | 912 × 571   | 78 ch        |
-| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:671)     | 1006 × 505  | 90 ch        |
-| `regcf-transfer-permitted`   | `transfer is permitted` (:731)                          | 846 × 269   | 63 ch        |
-| `regcf-intermediary`         | `intermediary obligations are met` (:568)               | 2054 × 180  | 75 ch        |
-| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:721) | 2751 × 440 | **301 ch**   |
-| `regcf-exemption`            | `the transaction qualifies…` (:759)                     | **3027 × 185** | 61 ch     |
+| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:309)              | 912 × 571   | 78 ch        |
+| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:683)     | 1006 × 505  | 90 ch        |
+| `regcf-transfer-permitted`   | `transfer is permitted` (:743)                          | 846 × 269   | 63 ch        |
+| `regcf-intermediary`         | `intermediary obligations are met` (:580)               | 2054 × 180  | 75 ch        |
+| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:733) | 2751 × 440 | **301 ch**   |
+| `regcf-exemption`            | `the transaction qualifies…` (:771)                     | **3027 × 185** | 61 ch     |
 
-Every line reference and every scene size in that table was re-derived from the corpus
-and from the emitted SVG `viewBox` on 2026-08-03. The six line references it carried
-before were stale — they read `:211 :550 :615 :452 :601 :643` against a corpus whose
-actual lines were `303 690 755 581 741 783` even before the enumeration-label ruling
-moved them again. Nothing regenerates them, so re-derive them when you regenerate the
-figures.
+Every scene size in that table is the emitted SVG's `viewBox`, and every line reference
+is the line of the decision's `MEANS`/`DECIDE` head in `regcf.l4` as it stands in this
+commit. Both were checked on 2026-08-03 by reading the SVGs and the corpus, not carried
+over from a previous run.
+
+Nothing regenerates these numbers, and they have now drifted twice, so re-derive them
+whenever you regenerate the figures — and re-derive them **last**, after the corpus has
+stopped moving. The refs this table carried before the enumeration-label ruling read
+`:211 :550 :615 :452 :601 :643` against a corpus whose actual lines were
+`303 690 755 581 741 783`. The first attempt at repairing them, made in this same
+branch, replaced them with `297 671 731 568 721 759` — measured correctly but *before*
+the last twelve lines of corpus edits landed above them, so every one was uniformly
+twelve short. Measuring early is the failure mode here, not measuring wrongly.
 
 The corpus has **34** visualisable decisions in total (every boolean-returning
 `DECIDE`/`MEANS`; the LSP code lens does not require `@export`). These six were
