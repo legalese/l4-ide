@@ -73,15 +73,36 @@ runCmd opts = do
       evalResults = case mEval of
         Just rs -> rs
         Nothing -> []
-      -- Exit code is based on Shake rule results and structural diagnostics,
-      -- NOT on the raw log stream. #EVAL directive outcomes are published as
-      -- source="eval" diagnostics (Information for values, Error for a failed
-      -- assertion / eval exception); 'hasBlockingError' excludes source="eval"
-      -- so passing OR failing #EVALs never by themselves change the exit code.
-      -- Non-#EVAL Error diagnostics (parse/type errors, failed imports, an
-      -- import cycle) do fail the run — including cycles whose diagnostic the
-      -- engine attaches to a transitively-imported file rather than the entry.
-      overallOk = typecheckOk && not (hasBlockingError diags)
+      -- A directive that CRASHED during evaluation — an eval exception, e.g. a
+      -- CONSIDER reached with no branch matching the scrutinee — fails the run.
+      -- Ruled by Meng 2026-08-01: `l4 run` should be loud and faily on a
+      -- crashed #EVAL rather than exit 0 with the crash buried in the output.
+      -- If silence is ever wanted, add a `-q`/`--quiet-eval` option that
+      -- restores exit 0 for this case; do NOT flip the default back.
+      --
+      -- Note the deliberate asymmetry: a crash is a failure, but an `Assertion
+      -- False` (a directive that evaluated cleanly to a false assertion) is
+      -- NOT, and neither is any other #EVAL outcome. Only the crash was ruled
+      -- on; widening this to assertions is a separate decision.
+      --
+      -- "Crash" is every 'EvalException', which is broader than a CONSIDER
+      -- hole. It notably includes 'Stuck': an ASSUME-style module typechecks
+      -- but cannot evaluate ("I needed to know the value of x but it is an
+      -- assumed term"), so `l4 run` over one now exits 1 where it used to exit
+      -- 0. That is the intent — a module that cannot evaluate should not
+      -- report success — but it is the widest-reaching consequence of the
+      -- ruling, so it is called out here rather than left to be rediscovered.
+      evalCrashed = any evalDirectiveCrashed evalResults
+      -- Exit code is otherwise based on Shake rule results and structural
+      -- diagnostics, NOT on the raw log stream. #EVAL directive outcomes are
+      -- published as source="eval" diagnostics (Information for values, Error
+      -- for a failed assertion / eval exception); 'hasBlockingError' excludes
+      -- source="eval", so #EVAL outcomes reach the exit code only through
+      -- 'evalCrashed' above. Non-#EVAL Error diagnostics (parse/type errors,
+      -- failed imports, an import cycle) do fail the run — including cycles
+      -- whose diagnostic the engine attaches to a transitively-imported file
+      -- rather than the entry.
+      overallOk = typecheckOk && not (hasBlockingError diags) && not evalCrashed
 
   if opts.runJsonOut
     then do
@@ -111,6 +132,15 @@ runCmd opts = do
                  Text.hPutStrLn stderr "Run failed (file may be empty, unparseable, or not found)"
             _ -> pure ()
           exitFailure
+
+-- | Did this directive crash during evaluation, rather than produce a value or
+-- an assertion outcome? A crashed directive fails @l4 run@ (see 'runCmd'); a
+-- directive that merely evaluated to @Assertion False@ does not.
+evalDirectiveCrashed :: EvalDirectiveResult -> Bool
+evalDirectiveCrashed r = case r.result of
+  Reduction (Left _) -> True
+  Reduction (Right _) -> False
+  Assertion _         -> False
 
 ----------------------------------------------------------------------------
 -- JSON shape

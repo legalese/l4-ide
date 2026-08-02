@@ -209,9 +209,21 @@ runOneshotWithDiagnostics evalConfig fp act = do
 -- An Error-severity diagnostic from any source /except/ @\"eval\"@ counts as
 -- blocking: parse errors, type errors, unresolved/failed imports, and the raw
 -- engine cycle exception all qualify. @#EVAL@ directive outcomes are tagged
--- with source @\"eval\"@ and are deliberately excluded, so that a failed
--- assertion or an evaluation-time exception does not by itself change the exit
--- code — preserving the existing @l4 run@ contract.
+-- with source @\"eval\"@ and are excluded /here/, so that this predicate speaks
+-- only about structural diagnostics and stays usable by commands that never
+-- evaluate (notably @l4 check@).
+--
+-- That exclusion is NOT the whole exit-code contract for @l4 run@. Ruled by
+-- Meng 2026-08-01: a @#EVAL@ that CRASHES during evaluation must be loud — it
+-- exits non-zero. @l4 run@ therefore applies its own crash check on the
+-- directive results ('L4.Cli.Run.evalDirectiveCrashed') in addition to calling
+-- this predicate. An earlier version of this comment claimed an
+-- evaluation-time exception never changes the exit code; that was the
+-- pre-ruling behaviour and is no longer true.
+--
+-- If silencing is ever wanted, add a @-q@ \/ @--quiet-eval@ option to @l4 run@
+-- that restores exit 0 for a crashed directive — rather than flipping the
+-- default back.
 hasBlockingError :: [FileDiagnostic] -> Bool
 hasBlockingError = any isBlocking
   where

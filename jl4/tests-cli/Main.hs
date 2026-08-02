@@ -247,6 +247,12 @@ dmnEngineCheck label script requiredVar =
 data HarnessOutcome = HarnessMustPass | HarnessMustFail
   deriving (Eq, Show)
 
+-- | For probe leg titles.
+outcomeWord :: HarnessOutcome -> String
+outcomeWord = \case
+  HarnessMustPass -> "MustPass"
+  HarnessMustFail -> "MustFail"
+
 -- | The general form: run one committed engine harness over one file and
 -- assert its VERDICT banner, under the same opt-in/skip contract as
 -- 'dmnEngineCheck'.
@@ -375,6 +381,10 @@ cleanFixture   = fixtureDir </> "clean.l4"
 evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
+
+-- | Typechecks cleanly, then THROWS when its @#EVAL@ is evaluated.
+evalCrashFixture :: FilePath
+evalCrashFixture = fixtureDir </> "eval-crash.l4"
 
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
@@ -532,6 +542,14 @@ dateProbeModel    = dmnDateProbeDir </> "date-axis.dmn"
 dateProbeCases    = dmnDateProbeDir </> "date-axis.cases.json"
 dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
 
+-- The Reg CF CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
+-- the 1,236-line statute corpus, 67 decisions, evaluated end to end. The cases
+-- file's own header records how each pin was anchored (L4 + the documented
+-- transform, never the engine's own output).
+corpusGolden, corpusEngineCases :: FilePath
+corpusGolden      = "examples/dmn/expected/regcf-corpus.dmn"
+corpusEngineCases = "examples/dmn/regcf-corpus.cases.json"
+
 dmnDateProbeDir :: FilePath
 dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
 
@@ -565,6 +583,54 @@ hydrationProbeCases = dmnHydrationProbeDir </> "hydration.cases.json"
 dmnHydrationProbeDir :: FilePath
 dmnHydrationProbeDir = fixtureDir </> "dmn-hydration-probe"
 
+-- The 23 Phase 5 BKM/service probes (spec §6.2, §13.3-§13.5;
+-- DMN-PHASE5-BUILD-PLAN.md §1 holds the full matrix). Hand-written, never
+-- regenerated: they pin the IDIOMS (BKM invocation, knowledgeRequirement
+-- topology, decisionService shapes, name-collision semantics) independently
+-- of the emitter — a red run on a probe isolates the ENGINE, a red run on
+-- the emitted goldens isolates the LOWERING, exactly the hydration split.
+--
+-- Each row: (label, fixture stem, KIE outcome, Camunda outcome), the
+-- outcomes transcribed from each fixture's own MEASURED header (2026-07-31)
+-- and re-run here. THE ASYMMETRY IS THE FLAVOR AXIS: the seven fixtures that
+-- fail on KIE and pass on Camunda (C4, D5, E4, E5, E6, and with C3/D3's null
+-- degradations beside them) are, without exception, cases where CAMUNDA'S
+-- SILENCE IS THE DANGER — KIE refuses at validator/compile where zeebe-dmn
+-- parses and answers something. A FLIP on any row means an engine changed
+-- its mind across an upgrade: re-read the fixture's header and the spec
+-- section it names before touching the row (e.g. C4 going green on KIE
+-- would relax §6.2's name==variable invariant; E4 agreeing would demote
+-- §5.2's BKM-in-scope-1 requirement).
+dmnBkmProbeDir :: FilePath
+dmnBkmProbeDir = fixtureDir </> "dmn-bkm-probe"
+
+bkmProbeMatrix :: [(String, String, HarnessOutcome, HarnessOutcome)]
+bkmProbeMatrix =
+  [ ("A1", "bkm-multiparam",               HarnessMustPass, HarnessMustPass)
+  , ("A2", "bkm-named-args",               HarnessMustPass, HarnessMustPass)
+  , ("A3", "bkm-table-multiparam",         HarnessMustPass, HarnessMustPass)
+  , ("B1", "bkm-in-context",               HarnessMustPass, HarnessMustPass)
+  , ("B2", "bkm-in-context-sibling",       HarnessMustPass, HarnessMustPass)
+  , ("B3", "bkm-null",                     HarnessMustPass, HarnessMustPass)
+  , ("C1", "bkm-chain",                    HarnessMustPass, HarnessMustPass)
+  , ("C2", "bkm-chain-flat",               HarnessMustFail, HarnessMustFail)
+  , ("C3", "bkm-chain-nokr",               HarnessMustFail, HarnessMustFail)
+  , ("C4", "bkm-name-mismatch",            HarnessMustFail, HarnessMustPass)
+  , ("D1", "svc-grouping",                 HarnessMustPass, HarnessMustPass)
+  , ("D2", "svc-invoked",                  HarnessMustPass, HarnessMustFail)
+  , ("D3", "svc-invoked-minus-kr",         HarnessMustFail, HarnessMustFail)
+  , ("D4", "svc-plus-bkm",                 HarnessMustPass, HarnessMustPass)
+  , ("D5", "svc-no-output",                HarnessMustFail, HarnessMustPass)
+  , ("D6", "svc-cycle",                    HarnessMustFail, HarnessMustFail)
+  , ("E1", "collide-param-input",          HarnessMustPass, HarnessMustPass)
+  , ("E2", "collide-param-param",          HarnessMustPass, HarnessMustPass)
+  , ("E3", "collide-param-decision",       HarnessMustFail, HarnessMustFail)
+  , ("E4", "collide-bkm-decision",         HarnessMustFail, HarnessMustPass)
+  , ("E5", "collide-svc-decision",         HarnessMustFail, HarnessMustPass)
+  , ("E6", "collide-svc-svc",              HarnessMustFail, HarnessMustPass)
+  , ("E7", "collide-param-shadow-visible", HarnessMustPass, HarnessMustPass)
+  ]
+
 -- The EMITTER'S OWN hydration output, and its cases. Strictly stronger than the
 -- hand-written probe above: that one pins that the boxed-context idiom
 -- evaluates, this one pins that jl4-core/src/L4/Dmn/Lower.hs emits it. A red run
@@ -582,6 +648,22 @@ hydrationEngineCases = "examples/dmn/hydration.cases.json"
 -- case runs.
 sumtypeGolden :: FilePath
 sumtypeGolden = "examples/dmn/expected/sumtype.dmn"
+
+-- The Phase 5 exhibits (spec §6.2, §2.3, §13.5, §13.6). `bkm` is
+-- flavor-identical and MustPass on BOTH engines; `svc` is the one subject
+-- whose goldens SPLIT by flavor — its kie golden MustPass on KIE (the service
+-- invocation executes) and its camunda golden MustFail on Camunda (the §13.5
+-- refusal keeps the call site raw L4, which zeebe-dmn rejects at parse).
+bkmSource, bkmDmnGolden, bkmEngineCases :: FilePath
+bkmSource      = "examples/dmn/bkm.l4"
+bkmDmnGolden   = "examples/dmn/expected/bkm.dmn"
+bkmEngineCases = "examples/dmn/bkm.cases.json"
+
+svcSource, svcGolden, svcKieDmnGolden, svcEngineCases :: FilePath
+svcSource       = "examples/dmn/svc.l4"
+svcGolden       = "examples/dmn/expected/svc.dmn"
+svcKieDmnGolden = "examples/dmn/expected/svc.kie.dmn"
+svcEngineCases  = "examples/dmn/svc.cases.json"
 
 -- The NULL probe (R8-d′). Written and measured BEFORE the MAYBE→null lowering,
 -- because the whole ruling rests on FEEL's `=` against null being a proper
@@ -633,6 +715,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , evalCrashFixture
        , breachTraceFixture, breachInputsFixture
        , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
        , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
@@ -650,7 +733,9 @@ main = do
        , spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases
        , hydrationProbeModel, hydrationProbeCases
        , nullProbeModel, nullProbeCases, nullAbsentModel, nullAbsentCases
-       , hydrationGolden, hydrationEngineCases, sumtypeGolden ] \fp -> do
+       , hydrationGolden, hydrationEngineCases, sumtypeGolden
+       , bkmSource, bkmDmnGolden, bkmEngineCases
+       , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -704,6 +789,27 @@ spec bin = do
     it "returns ok=false in JSON on a typecheck error" $ do
       env <- jsonEnvelope bin ["run", errorFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
+
+    -- Ruled by Meng 2026-08-01: a crashed #EVAL must be loud. Before the
+    -- ruling this exited 0 with the crash buried in the output, and nothing
+    -- pinned it either way.
+    it "fails when a #EVAL crashes during evaluation" $
+      expectFail bin ["run", evalCrashFixture]
+
+    it "returns ok=false in JSON when a #EVAL crashes" $ do
+      env <- jsonEnvelope bin ["run", evalCrashFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 1
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Guards the reason as well as the outcome: the fixture must fail because
+    -- it CRASHED, not because it failed to typecheck (which would make the two
+    -- assertions above pass for the wrong reason). It also pins the asymmetry —
+    -- the crash rule belongs to `l4 run`, which evaluates; `l4 check`, which
+    -- does not, is unaffected.
+    it "still typechecks the crashing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", evalCrashFixture] "Check succeeded."
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
@@ -1387,10 +1493,29 @@ spec bin = do
           code `shouldBe` ExitSuccess
           serr `shouldSatisfy` ("DMN 1.3 (XML), kie flavor" `isInfixOf`)
 
-      it "EXPECTED TO FAIL AT PHASE 5: the two flavors still emit the same bytes" $ do
-        -- The companion of the identity test in jl4/tests/DmnExport.hs, through
-        -- the CLI rather than the library. When decision services land this
-        -- must go red; the fix is to split the goldens, not to delete the test.
+      it "the flavors diverge on the §-invocation exhibit and nowhere else, through the CLI" $ do
+        -- This test used to be the CLI half of the Phase 5 tripwire
+        -- ("EXPECTED TO FAIL AT PHASE 5"); it fired on 2026-08-01 and was
+        -- flipped as instructed: the goldens split (svc.kie.dmn beside
+        -- svc.dmn) and the seam is asserted in both directions.
+        --
+        -- Positive direction: the kie bytes of the §-invocation exhibit carry
+        -- a requiredKnowledge onto a decisionService; the camunda bytes do
+        -- not (that one edge is fatal to Camunda 8's parse(), spec §13.4),
+        -- and each equals its committed golden.
+        Output _ svcCam _ <- runL4 bin ["export", "--to=dmn", svcSource]
+        Output _ svcKie _ <- runL4 bin ["export", "--to=dmn", svcSource, "--flavor=kie"]
+        svcKie `shouldSatisfy`
+          ("<requiredKnowledge href=\"#service_special_assessment\"/>" `isInfixOf`)
+        svcCam `shouldSatisfy` (not . ("requiredKnowledge href=\"#service_" `isInfixOf`))
+        svcCamGolden <- readUtf8 svcGolden
+        svcCam `shouldBe` svcCamGolden
+        svcKieGolden <- readUtf8 svcKieDmnGolden
+        svcKie `shouldBe` svcKieGolden
+        -- Identity direction: reg-cf has no §-invocation, so its flavors stay
+        -- byte-identical (measured 2026-08-01 over every golden subject) and
+        -- both equal the one unsuffixed golden. A drift here means the flavor
+        -- bit grew a second observable, which wants its own golden split.
         Output _ camunda _ <- runL4 bin
           ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
         Output _ kie _ <- runL4 bin
@@ -1469,22 +1594,61 @@ spec bin = do
         out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
         out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
 
+    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 67-decision Reg CF
+    -- corpus builds and answers on both engines, over SIXTEEN cases — the base
+    -- world plus the 15 dated cases that relocate the rule-date-rebinding
+    -- fixtures R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law
+    -- under a date; the harness owns the dates"). 16 x 67 = 1072. All counts
+    -- below are MEASURED (2026-08-02, this machine, both harnesses), not
+    -- aspirational: before R12/R13 KIE refused with 16 build errors and
+    -- Camunda refused the file at parse() on the raw-L4 deontic body.
+    it "KIE builds and answers the whole Reg CF corpus (R12/R13)" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
+          out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("16 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("1072/1072 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("1072/1072 value(s) as expected" `isInfixOf`)
+          -- the SVC leg is a value check since 2026-08-02 (each service fed
+          -- its inputDecisions' computed values, each outputDecision compared
+          -- against the same expect entry): 7 services, 14 declared outputs,
+          -- per case
+          out `shouldSatisfy` ("224/224 service output value(s) as expected" `isInfixOf`)
+
+    it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
+          out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("16 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("1072/1072 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("1072/1072 value(s) as expected" `isInfixOf`)
+
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
   -- in a real engine, driven only by half-open date intervals on a UNIQUE
-  -- table. `70/70 value(s) as expected` over ten cases is the claim -- ten rule
-  -- dates x seven decisions -- and seven of those ten exist purely to pin the
-  -- interval convention: a day-of/day-before pair on each of the three seams,
-  -- plus a rule date well before commencement.
+  -- table. `60/60 value(s) as expected` over ten cases is the claim -- ten rule
+  -- dates x six decisions (Phase 5 moved the seventh, `the rules in force
+  -- include`, to a businessKnowledgeModel, which the cases schema cannot
+  -- assert -- its logic is exercised through the interval endpoints D2 inlined
+  -- it into) -- and seven of those ten cases exist purely to pin the interval
+  -- convention: a day-of/day-before pair on each of the three seams, plus a
+  -- rule date well before commencement.
   describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
     it "KIE answers the dated-regime exhibit correctly for ten rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          -- zero warnings is load-bearing: the emitted BKM must carry its
+          -- DMNShape, or KIE raises WARN [DMNDI_MISSING_DIAGRAM] (measured
+          -- 2026-08-01; the shape row above the decisions exists for this).
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
 
     it "Camunda answers the dated-regime exhibit correctly for ten rule dates" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
@@ -1492,8 +1656,8 @@ spec bin = do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
 
     -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
     -- the emitter cannot generate an <annotationEntry> carrying an @id, so only
@@ -1638,6 +1802,83 @@ spec bin = do
           -- and pinning it here is what stops it being lost. See §11-R8-a.
           out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
           out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
+
+  -- Tier 1 of the Phase 5 evidence: the 23 hand-written BKM/service probes,
+  -- exactly per DMN-PHASE5-BUILD-PLAN.md §1's matrix. See 'bkmProbeMatrix'
+  -- for what the asymmetry means and what a flip would say. What is asserted
+  -- per leg is the VERDICT banner (the harness RAN) and the exit direction
+  -- (the measured outcome); the value-level detail lives in each fixture's
+  -- own cases file and MEASURED header. NOTE the recorded harness limitation
+  -- (spec §13.6): `expect` keys on DECISION names only, so a BKM's or a
+  -- service's own return value is never compared directly — every probe
+  -- asserts invocables through caller decisions, deliberately.
+  describe "the 23 BKM/service probes (opt-in: L4_DMN_ENGINE_CHECK=1)" $
+    for_ bkmProbeMatrix \(label, stem, kieOutcome, camOutcome) -> do
+      let model = dmnBkmProbeDir </> (stem <> ".dmn")
+          cases = dmnBkmProbeDir </> (stem <> ".cases.json")
+      it (label <> " " <> stem <> ": KIE " <> outcomeWord kieOutcome) $
+        dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" kieOutcome
+          model [model, "--cases", cases] \out ->
+            out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
+      it (label <> " " <> stem <> ": Camunda " <> outcomeWord camOutcome) $
+        dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" camOutcome
+          model [model, "--cases", cases] \out ->
+            out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
+
+  -- The Phase 5 EMITTED-BKM legs (spec §6.2, §13.6): the emitter's own BKM
+  -- output through both engines, the strictly-stronger counterpart of the 23
+  -- hand-written dmn-bkm-probe fixtures — a red probe isolates the ENGINE, a
+  -- red run here isolates the LOWERING. Each leg names its flavor; an absent
+  -- harness reports UNEXERCISED (pendingWith) rather than passing.
+  describe "the Phase 5 BKM exhibit (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE evaluates the emitted BKMs: chain, hydrator call, lifted closure (camunda golden)" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        bkmDmnGolden [bkmDmnGolden, "--cases", bkmEngineCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          -- zero warnings pins the DMNDI contract: every BKM has a DMNShape
+          -- and every knowledgeRequirement a DMNEdge (KIE warns
+          -- DMNDI_MISSING_DIAGRAM for each omission — measured 2026-08-01).
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 value(s) as expected" `isInfixOf`)
+
+    it "Camunda evaluates the same bytes (the flavors are byte-identical here, by measurement)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        bkmDmnGolden [bkmDmnGolden, "--cases", bkmEngineCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("14/14 value(s) as expected" `isInfixOf`)
+
+  -- The §-invocation exhibit: the ONE construct on which the flavors emit
+  -- different bytes (§13.5), so each golden meets exactly one engine, in
+  -- opposite directions. The asymmetry IS the flavor axis.
+  describe "the §-invocation exhibit (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE executes the kie golden: the service invocation binds per call" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        svcKieDmnGolden [svcKieDmnGolden, "--cases", svcEngineCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          -- case B is the load-bearing pair: special_rate (standalone,
+          -- global-bound) answers 5 while special_case (through the service,
+          -- invocation-bound) answers 195 — the invocation carries its OWN
+          -- bindings, which is the whole point of an invocable §.
+          out `shouldSatisfy` ("8/8 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("8/8 value(s) as expected" `isInfixOf`)
+
+    it "Camunda REJECTS the camunda golden at parse: the refused call site is raw L4, loudly noted" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        svcGolden [svcGolden, "--cases", svcEngineCases] \out -> do
+          -- The camunda flavor cannot emit the KR→service edge (fatal to
+          -- parse(), §13.4), so `special case` stays verbatim and zeebe-dmn
+          -- refuses the file. The loudness lives in the FIDELITY report
+          -- (D-FLAVOR-NOSERVICE, Blocking) — this leg pins that the artifact
+          -- itself is not silently degraded into something that half-loads.
+          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
+
 
   -- R8-d′'s evidence. Written and MEASURED before the MAYBE→null lowering
   -- existed, because the ruling is only safe if `=` against null is a proper

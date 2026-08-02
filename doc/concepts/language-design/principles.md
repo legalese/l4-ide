@@ -131,13 +131,15 @@ GIVETH A BOOLEAN            -- Always returns Boolean
 **Exhaustive pattern matching:**
 
 ```l4
--- Must handle all cases
+-- Should handle all cases
 CONSIDER status
 WHEN Active THEN ...
 WHEN Suspended THEN ...
 WHEN Terminated THEN ...
--- Error if case missing
+-- The compiler warns if a case is missing
 ```
+
+(The check applies to algebraic types with a known set of constructors; scrutinees of primitive types like NUMBER, STRING, or DATE are not checked, since their values can't be enumerated. See [Exhaustiveness](../type-system/exhaustiveness.md).)
 
 **No implicit behavior:**
 
@@ -230,9 +232,9 @@ result MEANS finalStep
 **Module system:**
 
 ```l4
--- Import from other files
-IMPORT "types/parties.l4"
-IMPORT "rules/eligibility.l4"
+-- Import other modules by name
+IMPORT prelude
+IMPORT daydate
 ```
 
 **Regulative combinators:**
@@ -282,14 +284,13 @@ L4 solution: Simple syntax for common cases, full power available when needed.
 
 ### Legal Isomorphism vs Consistency
 
-Different jurisdictions write differently:
+Different drafters write differently:
 
 ```l4
--- UK style: "shall"
--- US style: "must"
--- L4 uses both as synonyms
-MUST action
-SHALL action  -- Same meaning
+-- Some texts say "shall not", others "must not"
+-- L4 accepts both prohibition forms as synonyms
+SHANT    action
+MUST NOT action  -- Same meaning
 ```
 
 L4 solution: Support multiple phrasings with identical semantics.

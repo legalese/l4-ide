@@ -19,7 +19,7 @@ An insurance premium calculator with two exported rules: one to compute a premiu
 The `@export` annotation tells L4 which rules should be exposed as API endpoints. Place it directly above a `DECIDE` or `MEANS` definition:
 
 ```l4
-@export Calculate the insurance premium for an applicant
+@export default Calculate the insurance premium for an applicant
 GIVEN applicant IS A Applicant @desc The applicant's details
 GIVETH A NUMBER
 DECIDE `calculate premium` IS
@@ -113,27 +113,31 @@ From here you can:
 
 ## Step 5: Call the API
 
-Once a deployment is **Ready**, its rules are available as REST endpoints. You can visit your Legalese Cloud home directory to see them at `https://{your-org}.legalese.cloud`.
+Once a deployment is **Ready**, its rules are available as REST endpoints at `https://api.legalese.cloud/{orgSlug}/{deploymentId}/...`, where `{orgSlug}` is your Legalese Cloud organization and `{deploymentId}` is the deployment name you chose. Authenticate with an API key from the [Legalese Cloud console](https://legalese.cloud) (`Authorization: Bearer sk_...`).
+
+Note that rule and parameter names are **sanitized** for the API: spaces and other special characters become hyphens, so the rule `qualifies for discount` is called as `qualifies-for-discount` and the field `risk score` is passed as `"risk-score"`.
 
 ### List available rules
 
 Here are some ways you can use the REST API from your command line:
 
 ```bash
-curl https://{your-org}.legalese.cloud/deployments/insurance-premium/rules
+curl https://api.legalese.cloud/{orgSlug}/insurance-premium/functions \
+  -H "Authorization: Bearer sk_..."
 ```
 
 ### Evaluate the default rule
 
 ```bash
-curl -X POST http://your-service/deployments/insurance-premium/rules/calculate-premium/evaluation \
+curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/evaluation \
+  -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "arguments": {
       "applicant": {
         "age": 35,
-        "risk score": 0.4,
-        "is existing customer": true
+        "risk-score": 0.4,
+        "is-existing-customer": true
       }
     }
   }'
@@ -142,14 +146,15 @@ curl -X POST http://your-service/deployments/insurance-premium/rules/calculate-p
 ### Evaluate a specific rule
 
 ```bash
-curl -X POST http://your-service/deployments/insurance-premium/rules/qualifies_for_discount/evaluation \
+curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qualifies-for-discount/evaluation \
+  -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "arguments": {
       "applicant": {
         "age": 35,
-        "risk score": 0.4,
-        "is existing customer": true
+        "risk-score": 0.4,
+        "is-existing-customer": true
       }
     }
   }'
@@ -160,9 +165,10 @@ curl -X POST http://your-service/deployments/insurance-premium/rules/qualifies_f
 Not sure which inputs matter? Use the query-plan endpoint to ask only the questions that affect the outcome:
 
 ```bash
-curl -X POST http://your-service/deployments/insurance-premium/rules/calculate-premium/query-plan \
+curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/query-plan \
+  -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
-  -d '{"arguments": {"applicant": {"is existing customer": true}}}'
+  -d '{"arguments": {"applicant": {"is-existing-customer": true}}}'
 ```
 
 This returns which inputs are still needed, ranked by their impact on the result.
@@ -180,7 +186,8 @@ The L4 service includes a built-in [MCP](https://modelcontextprotocol.io/) serve
 **Discover available tools:**
 
 ```bash
-curl -X POST https://{your-org}.legalese.cloud/.mcp \
+curl -X POST https://mcp.legalese.cloud/{orgSlug}/insurance-premium \
+  -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
@@ -188,7 +195,8 @@ curl -X POST https://{your-org}.legalese.cloud/.mcp \
 **Call a tool:**
 
 ```bash
-curl -X POST https://{your-org}.legalese.cloud/.mcp \
+curl -X POST https://mcp.legalese.cloud/{orgSlug}/insurance-premium \
+  -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -207,7 +215,7 @@ curl -X POST https://{your-org}.legalese.cloud/.mcp \
   }'
 ```
 
-You can also scope MCP to a single deployment by posting to `/{deployment-id}/.mcp` instead of `/.mcp`.
+This endpoint is scoped to one deployment. There is also an org-wide rules MCP at `https://mcp.legalese.cloud` (no org in the URL — your organization is resolved from your sign-in); see [Use Deployed Rules from an AI Agent](../legalese-cloud/agent-marketplace.md). For MCP client setup, see the [MCP Server](../legalese-cloud/mcp-server.md) tutorial.
 
 The service logs every MCP tool call as structured JSON — the same format used for REST API requests — so you can monitor agent activity in your log aggregator alongside regular API traffic.
 
@@ -219,18 +227,22 @@ The L4 service provides a JavaScript snippet you can embed on any web page:
 
 ```html
 <!-- Expose all deployed rules as WebMCP tools -->
-<script src="https://{your-org}.legalese.cloud/.webmcp/embed.js"></script>
+<script
+  src="https://api.legalese.cloud/.webmcp/embed.js"
+  data-org="{orgSlug}"
+  data-api-key="sk_..."
+></script>
 
 <!-- Scope to specific deployments -->
 <script
-  src="https://{your-org}.legalese.cloud/.webmcp/embed.js"
+  src="https://api.legalese.cloud/.webmcp/embed.js"
+  data-org="{orgSlug}"
+  data-api-key="sk_..."
   data-scope="insurance-premium/*"
 ></script>
 ```
 
-The script registers discovery tools (`search_rules`, `get_rule_schema`, `evaluate_rule`) that browser AI agents can call to find and invoke your L4 rules. When the number of rules is small (≤ 20), direct per-rule tools are also registered.
-
-You can explore your deployments and grab the embed snippet from the service's built-in deployment explorer at the service root URL.
+By default (`data-tools="auto"`) the script registers one tool per exported rule when the scope covers at most 10 rules; with more than 10, it registers discovery tools (`search_rules`, `get_rule_schema`, `evaluate_rule`) that browser AI agents call to find and invoke your L4 rules. See the [WebMCP Embed Script](../legalese-cloud/webmcp-embed.md) tutorial for all attributes and how to get an API key.
 
 ---
 
@@ -302,7 +314,20 @@ DECIDE `calculate premium` IS ...
 
 ---
 
+## Self-hosted jl4-service
+
+If you run your own `jl4-service` instead of Legalese Cloud, the same API surface is served from your own host (e.g. `http://localhost:8080`), with the deployment id in the path instead of the org/deployment pair:
+
+- `GET /deployments/{deploymentId}/functions` — list exported rules
+- `POST /deployments/{deploymentId}/functions/{name}/evaluation` — evaluate a rule
+- `POST /deployments/{deploymentId}/functions/{name}/query-plan` — interactive query plan
+- `POST /deployments/{deploymentId}/.mcp` (or `/{deploymentId}/.mcp`) — deployment-scoped MCP; `/.mcp` is the org-wide endpoint
+- `GET /.webmcp/embed.js` — the WebMCP embed script
+- `GET /deployments/{deploymentId}/openapi.json` — the deployment's OpenAPI spec (`/openapi.json` covers all deployments)
+
+---
+
 ## Next Steps
 
-- [Common Patterns](../getting-started/common-patterns.md) — Frequently used L4 patterns
+- [Common Patterns](../../reference/patterns/common-patterns.md) — Frequently used L4 patterns
 - [Reference: Annotations](../../reference/GLOSSARY.md) — All L4 annotations including `@export` and `@desc`

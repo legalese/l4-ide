@@ -30,6 +30,7 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 | PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                                | ⏭️ not implementable                      | —                                                 |
 | LIBRARY-RESOLUTION-SHADOW         | 🟢 OPEN (DX/infra)    | `docs/library-resolution-shadow` | ⬜ todo — spec only, no PR                | —                                                 |
 | FIDELITY-SEVERITY-AXIS            | 🟢 OPEN (interchange) | `docs/fidelity-severity-axis`    | ⬜ todo — ruling only, no impl            | —                                                 |
+| DMN-RECURSION-FLATTENING          | 🟢 OPEN (DMN export)  | —                                | ⬜ todo — spec only, blocked on Q1        | —                                                 |
 
 > **FIDELITY-SEVERITY-AXIS** (classified Tier-2: interchange/DX). Answers smucclaw/l4-ide#928:
 > `FidelitySeverity`'s `Blocking` conflates "the target cannot express this" with "we emitted
@@ -50,6 +51,22 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 > Stage 2 = surgical precedence flip (embedded above the two ambient locations, project-scoped
 > overrides still above embedded) + ambiguity warning. Design sketch only — implementer
 > should build against the spec's §8 acceptance criteria; anchors at `jl4-lsp/src/LSP/L4/Rules.hs:252-478`.
+
+> **DMN-RECURSION-FLATTENING** (classified Tier-2: DMN export). Narrows — does not lift — the
+> recursion refusal that `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §763 records as _the_ measured refusal
+> set. Motivating instance is Reg CF's `ongoing reporting obligation` (`regcf.l4:707`), whose
+> recursive call passes `status` through unchanged and moves only a counter: **a map, not a fold**,
+> which matters because FEEL 1.3 has `for … in … return` and **no** fold. Proposed recognition rule
+> is five syntactic conditions (single self-call; one moving argument; strict decrease by a literal;
+> base case on the same parameter; no other self-reference) — everything else keeps `D-RECURSIVE`.
+> Preferred lowering is a FEEL `for` in one decision, which keeps the bound an input and avoids the
+> open cap-overflow question. **Blocked on Q1**: whether `for … in … return` evaluates identically
+> on KIE 8.44 and Camunda 8.7.6 inside our emitted contexts — unmeasured, and nothing emits a FEEL
+> `for` today. Also unmeasured: whether any definition other than the one motivating instance
+> satisfies the rule (Q4) — if the answer is "one", schedule it as a one-instance feature.
+> Interim decision shipped 2026-08-02 as `ba841f8f`: erase the self-edge at emission, keep the
+> `D-CYCLE` note (spec §7; ruled and measured at `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §6.4.4-4a).
+> Spec: `specs/todo/DMN-RECURSION-FLATTENING-SPEC.md`.
 
 ## Live lanes in ../l4wt/ (do NOT duplicate)
 

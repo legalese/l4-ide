@@ -105,6 +105,34 @@ GIVEN age IS A NUMBER
 DECIDE `is adult` IF age >= 18
 ```
 
+## Mixfix Function Definitions
+
+L4 functions do not have to put the function name first. In a **mixfix** definition, the parameters declared with GIVEN are interleaved with the identifier words of the function name, so calls read like natural language:
+
+```l4
+GIVEN mom IS A STRING
+      dad IS A STRING
+      kid IS A STRING
+GIVES A STRING
+mom and dad `have a baby named` kid MEANS
+    CONCAT "mother: ", mom, ", father: ", dad, ", child: ", kid
+```
+
+The call site uses the same word order:
+
+```l4
+#EVAL "alice" and "bob" `have a baby named` "carol"
+```
+
+Key points:
+
+- Parameters may appear before, between, or after the function's identifier words — enabling infix (`x plus y`) and postfix (`n squared`) conventions as well.
+- Backtick-quoted identifiers may contain spaces, so the "name words" can be multi-word legal phrases (`` `is entitled to` ``).
+- The words of the pattern that are not parameters act as **mixfix keywords**. The typechecker records each mixfix definition — its written pattern and checked type signature — in a **mixfix registry**, which it uses to resolve call sites where arguments and keywords are interleaved.
+- Tooling reuses the registry: the document renderer derives prose **headings** for mixfix functions from the registered pattern, rendering each parameter slot in the author's original word order (so even functions that are never called elsewhere get proper headings).
+
+For when to reach for mixfix and more worked examples, see [Advanced Patterns: Mixfix Function Definitions](../patterns/README.md#mixfix-function-definitions).
+
 ## Local Bindings
 
 Two styles for introducing local definitions:

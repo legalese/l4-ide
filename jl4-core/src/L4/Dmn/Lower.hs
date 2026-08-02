@@ -182,6 +182,79 @@ data NameEnv = MkNameEnv
     -- Phase 4 made this guard load-bearing — an un-lifted call in base
     -- position now renders as a clean bare name, which would otherwise
     -- launder the whole projection into 'SFeel'.
+  , neBkms       :: !(Map Unique BkmCallInfo)
+    -- ^ Phase 5 (§6.1, §6.2): the emitted BKMs, keyed by the decide's
+    -- 'Unique'. A __saturated__ call to one renders as a FEEL named-argument
+    -- invocation @f(p: x, q: y, …)@ — named rather than positional because it
+    -- makes §6.2's position→name binding visible and kills silent argument
+    -- transposition (probe A2: zeebe-dmn accepts named args in scrambled
+    -- order; A1 shows positional also works). A __bare__ reference renders
+    -- verbatim: a BKM is an invocable, not a variable, and §6.3-2 refuses
+    -- higher-order use. The map's values carry the resolved parameter names,
+    -- so the call site and the emitted @formalParameter@ cannot disagree.
+  , neBkmParams  :: !(Set Unique)
+    -- ^ the @GIVEN@ binders of every emitted BKM. Inside a BKM body they
+    -- render by their formalParameter FEEL names (via 'neVars' entries), and
+    -- a COMPUTED-field read through one takes the inline arm
+    -- ('neComputedInline') rather than the hydrator fold — a parameter is
+    -- per-call, so no global hydrator can stand for it.
+  , neServiceCalls :: !(Map Unique SvcCallInfo)
+    -- ^ @kie@ flavor ONLY (§13.5 — the one flavor bit): decides whose
+    -- saturated call sites render as an invocation of their section's
+    -- @decisionService@, `svc(p: e, …)` with the service's inputData names as
+    -- the parameter names (§2.3.1: named binding at every service call site).
+    -- Populated for the narrow measured shape — a safety-refused parameterised
+    -- decide that is the sole output of its (post-split) service, whose
+    -- service inputs are exactly its own GIVEN params — and EMPTY on the
+    -- default flavor, where the knowledgeRequirement→service edge this render
+    -- requires is fatal to Camunda's parse() (§13.4, probe D2).
+  , neRecordCtors :: !(Map Unique [Unique])
+    -- ^ RECORD constructors only (never an enum's payload constructor — those
+    -- carry a tag FEEL cannot spell and stay refused under @D-SUMTYPE@), each
+    -- to its declared STORED field selectors in declaration order. A
+    -- saturated @R WITH f IS e, …@ construction lowers to the FEEL context
+    -- literal @{f: e, …}@ — the same reading the hydration design gives a
+    -- record (a FEEL context IS the record) — iff every stored field is
+    -- supplied exactly once; anything else stays verbatim.
+  , neComputedInline :: !(Map Unique (Unique, Expr Resolved))
+    -- ^ self-contained computed selectors (§4.4 × §6.2): selector 'Unique' →
+    -- (the @_self@ binder's 'Unique', the prepared body). A computed read
+    -- through a BKM __parameter__ inlines the selector body with @_self@
+    -- substituted by the receiver — the only faithful form, since the
+    -- parameter cannot be hydrated. Restricted to selectors whose bodies
+    -- reference nothing beyond @_self@ (no module globals, no sibling
+    -- computed reads), so the inline cannot smuggle unliftable environment
+    -- references into a BKM body.
+  }
+
+-- | One member of a BKM's λ-lifted closure (§6.2): either a module element
+-- read directly (an @inputData@ or a decision variable, by canonical
+-- 'Unique'), or the __hydrator__ of an instance whose computed field the body
+-- reads — the fold points the rendered text at the hydrator, so the hydrator
+-- is what must be passed.
+data ClosureRef = EnvDirect !Unique | EnvHydrator !Unique
+  deriving stock (Eq, Ord, Show)
+
+-- | What a call site needs to know about an invocable @§@ (@kie@ flavor only).
+data SvcCallInfo = MkSvcCallInfo
+  { sciFeelName :: !Text
+  , sciParams   :: ![Text]
+    -- ^ the service's inputData FEEL names, positional in the callee's GIVEN
+    -- order — the names the named-argument invocation binds.
+  }
+
+-- | What a call site needs to know about an emitted BKM (§6.2).
+data BkmCallInfo = MkBkmCallInfo
+  { bciFeelName :: !Text
+  , bciParams   :: ![Text]
+    -- ^ the resolved FEEL names of the L4 @GIVEN@ parameters, positional — the
+    -- position→name map fixed once at the BKM and reused at every call site.
+  , bciClosure  :: ![Text]
+    -- ^ the λ-lifted closure parameters (§6.2's measured boundary: a BKM body
+    -- may read nothing beyond its parameters and knowledge requirements),
+    -- each named exactly as the module element it lifts; the call site
+    -- supplies each as @name: name@, which the caller has in scope through
+    -- its own requirement edges.
   }
 
 -- | The resolved 'Unique's of the prelude's @isJust@ and @isNothing@.
@@ -208,6 +281,11 @@ emptyNameEnv = MkNameEnv
   , neBareProj   = Set.empty
   , neUnlifted   = Set.empty
   , neComputedFields = Set.empty
+  , neBkms       = Map.empty
+  , neBkmParams  = Set.empty
+  , neServiceCalls = Map.empty
+  , neRecordCtors = Map.empty
+  , neComputedInline = Map.empty
   }
 
 -- | What a single table needs to know beyond its rows.
@@ -1588,6 +1666,11 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- refusal stays loud.
     App _ r [] | getUnique r == TC.nothingUnique, flatMaybe e -> (atomPrec, "null", FullFeel)
                | isBuiltinSumCon r                            -> verbatim e
+               -- A BARE reference to an emitted BKM (§6.3-2): a BKM is an
+               -- invocable, not a variable, and its FEEL name no longer names
+               -- a decision variable — rendering it bare would be valid-looking
+               -- FEEL that KIE refuses and Camunda nulls. Verbatim, Blocking.
+               | Map.member (getUnique r) names.neBkms        -> verbatim e
                | otherwise                                    -> (atomPrec, nullaryText r, SFeel)
     -- JUST x IS x. FEEL has one flat null and no tag, so the constructor has no
     -- image; the payload does. (R8-d′)
@@ -1619,6 +1702,19 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     _ | Just (x, f) <- foldableComputedRead e
       , Just h <- Map.lookup (getUnique x) names.neHydrated ->
           (atomPrec, h <> "." <> feelFieldIn names f, SFeel)
+    -- §4.4 × §6.2: a computed read through a BKM PARAMETER. The parameter is
+    -- per-call, so no global hydrator can stand for it; the faithful form is
+    -- to inline the selector's own body with `_self` substituted by the
+    -- receiver, which turns `investor's greater of a or b` into FEEL over the
+    -- parameter's STORED components (`max(investor.a, investor.b)`). Gated to
+    -- BKM parameters (so D12's verbatim boundary is untouched everywhere
+    -- else) and to SELF-CONTAINED selectors ('neComputedInline' membership),
+    -- so the inline cannot pull module globals or sibling computed reads into
+    -- a BKM body behind the closure computation's back.
+    _ | Just (x, f) <- foldableComputedRead e
+      , Set.member (getUnique x) names.neBkmParams
+      , Just (self, sbody) <- Map.lookup (getUnique f) names.neComputedInline ->
+          go (substLocals (Map.singleton self (App emptyAnno x [])) sbody)
     -- §4.4, D12's boundary, preserved under Phase 4 un-lifting: a COMPUTED
     -- field that was NOT folded onto a hydrator (the arm above) has no image
     -- in the artifact — the emitted record carries stored components only —
@@ -1678,33 +1774,51 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- FEEL has no cons operator, but it has `concatenate` (DMN 1.1 §10.3.4), and
     -- a one-element list literal is how you spell the head.
     Cons _ x xs -> pair e FullFeel (\tx txs -> "concatenate([" <> tx <> "], " <> txs <> ")") x xs
-    -- @AppNamed@ deliberately has NO case here: it falls to 'verbatim' below and
-    -- is therefore reported @D-NONFEELOUTPUT@ \/ Blocking.
-    --
-    -- It is tempting to render it as a FEEL context literal @{f: v, …}@, since
-    -- 'Proj' above renders the read side as @r.f@. That lowering was written and
-    -- REVERTED, because it is wrong four ways, each verified by running both
-    -- evaluators:
+    -- @AppNamed@: the RECORD-CONSTRUCTION subset lowers to a FEEL context
+    -- literal; everything else still falls to 'verbatim' below and is reported
+    -- Blocking. An unrestricted @{f: v, …}@ lowering was once written and
+    -- REVERTED for four measured reasons; the arm below is gated so that each
+    -- is answered rather than reintroduced:
     --
     --   1. @AppNamed@ is L4\'s general NAMED-ARGUMENT APPLICATION, not record
-    --      construction. 'inferAppNamed' types it against any @Fun@, and the
-    --      evaluator reduces it to @App@. With @f MEANS x TIMES y@,
-    --      @f WITH x IS 3, y IS 4@ is @12@ in L4 and @{x: 3, y: 4}@ under that
-    --      lowering — which KIE compiles happily and returns as a context.
-    --   2. It drops the constructor tag, so @Paid WITH amount IS 40@ and
-    --      @Owed WITH amount IS 40@ both become @{amount: 40}@. L4 says those are
-    --      unequal; a DMN engine says they are equal.
-    --   3. Field names are not checked against FEEL\'s reserved words, so a field
-    --      called @for@ or @in@ emits @{for: 1}@, which KIE fails to compile while
-    --      still reporting the decision SUCCEEDED with an empty result.
-    --   4. Computed fields (@HAS f IS A T MEANS …@) are not supplied as arguments,
-    --      so they are absent from the context while 'Proj' still reads @r.f@ —
-    --      null in DMN, a value in L4.
-    --
-    -- Each of those turns an honest Blocking note into a silently wrong answer
-    -- reported Advisory, which is strictly worse than not lowering at all. A
-    -- correct version must check the head is a constructor, quote the tag,
-    -- validate keys, and supply computed fields; until then, verbatim is honest.
+    --      construction ('inferAppNamed' types it against any @Fun@) — so the
+    --      head must resolve in 'neRecordCtors', which holds record
+    --      constructors and nothing else. @f WITH x IS 3@ over a function @f@
+    --      stays verbatim. (A named-argument call to an emitted BKM also stays
+    --      verbatim + Blocking — deferred, recorded in spec §6.1.)
+    --   2. An enum\'s payload constructor carries a TAG FEEL cannot spell
+    --      (@Paid WITH amount IS 40@ ≠ @Owed WITH amount IS 40@) — so enum
+    --      constructors are not in the map at all, and stay under @D-SUMTYPE@.
+    --      A record has one constructor; a context IS its faithful image, and
+    --      it is the same image hydration already gives records.
+    --   3. Field names must be FEEL-safe — the entry keys come from the same
+    --      'neFields' scope the 'ItemComponent' names and 'Proj' path steps
+    --      use, so a field called @for@ folds exactly as its component does
+    --      and the write side cannot disagree with the read side.
+    --   4. Computed fields are ABSENT from the context, deliberately: a
+    --      stored-components-only context is what the hydration design calls
+    --      the record, and every computed READ is separately guarded — folded
+    --      onto a hydrator (global instances), inlined ('neComputedInline',
+    --      BKM parameters), or refused verbatim ('neComputedFields'). The
+    --      construction must still supply every STORED field exactly once, or
+    --      a missing entry would answer null where L4 has a value — the guard
+    --      compares the supplied set against the declaration.
+    AppNamed _ r nes _
+      | Just fields <- Map.lookup (getUnique r) names.neRecordCtors
+      , let supplied = Map.fromList [(getUnique n, (n, x)) | MkNamedExpr _ n x <- nes]
+      , length nes == length fields
+      , Map.keysSet supplied == Set.fromList fields ->
+          let entries =
+                [ (feelFieldIn names n, go x)
+                | fu <- fields
+                , Just (n, x) <- [Map.lookup fu supplied]
+                ]
+          in if any (\(_, (_, _, fr)) -> fr == L4Verbatim) entries
+               then verbatim e
+               else ( atomPrec
+                    , "{" <> Text.intercalate ", " [k <> ": " <> t | (k, (_, t, _)) <- entries] <> "}"
+                    , FullFeel
+                    )
     -- A conditional whose arms ARE its comparison's operands is not a decision;
     -- it is `max` / `min`. Lower it to FEEL's own function rather than to an
     -- `if`, the way a compiler backend recognises a select pattern instead of
@@ -1747,6 +1861,48 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- (deliberately not built in Phase 4).
     App _ f (_ : _) | Set.member (getUnique f) names.neUnlifted ->
       (atomPrec, feelIdentIn names f, SFeel)
+    -- Phase 5 (§6.1, corrected block; §6.2): a SATURATED call to an emitted
+    -- BKM renders as a FEEL named-argument invocation. Named, not positional
+    -- (probe A2), so the position→name binding is visible in the artifact and
+    -- an argument transposition cannot be silent. The λ-lifted closure
+    -- parameters are appended as `name: name` — the caller has each lifted
+    -- element in scope through its own requirement edges, and the parameter
+    -- deliberately shadows the same-named global inside the BKM body (probes
+    -- E1/E7). The fragment is FullFeel: an invocation is not S-FEEL. A
+    -- partial application (wrong arity) falls through to verbatim, which is
+    -- §6.3-2's refusal.
+    App _ f es@(_ : _)
+      | Just info <- Map.lookup (getUnique f) names.neBkms
+      , length es == length info.bciParams ->
+          let parts = map go es
+          in if any (\(_, _, fr) -> fr == L4Verbatim) parts
+               then verbatim e
+               else ( atomPrec
+                    , info.bciFeelName <> "("
+                        <> Text.intercalate ", "
+                             ( zipWith (\p (_, t, _) -> p <> ": " <> t) info.bciParams parts
+                                 <> [c <> ": " <> c | c <- info.bciClosure]
+                             )
+                        <> ")"
+                    , FullFeel
+                    )
+    -- §13.5's one flavor bit, the call-site half: on `kie`, a saturated call
+    -- to a §-invocable decide renders as a named-argument invocation of the
+    -- SERVICE, binding the service's inputData names (§2.3.1). Empty map on
+    -- the default flavor, where the edge this needs kills Camunda's parse().
+    App _ f es@(_ : _)
+      | Just sci <- Map.lookup (getUnique f) names.neServiceCalls
+      , length es == length sci.sciParams ->
+          let parts = map go es
+          in if any (\(_, _, fr) -> fr == L4Verbatim) parts
+               then verbatim e
+               else ( atomPrec
+                    , sci.sciFeelName <> "("
+                        <> Text.intercalate ", "
+                             (zipWith (\p (_, t, _) -> p <> ": " <> t) sci.sciParams parts)
+                        <> ")"
+                    , FullFeel
+                    )
     App _ _ (_ : _) -> verbatim e
     -- R8-d′. A CONSIDER over a MAYBE is an ABSENCE TEST, and FEEL spells one
     -- with a comparison against null. Two arms, in either source order, one
@@ -2514,13 +2670,12 @@ builtinType u
 -- [@D-DATEDCHAIN@ (Blocking)] the decision is a chain of rule-date guards that
 --   could not be lowered to a date-interval table, so it shipped as boolean
 --   columns over raw L4 that no engine can evaluate (spec §15.3, R10).
--- [@D-RULEDATE-UNBOUND@ (Blocking)] the decision rebinds law time with
+-- [@D-RULEDATE-UNBOUND@ (Lossy)] the decide rebinds law time with
 --   @EVAL UNDER RULES EFFECTIVE AT@; a DRG has one global rule-date input and no
---   scoped rebinding, so supplying that input does not make it answer. The
---   message has TWO forms, chosen from the emitted logic: a boxed literal gets
---   the whole-decision claim, and a decision that still ships a table gets the
---   sub-expression claim, because "no engine can evaluate this decision" would
---   be false of a table an engine will run (spec §15.5).
+--   scoped rebinding, so no faithful @<decision>@ exists and the decide is
+--   dropped at population time and not emitted at all (R12, spec §15.12).
+--   ONE message form; re-severed Blocking → Lossy 2026-08-02 when R12 removed
+--   the emission (and with it the thing that was broken).
 -- [@D-SCOPE@ (Lossy)] two differently-scoped L4 terms collide on one DMN
 --   @inputData@ name.
 -- [@D-RULEDATE@ (Advisory)] the model is temporally parameterised: the rule-date
@@ -2855,6 +3010,7 @@ lowerModule opts modul@(MkModule _ uri _) =
                        <> ruleDateNotes <> computedFieldNotes <> hydratorVerbatimNotes
                        <> concatMap snd lowered
                        <> phase4Notes
+                       <> serviceNotes
     }
  where
   modelId = sanitiseId opts.dloModelName
@@ -2862,10 +3018,127 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Named rather than inlined into 'drgNodes' because the itemDefinition list
   -- reads the emitted types back off it, to decide which domain-free aliases
   -- are pointed at. Nothing flows the other way, so there is no knot.
+  --
+  -- Phase 5: the tier-2 emitted-BKM decides leave the decision block and are
+  -- APPENDED as businessKnowledgeModel nodes (tDefinitions sequences
+  -- drgElement*, and intra-group order is free — the same reasoning that puts
+  -- hydrators after the decisions). Every caller — decision and hydrator
+  -- alike — goes through 'finishCaller', which splits classifyRef's uniform
+  -- edges into informationRequirements and knowledgeRequirements and adds the
+  -- requirement edges the rendered closure arguments need.
   nodes =
+    finishedDecisionNodes
+      <> [ NodeBkm (toBkm d dec)
+         | (d, (dec, _)) <- zip decides lowered
+         , isBkmDecide d
+         ]
+      <> serviceNodes
+
+  finishedDecisionNodes :: [DrgNode]
+  finishedDecisionNodes =
     map NodeInputData inputNodes
-      <> map (NodeDecision . fst) lowered
-      <> map NodeDecision hydratorNodes
+      <> [ NodeDecision (finishCaller dec)
+         | (d, (dec, _)) <- zip decides lowered
+         , not (isBkmDecide d)
+         ]
+      <> map (NodeDecision . finishCaller) hydratorNodes
+
+  -- The emitted BKM ids, and the way back from an edge target to the BKM.
+  bkmIdSet :: Set Text
+  bkmIdSet = Set.fromList (Map.elems bkmIdByUnique)
+
+  bkmIdByUnique :: Map Unique Text
+  bkmIdByUnique = Map.fromList
+    [ (getUnique (decideResolved d), did)
+    | (d, did) <- zip decides decideIds
+    , isBkmDecide d
+    ]
+
+  bkmUniqueById :: Map Text Unique
+  bkmUniqueById = Map.fromList [(i, u) | (u, i) <- Map.toList bkmIdByUnique]
+
+  -- Phase 5 (§6.2): split the uniform RequiredDecision edges 'classifyRef'
+  -- produced into (a) true informationRequirements, (b) knowledgeRequirement
+  -- edges for called BKMs — the edge is REQUIRED by KIE (compile error
+  -- without it) and Camunda has no backstop at all (silent null), probes
+  -- C3/D3 — and (c) the extra information requirements the caller needs so
+  -- that every λ-lifted closure argument it now renders (`name: name`) is in
+  -- its FEEL scope.
+  finishCaller :: Decision -> Decision
+  finishCaller dec =
+    dec
+      { dcnRequirements  = sort (nubOrd (plainEdges <> closureExtras))
+      , dcnKnowledgeReqs =
+          sort
+            (nubOrd
+               ( [RequiredBkm t | RequiredDecision t <- bkmEdges]
+                   -- kie only (the map is empty otherwise): the caller's info
+                   -- edge on a §-invocable callee becomes the
+                   -- knowledgeRequirement→SERVICE edge the invocation needs —
+                   -- REPLACES, not accompanies: an informationRequirement
+                   -- would make the safety-refused callee a hard dependency
+                   -- of this caller on KIE.
+                   <> [ RequiredService sid
+                      | RequiredDecision t <- svcEdges
+                      , Just sid <- [Map.lookup t svcEdgeByDecisionId]
+                      ]
+               ))
+      }
+   where
+    (bkmEdges, infoEdges) = partition isBkmEdge dec.dcnRequirements
+    (svcEdges, plainEdges) = partition isSvcEdge infoEdges
+    isBkmEdge = \case
+      RequiredDecision t -> Set.member t bkmIdSet
+      RequiredInput _    -> False
+    isSvcEdge = \case
+      RequiredDecision t -> Map.member t svcEdgeByDecisionId
+      RequiredInput _    -> False
+    closureExtras =
+      [ edge
+      | RequiredDecision t <- bkmEdges
+      , Just bu <- [Map.lookup t bkmUniqueById]
+      , cr <- Set.toList (Map.findWithDefault Set.empty bu bkmClosure)
+      , Just edge <- [closureEdge cr]
+      ]
+
+  -- A lowered tier-2 decide, rewrapped as the BKM it is (§6.2). Its
+  -- 'dcnRequirements' are consumed rather than kept: the BKM-target edges
+  -- become its OWN knowledgeRequirements (the BKM→BKM edge lives on the
+  -- calling BKM, probe C1), and everything else was λ-lifted into
+  -- formalParameters — a BKM has no informationRequirement child at all.
+  toBkm :: Decide Resolved -> Decision -> Bkm
+  toBkm d dec =
+    MkBkm
+      { bkmId            = dec.dcnId
+      , bkmName          = dec.dcnName
+      , bkmFeelName      = dec.dcnFeelName
+      , bkmType          = dec.dcnType
+      , bkmParams        =
+          [ MkFormalParameter
+              { fpId    = dec.dcnId <> "_p" <> tshow i
+              , fpName  = fn
+              , fpLabel = lbl
+              , fpType  = t
+              }
+          | (i, (fn, lbl, t)) <- zip [1 :: Int ..] (givenTriples <> closureTriples)
+          ]
+      , bkmLogic         = dec.dcnLogic
+      , bkmKnowledgeReqs =
+          sort
+            (nubOrd
+               [ RequiredBkm t
+               | RequiredDecision t <- dec.dcnRequirements
+               , Set.member t bkmIdSet
+               ])
+      }
+   where
+    (givens, closures) =
+      Map.findWithDefault ([], []) (getUnique (decideResolved d)) bkmSignatures
+    givenTriples   = [(gn, lbl, t) | (_, lbl, gn, t) <- givens]
+    -- A closure parameter's label IS its name: the parameter stands for the
+    -- module element of that exact spelling, and 'namedAttrs' omits an
+    -- @label@ that equals the @name@.
+    closureTriples = [(cn, cn, t) | (_, cn, t) <- closures]
 
   decls   = topDecls modul
   -- The TopDecl's own annotation is kept, not discarded: `attachRef` claims an
@@ -2952,6 +3225,14 @@ lowerModule opts modul@(MkModule _ uri _) =
                  && not (Set.member u constructors)
                  && not (Set.member u selectors)
                  && not (Set.member u computedSelfUniques)
+        -- R12 (§15.12): the rebind predicate, over the RAW body. The old
+        -- lowering-time detection ran over the caramelised+peeled body;
+        -- 'gplate' descends through WHERE/LET locals from the raw body too,
+        -- which not-ok/ruledate-rebind.l4's WHERE-wrapped case pins.
+        , A.piRuleDateRebind   = \b ->
+            or [ getUnique r == TC.evalUnderRulesEffectiveAtUnique
+               | App _ r _ <- toListOf (cosmosOf (gplate @(Expr Resolved))) b
+               ]
         }
       callGraph allDecides
 
@@ -2976,6 +3257,41 @@ lowerModule opts modul@(MkModule _ uri _) =
     , not (null (A.decideParams d))
     , A.tierOf callGraph u == A.Tier1
     , not (Map.member u safetyIssues)
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 5: BKM emission (§6.2)
+  ------------------------------------------------------------------------
+
+  -- Tier-2, DMN-SAFE, parameterised, kept: the emitted-BKM set. The same
+  -- predicate as the D-BKM classification, MINUS the safety-refused members
+  -- (§6.2's stated boundary): a tier-2 decide with safetyIssues keeps its
+  -- <decision> node, its verbatim call sites and its D-PARTIAL note exactly
+  -- as in Phase 4 — an uncertified body inside a BKM would be the same silent
+  -- null one element kind later.
+  bkmCandidateSet :: Set Unique
+  bkmCandidateSet = Set.fromList
+    [ u
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    , not (null (A.decideParams d))
+    , A.tierOf callGraph u == A.Tier2
+    , not (Map.member u safetyIssues)
+    ]
+
+  isBkmDecide d = Set.member (getUnique (decideResolved d)) bkmCandidateSet
+
+  (bkmDecides, plainDecides) = partition isBkmDecide decides
+
+  -- The GIVEN binders of every emitted BKM. These leave the inputData
+  -- population ('decideFreeTerms' filters them): a BKM parameter is bound
+  -- per-call by the invocation, not supplied globally — which is the whole
+  -- point of tier 2.
+  bkmParamSet :: Set Unique
+  bkmParamSet = Set.fromList
+    [ getUnique p
+    | d <- bkmDecides
+    , (p, _) <- A.decideParams d
     ]
 
   ------------------------------------------------------------------------
@@ -3459,6 +3775,10 @@ lowerModule opts modul@(MkModule _ uri _) =
         , dcnName         = nm
         , dcnFeelName     = feel
         , dcnType         = DmnNamed hnm DmnAny
+        -- filled by 'finishCaller': a hydrator entry may invoke a BKM (probe
+        -- B1 — the edge lives on the ENCLOSING decision), and classifyRef
+        -- records the reference below like any other.
+        , dcnKnowledgeReqs = []
         , dcnLogic        = LogicContext (storedEntries <> computedEntries)
         -- ★ The source instance is NOT the only edge, and treating it as the
         -- only one was a defect: a computed field's @MEANS@ body may reference
@@ -3591,7 +3911,13 @@ lowerModule opts modul@(MkModule _ uri _) =
   nodeTypeRefs :: DrgNode -> [DmnType]
   nodeTypeRefs = \case
     NodeInputData i -> [i.idType]
-    NodeDecision  d -> d.dcnType : case d.dcnLogic of
+    NodeDecision  d -> d.dcnType : logicTypeRefs d.dcnLogic
+    -- A BKM's variable, its formalParameters and its logic all carry typeRefs
+    -- (§6.2), and each is a reference like any other.
+    NodeBkm b -> b.bkmType : map (.fpType) b.bkmParams <> logicTypeRefs b.bkmLogic
+    NodeService s -> [s.dsvType]
+   where
+    logicTypeRefs = \case
       LogicTable t    -> map (.icType) t.dtInputs
       LogicLiteral _  -> []
       -- A hydrator's entry typeRefs are REFERENCES like any other, and this
@@ -3710,7 +4036,15 @@ lowerModule opts modul@(MkModule _ uri _) =
     , u <- getUnique cn : [getUnique fn | MkTypedName _ fn _ _ _ <- cfs]
     ]
 
-  decideIds      = assignIds "decision_" (map decideName decides)
+  -- Aligned with 'decides'. Emitted BKMs take a "bkm_" id prefix (the probes'
+  -- own convention); the mixed list goes through ONE 'uniquifyIn' so the two
+  -- kinds cannot collide, and the differing prefixes keep every pre-Phase-5
+  -- decision id byte-stable in a module with no tier-2 decides.
+  decideIds =
+    uniquifyIn
+      [ (if isBkmDecide d then "bkm_" else "decision_") <> sanitiseId (decideName d)
+      | d <- decides
+      ]
 
   -- A nullary decision whose body is a literal is a NAMED THRESHOLD -- the thing
   -- that makes a lifted max/min worth a D-LIFTEDTHRESHOLD note.
@@ -3745,6 +4079,9 @@ lowerModule opts modul@(MkModule _ uri _) =
     nubOrdOn (\(u, _, _) -> u)
       [ (u, nm, owner)
       | (u, nm) <- instanceCandidates
+      -- Phase 5: an emitted BKM is applied, not read as a record instance,
+      -- and a hydrator over one would read a global that no longer exists.
+      , not (Set.member u bkmCandidateSet)
       , Set.member u computedlyRead
       , Just owner <- [Map.lookup u instanceRecordOf]
       , not (null (Map.findWithDefault [] owner computedFieldsOf))
@@ -3908,6 +4245,9 @@ lowerModule opts modul@(MkModule _ uri _) =
     , not (Map.member u decideByUnique)
     , not (Set.member u constructors)
     , not (Set.member u selectors)
+    -- Phase 5 (§6.2): an emitted BKM's GIVEN binders are formalParameters,
+    -- bound per-call by the invocation. They must not mint inputData.
+    , not (Set.member u bkmParamSet)
     ]
 
   -- The emitted element id of the rule-date input, when the module reaches law
@@ -3949,30 +4289,61 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- order is inputData then decision, which is the order 'drgNodes' is
   -- assembled in above, so the resolution is a function of source order alone.
   --
-  -- Two further scopes §5.2 names have no emitter yet and therefore no entry
-  -- here: `decisionService` names (§2.3) and BKM `formalParameter` names (§6.2),
-  -- both Phase 5. Each is its own 'uniquifyIn' scope -- neither shares this one
-  -- -- so extending this is adding a scope, not widening it.
-  -- Hydrator names are APPENDED, after the decisions, for the same reason law
-  -- time's inputData is (§15.2): appending keeps every existing FEEL name
-  -- byte-stable, so a hydration diff shows the hydrators and nothing else.
+  -- BKM element/variable names are IN this scope, appended last -- a hard
+  -- requirement, not a convenience: probe E4 (`collide-bkm-decision`) measured
+  -- the two engines DISAGREEING about what a colliding document means (KIE:
+  -- the BKM wins and the decision is deleted from the result, build clean;
+  -- Camunda: disjoint namespaces, both right, silent), so neither engine can
+  -- backstop the emitter. Two further scopes now exist as their own
+  -- 'uniquifyIn' calls, per Group E's measurement: BKM `formalParameter`
+  -- names, one scope per encapsulatedLogic ('bkmSignatures' below; E1/E2/E7:
+  -- a parameter shadows same-named inputData and decisions, and parameters do
+  -- not collide across BKMs), and `decisionService` names (§2.3, their own
+  -- scope, arriving with the service emitter).
+  -- Hydrator names are APPENDED after the decisions, and BKM names after the
+  -- hydrators, for the same reason law time's inputData is (§15.2): appending
+  -- keeps every existing FEEL name byte-stable, so the diff shows only the
+  -- new element kind.
   varFolded =
     map (feelIdentText . snd) freeTerms
-      <> map (feelIdentText . decideName) decides
+      <> map (feelIdentText . decideName) plainDecides
       <> [feelIdentText (nm <> " hydrated") | (_, nm, _) <- hydratedInstances]
+      <> map (feelIdentText . decideName) bkmDecides
   varResolved = uniquifyIn varFolded
   (inputFeelNames, varRest) = splitAt (length freeTerms) varResolved
-  (decideFeelNames, hydratorFeelNames) = splitAt (length decides) varRest
+  (plainDecideFeelNames, varRest2) = splitAt (length plainDecides) varRest
+  (hydratorFeelNames, bkmFeelNames) = splitAt (length hydratedInstances) varRest2
+
+  -- Every decide's resolved FEEL name, whichever segment it came from.
+  feelNameByDecideU :: Map Unique Text
+  feelNameByDecideU = Map.fromList
+    ( zip (map (getUnique . decideResolved) plainDecides) plainDecideFeelNames
+        <> zip (map (getUnique . decideResolved) bkmDecides) bkmFeelNames
+    )
+
+  -- Aligned with 'decides', as every zip3 consumer below expects.
+  decideFeelNames =
+    [ Map.findWithDefault (feelIdentText (decideName d)) (getUnique (decideResolved d)) feelNameByDecideU
+    | d <- decides
+    ]
+
+  -- The variable namespace WITHOUT the BKM parameter entries. Named so that
+  -- 'closureFeelName' can read it: reading the finished 'neVars' there would
+  -- tie a strict knot (neVars ← bkmParamNames ← bkmSignatures ←
+  -- closureFeelName ← neVars), and a closure member is a global, never a
+  -- parameter, so the base map is also the RIGHT map.
+  baseVarNames :: Map Unique Text
+  baseVarNames =
+    let base = Map.fromList
+          ( zip (map fst freeTerms) inputFeelNames
+              <> Map.toList feelNameByDecideU
+          )
+    -- a body reference through a merged MEMBER binder renders the
+    -- canonical (shared) FEEL name
+    in Map.union base (aliasThrough base)
 
   nameEnv = MkNameEnv
-    { neVars   =
-        let base = Map.fromList
-              ( zip (map fst freeTerms) inputFeelNames
-                  <> zip (map (getUnique . decideResolved) decides) decideFeelNames
-              )
-        -- a body reference through a merged MEMBER binder renders the
-        -- canonical (shared) FEEL name
-        in Map.union base (aliasThrough base)
+    { neVars   = Map.union baseVarNames bkmParamNames
     , neFields = fieldNames
     , neMaybePreds = opts.dloMaybePredicates
     , neHydrated   = Map.union hydratorFeelNameByInstance (aliasThrough hydratorFeelNameByInstance)
@@ -3980,7 +4351,664 @@ lowerModule opts modul@(MkModule _ uri _) =
     , neUnlifted   = unliftedSet
     , neComputedFields =
         Set.fromList (map (getUnique . decideResolved) computedSelectorDecides)
+    , neBkms       = bkmCallInfos
+    , neBkmParams  = bkmParamSet
+    , neServiceCalls = svcCallInfos
+    , neRecordCtors = recordCtorFields
+    , neComputedInline = selfContainedSelectors
     }
+
+  -- RECORD constructors only — see 'neRecordCtors'. An enum's constructors
+  -- (payload-carrying or not) are deliberately absent.
+  recordCtorFields :: Map Unique [Unique]
+  recordCtorFields = Map.fromList
+    [ (getUnique cn, [getUnique n | MkTypedName _ n _ _ _ <- fs])
+    | Declare _ (MkDeclare _ _ _ (RecordDecl _ mn fs)) <- decls
+    , cn <- maybeToList mn
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 5: BKM signatures — parameter scopes and the λ-lifted closure (§6.2)
+  ------------------------------------------------------------------------
+
+  -- What a BKM body may reference beyond its own parameters, measured on both
+  -- engines (§6.2, 2026-08-01): NOTHING that is not passed. A decision
+  -- variable read from inside an encapsulatedLogic is a KIE whole-model
+  -- compile error and a silent Camunda null (probe E3); an unshadowed
+  -- inputData read is a KIE compile error while Camunda ANSWERS (the engines
+  -- disagree, so neither spelling-by-omission is portable). The lift is the
+  -- classical λ-lift: each module-level free reference of the body becomes an
+  -- extra formalParameter named EXACTLY as the global it lifts — a parameter
+  -- shadows the same-named global on both engines (E1/E7), so the body text
+  -- is unchanged — and every call site supplies it as `name: name`.
+  --
+  -- The closure is TRANSITIVE through BKM→BKM calls (measured: the threaded
+  -- shape passes both engines): if g calls h and h lifts `n`, then g lifts
+  -- `n` too, so g's own body can supply `n: n` from its parameter scope.
+  bkmEnvRefs :: Map Unique (Set ClosureRef, Set Unique)
+  bkmEnvRefs = Map.fromList
+    [ (u, (Set.fromList (envRefs <> hydraRefs), Set.fromList callees))
+    | d <- bkmDecides
+    , let u = getUnique (decideResolved d)
+    , let params = Set.fromList (map (getUnique . fst) (A.decideParams d))
+    , let (survivors, touched) = survivingRefs [view decideBody d]
+    , let classified =
+            [ cls
+            | r <- survivors
+            , let ru = getUnique r
+            , not (Set.member ru params)
+            , not (Set.member ru computedSelfUniques)
+            , Just cls <-
+                [ if Set.member ru bkmCandidateSet
+                    then Just (Right ru)
+                    else if Map.member ru decideByUnique
+                      then Just (Left (EnvDirect ru))
+                      else if Map.member ru inputByUnique
+                        then Just (Left (EnvDirect (canonUnique ru)))
+                        else Nothing
+                ]
+            ]
+    , let envRefs  = [c | Left c  <- classified]
+    , let callees  = [c | Right c <- classified]
+    , let hydraRefs =
+            [ EnvHydrator (canonUnique t)
+            | t <- touched
+            , not (Set.member t params)
+            , Map.member t hydratorIdByInstance
+            ]
+    ]
+
+  -- Least fixpoint of closure(b) = env(b) ∪ ⋃ closure(callees b). Monotone
+  -- and bounded by the module's element count, so the iteration terminates
+  -- even on a (refused, D-RECURSIVE) cyclic BKM graph.
+  bkmClosure :: Map Unique (Set ClosureRef)
+  bkmClosure = go (Map.map fst bkmEnvRefs)
+   where
+    go m =
+      let m' = Map.mapWithKey step m
+          step u env =
+            Set.unions
+              ( env
+                  : [ Map.findWithDefault Set.empty k m
+                    | k <- Set.toList (maybe Set.empty snd (Map.lookup u bkmEnvRefs))
+                    ]
+              )
+      in if m' == m then m else go m'
+
+  closureFeelName :: ClosureRef -> Text
+  closureFeelName = \case
+    EnvDirect u   -> Map.findWithDefault "" u baseVarNames
+    EnvHydrator u -> Map.findWithDefault "" u hydratorFeelNameByInstance
+
+  closureDmnType :: ClosureRef -> DmnType
+  closureDmnType = \case
+    EnvDirect u
+      | Just t <- Map.lookup u freeTermTypes     -> t
+      | Just t <- Map.lookup u decideGivethTypes -> t
+      | otherwise                                -> DmnAny
+    EnvHydrator u -> Map.findWithDefault DmnAny u hydratorTypeByInstance
+
+  closureEdge :: ClosureRef -> Maybe Requirement
+  closureEdge = \case
+    EnvDirect u -> case Map.lookup u decideByUnique of
+      Just t  -> Just (RequiredDecision t)
+      Nothing -> RequiredInput <$> Map.lookup u inputByUnique
+    EnvHydrator u -> RequiredDecision <$> Map.lookup u hydratorIdByInstance
+
+  decideGivethTypes :: Map Unique DmnType
+  decideGivethTypes = Map.fromList
+    [ (getUnique (decideResolved d), t)
+    | d@(MkDecide _ (MkTypeSig _ _ (Just (MkGivethSig _ ty))) _ _) <- decides
+    , let (t, _, _) = classifyType typeEnv ty
+    ]
+
+  -- Independent of 'hydratorNodes', deliberately: 'neBkms' needs the type and
+  -- reading it off the node list would thread a lazy knot through renderFeelIn.
+  hydratorTypeByInstance :: Map Unique DmnType
+  hydratorTypeByInstance = Map.fromList
+    [ (u, DmnNamed hnm DmnAny)
+    | (u, _, owner) <- hydratedInstances
+    , Just hnm <- [Map.lookup owner hydratedNameOf]
+    ]
+
+  -- One 'uniquifyIn' scope PER encapsulatedLogic (§5.2 scope 4, measured by
+  -- E1/E2/E7). The closure names go through it FIRST so each keeps the exact
+  -- spelling of the global it lifts (globals are already injective under
+  -- scope 1); a GIVEN whose fold collides with a lifted global is the one
+  -- that gets the suffix — its body references resolve through 'neVars' to
+  -- the suffixed name, so declaration and reference cannot disagree.
+  bkmSignatures :: Map Unique ([(Unique, Text, Text, DmnType)], [(ClosureRef, Text, DmnType)])
+  bkmSignatures = Map.fromList
+    [ (u, (givens, closures))
+    | d <- bkmDecides
+    , let u = getUnique (decideResolved d)
+    , let givenPs = A.decideParams d
+    , let closureRefs =
+            sortOn closureFeelName (Set.toList (Map.findWithDefault Set.empty u bkmClosure))
+    , let closureNames = map closureFeelName closureRefs
+    , let resolved = uniquifyIn (closureNames <> map (feelIdentText . nameOf . fst) givenPs)
+    , let (closResolved, givenResolved) = splitAt (length closureNames) resolved
+    , let givens =
+            [ (getUnique p, nameOf p, gn, Map.findWithDefault DmnAny (getUnique p) freeTermTypes)
+            | ((p, _), gn) <- zip givenPs givenResolved
+            ]
+    , let closures =
+            [ (cr, cn, closureDmnType cr)
+            | (cr, cn) <- zip closureRefs closResolved
+            ]
+    ]
+
+  -- Body references to a GIVEN of an emitted BKM render by its resolved
+  -- formalParameter name. Keyed by binder 'Unique', so the entries are
+  -- per-BKM by construction even though they live in the one shared map.
+  bkmParamNames :: Map Unique Text
+  bkmParamNames = Map.fromList
+    [ (pu, gn)
+    | (givens, _) <- Map.elems bkmSignatures
+    , (pu, _, gn, _) <- givens
+    ]
+
+  bkmCallInfos :: Map Unique BkmCallInfo
+  bkmCallInfos = Map.fromList
+    [ ( u
+      , MkBkmCallInfo
+          { bciFeelName = Map.findWithDefault "" u feelNameByDecideU
+          , bciParams   = [gn | (_, _, gn, _) <- givens]
+          , bciClosure  = [cn | (_, cn, _) <- closures]
+          }
+      )
+    | (u, (givens, closures)) <- Map.toList bkmSignatures
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 5: one decisionService per § (§2.3), the splitter (§2.3.2), and
+  -- the flavor bit (§13.5)
+  ------------------------------------------------------------------------
+
+  -- Every NAMED section with its kept, non-BKM member decides — each decide
+  -- assigned to its INNERMOST named §. 'topDecls' flattens the tree, so this
+  -- walks the module itself; the walk is the only consumer of the nesting.
+  --
+  -- The walk collects EVERY decide and the kept/dropped filters are applied
+  -- outside, because D-SVCEMPTY's first arm needs to see a § whose entire
+  -- membership was rule-date-rebind-dropped (§15.12) — a § the kept-only
+  -- table would render indistinguishable from one that never held a decide.
+  sectionTable :: [(Text, [Unique])]
+  sectionTable =
+    [ ( nm
+      , [ u
+        | (c, u) <- sectionAssigns
+        , c == i
+        , Map.member u decideByUnique
+        , not (Set.member u bkmCandidateSet)
+        ]
+      )
+    | (i, nm) <- sectionNames
+    ]
+
+  -- Aligned with 'sectionTable': the same §s, membership = population-dropped
+  -- member decides with their reasons — ALL of 'pvDropped', not only the
+  -- rebind set. (It was rebind-only at first, which left a § of all-fixture
+  -- decides — the corpus's `Group 6 — advertising (Rule 204)` — exactly as
+  -- silent as the silence D-SVCEMPTY exists to end; widened 2026-08-02.)
+  sectionDropped :: [(Text, [(Unique, A.DropReason)])]
+  sectionDropped =
+    [ ( nm
+      , [ (u, r)
+        | (c, u) <- sectionAssigns
+        , c == i
+        , Just r <- [Map.lookup u popVerdict.pvDropped]
+        ]
+      )
+    | (i, nm) <- sectionNames
+    ]
+
+  -- Arm (ii)'s lost-line reads this: a § that ALSO had population-dropped
+  -- members must not claim its member decisions are "all emitted".
+  sectionDroppedByName :: Map Text [(Unique, A.DropReason)]
+  sectionDroppedByName = Map.fromListWith (<>) sectionDropped
+
+  -- Aligned with 'sectionTable': BKM-candidate members, which 'sectionTable'
+  -- excludes. A § whose only members are BKMs is NOT a candidate for arm (i):
+  -- its decides ARE emitted, as businessKnowledgeModels.
+  sectionBkmMembers :: [(Text, [Unique])]
+  sectionBkmMembers =
+    [ (nm, [u | (c, u) <- sectionAssigns, c == i, Set.member u bkmCandidateSet])
+    | (i, nm) <- sectionNames
+    ]
+
+  -- One phrase per 'A.DropReason', naming the note code that carries the
+  -- member's own loss. Keep "rule-date-rebinding" verbatim: a test pins it.
+  dropReasonPhrase :: A.DropReason -> Text
+  dropReasonPhrase = \case
+    A.DroppedRuleDateRebind -> "rule-date-rebinding (D-RULEDATE-UNBOUND, §15.12)"
+    A.DroppedFixture        -> "test fixtures (D-FIXTURE, §2.5.6-2)"
+    A.DroppedFixtureHelper  -> "fixture-side helpers (D-FIXTURE, §2.5.6-2)"
+    A.DroppedRegulative     -> "uncalled regulative bodies (D-REGULATIVE, §2.5.6-3)"
+
+  dropNoteCode :: A.DropReason -> Text
+  dropNoteCode = \case
+    A.DroppedRuleDateRebind -> "D-RULEDATE-UNBOUND"
+    A.DroppedFixture        -> "D-FIXTURE"
+    A.DroppedFixtureHelper  -> "D-FIXTURE"
+    A.DroppedRegulative     -> "D-REGULATIVE"
+
+  -- "2 as rule-date-rebinding (…); 1 as test fixtures (…)" — counts grouped
+  -- by reason, in the fixed constructor order, so the text is deterministic.
+  dropReasonSummary :: [A.DropReason] -> Text
+  dropReasonSummary rs = Text.intercalate "; "
+    [ tshow n <> " as " <> dropReasonPhrase r
+    | r <- [ A.DroppedRuleDateRebind, A.DroppedFixture
+           , A.DroppedFixtureHelper, A.DroppedRegulative ]
+    , let n = length (filter (== r) rs)
+    , n > 0
+    ]
+
+  sectionAssigns :: [(Int, Unique)]
+  sectionNames   :: [(Int, Text)]
+  (sectionAssigns, sectionNames) = (assigns, secs)
+   where
+    MkModule _ _ topSec = modul
+    (assigns, secs, _) = goSec Nothing (0 :: Int) topSec
+    goSec cur idx (MkSection _ mName _ ds) =
+      let (cur', idx', secs0) = case mName of
+            Just n  -> (Just idx, idx + 1, [(idx, nameOf n)])
+            Nothing -> (cur, idx, [])
+          step (as, ss, i) dcl = case dcl of
+            Section _ sub ->
+              let (as2, ss2, i2) = goSec cur' i sub
+              in (as <> as2, ss <> ss2, i2)
+            Decide _ dd ->
+              let u = getUnique (decideResolved dd)
+              in (as <> [(c, u) | Just c <- [cur']], ss, i)
+            _ -> (as, ss, i)
+      in foldl' step ([], secs0, idx') ds
+
+  -- The SYNTACTIC decision→decision reference approximation the service
+  -- structure is computed over. Deliberately NOT the emitted edges: the
+  -- emitted `dcnRequirements` force each decision's rendered logic (strict
+  -- fields), and the render reads 'neServiceCalls', which needs the service
+  -- structure — a strict knot. Raw 'freeRefs' is a SUPERSET of the emitted
+  -- edges (dated chains and hydration only remove or redirect), and a
+  -- superset is safe here: an extra edge can cause an extra split (Advisory)
+  -- but never hide a cycle, and 'checkDrg''s §6.3.10 pass asserts the final
+  -- artifact regardless.
+  decideReqUniques :: Map Unique (Set Unique)
+  decideReqUniques = Map.fromList
+    [ ( u
+      , Set.fromList
+          [ ru
+          | r <- freeRefs d
+          , let ru = getUnique r
+          , ru /= u
+          , Map.member ru decideByUnique
+          , not (Set.member ru bkmCandidateSet)
+          ]
+      )
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    ]
+
+  -- The §2.3.2 splitter, run to FIXPOINT over 'cyclicGroups' — the same
+  -- routine as every other acyclicity question (§6.4.4). A section whose
+  -- grouping closes a service-level cycle is split into per-decision
+  -- services; a SINGLETON that still cycles holds a genuine decision-level
+  -- cycle (already D-CYCLE) and is DROPPED rather than re-split, which is
+  -- what makes the iteration terminate on any input.
+  -- Each struct: (original § name if this is a split fragment, service name,
+  -- members).
+  finalServiceStructs :: [(Maybe Text, Text, [Unique])]
+  svcSplitEvents      :: [(Text, [Text])]   -- (§ name, fragment names)
+  svcDroppedCycles    :: [Text]             -- service names dropped as genuine cycles
+  (finalServiceStructs, svcSplitEvents, svcDroppedCycles) =
+    goSplit [(Nothing, nm, us) | (nm, us) <- sectionTable, not (null us)] [] []
+   where
+    goSplit svcs splits dropped =
+      let keyed = zip [0 :: Int ..] svcs
+          memberSvc = Map.fromList [(u, i) | (i, (_, _, us)) <- keyed, u <- us]
+          edgesOf i us = nubOrd
+            [ j
+            | u <- us
+            , t <- Set.toList (Map.findWithDefault Set.empty u decideReqUniques)
+            , Just j <- [Map.lookup t memberSvc]
+            , j /= i
+            ]
+          cycSet = Set.fromList
+            (concat (cyclicGroups [(i, i, edgesOf i us) | (i, (_, _, us)) <- keyed]))
+      in if Set.null cycSet
+           then (svcs, splits, dropped)
+           else
+             let splitOne (i, s@(orig, nm, us))
+                   | not (Set.member i cycSet) = ([s], [], [])
+                   | [_] <- us = ([], [], [nm])
+                   | otherwise =
+                       let frags =
+                             [ ( Just (fromMaybe nm orig)
+                               , nm <> " — " <> decideNameByUnique u
+                               , [u]
+                               )
+                             | u <- us
+                             ]
+                       in (frags, [(fromMaybe nm orig, [n | (_, n, _) <- frags])], [])
+                 parts = map splitOne keyed
+             in goSplit
+                  (concatMap (\(a, _, _) -> a) parts)
+                  (splits <> concatMap (\(_, b, _) -> b) parts)
+                  (dropped <> concatMap (\(_, _, c) -> c) parts)
+
+  decideNameByUnique :: Unique -> Text
+  decideNameByUnique u =
+    Map.findWithDefault "" u
+      (Map.fromList [(getUnique (decideResolved d), decideName d) | d <- decides])
+
+  -- §5.2 SCOPE 3: decisionService names are their OWN uniquifyIn scope —
+  -- measured, not assumed (E6: two same-named services both resolve to the
+  -- FIRST, silently; E5: a service sharing a DECISION's name is
+  -- validator-only with zero runtime effect, so services do not uniquify
+  -- against decisions).
+  svcFeelNames = uniquifyIn (map (\(_, nm, _) -> feelIdentText nm) finalServiceStructs)
+  svcIds       = assignIds "service_" (map (\(_, nm, _) -> nm) finalServiceStructs)
+
+  -- §13.5 row 6: which decides are §-INVOCABLE — the narrow measured shape.
+  -- A kept, parameterised, NOT-un-lifted, NOT-BKM decide (the safety-refused
+  -- verbatim population) that is the SOLE output of its service, whose
+  -- service has encapsulated members, no cross-service decision inputs, and
+  -- whose service inputData are EXACTLY the decide's own GIVEN params. Under
+  -- those conditions `svc(p: e, …)` computes the decide with its inputs bound
+  -- per call, which is what the L4 call means.
+  svcInvocable :: Map Unique Int
+  svcInvocable = Map.fromList
+    [ (uf, i)
+    | (i, (_, _, us)) <- zip [0 :: Int ..] finalServiceStructs
+    , let memberSet = Set.fromList us
+    , let requiredByMembers =
+            Set.unions [Map.findWithDefault Set.empty m decideReqUniques | m <- us]
+    , let outputs = [m | m <- us, not (Set.member m requiredByMembers)]
+    , [uf] <- [outputs]
+    , length us > 1   -- §6.3.10: encapsulated members must exist
+    , Just d <- [listToMaybe [d' | d' <- decides, getUnique (decideResolved d') == uf]]
+    , let ps = A.decideParams d
+    , not (null ps)
+    , not (Set.member uf unliftedSet)
+    , not (Set.member uf bkmCandidateSet)
+    -- every decision reference of every member stays inside the service
+    , Set.isSubsetOf requiredByMembers memberSet
+    -- the members' input references are exactly the callee's params
+    , let inputRefs = Set.fromList
+            [ canonUnique ru
+            | m <- us
+            , d' <- decides
+            , getUnique (decideResolved d') == m
+            , r <- freeRefs d'
+            , let ru = getUnique r
+            , Map.member ru inputByUnique
+            ]
+    , inputRefs == Set.fromList (map (getUnique . fst) ps)
+    ]
+
+  -- The invocation map the renderer reads — populated on `kie` ONLY.
+  svcCallInfos :: Map Unique SvcCallInfo
+  svcCallInfos
+    | opts.dloFlavor /= FlavorKie = Map.empty
+    | otherwise = Map.fromList
+        [ ( uf
+          , MkSvcCallInfo
+              { sciFeelName = svcFeelNames !! i
+              , sciParams =
+                  [ Map.findWithDefault "" (getUnique p) baseVarNames
+                  | Just d <- [listToMaybe [d' | d' <- decides, getUnique (decideResolved d') == uf]]
+                  , (p, _) <- A.decideParams d
+                  ]
+              }
+          )
+        | (uf, i) <- Map.toList svcInvocable
+        ]
+
+  -- decision id → service id, for 'finishCaller' (kie only): the caller's
+  -- info edge onto the callee decision is REPLACED by the knowledgeRequirement
+  -- onto the service — an info requirement would make the (uncompilable,
+  -- safety-refused) callee a hard dependency of the caller on KIE.
+  svcEdgeByDecisionId :: Map Text Text
+  svcEdgeByDecisionId
+    | opts.dloFlavor /= FlavorKie = Map.empty
+    | otherwise = Map.fromList
+        [ (did, svcIds !! i)
+        | (uf, i) <- Map.toList svcInvocable
+        , Just did <- [Map.lookup uf decideByUnique]
+        ]
+
+  -- The final service NODES, assembled from the FINISHED decisions so the
+  -- emitted member lists agree with the emitted edges (lazy — nothing on the
+  -- render path reads these). A struct that fails the D5/§6.3.10 guards is
+  -- returned 'Left' so D-SVCEMPTY can say so — the skip used to be silent.
+  serviceStructResults :: [Either (Text, Int, Int, Int) DrgNode]
+  serviceStructResults =
+    [ -- probe D5: a service with no outputDecision is a KIE runtime throw and
+      -- a Camunda silence; §6.3.10: at least one of encapsulated /
+      -- inputDecisions SHALL be present. A § that cannot satisfy both emits
+      -- no service — loudly, via D-SVCEMPTY's second arm.
+      if null outputs || (null encapsulated && null inputDecisions)
+        then Left (nm, length outputs, length encapsulated, length inputDecisions)
+        else Right $ NodeService MkDecisionService
+          { dsvId             = sid
+          , dsvName           = nm
+          , dsvFeelName       = feel
+          , dsvType           = case outputs of
+              [o] -> maybe DmnAny (.dcnType) (Map.lookup o finishedById)
+              _   -> DmnAny
+          , dsvOutputs        = outputs
+          , dsvEncapsulated   = encapsulated
+          , dsvInputDecisions = inputDecisions
+          , dsvInputData      = inputDataIds
+          }
+    | ((_, nm, us), feel, sid) <- zip3 finalServiceStructs svcFeelNames svcIds
+    , let declaredIds = [did | u <- us, Just did <- [Map.lookup u decideByUnique]]
+    , let declaredSet = Set.fromList declaredIds
+    -- A HYDRATOR whose readers all live in this § joins the service as an
+    -- encapsulated member — it is scaffolding of those readers, and leaving
+    -- it outside makes it an inputDecision that KIE's evaluateDecisionService
+    -- then wants precomputed in the invocation context, warning
+    -- "Required input '<hydrator>' not found ... invoking using null"
+    -- (measured on the bkm exhibit). Cross-§ readers leave it outside.
+    , let absorbedHydrators =
+            [ hid
+            | NodeDecision h <- finishedDecisionNodes
+            , let hid = h.dcnId
+            , Text.isPrefixOf "hydration_" hid
+            , let readers =
+                    [ dec.dcnId
+                    | NodeDecision dec <- finishedDecisionNodes
+                    , RequiredDecision hid `elem` dec.dcnRequirements
+                    ]
+            , not (null readers)
+            , all (`Set.member` declaredSet) readers
+            ]
+    , let memberIds = declaredIds <> absorbedHydrators
+    , let memberSet = Set.fromList memberIds
+    , let memberDecs = [dec | m <- memberIds, Just dec <- [Map.lookup m finishedById]]
+    , let requiredByMembers = Set.fromList
+            [t | dec <- memberDecs, RequiredDecision t <- dec.dcnRequirements]
+    , let outputs      = [m | m <- memberIds, not (Set.member m requiredByMembers)]
+    , let encapsulated = [m | m <- memberIds, Set.member m requiredByMembers]
+    , let inputDecisions = nubOrd
+            [ t
+            | dec <- memberDecs
+            , RequiredDecision t <- dec.dcnRequirements
+            , not (Set.member t memberSet)
+            ]
+    , let inputDataIds = nubOrd
+            [t | dec <- memberDecs, RequiredInput t <- dec.dcnRequirements]
+    ]
+
+  serviceNodes :: [DrgNode]
+  serviceNodes = [n | Right n <- serviceStructResults]
+
+  -- (§ name, #outputs, #encapsulated, #inputDecisions) of every guard-failing
+  -- struct, for D-SVCEMPTY's second arm.
+  svcEmptySkips :: [(Text, Int, Int, Int)]
+  svcEmptySkips = [x | Left x <- serviceStructResults]
+
+  finishedById :: Map Text Decision
+  finishedById = Map.fromList
+    [(dec.dcnId, dec) | NodeDecision dec <- finishedDecisionNodes]
+
+  -- D-SVCSPLIT (Advisory): the artifact departs from the source's sectioning
+  -- (§2.3.2 — the split is OUR granularity repair, semantics-preserving,
+  -- which is exactly why it is performed rather than reported-and-refused;
+  -- contrast §6.4.4-4 on decision-level cycles). D-FLAVOR-NOSERVICE: §13.5's
+  -- two ruled arms.
+  serviceNotes :: [FidelityNote]
+  serviceNotes =
+    [ dmnNote "D-SVCSPLIT" Advisory (feelIdentText orig) Nothing
+        ("the section `" <> orig <> "` would close a service-level requirement cycle \
+          \(DMN 1.3 §6.3.10) as one decisionService, so it is emitted as "
+           <> tshow (length frags) <> " finer service(s): "
+           <> Text.intercalate ", " (map tick frags)
+           <> ". Section granularity can manufacture a cycle decisions do not have; \
+              \splitting until acyclic preserves every decision and every edge")
+        "the source's own sectioning: the artifact's service boundaries are finer than \
+        \the module's § boundaries"
+    | (orig, frags) <- svcSplitEvents
+    ]
+      <> [ dmnNote "D-SVCSPLIT" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` holds a genuine decision-level requirement \
+               \cycle, which no service granularity can repair, so NO decisionService is \
+               \emitted for it (its members and their D-CYCLE note are unaffected)")
+             "the § as an invocable or grouping unit"
+         | nm <- svcDroppedCycles
+         ]
+      <> [ dmnNote "D-FLAVOR-NOSERVICE" Blocking callerId Nothing
+             ("`" <> callerName <> "` applies `" <> decideNameByUnique uf
+                <> "`, which is §-invocable — on the `kie` flavor this call renders as \
+                   \a FEEL invocation of the decisionService `" <> (svcFeelNames !! i)
+                <> "` — but the `camunda` flavor never emits the \
+                   \knowledgeRequirement→decisionService edge that invocation needs \
+                   \(it is fatal to Camunda 8's parse(), §13.4), so the call site stays \
+                   \raw L4")
+             "the invocation on this flavor: route the callee to a BKM (make it \
+             \DMN-SAFE) or evaluate on the kie flavor"
+         | opts.dloFlavor == FlavorCamunda
+         , (uf, i) <- Map.toList svcInvocable
+         , (callerId, callerName) <- qualifyingCallers uf
+         ]
+      <> [ dmnNote "D-FLAVOR-NOSERVICE" Advisory sid Nothing
+             ("the decisionService `" <> feel <> "` (§ `" <> nm <> "`) is emitted as \
+               \GROUPING only: no call site invokes it"
+                <> (if opts.dloFlavor == FlavorKie
+                      then ""
+                      else ", and on this flavor none could — the `camunda` flavor \
+                           \never emits the knowledgeRequirement→decisionService edge \
+                           \an invocation needs (§13.4/§13.5)"))
+             "nothing: an uninvoked grouping service is inert on both engines (probe D1)"
+         | ((_, nm, _), feel, sid, i) <-
+             zip4 finalServiceStructs svcFeelNames svcIds [0 :: Int ..]
+         -- only services that actually EMIT (the D5/§6.3.10 skips filter some
+         -- structs out); a note naming an element id the artifact does not
+         -- contain would be describing a different file
+         , Set.member sid emittedServiceIds
+         , i `notElem`
+             [ j | (uf, j) <- Map.toList svcInvocable, not (null (qualifyingCallers uf)) ]
+         ]
+      -- D-SVCEMPTY (§15.12's companion): one code, one severity, two message
+      -- forms (D-FIXTURE's precedent). Advisory, and the Advisory ⟹ Faithful
+      -- argument is discharged in FIDELITY-SEVERITY-AXIS-SPEC.md §5.2: the
+      -- per-decision loss is already carried by each member's own note
+      -- (D-RULEDATE-UNBOUND / D-REGULATIVE Lossy, D-FIXTURE Advisory), and a
+      -- service shell is grouping metadata (D-FLAVOR-NOSERVICE's grouping-arm
+      -- precedent). Elements are named by the §'s FEEL-folded name, never by
+      -- a service id the artifact does not contain.
+      --
+      -- Arm (i): a § whose ENTIRE decide membership was population-dropped —
+      -- for ANY 'A.DropReason', not only the rebind one. The kept-only
+      -- section table renders such a § indistinguishable from one that never
+      -- held a decide, which is exactly the silence this arm ends. (BKM-only
+      -- §s are excluded: their decides ARE emitted, as BKMs.)
+      <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` has no emitted member decisions: its "
+                <> englishCount (length droppedMembers) <> " member decide(s) "
+                <> Text.intercalate ", " (map (tick . droppedNameOf . fst) droppedMembers)
+                <> " were all dropped at population time ("
+                <> dropReasonSummary (map snd droppedMembers)
+                <> "), so no decisionService is emitted for it")
+             ("nothing an engine needs: the grouping shell had no members left to \
+              \group; the members' own loss is carried by their "
+                <> Text.intercalate " / "
+                     (nubOrd (map (dropNoteCode . snd) droppedMembers))
+                <> " notes")
+         | ((nm, kept), (_, droppedMembers), (_, bkms)) <-
+             zip3 sectionTable sectionDropped sectionBkmMembers
+         , null kept
+         , null bkms
+         , not (null droppedMembers)
+         ]
+      -- Arm (ii): a struct with kept members that cannot satisfy §6.3.10's
+      -- decisionService shape. This skip existed before and was silent; the
+      -- note is new, the behaviour is not. The lost-line is CONDITIONED on
+      -- whether the § also had population-dropped members: the unconditional
+      -- "its member decisions are all emitted" was false on every mixed §
+      -- (three of seven corpus instances), repaired 2026-08-02.
+      <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` cannot satisfy DMN 1.3 §6.3.10's \
+              \decisionService shape — at least one output decision, and at least one \
+              \encapsulated member or input decision; this one has " <> shapeText
+                <> " — so no decisionService is emitted for it (probe D5: a service \
+                   \with no outputDecision is a KIE runtime throw and a Camunda silence)")
+             lostText
+         | (nm, nOut, nEnc, _nInp) <- svcEmptySkips
+         , let shapeText
+                 | nOut == 0 = "no output decision"
+                 | otherwise =
+                     tshow nOut <> " output(s) but no encapsulated member and no \
+                     \input decision"
+         , let droppedHere = Map.findWithDefault [] nm sectionDroppedByName
+         , let lostText
+                 | null droppedHere =
+                     "the § as a grouping unit: its member decisions are all emitted; \
+                     \only the service shell is not"
+                 | otherwise =
+                     "the § as a grouping unit: its " <> tshow (nOut + nEnc)
+                       <> " emitted member decision(s) are in the artifact, "
+                       <> englishCount (length droppedHere)
+                       <> " member decide(s) were separately dropped at population \
+                          \time (each carries its own "
+                       <> Text.intercalate " / "
+                            (nubOrd (map (dropNoteCode . snd) droppedHere))
+                       <> " note), and the service shell is not emitted"
+         ]
+
+  emittedServiceIds :: Set Text
+  emittedServiceIds = Set.fromList [s.dsvId | NodeService s <- serviceNodes]
+
+  -- The call sites that MEET the §-invocation condition, per callee: applied,
+  -- arity-matching, from an emitted caller. Flavor-independent — on kie they
+  -- render, on camunda they draw the Blocking arm.
+  qualifyingCallers :: Unique -> [(Text, Text)]
+  qualifyingCallers uf = nubOrd
+    [ (callerId, decideNameByUnique c)
+    | Just d <- [listToMaybe [d' | d' <- decides, getUnique (decideResolved d') == uf]]
+    , let arity = length (A.decideParams d)
+    , s <- Map.findWithDefault [] uf callGraph.cgCalls
+    , s.csApplied
+    , length s.csArgs == arity
+    , Just c <- [s.csCaller]
+    , Just callerId <- [Map.lookup c decideByUnique]
+    ]
+
+  -- §4.4 × §6.2: computed selectors whose bodies reference nothing beyond the
+  -- record's own `_self` — the only ones safe to inline at a BKM parameter
+  -- receiver (anything wider would smuggle environment references past the
+  -- closure computation; anything nested would recurse through another
+  -- selector). Everything else falls to verbatim, Blocking-noted as today.
+  selfContainedSelectors :: Map Unique (Unique, Expr Resolved)
+  selfContainedSelectors = Map.fromList
+    [ (getUnique (decideResolved d), (getUnique self, prepared))
+    | d <- computedSelectorDecides
+    , Just (_, self, _) <- [computedSelectorOwner d]
+    , let prepared = hydratorBody (view decideBody d)
+    , let (survivors, touchedS) = survivingRefs [prepared]
+    , all (\r -> Set.member (getUnique r) computedSelfUniques) survivors
+    , null touchedS
+    ]
 
   -- A GIVEN's declared type is the best evidence about a free term; an ASSUME's
   -- is the other source. Anything else stays Any.
@@ -4079,7 +5107,7 @@ lowerModule opts modul@(MkModule _ uri _) =
   phase4Notes :: [FidelityNote]
   phase4Notes =
     populationNotes <> paramTypeNotes <> paramAsInputNotes
-      <> partialNotes <> bkmNotes
+      <> partialNotes <> bkmNotes <> bkmConsumerNotes
 
   allDecideByUnique :: Map Unique (Decide Resolved)
   allDecideByUnique =
@@ -4111,6 +5139,16 @@ lowerModule opts modul@(MkModule _ uri _) =
              \decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a \
              \<decision> whose logic is raw deontic L4 misdescribes both")
             "the obligation's lifecycle: route this rule to the BPMN exporter instead"
+        -- R12 (§15.12): same code as the old lowering-time note, retexted, ONE
+        -- severity (Lossy, D-REGULATIVE's precedent): nothing emitted is
+        -- broken, and the document is genuinely incomplete w.r.t. the source.
+        A.DroppedRuleDateRebind ->
+          dmnNote "D-RULEDATE-UNBOUND" Lossy nm rng
+            ("`" <> nm <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER \
+             \RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no \
+             \scoped rebinding, so no faithful <decision> exists and it is not emitted")
+            "the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE \
+            \across engine invocations"
     | (u, reason) <- Map.toAscList popVerdict.pvDropped
     , let nm  = droppedNameOf u
     , let rng = droppedRangeOf u
@@ -4232,25 +5270,54 @@ lowerModule opts modul@(MkModule _ uri _) =
     , any (.csApplied) (Map.findWithDefault [] ownerU callGraph.cgCalls)
     ]
 
+  -- The decisions whose logic went through the R13 verdict lowering (§16),
+  -- read off the emitted notes: D-VERDICT's element is the decision id, and
+  -- the note is emitted exactly when the lowering fired, so this cannot drift
+  -- from the artifact. Consumed by 'partialNotes', whose default message
+  -- asserts artifact facts ("saturated call sites remain raw L4") the verdict
+  -- lowering falsifies.
+  verdictElemIds :: Set Text
+  verdictElemIds = Set.fromList
+    [n.element | (_, ns) <- lowered, n <- ns, n.code == "D-VERDICT"]
+
   -- D-PARTIAL (§2.4.2, OPEN-1): Phase 4 classifies and reports; it does not
   -- change node kind. A ¬DMN-SAFE decision simply does not un-lift — it keeps
   -- today's <decision> + verbatim call sites — and carries this note at the
   -- ruled severity, keyed off the CALL SITE, not the node kind (null arrives
   -- identically from a <decision> body, a BKM's encapsulatedLogic or an
   -- inlined cell; routing removes the widening, never the coercion).
+  --
+  -- A VERDICT-LOWERED decide (§16) takes a different message form: its body
+  -- ships as a decision table that always answers, and no raw-L4 call site of
+  -- it remains, so what stays uncertified is the L4 SOURCE — retexted rather
+  -- than left asserting artifact facts R13 falsified.
   partialNotes =
-    [ dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
-        ("`" <> decideName d <> "` could not be certified total ("
-           <> clauseText
-           <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
-              \call sites remain raw L4 (Phase 5 routes such decisions to a \
-              \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
-              \on every input any requiring decision is evaluated on, and an undefined \
-              \FEEL result is null, which reads as false in every consuming boolean \
-              \position"
-           <> fallbackText)
-        "the certainty that this node evaluates wherever the DRG reaches it: an input \
-        \outside the decision's domain answers null with status SUCCEEDED, not an error"
+    [ if Set.member did verdictElemIds
+        then
+          dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+            ("`" <> decideName d <> "` could not be certified total ("
+               <> clauseText
+               <> "), so it is not un-lifted. Its deontic body is lowered to a verdict \
+                  \decision table (see D-VERDICT), which always answers one row, and no \
+                  \raw-L4 call site of it remains in the artifact; what could not be \
+                  \certified is the L4 source itself — the HENCE self-recursion may not \
+                  \terminate — and the artifact does not carry that recursion")
+            "the certainty that the SOURCE obligation spine terminates: the verdict \
+            \table answers regardless, and the L4 recursion it summarises is what could \
+            \not be certified"
+        else
+          dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+            ("`" <> decideName d <> "` could not be certified total ("
+               <> clauseText
+               <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
+                  \call sites remain raw L4 (Phase 5 routes such decisions to a \
+                  \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
+                  \on every input any requiring decision is evaluated on, and an undefined \
+                  \FEEL result is null, which reads as false in every consuming boolean \
+                  \position"
+               <> fallbackText)
+            "the certainty that this node evaluates wherever the DRG reaches it: an input \
+            \outside the decision's domain answers null with status SUCCEEDED, not an error"
     | d <- decides
     , let u = getUnique (decideResolved d)
     , Just issues <- [Map.lookup u safetyIssues]
@@ -4275,21 +5342,41 @@ lowerModule opts modul@(MkModule _ uri _) =
                 (Lossy, ". Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null")
     ]
 
-  -- D-BKM (W9, report-only in Phase 4): tier-2 classification made visible a
-  -- phase early. The decision keeps today's behaviour — a <decision> whose
-  -- saturated call sites render verbatim, already Blocking-noted — and
-  -- Phase 5's BKM emission is what will change it (the golden pinning this is
-  -- the tripwire that goes red that day).
+  -- D-BKM (Phase 5, §6.2): the tier-2 classification, now carried out. The
+  -- decide is emitted as a <businessKnowledgeModel>; saturated call sites
+  -- render as FEEL named-argument invocations backed by a knowledgeRequirement
+  -- edge on each caller; module-level free terms of the body are λ-lifted
+  -- into extra formal parameters (see 'bkmSignatures'). Advisory, per §7: the
+  -- note records the emission and its lift, not a loss.
+  --
+  -- The SAFETY-REFUSED tier-2 residue (a member of safetyIssues) keeps the
+  -- Phase 4 wording: it stays a <decision> with verbatim call sites, D-PARTIAL
+  -- says why, and this note says what that costs.
   bkmNotes =
-    [ dmnNote "D-BKM" Advisory did Nothing
-        ("`" <> decideName d <> "` is classified as a businessKnowledgeModel candidate \
-          \(tier 2): it is applied to distinct argument expressions"
-           <> (if null callerNames
-                 then ""
-                 else " by " <> Text.intercalate ", " (map tick callerNames))
-           <> ". In Phase 4 it keeps its <decision> node and its call sites stay verbatim; \
-              \Phase 5 emits it as a BKM with knowledgeRequirement edges")
-        "nothing yet: this is a classification, not a change of behaviour"
+    [ if Set.member u bkmCandidateSet
+        then
+          dmnNote "D-BKM" Advisory did Nothing
+            ("`" <> decideName d <> "` is emitted as a businessKnowledgeModel \
+              \(tier 2): it is applied to distinct argument expressions"
+               <> (if null callerNames
+                     then ""
+                     else " by " <> Text.intercalate ", " (map tick callerNames))
+               <> ". Saturated call sites render as FEEL named-argument invocations \
+                  \with a knowledgeRequirement edge on each caller"
+               <> closureText)
+            "the decision-as-variable reading: the callee no longer appears as a 0-ary \
+            \decision variable, and is reachable only by invocation"
+        else
+          dmnNote "D-BKM" Advisory did Nothing
+            ("`" <> decideName d <> "` is classified as a businessKnowledgeModel candidate \
+              \(tier 2): it is applied to distinct argument expressions"
+               <> (if null callerNames
+                     then ""
+                     else " by " <> Text.intercalate ", " (map tick callerNames))
+               <> ", but it could not be certified total (see its D-PARTIAL note), so it \
+                  \keeps its <decision> node and its call sites stay verbatim")
+            "the invocation: an uncertified body inside a BKM would answer the same silent \
+            \null one element kind later, so the emission is refused rather than degraded"
     | d <- decides
     , let u = getUnique (decideResolved d)
     , not (null (A.decideParams d))
@@ -4300,6 +5387,33 @@ lowerModule opts modul@(MkModule _ uri _) =
             | s <- Map.findWithDefault [] u callGraph.cgCalls
             , Just c <- [s.csCaller]
             ]
+    , let closureText = case Map.findWithDefault ([], []) u bkmSignatures of
+            (_, [])       -> ""
+            (_, closures) ->
+              "; " <> tshow (length closures)
+                <> " module-level free reference(s) of its body ("
+                <> Text.intercalate ", " [tick cn | (_, cn, _) <- closures]
+                <> ") are λ-lifted into extra formal parameters, supplied at every call \
+                   \site as `name: name` — a BKM body may read nothing beyond its \
+                   \parameters (measured on both engines, §6.2)"
+    ]
+
+  -- §6.3-3, as narrowed by R7/§13.3: NOT a suppression and NOT a flavor gate —
+  -- one Advisory, module-level, naming the consumers we do NOT emit for that
+  -- cannot execute a BKM. Named because their failure modes are silent in
+  -- opposite ways, so a reader who ships this artifact to one of them would
+  -- learn nothing from the artifact itself.
+  bkmConsumerNotes =
+    [ dmnNote "D-BKM-CONSUMERS" Advisory "definitions" Nothing
+        (tshow (Set.size bkmCandidateSet)
+           <> " decision(s) are emitted as businessKnowledgeModels. Both target \
+              \flavors execute BKMs (KIE 8.44, Camunda 8; §13.3), but two known \
+              \NON-target consumers cannot: @hbtgmbh/dmn-eval-js has no BKM support \
+              \and falls through to the next rule on an unresolvable callee \
+              \(a plausible wrong answer), and Camunda 7 answers null, silently")
+        "nothing on the target engines; portability to BKM-less consumers, which fail \
+        \silently rather than loudly"
+    | not (Set.null bkmCandidateSet)
     ]
 
   -- D-RULEDATE (§15.5), Advisory, exactly ONE per DRG. Structural model:
@@ -4431,8 +5545,12 @@ lowerModule opts modul@(MkModule _ uri _) =
   declaredFeelNames :: [(Text, (Text, Text, Text))]
   declaredFeelNames =
     [ (n.idFeelName, ("inputData", n.idName, n.idId)) | n <- inputNodes ]
-      <> [ (feel, ("decision", decideName d, did))
+      <> [ (feel, (kind, decideName d, did))
          | (d, did, feel) <- zip3 decides decideIds decideFeelNames
+         -- Phase 5: BKM names live in the same flat scope (probe E4 — the
+         -- engines DISAGREE on a BKM/decision collision, so the detector must
+         -- cover it), and the note should name the element kind that collided.
+         , let kind = if isBkmDecide d then "businessKnowledgeModel" else "decision"
          ]
 
   feelNameCollisionNotes =
@@ -4644,63 +5762,12 @@ lowerModule opts modul@(MkModule _ uri _) =
       reason : _ -> literalFallback (SumTypeRead reason)
       [] -> plainLowering
 
-    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes <> ruleDateUnboundNotes
-
-    -- D-RULEDATE-UNBOUND (§15.5). A decision that evaluates a sub-graph under
-    -- its OWN rule date cannot be governed by the DRG's single global rule-date
-    -- input, because DMN has no scoped rebinding. This ACCOMPANIES its
-    -- D-LITERALEXPR; it does not replace it.
-    --
-    -- v1 matches `EVAL UNDER RULES EFFECTIVE AT` only. The valid-time /
-    -- transaction-time builtins stamp a DIFFERENT temporal context and were not
-    -- measured; adding them silently would change counts with nothing behind
-    -- them (§15.5).
-    ruleDateUnboundNotes =
-      [ uncurry (dmnNote "D-RULEDATE-UNBOUND" Blocking did (bestRange body))
-          ruleDateUnboundText
-      | any isEvalUnderRules subExprs
-      ]
-
-    -- The claim is SCOPED TO WHAT WAS EMITTED. `EVAL UNDER RULES EFFECTIVE AT`
-    -- can sit inside an arm body of a chain that still tabulates, and saying "no
-    -- DMN engine can evaluate this decision" of a decision that ships a real
-    -- <decisionTable> would be false about the rest of the table. On today's
-    -- corpus all 15 instances are boxed literals, which is asserted rather than
-    -- assumed (jl4/tests/DmnExport.hs, "scopes D-RULEDATE-UNBOUND's claim") --
-    -- but the note must not depend on that staying true.
-    ruleDateUnboundText = case logic of
-      -- A hydrator takes the same reading as a boxed literal: neither has any
-      -- row, so nothing about it is "still governed by the rule-date input".
-      -- It is also unreachable in practice -- hydrators are minted OUTSIDE
-      -- this per-decide computation, so 'logic' here is never a context -- but
-      -- the arm is written to the same standard rather than left as an error,
-      -- because an unreachable branch that becomes reachable is exactly how a
-      -- scoped claim silently stops being scoped.
-      LogicContext _ -> literalUnboundText
-      LogicLiteral _ -> literalUnboundText
-      LogicTable _ ->
-        ( "a sub-expression of `" <> decideName d
-            <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-               \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-               \rebinding, so that sub-graph is not governed by it and cannot be, even \
-               \though the surrounding decision table is"
-        , "execution of the rebound sub-graph: supplying the model's rule-date input does \
-          \not make it answer, and the table around it will answer as though it had"
-        )
-
-    literalUnboundText =
-      ( "`" <> decideName d
-          <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-             \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-             \rebinding, so this decision is not governed by it and cannot be"
-      , "execution: no DMN engine can evaluate this decision, and -- the part a reader is \
-        \most likely to get wrong -- supplying the model's rule-date input does not make \
-        \it answer"
-      )
-
-    isEvalUnderRules = \case
-      App _ r _ -> getUnique r == TC.evalUnderRulesEffectiveAtUnique
-      _         -> False
+    -- D-RULEDATE-UNBOUND moved to population time (R12, §15.12): a decide that
+    -- rebinds law time is dropped by 'classifyPopulation' before this function
+    -- ever sees it, and 'populationNotes' carries the (now Lossy) note. The
+    -- per-decision two-message machinery that lived here described an emitted
+    -- element that no longer exists.
+    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes
 
     -- Computed ONCE and shared by 'plainLowering' and the requirement rewrite
     -- below, so the emitted logic and the emitted DRG edges cannot disagree.
@@ -4721,6 +5788,38 @@ lowerModule opts modul@(MkModule _ uri _) =
     datedSurvivors = case datedResult of
       Dated arms oth _ -> Just (map (.daBody) arms <> [oth])
       _                -> Nothing
+
+    -- R13 (§16): the verdict lowering's one decision point, computed ONCE and
+    -- shared by 'ordinaryPath' (which emits the table) and 'dcnRequirements'
+    -- (which emits the edges), so the two cannot disagree — R11's own
+    -- discipline. The law-time gate keeps R10's ruling intact: a
+    -- law-time-guarded obligation (`dated-chain-regulative.l4`) stays refused
+    -- rather than quietly acquiring a verdict table under a ruling that never
+    -- looked at it.
+    verdictLowering :: Maybe (GuardedRows, GuardedRows, [Text], [Expr Resolved])
+    verdictLowering = do
+      guard (null sumTypeReasons)
+      rs0 <- guardedRows
+      guard (not (rowsElided body rs0))
+      let (rs, capped) = flattenGuarded rs0
+      guard (not (any guardReadsLawTime (map fst rs.grRows)))
+      (rs', vs) <- verdictRows rs
+      pure (rs, rs', vs, capped)
+
+    guardReadsLawTime g =
+      or
+        [ getUnique r == TC.rulesEffectiveDateUnique
+            || Map.member (getUnique r) lawTimePreds
+        | r@Ref {} <- toList g
+        ]
+
+    -- 'renderFeelIn' renders a saturated call to an un-lifted decision as the
+    -- callee's bare FEEL name, argument discarded (Phase 4, §2.1). The same
+    -- discard is applied here before 'survivingRefs' so the verdict table's
+    -- edges describe the emitted cells, not the source call.
+    pruneUnliftedArgs = transformOf (gplate @(Expr Resolved)) \case
+      App a f (_ : _) | Set.member (getUnique f) unliftedSet -> App a f []
+      e -> e
 
     plainLowering = case peeled of
       Left loss -> literalFallback loss
@@ -4777,11 +5876,37 @@ lowerModule opts modul@(MkModule _ uri _) =
      where
       ordinaryPath rs0
         | rowsElided body rs0 = literalFallback RowsElided
+        -- R13 (§16): the verdict lowering. The rewritten rows go through the
+        -- SAME 'rowsToDmnWith'' as every ordinary table; the overridden ctx
+        -- types the output column `string` and enumerates the verdict domain
+        -- as outputValues (§3.2's mechanism). A refusal it still hits
+        -- (an effectful guard, say) falls back to 'literalFallback' on the
+        -- ORIGINAL body, exactly as if the verdict path did not exist.
+        | Just (_, rs', vs, capped) <- verdictLowering =
+            let tctxV = tctx { tcOutputType = DmnString, tcOutputValues = Just vs }
+            in case rowsToDmnWith' tctxV inlined capped rs' of
+                 Right t   -> (LogicTable t, verdictNotes)
+                 Left loss -> literalFallback loss
         | otherwise =
             let (rs, capped) = flattenGuarded rs0
             in case rowsToDmnWith' tctx inlined capped rs of
                  Right t   -> (LogicTable t, [])
                  Left loss -> literalFallback loss
+
+      -- D-VERDICT (§16), Lossy: real content routed to another artifact
+      -- (D-REGULATIVE's precedent). Its own code per §7's house doctrine.
+      verdictNotes =
+        [ dmnNote "D-VERDICT" Lossy did (bestRange body)
+            ("`" <> decideName d <> "` has a deontic body; it is lowered to a VERDICT \
+             \decision table over its guards, each rule's output a string naming the \
+             \arm. The obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) are the \
+             \BPMN exporter's job (`l4 export --to=bpmn`): WITHIN deadlines are the \
+             \exported deadline decisions, the HENCE loop is the BPMN loop-back edge, \
+             \and a BPMN gateway consumes this verdict to choose the process path")
+            "the obligation as a state: PARTY/WITHIN/HENCE/LEST do not survive into \
+            \this artifact; the verdict names the arm, the BPMN projection carries the \
+            \lifecycle"
+        ]
 
     -- Never drop a decision. DMN's own answer for logic that is not tabular is a
     -- boxed literal expression, and a DRG that quietly omitted such decisions
@@ -4791,21 +5916,54 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- because FEEL has no sum type is @D-SUMTYPE@, everything else is
     -- @D-LITERALEXPR@. One shape, two diagnoses, which is §4.2.1-8's
     -- requirement expressed where it cannot be forgotten.
+    --
+    -- @D-LITERALEXPR@'s SEVERITY is keyed on the RENDERED FRAGMENT (ruled at
+    -- the Phase 5 build, recorded in §7): Blocking's definition is "the target
+    -- cannot express this at all; we emitted a fallback", which is true of a
+    -- raw-L4 literal no engine can compile and FALSE of a boxed literal whose
+    -- body is genuine FEEL — that one EXECUTES, and what it forfeits is the
+    -- decision-table analyses, which is Advisory's definition to the letter.
+    -- Before this, `Reg CF commenced MEANS Date 20 9 2016` — a date constant
+    -- both engines evaluate — was counted in the same Blocking total as a
+    -- deontic body, and the corpus's headline could not distinguish "will not
+    -- execute" from "will not tabulate". @D-SUMTYPE@ keeps its ruled Blocking
+    -- regardless of fragment (§4.2.1: the rendered text may compile and still
+    -- answer differently from L4, which is worse than not compiling).
     literalFallback loss =
       ( LogicLiteral rendered
-      , [ dmnNote (fidelityLossCode loss) Blocking did (bestRange body)
-            ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
-               <> ", so it is emitted as a boxed literal expression rather than a decision table")
-            "every decision-table analysis: gap, overlap, consistency and manual review"
+      , [ if blocking
+            then
+              dmnNote code Blocking did (bestRange body)
+                ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
+                   <> ", so it is emitted as a boxed literal expression rather than a \
+                      \decision table" <> verbatimTail)
+                "every decision-table analysis: gap, overlap, consistency and manual review"
+            else
+              dmnNote code Advisory did (bestRange body)
+                ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
+                   <> ", so it is emitted as a boxed literal expression rather than a \
+                      \decision table; the expression is FEEL, and an engine evaluates it")
+                "the decision-table analyses (gap, overlap, consistency): the literal \
+                \computes, but it is not rules a checker can reach"
         ]
       )
      where
       rendered = renderFeelIn nameEnv constructors (oracleOf tctx) body
+      code     = fidelityLossCode loss
+      blocking = code == "D-SUMTYPE" || rendered.feFragment == L4Verbatim
+      verbatimTail
+        | rendered.feFragment == L4Verbatim =
+            ". Its body could not be rendered as FEEL, so the emitted text is raw L4 \
+            \that NO engine can evaluate"
+        | otherwise = ""
 
     decision = MkDecision
       { dcnId           = did
       , dcnName         = decideName d
       , dcnFeelName     = feelName
+      -- filled by 'finishCaller' (or consumed by 'toBkm'), from the edge set
+      -- computed below.
+      , dcnKnowledgeReqs = []
       , dcnType         = case logic of
           LogicTable t    -> t.dtOutput.ocType
           LogicLiteral _  -> declaredType
@@ -4832,14 +5990,34 @@ lowerModule opts modul@(MkModule _ uri _) =
             in sort . nubOrd $
                  RequiredInput lawId
                    : mapMaybe (classifyRef did) survivors <> hydratorEdges touched
-          _ ->
-            let (survivors, touched) = survivingRefs [view decideBody d]
-                -- 'freeRefs' bounds the survivors to what this decide does not
-                -- itself bind, exactly as before; the fold only removes.
-                free = Set.fromList (map getUnique (freeRefs d))
-                kept = [r | r <- survivors, Set.member (getUnique r) free]
-            in sort . nubOrd $
-                 mapMaybe (classifyRef did) kept <> hydratorEdges touched
+          _ -> case verdictLowering of
+            -- R13 × R11: a verdict table's requirements are computed from what
+            -- SURVIVES into the artifact — the GUARDS, and nothing else. The
+            -- deontic arm bodies are rewritten to string literals, so their
+            -- references (the WITHIN deadline decisions, the HENCE self-call)
+            -- must not become edges the expression contradicts; in particular
+            -- the self-edge never enters the IR, which is what makes the
+            -- corpus D-CYCLE disappear by construction rather than by
+            -- suppression (§6.4.4-4a's XML-time eraser is untouched and still
+            -- guarded by cycle-p3-self). A saturated call to an UN-LIFTED
+            -- decision renders as the callee's bare FEEL name with the
+            -- argument discarded, so the discarded argument's refs are pruned
+            -- for the same R11 reason: the emitted cell does not mention them.
+            Just (rs, _, _, _) ->
+              let (survivors, touched) =
+                    survivingRefs (map pruneUnliftedArgs (map fst rs.grRows))
+                  free = Set.fromList (map getUnique (freeRefs d))
+                  kept = [r | r <- survivors, Set.member (getUnique r) free]
+              in sort . nubOrd $
+                   mapMaybe (classifyRef did) kept <> hydratorEdges touched
+            Nothing ->
+              let (survivors, touched) = survivingRefs [view decideBody d]
+                  -- 'freeRefs' bounds the survivors to what this decide does not
+                  -- itself bind, exactly as before; the fold only removes.
+                  free = Set.fromList (map getUnique (freeRefs d))
+                  kept = [r | r <- survivors, Set.member (getUnique r) free]
+              in sort . nubOrd $
+                   mapMaybe (classifyRef did) kept <> hydratorEdges touched
       }
      where
       hydratorEdges touched =
@@ -4848,20 +6026,25 @@ lowerModule opts modul@(MkModule _ uri _) =
         , Just hid <- [Map.lookup u hydratorIdByInstance]
         ]
 
-  -- DMN 7.3.1: a Decision SHALL not require itself, "directly or indirectly".
+  -- DMN 1.3 §6.3.7: a Decision SHALL not require itself, "directly or
+  -- indirectly". Both cases are DETECTED, not suppressed (§6.4.4-2):
   --
-  -- The direct case is already handled upstream -- 'freeRefs' treats a
-  -- decision's own name as bound -- and the guard below is belt-and-braces
-  -- behind that.
-  --
-  -- The INDIRECT case is not detected, and deliberately so: a cycle among top-
-  -- level DECIDEs would need a forward reference, which L4's one-pass scope
-  -- checker does not currently admit, so no L4 module can produce one. If
-  -- forward references land, this becomes a real gap and wants a cycle check
-  -- with its own fidelity note.
-  classifyRef did r = case Map.lookup u decideByUnique of
-    Just target | target /= did -> Just (RequiredDecision target)
-                | otherwise     -> Nothing
+  --   * the direct case used to be erased here (a `target /= did` arm) and in
+  --     'freeRefs' (which bound the decide's own name), so a self-requiring
+  --     decision exported with advisory-only fidelity, KIE compiled it, and
+  --     `x=false` answered a silent null [SUCCEEDED]. The filter was what
+  --     converted a violation three engines catch loudly into a silent one.
+  --     Deleted; a self-edge now reaches 'dcnRequirements' and 'checkDrg'
+  --     reports it as a one-member SCC (`D-CYCLE`).
+  --   * the indirect case exists — L4 DOES admit forward references among
+  --     top-level DECIDEs (the three-phase pipeline scans declarations before
+  --     inferring bodies; an earlier version of this comment asserted the
+  --     opposite, reasoned from a stale TypeCheck.hs header) — and is the same
+  --     SCC check's ≥ 2 arm.
+  -- The first parameter (the owner's id) is retained so every call site reads
+  -- unchanged; nothing branches on it any more.
+  classifyRef _did r = case Map.lookup u decideByUnique of
+    Just target -> Just (RequiredDecision target)
     Nothing -> RequiredInput <$> Map.lookup u inputByUnique
    where
     u = getUnique r
@@ -4952,11 +6135,18 @@ decideName = nameOf . decideResolved
 -- term); constructors and names from other modules are dropped by the caller,
 -- which is what keeps every prelude function and builtin out of the DRG.
 freeRefs :: Decide Resolved -> [Resolved]
-freeRefs d@(MkDecide _ _ _ body) =
+freeRefs (MkDecide _ _ _ body) =
   [r | r <- refs, not (Set.member (getUnique r) bound)]
  where
   allResolved = toList body
-  bound = Set.fromList ([u | Def u _ <- allResolved] <> [getUnique (decideResolved d)])
+  -- The decide's OWN name is deliberately NOT in `bound` (§6.4.4-2): treating a
+  -- self-reference as bound erased the self-edge before any graph could see it,
+  -- which is how a decision that requires itself — the case DMN 1.3 §6.3.7
+  -- names first — exported with advisory-only fidelity. Downstream consumers
+  -- are unaffected: 'decideFreeTerms' filters `decideByUnique` membership, so
+  -- the own name cannot mint an inputData; what it now CAN do is reach
+  -- 'classifyRef' and appear in 'dcnRequirements' as the self-edge it is.
+  bound = Set.fromList [u | Def u _ <- allResolved]
   projFields = Set.fromList
     [getUnique n | Proj _ _ n <- toListOf (cosmosOf (gplate @(Expr Resolved))) body]
   refs = nubOrdOn getUnique
@@ -4999,6 +6189,79 @@ isRegulative = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
   Event {}      -> True
   Breach {}     -> True
   _             -> False
+
+------------------------------------------------------------------------
+-- The deontic verdict lowering (R13, §16)
+------------------------------------------------------------------------
+
+-- | R13 (§16): a flattened guarded chain whose EVERY row body (and OTHERWISE)
+-- is a single deontic arm — one 'Regulative' node, or @FULFILLED@ — with at
+-- least one genuine 'Regulative' among them, lowers to a VERDICT decision
+-- table: each body is rewritten to a string literal naming the arm, and the
+-- table's guards carry the whole decision. The obligation semantics
+-- (PARTY\/MUST\/WITHIN\/HENCE\/LEST) are the BPMN exporter's job; a BPMN
+-- gateway consumes the verdict to choose the process path.
+--
+-- v1 scope, deliberately narrow: a MIXED chain (an arm that is @RAND@\/@ROR@
+-- of obligations, or any non-arm deontic shape) answers 'Nothing' here and
+-- keeps today's 'RegulativeBody' refusal; a BARE deontic body never reaches
+-- this function ('normaliseGuarded' answers 'Nothing') and keeps
+-- 'NotAGuardedChain'. The caller additionally gates law-time-guarded chains
+-- off this path (R10's fixture `dated-chain-regulative.l4` pins that
+-- refusal), so this function never needs to know about law time.
+--
+-- Returns the rewritten rows and the verdict domain (first-mention order,
+-- deduplicated) for the output column's @outputValues@.
+verdictRows :: GuardedRows -> Maybe (GuardedRows, [Text])
+verdictRows rs = do
+  guard (not (null rs.grRows))
+  let bodies = map snd rs.grRows <> maybeToList rs.grOtherwise
+  guard (any (\case Regulative {} -> True; _ -> False) bodies)
+  vs <- traverse verdictOf bodies
+  let (rowVs, othVs) = splitAt (length rs.grRows) vs
+      lit b v = Lit (getAnno b) (StringLit emptyAnno v)
+  pure
+    ( rs
+        { grRows = zipWith (\(g, b) v -> (g, lit b v)) rs.grRows rowVs
+        , grOtherwise = case (rs.grOtherwise, othVs) of
+            (Just b, [v]) -> Just (lit b v)
+            _             -> Nothing
+        }
+    , nubOrd vs
+    )
+
+-- | The verdict a deontic arm resolves to, or 'Nothing' when the arm is not a
+-- shape v1 summarises. Deterministic and total on the matched shapes:
+--
+--   * @MUST act@              → the action's declared name, verbatim
+--   * @… HENCE k@             → suffix @" and continue"@
+--   * @MAY act@               → prefix @"may "@
+--   * @SHANT act@ (@MUST NOT@) → prefix @"must not "@
+--   * @DO act@                → the action name (the modal adds no direction)
+--   * @FULFILLED@             → @"fulfilled"@
+--
+-- @WITHIN@, @LEST@ and @PROVIDED@ are deliberately absent from the string:
+-- deadlines are the already-exported deadline decisions, and the reparation
+-- path is process structure — both BPMN's, per the D-VERDICT note. Exact
+-- strings are pinned by goldens, not sacred.
+verdictOf :: Expr Resolved -> Maybe Text
+verdictOf = \case
+  Regulative _ d -> do
+    nm <- actionName d.action.action
+    let modal = case d.action.modal of
+          DMust    -> ""
+          DDo      -> ""
+          DMay     -> "may "
+          DMustNot -> "must not "
+        henceTail = maybe "" (const " and continue") d.hence
+    pure (modal <> nm <> henceTail)
+  App _ r [] | getUnique r == TC.fulfilUnique -> Just "fulfilled"
+  _ -> Nothing
+ where
+  actionName = \case
+    PatApp _ n _ -> Just (nameOf n)
+    PatVar _ n   -> Just (nameOf n)
+    _            -> Nothing
 
 ------------------------------------------------------------------------
 -- Small helpers

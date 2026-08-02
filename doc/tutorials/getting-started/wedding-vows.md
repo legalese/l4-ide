@@ -182,12 +182,15 @@ GIVETH DEONTIC Person Action
 
 ### MUST vs SHANT
 
+L4 has three deontic modalities:
+
 | Keyword | Meaning           | Example                 |
 | ------- | ----------------- | ----------------------- |
 | `MUST`  | Required action   | Must love and cherish   |
 | `MAY`   | Permitted action  | May have pets           |
 | `SHANT` | Prohibited action | Shall not be unfaithful |
-| `DO`    | Possible action   | enters the premise      |
+
+Do not confuse these with `DOES` (and its form `DO`) — that is **event** syntax, not a fourth modality. It records that a party actually performed an action, as in the `#TRACE` scenarios later in this tutorial (``PARTY Spouse1 DOES `exchange vows` AT 0``).
 
 ---
 
@@ -342,6 +345,6 @@ The same patterns apply to:
 
 ## Next Steps
 
-- [Foundation Course Module 5](../../courses/foundation/module-5-regulative.md) - Deep dive on regulative rules
-- [Common Patterns](common-patterns.md) - More L4 patterns
+- [Foundation Course Module 5](../../courses/foundation/module-6-regulative.md) - Deep dive on regulative rules
+- [Common Patterns](../../reference/patterns/common-patterns.md) - More L4 patterns
 - [Encoding Legislation](encoding-legislation.md) - Turn legal text into L4

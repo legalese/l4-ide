@@ -2,6 +2,7 @@
 -- All examples are validated and use natural language identifiers
 
 IMPORT prelude
+IMPORT daydate
 
 -- =======================================
 -- SECTION 1: Basic Eligibility Decisions
@@ -245,7 +246,50 @@ DECIDE `qualifies for lease renewal` IF
             `current rent` >= `market rent` * 0.9
 
 -- =======================================
--- SECTION 7: Test Data
+-- SECTION 7: Optional Values and Dates
+-- =======================================
+
+-- A contract with an optional termination date
+DECLARE Contract HAS
+    `the effective date` IS A DATE
+    `the termination date` IS A MAYBE DATE
+    `the notice period in days` IS A NUMBER
+
+-- A party who may or may not have given notice
+DECLARE `Contract Party` HAS
+    `the party's name` IS A STRING
+    `notice was given on` IS A MAYBE DATE
+
+-- Days between two dates, using serial day numbers
+GIVEN `the first date` IS A DATE
+      `the second date` IS A DATE
+GIVETH A NUMBER
+`the days between` MEANS
+    DATE_SERIAL `the second date` - DATE_SERIAL `the first date`
+
+-- Contract clause interpretation with MAYBE and dates
+GIVEN `the contract` IS A Contract
+      `the party` IS A `Contract Party`
+      `today` IS A DATE
+GIVETH A BOOLEAN
+DECIDE `the party may terminate` IF
+    `the contract is active`
+    AND `the party has given sufficient notice`
+    WHERE
+        `the contract is active` MEANS
+            `today` >= `the contract`'s `the effective date`
+            AND CONSIDER `the contract`'s `the termination date`
+                WHEN NOTHING THEN TRUE
+                WHEN JUST `the end date` THEN `today` < `the end date`
+
+        `the party has given sufficient notice` MEANS
+            CONSIDER `the party`'s `notice was given on`
+            WHEN NOTHING THEN FALSE
+            WHEN JUST `the notice date` THEN
+                `the days between` `the notice date` `today` >= `the contract`'s `the notice period in days`
+
+-- =======================================
+-- SECTION 8: Test Data
 -- =======================================
 
 `test person eligible` MEANS
@@ -263,8 +307,12 @@ DECIDE `qualifies for lease renewal` IF
 `test person disqualified` MEANS
     Person "Eve" 30 "citizen" 20000 TRUE
 
+`the open-ended contract` MEANS Contract (Date 1 1 2024) NOTHING 30
+`the party with notice` MEANS `Contract Party` "Acme Ltd" (JUST (Date 1 3 2024))
+`the party without notice` MEANS `Contract Party` "Beta Ltd" NOTHING
+
 -- =======================================
--- SECTION 8: Tests
+-- SECTION 9: Tests
 -- =======================================
 
 -- Basic eligibility tests
@@ -299,3 +347,8 @@ DECIDE `qualifies for lease renewal` IF
 #EVAL `the late payment penalty` 1000 45
 #EVAL `qualifies for lease renewal` 2 0 1800 2000
 #EVAL `qualifies for lease renewal` 2 3 1800 2000
+
+-- Optional values and dates tests
+#EVAL `the days between` (Date 1 3 2024) (Date 15 4 2024)
+#EVAL `the party may terminate` `the open-ended contract` `the party with notice` (Date 15 4 2024)
+#EVAL `the party may terminate` `the open-ended contract` `the party without notice` (Date 15 4 2024)

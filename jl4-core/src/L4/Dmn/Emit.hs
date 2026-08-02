@@ -222,18 +222,85 @@ nodeXml = \case
   NodeDecision d ->
     Elem "decision" (namedAttrs d.dcnId d.dcnFeelName d.dcnName) $
       -- tDecision is an xsd:sequence: variable, then informationRequirement*,
-      -- then the expression.
+      -- then knowledgeRequirement*, then the expression. Getting the KR after
+      -- the IRs and before the expression is a Xerces-checked sequence
+      -- constraint of the same class the dmn-xsd-order fixture pins.
       [ Elem "variable"
           (namedAttrs (d.dcnId <> "_var") d.dcnFeelName d.dcnName
              <> [("typeRef", dmnTypeAttr d.dcnType)])
           []
       ]
-        <> zipWith (requirementXml d.dcnId) [1 :: Int ..] d.dcnRequirements
-        <> [ case d.dcnLogic of
-               LogicTable t    -> decisionTableXml t
-               LogicLiteral e  -> literalXml (d.dcnId <> "_literal") e
-               LogicContext es -> contextXml (d.dcnId <> "_ctx") es
-           ]
+      -- 'emittedRequirements' / 'emittedKnowledgeReqs', not the raw fields: a
+      -- self-edge stays in the IR (so 'checkDrg' reports it) and stays out of
+      -- the XML (DMN §7.3.1 forbids it, and an unloadable file is not an
+      -- exhibit). See "L4.Dmn.IR"'s $selfedges. The _irN / _krN counters run
+      -- over the FILTERED lists, and 'edgesXml' / 'krEdgesXml' below filter the
+      -- same way, so the ids a DMNEdge points at stay contiguous and matched.
+        <> zipWith (requirementXml d.dcnId) [1 :: Int ..] (emittedRequirements d)
+        <> zipWith (knowledgeRequirementXml d.dcnId) [1 :: Int ..]
+             (emittedKnowledgeReqs d.dcnId d.dcnKnowledgeReqs)
+        <> [logicXml d.dcnId d.dcnLogic]
+  NodeBkm b -> bkmXml b
+  -- tDecisionService (DMN13.xsd:516-519): variable?, outputDecision*,
+  -- encapsulatedDecision*, inputDecision*, inputData* — the XSD child order.
+  -- The SEMANTIC parameter order is the REVERSE (inputData first, then
+  -- inputDecisions, §10.4), which matters only at invocation sites — and
+  -- those emit NAMED parameters (§2.3.1), so the order never binds anything.
+  NodeService s ->
+    Elem "decisionService" (namedAttrs s.dsvId s.dsvFeelName s.dsvName) $
+      [ Elem "variable"
+          (namedAttrs (s.dsvId <> "_var") s.dsvFeelName s.dsvName
+             <> [("typeRef", dmnTypeAttr s.dsvType)])
+          []
+      ]
+        <> [Elem "outputDecision"       [("href", "#" <> t)] [] | t <- s.dsvOutputs]
+        <> [Elem "encapsulatedDecision" [("href", "#" <> t)] [] | t <- s.dsvEncapsulated]
+        <> [Elem "inputDecision"        [("href", "#" <> t)] [] | t <- s.dsvInputDecisions]
+        <> [Elem "inputData"            [("href", "#" <> t)] [] | t <- s.dsvInputData]
+
+-- | The one boxed-expression child every logic carrier shares. The id scheme is
+-- the decision one, unchanged, so pre-BKM goldens keep their bytes.
+logicXml :: Text -> DecisionLogic -> Xml
+logicXml prefix = \case
+  LogicTable t    -> decisionTableXml t
+  LogicLiteral e  -> literalXml (prefix <> "_literal") e
+  LogicContext es -> contextXml (prefix <> "_ctx") es
+
+-- | A @\<businessKnowledgeModel\>@ (§6.2).
+--
+-- Child order (@tBusinessKnowledgeModel@, xsd:sequence, inherited first):
+-- @description?@, @extensionElements?@, @variable?@, @encapsulatedLogic?@,
+-- @knowledgeRequirement*@, @authorityRequirement*@. __@formalParameter@ is NOT
+-- a BKM child__ — it belongs inside @encapsulatedLogic@
+-- (@tFunctionDefinition@: @formalParameter*@ then the expression). The
+-- @\@name@ == @variable\/\@name@ invariant is carried by construction from
+-- 'Bkm' ('bkmFeelName' feeds both), because probe C4 measured that Camunda
+-- never checks it (§13.8-5b).
+bkmXml :: Bkm -> Xml
+bkmXml b =
+  Elem "businessKnowledgeModel" (namedAttrs b.bkmId b.bkmFeelName b.bkmName) $
+    [ Elem "variable"
+        (namedAttrs (b.bkmId <> "_var") b.bkmFeelName b.bkmName
+           <> [("typeRef", dmnTypeAttr b.bkmType)])
+        []
+    , Elem "encapsulatedLogic" [("id", b.bkmId <> "_logic")] $
+        [ Elem "formalParameter"
+            (namedAttrs p.fpId p.fpName p.fpLabel <> [("typeRef", dmnTypeAttr p.fpType)])
+            []
+        | p <- b.bkmParams
+        ]
+          -- The single <output> of a table in here carries no typeRef;
+          -- 'outputXml' already omits it (probe A3 measured KIE
+          -- WARN [ILLEGAL_USE_OF_TYPEREF] on one that does).
+          <> [logicXml b.bkmId b.bkmLogic]
+    ]
+      <> zipWith (knowledgeRequirementXml b.bkmId) [1 :: Int ..]
+           (emittedKnowledgeReqs b.bkmId b.bkmKnowledgeReqs)
+
+knowledgeRequirementXml :: Text -> Int -> KnowledgeRequirement -> Xml
+knowledgeRequirementXml owner i kr =
+  Elem "knowledgeRequirement" [("id", owner <> "_kr" <> Text.pack (show i))]
+    [Elem "requiredKnowledge" [("href", "#" <> knowledgeRequirementTarget kr)] []]
 
 -- | A boxed @\<context\>@ (DMN §7.3.6, @tContext@).
 --
@@ -387,10 +454,87 @@ dmndiXml drg =
   Elem "dmndi:DMNDI" []
     [ Elem "dmndi:DMNDiagram"
         [("id", drg.drgId <> "_diagram"), ("name", drg.drgName)]
-        (map shapeXml placed <> concatMap edgesXml (drgDecisions drg))
+        (map shapeXml placed
+           <> map serviceShapeXml (drgServices drg)
+           <> concatMap edgesXml (drgDecisions drg)
+           <> concatMap krEdgesXml krOwners)
     ]
  where
-  levels = decisionLevels drg
+  -- A decisionService is drawn as the bounding box of its member decisions,
+  -- with a margin — the conventional "expanded service" rectangle. It exists
+  -- for the same measured reason the BKM shapes do: KIE's validator raises
+  -- WARN [DMNDI_MISSING_DIAGRAM] for any element with no DMNDiagramElement,
+  -- and the engine legs pin warning counts at zero. A service with no placed
+  -- member (all members filtered) cannot be emitted at all, so the fallback
+  -- box is unreachable in practice and exists to keep this total.
+  serviceBoxes :: Map Text (Int, Int, Int, Int)
+  serviceBoxes = Map.fromList
+    [ (s.dsvId, box)
+    | s <- drgServices drg
+    , let memberPos =
+            [ (x, y)
+            | m <- s.dsvOutputs <> s.dsvEncapsulated
+            , Just (x, y) <- [Map.lookup m positions]
+            ]
+    , let margin = 20
+    , let box = case memberPos of
+            [] -> (0, 0, shapeWidth, shapeHeight)
+            _  ->
+              let xs = map fst memberPos
+                  ys = map snd memberPos
+                  x0 = minimum xs - margin
+                  y0 = minimum ys - margin
+              in ( x0
+                 , y0
+                 , maximum xs + shapeWidth + margin - x0
+                 , maximum ys + shapeHeight + margin - y0
+                 )
+    ]
+
+  serviceShapeXml s =
+    let (bx, by, bw, bh) =
+          Map.findWithDefault (0, 0, shapeWidth, shapeHeight) s.dsvId serviceBoxes
+    in Elem "dmndi:DMNShape" [("id", s.dsvId <> "_shape"), ("dmnElementRef", s.dsvId)]
+         [ Elem "dc:Bounds"
+             [ ("x", tshowInt bx)
+             , ("y", tshowInt by)
+             , ("width", tshowInt bw)
+             , ("height", tshowInt bh)
+             ]
+             []
+         ]
+
+  -- knowledgeRequirement edges get DMNEdges too — measured, not decorative:
+  -- KIE raises WARN [DMNDI_MISSING_DIAGRAM] "Missing DMNEdge for '<owner>_kr1'"
+  -- for each undrawn one, and the engine legs pin warning counts at zero. The
+  -- id scheme mirrors 'knowledgeRequirementXml'.
+  krOwners :: [(Text, [KnowledgeRequirement])]
+  krOwners =
+    [(d.dcnId, emittedKnowledgeReqs d.dcnId d.dcnKnowledgeReqs) | d <- drgDecisions drg]
+      <> [(b.bkmId, emittedKnowledgeReqs b.bkmId b.bkmKnowledgeReqs) | b <- drgBkms drg]
+
+  krEdgesXml (owner, krs) =
+    [ Elem "dmndi:DMNEdge"
+        [ ("id", owner <> "_kr" <> tshowInt i <> "_edge")
+        , ("dmnElementRef", owner <> "_kr" <> tshowInt i)
+        ]
+        [ waypoint (sx + sw `div` 2) (sy + sh)
+        , waypoint (tx + shapeWidth `div` 2) ty
+        ]
+    | (i, kr) <- zip [1 :: Int ..] krs
+    , let target = knowledgeRequirementTarget kr
+    , Just (sx, sy, sw, sh) <-
+        [ case Map.lookup target positions of
+            Just (x, y) -> Just (x, y, shapeWidth, shapeHeight)
+            Nothing     -> Map.lookup target serviceBoxes
+        ]
+    , Just (tx, ty) <- [Map.lookup owner positions]
+    ]
+  decLevels = decisionLevels drg
+  bkmLevel  = 1 + maximum (0 : Map.elems decLevels)
+  levels =
+    Map.union decLevels
+      (Map.fromList [(b.bkmId, bkmLevel) | NodeBkm b <- drg.drgNodes])
   levelOf eid = Map.findWithDefault 0 eid levels
   maxLevel = maximum (0 : Map.elems levels)
 
@@ -398,10 +542,25 @@ dmndiXml drg =
   byLevel :: Map Int [Text]
   byLevel = Map.fromListWith (flip (<>)) [(levelOf eid, [eid]) | eid <- nodeIds]
 
-  nodeIds = map nodeId drg.drgNodes
+  -- BKM nodes are drawn on their own row ABOVE every decision (ruled at the
+  -- Phase 5 build, measured rather than aesthetic: KIE's validator raises
+  -- WARN [DMNDI_MISSING_DIAGRAM] for any element without a DMNShape, and the
+  -- gst-rate engine leg pins its warning count at zero). They sit outside
+  -- 'decisionLevels'' longest-path-to-an-input frame — a BKM has no
+  -- information requirements — so the top row is a placement, not a claim
+  -- about dataflow. The knowledgeRequirement edges ARE drawn — see
+  -- 'krEdgesXml' above, and its measurement (KIE warns
+  -- [DMNDI_MISSING_DIAGRAM] for each undrawn one); an earlier version of
+  -- this comment asserted the opposite, from before those edges landed.
+  nodeIds =
+    mapMaybe nodeId drg.drgNodes
+      <> [b.bkmId | NodeBkm b <- drg.drgNodes]
   nodeId = \case
-    NodeInputData i -> i.idId
-    NodeDecision d  -> d.dcnId
+    NodeInputData i -> Just i.idId
+    NodeDecision d  -> Just d.dcnId
+    NodeBkm _       -> Nothing
+    -- services are drawn as member bounding boxes, not grid cells
+    NodeService _   -> Nothing
 
   placed =
     [ (eid, x, y)
@@ -432,7 +591,7 @@ dmndiXml drg =
         [ waypoint (sx + shapeWidth `div` 2) sy
         , waypoint (tx + shapeWidth `div` 2) (ty + shapeHeight)
         ]
-    | (i, req) <- zip [1 :: Int ..] d.dcnRequirements
+    | (i, req) <- zip [1 :: Int ..] (emittedRequirements d)
     , Just (sx, sy) <- [Map.lookup (requirementTarget req) positions]
     , Just (tx, ty) <- [Map.lookup d.dcnId positions]
     ]
@@ -440,8 +599,13 @@ dmndiXml drg =
   waypoint x y = Elem "di:waypoint" [("x", tshowInt x), ("y", tshowInt y)] []
 
 -- | Longest path to an input, so an edge always points from a lower row to a
--- higher one. The fold is bounded by the number of decisions, which terminates
--- even if a cycle sneaks past the self-reference filter in "L4.Dmn.Lower".
+-- higher one. The fold is bounded by the number of decisions, so it terminates
+-- on a cyclic requirement graph — which CAN occur, deliberately: §6.4.4-4 emits
+-- a MULTI-node source-level cycle as it is (with a Blocking @D-CYCLE@ note from
+-- 'L4.Dmn.IR.checkDrg') rather than repairing it into a different model. The
+-- one-node case is the exception ruled 2026-08-02: it is erased from the XML by
+-- 'L4.Dmn.IR.emittedRequirements' but __not__ from the 'Drg', which is what this
+-- fold reads — so the self-guard in 'bump' is load-bearing, not vestigial.
 decisionLevels :: Drg -> Map Text Int
 decisionLevels drg = go (Map.fromList [(i.idId, 0) | i <- drgInputData drg]) (length ds)
  where
@@ -450,7 +614,18 @@ decisionLevels drg = go (Map.fromList [(i.idId, 0) | i <- drgInputData drg]) (le
   go acc n = let acc' = step acc in if acc' == acc then acc else go acc' (n - 1 :: Int)
   step acc = foldl' bump acc ds
   bump acc d =
-    let deps = [Map.findWithDefault 0 (requirementTarget r) acc | r <- d.dcnRequirements]
+    -- A SELF-edge is excluded from the layout only, not from the model: with it
+    -- included, `1 + max(deps)` re-raises the node's own level on every
+    -- relaxation pass until the fuel runs out, which stretched a 96-decision
+    -- corpus diagram to y ≈ 15000 for one self-recursive decision. The edge
+    -- stays in the IR (§6.4.4-2, where 'checkDrg' reads it); it leaves at
+    -- emission (§6.4.4-4a) and the diagram never let it define "one row above
+    -- itself" even while it was still being written out.
+    let deps = [ Map.findWithDefault 0 t acc
+               | r <- d.dcnRequirements
+               , let t = requirementTarget r
+               , t /= d.dcnId
+               ]
     in Map.insert d.dcnId (1 + maximum (0 : deps)) acc
 
 tshowInt :: Int -> Text

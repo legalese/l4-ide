@@ -1,0 +1,31 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-LITERALEXPR] advisory — decision_base_charge  (main.l4:33:21-23)
+      `base charge` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] blocking — decision_special_case  (main.l4:36:22-61)
+      `special case` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_assessment_floor  (main.l4:41:26-29)
+      `assessment floor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-PARTIAL] blocking — decision_special_case
+      `special case` could not be certified total (TOTAL: calls `special rate`, which could not itself be certified total), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. No call site consumes it (it is a DRG root), so no guard can fence the null
+      lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error
+  [D-PARTIAL] blocking — decision_special_rate  (main.l4:48:1-53:31)
+      `special rate` could not be certified total (L2 at main.l4:48:1-53:31: the definition is decorated @nonexhaustive: its author declares the match incomplete), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. At least one call site consumes it from a strict position, so no guard fences the null
+      lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error
+  [D-FLAVOR-NOSERVICE] blocking — decision_special_case
+      `special case` applies `special rate`, which is §-invocable — on the `kie` flavor this call renders as a FEEL invocation of the decisionService `special_assessment` — but the `camunda` flavor never emits the knowledgeRequirement→decisionService edge that invocation needs (it is fatal to Camunda 8's parse(), §13.4), so the call site stays raw L4
+      lost: the invocation on this flavor: route the callee to a BKM (make it DMN-SAFE) or evaluate on the kie flavor
+  [D-FLAVOR-NOSERVICE] advisory — service_service_exhibit
+      the decisionService `Service_exhibit` (§ `Service exhibit`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
+  [D-UNDECOMPOSABLE] advisory — decision_special_rate  (main.l4:52:15-48)
+      the guard `p GREATER THAN `assessment floor`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
+      lost: interval gap and overlap analysis over this condition
+  [D-COMPUTEDOUTPUT] advisory — decision_special_rate  (main.l4:52:54-62)
+      the output entry `p + q` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
+  [D-COMPUTEDOUTPUT] advisory — decision_special_rate  (main.l4:53:22-31)
+      the output entry `p - q` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

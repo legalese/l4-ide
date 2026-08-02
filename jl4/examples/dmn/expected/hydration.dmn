@@ -217,6 +217,25 @@
       </contextEntry>
     </context>
   </decision>
+  <decisionService id="service_hydration" name="Hydration">
+    <variable id="service_hydration_var" name="Hydration" typeRef="Any"/>
+    <outputDecision href="#decision_applicant_score"/>
+    <outputDecision href="#decision_applicant_band_width"/>
+    <outputDecision href="#decision_leading_total"/>
+    <outputDecision href="#decision_capped_bonus"/>
+    <outputDecision href="#decision_bonus_is_settled"/>
+    <outputDecision href="#decision_bonus_is_unsettled"/>
+    <outputDecision href="#decision_bonus_or_zero"/>
+    <encapsulatedDecision href="#decision_the_leading_applicant"/>
+    <encapsulatedDecision href="#hydration_applicant"/>
+    <encapsulatedDecision href="#hydration_the_leading_applicant"/>
+    <inputData href="#input_the_submission"/>
+    <inputData href="#input_n"/>
+    <inputData href="#input_b"/>
+    <inputData href="#input_c"/>
+    <inputData href="#input_m"/>
+    <inputData href="#input_applicant"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_hydration_diagram" name="Hydration">
       <dmndi:DMNShape id="input_applicant_shape" dmnElementRef="input_applicant">
@@ -266,6 +285,9 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_leading_total_shape" dmnElementRef="decision_leading_total">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_hydration_shape" dmnElementRef="service_hydration">
+        <dc:Bounds x="40" y="40" width="1320" height="440"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_applicant_score_ir1_edge" dmnElementRef="decision_applicant_score_ir1">
         <di:waypoint x="1250" y="380"/>

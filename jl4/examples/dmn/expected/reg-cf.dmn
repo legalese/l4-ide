@@ -212,6 +212,19 @@
       </rule>
     </decisionTable>
   </decision>
+  <decisionService id="service_regulation_crowdfunding" name="Regulation_Crowdfunding" label="Regulation Crowdfunding">
+    <variable id="service_regulation_crowdfunding_var" name="Regulation_Crowdfunding" label="Regulation Crowdfunding" typeRef="Any"/>
+    <outputDecision href="#decision_combined_resources"/>
+    <outputDecision href="#decision_financial_statements_required"/>
+    <outputDecision href="#decision_investor_limit"/>
+    <encapsulatedDecision href="#decision_is_accredited_investor"/>
+    <encapsulatedDecision href="#decision_annual_limit_basis"/>
+    <inputData href="#input_class"/>
+    <inputData href="#input_annual_income"/>
+    <inputData href="#input_net_worth"/>
+    <inputData href="#input_first_time_issuer"/>
+    <inputData href="#input_offering_amount"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_regulation_crowdfunding_diagram" name="Regulation Crowdfunding">
       <dmndi:DMNShape id="input_class_shape" dmnElementRef="input_class">
@@ -243,6 +256,9 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_investor_limit_shape" dmnElementRef="decision_investor_limit">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_regulation_crowdfunding_shape" dmnElementRef="service_regulation_crowdfunding">
+        <dc:Bounds x="40" y="40" width="880" height="280"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_is_accredited_investor_ir1_edge" dmnElementRef="decision_is_accredited_investor_ir1">
         <di:waypoint x="150" y="380"/>

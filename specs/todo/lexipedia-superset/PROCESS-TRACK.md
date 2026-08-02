@@ -241,9 +241,20 @@ into engine dialect — refused above.
 ### 8.3 The DMN wiring — mandated 2026-08-01, design sketched here, NOT BUILT
 
 **Status: mandated 2026-08-01; what follows is a design sketch, not a description of the
-tree. Nothing below is built.** Build is gated on DMN Phase 5 BKM emission landing (branch
-`mengwong/dmn-phase5-bkm`, in flight): a `businessRuleTask` needs a decision to call before
-wiring one is meaningful.
+tree. Nothing below is built.** Build was gated on DMN Phase 5 BKM emission, which has
+**LANDED** (PR legalese#188, merged to `unstable` 2026-08-01, commit `973bdf93` — the branch
+`mengwong/dmn-phase5-bkm` is no longer in flight): a `businessRuleTask` needs a decision to
+call before wiring one is meaningful, and the decisions now exist.
+
+**DMN-side prerequisite DISCHARGED 2026-08-02 (R13, `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §16):**
+the stable verdict decision now exists. `ongoing reporting obligation` emits as a real decision
+table (`decision_ongoing_reporting_obligation`, `typeRef="string"`, enumerated `outputValues` =
+the three arm verdicts), designed as the interface this wiring consumes: a gateway's outgoing
+flows compare against the enumerated verdict strings. The wiring itself remains **NOT BUILT** — a
+named follow-up ("BPMN businessRuleTask wiring", scoped out of the R12/R13 PR deliberately, see
+DMN spec §16.5) — and everything below this line is still a sketch, including the anonymous-guard
+question (`annual cycles AT MOST 0` now HAS a DMN home: it is a column of the verdict table, not a
+decision of its own, which sharpens rather than answers the open probe).
 
 The sketch:
 

@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_gst_rate" name="GST rate" namespace="https://legalese.com/l4/dmn/gst_rate" exporter="jl4">
-  <inputData id="input_change" name="change">
-    <variable id="input_change_var" name="change" typeRef="date"/>
-  </inputData>
   <inputData id="input_no_gst_rate_exists_before_commencement_on_1994_04_01" name="no_GST_rate_exists_before_commencement_on_1994_04_01" label="no GST rate exists before commencement on 1994-04-01">
     <variable id="input_no_gst_rate_exists_before_commencement_on_1994_04_01_var" name="no_GST_rate_exists_before_commencement_on_1994_04_01" label="no GST rate exists before commencement on 1994-04-01" typeRef="number"/>
   </inputData>
@@ -28,18 +25,6 @@
     <variable id="decision_gst_commenced_var" name="GST_commenced" label="GST commenced" typeRef="date"/>
     <literalExpression id="decision_gst_commenced_literal">
       <text>date("1994-04-01")</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_the_rules_in_force_include" name="the_rules_in_force_include" label="the rules in force include">
-    <variable id="decision_the_rules_in_force_include_var" name="the_rules_in_force_include" label="the rules in force include" typeRef="boolean"/>
-    <informationRequirement id="decision_the_rules_in_force_include_ir1">
-      <requiredInput href="#input_change"/>
-    </informationRequirement>
-    <informationRequirement id="decision_the_rules_in_force_include_ir2">
-      <requiredInput href="#input_rules_effective_date"/>
-    </informationRequirement>
-    <literalExpression id="decision_the_rules_in_force_include_literal">
-      <text>RULES_EFFECTIVE_DATE &gt;= change</text>
     </literalExpression>
   </decision>
   <decision id="decision_gst_rate_percent" name="GST_rate_percent" label="GST rate percent">
@@ -174,72 +159,86 @@
       <text>supply_value * GST_rate_percent / 100</text>
     </literalExpression>
   </decision>
+  <businessKnowledgeModel id="bkm_the_rules_in_force_include" name="the_rules_in_force_include" label="the rules in force include">
+    <variable id="bkm_the_rules_in_force_include_var" name="the_rules_in_force_include" label="the rules in force include" typeRef="boolean"/>
+    <encapsulatedLogic id="bkm_the_rules_in_force_include_logic">
+      <formalParameter id="bkm_the_rules_in_force_include_p1" name="change" typeRef="date"/>
+      <formalParameter id="bkm_the_rules_in_force_include_p2" name="RULES_EFFECTIVE_DATE" typeRef="date"/>
+      <literalExpression id="bkm_the_rules_in_force_include_literal">
+        <text>RULES_EFFECTIVE_DATE &gt;= change</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decisionService id="service_gst_rate" name="GST_rate" label="GST rate">
+    <variable id="service_gst_rate_var" name="GST_rate" label="GST rate" typeRef="Any"/>
+    <outputDecision href="#decision_the_2024_rate_change"/>
+    <outputDecision href="#decision_the_2023_rate_change"/>
+    <outputDecision href="#decision_gst_commenced"/>
+    <outputDecision href="#decision_tourist_refund_minimum_spend"/>
+    <outputDecision href="#decision_gst_payable_on"/>
+    <encapsulatedDecision href="#decision_gst_rate_percent"/>
+    <inputData href="#input_no_gst_rate_exists_before_commencement_on_1994_04_01"/>
+    <inputData href="#input_rules_effective_date"/>
+    <inputData href="#input_supply_value"/>
+  </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_gst_rate_diagram" name="GST rate">
-      <dmndi:DMNShape id="input_change_shape" dmnElementRef="input_change">
-        <dc:Bounds x="60" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
       <dmndi:DMNShape id="input_no_gst_rate_exists_before_commencement_on_1994_04_01_shape" dmnElementRef="input_no_gst_rate_exists_before_commencement_on_1994_04_01">
-        <dc:Bounds x="280" y="380" width="180" height="80"/>
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="input_supply_value_shape" dmnElementRef="input_supply_value">
-        <dc:Bounds x="500" y="380" width="180" height="80"/>
+        <dc:Bounds x="280" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="input_rules_effective_date_shape" dmnElementRef="input_rules_effective_date">
-        <dc:Bounds x="720" y="380" width="180" height="80"/>
+        <dc:Bounds x="500" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_2024_rate_change_shape" dmnElementRef="decision_the_2024_rate_change">
-        <dc:Bounds x="60" y="220" width="180" height="80"/>
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_2023_rate_change_shape" dmnElementRef="decision_the_2023_rate_change">
-        <dc:Bounds x="280" y="220" width="180" height="80"/>
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_gst_commenced_shape" dmnElementRef="decision_gst_commenced">
-        <dc:Bounds x="500" y="220" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_rules_in_force_include_shape" dmnElementRef="decision_the_rules_in_force_include">
-        <dc:Bounds x="720" y="220" width="180" height="80"/>
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_gst_rate_percent_shape" dmnElementRef="decision_gst_rate_percent">
-        <dc:Bounds x="940" y="220" width="180" height="80"/>
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_tourist_refund_minimum_spend_shape" dmnElementRef="decision_tourist_refund_minimum_spend">
-        <dc:Bounds x="1160" y="220" width="180" height="80"/>
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_gst_payable_on_shape" dmnElementRef="decision_gst_payable_on">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="bkm_the_rules_in_force_include_shape" dmnElementRef="bkm_the_rules_in_force_include">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNEdge id="decision_the_rules_in_force_include_ir1_edge" dmnElementRef="decision_the_rules_in_force_include_ir1">
-        <di:waypoint x="150" y="380"/>
-        <di:waypoint x="810" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_rules_in_force_include_ir2_edge" dmnElementRef="decision_the_rules_in_force_include_ir2">
-        <di:waypoint x="810" y="380"/>
-        <di:waypoint x="810" y="300"/>
-      </dmndi:DMNEdge>
+      <dmndi:DMNShape id="service_gst_rate_shape" dmnElementRef="service_gst_rate">
+        <dc:Bounds x="40" y="200" width="1100" height="280"/>
+      </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_gst_rate_percent_ir1_edge" dmnElementRef="decision_gst_rate_percent_ir1">
-        <di:waypoint x="370" y="380"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="810" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_gst_rate_percent_ir2_edge" dmnElementRef="decision_gst_rate_percent_ir2">
-        <di:waypoint x="810" y="380"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="590" y="540"/>
+        <di:waypoint x="810" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_tourist_refund_minimum_spend_ir1_edge" dmnElementRef="decision_tourist_refund_minimum_spend_ir1">
-        <di:waypoint x="370" y="380"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="1030" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_tourist_refund_minimum_spend_ir2_edge" dmnElementRef="decision_tourist_refund_minimum_spend_ir2">
-        <di:waypoint x="810" y="380"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="590" y="540"/>
+        <di:waypoint x="1030" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_gst_payable_on_ir1_edge" dmnElementRef="decision_gst_payable_on_ir1">
-        <di:waypoint x="1030" y="220"/>
-        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_gst_payable_on_ir2_edge" dmnElementRef="decision_gst_payable_on_ir2">
-        <di:waypoint x="590" y="380"/>
-        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="370" y="540"/>
+        <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
     </dmndi:DMNDiagram>
   </dmndi:DMNDI>

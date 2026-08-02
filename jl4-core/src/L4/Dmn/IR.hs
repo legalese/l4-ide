@@ -72,8 +72,19 @@ module L4.Dmn.IR
   , InputData (..)
   , Requirement (..)
   , requirementTarget
+  , KnowledgeRequirement (..)
+  , knowledgeRequirementTarget
+    -- ** Self-edges: kept in the IR, erased from the XML
+    -- $selfedges
+  , emittedRequirements
+  , emittedKnowledgeReqs
+  , Bkm (..)
+  , FormalParameter (..)
+  , DecisionService (..)
   , drgDecisions
   , drgInputData
+  , drgBkms
+  , drgServices
     -- * Fidelity
     -- $fidelity
   , FidelityLoss (..)
@@ -81,16 +92,21 @@ module L4.Dmn.IR
   , fidelityLossCode
   , drgNotesAll
   , dmnReport
+    -- * Well-formedness (R5)
+  , checkDrg
+  , cyclicGroups
   ) where
 
 import Base
 import qualified Base.Text as Text
+import qualified Data.Graph as Graph
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
 import Data.Time.Calendar (Day, showGregorian)
 
-import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport, addNote, emptyReport)
+import L4.Interchange.Fidelity
+  (FidelityNote (..), FidelityReport, FidelitySeverity (..), addNote, emptyReport)
 
 ------------------------------------------------------------------------
 -- Cells
@@ -713,6 +729,73 @@ requirementTarget = \case
   RequiredDecision t -> t
   RequiredInput t    -> t
 
+-- | A knowledge requirement: DMN §6.2.2.3 allows these "from Business
+-- Knowledge Models to Decisions and to other Business Knowledge Models", and —
+-- on the @kie@ flavor only, §13.5 — to a 'DecisionService'.
+--
+-- __A separate sum from 'Requirement', deliberately__: the two are different
+-- XML elements in different XSD sequence positions, and the engines treat them
+-- asymmetrically — the knowledge edge is what puts an invocable\'s name into a
+-- caller\'s FEEL scope on KIE (compile error without it, probe @bkm-chain-nokr@)
+-- while Camunda has __no backstop at all__ (parses, and the calling decision
+-- answers @null@ with no message at any severity, probes C3\/D3). The edge set
+-- is the __direct__-call set, not its transitive closure (C1 passes where C2
+-- fails, byte-identical diagnostics on both engines).
+data KnowledgeRequirement
+  = RequiredBkm !Text      -- ^ the target 'bkmId'
+  | RequiredService !Text  -- ^ the target service id (@kie@ flavor only, §13.4/§13.5)
+  deriving stock (Eq, Ord, Show, Generic)
+
+knowledgeRequirementTarget :: KnowledgeRequirement -> Text
+knowledgeRequirementTarget = \case
+  RequiredBkm t     -> t
+  RequiredService t -> t
+
+-- $selfedges
+--
+-- __The IR keeps self-edges; the XML does not.__ A self-recursive L4 definition
+-- lowers to an element that requires itself, and 'checkDrg' reports it — that is
+-- the whole point of the §6.4.4-2 un-suppression, and 'emittedRequirements' and
+-- 'emittedKnowledgeReqs' below do not touch the graph 'checkDrg' reads.
+--
+-- What they change is what "L4.Dmn.Emit" writes. DMN 1.3 §7.3.1 forbids an
+-- element from requiring itself, so a faithfully-emitted self-edge produces a
+-- file no engine will load and the @dmn-moddle@ metamodel gate rejects
+-- (@etc\/validate-dmn.mjs@ checks exactly this shape). __Ruled 2026-08-02
+-- (Meng): erase the self-edge again, and keep the note.__ DMN cannot represent
+-- the recursion at all; the @D-CYCLE@ finding is what tells the truth about it;
+-- and an artifact no engine will load is not an exhibit. See
+-- @specs\/todo\/DMN-RECURSION-FLATTENING-SPEC.md@ §7 for the ruling and its
+-- cost, and the rest of that document for the flattening that would let the
+-- emitted file carry the recursion instead of only the report.
+--
+-- __Self-edges only.__ A cycle of two or more elements keeps every edge and is
+-- emitted exactly as §6.4.4-4 says: there is no way to drop one edge of a
+-- multi-node cycle without choosing which member's meaning to change, whereas a
+-- self-edge has no such choice to make — it is the one case where "drop it and
+-- report it" is not a rewrite of somebody's semantics into somebody else's.
+
+-- | The information requirements of a 'Decision' that may legally be
+-- __emitted__: 'dcnRequirements' minus any edge back to the decision itself.
+-- See $selfedges.
+emittedRequirements :: Decision -> [Requirement]
+emittedRequirements d =
+  [r | r <- d.dcnRequirements, not (isSelf r)]
+ where
+  isSelf = \case
+    RequiredDecision t -> t == d.dcnId
+    RequiredInput _    -> False
+
+-- | The knowledge requirements of an invocable (a 'Decision' or a 'Bkm', hence
+-- the loose id-plus-list signature) that may legally be __emitted__: the given
+-- edges minus any edge back to the owner. The 'Bkm' arm is the reachable one —
+-- 'L4.Dmn.Lower' mints a @RequiredBkm@ for every body reference that landed in
+-- the emitted-BKM set, its own name included — and DMN §6.3.9 forbids it in the
+-- same terms §7.3.1 forbids the decision case. See $selfedges.
+emittedKnowledgeReqs :: Text -> [KnowledgeRequirement] -> [KnowledgeRequirement]
+emittedKnowledgeReqs owner krs =
+  [kr | kr <- krs, knowledgeRequirementTarget kr /= owner]
+
 -- | One @\<contextEntry\>@ of a 'LogicContext'.
 --
 -- __Every entry is NAMED.__ A context entry with no @\<variable\>@ is DMN's
@@ -762,12 +845,64 @@ data DecisionLogic
 -- than by an emitter remembering to re-fold). Resolution is a property of the
 -- whole graph, so it cannot be recomputed from the string at emission time.
 data Decision = MkDecision
-  { dcnId           :: !Text
-  , dcnName         :: !Text
-  , dcnFeelName     :: !Text
-  , dcnType         :: !DmnType
-  , dcnLogic        :: !DecisionLogic
-  , dcnRequirements :: ![Requirement]  -- ^ sorted by target id, for determinism
+  { dcnId            :: !Text
+  , dcnName          :: !Text
+  , dcnFeelName      :: !Text
+  , dcnType          :: !DmnType
+  , dcnLogic         :: !DecisionLogic
+  , dcnRequirements  :: ![Requirement]  -- ^ sorted by target id, for determinism
+  , dcnKnowledgeReqs :: ![KnowledgeRequirement]
+    -- ^ one per invocable this decision\'s rendered logic invokes (§6.2). Sorted
+    -- by target id. Every rendered invocation must have its edge here — KIE
+    -- refuses at compile without it and Camunda silently answers @null@, so
+    -- 'checkDrg' asserts the completeness.
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | One @\<formalParameter\>@ of a BKM\'s @\<encapsulatedLogic\>@
+-- (@tFunctionDefinition@). Two names for 'ItemComponent'\'s reason: 'fpName' is
+-- the resolved FEEL name (its own 'uniquifyIn' scope, one per
+-- @encapsulatedLogic@ — §5.2 scope 4, measured by probes E1\/E2\/E7), 'fpLabel'
+-- the verbatim L4 name.
+data FormalParameter = MkFormalParameter
+  { fpId    :: !Text
+  , fpName  :: !Text
+  , fpLabel :: !Text
+  , fpType  :: !DmnType
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | A @\<businessKnowledgeModel\>@ (§6.2): a tier-2 decide emitted as a named
+-- first-order FEEL function.
+--
+-- 'bkmName'\/'bkmFeelName' mirror the 'dcnName'\/'dcnFeelName' split so the
+-- __@\@name@ == @variable\/\@name@ invariant is true by construction__ — probe
+-- C4 measured that this is the ONLY backstop: KIE\'s validator flags a mismatch
+-- and the runtime then fails, but Camunda tolerates it silently and answers
+-- correctly (binds by @\@name@, never reads @variable\/\@name@), so on the
+-- default flavor nothing downstream would ever notice an emitter drift.
+--
+-- 'bkmParams' is the L4 @GIVEN@ list __plus the λ-lifted closure__: a BKM body
+-- may read nothing beyond its parameters and its knowledge requirements —
+-- measured on BOTH kinds of environment reference: a decision variable (probe
+-- E3, @collide-param-decision@: KIE whole-model compile error, Camunda null)
+-- and an unshadowed @inputData@ (measured 2026-08-01: KIE
+-- @Unknown variable@ at compile; Camunda answers, so the engines DISAGREE and
+-- the only portable spelling is to pass the value). Each module-level free
+-- term of the body therefore becomes an extra formal parameter named exactly
+-- as the global it lifts (parameters shadow same-named globals on both
+-- engines, probes E1\/E7), and every call site supplies it as @name: name@.
+data Bkm = MkBkm
+  { bkmId            :: !Text
+  , bkmName          :: !Text            -- ^ verbatim L4 name → @\@label@
+  , bkmFeelName      :: !Text            -- ^ resolved → @\@name@ AND @variable\/\@name@
+  , bkmType          :: !DmnType         -- ^ the function\'s result type
+  , bkmParams        :: ![FormalParameter]
+  , bkmLogic         :: !DecisionLogic   -- ^ 'LogicTable' works unchanged (probe A3)
+  , bkmKnowledgeReqs :: ![KnowledgeRequirement]
+    -- ^ the BKMs this BKM\'s own body invokes — the edge lives on the CALLING
+    -- BKM (probe C1), never hoisted to the top-level caller (C2 fails on both
+    -- engines).
   }
   deriving stock (Eq, Show, Generic)
 
@@ -785,9 +920,33 @@ data InputData = MkInputData
   }
   deriving stock (Eq, Show, Generic)
 
+-- | A @\<decisionService\>@ (§2.3): one per L4 @§@, as GROUPING on both flavors
+-- (probe D1); an invocable target of a @knowledgeRequirement@ on the @kie@
+-- flavor only (§13.4\/§13.5: that one edge is required by KIE and fatal to
+-- Camunda 8\'s @parse()@).
+--
+-- Member lists carry element __ids__. Never emitted with zero outputs (probe
+-- D5: Xerces-valid, KIE validator ERROR + runtime throw, Camunda completely
+-- silent), and never with both 'dsvEncapsulated' and 'dsvInputDecisions' empty
+-- (§6.3.10\'s second SHALL, read at R6\/§2.5.5) — a @§@ that cannot satisfy
+-- both simply emits no service.
+data DecisionService = MkDecisionService
+  { dsvId             :: !Text
+  , dsvName           :: !Text     -- ^ the verbatim @§@ heading → @\@label@
+  , dsvFeelName       :: !Text     -- ^ resolved, in the SERVICE name scope (§5.2 scope 3, probe E6)
+  , dsvType           :: !DmnType  -- ^ the single output\'s type; 'DmnAny' on a multi-output grouping
+  , dsvOutputs        :: ![Text]
+  , dsvEncapsulated   :: ![Text]
+  , dsvInputDecisions :: ![Text]
+  , dsvInputData      :: ![Text]
+  }
+  deriving stock (Eq, Show, Generic)
+
 data DrgNode
   = NodeDecision !Decision
   | NodeInputData !InputData
+  | NodeBkm !Bkm
+  | NodeService !DecisionService
   deriving stock (Eq, Show, Generic)
 
 data Drg = MkDrg
@@ -820,6 +979,12 @@ drgDecisions drg = [d | NodeDecision d <- drg.drgNodes]
 
 drgInputData :: Drg -> [InputData]
 drgInputData drg = [i | NodeInputData i <- drg.drgNodes]
+
+drgBkms :: Drg -> [Bkm]
+drgBkms drg = [b | NodeBkm b <- drg.drgNodes]
+
+drgServices :: Drg -> [DecisionService]
+drgServices drg = [s | NodeService s <- drg.drgNodes]
 
 ------------------------------------------------------------------------
 -- Fidelity
@@ -896,16 +1061,265 @@ renderFidelityLoss = \case
     "a WHERE/LET local could not be inlined (parameterised, or effectful)"
   SumTypeRead what -> what
 
--- | Every note in a 'Drg': the module-level ones, then each table\'s own, in
--- decision order.
+-- | Every note in a 'Drg': the module-level ones, then 'checkDrg'\'s
+-- well-formedness findings, then each table\'s own, in decision order. The
+-- ordering is fixed (§6.4.4-1) so that adding a well-formedness check does not
+-- churn every golden that carries module notes.
 drgNotesAll :: Drg -> [FidelityNote]
 drgNotesAll drg =
   drg.drgNotes
+    <> checkDrg drg
     <> [ note
        | NodeDecision d <- drg.drgNodes
        , LogicTable t <- [d.dcnLogic]
        , note <- t.dtNotes
        ]
+
+------------------------------------------------------------------------
+-- Well-formedness (R5, §6.4)
+------------------------------------------------------------------------
+
+-- | The cyclic strongly connected components of a keyed edge list, in the
+-- traversal order 'Graph.stronglyConnComp' gives (reverse topological, which is
+-- deterministic in the input order).
+--
+-- __One detector, three graphs__ (§6.4.4): DMN 1.3 states the same acyclicity
+-- @SHALL@ three times — §6.3.7 for a Decision\'s @informationRequirement@
+-- subgraph, §6.3.9 for a BusinessKnowledgeModel\'s @knowledgeRequirement@
+-- subgraph, §6.3.10 for a DecisionService\'s. 'checkDrg' runs this routine over
+-- the first two; "L4.Dmn.Lower"\'s §2.3.2 service splitter runs it over the
+-- third, mid-lowering — which is why it is exported rather than inlined.
+--
+-- The §6.4.4-3 side condition — @|SCC| ≥ 2@, __or__ @|SCC| = 1@ with a
+-- self-edge — is exactly 'Graph.CyclicSCC': a vertex with a self-loop is
+-- cyclic, a vertex merely on no cycle is 'Graph.AcyclicSCC'. Both obvious
+-- defaults are wrong (literal "one per SCC" notes every acyclic node; "size
+-- ≥ 2" silently undoes the §6.4.4-2 self-edge un-suppression).
+cyclicGroups :: Ord k => [(n, k, [k])] -> [[n]]
+cyclicGroups nodes = [ns | Graph.CyclicSCC ns <- Graph.stronglyConnComp nodes]
+
+-- | Well-formedness of the finished IR (§6.4.4-1): a plain function over 'Drg',
+-- folded into 'drgNotesAll', and __also callable from "L4.Dmn.Lower"
+-- mid-lowering__ (§6.4.4-6, the §2.3.2 splitter fixpoint).
+--
+-- One note per offending SCC, @range = Nothing@ (a cycle is not at a point;
+-- same ruling as BPMN\'s @P-CYCLE@), naming every member by __name and id__ —
+-- names alone are ambiguous under §5.2\'s uniquifier, which can emit two
+-- decisions both labelled @shared@.
+checkDrg :: Drg -> [FidelityNote]
+checkDrg drg = cycleNotes <> recursiveNotes <> serviceCycleNotes <> knowledgeReqNotes
+ where
+  decisions = drgDecisions drg
+  bkms      = drgBkms drg
+  services  = drgServices drg
+
+  -- §6.3.7: the informationRequirement graph. Only decision→decision edges can
+  -- close a cycle (an inputData has no requirements), so the graph is over
+  -- decisions with their RequiredDecision edges.
+  cycleNotes =
+    [ MkFidelityNote
+        { code     = "D-CYCLE"
+        , severity = Blocking
+        , element  = headId ds
+        , range    = Nothing
+        , message  = cycleMessage "informationRequirement" "decision" (memberList ds)
+        , lost     =
+            "loadability: DMN 1.3 §6.3.7 requires a Decision's requirement subgraph to \
+            \be acyclic. KIE 8.44 reports `Cyclic dependency detected` and skips the \
+            \node; Camunda 8 rejects the whole file at parse"
+        }
+    | ds <- cyclicGroups
+        [ (d, d.dcnId, [t | RequiredDecision t <- d.dcnRequirements])
+        | d <- decisions
+        ]
+    , let memberList xs = [(x.dcnName, x.dcnId) | x <- xs]
+    , let headId xs = case xs of (x : _) -> x.dcnId; [] -> ""
+    ]
+
+  -- §6.3.9, the SAME SCC routine over the SECOND graph (§6.4.4-5): the
+  -- knowledgeRequirement edges, whose nodes are decisions AND BKMs (probe C1:
+  -- the BKM→BKM edge lives on the calling BKM). A different code because the
+  -- clause cited and the reader's remedy differ; one detector because two
+  -- detectors is how one of them gets skipped. The side condition is
+  -- 'cyclicGroups'' own (|SCC| ≥ 2, or a self-edge singleton — the second arm
+  -- is what the §6.4.4-2 un-suppression exists for). This discharges §6.3-1's
+  -- forward reference to R5.
+  recursiveNotes =
+    [ MkFidelityNote
+        { code     = "D-RECURSIVE"
+        , severity = Blocking
+        , element  = headId ds
+        , range    = Nothing
+        , message  = cycleMessage "knowledgeRequirement" "invocable" (memberList ds)
+        , lost     =
+            "well-formedness: DMN 1.3 §6.3.9 says a BusinessKnowledgeModel SHALL not \
+            \require itself, directly or indirectly; behaviour on a violating model is \
+            \explicitly vendor-dependent (KIE evaluates recursive BKMs but emits a \
+            \spurious eval-time ERROR)"
+        }
+    | ds <- cyclicGroups
+        ( [ (Left d, d.dcnId, map knowledgeRequirementTarget d.dcnKnowledgeReqs)
+          | d <- decisions
+          ]
+            <> [ (Right b, b.bkmId, map knowledgeRequirementTarget b.bkmKnowledgeReqs)
+               | b <- bkms
+               ]
+        )
+    , let memberList = map (either (\d -> (d.dcnName, d.dcnId)) (\b -> (b.bkmName, b.bkmId)))
+    , let headId xs = case xs of
+            (Left d : _)  -> d.dcnId
+            (Right b : _) -> b.bkmId
+            []            -> ""
+    ]
+
+  -- §6.3.10, the THIRD graph (§6.4.4-6): the service-level requirement graph,
+  -- whose edges are manufactured by SECTION GRANULARITY (§2.3.2 — decisions
+  -- may be acyclic while their grouping is not). "L4.Dmn.Lower"'s splitter
+  -- runs this same routine mid-lowering and splits offending sections until
+  -- acyclic, so a note here means the splitter failed — it is the emitted
+  -- artifact's own well-formedness assertion, exactly as D-CYCLE is for
+  -- decisions. Probe svc-cycle is the negative control: KIE's validator AND
+  -- build are clean on the shape, every decision SUCCEEDED-but-null, and only
+  -- the runtime message channel fires — which a design-time exporter cannot
+  -- see, hence a static check or nothing.
+  serviceCycleNotes =
+    [ MkFidelityNote
+        { code     = "D-CYCLE"
+        , severity = Blocking
+        , element  = headId ss
+        , range    = Nothing
+        , message  = cycleMessage "decisionService requirement" "decision service" (memberList ss)
+        , lost     =
+            "well-formedness: DMN 1.3 §6.3.10 requires a DecisionService's requirement \
+            \subgraph to be acyclic. KIE evaluates every member to a silent null under \
+            \status SUCCEEDED; Camunda 8 rejects the file at parse"
+        }
+    | not (null services)
+    , let serviceOfDecision =
+            [ (m, s.dsvId)
+            | s <- services
+            , m <- s.dsvOutputs <> s.dsvEncapsulated
+            ]
+    , let requiresOf = [(d.dcnId, [t | RequiredDecision t <- d.dcnRequirements]) | d <- decisions]
+    , ss <- cyclicGroups
+        [ ( s
+          , s.dsvId
+          , nubOrdText
+              [ sid
+              | m <- s.dsvOutputs <> s.dsvEncapsulated
+              , ts <- [t | (did, t) <- requiresOf, did == m]
+              , t <- ts
+              , (m', sid) <- serviceOfDecision
+              , m' == t
+              , sid /= s.dsvId
+              ]
+          )
+        | s <- services
+        ]
+    , let memberList xs = [(x.dsvName, x.dsvId) | x <- xs]
+    , let headId xs = case xs of (x : _) -> x.dsvId; [] -> ""
+    ]
+
+  nubOrdText :: [Text] -> [Text]
+  nubOrdText = Set.toList . Set.fromList
+
+  -- §6.2 / §13.3 consequence 2: knowledgeRequirement COMPLETENESS is asserted,
+  -- not assumed — mandatory rather than belt-and-braces, because on the
+  -- DEFAULT flavor nothing downstream would ever notice a missing edge: KIE
+  -- refuses at compile (probe C3), but Camunda parses and the calling decision
+  -- answers null with no message at any severity. The check is a
+  -- token-boundary scan of every non-verbatim FEEL text a node carries, for
+  -- each emitted invocable name followed by `(`; verbatim (raw-L4) texts are
+  -- skipped, since nothing in them is an invocation.
+  knowledgeReqNotes =
+    [ MkFidelityNote
+        { code     = "D-KNOWLEDGEREQ"
+        , severity = Blocking
+        , element  = ownerId
+        , range    = Nothing
+        , message  =
+            "`" <> ownerName <> "` invokes `" <> b.bkmFeelName
+              <> "` but carries no knowledgeRequirement edge to " <> b.bkmId
+              <> ": the edge is what puts an invocable's name into a caller's FEEL \
+                 \scope. KIE refuses the model at compile time; Camunda parses it and \
+                 \the calling decision answers null with NO message at any severity"
+        , lost     = "the invocation, silently, on the default flavor"
+        }
+    | not (null bkms)
+    , (ownerId, ownerName, edges, texts) <-
+        [ ( d.dcnId
+          , d.dcnName
+          , map knowledgeRequirementTarget d.dcnKnowledgeReqs
+          , logicFeelTexts d.dcnLogic
+          )
+        | d <- decisions
+        ]
+          <> [ ( b.bkmId
+               , b.bkmName
+               , map knowledgeRequirementTarget b.bkmKnowledgeReqs
+               , logicFeelTexts b.bkmLogic
+               )
+             | b <- bkms
+             ]
+    , b <- bkms
+    , b.bkmId `notElem` edges
+    , any (invokes b.bkmFeelName) texts
+    ]
+
+  -- Every FEEL text a node's logic evaluates, minus the verbatim ones.
+  logicFeelTexts = \case
+    LogicLiteral e  -> [e.feText | e.feFragment /= L4Verbatim]
+    LogicContext es -> [ce.ceExpr.feText | ce <- es, ce.ceExpr.feFragment /= L4Verbatim]
+    LogicTable t ->
+      [c.icExpr.feText | c <- t.dtInputs, c.icExpr.feFragment /= L4Verbatim]
+        <> [r.drOutput.feText | r <- t.dtRules, r.drOutput.feFragment /= L4Verbatim]
+        <> [d.feText | Just d <- [t.dtOutput.ocDefault], d.feFragment /= L4Verbatim]
+
+  -- Does the text contain `name(` at a token boundary? The name is a folded
+  -- FEEL identifier (no spaces), so a boundary check on the preceding
+  -- character is exact enough for text this exporter itself generated —
+  -- PROVIDED string literals are blanked first: the exporter also generates
+  -- FEEL string literals (an L4 STRING constant renders as one), and
+  -- "please call half(now)" inside quotes is prose, not an invocation.
+  -- Each double-quoted span (backslash escapes respected) is replaced by a
+  -- single space, preserving the token boundaries on both sides; an unterminated quote blanks to end-of-text, which fails safe —
+  -- a span the scanner cannot delimit can only suppress a note, never
+  -- invent one on a model both engines accept.
+  invokes nm txt = go (blankStrings txt)
+   where
+    blankStrings t = case Text.breakOn "\"" t of
+      (pre, "")   -> pre
+      (pre, rest) -> pre <> " " <> blankStrings (skipString (Text.drop 1 rest))
+    skipString t = case Text.uncons t of
+      Nothing         -> ""
+      Just ('\\', t') -> skipString (Text.drop 1 t')
+      Just ('"', t')  -> t'
+      Just (_, t')    -> skipString t'
+    go t = case Text.breakOn nm t of
+      (_, "") -> False
+      (before, rest) ->
+        let after = Text.drop (Text.length nm) rest
+            openParen = Text.take 1 (Text.dropWhile (== ' ') after) == "("
+            boundary = case Text.unsnoc before of
+              Nothing     -> True
+              Just (_, c) -> not (isTokenChar c)
+        in (boundary && openParen)
+             || go (Text.drop 1 rest)
+    isTokenChar c = (isAscii c && isAlphaNum c) || c == '_'
+
+-- | The prose shared by the cycle findings: one member reads "requires itself",
+-- several read as a cycle listing every member by name and id.
+cycleMessage :: Text -> Text -> [(Text, Text)] -> Text
+cycleMessage graphName kind members = case members of
+  [(nm, eid)] ->
+    kind <> " `" <> nm <> "` (" <> eid <> ") requires itself: its "
+      <> graphName <> " subgraph has a self-edge"
+  _ ->
+    tshowLen (length members) <> " " <> kind <> "s form a cycle in the "
+      <> graphName <> " graph: "
+      <> Text.intercalate ", " ["`" <> nm <> "` (" <> eid <> ")" | (nm, eid) <- members]
+ where
+  tshowLen = Text.pack . show
 
 -- | The XML backend\'s report.
 --

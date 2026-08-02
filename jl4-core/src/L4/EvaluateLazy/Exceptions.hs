@@ -42,7 +42,7 @@ data InternalEvalException =
 data UserEvalException =
     BlackholeForced (Expr Resolved)
   | EqualityOnUnsupportedType WHNF WHNF
-  | NonExhaustivePatterns Reference -- we could try to warn statically
+  | NonExhaustivePatterns (Either Reference WHNF) -- ^ 'Right' the forced scrutinee value when available, 'Left' the raw reference otherwise
   | StackOverflow
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
@@ -92,9 +92,12 @@ prettyUserEvalException = \ case
     <> indentMany v1
     <> indentMany v2
   NonExhaustivePatterns val ->
-    [ "Value" ]
-    <> indentMany val
-    <> [ "has no corresponding pattern." ]
+    [ "The value" ]
+    <> either indentMany indentMany val
+    <> [ "reached a CONSIDER that has no branch for it."
+       , "Add a WHEN branch for this case, or a catch-all OTHERWISE branch."
+       , "The typechecker's exhaustiveness warning lists all missing branches."
+       ]
   StackOverflow ->
     [ "Stack overflow: "
     , "Recursion depth of " <> Text.textShow maximumFrameDepth
