@@ -4,10 +4,10 @@
 `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every
 reachable projection and emits conversion report v0; the seven de novo and publish stages are
 scaffolded entry points that refuse with a named blocker. With R4 ruled (2026-08-02), the
-encode/fork stages' blocker is unbuilt tooling; only P8 (R5) and P10 (R1/R2) still wait on open
-rulings — and since then R5 has been ruled too (the ROBDD-first ladder) and R2's pathway
-ruled (probe now, note at G4, contact only with a live page), so what still waits on a ruling
-is R1's remainder: repo name/org and the license instrument. The orchestrator's own present-tense inventory is
+encode/fork stages' blocker is unbuilt tooling — and by end of day R5 (the ROBDD-first
+ladder), R2 (probe/note/contact three-step) and R1 in full (`legalese/canon`, public,
+Apache-2.0 + carried source-terms) had been ruled as well, so **no stage anywhere in the
+pipeline waits on an open ruling**: every remaining blocker is engineering or an HG2 act. The orchestrator's own present-tense inventory is
 [ORCHESTRATOR.md](./ORCHESTRATOR.md); §5 below still names what does not exist (BKM emission, the
 ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo — and P8's component row
 inventories nothing, pending R5). §5 is the verified inventory and §6 is the gap register.
@@ -217,7 +217,7 @@ unstable now.
 | P8 verifier toolchain      | not inventoried here — R5 asks which existing machinery or external tool goes first                                                                                                                                                                                                                                                                                                                                      |
 | P2 sweep tooling           | no repo component needed — agent web search; the register format is defined in P2 itself                                                                                                                                                                                                                                                                                                                                 |
 | orchestrator ("go")        | **milestone G1 runs today** — `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every reachable projection and emits report v0; seven stages (P1, P2, P3-encode, P4, P5, P8, P10) are scaffolded and refuse with a named blocker; R4 is ruled (2026-08-02) so G2's blocker is now unbuilt tooling, not an open ruling. Present-tense inventory: [ORCHESTRATOR.md](./ORCHESTRATOR.md) |
-| corpus-of-law repo         | **does not exist** (R1)                                                                                                                                                                                                                                                                                                                                                                                                  |
+| corpus-of-law repo         | **does not exist yet** — R1 ruled in full 2026-08-02: `legalese/canon`, public from day one with inspectable gates and encoding versions, sidecar class/instance layout, Apache-2.0 + carried source-terms + optional CC-BY prose. Creation itself is an HG2 act                                                                                                                                                         |
 
 ## 6. Gaps → milestones
 
@@ -287,8 +287,9 @@ R-numbers are scoped to this document (house precedent: the DMN spec has its own
 lexipedia-superset spec its K-series). Cross-references from elsewhere should say "SI-Rn".
 
 - **R0 — ANSWERED 2026-07-31**: the execution is the exhibit (§2).
-- **R1 — corpus-of-law repository**: name, org, license, layout. Owner: Meng. **PARTIALLY
-  ANSWERED 2026-08-02 (Meng), three of five dimensions:** (1) **visibility: PUBLIC from day
+- **R1 — corpus-of-law repository**: name, org, license, layout. Owner: Meng. **ANSWERED IN
+  FULL 2026-08-02 (Meng), across one review session, five dimensions:** (0) **name/org:
+  `legalese/canon`** — the final dimension, ruled last. (1) **visibility: PUBLIC from day
   one** — with draft-status markers per subject, **inspectable HG1/HG2** (the gate grants —
   signature files, waiver records, `gate-allowed-signers` — are in-repo artifacts a reader can
   verify with `ssh-keygen -Y verify`, which the gate machinery already supports), and **version
@@ -306,7 +307,9 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   (conversion reports, commentary, comparison notes) may carry CC-BY-4.0 in addition, so they
   flow one-way into BY-SA wikis (lexipedia is CC BY-SA 4.0, measured 2026-08-02) without
   ShareAlike ever reaching the encodings. The open-core → freemium-enrichment pathway stays
-  open by construction. **Still open:** repo name + org confirmation — the last R1 dimension.
+  open by construction. Nothing in R1 remains open; **creating** `legalese/canon` is a
+  distinct outward-facing act and is HG2's, per §7.3 — the ruling names the repo, it does not
+  create it.
 - **R2 — lexipedia compatibility**: **ANSWERED 2026-08-02 (Meng), as a three-step pathway:**
   **probe now** (read-only: their DokuWiki format, contribution route, licensing — measured
   2026-08-02: the site is CC BY-SA 4.0, so a comparison note must be written in our own words

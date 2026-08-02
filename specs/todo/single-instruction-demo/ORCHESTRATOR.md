@@ -15,8 +15,9 @@ What that means precisely, in the present tense:
   `p4-forks`, `p5-gate`, `p8-verify`, `p10-publish`. Each is an entry point that prints what it
   would do and what is blocking it, then exits 3. Since R4 was ruled (2026-08-02) the
   encode/fork stages are blocked on engineering — the tooling is unbuilt. R5 is now ruled too
-  (2026-08-02, the ROBDD-first ladder), so `p8-verify` is engineering as well; only
-  `p10-publish` still waits on a ruling (R1's remainder). §5 names each blocker.
+  (2026-08-02, the ROBDD-first ladder), so `p8-verify` is engineering as well; and with R1
+  closed in full the same day (`legalese/canon`), `p10-publish` waits only on HG2 acts and
+  unbuilt tooling — no stage waits on an open ruling. §5 names each blocker.
 - **Milestone G2 is unbuilt.** `go.sh plan --milestone g2` refuses and says why: R4 is ruled
   but none of the de novo tooling it unblocks exists yet. The §8 diff oracle does not exist
   either.
@@ -362,12 +363,12 @@ milestone's declared stage list, so its absence cannot make a milestone `INCOMPL
 | `p4-forks`    | R4 ruled 2026-08-02, and the design note's own §6 says no code changes until the encode phase runs; the fork register still has no machine-readable format (the BNA smoke's register shape, PR #195, is the leading candidate)                                  |
 | `p5-gate`     | its condition is explicitly a judgement; two of its five checks already run inside `p3-check`, and two of the remaining three join over registers that do not exist                                                                                             |
 | `p8-verify`   | R5 ruled 2026-08-02 (ROBDD first, fork-space sweep second, external MC last) — the blocker is now engineering: no CLI footing exposes the query-planner ROBDD to a script, and SPEC.md §6 gives P8 no pass condition yet. Gates nothing in G0–G4                |
-| `p10-publish` | **R1** open (owner: Meng), **R2** open, and every outward-facing act here is HG2's                                                                                                                                                                              |
+| `p10-publish` | R1 ruled in full 2026-08-02 (`legalese/canon` + license + layout + public-with-inspectable-gates) and R2 ruled (probe done, PR #199); what remains is that the repo does not exist and every act that would change that is HG2's, plus unbuilt stage tooling    |
 
 Until 2026-08-02 five of the seven were blocked on a ruling rather than on engineering — a
 deliberate stance: building against an unruled representation is building to be rewritten. With
-R4 and R5 ruled, only `p10-publish` still waits on a ruling (R1's remainder: name/org and the
-license instrument — R2's pathway is ruled); the rest wait on
+R4 and R5 ruled — and R1 closed in full the same day (`legalese/canon`) — no stage waits on an
+open ruling any more; everything remaining waits on
 tooling.
 
 ### 5.3 The `l4 run` workaround, and its expiry
@@ -549,7 +550,7 @@ drifts on its first execution.
 | `loopUntil`-style retry-until-green                                    | it is the precise anti-pattern for this stance: rerunning a projection until a regex matches is how `DEGRADED` becomes `PASS`. Banned in the skill, with the reason stated                                                                                                                     |
 | the de novo path and the §8 diff oracle                                | **R4** was open when this was written (ruled 2026-08-02 — the `Interpretation` parameter, extended to regulative rules); building the tooling is now unblocked lap-two work, sequenced behind the encode phase per the design note's §6                                                        |
 | P8 verification                                                        | **R5** open, gates nothing in G0–G4, and there is zero CLI footing. A leg here would be pure `UNVERIFIED`                                                                                                                                                                                      |
-| the corpus-of-law repo and the lexipedia probe                         | **R1**/**R2** open, both HG2                                                                                                                                                                                                                                                                   |
+| the corpus-of-law repo and the lexipedia probe                         | both since ruled (R1: `legalese/canon` in full; R2: probe DONE as PR #199); the repo's creation and any lexipedia contact remain HG2 acts                                                                                                                                                      |
 | a `regcf-corpus.cases.json`                                            | **discharged 2026-08-02** — PR #194 landed the file (16 dated cases, expected values L4-evaluated), meeting the condition §5.4 named. "Not built _here_" stays true: the orchestrator consumes the committed file and still never writes one                                                   |
 | patching `l4` for `--fail-on-assert`                                   | the right fix; needs `cabal build`, which this orchestrator never runs. Top upstream ask, shipped as a workaround with an expiry tripwire                                                                                                                                                      |
 | machine-readable fork and external-modification registers              | SPEC.md defines neither format anywhere, and P5's "every entry disposed" (§4, P5) cannot be checked without them. They are P2/P4's deliverables; R4 is now ruled (2026-08-02), so defining them is unblocked — the BNA smoke's emergent register shape (PR #195) is the candidate to formalise |

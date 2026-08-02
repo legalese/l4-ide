@@ -23,12 +23,15 @@ WHAT IT WOULD DO
   or publish the comparison note in its place.
 
 BLOCKER
-  Ruling R1 is OPEN and its owner is Meng: the corpus-of-law repository has
-  no name, org, license or layout, and SPEC.md is explicit that
-  jl4/examples/ and experiments/ are NOT its long-term home. Ruling R2
-  (lexipedia format, contribution route, licensing) is OPEN and needs a
-  read-only probe first. Every outward-facing act here is HG2's, including
-  any lexipedia contact. This orchestrator therefore contains no code that
+  Ruling R1 was RULED IN FULL on 2026-08-02: the repository is
+  legalese/canon — public from day one with inspectable gates and encoding
+  version numbers, sidecar class/instance layout, Apache-2.0 + carried
+  source-terms + optional CC-BY on prose. It does not exist yet, and
+  SPEC.md is explicit that jl4/examples/ and experiments/ are NOT its
+  long-term home. Ruling R2 was ruled the same day (probe done; comparison
+  note at G4; contact only with a live page). Every outward-facing act
+  here is HG2's — including CREATING legalese/canon and any lexipedia
+  contact; the ruling names the repo, it does not create it. This orchestrator therefore contains no code that
   can publish anything, and this stage is where that absence is stated
   rather than assumed.
 
