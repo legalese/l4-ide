@@ -1,6 +1,6 @@
 # Projections of the Reg CF corpus
 
-Everything on this page is **cut from `regcf.l4`**, the 992-line formalisation of 17 CFR Part 227.
+Everything on this page is **cut from `regcf.l4`**, the 1,236-line formalisation of 17 CFR Part 227.
 Nothing here is transcribed. If a threshold changes in the corpus, it changes in every artifact
 below on the next run, because no artifact below holds a second copy of it.
 

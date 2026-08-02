@@ -263,7 +263,7 @@ $ JL4_LIBRARY_PATH=jl4-core/libraries cabal run jl4:exe:l4 -- check jl4/examples
 Check succeeded.
 ```
 
-`l4 run` on the same file: **55 assertions, all satisfied; 0 errors, 0 warnings.**
+`l4 run` on the same file: **70 assertions, all satisfied; 0 errors, 0 warnings.**
 `l4 format` is the identity on the source (the exactprint-identity invariant CI enforces).
 
 Boundary coverage — at least one case on each side of every numeric threshold:
