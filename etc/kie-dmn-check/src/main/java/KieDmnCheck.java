@@ -17,6 +17,7 @@ import org.kie.dmn.api.core.ast.BusinessKnowledgeModelNode;
 import org.kie.dmn.api.core.ast.DecisionNode;
 import org.kie.dmn.api.core.ast.DecisionServiceNode;
 import org.kie.dmn.api.core.ast.InputDataNode;
+import org.kie.dmn.model.api.DMNElementReference;
 import org.kie.dmn.validation.DMNValidator;
 import org.kie.dmn.validation.DMNValidatorFactory;
 import org.kie.internal.io.ResourceFactory;
@@ -100,7 +101,23 @@ import java.util.Map;
  * The reason is the third row: the KIE validator is known to over-report, so
  * making WARN fatal inside the harness would put a policy decision in the wrong
  * place. jl4/tests-cli asserts on the warning count in the verdict banner
- * instead, where relaxing it takes a visible edit.
+ * instead, where relaxing it takes a visible edit. The counter covers EVERY
+ * leg — validator WARNs and runtime WARNs alike. (It covered only the
+ * validator leg until 2026-08-02, so a corpus run whose service sweep printed
+ * six runtime "Required input ... not found" WARNs still bannered
+ * "0 warning(s)": a banner the caller asserts must count everything the run
+ * said, or the assertion is blind by construction.)
+ *
+ * The SVC leg is a VALUE check, not a smoke test (also 2026-08-02; it used to
+ * invoke each decisionService against the bare input context, so every
+ * inputDecision requirement was null-fed and the outputs went uncompared).
+ * Each service's declared inputDecisions are fed their evaluateAll-computed
+ * values, and each declared outputDecision's answer is compared against the
+ * SAME `expect` entry that already pins it as a plain decision — reported as
+ * its own banner clause, because a service output equals its plain-decision
+ * value only if the service's requirement wiring is right, which is the thing
+ * this leg exists to exercise. The Camunda harness has no such leg to keep
+ * symmetric: zeebe-dmn cannot evaluate a decisionService at all.
  *
  * On success the last line is a VERDICT banner. The test harness asserts the
  * BANNER, not the exit code, so that "exited 0 without running anything" — which
@@ -119,6 +136,8 @@ public final class KieDmnCheck {
   private static int cases = 0;
   private static int checked = 0;
   private static int matched = 0;
+  private static int svcChecked = 0;
+  private static int svcMatched = 0;
 
   public static void main(String[] argv) throws Exception {
     // FILE.dmn [--ctx c.json | --cases cs.json] ...: the flag attaches to the
@@ -170,13 +189,18 @@ public final class KieDmnCheck {
     }
 
     boolean ok =
-        errors == 0 && decisions > 0 && succeeded == decisions && matched == checked;
+        errors == 0
+            && decisions > 0
+            && succeeded == decisions
+            && matched == checked
+            && svcMatched == svcChecked;
     System.out.println();
     System.out.println(
         "KIE " + version + " VERDICT: " + files + " file(s), " + cases + " case(s), "
             + errors + " error(s), " + warnings + " warning(s), "
             + succeeded + "/" + decisions + " decision(s) SUCCEEDED, "
-            + matched + "/" + checked + " value(s) as expected"
+            + matched + "/" + checked + " value(s) as expected, "
+            + svcMatched + "/" + svcChecked + " service output value(s) as expected"
             + (ok ? "" : "   <<< FAILED"));
     System.exit(ok ? 0 : 1);
   }
@@ -309,6 +333,9 @@ public final class KieDmnCheck {
       System.out.println("MODEL  " + model.getName() + "  ns=" + model.getNamespace());
       for (DMNMessage m : model.getMessages()) {
         System.out.println("       msg " + m.getSeverity() + " " + m.getText());
+        if (m.getSeverity() == DMNMessage.Severity.WARN) {
+          warnings++;
+        }
       }
       List<String> ins = new ArrayList<>();
       for (InputDataNode n : model.getInputs()) {
@@ -352,6 +379,8 @@ public final class KieDmnCheck {
           // gives: every decision still reports SUCCEEDED.
           if (m.getSeverity() == DMNMessage.Severity.ERROR) {
             errors++;
+          } else if (m.getSeverity() == DMNMessage.Severity.WARN) {
+            warnings++;
           }
         }
         List<String> seen = new ArrayList<>();
@@ -415,9 +444,23 @@ public final class KieDmnCheck {
           }
         }
 
+        // The evaluateAll answers, by decision name: the values the SVC leg
+        // feeds each service's declared inputDecisions. Without this every
+        // inputDecision requirement is null-fed (a runtime WARN per input)
+        // and the leg proves liveness only.
+        Map<String, Object> byName = new LinkedHashMap<>();
+        for (DMNDecisionResult dr : r.getDecisionResults()) {
+          byName.put(dr.getDecisionName(), dr.getResult());
+        }
         for (DecisionServiceNode n : model.getDecisionServices()) {
           DMNContext c2 = rt.newContext();
           ctx.forEach(c2::set);
+          for (DMNElementReference ref : n.getDecisionService().getInputDecision()) {
+            DecisionNode dn = model.getDecisionById(hrefId(ref));
+            if (dn != null && byName.containsKey(dn.getName())) {
+              c2.set(dn.getName(), byName.get(dn.getName()));
+            }
+          }
           try {
             DMNResult rs = rt.evaluateDecisionService(model, c2, n.getName());
             System.out.println("SVC    " + n.getName() + " -> " + show(rs.getContext().getAll()));
@@ -425,6 +468,42 @@ public final class KieDmnCheck {
               System.out.println("       msg " + m.getSeverity() + " " + m.getText());
               if (m.getSeverity() == DMNMessage.Severity.ERROR) {
                 errors++;
+              } else if (m.getSeverity() == DMNMessage.Severity.WARN) {
+                warnings++;
+              }
+            }
+            // The value check: each declared outputDecision, against the SAME
+            // expect entry that pins it as a plain decision. Symmetric like
+            // the plain leg: an output with no expectation is an error, not a
+            // silent gap.
+            if (c.expect != null) {
+              for (DMNElementReference ref : n.getDecisionService().getOutputDecision()) {
+                DecisionNode dn = model.getDecisionById(hrefId(ref));
+                if (dn == null) {
+                  System.out.println(
+                      "       svc out " + pad(hrefId(ref), 30)
+                          + "   <<< outputDecision href resolves to no decision");
+                  errors++;
+                  continue;
+                }
+                String outName = dn.getName();
+                Object got = rs.getContext().get(outName);
+                if (!c.expect.containsKey(outName)) {
+                  System.out.println(
+                      "       svc out " + pad(outName, 30)
+                          + "   <<< NO EXPECTATION for this service output");
+                  errors++;
+                } else {
+                  svcChecked++;
+                  Object want = c.expect.get(outName);
+                  if (sameValue(want, got)) {
+                    svcMatched++;
+                  } else {
+                    System.out.println(
+                        "       svc out " + pad(outName, 30) + " = " + show(got)
+                            + "   <<< EXPECTED " + show(want));
+                  }
+                }
               }
             }
           } catch (Throwable t) {
@@ -554,6 +633,12 @@ public final class KieDmnCheck {
 
   private static String typeOf(DMNType t) {
     return t == null ? "?" : String.valueOf(t.getName());
+  }
+
+  /** {@code href="#decision_x"} → {@code decision_x}. */
+  private static String hrefId(DMNElementReference ref) {
+    String h = ref.getHref();
+    return h != null && h.startsWith("#") ? h.substring(1) : String.valueOf(h);
   }
 
   private static String pad(String s, int n) {

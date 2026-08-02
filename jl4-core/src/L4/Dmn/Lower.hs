@@ -2670,13 +2670,12 @@ builtinType u
 -- [@D-DATEDCHAIN@ (Blocking)] the decision is a chain of rule-date guards that
 --   could not be lowered to a date-interval table, so it shipped as boolean
 --   columns over raw L4 that no engine can evaluate (spec §15.3, R10).
--- [@D-RULEDATE-UNBOUND@ (Blocking)] the decision rebinds law time with
+-- [@D-RULEDATE-UNBOUND@ (Lossy)] the decide rebinds law time with
 --   @EVAL UNDER RULES EFFECTIVE AT@; a DRG has one global rule-date input and no
---   scoped rebinding, so supplying that input does not make it answer. The
---   message has TWO forms, chosen from the emitted logic: a boxed literal gets
---   the whole-decision claim, and a decision that still ships a table gets the
---   sub-expression claim, because "no engine can evaluate this decision" would
---   be false of a table an engine will run (spec §15.5).
+--   scoped rebinding, so no faithful @<decision>@ exists and the decide is
+--   dropped at population time and not emitted at all (R12, spec §15.12).
+--   ONE message form; re-severed Blocking → Lossy 2026-08-02 when R12 removed
+--   the emission (and with it the thing that was broken).
 -- [@D-SCOPE@ (Lossy)] two differently-scoped L4 terms collide on one DMN
 --   @inputData@ name.
 -- [@D-RULEDATE@ (Advisory)] the model is temporally parameterised: the rule-date
@@ -3226,6 +3225,14 @@ lowerModule opts modul@(MkModule _ uri _) =
                  && not (Set.member u constructors)
                  && not (Set.member u selectors)
                  && not (Set.member u computedSelfUniques)
+        -- R12 (§15.12): the rebind predicate, over the RAW body. The old
+        -- lowering-time detection ran over the caramelised+peeled body;
+        -- 'gplate' descends through WHERE/LET locals from the raw body too,
+        -- which not-ok/ruledate-rebind.l4's WHERE-wrapped case pins.
+        , A.piRuleDateRebind   = \b ->
+            or [ getUnique r == TC.evalUnderRulesEffectiveAtUnique
+               | App _ r _ <- toListOf (cosmosOf (gplate @(Expr Resolved))) b
+               ]
         }
       callGraph allDecides
 
@@ -4521,11 +4528,85 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Every NAMED section with its kept, non-BKM member decides — each decide
   -- assigned to its INNERMOST named §. 'topDecls' flattens the tree, so this
   -- walks the module itself; the walk is the only consumer of the nesting.
+  --
+  -- The walk collects EVERY decide and the kept/dropped filters are applied
+  -- outside, because D-SVCEMPTY's first arm needs to see a § whose entire
+  -- membership was rule-date-rebind-dropped (§15.12) — a § the kept-only
+  -- table would render indistinguishable from one that never held a decide.
   sectionTable :: [(Text, [Unique])]
   sectionTable =
-    [ (nm, [u | (c, u) <- assigns, c == i])
-    | (i, nm) <- secs
+    [ ( nm
+      , [ u
+        | (c, u) <- sectionAssigns
+        , c == i
+        , Map.member u decideByUnique
+        , not (Set.member u bkmCandidateSet)
+        ]
+      )
+    | (i, nm) <- sectionNames
     ]
+
+  -- Aligned with 'sectionTable': the same §s, membership = population-dropped
+  -- member decides with their reasons — ALL of 'pvDropped', not only the
+  -- rebind set. (It was rebind-only at first, which left a § of all-fixture
+  -- decides — the corpus's `Group 6 — advertising (Rule 204)` — exactly as
+  -- silent as the silence D-SVCEMPTY exists to end; widened 2026-08-02.)
+  sectionDropped :: [(Text, [(Unique, A.DropReason)])]
+  sectionDropped =
+    [ ( nm
+      , [ (u, r)
+        | (c, u) <- sectionAssigns
+        , c == i
+        , Just r <- [Map.lookup u popVerdict.pvDropped]
+        ]
+      )
+    | (i, nm) <- sectionNames
+    ]
+
+  -- Arm (ii)'s lost-line reads this: a § that ALSO had population-dropped
+  -- members must not claim its member decisions are "all emitted".
+  sectionDroppedByName :: Map Text [(Unique, A.DropReason)]
+  sectionDroppedByName = Map.fromListWith (<>) sectionDropped
+
+  -- Aligned with 'sectionTable': BKM-candidate members, which 'sectionTable'
+  -- excludes. A § whose only members are BKMs is NOT a candidate for arm (i):
+  -- its decides ARE emitted, as businessKnowledgeModels.
+  sectionBkmMembers :: [(Text, [Unique])]
+  sectionBkmMembers =
+    [ (nm, [u | (c, u) <- sectionAssigns, c == i, Set.member u bkmCandidateSet])
+    | (i, nm) <- sectionNames
+    ]
+
+  -- One phrase per 'A.DropReason', naming the note code that carries the
+  -- member's own loss. Keep "rule-date-rebinding" verbatim: a test pins it.
+  dropReasonPhrase :: A.DropReason -> Text
+  dropReasonPhrase = \case
+    A.DroppedRuleDateRebind -> "rule-date-rebinding (D-RULEDATE-UNBOUND, §15.12)"
+    A.DroppedFixture        -> "test fixtures (D-FIXTURE, §2.5.6-2)"
+    A.DroppedFixtureHelper  -> "fixture-side helpers (D-FIXTURE, §2.5.6-2)"
+    A.DroppedRegulative     -> "uncalled regulative bodies (D-REGULATIVE, §2.5.6-3)"
+
+  dropNoteCode :: A.DropReason -> Text
+  dropNoteCode = \case
+    A.DroppedRuleDateRebind -> "D-RULEDATE-UNBOUND"
+    A.DroppedFixture        -> "D-FIXTURE"
+    A.DroppedFixtureHelper  -> "D-FIXTURE"
+    A.DroppedRegulative     -> "D-REGULATIVE"
+
+  -- "2 as rule-date-rebinding (…); 1 as test fixtures (…)" — counts grouped
+  -- by reason, in the fixed constructor order, so the text is deterministic.
+  dropReasonSummary :: [A.DropReason] -> Text
+  dropReasonSummary rs = Text.intercalate "; "
+    [ tshow n <> " as " <> dropReasonPhrase r
+    | r <- [ A.DroppedRuleDateRebind, A.DroppedFixture
+           , A.DroppedFixtureHelper, A.DroppedRegulative ]
+    , let n = length (filter (== r) rs)
+    , n > 0
+    ]
+
+  sectionAssigns :: [(Int, Unique)]
+  sectionNames   :: [(Int, Text)]
+  (sectionAssigns, sectionNames) = (assigns, secs)
    where
     MkModule _ _ topSec = modul
     (assigns, secs, _) = goSec Nothing (0 :: Int) topSec
@@ -4539,15 +4620,7 @@ lowerModule opts modul@(MkModule _ uri _) =
               in (as <> as2, ss <> ss2, i2)
             Decide _ dd ->
               let u = getUnique (decideResolved dd)
-              in ( as
-                     <> [ (c, u)
-                        | Just c <- [cur']
-                        , Map.member u decideByUnique
-                        , not (Set.member u bkmCandidateSet)
-                        ]
-                 , ss
-                 , i
-                 )
+              in (as <> [(c, u) | Just c <- [cur']], ss, i)
             _ -> (as, ss, i)
       in foldl' step ([], secs0, idx') ds
 
@@ -4706,21 +4779,28 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   -- The final service NODES, assembled from the FINISHED decisions so the
   -- emitted member lists agree with the emitted edges (lazy — nothing on the
-  -- render path reads these).
-  serviceNodes :: [DrgNode]
-  serviceNodes =
-    [ NodeService MkDecisionService
-        { dsvId             = sid
-        , dsvName           = nm
-        , dsvFeelName       = feel
-        , dsvType           = case outputs of
-            [o] -> maybe DmnAny (.dcnType) (Map.lookup o finishedById)
-            _   -> DmnAny
-        , dsvOutputs        = outputs
-        , dsvEncapsulated   = encapsulated
-        , dsvInputDecisions = inputDecisions
-        , dsvInputData      = inputDataIds
-        }
+  -- render path reads these). A struct that fails the D5/§6.3.10 guards is
+  -- returned 'Left' so D-SVCEMPTY can say so — the skip used to be silent.
+  serviceStructResults :: [Either (Text, Int, Int, Int) DrgNode]
+  serviceStructResults =
+    [ -- probe D5: a service with no outputDecision is a KIE runtime throw and
+      -- a Camunda silence; §6.3.10: at least one of encapsulated /
+      -- inputDecisions SHALL be present. A § that cannot satisfy both emits
+      -- no service — loudly, via D-SVCEMPTY's second arm.
+      if null outputs || (null encapsulated && null inputDecisions)
+        then Left (nm, length outputs, length encapsulated, length inputDecisions)
+        else Right $ NodeService MkDecisionService
+          { dsvId             = sid
+          , dsvName           = nm
+          , dsvFeelName       = feel
+          , dsvType           = case outputs of
+              [o] -> maybe DmnAny (.dcnType) (Map.lookup o finishedById)
+              _   -> DmnAny
+          , dsvOutputs        = outputs
+          , dsvEncapsulated   = encapsulated
+          , dsvInputDecisions = inputDecisions
+          , dsvInputData      = inputDataIds
+          }
     | ((_, nm, us), feel, sid) <- zip3 finalServiceStructs svcFeelNames svcIds
     , let declaredIds = [did | u <- us, Just did <- [Map.lookup u decideByUnique]]
     , let declaredSet = Set.fromList declaredIds
@@ -4758,12 +4838,15 @@ lowerModule opts modul@(MkModule _ uri _) =
             ]
     , let inputDataIds = nubOrd
             [t | dec <- memberDecs, RequiredInput t <- dec.dcnRequirements]
-    -- probe D5: a service with no outputDecision is a KIE runtime throw and a
-    -- Camunda silence; §6.3.10: at least one of encapsulated/inputDecisions
-    -- SHALL be present. A § that cannot satisfy both emits no service.
-    , not (null outputs)
-    , not (null encapsulated && null inputDecisions)
     ]
+
+  serviceNodes :: [DrgNode]
+  serviceNodes = [n | Right n <- serviceStructResults]
+
+  -- (§ name, #outputs, #encapsulated, #inputDecisions) of every guard-failing
+  -- struct, for D-SVCEMPTY's second arm.
+  svcEmptySkips :: [(Text, Int, Int, Int)]
+  svcEmptySkips = [x | Left x <- serviceStructResults]
 
   finishedById :: Map Text Decision
   finishedById = Map.fromList
@@ -4825,6 +4908,72 @@ lowerModule opts modul@(MkModule _ uri _) =
          , Set.member sid emittedServiceIds
          , i `notElem`
              [ j | (uf, j) <- Map.toList svcInvocable, not (null (qualifyingCallers uf)) ]
+         ]
+      -- D-SVCEMPTY (§15.12's companion): one code, one severity, two message
+      -- forms (D-FIXTURE's precedent). Advisory, and the Advisory ⟹ Faithful
+      -- argument is discharged in FIDELITY-SEVERITY-AXIS-SPEC.md §5.2: the
+      -- per-decision loss is already carried by each member's own note
+      -- (D-RULEDATE-UNBOUND / D-REGULATIVE Lossy, D-FIXTURE Advisory), and a
+      -- service shell is grouping metadata (D-FLAVOR-NOSERVICE's grouping-arm
+      -- precedent). Elements are named by the §'s FEEL-folded name, never by
+      -- a service id the artifact does not contain.
+      --
+      -- Arm (i): a § whose ENTIRE decide membership was population-dropped —
+      -- for ANY 'A.DropReason', not only the rebind one. The kept-only
+      -- section table renders such a § indistinguishable from one that never
+      -- held a decide, which is exactly the silence this arm ends. (BKM-only
+      -- §s are excluded: their decides ARE emitted, as BKMs.)
+      <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` has no emitted member decisions: its "
+                <> englishCount (length droppedMembers) <> " member decide(s) "
+                <> Text.intercalate ", " (map (tick . droppedNameOf . fst) droppedMembers)
+                <> " were all dropped at population time ("
+                <> dropReasonSummary (map snd droppedMembers)
+                <> "), so no decisionService is emitted for it")
+             ("nothing an engine needs: the grouping shell had no members left to \
+              \group; the members' own loss is carried by their "
+                <> Text.intercalate " / "
+                     (nubOrd (map (dropNoteCode . snd) droppedMembers))
+                <> " notes")
+         | ((nm, kept), (_, droppedMembers), (_, bkms)) <-
+             zip3 sectionTable sectionDropped sectionBkmMembers
+         , null kept
+         , null bkms
+         , not (null droppedMembers)
+         ]
+      -- Arm (ii): a struct with kept members that cannot satisfy §6.3.10's
+      -- decisionService shape. This skip existed before and was silent; the
+      -- note is new, the behaviour is not. The lost-line is CONDITIONED on
+      -- whether the § also had population-dropped members: the unconditional
+      -- "its member decisions are all emitted" was false on every mixed §
+      -- (three of seven corpus instances), repaired 2026-08-02.
+      <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
+             ("the section `" <> nm <> "` cannot satisfy DMN 1.3 §6.3.10's \
+              \decisionService shape — at least one output decision, and at least one \
+              \encapsulated member or input decision; this one has " <> shapeText
+                <> " — so no decisionService is emitted for it (probe D5: a service \
+                   \with no outputDecision is a KIE runtime throw and a Camunda silence)")
+             lostText
+         | (nm, nOut, nEnc, _nInp) <- svcEmptySkips
+         , let shapeText
+                 | nOut == 0 = "no output decision"
+                 | otherwise =
+                     tshow nOut <> " output(s) but no encapsulated member and no \
+                     \input decision"
+         , let droppedHere = Map.findWithDefault [] nm sectionDroppedByName
+         , let lostText
+                 | null droppedHere =
+                     "the § as a grouping unit: its member decisions are all emitted; \
+                     \only the service shell is not"
+                 | otherwise =
+                     "the § as a grouping unit: its " <> tshow (nOut + nEnc)
+                       <> " emitted member decision(s) are in the artifact, "
+                       <> englishCount (length droppedHere)
+                       <> " member decide(s) were separately dropped at population \
+                          \time (each carries its own "
+                       <> Text.intercalate " / "
+                            (nubOrd (map (dropNoteCode . snd) droppedHere))
+                       <> " note), and the service shell is not emitted"
          ]
 
   emittedServiceIds :: Set Text
@@ -4990,6 +5139,16 @@ lowerModule opts modul@(MkModule _ uri _) =
              \decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a \
              \<decision> whose logic is raw deontic L4 misdescribes both")
             "the obligation's lifecycle: route this rule to the BPMN exporter instead"
+        -- R12 (§15.12): same code as the old lowering-time note, retexted, ONE
+        -- severity (Lossy, D-REGULATIVE's precedent): nothing emitted is
+        -- broken, and the document is genuinely incomplete w.r.t. the source.
+        A.DroppedRuleDateRebind ->
+          dmnNote "D-RULEDATE-UNBOUND" Lossy nm rng
+            ("`" <> nm <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER \
+             \RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no \
+             \scoped rebinding, so no faithful <decision> exists and it is not emitted")
+            "the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE \
+            \across engine invocations"
     | (u, reason) <- Map.toAscList popVerdict.pvDropped
     , let nm  = droppedNameOf u
     , let rng = droppedRangeOf u
@@ -5111,25 +5270,54 @@ lowerModule opts modul@(MkModule _ uri _) =
     , any (.csApplied) (Map.findWithDefault [] ownerU callGraph.cgCalls)
     ]
 
+  -- The decisions whose logic went through the R13 verdict lowering (§16),
+  -- read off the emitted notes: D-VERDICT's element is the decision id, and
+  -- the note is emitted exactly when the lowering fired, so this cannot drift
+  -- from the artifact. Consumed by 'partialNotes', whose default message
+  -- asserts artifact facts ("saturated call sites remain raw L4") the verdict
+  -- lowering falsifies.
+  verdictElemIds :: Set Text
+  verdictElemIds = Set.fromList
+    [n.element | (_, ns) <- lowered, n <- ns, n.code == "D-VERDICT"]
+
   -- D-PARTIAL (§2.4.2, OPEN-1): Phase 4 classifies and reports; it does not
   -- change node kind. A ¬DMN-SAFE decision simply does not un-lift — it keeps
   -- today's <decision> + verbatim call sites — and carries this note at the
   -- ruled severity, keyed off the CALL SITE, not the node kind (null arrives
   -- identically from a <decision> body, a BKM's encapsulatedLogic or an
   -- inlined cell; routing removes the widening, never the coercion).
+  --
+  -- A VERDICT-LOWERED decide (§16) takes a different message form: its body
+  -- ships as a decision table that always answers, and no raw-L4 call site of
+  -- it remains, so what stays uncertified is the L4 SOURCE — retexted rather
+  -- than left asserting artifact facts R13 falsified.
   partialNotes =
-    [ dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
-        ("`" <> decideName d <> "` could not be certified total ("
-           <> clauseText
-           <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
-              \call sites remain raw L4 (Phase 5 routes such decisions to a \
-              \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
-              \on every input any requiring decision is evaluated on, and an undefined \
-              \FEEL result is null, which reads as false in every consuming boolean \
-              \position"
-           <> fallbackText)
-        "the certainty that this node evaluates wherever the DRG reaches it: an input \
-        \outside the decision's domain answers null with status SUCCEEDED, not an error"
+    [ if Set.member did verdictElemIds
+        then
+          dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+            ("`" <> decideName d <> "` could not be certified total ("
+               <> clauseText
+               <> "), so it is not un-lifted. Its deontic body is lowered to a verdict \
+                  \decision table (see D-VERDICT), which always answers one row, and no \
+                  \raw-L4 call site of it remains in the artifact; what could not be \
+                  \certified is the L4 source itself — the HENCE self-recursion may not \
+                  \terminate — and the artifact does not carry that recursion")
+            "the certainty that the SOURCE obligation spine terminates: the verdict \
+            \table answers regardless, and the L4 recursion it summarises is what could \
+            \not be certified"
+        else
+          dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+            ("`" <> decideName d <> "` could not be certified total ("
+               <> clauseText
+               <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
+                  \call sites remain raw L4 (Phase 5 routes such decisions to a \
+                  \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
+                  \on every input any requiring decision is evaluated on, and an undefined \
+                  \FEEL result is null, which reads as false in every consuming boolean \
+                  \position"
+               <> fallbackText)
+            "the certainty that this node evaluates wherever the DRG reaches it: an input \
+            \outside the decision's domain answers null with status SUCCEEDED, not an error"
     | d <- decides
     , let u = getUnique (decideResolved d)
     , Just issues <- [Map.lookup u safetyIssues]
@@ -5574,63 +5762,12 @@ lowerModule opts modul@(MkModule _ uri _) =
       reason : _ -> literalFallback (SumTypeRead reason)
       [] -> plainLowering
 
-    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes <> ruleDateUnboundNotes
-
-    -- D-RULEDATE-UNBOUND (§15.5). A decision that evaluates a sub-graph under
-    -- its OWN rule date cannot be governed by the DRG's single global rule-date
-    -- input, because DMN has no scoped rebinding. This ACCOMPANIES its
-    -- D-LITERALEXPR; it does not replace it.
-    --
-    -- v1 matches `EVAL UNDER RULES EFFECTIVE AT` only. The valid-time /
-    -- transaction-time builtins stamp a DIFFERENT temporal context and were not
-    -- measured; adding them silently would change counts with nothing behind
-    -- them (§15.5).
-    ruleDateUnboundNotes =
-      [ uncurry (dmnNote "D-RULEDATE-UNBOUND" Blocking did (bestRange body))
-          ruleDateUnboundText
-      | any isEvalUnderRules subExprs
-      ]
-
-    -- The claim is SCOPED TO WHAT WAS EMITTED. `EVAL UNDER RULES EFFECTIVE AT`
-    -- can sit inside an arm body of a chain that still tabulates, and saying "no
-    -- DMN engine can evaluate this decision" of a decision that ships a real
-    -- <decisionTable> would be false about the rest of the table. On today's
-    -- corpus all 15 instances are boxed literals, which is asserted rather than
-    -- assumed (jl4/tests/DmnExport.hs, "scopes D-RULEDATE-UNBOUND's claim") --
-    -- but the note must not depend on that staying true.
-    ruleDateUnboundText = case logic of
-      -- A hydrator takes the same reading as a boxed literal: neither has any
-      -- row, so nothing about it is "still governed by the rule-date input".
-      -- It is also unreachable in practice -- hydrators are minted OUTSIDE
-      -- this per-decide computation, so 'logic' here is never a context -- but
-      -- the arm is written to the same standard rather than left as an error,
-      -- because an unreachable branch that becomes reachable is exactly how a
-      -- scoped claim silently stops being scoped.
-      LogicContext _ -> literalUnboundText
-      LogicLiteral _ -> literalUnboundText
-      LogicTable _ ->
-        ( "a sub-expression of `" <> decideName d
-            <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-               \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-               \rebinding, so that sub-graph is not governed by it and cannot be, even \
-               \though the surrounding decision table is"
-        , "execution of the rebound sub-graph: supplying the model's rule-date input does \
-          \not make it answer, and the table around it will answer as though it had"
-        )
-
-    literalUnboundText =
-      ( "`" <> decideName d
-          <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-             \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-             \rebinding, so this decision is not governed by it and cannot be"
-      , "execution: no DMN engine can evaluate this decision, and -- the part a reader is \
-        \most likely to get wrong -- supplying the model's rule-date input does not make \
-        \it answer"
-      )
-
-    isEvalUnderRules = \case
-      App _ r _ -> getUnique r == TC.evalUnderRulesEffectiveAtUnique
-      _         -> False
+    -- D-RULEDATE-UNBOUND moved to population time (R12, §15.12): a decide that
+    -- rebinds law time is dropped by 'classifyPopulation' before this function
+    -- ever sees it, and 'populationNotes' carries the (now Lossy) note. The
+    -- per-decision two-message machinery that lived here described an emitted
+    -- element that no longer exists.
+    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes
 
     -- Computed ONCE and shared by 'plainLowering' and the requirement rewrite
     -- below, so the emitted logic and the emitted DRG edges cannot disagree.
@@ -5651,6 +5788,38 @@ lowerModule opts modul@(MkModule _ uri _) =
     datedSurvivors = case datedResult of
       Dated arms oth _ -> Just (map (.daBody) arms <> [oth])
       _                -> Nothing
+
+    -- R13 (§16): the verdict lowering's one decision point, computed ONCE and
+    -- shared by 'ordinaryPath' (which emits the table) and 'dcnRequirements'
+    -- (which emits the edges), so the two cannot disagree — R11's own
+    -- discipline. The law-time gate keeps R10's ruling intact: a
+    -- law-time-guarded obligation (`dated-chain-regulative.l4`) stays refused
+    -- rather than quietly acquiring a verdict table under a ruling that never
+    -- looked at it.
+    verdictLowering :: Maybe (GuardedRows, GuardedRows, [Text], [Expr Resolved])
+    verdictLowering = do
+      guard (null sumTypeReasons)
+      rs0 <- guardedRows
+      guard (not (rowsElided body rs0))
+      let (rs, capped) = flattenGuarded rs0
+      guard (not (any guardReadsLawTime (map fst rs.grRows)))
+      (rs', vs) <- verdictRows rs
+      pure (rs, rs', vs, capped)
+
+    guardReadsLawTime g =
+      or
+        [ getUnique r == TC.rulesEffectiveDateUnique
+            || Map.member (getUnique r) lawTimePreds
+        | r@Ref {} <- toList g
+        ]
+
+    -- 'renderFeelIn' renders a saturated call to an un-lifted decision as the
+    -- callee's bare FEEL name, argument discarded (Phase 4, §2.1). The same
+    -- discard is applied here before 'survivingRefs' so the verdict table's
+    -- edges describe the emitted cells, not the source call.
+    pruneUnliftedArgs = transformOf (gplate @(Expr Resolved)) \case
+      App a f (_ : _) | Set.member (getUnique f) unliftedSet -> App a f []
+      e -> e
 
     plainLowering = case peeled of
       Left loss -> literalFallback loss
@@ -5707,11 +5876,37 @@ lowerModule opts modul@(MkModule _ uri _) =
      where
       ordinaryPath rs0
         | rowsElided body rs0 = literalFallback RowsElided
+        -- R13 (§16): the verdict lowering. The rewritten rows go through the
+        -- SAME 'rowsToDmnWith'' as every ordinary table; the overridden ctx
+        -- types the output column `string` and enumerates the verdict domain
+        -- as outputValues (§3.2's mechanism). A refusal it still hits
+        -- (an effectful guard, say) falls back to 'literalFallback' on the
+        -- ORIGINAL body, exactly as if the verdict path did not exist.
+        | Just (_, rs', vs, capped) <- verdictLowering =
+            let tctxV = tctx { tcOutputType = DmnString, tcOutputValues = Just vs }
+            in case rowsToDmnWith' tctxV inlined capped rs' of
+                 Right t   -> (LogicTable t, verdictNotes)
+                 Left loss -> literalFallback loss
         | otherwise =
             let (rs, capped) = flattenGuarded rs0
             in case rowsToDmnWith' tctx inlined capped rs of
                  Right t   -> (LogicTable t, [])
                  Left loss -> literalFallback loss
+
+      -- D-VERDICT (§16), Lossy: real content routed to another artifact
+      -- (D-REGULATIVE's precedent). Its own code per §7's house doctrine.
+      verdictNotes =
+        [ dmnNote "D-VERDICT" Lossy did (bestRange body)
+            ("`" <> decideName d <> "` has a deontic body; it is lowered to a VERDICT \
+             \decision table over its guards, each rule's output a string naming the \
+             \arm. The obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) are the \
+             \BPMN exporter's job (`l4 export --to=bpmn`): WITHIN deadlines are the \
+             \exported deadline decisions, the HENCE loop is the BPMN loop-back edge, \
+             \and a BPMN gateway consumes this verdict to choose the process path")
+            "the obligation as a state: PARTY/WITHIN/HENCE/LEST do not survive into \
+            \this artifact; the verdict names the arm, the BPMN projection carries the \
+            \lifecycle"
+        ]
 
     -- Never drop a decision. DMN's own answer for logic that is not tabular is a
     -- boxed literal expression, and a DRG that quietly omitted such decisions
@@ -5795,14 +5990,34 @@ lowerModule opts modul@(MkModule _ uri _) =
             in sort . nubOrd $
                  RequiredInput lawId
                    : mapMaybe (classifyRef did) survivors <> hydratorEdges touched
-          _ ->
-            let (survivors, touched) = survivingRefs [view decideBody d]
-                -- 'freeRefs' bounds the survivors to what this decide does not
-                -- itself bind, exactly as before; the fold only removes.
-                free = Set.fromList (map getUnique (freeRefs d))
-                kept = [r | r <- survivors, Set.member (getUnique r) free]
-            in sort . nubOrd $
-                 mapMaybe (classifyRef did) kept <> hydratorEdges touched
+          _ -> case verdictLowering of
+            -- R13 × R11: a verdict table's requirements are computed from what
+            -- SURVIVES into the artifact — the GUARDS, and nothing else. The
+            -- deontic arm bodies are rewritten to string literals, so their
+            -- references (the WITHIN deadline decisions, the HENCE self-call)
+            -- must not become edges the expression contradicts; in particular
+            -- the self-edge never enters the IR, which is what makes the
+            -- corpus D-CYCLE disappear by construction rather than by
+            -- suppression (§6.4.4-4a's XML-time eraser is untouched and still
+            -- guarded by cycle-p3-self). A saturated call to an UN-LIFTED
+            -- decision renders as the callee's bare FEEL name with the
+            -- argument discarded, so the discarded argument's refs are pruned
+            -- for the same R11 reason: the emitted cell does not mention them.
+            Just (rs, _, _, _) ->
+              let (survivors, touched) =
+                    survivingRefs (map pruneUnliftedArgs (map fst rs.grRows))
+                  free = Set.fromList (map getUnique (freeRefs d))
+                  kept = [r | r <- survivors, Set.member (getUnique r) free]
+              in sort . nubOrd $
+                   mapMaybe (classifyRef did) kept <> hydratorEdges touched
+            Nothing ->
+              let (survivors, touched) = survivingRefs [view decideBody d]
+                  -- 'freeRefs' bounds the survivors to what this decide does not
+                  -- itself bind, exactly as before; the fold only removes.
+                  free = Set.fromList (map getUnique (freeRefs d))
+                  kept = [r | r <- survivors, Set.member (getUnique r) free]
+              in sort . nubOrd $
+                   mapMaybe (classifyRef did) kept <> hydratorEdges touched
       }
      where
       hydratorEdges touched =
@@ -5974,6 +6189,79 @@ isRegulative = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
   Event {}      -> True
   Breach {}     -> True
   _             -> False
+
+------------------------------------------------------------------------
+-- The deontic verdict lowering (R13, §16)
+------------------------------------------------------------------------
+
+-- | R13 (§16): a flattened guarded chain whose EVERY row body (and OTHERWISE)
+-- is a single deontic arm — one 'Regulative' node, or @FULFILLED@ — with at
+-- least one genuine 'Regulative' among them, lowers to a VERDICT decision
+-- table: each body is rewritten to a string literal naming the arm, and the
+-- table's guards carry the whole decision. The obligation semantics
+-- (PARTY\/MUST\/WITHIN\/HENCE\/LEST) are the BPMN exporter's job; a BPMN
+-- gateway consumes the verdict to choose the process path.
+--
+-- v1 scope, deliberately narrow: a MIXED chain (an arm that is @RAND@\/@ROR@
+-- of obligations, or any non-arm deontic shape) answers 'Nothing' here and
+-- keeps today's 'RegulativeBody' refusal; a BARE deontic body never reaches
+-- this function ('normaliseGuarded' answers 'Nothing') and keeps
+-- 'NotAGuardedChain'. The caller additionally gates law-time-guarded chains
+-- off this path (R10's fixture `dated-chain-regulative.l4` pins that
+-- refusal), so this function never needs to know about law time.
+--
+-- Returns the rewritten rows and the verdict domain (first-mention order,
+-- deduplicated) for the output column's @outputValues@.
+verdictRows :: GuardedRows -> Maybe (GuardedRows, [Text])
+verdictRows rs = do
+  guard (not (null rs.grRows))
+  let bodies = map snd rs.grRows <> maybeToList rs.grOtherwise
+  guard (any (\case Regulative {} -> True; _ -> False) bodies)
+  vs <- traverse verdictOf bodies
+  let (rowVs, othVs) = splitAt (length rs.grRows) vs
+      lit b v = Lit (getAnno b) (StringLit emptyAnno v)
+  pure
+    ( rs
+        { grRows = zipWith (\(g, b) v -> (g, lit b v)) rs.grRows rowVs
+        , grOtherwise = case (rs.grOtherwise, othVs) of
+            (Just b, [v]) -> Just (lit b v)
+            _             -> Nothing
+        }
+    , nubOrd vs
+    )
+
+-- | The verdict a deontic arm resolves to, or 'Nothing' when the arm is not a
+-- shape v1 summarises. Deterministic and total on the matched shapes:
+--
+--   * @MUST act@              → the action's declared name, verbatim
+--   * @… HENCE k@             → suffix @" and continue"@
+--   * @MAY act@               → prefix @"may "@
+--   * @SHANT act@ (@MUST NOT@) → prefix @"must not "@
+--   * @DO act@                → the action name (the modal adds no direction)
+--   * @FULFILLED@             → @"fulfilled"@
+--
+-- @WITHIN@, @LEST@ and @PROVIDED@ are deliberately absent from the string:
+-- deadlines are the already-exported deadline decisions, and the reparation
+-- path is process structure — both BPMN's, per the D-VERDICT note. Exact
+-- strings are pinned by goldens, not sacred.
+verdictOf :: Expr Resolved -> Maybe Text
+verdictOf = \case
+  Regulative _ d -> do
+    nm <- actionName d.action.action
+    let modal = case d.action.modal of
+          DMust    -> ""
+          DDo      -> ""
+          DMay     -> "may "
+          DMustNot -> "must not "
+        henceTail = maybe "" (const " and continue") d.hence
+    pure (modal <> nm <> henceTail)
+  App _ r [] | getUnique r == TC.fulfilUnique -> Just "fulfilled"
+  _ -> Nothing
+ where
+  actionName = \case
+    PatApp _ n _ -> Just (nameOf n)
+    PatVar _ n   -> Just (nameOf n)
+    _            -> Nothing
 
 ------------------------------------------------------------------------
 -- Small helpers

@@ -1,0 +1,73 @@
+-- NEGATIVE fixture for R12 (spec §15.12): rule-date-REBINDING decides are not
+-- emitted.
+--
+-- `EVAL UNDER RULES EFFECTIVE AT` evaluates a sub-graph under its OWN rule
+-- date. A DMN DRG has one global rule-date input and no scoped rebinding, so
+-- no faithful <decision> exists for such a decide: it is dropped by the
+-- population filter (§2.5.6's new structural rule), and the D-RULEDATE-UNBOUND
+-- note — now Lossy, not Blocking — says so from the population side.
+--
+-- Four decides, each pinning one edge of the rule:
+--
+--   * `the fee under the 2016 rules`         the plain rebind, DROPPED;
+--   * `twice the 2016 fee`                   its surviving CALLER: it stays
+--                                            emitted, and the dropped callee
+--                                            surfaces as an ordinary inputData
+--                                            (no dangling requiredDecision);
+--   * `the fee under the 2019 rules, doubled` the rebind hidden in a WHERE
+--                                            local — the population predicate
+--                                            runs over the RAW body, and this
+--                                            pins that it sees through WHERE
+--                                            exactly as the old peeled-body
+--                                            detection did;
+--   * `the fixture-shaped rebind`            ALSO satisfies FIXTURE(a)-(c)
+--                                            module-locally (referenced only
+--                                            from a directive argument, no
+--                                            callers, never the tested
+--                                            subject) — it must carry ONE drop
+--                                            reason (the rebind) and no
+--                                            D-FIXTURE advisory, even when the
+--                                            importer view is unavailable.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `rule-date rebinding`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A NUMBER
+`the fee` MEANS
+    IF `RULES EFFECTIVE DATE` AT LEAST Date 1 1 2024 THEN 9 ELSE 3
+
+-- The plain rebind. Dropped (D-RULEDATE-UNBOUND, Lossy).
+GIVETH A NUMBER
+`the fee under the 2016 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 9 2016) `the fee`
+
+-- Its surviving caller. Kept; the dropped callee becomes an inputData.
+GIVETH A NUMBER
+`twice the 2016 fee` MEANS
+    `the fee under the 2016 rules` TIMES 2
+
+-- The WHERE-wrapped rebind. Dropped by the same raw-body predicate.
+GIVETH A NUMBER
+`the fee under the 2019 rules, doubled` MEANS
+    pinned TIMES 2
+    WHERE
+        pinned MEANS `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) `the fee`
+
+-- The fixture-crossing case: referenced only from the directive argument
+-- position below, no callers, never the tested subject — FIXTURE(a)-(c) —
+-- AND a rebind. The rebind drop must win, alone.
+GIVETH A NUMBER
+`the fixture-shaped rebind` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 9 2016) `the fee`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`double` n MEANS n TIMES 2
+
+#EVAL `double` `the fixture-shaped rebind`

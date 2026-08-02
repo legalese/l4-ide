@@ -2267,8 +2267,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
     -- §15.5's invariant, asserted over EVERY golden subject rather than left to
     -- the goldens: no emitted model may reference law time without either the
-    -- bound input plus its Advisory, or the Blocking finding.
-    it "never references law time without a binding or a Blocking note (§15.5)" $
+    -- bound input plus its Advisory, or the Lossy population finding (R12
+    -- re-severed D-RULEDATE-UNBOUND Blocking → Lossy, spec §15.12).
+    it "never references law time without a binding or a Lossy note (§15.5)" $
       forM_ goldenSubjects \(srcPath, stem, _) -> do
         src <- Text.readFile (examplesRoot </> srcPath)
         let drg   = drgAsCli srcPath src
@@ -2282,7 +2283,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           unless ((bound && length ruleDate == 1) || not (null unbound)) $
             expectationFailure
               (stem <> " references law time with neither a bound input + one \
-                        \D-RULEDATE Advisory nor a D-RULEDATE-UNBOUND Blocking")
+                        \D-RULEDATE Advisory nor a D-RULEDATE-UNBOUND Lossy")
 
     -- D2, the PREDICATE idiom. The cells are asserted VERBATIM because the
     -- closed-low/open-high convention is the whole content of the lowering.
@@ -2438,30 +2439,158 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral _ -> expectationFailure "expected the ordinary table"
 
         LogicContext _ -> expectationFailure "unexpected boxed context"
-    it "fires D-RULEDATE-UNBOUND on every EVAL UNDER RULES EFFECTIVE AT decision" $ do
+    -- R12 (§15.12): a rule-date-rebinding decide is DROPPED at population
+    -- time, so the note is a population note (Lossy) about a decision the
+    -- artifact does not contain — one per rebinding decide, 15 on the corpus.
+    it "drops every EVAL UNDER RULES EFFECTIVE AT decision, Lossy-noted (§15.12)" $ do
       drg <- corpusDrg
       let ns = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
-      ns `shouldSatisfy` (not . null)
-      map (.severity) ns `shouldSatisfy` all (== Blocking)
+      length ns `shouldBe` 15
+      map (.severity) ns `shouldSatisfy` all (== Lossy)
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not emitted")
+      -- ...and none of the named decisions is in the DRG. Population notes
+      -- name the decide by its L4 name (there is no element id to name).
+      let emittedNames = Set.fromList [d.dcnName | d <- drgDecisions drg]
+      [n.element | n <- ns, Set.member n.element emittedNames] `shouldBe` []
+      -- the ~20 assert-only scenario fixtures are NOT rebind-dropped: the gate
+      -- is the structural rebind property, never test-ness (the R12 tripwire).
+      emittedNames `shouldSatisfy` Set.member "the base case qualifies"
 
-    -- ...and the note's CLAIM is scoped to what was emitted. "No DMN engine can
-    -- evaluate this decision" is true of a boxed literal and false of a
-    -- decision that still ships a table (the rebinding can sit inside an arm
-    -- body). Asserted as an invariant over every subject rather than as a fact
-    -- about today's corpus, which is what the earlier version did.
-    it "scopes D-RULEDATE-UNBOUND's claim to what was emitted (§15.5)" $
+    -- The §15.12 non-emission invariant, over every golden subject: no decide
+    -- carrying D-RULEDATE-UNBOUND appears in the emitted decision population.
+    -- (This replaces the retired two-message scoping test: with nothing
+    -- emitted, there is no emitted logic for the claim to be scoped to.)
+    it "never emits a decision that carries D-RULEDATE-UNBOUND (§15.12)" $
       forM_ goldenSubjects \(srcPath, stem, _) -> do
         src <- Text.readFile (examplesRoot </> srcPath)
-        let drg  = drgAsCli srcPath src
-            ns   = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
-            lits = [d.dcnId | d <- drgDecisions drg, LogicLiteral _ <- [d.dcnLogic]]
+        let drg   = drgAsCli srcPath src
+            ns    = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+            names = Set.fromList [d.dcnName | d <- drgDecisions drg]
         forM_ ns \n ->
-          unless (if n.element `elem` lits
-                    then Text.isInfixOf "no DMN engine can evaluate this decision" n.lost
-                    else Text.isInfixOf "a sub-expression of" n.message) $
+          when (Set.member n.element names) $
             expectationFailure
               (stem <> ": D-RULEDATE-UNBOUND on " <> Text.unpack n.element
-                 <> " claims more than the emitted logic supports")
+                 <> " but the decision was emitted anyway")
+
+    describe "the ruledate-rebind fixture (§15.12)" $ do
+      let rebindDrg = do
+            src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
+            pure (drgAsCli "ruledate-rebind.l4" src)
+
+      it "drops the rebinding decides — plain AND WHERE-wrapped — with one Lossy note each" $ do
+        drg <- rebindDrg
+        let names = [d.dcnName | d <- drgDecisions drg]
+        names `shouldNotSatisfy` elem "the fee under the 2016 rules"
+        -- raw-body traversal parity: the old detection ran over the peeled
+        -- body; the population predicate must see through WHERE too
+        names `shouldNotSatisfy` elem "the fee under the 2019 rules, doubled"
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+        map (.severity) ns `shouldSatisfy` all (== Lossy)
+        length ns `shouldBe` 3
+
+      it "keeps the CALLER, whose dropped callee surfaces as an inputData" $ do
+        drg <- rebindDrg
+        let caller = decisionNamed "twice the 2016 fee" drg
+            inputs = [i | NodeInputData i <- drg.drgNodes]
+        [i.idId | i <- inputs, i.idName == "the fee under the 2016 rules"]
+          `shouldBe` ["input_the_fee_under_the_2016_rules"]
+        caller.dcnRequirements
+          `shouldSatisfy` elem (RequiredInput "input_the_fee_under_the_2016_rules")
+        -- no dangling edge: every requirement resolves to an emitted element
+        let decisionIds = Set.fromList [d.dcnId | d <- drgDecisions drg]
+            inputIds    = Set.fromList [i.idId | i <- inputs]
+        forM_ [d | d <- drgDecisions drg] \d ->
+          forM_ d.dcnRequirements \case
+            RequiredDecision t -> Set.member t decisionIds `shouldBe` True
+            RequiredInput t    -> Set.member t inputIds `shouldBe` True
+
+      it "gives a fixture-shaped rebind ONLY the rebind drop, even unverified (§15.12)" $ do
+        -- `the fixture-shaped rebind` satisfies FIXTURE(a)-(c) module-locally.
+        -- With no importer view, the fixture filter would KEEP it with a
+        -- report-only D-FIXTURE advisory — but the rebind gate is structural
+        -- and unconditional, so it is dropped as a rebind, with no D-FIXTURE
+        -- beside the drop and no second drop reason.
+        src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
+        let drg = drgGeneral emptyVFS (\o -> o { dloExternalRefNames = Nothing })
+                    defaultDmnFlavor (const "Test") src
+            notes = (dmnReport drg).notes
+        [d.dcnName | d <- drgDecisions drg] `shouldNotSatisfy` elem "the fixture-shaped rebind"
+        [n.code | n <- notes, n.element == "the fixture-shaped rebind"]
+          `shouldBe` ["D-RULEDATE-UNBOUND"]
+
+      it "still drops on --include-tests: the gate is structural, not test-ness" $ do
+        src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
+        let drg = drgAdjusted (\o -> o { dloIncludeTests = True }) src
+        [d.dcnName | d <- drgDecisions drg] `shouldNotSatisfy` elem "the fee under the 2016 rules"
+        [n.code | n <- (dmnReport drg).notes, n.element == "the fee under the 2016 rules"]
+          `shouldBe` ["D-RULEDATE-UNBOUND"]
+
+    describe "D-SVCEMPTY (the un-emitted decisionService, §15.12's companion)" $ do
+      let svcEmptyDrg = do
+            src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "svc-empty-ruledate.l4")
+            pure (drgAsCli "svc-empty-ruledate.l4" src)
+
+      it "emits NO decisionService and one Advisory per un-emitted §, two message forms" $ do
+        drg <- svcEmptyDrg
+        [s | NodeService s <- drg.drgNodes] `shouldBe` []
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
+        map (.severity) ns `shouldSatisfy` all (== Advisory)
+        -- arm (i): the § whose whole membership was rebind-dropped
+        [n | n <- ns, n.element == "pinned_scenarios"] `shouldSatisfy` \arm ->
+          length arm == 1
+            && all (Text.isInfixOf "rule-date-rebinding" . (.message)) arm
+        -- arm (ii): the kept-but-shapeless § (the previously silent D5 skip)
+        [n | n <- ns, n.element == "fees"] `shouldSatisfy` \arm ->
+          length arm == 1 && all (Text.isInfixOf "6.3.10" . (.message)) arm
+        length ns `shouldBe` 2
+
+      it "never lets D-FLAVOR-NOSERVICE name a service the artifact does not contain" $ do
+        drg <- svcEmptyDrg
+        [n | n <- (dmnReport drg).notes, n.code == "D-FLAVOR-NOSERVICE"] `shouldBe` []
+
+      -- The 2026-08-02 widening, pinned on the corpus because the corpus is
+      -- where both halves were measured false: arm (i) was rebind-only, which
+      -- left the all-fixture `Group 6 — advertising (Rule 204)` exactly as
+      -- silent as the silence the note exists to end; and arm (ii)'s
+      -- unconditional lost-line claimed "its member decisions are all
+      -- emitted" of three §s whose members the SAME report records as
+      -- dropped (15 rebinds in the rule-version §, 4 fixtures in `Fixtures`,
+      -- 1 uncalled regulative in §6).
+      it "names the corpus's all-fixture § (Group 6) via arm (i)" $ do
+        drg <- corpusDrg
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
+        [n | n <- ns, Text.isInfixOf "Group 6" n.message] `shouldSatisfy` \arm ->
+          length arm == 1
+            && all (Text.isInfixOf "test fixtures (D-FIXTURE" . (.message)) arm
+            && all (Text.isInfixOf "no emitted member decisions" . (.message)) arm
+
+      it "claims 'all emitted' ONLY of §s with no dropped members (the mixed lost-line)" $ do
+        drg <- corpusDrg
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
+            claimsAll n = Text.isInfixOf "all emitted" n.lost
+        -- the pure arm-(ii) §s keep the strong claim …
+        sort [n.element | n <- ns, claimsAll n]
+          `shouldBe` [ "Group_4_disclosure_Rule_201_t_boundaries_at_124_000_618_000_1_235_000"
+                     , "Periods_every_deadline_bound_once"
+                     , "Thresholds_every_dollar_figure_bound_once_dated_per_regime"
+                     , "_2_Offering_limit_Rule_100_a_1"
+                     ]
+        -- … and every mixed § says instead how many decides were dropped,
+        -- naming the note code that carries each member's own loss
+        let mixed = [n | n <- ns, Text.isInfixOf "separately dropped" n.lost]
+        sort [n.element | n <- mixed]
+          `shouldBe` [ "Fixtures"
+                     , "The_rule_version_axis_the_same_question_under_four_regimes"
+                     , "_6_Advertising_restrictions_Rule_204"
+                     ]
+        [n.lost | n <- mixed, n.element == "Fixtures"]
+          `shouldSatisfy` all (Text.isInfixOf "D-FIXTURE")
+        [ n.lost
+          | n <- mixed
+          , n.element == "The_rule_version_axis_the_same_question_under_four_regimes"
+          ] `shouldSatisfy` all (Text.isInfixOf "D-RULEDATE-UNBOUND")
+        [n.lost | n <- mixed, n.element == "_6_Advertising_restrictions_Rule_204"]
+          `shouldSatisfy` all (Text.isInfixOf "D-REGULATIVE")
 
     it "carries the @ref citation into the annotation column (§15.9)" $ do
       drg <- corpusDrg
@@ -2491,6 +2620,105 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         | n <- (markdownReport drg).notes
         , n.code == "D-MD-CELLSYNTAX"
         ] `shouldSatisfy` (not . null)
+
+  ----------------------------------------------------------------------
+  -- The deontic verdict lowering (R13, spec §16)
+  ----------------------------------------------------------------------
+  describe "the deontic verdict lowering (R13, §16)" $ do
+    let corpusDrg = do
+          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          pure (drgAsCli "regcf.l4" src)
+        verdictDrg = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "deontic-verdict.l4")
+          pure (drgAsCli "deontic-verdict.l4" src)
+
+    it "lowers the corpus reporting spine to a FIRST verdict table over its guards" $ do
+      drg <- corpusDrg
+      let dec = decisionNamed "ongoing reporting obligation" drg
+      dec.dcnType `shouldBe` DmnString
+      case dec.dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          map (.feText) (map (.drOutput) t.dtRules)
+            `shouldBe` [ "\"file a Form C-TR termination of reporting\""
+                       , "\"fulfilled\""
+                       , "\"file a Form C-AR annual report and continue\""
+                       ]
+          t.dtOutput.ocType `shouldBe` DmnString
+          t.dtOutput.ocValues
+            `shouldBe` Just [ "file a Form C-TR termination of reporting"
+                            , "fulfilled"
+                            , "file a Form C-AR annual report and continue"
+                            ]
+        _ -> expectationFailure "expected the verdict decision table"
+      -- R13 × R11: the requirements are the GUARDS' survivors, nothing else —
+      -- in particular no self-edge (the HENCE call does not survive) and no
+      -- edge on the un-lifted callee's discarded argument.
+      dec.dcnRequirements
+        `shouldBe` [ RequiredDecision "decision_ongoing_reporting_obligation_may_terminate"
+                   , RequiredInput "input_annual_cycles"
+                   ]
+
+    it "makes the corpus D-CYCLE disappear by construction, and empties Blocking" $ do
+      drg <- corpusDrg
+      let notes = (dmnReport drg).notes
+      [n | n <- notes, n.code == "D-CYCLE"] `shouldBe` []
+      -- the R0 headline: nothing in the corpus report is Blocking any more
+      [(n.code, n.element) | n <- notes, n.severity == Blocking] `shouldBe` []
+      [n.severity | n <- notes, n.code == "D-VERDICT"] `shouldBe` [Lossy]
+      [n | n <- notes, n.code == "D-LITERALEXPR"
+         , n.element == "decision_ongoing_reporting_obligation"] `shouldBe` []
+      -- D-PARTIAL stays — it describes the L4 source — in its verdict-aware
+      -- form, which must not claim raw-L4 call sites the artifact lost
+      let partials = [n | n <- notes, n.code == "D-PARTIAL"]
+      map (.element) partials `shouldBe` ["decision_ongoing_reporting_obligation"]
+      map (.message) partials `shouldSatisfy`
+        all (Text.isInfixOf "verdict decision table")
+      map (.message) partials `shouldSatisfy`
+        all (not . Text.isInfixOf "remain raw L4")
+
+    it "pins every verdictOf spelling on the off-corpus exhibit" $ do
+      drg <- verdictDrg
+      let dec = decisionNamed "reporting duty" drg
+      case dec.dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          map (.feText) (map (.drOutput) t.dtRules)
+            `shouldBe` [ "\"file the termination report\""
+                       , "\"fulfilled\""
+                       , "\"may publish a notice\""
+                       , "\"must not advertise the offering\""
+                       , "\"file the annual report and continue\""
+                       ]
+        _ -> expectationFailure "expected the verdict decision table"
+      -- the HENCE self-call never becomes a self-edge
+      dec.dcnRequirements `shouldNotSatisfy`
+        elem (RequiredDecision "decision_reporting_duty")
+      [n | n <- (dmnReport drg).notes, n.code == "D-CYCLE"] `shouldBe` []
+
+    it "keeps the v1 scope: a RAND arm still refuses RegulativeBody" $ do
+      drg <- verdictDrg
+      case (decisionNamed "joint duty" drg).dcnLogic of
+        LogicTable _ -> expectationFailure "a RAND arm was verdict-tabulated"
+        _            -> pure ()
+      [ n | n <- (dmnReport drg).notes
+          , n.code == "D-LITERALEXPR"
+          , n.element == "decision_joint_duty"
+          , n.severity == Blocking
+          , Text.isInfixOf "deontic (regulative) body" n.message
+        ] `shouldSatisfy` ((== 1) . length)
+
+    it "keeps the v1 scope: a bare deontic body is still NotAGuardedChain" $ do
+      drg <- verdictDrg
+      case (decisionNamed "bare duty" drg).dcnLogic of
+        LogicTable _ -> expectationFailure "a bare deontic body was verdict-tabulated"
+        _            -> pure ()
+      [ n | n <- (dmnReport drg).notes
+          , n.code == "D-LITERALEXPR"
+          , n.element == "decision_bare_duty"
+          , n.severity == Blocking
+          , Text.isInfixOf "not a guarded chain" n.message
+        ] `shouldSatisfy` ((== 1) . length)
 
   describe "Phase 4: un-lifting, DMN-SAFE, and the population filter" $ do
     let notesOf code drg = [n | n <- (dmnReport drg).notes, n.code == code]
@@ -3489,6 +3717,13 @@ goldenSubjects =
   , ( "dmn" </> "svc.l4"
     , "svc"
     , "the §-invocation exhibit"
+    )
+    -- The R13 exhibit (spec §16): the deontic verdict lowering, off-corpus —
+    -- one chain exercising every `verdictOf` spelling, plus the two negative
+    -- controls that pin the v1 scope (RAND arm; bare deontic body).
+  , ( "dmn" </> "deontic-verdict.l4"
+    , "deontic-verdict"
+    , "the deontic-verdict exhibit"
     )
   ]
 

@@ -27,14 +27,18 @@ deleting a golden and re-running `cabal test jl4:jl4-test` twice.
 `reg-cf.l4` is written in module-level-scalar (`ASSUME`) style, which is the program
 model DMN itself has, and its **figures are illustrative** — its own header says so, and
 it must never be quoted as a statement of Reg CF. `regcf-corpus.*` is the real thing,
-and it is here to be honest about what the real thing costs. Measured 2026-08-01 on the
-shipped goldens (Phase 5: BKM emission + the λ-lift + the fragment-keyed severity):
-**82 decisions, 10 businessKnowledgeModels, 7 decisionServices, 15 `inputData`,
-32 blocking notes (95 at the Phase 4 merge; the figure 114 previously quoted
-here was already stale when written)** — and the 32 decompose exactly: 15
-`EVAL UNDER RULES EFFECTIVE AT` bodies (the temporal family, not Phase 5's), the
-deontic reporting spine and its D-CYCLE, and 15 `D-RULEDATE-UNBOUND` companions.
-The old one-sentence diagnosis — a DMN decision is a 0-ary variable, so the house
+and it is here to be honest about what the real thing costs. Measured 2026-08-02 on the
+shipped goldens (R12 + R13, spec §15.12/§16, on top of Phase 5's BKM emission):
+**67 decisions (12 decision tables), 10 businessKnowledgeModels, 7 decisionServices,
+15 `inputData`, and ZERO blocking notes (0 blocking / 21 lossy / 125 advisory)** — and
+both engines evaluate it end to end over the 16 cases in `regcf-corpus.cases.json`
+(the base world plus 15 dated relocation cases, spec §15.12.1), 1072/1072 values as
+expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
+2026-08-01 measurement counted (32 notes: the 15 `EVAL UNDER RULES EFFECTIVE AT`
+bodies with their 15 `D-RULEDATE-UNBOUND` companions, and the deontic reporting spine
+with its D-CYCLE) are **gone**: R12 drops the rebinding decides at population time
+(Lossy-noted, no longer emitted) and R13 lowers the deontic spine to a verdict decision
+table. The old one-sentence diagnosis — a DMN decision is a 0-ary variable, so the house
 `GIVEN`+record style turns every cross-decision reference into an unevaluable `f(x)` —
 is RETIRED for tier 2: those call sites now render as FEEL invocations of emitted
 BKMs (`../legal/regcf/PROJECTIONS.md` §1 records the history). Read that file
@@ -268,6 +272,63 @@ metamodel parser says:
 > engine-exercisable and what must retire first. So `25/25 value(s) as expected`
 > below is still a statement about the five-decision shape exhibit only; the
 > corpus verdicts are the two quoted lines above, no more.
+>
+> **Superseded again on 2026-08-02, and this time the corpus EXECUTES.** R12
+> (spec §15.12) removed the 15 `EVAL UNDER RULES EFFECTIVE AT` decisions from
+> the artifact, and R13 (spec §16) lowered the deontic reporting spine to a
+> verdict decision table — the two verbatim families named above, retired.
+> Measured on the shipped `expected/regcf-corpus.dmn` with
+> `regcf-corpus.cases.json` (67 decisions, 67 pins), verbatim:
+>
+> - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 1 case(s), 0 error(s), 0 warning(s),
+>   67/67 decision(s) SUCCEEDED, 67/67 value(s) as expected, 14/14 service
+>   output value(s) as expected` — the last clause is the decision-service
+>   sweep, a VALUE check since 2026-08-02: each of the seven emitted services
+>   (including `_7_Ongoing_reporting_Rules_202_203_b`, which only became
+>   emittable when the verdict table gave the § an output decision) is fed its
+>   declared inputDecisions' computed values and each of the 14 declared
+>   outputDecisions is compared against the same `expect` pin that checks it
+>   as a plain decision. (Until 2026-08-02 the sweep was a null-fed smoke
+>   test — six "Required input not found" runtime WARNs that the banner's
+>   warning counter did not even count. Both repaired in the harness.)
+> - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
+>   (67 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
+>   1 case(s), 1 parsed, 0 error(s), 67/67 decision(s) evaluated, 67/67
+>   value(s) as expected`.
+>
+> One pin moved under measurement, and it is a finding, not noise:
+> `the_over_limit_investor_case_qualifies` had been pinned `false` on the
+> unmeasured claim that the investor limb varies per call through BKM
+> parameters. Both engines answer `true`: the investment-limit limb's figures
+> enter the BKM through its λ-LIFTED closure parameters, bound `name: name` to
+> the GLOBAL decisions (spec §6.2), so the per-call over-limit investor never
+> reaches the limit check. The pin now records the model truth with that
+> derivation — the fourth member of the deliberately-pinned-'wrong' quartet,
+> which is now four for four.
+
+> **Extended later the same day (2026-08-02): the dropped fixtures' temporal
+> truths relocate into the case harness.** Ruling R-C (spec §15.12.1: "the
+> model owns the law under a date; the harness owns the dates") turns the 15
+> rule-date-rebinding fixture decisions R12 removed from the artifact into 15
+> dated engine cases in `regcf-corpus.cases.json` — each sets
+> `RULES_EFFECTIVE_DATE` to the fixture's pinned date, delivers the fixture's
+> scenario through the global `inputData`, and pins all 67 decisions to
+> L4-evaluated ground truth (the cases file's note block records every
+> derivation). Measured on the shipped `expected/regcf-corpus.dmn` with the
+> 16-case file, verbatim:
+>
+> - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 16 case(s), 0 error(s),
+>   0 warning(s), 1072/1072 decision(s) SUCCEEDED, 1072/1072 value(s) as
+>   expected, 224/224 service output value(s) as expected`
+> - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
+>   (67 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
+>   16 case(s), 1 parsed, 0 error(s), 1072/1072 decision(s) evaluated,
+>   1072/1072 value(s) as expected`
+>
+> Same artifact, sixteen worlds: the `1 case(s) … 67/67` banners quoted above
+> were the measurement at the single base case and stand as history.
 
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json
@@ -376,8 +437,9 @@ than a gap a further case could close.
 
 ## From the CLI
 
-Track **S0** is wired: both goldens in this directory are reproducible byte-for-byte
-through `l4 export`, from a repo checkout with `jl4/` as the working directory.
+Track **S0** is wired for the toy pair: `reg-cf.dmn` and `reg-cf.dmn.md` are
+reproducible **byte-for-byte** through `l4 export`, from a repo checkout with
+`jl4/examples/dmn/` as the working directory (`jl4/tests-cli` mirrors the `.dmn` leg).
 
 ```sh
 l4 export --to=dmn    reg-cf.l4 | diff - expected/reg-cf.dmn
@@ -387,6 +449,17 @@ l4 export --to=dmn-md reg-cf.l4 | diff - expected/reg-cf.dmn.md
 l4 export --to=dmn    ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
 l4 export --to=dmn-md ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
 ```
+
+**The corpus `.dmn` (and `gst-rate.dmn`) do NOT reproduce byte-for-byte, and the
+difference is exactly the source-range labels** (measured 2026-08-02): the goldens are
+generated by `jl4/tests/DmnExport.hs` through `checkWithImports`, which loads every
+module under the virtual URI `main`, so the dated-constant annotation columns carry
+`(main.l4:…)` where the CLI — which knows the real path — writes `(regcf.l4:…)` /
+`(gst-rate.l4:…)`. The corpus diff is those 23 annotation lines and nothing else
+(gst-rate: 4); the `.dmn.md` legs carry no source ranges and reproduce exactly. An
+earlier revision of this section claimed byte-for-byte reproduction for everything
+here, which the corpus golden never satisfied. Making the golden harness carry real
+paths is a possible follow-up; until then, this paragraph is the contract.
 
 No `--model-name` is needed, and that is the point. `lowerModule` takes the
 `<definitions>` name as a parameter rather than reading it off the module's URI, so

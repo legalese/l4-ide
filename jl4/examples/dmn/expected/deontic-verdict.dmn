@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_deontic_verdict" name="deontic verdict" namespace="https://legalese.com/l4/dmn/deontic_verdict" exporter="jl4">
+  <itemDefinition id="itemdef_actor" name="Actor">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"Issuer"</text>
+    </allowedValues>
+  </itemDefinition>
+  <itemDefinition id="itemdef_action" name="Action">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"file the termination report","file the annual report","publish a notice","advertise the offering","file jointly","notify investors"</text>
+    </allowedValues>
+  </itemDefinition>
+  <inputData id="input_may_terminate" name="may_terminate" label="may terminate">
+    <variable id="input_may_terminate_var" name="may_terminate" label="may terminate" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_cycles" name="cycles">
+    <variable id="input_cycles_var" name="cycles" typeRef="number"/>
+  </inputData>
+  <inputData id="input_notice_window_open" name="notice_window_open" label="notice window open">
+    <variable id="input_notice_window_open_var" name="notice_window_open" label="notice window open" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_escalated" name="escalated">
+    <variable id="input_escalated_var" name="escalated" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_trigger" name="trigger">
+    <variable id="input_trigger_var" name="trigger" typeRef="boolean"/>
+  </inputData>
+  <decision id="decision_reporting_duty" name="reporting_duty" label="reporting duty">
+    <variable id="decision_reporting_duty_var" name="reporting_duty" label="reporting duty" typeRef="string"/>
+    <informationRequirement id="decision_reporting_duty_ir1">
+      <requiredInput href="#input_cycles"/>
+    </informationRequirement>
+    <informationRequirement id="decision_reporting_duty_ir2">
+      <requiredInput href="#input_escalated"/>
+    </informationRequirement>
+    <informationRequirement id="decision_reporting_duty_ir3">
+      <requiredInput href="#input_may_terminate"/>
+    </informationRequirement>
+    <informationRequirement id="decision_reporting_duty_ir4">
+      <requiredInput href="#input_notice_window_open"/>
+    </informationRequirement>
+    <decisionTable id="decision_reporting_duty_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="reporting duty">
+      <input id="decision_reporting_duty_i1" label="`may terminate`">
+        <inputExpression id="decision_reporting_duty_i1_expr" typeRef="boolean">
+          <text>may_terminate</text>
+        </inputExpression>
+      </input>
+      <input id="decision_reporting_duty_i2" label="cycles">
+        <inputExpression id="decision_reporting_duty_i2_expr" typeRef="number">
+          <text>cycles</text>
+        </inputExpression>
+      </input>
+      <input id="decision_reporting_duty_i3" label="`notice window open`">
+        <inputExpression id="decision_reporting_duty_i3_expr" typeRef="boolean">
+          <text>notice_window_open</text>
+        </inputExpression>
+      </input>
+      <input id="decision_reporting_duty_i4" label="escalated">
+        <inputExpression id="decision_reporting_duty_i4_expr" typeRef="boolean">
+          <text>escalated</text>
+        </inputExpression>
+      </input>
+      <output id="decision_reporting_duty_o1">
+        <outputValues>
+          <text>"file the termination report","fulfilled","may publish a notice","must not advertise the offering","file the annual report and continue"</text>
+        </outputValues>
+      </output>
+      <rule id="decision_reporting_duty_r1">
+        <description>`may terminate`</description>
+        <inputEntry id="decision_reporting_duty_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r1_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r1_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_reporting_duty_r1_o1">
+          <text>"file the termination report"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_reporting_duty_r2">
+        <description>cycles AT MOST 0</description>
+        <inputEntry id="decision_reporting_duty_r2_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r2_i2">
+          <text>&lt;= 0</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r2_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r2_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_reporting_duty_r2_o1">
+          <text>"fulfilled"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_reporting_duty_r3">
+        <description>`notice window open`</description>
+        <inputEntry id="decision_reporting_duty_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r3_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r3_i3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r3_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_reporting_duty_r3_o1">
+          <text>"may publish a notice"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_reporting_duty_r4">
+        <description>escalated</description>
+        <inputEntry id="decision_reporting_duty_r4_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r4_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r4_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r4_i4">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="decision_reporting_duty_r4_o1">
+          <text>"must not advertise the offering"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_reporting_duty_r5">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_reporting_duty_r5_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r5_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r5_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_reporting_duty_r5_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_reporting_duty_r5_o1">
+          <text>"file the annual report and continue"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_joint_duty" name="joint_duty" label="joint duty">
+    <variable id="decision_joint_duty_var" name="joint_duty" label="joint duty" typeRef="Any"/>
+    <informationRequirement id="decision_joint_duty_ir1">
+      <requiredInput href="#input_trigger"/>
+    </informationRequirement>
+    <literalExpression id="decision_joint_duty_literal">
+      <text>IF trigger THEN (PARTY IssuerMUST `file jointly`WITHIN 5 RAND PARTY IssuerMUST `notify investors`WITHIN 5) ELSE FULFILLED</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_invoked_joint_duty" name="invoked_joint_duty" label="invoked joint duty">
+    <variable id="decision_invoked_joint_duty_var" name="invoked_joint_duty" label="invoked joint duty" typeRef="Any"/>
+    <informationRequirement id="decision_invoked_joint_duty_ir1">
+      <requiredDecision href="#decision_joint_duty"/>
+    </informationRequirement>
+    <informationRequirement id="decision_invoked_joint_duty_ir2">
+      <requiredInput href="#input_trigger"/>
+    </informationRequirement>
+    <literalExpression id="decision_invoked_joint_duty_literal">
+      <text>joint_duty</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_bare_duty" name="bare_duty" label="bare duty">
+    <variable id="decision_bare_duty_var" name="bare_duty" label="bare duty" typeRef="Any"/>
+    <literalExpression id="decision_bare_duty_literal">
+      <text>PARTY Issuer MUST `notify investors` WITHIN 10</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_invoked_bare_duty" name="invoked_bare_duty" label="invoked bare duty">
+    <variable id="decision_invoked_bare_duty_var" name="invoked_bare_duty" label="invoked bare duty" typeRef="Any"/>
+    <informationRequirement id="decision_invoked_bare_duty_ir1">
+      <requiredDecision href="#decision_bare_duty"/>
+    </informationRequirement>
+    <literalExpression id="decision_invoked_bare_duty_literal">
+      <text>bare_duty</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="service_deontic_verdict" name="deontic_verdict" label="deontic verdict">
+    <variable id="service_deontic_verdict_var" name="deontic_verdict" label="deontic verdict" typeRef="Any"/>
+    <outputDecision href="#decision_reporting_duty"/>
+    <outputDecision href="#decision_invoked_joint_duty"/>
+    <outputDecision href="#decision_invoked_bare_duty"/>
+    <encapsulatedDecision href="#decision_joint_duty"/>
+    <encapsulatedDecision href="#decision_bare_duty"/>
+    <inputData href="#input_cycles"/>
+    <inputData href="#input_escalated"/>
+    <inputData href="#input_may_terminate"/>
+    <inputData href="#input_notice_window_open"/>
+    <inputData href="#input_trigger"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_deontic_verdict_diagram" name="deontic verdict">
+      <dmndi:DMNShape id="input_may_terminate_shape" dmnElementRef="input_may_terminate">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_cycles_shape" dmnElementRef="input_cycles">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_notice_window_open_shape" dmnElementRef="input_notice_window_open">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_escalated_shape" dmnElementRef="input_escalated">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_trigger_shape" dmnElementRef="input_trigger">
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_reporting_duty_shape" dmnElementRef="decision_reporting_duty">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_joint_duty_shape" dmnElementRef="decision_joint_duty">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_bare_duty_shape" dmnElementRef="decision_bare_duty">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_invoked_joint_duty_shape" dmnElementRef="decision_invoked_joint_duty">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_invoked_bare_duty_shape" dmnElementRef="decision_invoked_bare_duty">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_deontic_verdict_shape" dmnElementRef="service_deontic_verdict">
+        <dc:Bounds x="40" y="40" width="660" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_reporting_duty_ir1_edge" dmnElementRef="decision_reporting_duty_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_reporting_duty_ir2_edge" dmnElementRef="decision_reporting_duty_ir2">
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_reporting_duty_ir3_edge" dmnElementRef="decision_reporting_duty_ir3">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_reporting_duty_ir4_edge" dmnElementRef="decision_reporting_duty_ir4">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_joint_duty_ir1_edge" dmnElementRef="decision_joint_duty_ir1">
+        <di:waypoint x="1030" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_invoked_joint_duty_ir1_edge" dmnElementRef="decision_invoked_joint_duty_ir1">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_invoked_joint_duty_ir2_edge" dmnElementRef="decision_invoked_joint_duty_ir2">
+        <di:waypoint x="1030" y="380"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_invoked_bare_duty_ir1_edge" dmnElementRef="decision_invoked_bare_duty_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

@@ -772,12 +772,22 @@ data PopulationInput = MkPopulationInput
     -- decision edge or an @inputData@ — module-local, not a constructor, not
     -- a selector. Supplied by the caller because those sets live in
     -- "L4.Dmn.Lower".
+  , piRuleDateRebind   :: !(Expr Resolved -> Bool)
+    -- ^ R12 (§15.12): does this RAW body evaluate a sub-graph under its OWN
+    -- rule date (@EVAL UNDER RULES EFFECTIVE AT@)? A DMN DRG has one global
+    -- rule-date input and no scoped rebinding, so no faithful @\<decision\>@
+    -- exists for such a decide and it is dropped here, before any element is
+    -- minted. Supplied by the caller because the builtin's 'Unique' matching
+    -- lives in "L4.Dmn.Lower", same as 'piForcedRef'. The gate is STRUCTURAL,
+    -- deliberately independent of 'piIncludeTests': test-ness is a policy
+    -- question, rebinding is a representability fact.
   }
 
 data DropReason
   = DroppedFixture        -- ^ satisfied @FIXTURE(a)–(d)@
   | DroppedFixtureHelper  -- ^ in the fixture-side transitive closure
   | DroppedRegulative     -- ^ uncalled regulative body
+  | DroppedRuleDateRebind -- ^ rebinds law time (@EVAL UNDER RULES EFFECTIVE AT@), §15.12
   deriving stock (Eq, Show)
 
 data PopulationVerdict = MkPopulationVerdict
@@ -818,18 +828,39 @@ classifyPopulation inp cg decides =
     , pvInert = inertSet (Map.keysSet dropped)
     }
  where
+  -- R12 (§15.12): computed FIRST and unconditionally — the rebind gate is a
+  -- structural fact about the body, not a test-ness policy, so it applies on
+  -- @--include-tests@ too. Rebind members are excluded from every fixture
+  -- bucket below (seeds, helpers, AND the unverified keep), so a decide never
+  -- carries two drop reasons and never gets a report-only D-FIXTURE besides
+  -- its rebind drop. The fixture criterion is NOT re-seeded over the reduced
+  -- graph: a helper whose only callers are rebind-dropped keeps those callers
+  -- for classification purposes and stays emitted.
+  rebindSet :: Set Unique
+  rebindSet = Set.fromList
+    [ u
+    | (u, d) <- Map.toList byUnique
+    , inp.piRuleDateRebind (decideBodyA d)
+    ]
+
   dropped :: Map Unique DropReason
   dropped
     | inp.piIncludeTests =
-        Map.fromList [(u, DroppedRegulative) | u <- regulativeDrops Set.empty]
+        Map.fromList
+          ( [(u, DroppedRuleDateRebind) | u <- Set.toList rebindSet]
+              <> [(u, DroppedRegulative) | u <- regulativeDrops rebindSet]
+          )
     | otherwise =
         Map.fromList
-          ( [(u, DroppedFixture) | u <- Set.toList fixtureSeeds]
+          ( [(u, DroppedRuleDateRebind) | u <- Set.toList rebindSet]
+              <> [(u, DroppedFixture) | u <- Set.toList fixtureSeeds]
               <> [ (u, DroppedFixtureHelper)
                  | u <- Set.toList fixtureDropSet
                  , not (Set.member u fixtureSeeds)
                  ]
-              <> [(u, DroppedRegulative) | u <- regulativeDrops fixtureDropSet]
+              <> [ (u, DroppedRegulative)
+                 | u <- regulativeDrops (Set.union fixtureDropSet rebindSet)
+                 ]
           )
 
   byUnique = Map.fromList [(getUnique (decideResolvedA d), d) | d <- decides]
@@ -865,14 +896,20 @@ classifyPopulation inp cg decides =
   fixtureSeeds = Set.fromList
     [ u
     | u <- Map.keys byUnique
+    , not (Set.member u rebindSet)
     , fixtureABC u
     , externallyClear u == Just True
     ]
 
+  -- A rebind decide that also satisfies FIXTURE(a)–(c) module-locally is
+  -- excluded HERE too, not only from the seeds: it is already dropped (and
+  -- Lossy-noted) as a rebind, and a report-only "kept, unverified" advisory
+  -- beside a drop would be two contradictory claims about one decision.
   unverified :: Set Unique
   unverified = Set.fromList
     [ u
     | u <- Map.keys byUnique
+    , not (Set.member u rebindSet)
     , fixtureABC u
     , isNothing (externallyClear u)
     ]
@@ -891,6 +928,7 @@ classifyPopulation inp cg decides =
       [ u
       | u <- Map.keys byUnique
       , not (Set.member u s)
+      , not (Set.member u rebindSet)
       , let callers = bodyCallers u
       , not (null callers)
       , all (`Set.member` s) callers
