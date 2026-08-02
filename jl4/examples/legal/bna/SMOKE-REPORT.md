@@ -21,33 +21,53 @@ assertion prints twice) and 0 `assertion failed` lines**. The `#EVAL` answers
 Assert-greenness is asserted here from **log content, not exit code** — see §3.2 for why the exit
 code alone would be a false-green vector.
 
-### The projection leg — emitted, with a measured blocking defect
+### The projection leg — emitted, zero blocking notes
 
-`l4 export bna.l4 --to dmn -o bna.dmn --fidelity-report --flavor camunda` (exit 0) produced
+`l4 export bna.l4 --to dmn -o bna.dmn --fidelity-report --flavor camunda` (exit 0) produces
 `bna.dmn`: 43 decisions, three inputData (`person`, `adoption`,
 `entitled_under_subsection_3_3A_or_4` — the D-PARAM-AS-INPUT un-lifting), one decision table (the
-`BirthOutcome` cascade, FIRST hit policy). `bna.fidelity.txt` records **3 blocking D-LITERALEXPR**:
-the dated constants `commencement`, `the_appointed_day`, `the_relevant_day` emit raw L4
-(`YMD OF 1983, 1, 1`) with no FEEL rendering. The `dmn-md` projection (`bna.dmn.md`) is
-**header-only**: 42 decisions are literal expressions (D-MD-NOLITERAL) and the one decision table
-is dropped too (D-MD-CELLSYNTAX — its output strings carry parentheses), so this corpus has no
-markdown shadow at all.
+`BirthOutcome` cascade, FIRST hit policy). `bna.fidelity.txt` records **78 advisory notes and zero
+blocking** ones. The `dmn-md` projection (`bna.dmn.md`) is **header-only**: 42 decisions are
+literal expressions (D-MD-NOLITERAL) and the one decision table is dropped too (D-MD-CELLSYNTAX —
+its output strings carry parentheses), so this corpus has no markdown shadow at all.
 
-### The execution leg — both engines refuse the shipped artifact; the pins are proven on a 3-line scratch
+**As first measured (2026-08-02), it was not zero.** The dated constants `commencement`,
+`the_appointed_day` and `the_relevant_day` emitted raw L4 (`YMD OF 1983, 1, 1`) with no FEEL
+rendering — 3 blocking D-LITERALEXPR — and both engines refused the whole file. That is the history
+recorded below, kept because the isolation move that pinned it is a reusable technique and because
+the "0 of 1075 pins compared" arithmetic is the point of §3.1. The exporter fix landed in
+legalese/l4-ide#196 and these artifacts were regenerated on it.
+
+### The execution leg — both engines green on the shipped artifact
 
 Cases: `bna.cases.json`, 25 cases x 43 expect pins, every pin derived from the L4 source by a
 979-`#EVAL` probe run of the prebuilt binary (activation contract; the same run satisfied all 42
 `#ASSERT`s), cross-checked in the generator against 18 `#ASSERT` ground truths — never from an
-engine's output.
+engine's output. The cases file has not been touched since; only the artifact under it changed.
 
-Verbatim final banners on the **emitted** `bna.dmn` (exit codes captured by redirect-then-echo):
+Verbatim final banners on the **emitted** `bna.dmn`, re-measured 2026-08-03 after regeneration
+(exit codes captured by redirect-then-echo):
+
+```
+KIE 8.44.0.Final VERDICT: 1 file(s), 25 case(s), 0 error(s), 0 warning(s), 1075/1075 decision(s) SUCCEEDED, 1075/1075 value(s) as expected, 325/325 service output value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 25 case(s), 1 parsed, 0 error(s), 1075/1075 decision(s) evaluated, 1075/1075 value(s) as expected
+KIE on emitted bna.dmn: exit=0
+Camunda on emitted bna.dmn: exit=0
+```
+
+The three literals now read `date("1983-01-01")` / `date("2002-05-21")` / `date("2010-01-13")` —
+i.e. the emitter now writes exactly what the cause-isolation scratch had to be hand-edited to say.
+
+#### The refusal that used to be here, and how it was pinned
+
+Verbatim final banners on the pre-#196 `bna.dmn` (2026-08-02):
 
 ```
 KIE 8.44.0.Final VERDICT: 1 file(s), 0 case(s), 6 error(s), 0 warning(s), 0/0 decision(s) SUCCEEDED, 0/0 value(s) as expected, 0/0 service output value(s) as expected   <<< FAILED
 Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 0 case(s), 0 parsed, 1 error(s), 0/0 decision(s) evaluated, 0/0 value(s) as expected   <<< FAILED
 ```
 
-Representative refusal lines (all three date constants fail identically):
+Representative refusal lines (all three date constants failed identically):
 
 ```
 ERROR [ERR_COMPILING_FEEL] DMN: Error compiling FEEL expression 'YMD OF 1983, 1, 1' for name 'commencement' on node 'commencement': syntax error near 'OF' (DMN id: decision_commencement_literal, Error compiling the referenced FEEL expression)
@@ -55,29 +75,14 @@ PARSE  INVALID: FEEL expression: failed to parse expression 'YMD OF 1983, 1, 1':
 ```
 
 Cause isolation: a scratch copy of `bna.dmn` with **only** those three `<text>` literals rewritten
-to `date("1983-01-01")` / `date("2002-05-21")` / `date("2010-01-13")` goes fully green on both
-engines against the same cases file — verbatim final banners:
+to FEEL date literals went fully green on both engines against the same cases file — 1075/1075 and
+325/325, both exit 0. That prediction is what the regenerated artifact above now discharges without
+a hand edit, at the same numbers.
 
-```
-KIE 8.44.0.Final VERDICT: 1 file(s), 25 case(s), 0 error(s), 0 warning(s), 1075/1075 decision(s) SUCCEEDED, 1075/1075 value(s) as expected, 325/325 service output value(s) as expected
-Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 25 case(s), 1 parsed, 0 error(s), 1075/1075 decision(s) evaluated, 1075/1075 value(s) as expected
-```
-
-Complete exit-code record (all five, in one place — see §3.8):
-
-```
-KIE on emitted bna.dmn: exit=1
-Camunda on emitted bna.dmn: exit=1
-KIE on datefix scratch: exit=0
-Camunda on datefix scratch: exit=0
-l4 run of the 979-eval probe: exit=0
-```
-
-**Honest status:** the L4 encoding runs end to end. The shipped DMN artifact does **not** execute
-on either engine; the missing `YMD` FEEL lowering is measured as the sole defect between it and a
-1075/1075 two-engine green run. Zero value mismatches anywhere — but on the emitted file that
-statement is vacuous (no value was ever compared); the load-bearing zero comes from the scratch
-run.
+**Honest status:** the L4 encoding runs end to end, and the shipped DMN artifact executes on both
+engines with zero value mismatches over all 1075 pins. What the run does not cover is unchanged and
+is listed in §3 — no deployment-time validation, no Modeler import, and the `dmn-md` shadow is
+still empty for this corpus.
 
 ## 2. Stage ledger — what was done by hand, and what the real stage therefore needs
 
@@ -130,20 +135,23 @@ the statute and re-running everything the fix touches — never by weakening a t
 the activation contract (pins from a 979-`#EVAL` probe, cross-checked against `#ASSERT` truths;
 symmetric check — every decision in the DMN pinned in every case); both engines run; the whole-file
 refusal measured; the cause isolated by a minimal 3-line scratch edit and the pins value-proven
-1075/1075 on both engines. The real stage needs: the exporter fix (§3.1) so the shipped artifact
-executes; banner-content gating rather than exit-code gating for the L4 legs (§3.2); and the
+1075/1075 on both engines. The exporter fix that isolation called for landed (§3.1) and the
+artifacts were regenerated on it, so the shipped file now executes at those same numbers. The real
+stage needs: banner-content gating rather than exit-code gating for the L4 legs (§3.2); and the
 isolation-scratch move — rerun with the smallest possible edit to attribute a refusal — as a
 standard debugging step, because "3 of 43 decisions lost" and "0 of 1075 pins compared" are the
 same defect at two very different severities.
 
 ## 3. What broke or surprised
 
-1. **Both engines refuse the emitted DMN whole-file** on the three dated constants
+1. **Both engines refused the emitted DMN whole-file** on the three dated constants
    (D-LITERALEXPR, banners in §1). DMN has no partial-file execution on either engine, so three
-   unrenderable expressions zero out all 1075 pins rather than losing 3/43 decisions. **Fix
-   (open, exporter):** lower `YMD y m d` to FEEL `date("y-m-d")` for standalone dated constants —
-   the regcf corpus never hit this only because its rule-version axis turned dated constants into
-   guarded interval tables. The isolation run proves this is the sole blocker.
+   unrenderable expressions zeroed out all 1075 pins rather than losing 3/43 decisions. **Fixed in
+   the exporter** (legalese/l4-ide#196): `YMD y m d` lowers to FEEL `date("YYYY-MM-DD")` for
+   standalone dated constants — the regcf corpus never hit this only because its rule-version axis
+   turned dated constants into guarded interval tables. The isolation run had proved this was the
+   sole blocker, and regenerating these artifacts on the fixed exporter confirmed it: 1075/1075 on
+   both engines with no hand edit.
 2. **`l4 run` exits 0 when an assertion fails.** Measured on a scratch copy with one assert
    negated: the log carries `Severity: DiagnosticSeverity_Error` / `Result: assertion failed`, yet
    the process exits 0 (a syntactically broken file exits 1, so the exit code is meaningful for
@@ -195,12 +203,11 @@ same defect at two very different severities.
 
 This smoke run proves that a fresh, never-encoded statute can be taken from fetched source to an
 auditable inert-style L4 corpus — verbatim text riding inline, 12 argued ambiguity resolutions, 42
-boundary-pair asserts all green — and projected to DMN whose 1075 case-pins execute identically on
-two independent engines, in one hand-driven pass, with every stage leaving evidence the next stage
-can check; and it proves the adversarial gate earns its place, catching a fabricated citation, a
+boundary-pair asserts all green — and projected to a DMN artifact whose 1075 case-pins execute
+identically on two independent engines, in one hand-driven pass, with every stage leaving evidence
+the next stage can check; and it proves the adversarial gate earns its place, catching a fabricated citation, a
 scope omission, and an overdetermined test that the authoring stages sincerely believed in. It does
-**not** prove: that the shipped DMN artifact executes (it is refused whole-file until the exporter
-learns to lower dated constants); that the stages compose unattended (every one was driven and
+**not** prove: that the stages compose unattended (every one was driven and
 judged by hand — the orchestrator exists only as scaffolding); that the approach scales past one
 section of one act (the 1986 team translated ~50 pages and estimated ~500 rules; this is one
 section with 43 decisions); or anything about the regulative layer, since s 1 imposes no

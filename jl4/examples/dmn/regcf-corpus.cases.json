@@ -3,26 +3,30 @@
     "Engine cases for the Reg CF CORPUS projection (regcf-corpus.dmn) — the",
     "deliverable R0 ('the execution is the exhibit', spec §6.2) names.",
     "",
-    "STATUS 2026-08-02 — 16 cases: the base case (REGENERATED for R12 + R13,",
-    "spec §15.12 / §16) plus 15 RELOCATION cases carrying the temporal truths of",
+    "STATUS 2026-08-03 — 20 cases: the base case (REGENERATED for R12 + R13,",
+    "spec §15.12 / §16), 15 RELOCATION cases carrying the temporal truths of",
     "the 15 rule-date-rebinding fixture decisions R12 dropped from the artifact",
     "(ruling R-C, spec §15.12.1: 'the model owns the law under a date; the",
-    "harness owns the dates'). MEASURED the same day on both engines at the",
-    "R12/R13 tree plus this file, banners verbatim:",
+    "harness owns the dates'), and 4 SEED cases added to close the two",
+    "structurally-inert leaves the §8 diff oracle reported (legalese#197; see",
+    "THE SEED CASES below). MEASURED 2026-08-03 on both engines against the",
+    "UNCHANGED regcf-corpus.dmn, banners verbatim:",
     "  * KIE 8.44.0.Final: 'XSD valid; VALID clean; BUILD clean;",
-    "    KIE 8.44.0.Final VERDICT: 1 file(s), 16 case(s), 0 error(s),",
-    "    0 warning(s), 1072/1072 decision(s) SUCCEEDED, 1072/1072 value(s) as",
-    "    expected, 224/224 service output value(s) as expected'",
+    "    KIE 8.44.0.Final VERDICT: 1 file(s), 20 case(s), 0 error(s),",
+    "    0 warning(s), 1340/1340 decision(s) SUCCEEDED, 1340/1340 value(s) as",
+    "    expected, 280/280 service output value(s) as expected' (exit 0)",
     "    — the service clause value-checks every declared outputDecision of the",
     "    7 emitted decisionServices against the SAME expect pins, per case, with",
-    "    each service fed its inputDecisions' computed values",
-    "    (before R12/R13: VALID 16 error(s), evaluation refused).",
+    "    each service fed its inputDecisions' computed values.",
     "  * Camunda 8.7.6 (zeebe-dmn): 'PARSE ok: SEC Regulation Crowdfunding —",
     "    17 CFR Part 227 (67 decision(s));",
-    "    Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 16 case(s), 1 parsed,",
-    "    0 error(s), 1072/1072 decision(s) evaluated, 1072/1072 value(s) as",
-    "    expected'",
-    "    (before: PARSE INVALID on the raw-L4 deontic body, 0 parsed).",
+    "    Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 20 case(s), 1 parsed,",
+    "    0 error(s), 1340/1340 decision(s) evaluated, 1340/1340 value(s) as",
+    "    expected' (exit 0).",
+    "  * At 16 cases the same artifact measured 1072/1072 + 224/224 (KIE) and",
+    "    1072/1072 (Camunda) on 2026-08-02; before R12/R13, KIE VALID reported",
+    "    16 errors and evaluation was refused, and Camunda answered PARSE",
+    "    INVALID on the raw-L4 deontic body with 0 parsed.",
     "",
     "KEYS RENAMED 2026-08-03 (the clitic ruling). Nine IssuerProfile /",
     "InvestorProfile / Transfer field names in regcf.l4 dropped a leading `is`",
@@ -156,6 +160,60 @@
     "The reporting spine and transfer decisions read only status/status_2/",
     "annual_cycles/transfer, none of which any relocation case touches, so",
     "their pins are identical in all 16 cases.",
+    "",
+    "THE SEED CASES (2026-08-03). PR legalese#197's §8 diff oracle reported a",
+    "blind spot in its own battery rather than hiding it: a perturbation of the",
+    "$10,000,000 total-assets threshold to $20,000,000 came back '6800 agreed ·",
+    "0 diverged' — every word true, the impression false, because no seeded",
+    "value ever crossed the threshold. Its sensitivity accounting named 6",
+    "structurally inert (pair, fact) leaves behind two gaps in THIS file: the",
+    "only seeded `status` sat below both the real and the perturbed total-assets",
+    "threshold, and the only seeded `transfer` sat outside the resale restricted",
+    "period. Four cases close both, each straddling its constant so a move in",
+    "EITHER direction flips a leaf:",
+    "  * total assets = 10,000,000 with 3 annual reports filed — (b)(3) true at",
+    "    the ceiling exactly; a threshold LOWERED below $10M flips it.",
+    "  * total assets = 10,000,001, same reports — (b)(3) false one dollar over;",
+    "    a threshold RAISED above $10M flips it. This case is also the only one",
+    "    in the file with `ongoing reporting obligation may terminate` FALSE, so",
+    "    it is the only one that reaches the reporting spine's second arm.",
+    "  * a transfer on day 364 with no exception — inside the period (the",
+    "    half-open reading, README's endpoint note), so `transfer is permitted`",
+    "    is false; a resale period shortened below 364 flips it.",
+    "  * a transfer on day 100 to an accredited investor — inside the period AND",
+    "    excepted, so the 501(a) exception limb is load-bearing for the first",
+    "    time (with the previous day-400 seed, `permitted` was true whatever the",
+    "    exceptions said).",
+    "RE-KEYED 2026-08-03 onto the field names PR legalese#205 landed (nine",
+    "`is_`-prefixed components lost the prefix). The four seed cases were written",
+    "before that rename and were re-keyed mechanically, values carried across",
+    "untouched and asserted structurally equal to the re-keyed pre-image, then",
+    "re-verified: both engines answer 1340/1340 over all 20 cases.",
+    "Each varies exactly ONE record of the base case. The 10 decisions that",
+    "transitively depend on `status` or `transfer` were re-derived from the L4",
+    "SOURCE (an #EVAL probe on a copy of regcf.l4 under EVAL UNDER RULES",
+    "EFFECTIVE AT 2023-06-01). RE-MEASURED 2026-08-03 on the post-clitic-rename",
+    "tree: all 70 #ASSERTs of regcf.l4 hold, and every one of the ten moved pins",
+    "was re-derived a second time and matched. An earlier revision of this",
+    "sentence said `all 140 #ASSERTs`; regcf.l4 carries 70, and the `140/140`",
+    "recorded further up this note (the 2026-08-02 relocation run) is a figure",
+    "about an uncommitted probe copy that no run on this tree reproduces --- it",
+    "is the stale prose LEXIPEDIA-PROBE.md sec. 5 flags, left in place because",
+    "correcting it would mean guessing at a number rather than measuring one.",
+    "the arithmetic they pin is already asserted in regcf.l4 itself",
+    "(#ASSERTs at :1036-1039 and :1058-1064). The other 57 pins are the base",
+    "case's, copied verbatim — which is sound because the artifact's own",
+    "requirement graph says so: computed over regcf-corpus.dmn, exactly",
+    "{b_1..b_5, ongoing_reporting_obligation_may_terminate,",
+    "ongoing_reporting_obligation} reach inputData `status`, exactly",
+    "{transfer_is_within_the_one_year_restricted_period,",
+    "transfer_falls_within_an_exception_in_Rule_501_a, transfer_is_permitted}",
+    "reach `transfer`, and nothing at all reaches `status_2`.",
+    "The two verdict-string pins come from verdictOf's spec'd definition (spec",
+    "§16.1) applied to the L4 SOURCE arms, never from the emitted table: the",
+    "may-terminate arm is a MUST with no HENCE, so its verdict is the action",
+    "name verbatim; the renewing arm is a MUST *with* a HENCE, so its verdict",
+    "takes the ' and continue' suffix.",
     "",
     "The 10 BKMs (the rules in force include, offering is within the offering",
     "limit, investment limit, investor is within the investment limit,",
@@ -3498,6 +3556,850 @@
         "the_over_limit_investor_case_qualifies": false,
         "the_short_availability_case_qualifies": false,
         "the_under_assured_financials_case_qualifies": false,
+        "W_offering": {
+          "target_offering_amount": 3000000,
+          "maximum_offering_amount_the_issuer_will_accept": 3000000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "I_3_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 110000,
+          "net_worth": 115000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "I_4_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 1240000,
+          "net_worth": 1240000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "A_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": true,
+          "annual_income": 1000000,
+          "net_worth": 1000000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
+        },
+        "F_offering": {
+          "target_offering_amount": 550000,
+          "maximum_offering_amount_the_issuer_will_accept": 550000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": true
+        },
+        "investor_hydrated": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "greater_of_annual_income_or_net_worth": 200000,
+          "lesser_of_annual_income_or_net_worth": 60000
+        }
+      }
+    },
+    {
+      "name": "total assets exactly at the (b)(3) ceiling, three annual reports filed",
+      "context": {
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2023-06-01"
+        },
+        "no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16": -1,
+        "the_COVID_19_temporary_rules_Rule_201_z_and_bb_are_not_modelled_here": "financial statements reviewed by an independent public accountant",
+        "supplied": "financial statements reviewed by an independent public accountant",
+        "amount_to_be_sold_in_this_transaction": 5000,
+        "annual_cycles": 2,
+        "issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "offering": {
+          "target_offering_amount": 500000,
+          "maximum_offering_amount_the_issuer_will_accept": 500000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "arrangement": {
+          "the_intermediary_complies_with_section_4A_a_of_the_Securities_Act_and_the_related_requirements_in_this_part": true,
+          "the_transaction_is_conducted_exclusively_through_the_intermediary_s_platform": true,
+          "the_number_of_intermediaries_used_for_the_offering": 1,
+          "the_intermediary_delivered_educational_materials_in_connection_with_establishing_the_investor_s_account": true,
+          "the_intermediary_has_a_reasonable_basis_for_believing_that_the_investor_satisfies_the_investment_limitations": true,
+          "the_days_the_issuer_information_has_been_publicly_available_on_the_intermediary_s_platform_before_any_sale": 21
+        },
+        "notice": {
+          "directs_investors_to_the_intermediary_s_platform": true,
+          "states_that_the_issuer_is_conducting_an_offering_pursuant_to_section_4_a_6_names_the_intermediary_and_directs_the_potential_investor_to_its_platform": true,
+          "states_the_terms_of_the_offering": true,
+          "states_factual_information_about_the_legal_identity_and_business_location_of_the_issuer": true,
+          "includes_information_beyond_that_permitted_by_paragraph_b": false
+        },
+        "status": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 3,
+          "holders_of_record": 400,
+          "total_assets": 10000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "status_2": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 3,
+          "holders_of_record": 500,
+          "total_assets": 20000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "transfer": {
+          "days_since_the_securities_were_issued": 400,
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+        }
+      },
+      "expect": {
+        "Reg_CF_commenced": {
+          "$date": "2016-05-16"
+        },
+        "the_2017_inflation_adjustment": {
+          "$date": "2017-04-12"
+        },
+        "the_2021_amendments": {
+          "$date": "2021-03-15"
+        },
+        "the_2022_inflation_adjustment": {
+          "$date": "2022-09-20"
+        },
+        "offering_maximum_in_a_12_month_period": 5000000,
+        "income_or_net_worth_cut_point": 124000,
+        "minimum_permitted_investment": 2500,
+        "maximum_amount_sold_to_any_one_investor_in_a_12_month_period": 124000,
+        "tier_1_ceiling": 124000,
+        "tier_2_ceiling": 618000,
+        "first_time_issuer_review_ceiling": 1235000,
+        "holders_of_record_threshold": 300,
+        "total_assets_threshold": 10000000,
+        "minimum_days_publicly_available_before_any_sale": 21,
+        "days_to_file_the_annual_report_after_fiscal_year_end": 120,
+        "business_days_to_file_Form_C_TR": 5,
+        "business_days_to_file_a_progress_update": 5,
+        "days_in_the_resale_restricted_period": 365,
+        "b_1_not_organized_under_State_or_territorial_law": false,
+        "b_2_an_Exchange_Act_reporting_company": false,
+        "b_3_an_investment_company": false,
+        "b_4_subject_to_a_bad_actor_disqualification": false,
+        "b_5_delinquent_in_ongoing_annual_reports": false,
+        "b_6_no_specific_business_plan_or_a_blank_check_business_plan": false,
+        "issuer_is_excluded_by_Rule_100_b": false,
+        "issuer_is_eligible": true,
+        "aggregate_offering_amount": 500000,
+        "the_applicable_measure_of_annual_income_or_net_worth": 200000,
+        "either_annual_income_or_net_worth_is_less_than_the_cut_point": true,
+        "aggregate_amount_sold_to_this_investor_including_this_transaction": 5000,
+        "the_accredited_investor_carve_out_applies_to": false,
+        "the_rule_date_is_inside_the_COVID_19_temporary_rules_window": false,
+        "financial_statement_requirement_is_satisfied": true,
+        "disclosure_requirements_are_met": true,
+        "a_3_conducted_through_a_single_complying_intermediary": true,
+        "the_21_day_public_availability_period_has_run": true,
+        "the_intermediary_has_discharged_its_investor_facing_duties": true,
+        "intermediary_obligations_are_met": true,
+        "notice_complies_with_Rule_204_b": true,
+        "definition_terms_of_the_offering": true,
+        "b_1_became_an_Exchange_Act_reporting_company": false,
+        "b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record": false,
+        "b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000": true,
+        "b_4_all_securities_repurchased": false,
+        "b_5_liquidated_or_dissolved": false,
+        "ongoing_reporting_obligation_may_terminate": true,
+        "ongoing_reporting_obligation": "file a Form C-TR termination of reporting",
+        "transfer_is_within_the_one_year_restricted_period": false,
+        "transfer_falls_within_an_exception_in_Rule_501_a": false,
+        "transfer_is_permitted": true,
+        "a_clean_issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "a_delinquent_issuer": {
+          "name": "Late Filer Inc",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "certified": "financial statements certified by the principal executive officer, with tax return information",
+        "reviewed": "financial statements reviewed by an independent public accountant",
+        "audited": "financial statements audited by an independent public accountant",
+        "a_conforming_filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "the_base_case_qualifies": true,
+        "the_delinquent_issuer_case_qualifies": true,
+        "the_over_limit_investor_case_qualifies": true,
+        "the_short_availability_case_qualifies": true,
+        "the_under_assured_financials_case_qualifies": true,
+        "W_offering": {
+          "target_offering_amount": 3000000,
+          "maximum_offering_amount_the_issuer_will_accept": 3000000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "I_3_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 110000,
+          "net_worth": 115000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "I_4_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 1240000,
+          "net_worth": 1240000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "A_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": true,
+          "annual_income": 1000000,
+          "net_worth": 1000000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
+        },
+        "F_offering": {
+          "target_offering_amount": 550000,
+          "maximum_offering_amount_the_issuer_will_accept": 550000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": true
+        },
+        "investor_hydrated": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "greater_of_annual_income_or_net_worth": 200000,
+          "lesser_of_annual_income_or_net_worth": 60000
+        }
+      }
+    },
+    {
+      "name": "total assets one dollar over the (b)(3) ceiling — the reporting duty renews",
+      "context": {
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2023-06-01"
+        },
+        "no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16": -1,
+        "the_COVID_19_temporary_rules_Rule_201_z_and_bb_are_not_modelled_here": "financial statements reviewed by an independent public accountant",
+        "supplied": "financial statements reviewed by an independent public accountant",
+        "amount_to_be_sold_in_this_transaction": 5000,
+        "annual_cycles": 2,
+        "issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "offering": {
+          "target_offering_amount": 500000,
+          "maximum_offering_amount_the_issuer_will_accept": 500000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "arrangement": {
+          "the_intermediary_complies_with_section_4A_a_of_the_Securities_Act_and_the_related_requirements_in_this_part": true,
+          "the_transaction_is_conducted_exclusively_through_the_intermediary_s_platform": true,
+          "the_number_of_intermediaries_used_for_the_offering": 1,
+          "the_intermediary_delivered_educational_materials_in_connection_with_establishing_the_investor_s_account": true,
+          "the_intermediary_has_a_reasonable_basis_for_believing_that_the_investor_satisfies_the_investment_limitations": true,
+          "the_days_the_issuer_information_has_been_publicly_available_on_the_intermediary_s_platform_before_any_sale": 21
+        },
+        "notice": {
+          "directs_investors_to_the_intermediary_s_platform": true,
+          "states_that_the_issuer_is_conducting_an_offering_pursuant_to_section_4_a_6_names_the_intermediary_and_directs_the_potential_investor_to_its_platform": true,
+          "states_the_terms_of_the_offering": true,
+          "states_factual_information_about_the_legal_identity_and_business_location_of_the_issuer": true,
+          "includes_information_beyond_that_permitted_by_paragraph_b": false
+        },
+        "status": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 3,
+          "holders_of_record": 400,
+          "total_assets": 10000001,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "status_2": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 3,
+          "holders_of_record": 500,
+          "total_assets": 20000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "transfer": {
+          "days_since_the_securities_were_issued": 400,
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+        }
+      },
+      "expect": {
+        "Reg_CF_commenced": {
+          "$date": "2016-05-16"
+        },
+        "the_2017_inflation_adjustment": {
+          "$date": "2017-04-12"
+        },
+        "the_2021_amendments": {
+          "$date": "2021-03-15"
+        },
+        "the_2022_inflation_adjustment": {
+          "$date": "2022-09-20"
+        },
+        "offering_maximum_in_a_12_month_period": 5000000,
+        "income_or_net_worth_cut_point": 124000,
+        "minimum_permitted_investment": 2500,
+        "maximum_amount_sold_to_any_one_investor_in_a_12_month_period": 124000,
+        "tier_1_ceiling": 124000,
+        "tier_2_ceiling": 618000,
+        "first_time_issuer_review_ceiling": 1235000,
+        "holders_of_record_threshold": 300,
+        "total_assets_threshold": 10000000,
+        "minimum_days_publicly_available_before_any_sale": 21,
+        "days_to_file_the_annual_report_after_fiscal_year_end": 120,
+        "business_days_to_file_Form_C_TR": 5,
+        "business_days_to_file_a_progress_update": 5,
+        "days_in_the_resale_restricted_period": 365,
+        "b_1_not_organized_under_State_or_territorial_law": false,
+        "b_2_an_Exchange_Act_reporting_company": false,
+        "b_3_an_investment_company": false,
+        "b_4_subject_to_a_bad_actor_disqualification": false,
+        "b_5_delinquent_in_ongoing_annual_reports": false,
+        "b_6_no_specific_business_plan_or_a_blank_check_business_plan": false,
+        "issuer_is_excluded_by_Rule_100_b": false,
+        "issuer_is_eligible": true,
+        "aggregate_offering_amount": 500000,
+        "the_applicable_measure_of_annual_income_or_net_worth": 200000,
+        "either_annual_income_or_net_worth_is_less_than_the_cut_point": true,
+        "aggregate_amount_sold_to_this_investor_including_this_transaction": 5000,
+        "the_accredited_investor_carve_out_applies_to": false,
+        "the_rule_date_is_inside_the_COVID_19_temporary_rules_window": false,
+        "financial_statement_requirement_is_satisfied": true,
+        "disclosure_requirements_are_met": true,
+        "a_3_conducted_through_a_single_complying_intermediary": true,
+        "the_21_day_public_availability_period_has_run": true,
+        "the_intermediary_has_discharged_its_investor_facing_duties": true,
+        "intermediary_obligations_are_met": true,
+        "notice_complies_with_Rule_204_b": true,
+        "definition_terms_of_the_offering": true,
+        "b_1_became_an_Exchange_Act_reporting_company": false,
+        "b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record": false,
+        "b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000": false,
+        "b_4_all_securities_repurchased": false,
+        "b_5_liquidated_or_dissolved": false,
+        "ongoing_reporting_obligation_may_terminate": false,
+        "ongoing_reporting_obligation": "file a Form C-AR annual report and continue",
+        "transfer_is_within_the_one_year_restricted_period": false,
+        "transfer_falls_within_an_exception_in_Rule_501_a": false,
+        "transfer_is_permitted": true,
+        "a_clean_issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "a_delinquent_issuer": {
+          "name": "Late Filer Inc",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "certified": "financial statements certified by the principal executive officer, with tax return information",
+        "reviewed": "financial statements reviewed by an independent public accountant",
+        "audited": "financial statements audited by an independent public accountant",
+        "a_conforming_filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "the_base_case_qualifies": true,
+        "the_delinquent_issuer_case_qualifies": true,
+        "the_over_limit_investor_case_qualifies": true,
+        "the_short_availability_case_qualifies": true,
+        "the_under_assured_financials_case_qualifies": true,
+        "W_offering": {
+          "target_offering_amount": 3000000,
+          "maximum_offering_amount_the_issuer_will_accept": 3000000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "I_3_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 110000,
+          "net_worth": 115000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "I_4_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 1240000,
+          "net_worth": 1240000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "A_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": true,
+          "annual_income": 1000000,
+          "net_worth": 1000000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
+        },
+        "F_offering": {
+          "target_offering_amount": 550000,
+          "maximum_offering_amount_the_issuer_will_accept": 550000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": true
+        },
+        "investor_hydrated": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "greater_of_annual_income_or_net_worth": 200000,
+          "lesser_of_annual_income_or_net_worth": 60000
+        }
+      }
+    },
+    {
+      "name": "a transfer on day 364 — inside the one-year restricted period, no exception",
+      "context": {
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2023-06-01"
+        },
+        "no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16": -1,
+        "the_COVID_19_temporary_rules_Rule_201_z_and_bb_are_not_modelled_here": "financial statements reviewed by an independent public accountant",
+        "supplied": "financial statements reviewed by an independent public accountant",
+        "amount_to_be_sold_in_this_transaction": 5000,
+        "annual_cycles": 2,
+        "issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "offering": {
+          "target_offering_amount": 500000,
+          "maximum_offering_amount_the_issuer_will_accept": 500000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "arrangement": {
+          "the_intermediary_complies_with_section_4A_a_of_the_Securities_Act_and_the_related_requirements_in_this_part": true,
+          "the_transaction_is_conducted_exclusively_through_the_intermediary_s_platform": true,
+          "the_number_of_intermediaries_used_for_the_offering": 1,
+          "the_intermediary_delivered_educational_materials_in_connection_with_establishing_the_investor_s_account": true,
+          "the_intermediary_has_a_reasonable_basis_for_believing_that_the_investor_satisfies_the_investment_limitations": true,
+          "the_days_the_issuer_information_has_been_publicly_available_on_the_intermediary_s_platform_before_any_sale": 21
+        },
+        "notice": {
+          "directs_investors_to_the_intermediary_s_platform": true,
+          "states_that_the_issuer_is_conducting_an_offering_pursuant_to_section_4_a_6_names_the_intermediary_and_directs_the_potential_investor_to_its_platform": true,
+          "states_the_terms_of_the_offering": true,
+          "states_factual_information_about_the_legal_identity_and_business_location_of_the_issuer": true,
+          "includes_information_beyond_that_permitted_by_paragraph_b": false
+        },
+        "status": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 1,
+          "holders_of_record": 200,
+          "total_assets": 5000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "status_2": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 3,
+          "holders_of_record": 500,
+          "total_assets": 20000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "transfer": {
+          "days_since_the_securities_were_issued": 364,
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+        }
+      },
+      "expect": {
+        "Reg_CF_commenced": {
+          "$date": "2016-05-16"
+        },
+        "the_2017_inflation_adjustment": {
+          "$date": "2017-04-12"
+        },
+        "the_2021_amendments": {
+          "$date": "2021-03-15"
+        },
+        "the_2022_inflation_adjustment": {
+          "$date": "2022-09-20"
+        },
+        "offering_maximum_in_a_12_month_period": 5000000,
+        "income_or_net_worth_cut_point": 124000,
+        "minimum_permitted_investment": 2500,
+        "maximum_amount_sold_to_any_one_investor_in_a_12_month_period": 124000,
+        "tier_1_ceiling": 124000,
+        "tier_2_ceiling": 618000,
+        "first_time_issuer_review_ceiling": 1235000,
+        "holders_of_record_threshold": 300,
+        "total_assets_threshold": 10000000,
+        "minimum_days_publicly_available_before_any_sale": 21,
+        "days_to_file_the_annual_report_after_fiscal_year_end": 120,
+        "business_days_to_file_Form_C_TR": 5,
+        "business_days_to_file_a_progress_update": 5,
+        "days_in_the_resale_restricted_period": 365,
+        "b_1_not_organized_under_State_or_territorial_law": false,
+        "b_2_an_Exchange_Act_reporting_company": false,
+        "b_3_an_investment_company": false,
+        "b_4_subject_to_a_bad_actor_disqualification": false,
+        "b_5_delinquent_in_ongoing_annual_reports": false,
+        "b_6_no_specific_business_plan_or_a_blank_check_business_plan": false,
+        "issuer_is_excluded_by_Rule_100_b": false,
+        "issuer_is_eligible": true,
+        "aggregate_offering_amount": 500000,
+        "the_applicable_measure_of_annual_income_or_net_worth": 200000,
+        "either_annual_income_or_net_worth_is_less_than_the_cut_point": true,
+        "aggregate_amount_sold_to_this_investor_including_this_transaction": 5000,
+        "the_accredited_investor_carve_out_applies_to": false,
+        "the_rule_date_is_inside_the_COVID_19_temporary_rules_window": false,
+        "financial_statement_requirement_is_satisfied": true,
+        "disclosure_requirements_are_met": true,
+        "a_3_conducted_through_a_single_complying_intermediary": true,
+        "the_21_day_public_availability_period_has_run": true,
+        "the_intermediary_has_discharged_its_investor_facing_duties": true,
+        "intermediary_obligations_are_met": true,
+        "notice_complies_with_Rule_204_b": true,
+        "definition_terms_of_the_offering": true,
+        "b_1_became_an_Exchange_Act_reporting_company": false,
+        "b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record": true,
+        "b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000": false,
+        "b_4_all_securities_repurchased": false,
+        "b_5_liquidated_or_dissolved": false,
+        "ongoing_reporting_obligation_may_terminate": true,
+        "ongoing_reporting_obligation": "file a Form C-TR termination of reporting",
+        "transfer_is_within_the_one_year_restricted_period": true,
+        "transfer_falls_within_an_exception_in_Rule_501_a": false,
+        "transfer_is_permitted": false,
+        "a_clean_issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "a_delinquent_issuer": {
+          "name": "Late Filer Inc",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "certified": "financial statements certified by the principal executive officer, with tax return information",
+        "reviewed": "financial statements reviewed by an independent public accountant",
+        "audited": "financial statements audited by an independent public accountant",
+        "a_conforming_filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "the_base_case_qualifies": true,
+        "the_delinquent_issuer_case_qualifies": true,
+        "the_over_limit_investor_case_qualifies": true,
+        "the_short_availability_case_qualifies": true,
+        "the_under_assured_financials_case_qualifies": true,
+        "W_offering": {
+          "target_offering_amount": 3000000,
+          "maximum_offering_amount_the_issuer_will_accept": 3000000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "I_3_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 110000,
+          "net_worth": 115000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "I_4_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 1240000,
+          "net_worth": 1240000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "A_investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": true,
+          "annual_income": 1000000,
+          "net_worth": 1000000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
+        },
+        "F_offering": {
+          "target_offering_amount": 550000,
+          "maximum_offering_amount_the_issuer_will_accept": 550000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": true
+        },
+        "investor_hydrated": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "greater_of_annual_income_or_net_worth": 200000,
+          "lesser_of_annual_income_or_net_worth": 60000
+        }
+      }
+    },
+    {
+      "name": "a transfer on day 100 to an accredited investor — inside the period, exception applies",
+      "context": {
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2023-06-01"
+        },
+        "no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16": -1,
+        "the_COVID_19_temporary_rules_Rule_201_z_and_bb_are_not_modelled_here": "financial statements reviewed by an independent public accountant",
+        "supplied": "financial statements reviewed by an independent public accountant",
+        "amount_to_be_sold_in_this_transaction": 5000,
+        "annual_cycles": 2,
+        "issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "offering": {
+          "target_offering_amount": 500000,
+          "maximum_offering_amount_the_issuer_will_accept": 500000,
+          "aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
+          "the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6": false
+        },
+        "investor": {
+          "name": "Test Investor",
+          "an_accredited_investor_as_defined_in_Rule_501": false,
+          "annual_income": 60000,
+          "net_worth": 200000,
+          "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
+        },
+        "filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "arrangement": {
+          "the_intermediary_complies_with_section_4A_a_of_the_Securities_Act_and_the_related_requirements_in_this_part": true,
+          "the_transaction_is_conducted_exclusively_through_the_intermediary_s_platform": true,
+          "the_number_of_intermediaries_used_for_the_offering": 1,
+          "the_intermediary_delivered_educational_materials_in_connection_with_establishing_the_investor_s_account": true,
+          "the_intermediary_has_a_reasonable_basis_for_believing_that_the_investor_satisfies_the_investment_limitations": true,
+          "the_days_the_issuer_information_has_been_publicly_available_on_the_intermediary_s_platform_before_any_sale": 21
+        },
+        "notice": {
+          "directs_investors_to_the_intermediary_s_platform": true,
+          "states_that_the_issuer_is_conducting_an_offering_pursuant_to_section_4_a_6_names_the_intermediary_and_directs_the_potential_investor_to_its_platform": true,
+          "states_the_terms_of_the_offering": true,
+          "states_factual_information_about_the_legal_identity_and_business_location_of_the_issuer": true,
+          "includes_information_beyond_that_permitted_by_paragraph_b": false
+        },
+        "status": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 1,
+          "holders_of_record": 200,
+          "total_assets": 5000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "status_2": {
+          "the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act": false,
+          "annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part": 3,
+          "holders_of_record": 500,
+          "total_assets": 20000000,
+          "the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6": false,
+          "the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law": false
+        },
+        "transfer": {
+          "days_since_the_securities_were_issued": 100,
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": true,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+        }
+      },
+      "expect": {
+        "Reg_CF_commenced": {
+          "$date": "2016-05-16"
+        },
+        "the_2017_inflation_adjustment": {
+          "$date": "2017-04-12"
+        },
+        "the_2021_amendments": {
+          "$date": "2021-03-15"
+        },
+        "the_2022_inflation_adjustment": {
+          "$date": "2022-09-20"
+        },
+        "offering_maximum_in_a_12_month_period": 5000000,
+        "income_or_net_worth_cut_point": 124000,
+        "minimum_permitted_investment": 2500,
+        "maximum_amount_sold_to_any_one_investor_in_a_12_month_period": 124000,
+        "tier_1_ceiling": 124000,
+        "tier_2_ceiling": 618000,
+        "first_time_issuer_review_ceiling": 1235000,
+        "holders_of_record_threshold": 300,
+        "total_assets_threshold": 10000000,
+        "minimum_days_publicly_available_before_any_sale": 21,
+        "days_to_file_the_annual_report_after_fiscal_year_end": 120,
+        "business_days_to_file_Form_C_TR": 5,
+        "business_days_to_file_a_progress_update": 5,
+        "days_in_the_resale_restricted_period": 365,
+        "b_1_not_organized_under_State_or_territorial_law": false,
+        "b_2_an_Exchange_Act_reporting_company": false,
+        "b_3_an_investment_company": false,
+        "b_4_subject_to_a_bad_actor_disqualification": false,
+        "b_5_delinquent_in_ongoing_annual_reports": false,
+        "b_6_no_specific_business_plan_or_a_blank_check_business_plan": false,
+        "issuer_is_excluded_by_Rule_100_b": false,
+        "issuer_is_eligible": true,
+        "aggregate_offering_amount": 500000,
+        "the_applicable_measure_of_annual_income_or_net_worth": 200000,
+        "either_annual_income_or_net_worth_is_less_than_the_cut_point": true,
+        "aggregate_amount_sold_to_this_investor_including_this_transaction": 5000,
+        "the_accredited_investor_carve_out_applies_to": false,
+        "the_rule_date_is_inside_the_COVID_19_temporary_rules_window": false,
+        "financial_statement_requirement_is_satisfied": true,
+        "disclosure_requirements_are_met": true,
+        "a_3_conducted_through_a_single_complying_intermediary": true,
+        "the_21_day_public_availability_period_has_run": true,
+        "the_intermediary_has_discharged_its_investor_facing_duties": true,
+        "intermediary_obligations_are_met": true,
+        "notice_complies_with_Rule_204_b": true,
+        "definition_terms_of_the_offering": true,
+        "b_1_became_an_Exchange_Act_reporting_company": false,
+        "b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record": true,
+        "b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000": false,
+        "b_4_all_securities_repurchased": false,
+        "b_5_liquidated_or_dissolved": false,
+        "ongoing_reporting_obligation_may_terminate": true,
+        "ongoing_reporting_obligation": "file a Form C-TR termination of reporting",
+        "transfer_is_within_the_one_year_restricted_period": true,
+        "transfer_falls_within_an_exception_in_Rule_501_a": true,
+        "transfer_is_permitted": true,
+        "a_clean_issuer": {
+          "name": "Clean Co",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "a_delinquent_issuer": {
+          "name": "Late Filer Inc",
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
+          "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
+        },
+        "certified": "financial statements certified by the principal executive officer, with tax return information",
+        "reviewed": "financial statements reviewed by an independent public accountant",
+        "audited": "financial statements audited by an independent public accountant",
+        "a_conforming_filing": {
+          "a_Form_C_offering_statement_was_filed_with_the_Commission_and_provided_to_investors_and_the_relevant_intermediary_prior_to_the_commencement_of_the_offering": true,
+          "the_Form_C_includes_the_information_required_by_section_227_201": true,
+          "the_financial_statements_supplied": "financial statements reviewed by an independent public accountant"
+        },
+        "the_base_case_qualifies": true,
+        "the_delinquent_issuer_case_qualifies": true,
+        "the_over_limit_investor_case_qualifies": true,
+        "the_short_availability_case_qualifies": true,
+        "the_under_assured_financials_case_qualifies": true,
         "W_offering": {
           "target_offering_amount": 3000000,
           "maximum_offering_amount_the_issuer_will_accept": 3000000,

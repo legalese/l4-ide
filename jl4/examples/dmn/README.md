@@ -31,9 +31,9 @@ and it is here to be honest about what the real thing costs. Measured 2026-08-02
 shipped goldens (R12 + R13, spec §15.12/§16, on top of Phase 5's BKM emission):
 **67 decisions (12 decision tables), 10 businessKnowledgeModels, 7 decisionServices,
 15 `inputData`, and ZERO blocking notes (0 blocking / 21 lossy / 125 advisory)** — and
-both engines evaluate it end to end over the 16 cases in `regcf-corpus.cases.json`
-(the base world plus 15 dated relocation cases, spec §15.12.1), 1072/1072 values as
-expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
+both engines evaluate it end to end over the 20 cases in `regcf-corpus.cases.json`
+(the base world, 15 dated relocation cases per spec §15.12.1, and 4 seed cases added
+2026-08-03), 1340/1340 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
 2026-08-01 measurement counted (32 notes: the 15 `EVAL UNDER RULES EFFECTIVE AT`
 bodies with their 15 `D-RULEDATE-UNBOUND` companions, and the deontic reporting spine
 with its D-CYCLE) are **gone**: R12 drops the rebinding decides at population time
@@ -315,20 +315,22 @@ metamodel parser says:
 > `RULES_EFFECTIVE_DATE` to the fixture's pinned date, delivers the fixture's
 > scenario through the global `inputData`, and pins all 67 decisions to
 > L4-evaluated ground truth (the cases file's note block records every
-> derivation). Measured on the shipped `expected/regcf-corpus.dmn` with the
-> 16-case file, verbatim:
+> derivation). Four further SEED cases were added 2026-08-03 to close the two
+> structurally inert leaves the §8 diff oracle reported. Measured 2026-08-03 on
+> the shipped `expected/regcf-corpus.dmn` with the 20-case file, verbatim:
 >
 > - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
->   `KIE 8.44.0.Final VERDICT: 1 file(s), 16 case(s), 0 error(s),
->   0 warning(s), 1072/1072 decision(s) SUCCEEDED, 1072/1072 value(s) as
->   expected, 224/224 service output value(s) as expected`
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 20 case(s), 0 error(s),
+>   0 warning(s), 1340/1340 decision(s) SUCCEEDED, 1340/1340 value(s) as
+>   expected, 280/280 service output value(s) as expected`
 > - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
 >   (67 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
->   16 case(s), 1 parsed, 0 error(s), 1072/1072 decision(s) evaluated,
->   1072/1072 value(s) as expected`
+>   20 case(s), 1 parsed, 0 error(s), 1340/1340 decision(s) evaluated,
+>   1340/1340 value(s) as expected`
 >
-> Same artifact, sixteen worlds: the `1 case(s) … 67/67` banners quoted above
-> were the measurement at the single base case and stand as history.
+> Same artifact, twenty worlds: the `1 case(s) … 67/67` banners quoted above
+> were the measurement at the single base case, and `16 case(s) … 1072/1072`
+> was the measurement before the seed cases; both stand as history.
 
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json

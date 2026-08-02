@@ -414,7 +414,7 @@ projection *cannot* say. What follows is the summary.
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
-| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1072/1072 over 16 cases on both engines** — see below |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1340/1340 over 20 cases on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 
 Every BPMN golden, and the DMN **markdown** golden, reproduces byte for byte from a bare
@@ -431,11 +431,11 @@ from this file's own outermost `§` heading.
 this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
 since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
 reporting spine to a verdict decision table — **both engines evaluate it end to end**,
-over the 16 cases in `../../dmn/regcf-corpus.cases.json` (the base world plus 15 dated
+over the 20 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec
-§15.12.1): KIE 8.44.0.Final answers 1072/1072 decisions with 1072/1072 values as
-expected (plus 224/224 decision-service output values), and Camunda 8.7.6 (zeebe-dmn)
-parses it and answers 1072/1072. An earlier revision of this section — "102 decisions, 11 tables, and a model no
+§15.12.1 — and 4 seed cases added 2026-08-03): KIE 8.44.0.Final answers 1340/1340
+decisions with 1340/1340 values as expected (plus 280/280 decision-service output
+values), and Camunda 8.7.6 (zeebe-dmn) parses it and answers 1340/1340. An earlier revision of this section — "102 decisions, 11 tables, and a model no
 engine can bind" — described the pre-BKM, pre-R12/R13 artifact; that model no longer
 ships.
 

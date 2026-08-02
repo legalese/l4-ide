@@ -106,19 +106,19 @@
   <decision id="decision_commencement" name="commencement">
     <variable id="decision_commencement_var" name="commencement" typeRef="date"/>
     <literalExpression id="decision_commencement_literal">
-      <text>YMD OF 1983, 1, 1</text>
+      <text>date("1983-01-01")</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_appointed_day" name="the_appointed_day" label="the appointed day">
     <variable id="decision_the_appointed_day_var" name="the_appointed_day" label="the appointed day" typeRef="date"/>
     <literalExpression id="decision_the_appointed_day_literal">
-      <text>YMD OF 2002, 5, 21</text>
+      <text>date("2002-05-21")</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_relevant_day" name="the_relevant_day" label="the relevant day">
     <variable id="decision_the_relevant_day_var" name="the_relevant_day" label="the relevant day" typeRef="date"/>
     <literalExpression id="decision_the_relevant_day_literal">
-      <text>YMD OF 2010, 1, 13</text>
+      <text>date("2010-01-13")</text>
     </literalExpression>
   </decision>
   <decision id="decision_permitted_days_of_absence_in_each_of_the_first_ten_years" name="permitted_days_of_absence_in_each_of_the_first_ten_years" label="permitted days of absence in each of the first ten years">

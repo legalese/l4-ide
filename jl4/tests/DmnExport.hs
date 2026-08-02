@@ -2436,6 +2436,43 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       it "refuses a computed component" $
         dayRefuses "YMD (1983 PLUS 40) 1 1"
 
+      -- smucclaw/l4-ide#933. The head test is PROVENANCE, not name + type: a
+      -- module that defines its OWN `YMD`/`Date` (and therefore does NOT import
+      -- daydate, or the redefinition would be an ambiguity error and export
+      -- would never run) must fall through to the raw-L4 path.
+      --
+      -- The shadow used here is daydate's semantics off by one year, which is
+      -- what makes the old behaviour a SILENT wrong answer rather than a noisy
+      -- one: name + type both agreed, the fold read the components as written,
+      -- and the artifact said 2024-01-02 where `l4 run` says DATE OF 2, 1, 2025.
+      -- Both arms are asserted, because #196 widened the hole from `Date` to
+      -- `YMD` rather than opening it.
+      let shadowDrg ctor params body =
+            drgOf
+              ( "IMPORT prelude\nGIVEN " <> params <> "\nGIVETH A DATE\n"
+                  <> ctor <> " MEANS DATE_FROM_DMY d m (y PLUS 1)\n"
+                  <> "GIVETH A DATE\n`the day` MEANS " <> body <> "\n"
+              )
+          shadowRefuses ctor params body = do
+            let drg = shadowDrg ctor params body
+            case (decisionNamed "the day" drg).dcnLogic of
+              LogicLiteral e -> do
+                e.feFragment `shouldBe` L4Verbatim
+                e.feText `shouldSatisfy` Text.isInfixOf ctor
+              _ -> expectationFailure ("expected a boxed literal for: " <> Text.unpack body)
+
+      it "refuses a locally-defined YMD that shadows daydate's (#933)" $
+        shadowRefuses
+          "YMD"
+          "y IS A NUMBER, m IS A NUMBER, d IS A NUMBER"
+          "YMD 2024 1 2"
+
+      it "refuses a locally-defined Date that shadows daydate's (#933)" $
+        shadowRefuses
+          "Date"
+          "d IS A NUMBER, m IS A NUMBER, y IS A NUMBER"
+          "Date 2 1 2024"
+
       it "keeps all three refusals in the negative fixture Blocking" $ do
         drg <- notOkDrg "ymd-unfoldable-date.l4"
         -- The OTHER notes on this fixture are D-INERT x3 and D-SVCEMPTY, which
@@ -3487,6 +3524,93 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         -- on a ninth constructor before this assertion ever runs
         coveredBy StackOverflow `shouldSatisfy` (not . Text.null)
         constructorCount `shouldBe` 8
+
+  -- smucclaw/l4-ide#936. Two gaps, one issue, and the tests are written in that
+  -- order deliberately: the FEEL lowering alone would have removed a loud
+  -- refusal and left a wrong answer under it.
+  describe "list quantifiers: some/every, and the binder that actually binds (#936)" $ do
+    let corpus body =
+          "IMPORT prelude\n\
+          \DECLARE Purpose HAS charitable IS A BOOLEAN, political IS A BOOLEAN\n\
+          \DECLARE Entity HAS purposes IS A LIST OF Purpose\n\
+          \GIVEN purpose IS A Purpose\n\
+          \GIVETH A BOOLEAN\n\
+          \`is political` purpose MEANS purpose's political\n\
+          \GIVEN purpose IS A Purpose\n\
+          \GIVETH A BOOLEAN\n\
+          \`counts` purpose MEANS purpose's charitable AND NOT `is political` purpose\n\
+          \GIVEN entity IS AN Entity\n\
+          \GIVETH A BOOLEAN\n\
+          \`the answer` entity MEANS " <> body <> "\n"
+        answerText src = case (decisionNamed "the answer" (drgOf src)).dcnLogic of
+          LogicLiteral e -> e
+          _              -> error "expected a boxed literal for `the answer`"
+
+    it "lowers `any f xs` to FEEL's some ... satisfies" $ do
+      let e = answerText (corpus "any `counts` (entity's `purposes`)")
+      e.feFragment `shouldNotBe` L4Verbatim
+      e.feText `shouldSatisfy` Text.isInfixOf "some "
+      e.feText `shouldSatisfy` Text.isInfixOf " in entity.purposes satisfies "
+
+    it "lowers `all (GIVEN x YIELD ...) xs` to FEEL's every ... satisfies" $ do
+      let e = answerText
+                (corpus "all (GIVEN purpose YIELD `counts` purpose) (entity's `purposes`)")
+      e.feFragment `shouldNotBe` L4Verbatim
+      e.feText `shouldSatisfy` Text.isInfixOf "every "
+      e.feText `shouldSatisfy` Text.isInfixOf " in entity.purposes satisfies "
+
+    -- THE Gap 2 regression, and the only test here that would have passed
+    -- against the broken lowering. `counts` and `is political` are un-lifted
+    -- tier-1 decides: their `purpose` parameter becomes a module-level
+    -- inputData, and a saturated call to either renders as the callee's BARE
+    -- decision name with the argument discarded (D-PARAM-AS-INPUT). Under a
+    -- quantifier that is a wrong answer, not a lossy one -- every element sees
+    -- the one global -- and it is INVISIBLE on single-element lists, which is
+    -- why #936 insists on a multi-element battery. The emitted text must
+    -- therefore mention neither decision variable, and must read the fields off
+    -- the bound element.
+    it "does not read a shadowed global under the binder -- it re-renders per element" $ do
+      for_ [ "any `counts` (entity's `purposes`)"
+           , "all (GIVEN purpose YIELD `counts` purpose) (entity's `purposes`)"
+           ] \body -> do
+        let e = answerText (corpus body)
+        e.feFragment `shouldNotBe` L4Verbatim
+        -- the two un-lifted callees, by their FEEL names: neither may appear
+        e.feText `shouldSatisfy` (not . Text.isInfixOf "counts")
+        e.feText `shouldSatisfy` (not . Text.isInfixOf "is_political")
+        -- ...and the global inputData the binder shadows may not appear either
+        e.feText `shouldSatisfy` (not . Text.isInfixOf "purpose.")
+        -- what SHOULD appear: both fields, read off the bound element
+        e.feText `shouldSatisfy` Text.isInfixOf "_elem.charitable"
+        e.feText `shouldSatisfy` Text.isInfixOf "_elem.political"
+
+    -- The refusal half. A predicate whose binder cannot be identified is not
+    -- guessed at: it falls back to raw L4, loudly. A higher-order GIVEN is the
+    -- cleanest such predicate -- §6.3-2 already refuses higher-order use, and
+    -- there is no binder to install because there is no callee to eta-expand.
+    it "refuses a predicate it cannot find a binder for" $ do
+      let src =
+            "IMPORT prelude\n\
+            \DECLARE Purpose HAS charitable IS A BOOLEAN\n\
+            \DECLARE Entity HAS purposes IS A LIST OF Purpose\n\
+            \GIVEN entity IS AN Entity, pred IS A FUNCTION FROM Purpose TO BOOLEAN\n\
+            \GIVETH A BOOLEAN\n\
+            \`the answer` entity pred MEANS any pred (entity's `purposes`)\n"
+      case (decisionNamed "the answer" (drgOf src)).dcnLogic of
+        LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
+        _              -> expectationFailure "expected a boxed literal for `the answer`"
+
+    -- The DRG half. What the binder lowering inlines is in the text, so it must
+    -- be in the requirement graph; a knowledgeRequirement missing here is a
+    -- whole-model KIE compile error and a silent Camunda null, which is exactly
+    -- what D-KNOWLEDGEREQ reports -- and did report, before the edges followed
+    -- the inline.
+    it "declares every edge the inlined text earns (no D-KNOWLEDGEREQ)" $ do
+      for_ [ "any `counts` (entity's `purposes`)"
+           , "all (GIVEN purpose YIELD `counts` purpose) (entity's `purposes`)"
+           ] \body -> do
+        let drg = drgOf (corpus body)
+        [n.code | n <- (dmnReport drg).notes, n.severity == Blocking] `shouldBe` []
 
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
