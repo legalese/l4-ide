@@ -323,6 +323,23 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Assert @l4 verify@ exits 1 on a fixture AND names the expected finding
+-- kind. Both halves are needed: exit 1 alone would be satisfied by a fixture
+-- that fails to typecheck, which would make the negative control a control over
+-- nothing.
+expectVerifyFinding :: FilePath -> FilePath -> String -> IO ()
+expectVerifyFinding bin fixture kind = do
+  Output code sout serr <- runL4 bin ["verify", fixture, "--format", "json"]
+  case code of
+    ExitFailure 1 -> pure ()
+    other -> expectationFailure $
+      "Expected exit 1 (findings present) but got " ++ show other
+      ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr
+  unless (("\"" ++ kind ++ "\"") `isInfixOf` sout) $
+    expectationFailure $
+      "Expected a " ++ show kind ++ " finding in the JSON envelope"
+      ++ "\n--- stdout ---\n" ++ sout
+
 -- | Assert the CLI exits 0 and its stdout exactly matches a committed golden
 -- file. Used for the OpenFisca backend, whose emit is fully deterministic.
 expectGolden :: FilePath -> [String] -> FilePath -> IO ()
@@ -356,10 +373,16 @@ firstLineWith :: String -> String -> Int
 firstLineWith needle = fromMaybe maxBound . findIndex (needle `isInfixOf`) . lines
 
 -- | Parse the stdout of a --json run as a JSON envelope.
+--
+-- Re-encodes as UTF-8 rather than using @BSL8.pack@, which truncates each Char
+-- to eight bits: an em-dash in a decision name (regcf is full of them) came back
+-- as byte 0x14 and aeson rejected it as a control character inside a string
+-- literal. Every envelope this suite parsed before was ASCII, so the bug was
+-- latent until a JSON mode started echoing corpus identifiers.
 jsonEnvelope :: FilePath -> [String] -> IO Value
 jsonEnvelope bin args = do
   Output _ sout _ <- runL4 bin args
-  case eitherDecode (BSL8.pack sout) of
+  case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
     Right v  -> pure v
     Left err -> do
       expectationFailure ("JSON parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
@@ -688,6 +711,33 @@ dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
 -- embedded stdlib).
+-- The `l4 verify` controls. One positive (a module with real boolean structure
+-- and nothing wrong with it) and four negatives, one per finding family.
+--
+-- The negatives are the load-bearing half. A consistency checker that never
+-- fires passes every corpus, so "regcf is clean" only means something if these
+-- five files prove the checker is capable of going red — and going red for the
+-- REASON claimed, which is why each test asserts the finding KIND and not just
+-- the exit code.
+verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture :: FilePath
+verifyVacuousGuardFixture, verifySeamFixture :: FilePath
+verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
+verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
+verifyDeadBranchFixture   = fixtureDir </> "verify-dead-branch.l4"
+verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
+verifySeamFixture         = fixtureDir </> "verify-seam.l4"
+
+-- The `l4 nlg` differential pair. These goldens are written by
+-- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
+-- FOR BYTE — that equality is the whole reason the orchestrator's p7-tnr leg
+-- can carry a `differential` oracle instead of reporting NOT-REGENERATED.
+-- If this pair ever diverges, p7-tnr silently stops measuring what it says.
+nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden :: FilePath
+nlgRegcfSource  = "examples/legal/regcf/regcf.l4"
+nlgRegcfGolden  = "examples/legal/regcf/tests/regcf.nlg.golden"
+nlgWizardSource = "examples/legal/regcf/regcf-wizard.l4"
+nlgWizardGolden = "examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+
 shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
 shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
 shadowSiblingEntry  = fixtureDir </> "library-shadow" </> "sibling-wins"  </> "main.l4"
@@ -723,6 +773,9 @@ main = do
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
        , shadowExtraEntry, shadowImporterEntry
+       , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
+       , verifyVacuousGuardFixture, verifySeamFixture
+       , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
        , exportTwoRulesFixture, exportNothingFixture
        , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
@@ -760,6 +813,8 @@ spec bin = do
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
       sout `shouldSatisfy` ("export" `isInfixOf`)
       sout `shouldSatisfy` ("openfisca" `isInfixOf`)
+      sout `shouldSatisfy` ("nlg" `isInfixOf`)
+      sout `shouldSatisfy` ("verify" `isInfixOf`)
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -2038,6 +2093,117 @@ spec bin = do
         spouseBkmTableDmn [spouseBkmTableDmn, "--cases", spouseCases] \out -> do
           out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
+
+  -- The NLG footing. Two assertions, and the second is the one that matters:
+  -- `l4 nlg` must be byte-identical to what jl4-test writes into the committed
+  -- `.nlg.golden`. Only that equality lets the orchestrator's p7-tnr leg
+  -- regenerate-and-diff instead of hashing a file it did not produce.
+  describe "l4 nlg" $ do
+    it "linearizes a clean module and exits 0" $ do
+      Output code sout _ <- runL4 bin ["nlg", cleanFixture]
+      code `shouldBe` ExitSuccess
+      -- clean.l4 has no directives, so the payload is empty. That is the
+      -- correct answer and not a failure: `nlg` linearizes DIRECTIVES.
+      sout `shouldBe` ""
+
+    it "refuses to emit prose for a module that does not typecheck" $
+      expectFail bin ["nlg", errorFixture]
+
+    it "reproduces the committed regcf NLG golden byte for byte" $
+      expectGolden bin ["nlg", nlgRegcfSource] nlgRegcfGolden
+
+    it "reproduces the committed regcf-wizard NLG golden byte for byte" $
+      expectGolden bin ["nlg", nlgWizardSource] nlgWizardGolden
+
+  -- The verifier footing. Every negative control asserts the finding KIND, not
+  -- merely a red exit: a checker that goes red for the wrong reason is a
+  -- checker whose green runs mean nothing either.
+  describe "l4 verify" $ do
+    it "reports no findings on a clean module and exits 0" $ do
+      Output code sout serr <- runL4 bin ["verify", verifyCleanFixture]
+      code `shouldBe` ExitSuccess
+      unless ("0 finding(s)." `isInfixOf` sout) $
+        expectationFailure ("expected a zero-finding summary\n" ++ sout ++ serr)
+
+    it "states its propositional bound in the report, not only in the source" $ do
+      Output _ sout _ <- runL4 bin ["verify", verifyCleanFixture]
+      sout `shouldSatisfy` ("PROPOSITIONAL" `isInfixOf`)
+      sout `shouldSatisfy` ("SOUND, not COMPLETE" `isInfixOf`)
+
+    -- Reachability, not prose. Every other subcommand answers
+    -- `Invalid option '--help'`, so without the `helper` wired into this one
+    -- the footer would exist and be unreadable.
+    it "states the same bound in --help, where a caller reads it first" $ do
+      Output _ sout _ <- runL4 bin ["verify", "--help"]
+      sout `shouldSatisfy` ("PROPOSITIONAL" `isInfixOf`)
+      sout `shouldSatisfy` ("--no-coalesce-atoms" `isInfixOf`)
+
+    it "emits a well-shaped JSON envelope with ok=true on a clean module" $ do
+      env <- jsonEnvelope bin ["verify", verifyCleanFixture, "--format", "json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      objField env "decisions" `shouldSatisfy` (/= Nothing)
+      objField env "bound" `shouldSatisfy` (/= Nothing)
+      case objField env "summary" >>= (`objField` "findings") of
+        Just (Number n) -> n `shouldBe` 0
+        other -> expectationFailure ("expected summary.findings, got " ++ show other)
+
+    it "goes RED on a decision no assignment can satisfy" $
+      expectVerifyFinding bin verifyUnsatFixture "unsat"
+
+    it "goes RED on an OR limb that cannot hold where it sits" $
+      expectVerifyFinding bin verifyDeadBranchFixture "dead-branch"
+
+    it "goes RED on a conjunct its own siblings already entail" $
+      expectVerifyFinding bin verifyVacuousGuardFixture "vacuous-guard"
+
+    it "goes RED on an unsatisfiable rule scope" $ do
+      Output code sout _ <-
+        runL4 bin ["verify", verifySeamFixture, "--format", "json"
+                  , "--decision", "`a rule that reaches nobody`"]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("\"vacuous-guard\"" `isInfixOf`)
+
+    it "goes RED when a rule's Complies verdict is unreachable" $ do
+      Output code sout _ <-
+        runL4 bin ["verify", verifySeamFixture, "--format", "json"
+                  , "--decision", "`everyone in scope is in breach`"]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("\"unreachable-outcome\"" `isInfixOf`)
+
+    it "goes RED when a rule's InBreach verdict is unreachable" $ do
+      Output code sout _ <-
+        runL4 bin ["verify", verifySeamFixture, "--format", "json"
+                  , "--decision", "`a requirement that adds nothing`"]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("\"unreachable-outcome\"" `isInfixOf`)
+
+    -- The suppression that keeps the checker usable. `x XOR y` normalises into
+    -- a CNF containing `x OR NOT x`; reporting that clause as a vacuous guard
+    -- would fire on ordinary drafting and teach the reader to ignore the tool.
+    -- verify-clean.l4's first decision IS an xor, so this is measured, not
+    -- asserted.
+    it "does not report the tautological clauses CNF distribution manufactures" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyCleanFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` (not . ("vacuous-guard" `isInfixOf`))
+
+    -- The weaker mode is documented as weaker; pin that it is not SILENTLY
+    -- weaker. `x` here is a nullary reference to a GIVEN binder, so the two
+    -- occurrences share a unique with or without coalescing and the finding
+    -- survives. What --no-coalesce-atoms drops is compound leaves, which this
+    -- fixture deliberately does not have.
+    it "still finds a binder-level contradiction with --no-coalesce-atoms" $ do
+      Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
+      code `shouldBe` ExitFailure 1
+
+    it "records a non-boolean DECIDE as skipped, never as clean" $ do
+      env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]
+      case objField env "summary" >>= (`objField` "skipped") of
+        Just (Number n) -> n `shouldSatisfy` (> 0)
+        other -> expectationFailure ("expected summary.skipped, got " ++ show other)
+
+    it "fails on a module that does not typecheck" $
+      expectFail bin ["verify", errorFixture]
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $

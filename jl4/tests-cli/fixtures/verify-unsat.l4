@@ -1,0 +1,12 @@
+§ `VerifyUnsatFixture`
+
+-- Negative control: a decision that is TRUE for nobody.
+--
+-- `x` and `NOT x` are the SAME atom -- a nullary reference to a GIVEN binder
+-- keeps the binder's unique -- so the ROBDD reduces the body to the constant
+-- 0 node and `l4 verify` reports `unsat` at `body` and exits 1.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `nobody can satisfy this` IS
+  x AND NOT x
