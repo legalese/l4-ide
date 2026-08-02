@@ -126,3 +126,87 @@ GIVETH A NUMBER
 
 -- expected: 7 — applying it INSIDE the pin is the idiom that works.
 #EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`apply to zero` `rate plus`)
+
+----------------------------------------------------------------------------
+-- J: THE SAME BOUNDARY, HIDDEN INSIDE DATA — and the fix makes it harder to
+-- see, not easier.
+--
+-- Case I pins a bare closure, where the escape is at least legible at the pin
+-- site: `EVAL UNDER … `rate plus`` visibly returns a function. Put the closure
+-- in a record FIELD and the pin site returns a data value, with nothing in the
+-- source to say one of its fields is still context-live.
+--
+-- Measured, `origin/unstable` @ 16adc022 vs this branch: PRE-fix the whole
+-- pinned record read the ambient regime — rate 9 AND apply 900, wrong but
+-- internally consistent. POST-fix the scalar field is pinned and the function
+-- field is not, so ONE record answers 7 and 900 at the same time. No
+-- diagnostic either way. See §1.4.1 "Closures".
+----------------------------------------------------------------------------
+
+DECLARE Calc
+    HAS rate  IS A NUMBER
+        apply IS A FUNCTION FROM NUMBER TO NUMBER
+
+GIVETH A Calc
+calc MEANS Calc `GST rate` (GIVEN n YIELD n TIMES `GST rate`)
+
+GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER
+GIVETH A NUMBER
+`apply to hundred` f MEANS f 100
+
+`pinned calc` MEANS `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) calc
+
+-- expected: 7 — the scalar field IS pinned.
+#EVAL `pinned calc`'s rate
+
+-- expected: 900, NOT 700 — the function field of the SAME record is not.
+#EVAL `apply to hundred` (`pinned calc`'s apply)
+
+-- expected: 700 — applying inside the pin is the idiom that works.
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`apply to hundred` (calc's apply))
+
+----------------------------------------------------------------------------
+-- K: A REGULATIVE VALUE IS OPAQUE TO THE PIN, for the same structural reason
+-- a closure is, and this is the boundary that matters most in practice
+-- because the corpus's law-time axis is deontic.
+--
+-- `ValObligation`'s party and due are `Either RExpr (Value a)` and its
+-- HENCE/LEST followups are bare `RExpr` closed over an `Environment`
+-- (`jl4-core/src/L4/Evaluate/ValueLazy.hs`). `Foldable` on `Value` — which is
+-- the deep pin's reachability relation, and `nfAux`'s — reaches none of them
+-- in a freshly built obligation, so EVERY deadline is computed later by the
+-- contract stepper under the AMBIENT context. The invariant "the pin covers
+-- exactly what the evaluator prints" still holds; it just does not imply
+-- coverage here, because what the printer prints for an obligation is the
+-- deadline's unevaluated SOURCE (`WITHIN window`), not its value.
+--
+-- Byte-identical pre- and post-fix: not a regression, the edge of the ruling.
+-- `window` is 30 under rules effective before 2024-01-01 and 10 on or after,
+-- and the pinned trace below breaches at 10 — the ambient answer.
+----------------------------------------------------------------------------
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Act IS ONE OF file, pay
+
+window MEANS
+    IF (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL (Date 1 1 2024))
+    THEN 10
+    ELSE 30
+
+duty MEANS
+  PARTY Alice
+  MUST file
+  WITHIN window
+  HENCE (PARTY Bob MUST pay WITHIN window)
+
+`pinned duty` MEANS `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) duty
+
+-- expected: BREACHED at deadline 10 — the pinned window is 30, so a deep pin
+-- would have this FULFILLED. The first obligation's own deadline escapes.
+#TRACE `pinned duty` AT 0 WITH
+  PARTY Alice DOES file AT 20
+
+-- expected: BREACHED at deadline 11 — so does the HENCE continuation's.
+#TRACE `pinned duty` AT 0 WITH
+  PARTY Alice DOES file AT 1
+  PARTY Bob DOES pay AT 20

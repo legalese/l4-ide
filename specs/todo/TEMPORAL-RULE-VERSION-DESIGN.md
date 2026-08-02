@@ -121,11 +121,15 @@ pre-PR#80 assumptions and are **already fixed** on `55bd0452`:
 
 ### 1.4.1 RULING: the pin is deep (2026-08-03)
 
-_Status: **implemented** on branch `mengwong/eval-pin-and-shadowing`, cut from
-`origin/unstable` @ `71da8b09`. Fixture `jl4/examples/ok/temporal-pin-deep.l4`;
+_Status: **implemented** on branch `mengwong/eval-pin-and-shadowing`, rebased on
+`origin/unstable` @ `16adc022`. Fixture `jl4/examples/ok/temporal-pin-deep.l4`;
 implementation `startDeepPin` / `driveDeepPin` / `snapshotVal` / `snapshotRef`
 in `jl4-core/src/L4/EvaluateLazy/Machine.hs`. Resolves
-[smucclaw/l4-ide#934](https://github.com/smucclaw/l4-ide/issues/934)._
+[smucclaw/l4-ide#934](https://github.com/smucclaw/l4-ide/issues/934) **for
+functional values only** — see the four boundaries below, of which the
+regulative one is open and material. Adversarially re-measured 2026-08-03
+against a second pair of full-tree sweeps (base `16adc022` binary vs this
+branch, `l4 run` over all 725 shared `.l4` files)._
 
 **The defect, measured.** With the WHNF boundary as shipped, these two answer
 differently, with no visible reason in the source and no diagnostic — the
@@ -206,12 +210,29 @@ exactly the part of the value the evaluator prints.**
   and by the visited-`Address` set, which makes the walk strictly tighter than
   the printer's (shared and cyclic structure is visited once per reference
   rather than re-expanded per path).
+
+  Measured 2026-08-03, so the shape is on the record rather than left as a
+  hedge. `Box good bad` with `bad MEANS 1 DIVIDED BY 0`, pinned, consumer reads
+  only `good`: base `16adc022` prints `42` and exits 0, this branch prints
+  `Division by zero` and exits 1. With `bad` replaced by a non-terminating
+  recursion: base prints `7` and exits 0, this branch **does not terminate**
+  (`timeout 45` → exit 124). So the honest statement is not "an error becomes
+  reachable" but "a terminating program can become a non-terminating one" —
+  the price of making the pin mean what it says. Nothing in the tree pays it
+  (see the sweep below), and the §6 Q4 lint stays available if that changes.
+
 - _Allocation._ One fresh reference per reachable reference of a pinned
   result, once, at the pin boundary.
 - Measured on this tree: the full suite is unchanged apart from the two new
-  fixtures.
+  fixtures. Re-measured adversarially by a whole-tree `l4 run` sweep (all 725
+  `.l4` files present on both sides, base binary vs branch binary, outputs
+  diffed): **no file's evaluated output changes.** Six files differ, five of
+  which (`fetch-uuid`, `post-with-json`, `test-post`, `test-post-headers`,
+  `thailand-cosmetics/orchestrator`) make live HTTP calls and differ in UUIDs
+  and AWS trace ids between any two runs; the sixth is the #930 file, below.
 
-**Three boundaries, all deliberate.**
+**Four boundaries. Three are deliberate; the fourth is the ruling's real
+limit.**
 
 - **Closures** are opaque to both passes, exactly as they are to `nfAux`. A
   function returned from under a pin still reads the _ambient_ context when it
@@ -221,13 +242,68 @@ exactly the part of the value the evaluator prints.**
   pins a closure, applies it outside, and asserts the ambient 9, so if a later
   change makes closures pin-aware that golden moves and the decision gets
   re-taken on purpose.
+
+  **Sharpened 2026-08-03**: case I pins a _bare_ closure, where the escape is
+  at least legible at the pin site. Put the closure in a record FIELD and the
+  pin site returns a _data_ value, with nothing in the source to say one field
+  is still context-live — and the fix then makes the symptom harder to see,
+  not easier. Measured on `Calc rate apply` pinned to 2023-06-01:
+
+  | field                   | base `16adc022` | this branch |
+  | ----------------------- | --------------- | ----------- |
+  | `rate` (NUMBER)         | 9               | **7**       |
+  | `apply` applied outside | 900             | 900         |
+
+  Pre-fix the record was uniformly ambient: wrong, but internally consistent.
+  Post-fix one record answers 7 and 900 at the same time, with no diagnostic.
+  Asserted as case J so a future closure-capture change moves that golden.
+
+- **Regulative values are not pinned at all** — not the followups, not even the
+  first obligation's own deadline. This is the boundary that matters most in
+  practice, because the corpus's law-time axis is deontic, and it is stated
+  here as an open limitation rather than a design choice.
+
+  Structural reason: `ValObligation`'s party and due are
+  `Either RExpr (Value a)` and its `HENCE`/`LEST` followups are bare `RExpr`
+  closed over an `Environment` (`jl4-core/src/L4/Evaluate/ValueLazy.hs:60`).
+  `Foldable` on `Value` — the pin's reachability relation, and `nfAux`'s —
+  reaches nothing in a freshly built obligation, where every one of those
+  fields is still `Left rexpr`. The contract stepper evaluates them later,
+  ambiently. Note what this does to the invariant above: "the pin covers
+  exactly the part of the value the evaluator prints" remains true, but for an
+  obligation the printer prints the deadline's unevaluated _source_
+  (`WITHIN window`), so covering what it prints covers nothing that matters.
+
+  Measured 2026-08-03, `window` = 30 under rules effective before 2024-01-01
+  and 10 on or after, ambient clock 2025: `EVAL UNDER RULES EFFECTIVE AT
+(Date 1 6 2023) duty` breaches an event at t=20 against deadline **10**, and
+  its `HENCE` continuation against **11** — both the ambient answer, and both
+  byte-identical on base `16adc022` and on this branch. Asserted as case K.
+
+  Fixing it is not a rider on this change. It needs the pinned
+  `TemporalContext` carried into the obligation's `Environment` (or a pinned-
+  contract wrapper) and re-installed at every stepper site that evaluates a
+  deadline or a followup — i.e. option (a) capture, scoped to regulative
+  values — and it first needs a semantic ruling this document does not have:
+  whether a contract pinned at trace start stays pinned across a multi-day
+  trace whose own events carry timestamps. Tracked on #934's thread.
+
 - **A back-edge** into a force we are still inside (a self-referential value
   whose recursion runs _through_ the pin) is skipped rather than forced. The
   first implementation did force it, and turned a program that printed a
   truncated list into one that raised "Infinite loop detected"; the deep pin
-  must not do that.
+  must not do that. Verified 2026-08-03 to be sound as well as non-crashing:
+  `xs MEANS EVAL UNDER … (GST rate FOLLOWED BY xs)` prints 200 sevens and no
+  nines, because the skipped back-edge resolves to the pinned thunk itself,
+  whose write-back is the snapshot.
+
 - **Beyond the depth budget** the original reference is kept — exactly where
-  the printer would have printed `…` anyway.
+  the printer would have printed `…` anyway. Verified 2026-08-03 rather than
+  assumed: a 300-element list of `GST rate` pinned to 2023-06-01 prints exactly
+  200 sevens then `...`, with zero nines, and every consumer of a value goes
+  through `NF` (`Print.hs`, `API.hs`, `ValueLazyJSON.hs`,
+  `jl4-service/src/Backend/Jl4.hs`), which `nfAux` truncates at the same 200.
+  So the budget boundary is unobservable, not merely tolerable.
 
 ---
 

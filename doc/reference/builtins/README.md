@@ -134,9 +134,17 @@ so nothing re-derives it afterwards. `VALUE AT` works the same way. Two
 consequences worth knowing:
 
 - A **closure** returned from under a pin is not covered: applying it later
-  reads the ambient context. Apply it inside the pin instead.
+  reads the ambient context. Apply it inside the pin instead. This holds for a
+  closure stored in a record **field** too, where it is much less obvious — a
+  pinned record can answer the pinned regime for its scalar fields and the
+  ambient one for its function fields.
+- A **regulative value** is not covered at all. Neither a `HENCE`/`LEST`
+  followup nor the obligation's own `WITHIN` deadline is evaluated at pin time,
+  so pinning a `PARTY … MUST …` and tracing it gives the ambient answer
+  throughout. Pin the values a contract reads, not the contract.
 - The pin is therefore **strict** in its argument's structure: a field nothing
-  demands is still evaluated.
+  demands is still evaluated, so an error — or a non-terminating computation —
+  in a field the consumer never reads will now surface.
 
 See `jl4/examples/ok/temporal-pin-deep.l4` and the ruling in
 `specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.1.

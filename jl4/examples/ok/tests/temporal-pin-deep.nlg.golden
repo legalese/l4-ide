@@ -12,3 +12,8 @@
 `VALUE AT` with `Date` with 1, 7 and 2024 and given `d` then `assess` with 1000
 `apply to zero` with `EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `rate plus`
 `EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `apply to zero` with `rate plus`
+`pinned calc` 's `rate`
+`apply to hundred` with `pinned calc` 's `apply`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `apply to hundred` with `calc` 's `apply`
+executing contract `pinned duty` at 0 with the following events:  party `Alice` did `file` at 20
+executing contract `pinned duty` at 0 with the following events:  party `Alice` did `file` at 1 party `Bob` did `pay` at 20

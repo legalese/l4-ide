@@ -29,3 +29,37 @@ temporal-pin-deep.l4:125:1-84:
   9
 temporal-pin-deep.l4:128:1-84:
   7
+temporal-pin-deep.l4:160:1-27:
+  7
+temporal-pin-deep.l4:163:1-49:
+  900
+temporal-pin-deep.l4:166:1-90:
+  700
+temporal-pin-deep.l4:206:1-207:30:
+  DEONTIC BREACHED:
+    party
+      Alice
+    who did action
+      file
+    at
+      20
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST file
+    before their deadline, which was at
+      10
+temporal-pin-deep.l4:210:1-212:27:
+  DEONTIC BREACHED:
+    party
+      Bob
+    who did action
+      pay
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST pay
+    before their deadline, which was at
+      11
