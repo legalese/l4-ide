@@ -1,13 +1,13 @@
 fidelity report — DMN 1.3 (XML), camunda flavor
-  [D-LITERALEXPR] blocking — decision_commencement  (bna.l4:72:22-34)
-      `commencement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_appointed_day  (bna.l4:76:27-40)
-      `the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_relevant_day  (bna.l4:85:26-39)
-      `the relevant day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_commencement  (bna.l4:72:22-34)
+      `commencement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_appointed_day  (bna.l4:76:27-40)
+      `the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_relevant_day  (bna.l4:85:26-39)
+      `the relevant day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-LITERALEXPR] advisory — decision_permitted_days_of_absence_in_each_of_the_first_ten_years  (bna.l4:89:66-68)
       `permitted days of absence in each of the first ten years` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach

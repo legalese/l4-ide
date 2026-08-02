@@ -108,9 +108,11 @@ exit code: `l4 run` exits 0 even when an assertion fails (measured; see `SMOKE-R
 ## Projection artifacts
 
 - `bna.dmn` + `bna.fidelity.txt` — the DMN 1.3 export (`l4 export --to dmn --flavor camunda
---fidelity-report`): 43 decisions, one decision table. The 3 blocking D-LITERALEXPR on the dated
-  constants mean **both engines currently refuse the file whole**; the measured banners and the
-  cause isolation are in `SMOKE-REPORT.md`.
+--fidelity-report`): 43 decisions, one decision table, **zero blocking notes**, and it **executes
+  green on both engines** against `bna.cases.json` (KIE 1075/1075 + 325/325 service outputs,
+  Camunda 1075/1075). Until #196 landed the YMD lowering, the 3 dated constants emitted raw L4 and
+  both engines refused the file whole; that history and the cause isolation that pinned it are in
+  `SMOKE-REPORT.md` §1.
 - `bna.dmn.md` + `bna.dmn.fidelity.txt` — the dmn-md export; header-only for this corpus (every
   decision is a literal expression or a table dmnmd cannot carry).
 - `bna.cases.json` — 25 cases x 43 expect pins, every pin derived from the L4 source under the
