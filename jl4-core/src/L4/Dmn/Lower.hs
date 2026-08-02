@@ -3774,6 +3774,9 @@ lowerModule opts modul@(MkModule _ uri _) =
         { dcnId           = hid
         , dcnName         = nm
         , dcnFeelName     = feel
+        -- A hydrator is synthesised, not lowered from a decide, so there is no
+        -- DECIDE for a sibling backend to look it up by.
+        , dcnDecide       = Nothing
         , dcnType         = DmnNamed hnm DmnAny
         -- filled by 'finishCaller': a hydrator entry may invoke a BKM (probe
         -- B1 — the edge lives on the ENCLOSING decision), and classifyRef
@@ -5961,6 +5964,9 @@ lowerModule opts modul@(MkModule _ uri _) =
       { dcnId           = did
       , dcnName         = decideName d
       , dcnFeelName     = feelName
+      -- The same key 'decideByUnique' is built on, kept on the emitted node so
+      -- a consumer holding the DRG never has to reconstruct the mapping.
+      , dcnDecide       = Just (getUnique (decideResolved d))
       -- filled by 'finishCaller' (or consumed by 'toBkm'), from the edge set
       -- computed below.
       , dcnKnowledgeReqs = []

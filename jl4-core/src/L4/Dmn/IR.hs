@@ -107,6 +107,7 @@ import Data.Time.Calendar (Day, showGregorian)
 
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport, FidelitySeverity (..), addNote, emptyReport)
+import L4.Syntax (Unique)
 
 ------------------------------------------------------------------------
 -- Cells
@@ -848,6 +849,15 @@ data Decision = MkDecision
   { dcnId            :: !Text
   , dcnName          :: !Text
   , dcnFeelName      :: !Text
+  , dcnDecide        :: !(Maybe Unique)
+    -- ^ the @DECIDE@ this decision was lowered from, or 'Nothing' for one this
+    -- backend synthesised (a §4.4 hydrator).
+    --
+    -- Emitted nowhere; it exists so a /sibling backend/ can ask "what did this
+    -- rule become here?" and get an answer that survives both the module-wide
+    -- @uniquifyIn@ and the population filter. Its only consumer today is
+    -- "L4.Bpmn.Wiring", which turns it into a @businessRuleTask@'s target;
+    -- see PROCESS-TRACK.md §8.3 for why a re-derived id would not do.
   , dcnType          :: !DmnType
   , dcnLogic         :: !DecisionLogic
   , dcnRequirements  :: ![Requirement]  -- ^ sorted by target id, for determinism
