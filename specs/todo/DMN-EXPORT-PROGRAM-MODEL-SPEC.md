@@ -3167,6 +3167,12 @@ decision(s) evaluated, 67/67 value(s) as expected`. (Before: `PARSE INVALID` on 
    > requirements are its guards), so this section's eraser is exercised by the `cycle-p3-self`
    > fixture rather than by the corpus. R0 — "the execution is the exhibit" — is satisfied for the
    > DMN leg: the corpus artifact loads, builds and answers on both target engines.
+   >
+   > _(The `67 decisions / 67 pins` cases-file description and the `1 case(s) … 67/67` banners
+   > above are the measurement at that commit and stand as history. Later the same day, R-C —
+   > §15.12.1 — relocated the 15 dropped rule-date fixtures into `regcf-corpus.cases.json` as
+   > dated cases; the current measured banners read `16 case(s) … 1072/1072` on both engines, and
+   > are quoted [E] there.)_
 
    **What this costs, stated plainly:** the emitted DRG no longer records that the recursion
    exists; only the report does. A reader with the `.dmn` alone sees a decision with one fewer
