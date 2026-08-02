@@ -685,6 +685,41 @@ jobs:
             --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 60/60 decision(s) evaluated, 60/60 value(s) as expected' camunda-gst.log
 
+      # The DATE-LITERAL leg (spec §15.4.1). Not redundant with the step above:
+      # gst-rate.l4 spells every date `Date d m y`, so nothing there would
+      # notice `YMD y m d` regressing back to raw L4 -- which is what it used to
+      # emit, for the constructor daydate.l4 RECOMMENDS. Eight cases x six
+      # decisions = 48, and the counts are pinned to the LOCALLY MEASURED
+      # verdict lines (2026-08-02).
+      #
+      # Two independent date axes, both fed: `the_application_date` (ordinary
+      # decision-table cells) and `RULES_EFFECTIVE_DATE` (law-time intervals),
+      # moved together in cases A-G to straddle both tables' seams and pulled
+      # apart in case H, so a lowering that confused the two fails there.
+      #
+      # The negative control -- a `YMD` that must NOT fold -- is deliberately
+      # not in this artifact and cannot be: a raw-L4 <literalExpression> makes
+      # zeebe-dmn refuse to parse the whole file. It lives in
+      # jl4/examples/dmn/not-ok/ymd-unfoldable-date.l4 and is asserted from
+      # jl4/tests/DmnExport.hs instead.
+      - name: Law time -- the date-literal exhibit (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/ymd-dates.dmn \
+            --cases jl4/examples/dmn/ymd-dates.cases.json | tee kie-ymd.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 8 case(s), 0 error(s), 0 warning(s), 48/48 decision(s) SUCCEEDED, 48/48 value(s) as expected, 16/16 service output value(s) as expected' kie-ymd.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/ymd-dates.dmn \
+            --cases jl4/examples/dmn/ymd-dates.cases.json | tee camunda-ymd.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 8 case(s), 1 parsed, 0 error(s), 48/48 decision(s) evaluated, 48/48 value(s) as expected' camunda-ymd.log
+
       # The hand-written probe PAIR (spec §15.6). Not redundant with the step
       # above: the emitter cannot produce an <annotationEntry> carrying an @id,
       # so only a fixture can ask whether Xerces objects to one.

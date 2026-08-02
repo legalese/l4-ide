@@ -4155,11 +4155,13 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
   `<description>` and the annotation column already state.
 
 - **R10 — the interval-table recogniser is a peephole over two idioms, and refuses loudly.
-  ANSWERED 2026-07-30, see §15.3.**
+  ANSWERED 2026-07-30, see §15.3. AMENDED 2026-08-02 by §15.4.1: `YMD` moved OUT of the
+  `NotDated` list below — a `YMD y m d` literal folds, so shape (b) has two spellings.**
   The recognised shapes are (a) an application of a one-parameter `DATE`-typed predicate whose body
   is `RULES EFFECTIVE DATE AT LEAST <that parameter>`, applied to a nullary decide whose body folds
-  to a date; and (b) the same comparison written inline against a `Date d m y` literal. Everything
-  else — strict (`>`) guards, `DATE_SERIAL`-wrapped comparisons, `YMD`, nested chains, multi-conjunct
+  to a date; and (b) the same comparison written inline against a `Date d m y` **or `YMD y m d`**
+  literal. Everything
+  else — strict (`>`) guards, `DATE_SERIAL`-wrapped comparisons, ~~`YMD`,~~ nested chains, multi-conjunct
   guards — is `NotDated` (existing path, unchanged findings); a chain that MIXES a rule-date arm with
   an ordinary one, or whose date will not fold, or whose arms are not strictly descending, is a
   **Blocking** `D-DATEDCHAIN`. **[E]** The severity follows the vocabulary in `Lower.hs`'s roster:
@@ -5246,6 +5248,12 @@ own rows, so the same number names the same source arm in all three refusal mess
 
 ### 15.4 FEEL dates
 
+> **AMENDED 2026-08-02: `YMD y m d` folds too.** The paragraph below saying "`YMD` is not folded at
+> all" is superseded — its stated reason does not survive reading the library, and the cost of the
+> refusal was paid by exactly the modules that took the library's own advice. See §15.4.1, which
+> also amends R10's `NotDated` list (§11). The superseded text is left standing per §6.4.2's
+> convention.
+
 `FeelValue` gains `VDate !Day`, rendered `date("YYYY-MM-DD")`. Two separate concerns, deliberately
 not conflated:
 
@@ -5272,6 +5280,71 @@ disjoint on Modified-Julian-Day arithmetic that means nothing.
 date cell raises `D-MD-CELLSYNTAX` Blocking and is honestly omitted. dmnmd's cell grammar has no
 date datatype: `>= 1994-04-01` would have been emitted and then misread by dmnmd's numeric parser.
 That is not a workaround for the gap; it **is** the gap being reported.
+
+#### 15.4.1 `YMD y m d` folds (amends §15.4 and R10, 2026-08-02)
+
+`foldDateLiteral` (`jl4-core/src/L4/Dmn/Lower.hs`) gains a second arm recognising `YMD y m d` over
+three integer literals, in **ISO argument order**, subject to the same `fromGregorianValid` calendar
+check and the same `oracleType … == DmnDate` guard the `Date d m y` arm already carries.
+
+**Why the old refusal was wrong, and not merely conservative.** §15.4 refused `YMD` on the ground
+that its body is an `IF … THEN candidate ELSE <ASSUME bottom>` and a structural match "would
+silently drop the refusal arm". Reading `daydate.l4:79-118`: `YMD`'s refusal arm fires exactly when
+the component round-trip through the lenient `Date` fails — i.e. exactly when `(y, m, d)` is not a
+real calendar day — which is exactly when `fromGregorianValid` returns `Nothing` and the fold
+already declines. **The refusal and the fold have the same domain**, so folding cannot drop it.
+
+**What it cost.** `daydate.l4:79-100` documents `YMD` as the recommended constructor for new code
+(ISO order makes a day/month transposition harder to write; it refuses out-of-range components where
+`Date` silently rolls them). So the exporter penalised precisely the modules that took that advice:
+the recommended spelling emitted raw L4 (`YMD OF 1983, 1, 1`), which is a **Blocking**
+`D-LITERALEXPR` and makes zeebe-dmn refuse to parse the whole file, where the same day spelled
+`Date 1 1 1983` emitted `date("1983-01-01")` and evaluated on both engines.
+
+**What did NOT change**, and each is pinned in `jl4/examples/dmn/not-ok/ymd-unfoldable-date.l4`:
+
+| shape                                                                     | treatment                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `YMD (1983 PLUS 40) 1 1` (computed)                                       | no fold; raw L4, Blocking `D-LITERALEXPR`. The fold is a **literal** recogniser; evaluating a component would be the exporter running the program. Same treatment `Date 1 (month PLUS 6) year` already gets. |
+| `YMD 2023 2 29` (no such day)                                             | no fold. L4 evaluation of that expression stops at `daydate.l4`'s deliberate `ASSUME` bottom, so there is no day to emit. This preserves §15.4's leniency ruling verbatim.                                   |
+| `YMD 2026 28 7` (transposition)                                           | no fold — same rule as the line above, and the case that makes the argument order load-bearing rather than cosmetic.                                                                                         |
+| date **arithmetic** in a body                                             | untouched; the fold recognises literals only.                                                                                                                                                                |
+| a **nullary reference** to a `YMD`-defined constant, inside an expression | still renders as the FEEL **name**, not the inlined value. The expression/cell asymmetry above is unchanged.                                                                                                 |
+
+**R10 is amended (§11).** Its `NotDated` list named `YMD` alongside strict guards and
+`DATE_SERIAL`-wrapped comparisons. `YMD`-dated arms are now foldable, so shape (b) of the interval
+recogniser gains a spelling: an inline arm may be written against a `Date d m y` **or** a `YMD y m d`
+literal. This is a **widening**, and the honest statement of it is that a module which yesterday got
+a Blocking `D-DATEDCHAIN` plus a boolean-column fallback today gets a silent `UNIQUE` interval table.
+That is the desirable direction — it is the same table the `Date`-spelled source already got — but it
+is a behaviour change and not only a fidelity reclassification.
+
+**Measured.** `jl4/examples/dmn/ymd-dates.l4` is the exhibit (a boxed literal body, a decision-table
+cell endpoint, and a law-time interval endpoint, all `YMD`-spelled), with
+`jl4/examples/dmn/ymd-dates.cases.json` straddling all three seams by a day-of/day-before pair. Its
+fidelity report carries **0 blocking, 8 advisory**. Before this change the same module carried
+**5 blocking, 11 advisory** — MEASURED 2026-08-02 by reverting `Lower.hs` alone and re-running
+`l4 export --to=dmn --fidelity-report` on the same source, not inferred:
+
+| before                                                                                                            | after                                     |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `D-LITERALEXPR` **Blocking** ×3 (the three constants, raw `YMD OF 1983, 1, 1`)                                    | `D-LITERALEXPR` Advisory ×3 (`date("…")`) |
+| `D-DATEDCHAIN` **Blocking** (`the filing fee`: the arm dates would not fold)                                      | gone; a `UNIQUE` interval table           |
+| `D-NONFEELINPUT` **Blocking** (that chain's boolean-column fallback shipped an input column whose text is raw L4) | gone with the fallback                    |
+| `D-UNDECOMPOSABLE` ×5                                                                                             | gone (both chains are now date columns)   |
+
+The third row is the one worth noticing: the refusal did not cost one finding, it cost a cascade —
+refusing to fold the arm dates forced the sound boolean-column fallback, and the fallback's own
+column was then raw L4 as well. And neither engine would run the file at all. Banners, 2026-08-02:
+
+> `XSD    valid` / `VALID  clean` / `BUILD  clean` /
+> `KIE 8.44.0.Final VERDICT: 1 file(s), 8 case(s), 0 error(s), 0 warning(s), 48/48 decision(s) SUCCEEDED, 48/48 value(s) as expected, 16/16 service output value(s) as expected`
+>
+> `PARSE  ok: YMD date literals (6 decision(s))` /
+> `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 8 case(s), 1 parsed, 0 error(s), 48/48 decision(s) evaluated, 48/48 value(s) as expected`
+
+No existing golden moved: the DMN golden subjects and the Reg CF corpus all spell their dates
+`Date d m y`, so the widening is observable only through the new fixture.
 
 ### 15.5 The three codes (D3)
 
