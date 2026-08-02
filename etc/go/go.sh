@@ -8,14 +8,22 @@
 #
 # Scope today: MILESTONE G1 — the replay run. It drives the EXISTING corpus
 # through every currently-reachable projection and emits conversion report v0.
-# No de novo encoding. G2's stages exist as entry points that refuse with a
-# named blocker; see `go.sh plan --milestone g2`.
+# No de novo encoding.
+#
+# MILESTONE G2 — the de novo run — runs its DEPOSIT-VALIDATING half. P1, P2, P3
+# and P4 do not fetch, search, encode or find forks: those need the network or a
+# model and this driver takes neither. They validate what an agent deposited,
+# and report SKIPPED with a named reason when the deposit is not there yet. So
+# `g2 COMPLETE` means every g2 stage is accounted for — NOT that a de novo run
+# happened. SPEC.md §6's G2 acceptance is the §8 diff oracle
+# (etc/go/lib/denovo-diff.mjs), which no stage calls. See
+# `go.sh plan --milestone g2`.
 #
 # This script NEVER runs cabal, never commits, and never pushes.
 #
 #   Usage:  etc/go/go.sh <command> [options]
 #
-#     run     --milestone g1 --subject ID [--run-id ID] [--through STAGE]
+#     run     --milestone g1|g2 --subject ID [--run-id ID] [--through STAGE]
 #             [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
 #
 #             HG1 is the only waivable gate. HG2 guards anything outward-facing
@@ -70,7 +78,23 @@ P7_LEG_ORDER=(
 # Stages that exist as entry points and cannot run. Each refuses with exit 3 and
 # names its blocker. They are NOT declared members of any milestone, so they
 # cannot make a milestone INCOMPLETE by their absence.
-UNIMPLEMENTED_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p10-publish)
+#
+# p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they are
+# now real stages that validate a deposit, and they are g2's declared members.
+UNIMPLEMENTED_STAGES=(p8-verify p10-publish)
+
+# G2's declared stages, in order. The five de novo stages plus the report.
+#
+# WHAT IS DELIBERATELY NOT HERE, and why the omission is the honest choice:
+# p3-check, p6-tests and every p7 leg read the subject's COMMITTED corpus and
+# its committed goldens (GO_S_CORPUS, legs[*].golden). Running them inside a g2
+# run would measure the replay artifacts and file the result under a de novo
+# label — "the encoding typechecks", "its assertions hold" — about a module the
+# de novo run never wrote. Re-pointing them at a `denovo.modules` deposit is
+# unbuilt; until it is, they are named in `plan --milestone g2` as NOT WIRED
+# rather than run. p9-report is included because it reads journal.ndjson and
+# nothing else, so it is correct for any milestone.
+G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
@@ -80,7 +104,7 @@ gated_by_HG1=""
 gated_by_HG2="p10-publish"
 
 usage() {
-  sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,48p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 die_usage() {
@@ -178,6 +202,26 @@ export "${!GO_S_@}"
 declare -a GO_CORPUS_FILES=("$GO_S_CORPUS")
 [[ -n "${GO_S_WIZARD:-}" ]] && GO_CORPUS_FILES+=("$GO_S_WIZARD")
 
+# At g2 the gate binds to the DE NOVO deposits instead, because that is what HG1
+# is being asked about. A waiver granted over the committed corpus says nothing
+# about an encoding that did not exist when it was granted — and since digestSet
+# records a missing file as ABSENT rather than skipping it, DEPOSITING a bundle
+# or a module changes the digest and re-opens the gate, which is the behaviour
+# §6.3 claims for a post-gate edit.
+if [[ "$MILESTONE" == "g2" ]]; then
+  GO_CORPUS_FILES=()
+  for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}"; do
+    [[ -n "$_p" ]] && GO_CORPUS_FILES+=("$_p")
+  done
+  if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
+    read -ra _mods <<<"$GO_S_DENOVO_MODULES"
+    GO_CORPUS_FILES+=("${_mods[@]}")
+  fi
+  # A subject with no `denovo` section at all still needs a digest to bind a
+  # gate to; `text:` entries are literal digest contributors (digestSet).
+  [[ ${#GO_CORPUS_FILES[@]} -eq 0 ]] && GO_CORPUS_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
+fi
+
 # Assemble the declared stage list and the HG1 set from the sidecar's legs.
 G1_STAGES=(p0-preflight p3-check p6-tests)
 gated_by_HG1="p6-tests"
@@ -190,21 +234,26 @@ done
 G1_STAGES+=(p9-report)
 gated_by_HG1="$gated_by_HG1 p9-report"
 
+# SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the only stage after
+# P5 is the report, so that is what HG1 gates — and, as at g1, a g2 run stops
+# there with exit 3 until the gate is signed or waived on the record.
+if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p9-report"; fi
+
+# deposit_state PATH -> undeclared | absent | present. `plan` only.
+deposit_state() {
+  if [[ -z "${1:-}" ]]; then
+    echo undeclared
+  elif [[ -f "$1" ]]; then
+    echo present
+  else
+    echo absent
+  fi
+}
+
 stages_for() {
   case "$1" in
     g1) printf '%s\n' "${G1_STAGES[@]}" ;;
-    g2)
-      echo "go.sh: milestone g2 is UNBUILT." >&2
-      echo "  R4 (ambiguity-fork representation) was ruled 2026-08-02 — the Interpretation" >&2
-      echo "  parameter, R4-FORK-REPRESENTATION.md §7 — but none of the de novo tooling it" >&2
-      echo "  unblocks exists yet. What DOES exist, since 2026-08-02, is the three deposit" >&2
-      echo "  contracts those stages write into -- source bundle, external modifications," >&2
-      echo "  fork register -- under specs/todo/single-instruction-demo/schemas/, with one" >&2
-      echo "  validator at etc/go/lib/register-validate.mjs. The stages p1-ingest, p2-sweep," >&2
-      echo "  p3-encode, p4-forks, p5-gate and the §8 diff oracle still exist only as entry" >&2
-      echo "  points that refuse; run one directly to see its blocker." >&2
-      return 3
-      ;;
+    g2) printf '%s\n' "${G2_STAGES[@]}" ;;
     *)
       echo "go.sh: unknown milestone '$1'; SPEC.md §6 defines G0-G4 and this driver implements G1." >&2
       return 2
@@ -214,11 +263,70 @@ stages_for() {
 
 # --- commands ---------------------------------------------------------------
 
+# The G2 plan. It prints SPEC.md §4's full de novo stage order — including the
+# stages this driver does NOT declare at g2 — because a plan that lists only
+# what runs cannot tell you what is missing. Every row says which of the two it
+# is, and the deposit rows say whether the deposit is there.
+cmd_plan_g2() {
+  local b r f m
+  b="${GO_S_DENOVO_BUNDLE:-}"
+  r="${GO_S_DENOVO_REGISTER:-}"
+  f="${GO_S_DENOVO_FORKS:-}"
+  m="${GO_S_DENOVO_MODULES:-}"
+
+  echo "milestone g2, subject $SUBJECT — SPEC.md §4's de novo stage order, in order:"
+  echo
+  printf '  %-14s %-9s %-11s %s\n' STAGE GATE DEPOSIT "WHAT IT CHECKS / WHY NOT"
+  printf '  %-14s %-9s %-11s %s\n' "p1-ingest" "-" "$(deposit_state "$b")" "${b:-(no denovo.bundle in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p2-sweep" "-" "$(deposit_state "$r")" "${r:-(no denovo.register in subject.json)}"
+
+  local mstate="undeclared" mn=0
+  if [[ -n "$m" ]]; then
+    local mm
+    read -ra mm <<<"$m"
+    mn=${#mm[@]}
+    mstate=present
+    local x
+    for x in "${mm[@]}"; do [[ -f "$x" ]] || mstate=absent; done
+  fi
+  printf '  %-14s %-9s %-11s %s\n' "p3-encode" "-" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no denovo.modules in subject.json)")"
+  printf '  %-14s %-9s %-11s %s\n' "p3-check" "NOT WIRED" "-" "reads the committed corpus ($GO_S_CORPUS); re-pointing it at a de novo deposit is unbuilt"
+  printf '  %-14s %-9s %-11s %s\n' "p4-forks" "-" "$(deposit_state "$f")" "${f:-(no denovo.fork_register in subject.json)}"
+
+  local n=0 s
+  for s in "$b" "$r" "$f"; do [[ -n "$s" && -f "$s" ]] && n=$((n + 1)); done
+  printf '  %-14s %-9s %-11s %s\n' "p5-gate" "-" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
+  echo "  ---- HG1 ------- Meng's go on the encoding; blocks P6 onward (SPEC.md §7.3)"
+  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "NOT WIRED" "-" "reads the committed corpus; a de novo run's tests discriminate between FORKS, which is unbuilt"
+  local leg
+  for leg in "${P7_LEG_ORDER[@]}"; do
+    [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
+    printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "compares against this subject's committed goldens, which are the replay artifacts"
+  done
+  printf '  %-14s %-9s %-11s %s\n' "p9-report" "HG1" "-" "reads journal.ndjson and nothing else"
+  echo
+  echo "declared by this driver at g2, and therefore run: ${G2_STAGES[*]}"
+  echo "entry points that still exist and refuse, each with a named blocker:"
+  for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
+  echo
+  echo "READ THIS BEFORE READING A g2 VERDICT. P1, P2, P3 and P4 do not fetch, search,"
+  echo "encode or find forks: those need the network or a model, and this driver takes"
+  echo "neither (ORCHESTRATOR.md §2.1, §6.4). They VALIDATE what an agent deposited, and"
+  echo "report SKIPPED with a named reason when the deposit is not there. So 'g2 COMPLETE'"
+  echo "means every g2 stage is accounted for — it does NOT mean a de novo run happened."
+  echo "SPEC.md §6's G2 acceptance is the §8 diff oracle, etc/go/lib/denovo-diff.mjs,"
+  echo "which no stage calls. Run with L4_GO_REQUIRED=1 to make an absent deposit fatal."
+}
+
 cmd_plan() {
   local rc=0
   local stages
   stages=$(stages_for "$MILESTONE") || rc=$?
   [[ $rc -eq 0 ]] || exit $rc
+  if [[ "$MILESTONE" == "g2" ]]; then
+    cmd_plan_g2
+    return 0
+  fi
   echo "milestone $MILESTONE, subject $SUBJECT — declared stages, in order:"
   local s
   while read -r s; do
@@ -454,7 +562,11 @@ EOF
     node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gname" --state waived \
       --corpus-digest "$corpus_digest" --reason "$greason"
     echo "go: gate $gname WAIVED — $greason"
-    echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file and $gname re-opens."
+    if [[ "$MILESTONE" == "g2" ]]; then
+      echo "go:   the waiver covers the de novo deposit set $corpus_digest and nothing else; deposit or edit one and $gname re-opens."
+    else
+      echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file and $gname re-opens."
+    fi
   done
 
   # --- dispatch --------------------------------------------------------------
@@ -667,6 +779,12 @@ EOF
 
   echo
   echo "go: VERDICT: $MILESTONE $verdict"
+  if [[ "$MILESTONE" == "g2" ]]; then
+    echo "go:   g2's verdict is over its DEPOSIT-VALIDATING stages. It says the deposits"
+    echo "go:   present are well formed and names the ones that are not there. It does not"
+    echo "go:   say a de novo run happened: SPEC.md §6's G2 acceptance is the §8 diff oracle"
+    echo "go:   (node etc/go/lib/denovo-diff.mjs), which no stage calls."
+  fi
   echo "go: journal  $RUN/journal.ndjson"
   [[ -f "$RUN/report.md" ]] && echo "go: report   $RUN/report.md"
   exit "$vexit"

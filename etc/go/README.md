@@ -27,6 +27,10 @@ etc/go/go.sh gc      [--keep N]
 etc/go/go.sh help
 ```
 
+Milestone `g2` is the de novo path; its stages validate deposits rather than producing them, and
+`plan --milestone g2` says which deposits a subject has. `g2 COMPLETE` is completeness of
+accounting over those stages, not a claim that a de novo run happened.
+
 `<id>` names a sidecar directory under `etc/go/subjects/` (today: `regcf`). While exactly
 one sidecar exists, `--subject` may be omitted and defaults to it; with several, naming one
 is mandatory. An unknown subject exits 2 listing the available sidecars and the recipe for
@@ -51,12 +55,12 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 
 A subject sidecar is four files in `etc/go/subjects/<id>/`:
 
-| file                 | role                                                                                                                                                                                                                                                                                                             |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `subject.json`       | the machine-readable descriptor: id, display name, legal citation, source entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check floors (`checks.min_dated_arms`, `checks.min_assertions`), and a `legs` object — one entry per projection leg, with its golden/cases paths |
-| `pins.json`          | the CLI surface the stage table reads, measured against that subject's corpus                                                                                                                                                                                                                                    |
-| `known-defects.json` | measured defects used as negative controls; empty groups say why they are empty                                                                                                                                                                                                                                  |
-| `NOTES.md`           | free-prose idiosyncrasies of the corpus, for humans and the skill. **No script reads it.**                                                                                                                                                                                                                       |
+| file                 | role                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subject.json`       | the machine-readable descriptor: id, display name, legal citation, source entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check floors (`checks.min_dated_arms`, `checks.min_assertions`), a `legs` object — one entry per projection leg, with its golden/cases paths — and an optional `denovo` object saying where the G2 deposits live (`bundle`, `register`, `fork_register`, `modules`), whose paths need not exist |
+| `pins.json`          | the CLI surface the stage table reads, measured against that subject's corpus                                                                                                                                                                                                                                                                                                                                                                                   |
+| `known-defects.json` | measured defects used as negative controls; empty groups say why they are empty                                                                                                                                                                                                                                                                                                                                                                                 |
+| `NOTES.md`           | free-prose idiosyncrasies of the corpus, for humans and the skill. **No script reads it.**                                                                                                                                                                                                                                                                                                                                                                      |
 
 `etc/go/lib/subject.mjs` resolves and validates a sidecar (unknown keys refused; a leg entry
 naming a missing golden is a hard error naming the path) and exports it to the driver as
@@ -125,10 +129,15 @@ a fork, a disposition table joined against the bundle's annotation inventory. A 
 whose peer is absent prints `skip` with a reason; it never passes quietly. Exit `0` clean · `1` a
 finding · `2` usage or a schema the validator cannot fully enforce.
 
-**Nothing in the pipeline writes one yet.** P1 and P2 need outward network access this
-orchestrator does not take, and P4 needs an encoding `p3-encode` does not produce. The formats
-exist so those stages have an interface and an acceptance condition; that is progress on the
-contract, not on the stages.
+**Nothing in the pipeline writes one, and nothing will.** Producing a bundle or a sweep needs
+outward network access this orchestrator does not take, and producing an encoding or a fork
+inventory needs a model it does not call. What the stages own is the other half: since 2026-08-03,
+`p1-ingest`, `p2-sweep`, `p3-encode`, `p4-forks` and `p5-gate` are milestone `g2`'s declared
+members and each VALIDATES its deposit — `SKIPPED` when it is not there, `DEGRADED` naming every
+rule that fired against it, `PASS` over a hashed artifact. A subject says where its deposits live
+in `subject.json`'s optional `denovo` section (`bundle`, `register`, `fork_register`, `modules`);
+those paths need not exist, because an unwritten deposit is a missing prerequisite, not a
+misconfiguration. `etc/go/go.sh plan --milestone g2 --subject <id>` prints each one's state.
 
 ## The §8 diff oracle
 
@@ -155,8 +164,8 @@ surface on which agreement is silence rather than evidence.
 
 Design, limits and the verbatim self-tests:
 [`DENOVO-DIFF-ORACLE.md`](../../specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md). **No
-stage calls it** — `p3-encode` produces nothing to compare — so it has been run only against the
-committed corpus and against scratch copies of it with one constant moved.
+stage calls it** — `p3-encode` checks a de novo module, it does not write one — so it has been run
+only against the committed corpus and against scratch copies of it with one constant moved.
 
 `selftest.mjs` proves the status lattice can still say no: that every status is
 producible, that `PASS` is rejected with a null, failing, or _weak_ oracle, that

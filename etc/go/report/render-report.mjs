@@ -241,14 +241,27 @@ function projectionsDetail() {
   return out.join("\n") || absent("Per-leg detail.", "no p7 receipt exists.");
 }
 
-function testsSection() {
-  const r = byStage.get("p6-tests");
-  if (!r)
-    return absent(
-      "SPEC.md §P6 requires the test results.",
-      "`p6-tests` has no receipt in this run.",
-    );
-  const lines = [`**${r.status}** — ${r.reason ?? "(no reason recorded)"}`];
+/**
+ * One receipt, rendered whole: status, reason, oracle, metrics, notes.
+ *
+ * `label` prefixes the status line when a section carries more than one
+ * receipt, so a reader can tell which stage is speaking.
+ *
+ * A PASS receipt has `reason: null` BY DESIGN — the reason field exists to
+ * explain a non-PASS, and verdict.mjs's rule 3 requires it only there. So the
+ * status line drops the dash entirely rather than printing the JS literal
+ * `null`, which is what the de novo sections did before this helper existed:
+ * a measured `**PASS** — null` in a report whose whole job is to say why.
+ *
+ * The oracle's `because` and the notes are not decoration. A de novo stage's
+ * PASS is a narrow structural claim, and everything it does NOT establish
+ * rides on those two fields — p1-ingest's "whether the bundle is the RIGHT
+ * text is unverified", p5-gate's two `CARRIED BY HG1` halves. Rendering the
+ * status without them turns a hedged claim into a bare green.
+ */
+function receiptBlock(r, label) {
+  const head = label ? `**${label}:** ${r.status}` : `**${r.status}**`;
+  const lines = [r.reason ? `${head} — ${r.reason}` : head];
   if (r.oracle) {
     lines.push("");
     lines.push(`Oracle (\`${r.oracle.class}\`): \`${r.oracle.cmd}\``);
@@ -263,9 +276,19 @@ function testsSection() {
   return lines.join("\n");
 }
 
+function testsSection() {
+  const r = byStage.get("p6-tests");
+  if (!r)
+    return absent(
+      "SPEC.md §P6 requires the test results.",
+      "`p6-tests` has no receipt in this run.",
+    );
+  return receiptBlock(r);
+}
+
 function sourceSection() {
   const r = byStage.get("p1-ingest");
-  if (r) return `**${r.status}** — ${r.reason}`;
+  if (r) return receiptBlock(r);
   const p0 = byStage.get("p0-preflight");
   const shas = Object.entries(p0?.metrics ?? {})
     .filter(([k]) => k.startsWith("corpus_sha_"))
@@ -273,7 +296,7 @@ function sourceSection() {
   return [
     absent(
       "SPEC.md §P1 requires the source bundle with provenance — the SEC entry point, the eCFR retrieval, and the FR citations for the adoption and each amendment.",
-      "`p1-ingest` is an entry point that refuses: at this milestone the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed.",
+      "`p1-ingest` is not declared at this milestone: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — at `g2` it validates a deposited source bundle — but a bundle is not what this run read.)",
     ),
     "",
     "What this run did read, and its exact content:",
@@ -286,23 +309,47 @@ function sourceSection() {
 
 function sweepSection() {
   const r = byStage.get("p2-sweep");
-  if (r) return `**${r.status}** — ${r.reason}`;
+  if (r) return receiptBlock(r);
   return absent(
     'SPEC.md §P2 requires the external-modification register, and requires this report to state what was SEARCHED, not only what was found — "no modification found" is a checked claim, not a default.',
-    "`p2-sweep` is an entry point that refuses. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts, C&DIs, no-action letters, or rules in flight.",
+    "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts, C&DIs, no-action letters, or rules in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
   );
 }
 
+/**
+ * SPEC.md §P3/§P4 want "what the encoding decided, including every ambiguity
+ * fork and every externally-settled resolution", and P5 is the gate over that
+ * same material. Three receipts answer to this heading, so all three are
+ * rendered — labelled, whole, and each with its own notes.
+ *
+ * This section used to render `p3-encode` alone and name `p4-forks` only in
+ * the ABSENT prose, which was measurable as a silence: a `g2` run whose fork
+ * register had been deposited and validated produced a `p4-forks` receipt that
+ * appeared NOWHERE in the report, and a `p5-gate` receipt whose two
+ * `CARRIED BY HG1` notes — the halves of the gate no script holds — likewise
+ * reached no reader. ORCHESTRATOR.md §5.2 asserted that every de novo receipt's
+ * reason "appears in the report"; measured, three of the five did.
+ */
 function encodingSection() {
   const r = byStage.get("p3-check");
   const enc = byStage.get("p3-encode");
+  const forks = byStage.get("p4-forks");
+  const gate = byStage.get("p5-gate");
   const out = [];
-  if (enc) out.push(`**Encoding (de novo):** ${enc.status} — ${enc.reason}`);
-  else
+  const denovo = [
+    [enc, "Encoding (de novo)"],
+    [forks, "Ambiguity forks"],
+    [gate, "Adversarial gate (mechanisable half)"],
+  ].filter(([rec]) => rec);
+  for (const [rec, label] of denovo) {
+    if (out.length) out.push("");
+    out.push(receiptBlock(rec, label));
+  }
+  if (!denovo.length)
     out.push(
       absent(
         "SPEC.md §P3/§P4 require what the encoding decided, including every ambiguity fork and every externally-settled resolution.",
-        "`p3-encode` and `p4-forks` are entry points that refuse — the de novo tooling is unbuilt (R4 itself was ruled 2026-08-02; see R4-FORK-REPRESENTATION.md) — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
+        "`p3-encode`, `p4-forks` and `p5-gate` are not declared at this milestone — they validate de novo deposits, and this run replayed the committed corpus — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
       ),
     );
   if (r) {

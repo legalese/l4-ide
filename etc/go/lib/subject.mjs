@@ -113,7 +113,10 @@ function refuseUnknown(id) {
       `  To add one: create etc/go/subjects/<id>/ with subject.json (id, display_name,\n` +
       `  citation, source_url, corpus.main [+ optional corpus.wizard], checks, and a 'legs'\n` +
       `  object declaring exactly the projection legs the subject supports, each with its\n` +
-      `  committed golden/cases paths, repo-root-relative), pins.json (the CLI surface,\n` +
+      `  committed golden/cases paths, repo-root-relative, plus an optional 'denovo' object\n` +
+      `  declaring where the G2 deposits live — bundle, register, fork_register, modules —\n` +
+      `  whose existence on disk is optional because producing them is agent work),\n` +
+      `  pins.json (the CLI surface,\n` +
       `  measured against that corpus), known-defects.json (measured negative controls,\n` +
       `  empty groups say why), and NOTES.md (free-prose idiosyncrasies; scripts never\n` +
       `  read it). The driver declares a milestone stage iff 'legs' has the entry, so a\n` +
@@ -169,6 +172,7 @@ export function loadSubject(id) {
     "corpus",
     "checks",
     "legs",
+    "denovo",
   ]);
   for (const k of ["id", "display_name", "citation", "source_url"]) {
     if (typeof desc[k] !== "string" || !desc[k])
@@ -257,6 +261,71 @@ export function loadSubject(id) {
       `legs['p7-wizard'] is declared but corpus.wizard is not: the wizard leg renders the wizard module, so a subject with no wizard module omits the leg`,
     );
 
+  // --- the de novo deposit declaration (G2) ---------------------------------
+  //
+  // The G2 stages do not WRITE their deliverables: fetching a statute and
+  // encoding it are agent acts, and the orchestrator makes no outward network
+  // request and calls no model. What the stages own is the other half — given a
+  // deposit, say whether it is well formed, and say so with an exit code.
+  //
+  // So a subject declares WHERE its de novo deposits live, and the paths'
+  // EXISTENCE is deliberately optional (the `x` kind, as for legs['p7-dmn'].
+  // cases): a deposit the agent has not produced yet is a missing prerequisite
+  // the stage reports as SKIPPED with a named reason, not a configuration
+  // error. Omitting the `denovo` section entirely is also legal, and means the
+  // subject has no de novo path declared at all — which the stages likewise
+  // report rather than assume.
+  const dn = desc.denovo;
+  const denovo = {
+    GO_S_DENOVO_BUNDLE: "",
+    GO_S_DENOVO_REGISTER: "",
+    GO_S_DENOVO_FORKS: "",
+    GO_S_DENOVO_MODULES: "",
+  };
+  if (dn !== undefined) {
+    if (typeof dn !== "object" || dn === null || Array.isArray(dn))
+      die(`subject.json: 'denovo' must be an object`);
+    checkKeys("denovo", dn, ["bundle", "register", "fork_register", "modules"]);
+    const declared = {
+      bundle: "GO_S_DENOVO_BUNDLE",
+      register: "GO_S_DENOVO_REGISTER",
+      fork_register: "GO_S_DENOVO_FORKS",
+    };
+    for (const [key, envName] of Object.entries(declared)) {
+      if (dn[key] === undefined) continue;
+      if (typeof dn[key] !== "string" || !dn[key])
+        die(`denovo.${key} must be a non-empty string`);
+      denovo[envName] = resolve(REPO, dn[key]); // existence is the stage's story
+    }
+    if (dn.modules !== undefined) {
+      if (!Array.isArray(dn.modules) || dn.modules.length === 0)
+        die(`denovo.modules must be a non-empty array of module paths`);
+      const abs = [];
+      for (const m of dn.modules) {
+        if (typeof m !== "string" || !m)
+          die(`denovo.modules: every entry must be a non-empty string`);
+        // The env transport is space-separated, matching GO_S_LEGS. A path with
+        // whitespace would split silently into two nonexistent paths, so it is
+        // refused here rather than mis-read there.
+        if (/\s/.test(m))
+          die(
+            `denovo.modules['${m}']: a module path may not contain whitespace`,
+          );
+        const a = resolve(REPO, m);
+        // SPEC.md §8: the de novo run re-derives the subject WITHOUT reading the
+        // existing corpus, and the diff oracle compares the two. A `denovo`
+        // module that IS a corpus module makes that comparison an identity and
+        // the G2 milestone a restatement of G1.
+        if (a === corpusMain || (corpusWizard && a === corpusWizard))
+          die(
+            `denovo.modules['${m}'] is also a corpus module. G2 re-derives the subject from source without reading the committed encoding (SPEC.md §8), so a de novo module that is the replay corpus makes the acceptance diff an identity`,
+          );
+        abs.push(a);
+      }
+      denovo.GO_S_DENOVO_MODULES = abs.join(" ");
+    }
+  }
+
   const pins = resolve(dir, "pins.json");
   const defects = resolve(dir, "known-defects.json");
   if (!existsSync(pins)) die(`${dir}/pins.json is required and missing`);
@@ -278,6 +347,7 @@ export function loadSubject(id) {
       GO_S_MIN_DATED_ARMS: String(desc.checks.min_dated_arms),
       GO_S_MIN_ASSERTIONS: String(desc.checks.min_assertions),
       GO_S_LEGS: legs.join(" "),
+      ...denovo,
       ...env,
     },
   };
