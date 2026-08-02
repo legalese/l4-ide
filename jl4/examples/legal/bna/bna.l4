@@ -1,0 +1,998 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `British Nationality Act 1981, section 1 — Acquisition by birth or adoption`
+
+-- The Home Office's clock: births, abandonments, adoption orders and
+-- registration applications are dated as United Kingdom civil dates.
+TIMEZONE IS "Europe/London"
+
+-- ===========================================================================
+-- BRITISH NATIONALITY ACT 1981 (c. 61), SECTION 1, as in force on 2026-07-04.
+--
+-- SCOPE. This module encodes section 1 only — acquisition of British
+-- citizenship by birth or adoption — in its CURRENT consolidated text.
+-- Subsections (1), (1A), (2), (3), (3A), (4), (5), (5A), (6) and (7) are
+-- encoded as predicates. Subsection (8) is a definitional pointer to s 50
+-- ("settled") and is carried by the @ref on the settled-parent input field
+-- rather than expanded: the s 50(2)-(5) construction of "settled" (ordinary
+-- residence, immigration-law restrictions, the s 50(4) exemption carve-back
+-- and its diplomatic-immunity exception) is OUT OF SCOPE — settled-ness at
+-- the time of the birth arrives as an already-construed input fact.
+-- Subsection (9) is encoded as the dated constant `the relevant day`.
+-- The REGISTRATION PROCESS (application form, fee, ceremony, s 41A grant
+-- machinery) is out of scope; subsections (3), (3A) and (4) are encoded as
+-- BOOLEAN entitlement predicates — "is entitled to be registered" — with the
+-- s 41A good-character restriction (modification C3) as a separate
+-- grant-gate predicate, not folded into the s 1 entitlements.
+-- The historic pre-2002 / pre-2010 / pre-2021 texts are NOT encoded: no
+-- rule-version axis in this smoke test. The HFEA parental-order
+-- modifications (C1/C4/C5) are out of scope; so is modification C2
+-- (S.I. 1972/1613 art. 6, as inserted by S.I. 1982/1649 art. 3), which
+-- explains s 1(1) by treating certain persons exempt from immigration
+-- control as settled — its substance rides inside the settled-as-input
+-- scope-out above.
+--
+-- SOURCES. Every rule text quoted inline is verbatim from the
+-- legislation.gov.uk revised text of s 1 as retrieved 2026-08-02 (snapshot
+-- banner: "up to date with all changes known to be in force on or before
+-- 04 July 2026"), saved with full provenance at source-s1.txt in this
+-- directory. The [F-number] amendment markers of the source are dropped
+-- from the inline quotes; the words are kept as they read in force.
+-- Definitions come from s 50 (Annex A of source-s1.txt).
+--
+-- DATES AND THEIR CLOCKS. Three statutory days matter, each bound once
+-- below: commencement (1 January 1983, s 50(1)), the appointed day
+-- (21 May 2002, S.I. 2002/1252 art. 2) and the relevant day
+-- (13 January 2010, s 1(9) with S.I. 2009/2731 art. 4(a)).
+--
+-- MODELLING NOTE. Constitutive material (who is, or is entitled to be
+-- registered as, a British citizen) is encoded as `DECIDE`/`MEANS`
+-- predicates carrying the verbatim rule text inline as inert prose. Section
+-- 1 imposes no obligations on anyone, so there is no regulative layer.
+-- Facts about a person are threaded as one GIVEN PersonProfile record;
+-- facts about an adoption as one GIVEN AdoptionCase record. Out-of-scope
+-- statutory concepts (settled, member of the armed forces, section 10A
+-- citizenship, good character) are record fields with @ref pointers to the
+-- provisions that define them — inputs, not stubs.
+-- ===========================================================================
+
+§§ `Interpretation — the statutory days (s 50(1), s 1(9))`
+
+-- AMBIGUITY: "after commencement" (ss (1), (2), (3), (4)). Commencement is
+-- an instant — the Act commenced at the first moment of 1 January 1983 — so
+-- a person born ON 1 January 1983 is born after commencement. Reading (i):
+-- birth date >= 1983-01-01 (taken here, and the settled understanding).
+-- Reading (ii): strictly after the whole commencement day, i.e. >=
+-- 1983-01-02 (rejected: it would leave commencement-day births governed by
+-- neither the old law nor the new). Encoded as AT LEAST 1983-01-01.
+
+@ref British Nationality Act 1981 s 50(1) — "commencement", without more, means the commencement of this Act: 1 January 1983
+GIVETH A DATE
+`commencement` MEANS YMD 1983 1 1
+
+@ref British Nationality Act 1981 s 50(1) — "appointed day"; S.I. 2002/1252 art. 2: 21 May 2002
+GIVETH A DATE
+`the appointed day` MEANS YMD 2002 5 21
+
+@ref British Nationality Act 1981 s 1(9); S.I. 2009/2731 art. 4(a) — commencement of BCIA 2009 s 42: 13 January 2010
+-- s 1(9): "The relevant day for the purposes of subsection (1A) or (3A) is
+-- the day appointed for the commencement of section 42 of the Borders,
+-- Citizenship and Immigration Act 2009 (which inserted those subsections)."
+-- That day is fixed and resolvable at encode time, so it is bound here as a
+-- constant — this IS the encoding of subsection (9).
+GIVETH A DATE
+`the relevant day` MEANS YMD 2010 1 13
+
+@ref British Nationality Act 1981 s 1(4) — the ninety-day absence ceiling
+GIVETH A NUMBER
+`permitted days of absence in each of the first ten years` MEANS 90
+
+§§ `The person — one record of birth, parentage and later-life facts`
+
+-- NOTE on "the United Kingdom": by s 50(1) it "means Great Britain,
+-- Northern Ireland and the Islands, taken together", where "the Islands"
+-- are the Channel Islands and the Isle of Man. The `born in the United
+-- Kingdom` and absence fields below carry that WIDER meaning — a birth in
+-- Jersey or the Isle of Man is a birth in the United Kingdom for this Act.
+--
+-- Out-of-scope concepts arriving as inputs, with the provisions that
+-- construe them:
+--   settled                  s 50(2)-(5) (ordinary residence free of
+--                            immigration-law time restriction; s 50(4)
+--                            deems certain exempt parents settled for
+--                            s 1(1) SPECIFICALLY, subject to a
+--                            diplomatic-immunity exception; s 50(3)/(5)
+--                            subtract exempt and unlawfully-present cases)
+--   member of the armed forces  s 50(1A)-(1B) (regular or reserve forces
+--                            under the Armed Forces Act 2006, minus the
+--                            s 369 / Visiting Forces Act 1933 deemed cases)
+--   British citizen under section 10A  s 10A (EU withdrawal agreement
+--                            registration route, S.I. 2021/743)
+--   good character           s 41A, applied to s 1(3)/(3A)/(4) applicants
+--                            aged 10 or over by IANA 2006 s 58
+--                            (modification C3)
+@ref British Nationality Act 1981 s 1; s 50
+DECLARE PersonProfile HAS
+    name                                              IS A STRING
+    `born in the United Kingdom`                      IS A BOOLEAN
+    `born in a qualifying territory`                  IS A BOOLEAN
+    `date of birth`                                   IS A DATE
+    `father or mother a British citizen at the time of the birth`                                          IS A BOOLEAN
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS A BOOLEAN
+    `father or mother a member of the armed forces at the time of the birth`                               IS A BOOLEAN
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS A BOOLEAN
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS A BOOLEAN
+    `date found abandoned`                            IS A DATE
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS A BOOLEAN
+    `a British citizen under section 10A`             IS A BOOLEAN
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS A BOOLEAN
+    `while a minor, father or mother became a member of the armed forces`                                  IS A BOOLEAN
+    `while a minor, an application made for registration as a British citizen`                             IS A BOOLEAN
+    `an application for registration made after attaining the age of ten years`                            IS A BOOLEAN
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS A NUMBER
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS A BOOLEAN
+    `of good character, where the good character requirement applies`                                      IS A BOOLEAN
+
+§§ `Common timing predicates`
+
+@ref British Nationality Act 1981 s 1(1); s 50(1) "commencement"
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`born in the United Kingdom after commencement` person MEANS
+        person's `born in the United Kingdom`
+    AND person's `date of birth` AT LEAST `commencement`
+
+@ref British Nationality Act 1981 s 1(1); s 50(1) "appointed day"
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`born in a qualifying territory on or after the appointed day` person MEANS
+        person's `born in a qualifying territory`
+    AND person's `date of birth` AT LEAST `the appointed day`
+
+@ref British Nationality Act 1981 s 1(1A)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`born in the United Kingdom or a qualifying territory` person MEANS
+        person's `born in the United Kingdom`
+    OR  person's `born in a qualifying territory`
+
+@ref British Nationality Act 1981 s 1(3A)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`born in the United Kingdom on or after the relevant day` person MEANS
+        person's `born in the United Kingdom`
+    AND person's `date of birth` AT LEAST `the relevant day`
+
+§§ `Subsection (1) — birth in the United Kingdom or a qualifying territory`
+
+@ref British Nationality Act 1981 s 1(1) chapeau — the birth limb
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day` person MEANS
+        `born in the United Kingdom after commencement` person
+    OR  `born in a qualifying territory on or after the appointed day` person
+
+@ref British Nationality Act 1981 s 1(1)(a)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(1)(a) — father or mother a British citizen` person MEANS
+        "(a) a British citizen; or"
+    ... person's `father or mother a British citizen at the time of the birth`
+
+-- AMBIGUITY: "(b) settled in the United Kingdom or that territory" — "that
+-- territory" refers back to the particular qualifying territory of the
+-- birth, not to qualifying territories at large. Reading (i): the parent
+-- must be settled in the UK or in the SAME territory where the birth
+-- occurred (taken here — the anaphor resolves to the birth territory, and
+-- the input field is worded "or the territory of birth" to put that burden
+-- on the fact-supplier). Reading (ii): settled in the UK or in ANY
+-- qualifying territory (rejected: "that" is a bound anaphor, not "a").
+@ref British Nationality Act 1981 s 1(1)(b); s 50(2)-(5) construe "settled"
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(1)(b) — father or mother settled in the United Kingdom or that territory` person MEANS
+        "(b) settled in the United Kingdom or that territory."
+    ... person's `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`
+
+@ref British Nationality Act 1981 s 1(1)(a)-(b) — the parent-status disjunction
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(1) — at the time of the birth his father or mother is a citizen or settled` person MEANS
+        `1(1)(a) — father or mother a British citizen` person
+    ..  `1(1)(b) — father or mother settled in the United Kingdom or that territory` person
+
+@ref British Nationality Act 1981 s 1(1)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(1) — satisfied on the actual facts of the birth` person MEANS
+        "(1) A person born in the United Kingdom after commencement, or in a qualifying territory on or after the appointed day, shall be a British citizen if at the time of the birth his father or mother is—"
+    ... `1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day` person
+    AND `1(1) — at the time of the birth his father or mother is a citizen or settled` person
+
+§§ `Subsection (2) — the foundling presumption`
+
+-- AMBIGUITY: "new-born infant" is undefined by the Act. Reading (i): an
+-- infant abandoned within days or weeks of birth, as assessed by the
+-- decision-maker (taken here — the boolean input field asserts
+-- new-born-ness as a found fact, leaving the vague boundary to the
+-- fact-supplier). Reading (ii): any abandoned child of apparently
+-- qualifying age (rejected: it reads "new-born" out of the text).
+--
+-- AMBIGUITY: "unless the contrary is shown". What must be shown to the
+-- contrary — the deemed birth facts of limb (a), the deemed parentage of
+-- limb (b), or either? Reading (i): showing the contrary of EITHER deemed
+-- fact defeats the deeming (taken here, as one rebuttal flag: subsection
+-- (1) needs both limbs, so rebutting either defeats the s 1(1) route and a
+-- single flag is extensionally adequate). Reading (ii): only a showing
+-- against both limbs jointly rebuts (rejected: it would deem a child known
+-- to have been born abroad to have been born here). Sergot et al. (1986)
+-- §"Some Difficulties with the Formalization of Negation" (pp. 378-381)
+-- wrestle with the same default; their encoding, like this one, makes
+-- rebuttal an explicit input.
+
+@ref British Nationality Act 1981 s 1(2); s 50(1) "commencement"
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`found abandoned in the United Kingdom after commencement` person MEANS
+        person's `found abandoned as a new-born infant in the United Kingdom`
+    AND person's `date found abandoned` AT LEAST `commencement`
+
+@ref British Nationality Act 1981 s 1(2); s 50(1) "appointed day"
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`found abandoned in a qualifying territory on or after the appointed day` person MEANS
+        person's `found abandoned as a new-born infant in a qualifying territory`
+    AND person's `date found abandoned` AT LEAST `the appointed day`
+
+@ref British Nationality Act 1981 s 1(2) — the abandonment limb
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(2) — found abandoned in the United Kingdom or a qualifying territory in time` person MEANS
+        `found abandoned in the United Kingdom after commencement` person
+    OR  `found abandoned in a qualifying territory on or after the appointed day` person
+
+-- The deeming reaches ONLY subsection (1): "deemed for the purposes of
+-- subsection (1)". A foundling gets no help toward subsection (1A) — the
+-- deemed parent is "a British citizen or settled", not a member of the
+-- armed forces.
+@ref British Nationality Act 1981 s 1(2)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+DECIDE `deemed by subsection (2) to satisfy subsection (1)` person IF
+        "(2) A new-born infant who, after commencement, is found abandoned in the United Kingdom, or on or after the appointed day is found abandoned in a qualifying territory, shall, unless the contrary is shown, be deemed for the purposes of subsection (1)—"
+    ... `1(2) — found abandoned in the United Kingdom or a qualifying territory in time` person
+    AND NOT person's `the contrary shown, rebutting the subsection (2) presumption`
+    AND "(a) to have been born in the United Kingdom after commencement or in that territory on or after the appointed day; and"
+    AND "(b) to have been born to a parent who at the time of the birth was a British citizen or settled in the United Kingdom or that territory."
+
+@ref British Nationality Act 1981 s 1(1), (2)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+DECIDE `a British citizen by virtue of subsection (1) or (2)` person IF
+        `1(1) — satisfied on the actual facts of the birth` person
+    OR  `deemed by subsection (2) to satisfy subsection (1)` person
+
+§§ `Subsection (1A) — the armed-forces route`
+
+-- AMBIGUITY: "born in the United Kingdom or a qualifying territory on or
+-- after the relevant day" — does "on or after the relevant day" qualify
+-- both places of birth or only the qualifying-territory limb? Reading (i):
+-- one date threshold governing both places (taken here: the subsection was
+-- inserted whole in 2010 and a UK birth before the relevant day cannot have
+-- an armed-forces route either). Reading (ii): the date attaches only to
+-- territory births, UK births reaching back to commencement (rejected: it
+-- would apply an inserted provision to two decades before its insertion).
+@ref British Nationality Act 1981 s 1(1A); s 50(1A)-(1B) construe "member of the armed forces"
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+DECIDE `a British citizen by virtue of subsection (1A)` person IF
+        "(1A) A person born in the United Kingdom or a qualifying territory on or after the relevant day shall be a British citizen if at the time of the birth his father or mother is a member of the armed forces."
+    ... `born in the United Kingdom or a qualifying territory` person
+    AND person's `date of birth` AT LEAST `the relevant day`
+    AND person's `father or mother a member of the armed forces at the time of the birth`
+
+§§ `The subsection (3), (3A) and (4) chapeau — not already a citizen`
+
+-- AMBIGUITY: "who is not a British citizen by virtue of subsection (1),
+-- (1A) or (2) or section 10A". Subsection (2) confers nothing by itself —
+-- it deems facts "for the purposes of subsection (1)" — so "by virtue of
+-- ... (2)" must mean "by virtue of subsection (1) as read with (2)" (taken
+-- here: the combined predicate below). Note also that the chapeau
+-- enumerates ONLY these routes: a person who is a British citizen some
+-- OTHER way (descent under s 2, registration under s 3, naturalisation) is
+-- not excluded by the chapeau's words, and this encoding follows the words.
+@ref British Nationality Act 1981 s 1(3), (3A), (4) chapeau; s 10A
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person MEANS
+        NOT `a British citizen by virtue of subsection (1) or (2)` person
+    AND NOT `a British citizen by virtue of subsection (1A)` person
+    AND NOT person's `a British citizen under section 10A`
+
+§§ `Subsection (3) — registration after a parent becomes a citizen or settled`
+
+-- AMBIGUITY: "if, while he is a minor— (a) ... and (b) ..." — does the
+-- chapeau's "while he is a minor" govern both limbs, or only limb (a)?
+-- Reading (i): both the parent's change of status AND the application must
+-- occur during minority (taken here — the temporal adverbial sits in the
+-- chapeau and distributes over the enumerated list; both input fields are
+-- worded "while a minor, ..."). Reading (ii): only limb (a) is
+-- time-bounded and the application may come at any age (rejected: an adult
+-- registrant has the s 4 routes, and the settled understanding requires an
+-- in-minority application).
+--
+-- NOTE the asymmetry with subsection (1): subsections (3), (3A) and (4)
+-- reach only births "in the United Kingdom" — a qualifying-territory birth
+-- has no s 1 registration entitlement. That is the enacted text, not an
+-- encoding shortcut.
+
+@ref British Nationality Act 1981 s 1(3)(a)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(3)(a) — father or mother becomes a British citizen or settled` person MEANS
+        "(a) his father or mother becomes a British citizen or becomes settled in the United Kingdom; and"
+    ... person's `while a minor, father or mother became a British citizen or became settled in the United Kingdom`
+
+@ref British Nationality Act 1981 s 1(3)(b)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(3)(b) — an application is made while a minor` person MEANS
+        "(b) an application is made for his registration as a British citizen."
+    ... person's `while a minor, an application made for registration as a British citizen`
+
+@ref British Nationality Act 1981 s 1(3)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+DECIDE `entitled to be registered under subsection (3)` person IF
+        "(3) A person born in the United Kingdom after commencement who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A shall be entitled to be registered as a British citizen if, while he is a minor—"
+    ... `born in the United Kingdom after commencement` person
+    AND `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person
+    AND `1(3)(a) — father or mother becomes a British citizen or settled` person
+    AND `1(3)(b) — an application is made while a minor` person
+
+§§ `Subsection (3A) — registration after a parent joins the armed forces`
+
+@ref British Nationality Act 1981 s 1(3A)(a)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(3A)(a) — father or mother becomes a member of the armed forces` person MEANS
+        "(a) his father or mother becomes a member of the armed forces; and"
+    ... person's `while a minor, father or mother became a member of the armed forces`
+
+@ref British Nationality Act 1981 s 1(3A)(b)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(3A)(b) — an application is made while a minor` person MEANS
+        "(b) an application is made for his registration as a British citizen"
+    ... person's `while a minor, an application made for registration as a British citizen`
+
+@ref British Nationality Act 1981 s 1(3A)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+DECIDE `entitled to be registered under subsection (3A)` person IF
+        "(3A) A person born in the United Kingdom on or after the relevant day who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A shall be entitled to be registered as a British citizen if, while he is a minor—"
+    ... `born in the United Kingdom on or after the relevant day` person
+    AND `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person
+    AND `1(3A)(a) — father or mother becomes a member of the armed forces` person
+    AND `1(3A)(b) — an application is made while a minor` person
+
+§§ `Subsection (4) — registration on ten years' residence, and the subsection (7) dispensation`
+
+-- AMBIGUITY: "as regards each of the first ten years of that person's
+-- life" — years of LIFE (birthday to birthday) or calendar years? Reading
+-- (i): the first ten years of life, measured from birth anniversary to
+-- birth anniversary (taken here — "of that person's life" anchors the
+-- years to the person, not the calendar). Reading (ii): the ten calendar
+-- years containing the person's first decade (rejected: it makes the test
+-- depend on the accident of a January or December birthday).
+--
+-- AMBIGUITY: counting "the number of days on which he was absent" — does a
+-- day of departure or arrival, part-spent in the UK, count as a day of
+-- absence? Reading (i): a day counts as absent only if the person was
+-- outside the UK for the whole day (taken here as the input convention —
+-- the NUMBER field carries whatever count the fact-supplier certifies).
+-- Reading (ii): any day touched by absence counts (not ruled out by the
+-- text; the burden sits on the fact-supplier, and the field is a single
+-- per-year maximum: the statute's per-year universal "as regards each ...
+-- does not exceed 90" is encoded extensionally as
+-- max-over-the-ten-years <= 90, which is equivalent).
+
+@ref British Nationality Act 1981 s 1(4) — the application limb
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(4) — application made after attaining the age of ten years` person MEANS
+        "on an application for his registration as a British citizen made at any time after he has attained the age of ten years"
+    ... person's `an application for registration made after attaining the age of ten years`
+
+@ref British Nationality Act 1981 s 1(4) — the residence limb
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(4) — absences within the ninety-day ceiling in each of the first ten years` person MEANS
+        "if, as regards each of the first ten years of that person's life, the number of days on which he was absent from the United Kingdom in that year does not exceed 90."
+    ... person's `greatest number of days absent from the United Kingdom in any one of the first ten years of life` AT MOST `permitted days of absence in each of the first ten years`
+
+-- Subsection (7) is encoded HERE, as the discretionary escape from the
+-- subsection (4) residence limb. The EXERCISE of the discretion is an
+-- input fact — whether the Secretary of State "thinks fit" is not a
+-- computable question.
+@ref British Nationality Act 1981 s 1(7)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(7) — the Secretary of State treats the residence requirement as fulfilled` person MEANS
+        "(7) If in the special circumstances of any particular case the Secretary of State thinks fit, he may for the purposes of subsection (4) treat the person to whom the application relates as fulfilling the requirement specified in that subsection although, as regards any one or more of the first ten years of that person's life, the number of days on which he was absent from the United Kingdom in that year or each of the years in question exceeds 90."
+    ... person's `the Secretary of State treats the subsection (4) residence requirement as fulfilled`
+
+@ref British Nationality Act 1981 s 1(4), (7)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+`1(4) — the residence requirement met or treated as met` person MEANS
+        `1(4) — absences within the ninety-day ceiling in each of the first ten years` person
+    OR  `1(7) — the Secretary of State treats the residence requirement as fulfilled` person
+
+@ref British Nationality Act 1981 s 1(4)
+GIVEN person IS A PersonProfile
+GIVETH A BOOLEAN
+DECIDE `entitled to be registered under subsection (4)` person IF
+        "(4) A person born in the United Kingdom after commencement who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A shall be entitled, on an application for his registration as a British citizen made at any time after he has attained the age of ten years, to be registered as such a citizen"
+    ... `born in the United Kingdom after commencement` person
+    AND `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person
+    AND `1(4) — application made after attaining the age of ten years` person
+    AND `1(4) — the residence requirement met or treated as met` person
+
+§§ `The good-character restriction on granting registration (modification C3)`
+
+-- NOT part of the s 1 text. Modification note C3: s 1(3)/(4) registration
+-- was restricted (4.12.2006) by Immigration, Asylum and Nationality Act
+-- 2006 s 58 — the good-character requirement now embodied in s 41A of this
+-- Act, which applies to applications under s 1(3), (3A) or (4) by persons
+-- aged 10 or over at the date of application.
+--
+-- AMBIGUITY: (of encoding placement, not of the words) does the
+-- restriction narrow the s 1 ENTITLEMENT, or only the GRANT of the
+-- application? Reading (i): the entitlement subsists as s 1 states it, and
+-- s 41A separately forbids granting the application to a person not of
+-- good character (taken here — the restriction is drafted against the
+-- registration provisions, not woven into s 1, so it is encoded as this
+-- separate grant-gate and the s 1 predicates above stay pure). Reading
+-- (ii): fold good character into each entitlement predicate (rejected: it
+-- would misstate what s 1 itself says, and the s 41A text was not fetched
+-- verbatim so it may not ride inline as inert prose).
+@ref Immigration, Asylum and Nationality Act 2006 s 58; British Nationality Act 1981 s 41A — modification C3, not part of the s 1 text
+GIVEN person IS A PersonProfile
+      `entitled under subsection (3), (3A) or (4)` IS A BOOLEAN
+GIVETH A BOOLEAN
+`registration may be granted` person `entitled under subsection (3), (3A) or (4)` MEANS
+        `entitled under subsection (3), (3A) or (4)`
+    AND person's `of good character, where the good character requirement applies`
+
+§§ `Subsections (5), (5A) and (6) — acquisition by adoption`
+
+@ref British Nationality Act 1981 s 1(5), (5A), (6)
+DECLARE AdoptionCase HAS
+    `the adopted person a minor on the date of the order or adoption`                  IS A BOOLEAN
+    `the adopted person already a British citizen`                                     IS A BOOLEAN
+    `an order of a court in the United Kingdom authorising the adoption`               IS A BOOLEAN
+    `an order of a court in a qualifying territory authorising the adoption`           IS A BOOLEAN
+    `a Convention adoption effected under the law of a country or territory outside the United Kingdom`    IS A BOOLEAN
+    `date of the order or Convention adoption`                                         IS A DATE
+    `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`              IS A BOOLEAN
+    `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date` IS A BOOLEAN
+    `the order or Convention adoption since ceased to have effect, whether on annulment or otherwise`      IS A BOOLEAN
+
+-- AMBIGUITY: in s 1(5)(a) the qualifying-territory words read "or, on or
+-- after the appointed day, any court in a qualifying territory makes an
+-- order" — the date qualifies the MAKING of the order, so a
+-- qualifying-territory order made before 21 May 2002 does not engage limb
+-- (a). Reading taken: order date >= the appointed day for territory
+-- courts, no date condition for United Kingdom courts (their competence
+-- runs from the 2003 substitution of the whole subsection, which is the
+-- text in force and the only text encoded).
+@ref British Nationality Act 1981 s 1(5)(a)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`order of a court in a qualifying territory on or after the appointed day` adoption MEANS
+        adoption's `an order of a court in a qualifying territory authorising the adoption`
+    AND adoption's `date of the order or Convention adoption` AT LEAST `the appointed day`
+
+@ref British Nationality Act 1981 s 1(5)(a)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`1(5)(a) — a court order authorising the adoption` adoption MEANS
+        "(a) any court in the United Kingdom or, on or after the appointed day, any court in a qualifying territory makes an order authorising the adoption of a minor who is not a British citizen; or"
+    ..  adoption's `an order of a court in the United Kingdom authorising the adoption`
+    ..  `order of a court in a qualifying territory on or after the appointed day` adoption
+
+@ref British Nationality Act 1981 s 1(5)(b); s 50(1) "Convention adoption"
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`1(5)(b) — adopted under a Convention adoption` adoption MEANS
+        "(b) a minor who is not a British citizen is adopted under a Convention adoption effected under the law of a country or territory outside the United Kingdom,"
+    ... adoption's `a Convention adoption effected under the law of a country or territory outside the United Kingdom`
+
+@ref British Nationality Act 1981 s 1(5)(a)-(b)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`1(5) — an order is made or a Convention adoption is effected` adoption MEANS
+        `1(5)(a) — a court order authorising the adoption` adoption
+    OR  `1(5)(b) — adopted under a Convention adoption` adoption
+
+@ref British Nationality Act 1981 s 1(5) — "a minor who is not a British citizen"
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`the adopted person a minor and not already a British citizen` adoption MEANS
+        adoption's `the adopted person a minor on the date of the order or adoption`
+    AND NOT adoption's `the adopted person already a British citizen`
+
+@ref British Nationality Act 1981 s 1(5A)(a)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`1(5A)(a) — the adopter, or one joint adopter, a British citizen` adoption MEANS
+        "(a) the adopter or, in the case of a joint adoption, one of the adopters is a British citizen; and"
+    ... adoption's `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`
+
+-- AMBIGUITY: "(b) ... both of the adopters are habitually resident in the
+-- United Kingdom or in a designated territory" — must joint adopters be
+-- habitually resident in the SAME place, or does each independently
+-- satisfy "in the United Kingdom or in a designated territory"? Reading
+-- (i): each adopter habitually resident somewhere within the listed places
+-- (taken here — the disjunction distributes over the adopters, and the
+-- input field carries the statutory phrase whole). Reading (ii): both in
+-- one and the same place (not compelled by the words; nothing in the
+-- encoding turns on it because the field arrives pre-construed).
+-- The proviso shape: limb (b) binds only "in a case within subsection
+-- (5)(b)" — a material implication, vacuously satisfied for domestic and
+-- territory court orders. Drafting pattern: NOT X .. Y.
+@ref British Nationality Act 1981 s 1(5A)(b); s 50(1) "designated territory"
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`1(5A)(b) — habitual residence, in a Convention case` adoption MEANS
+        "(b) in a case within subsection (5)(b), the adopter or, in the case of a joint adoption, both of the adopters are habitually resident in the United Kingdom or in a designated territory."
+    ..  NOT adoption's `a Convention adoption effected under the law of a country or territory outside the United Kingdom`
+    ..  adoption's `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date`
+
+@ref British Nationality Act 1981 s 1(5A)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+`1(5A) — the requirements are met on the date of the order or adoption` adoption MEANS
+        "(5A) Those requirements are that on the date on which the order is made or the Convention adoption is effected (as the case may be)—"
+    ... `1(5A)(a) — the adopter, or one joint adopter, a British citizen` adoption
+    AND `1(5A)(b) — habitual residence, in a Convention case` adoption
+
+@ref British Nationality Act 1981 s 1(5)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+DECIDE `a British citizen by virtue of subsection (5)` adoption IF
+        "that minor shall, if the requirements of subsection (5A) are met, be a British citizen as from the date on which the order is made or the Convention adoption is effected, as the case may be."
+    ... `the adopted person a minor and not already a British citizen` adoption
+    AND `1(5) — an order is made or a Convention adoption is effected` adoption
+    AND `1(5A) — the requirements are met on the date of the order or adoption` adoption
+
+-- Subsection (6) is an INVARIANCE: citizenship acquired under subsection
+-- (5) survives the order or Convention adoption later ceasing to have
+-- effect. Encoded by deliberately NOT reading the cesser field — the
+-- predicate below equals `a British citizen by virtue of subsection (5)`
+-- whatever the cesser flag says, and the tests assert exactly that.
+@ref British Nationality Act 1981 s 1(6)
+GIVEN adoption IS AN AdoptionCase
+GIVETH A BOOLEAN
+DECIDE `a British citizen notwithstanding cesser of the order — subsection (6)` adoption IF
+        "(6) Where an order or a Convention adoption in consequence of which any person became a British citizen by virtue of subsection (5) ceases to have effect, whether on annulment or otherwise, the cesser shall not affect the status of that person as a British citizen."
+    ... `a British citizen by virtue of subsection (5)` adoption
+
+§§ `The section 1 outcome at birth, as one total answer`
+
+DECLARE BirthOutcome IS ONE OF
+    `a British citizen from birth under subsection (1)`
+    `a British citizen from birth under subsection (1A)`
+    `not a British citizen from birth under section 1`
+
+-- The routes overlap (a settled parent may also serve in the armed
+-- forces); the order below is presentational priority, not statutory
+-- hierarchy — subsection (1) is reported first because it is the older and
+-- more general route.
+@ref British Nationality Act 1981 s 1(1)-(2), (1A)
+GIVEN person IS A PersonProfile
+GIVETH A BirthOutcome
+`section 1 outcome at birth` person MEANS
+    BRANCH IF `a British citizen by virtue of subsection (1) or (2)` person THEN `a British citizen from birth under subsection (1)`
+           IF `a British citizen by virtue of subsection (1A)` person       THEN `a British citizen from birth under subsection (1A)`
+           OTHERWISE `not a British citizen from birth under section 1`
+
+§ `Tests`
+
+§§ `Fixtures`
+
+-- The classic example lineage of Sergot, Sadri, Kowalski, Kriwaczek,
+-- Hammond & Cory, "The British Nationality Act as a Logic Program", CACM
+-- 29(5) 370-386 (1986). The paper's PROLOG section (p. 372) supplies
+-- "Peter was born in the U.K." with William his father; Figure 4, the
+-- APES dialogue extract (pp. 376-377), dates the birth 3 May 1983 and has
+-- William "a citizen of the U.K. and Colonies on date (31 Dec 1982)" with
+-- the right of abode — a British citizen at commencement (s 11(1)), hence
+-- at the birth. Adapted to the current consolidated text. Exercises
+-- s 1(1)(a).
+`Peter` MEANS PersonProfile WITH
+    name                                              IS "Peter"
+    `born in the United Kingdom`                      IS TRUE
+    `born in a qualifying territory`                  IS FALSE
+    `date of birth`                                   IS YMD 1983 5 3
+    `father or mother a British citizen at the time of the birth`                                          IS TRUE
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS FALSE
+    `father or mother a member of the armed forces at the time of the birth`                               IS FALSE
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS FALSE
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS FALSE
+    `date found abandoned`                            IS YMD 1983 5 3
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS FALSE
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS FALSE
+    `while a minor, father or mother became a member of the armed forces`                                  IS FALSE
+    `while a minor, an application made for registration as a British citizen`                             IS FALSE
+    `an application for registration made after attaining the age of ten years`                            IS FALSE
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS 0
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS FALSE
+    `of good character, where the good character requirement applies`                                      IS TRUE
+
+-- Peter again, with both subsection (3) limbs deliberately satisfied — the
+-- parent later becomes settled AND an application is made while he is a
+-- minor — so that the Group 4 negative on this fixture is carried by the
+-- "not already a British citizen" chapeau ALONE.
+`Peter with the subsection (3) limbs satisfied` MEANS PersonProfile WITH
+    name                                              IS "Peter"
+    `born in the United Kingdom`                      IS TRUE
+    `born in a qualifying territory`                  IS FALSE
+    `date of birth`                                   IS YMD 1983 5 3
+    `father or mother a British citizen at the time of the birth`                                          IS TRUE
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS FALSE
+    `father or mother a member of the armed forces at the time of the birth`                               IS FALSE
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS FALSE
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS FALSE
+    `date found abandoned`                            IS YMD 1983 5 3
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS FALSE
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS TRUE
+    `while a minor, father or mother became a member of the armed forces`                                  IS FALSE
+    `while a minor, an application made for registration as a British citizen`                             IS TRUE
+    `an application for registration made after attaining the age of ten years`                            IS FALSE
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS 0
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS FALSE
+    `of good character, where the good character requirement applies`                                      IS TRUE
+
+-- Boundary-sweep constructor for birth cases: a child born in the United
+-- Kingdom, varying the birth date and the three parent statuses.
+GIVEN dob              IS A DATE
+      `citizen parent` IS A BOOLEAN
+      `settled parent` IS A BOOLEAN
+      `forces parent`  IS A BOOLEAN
+GIVETH A PersonProfile
+`a child born in the United Kingdom on` dob `citizen parent` `settled parent` `forces parent` MEANS PersonProfile WITH
+    name                                              IS "a UK-born child"
+    `born in the United Kingdom`                      IS TRUE
+    `born in a qualifying territory`                  IS FALSE
+    `date of birth`                                   IS dob
+    `father or mother a British citizen at the time of the birth`                                          IS `citizen parent`
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS `settled parent`
+    `father or mother a member of the armed forces at the time of the birth`                               IS `forces parent`
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS FALSE
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS FALSE
+    `date found abandoned`                            IS dob
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS FALSE
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS FALSE
+    `while a minor, father or mother became a member of the armed forces`                                  IS FALSE
+    `while a minor, an application made for registration as a British citizen`                             IS FALSE
+    `an application for registration made after attaining the age of ten years`                            IS FALSE
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS 0
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS FALSE
+    `of good character, where the good character requirement applies`                                      IS TRUE
+
+-- The same, born in a qualifying territory (e.g. Bermuda, Gibraltar).
+GIVEN dob              IS A DATE
+      `citizen parent` IS A BOOLEAN
+      `settled parent` IS A BOOLEAN
+      `forces parent`  IS A BOOLEAN
+GIVETH A PersonProfile
+`a child born in a qualifying territory on` dob `citizen parent` `settled parent` `forces parent` MEANS PersonProfile WITH
+    name                                              IS "a territory-born child"
+    `born in the United Kingdom`                      IS FALSE
+    `born in a qualifying territory`                  IS TRUE
+    `date of birth`                                   IS dob
+    `father or mother a British citizen at the time of the birth`                                          IS `citizen parent`
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS `settled parent`
+    `father or mother a member of the armed forces at the time of the birth`                               IS `forces parent`
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS FALSE
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS FALSE
+    `date found abandoned`                            IS dob
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS FALSE
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS FALSE
+    `while a minor, father or mother became a member of the armed forces`                                  IS FALSE
+    `while a minor, an application made for registration as a British citizen`                             IS FALSE
+    `an application for registration made after attaining the age of ten years`                            IS FALSE
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS 0
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS FALSE
+    `of good character, where the good character requirement applies`                                      IS TRUE
+
+-- A foundling: place and date of birth, and parentage, are unknown — the
+-- subsection (2) deeming supplies them. `date of birth` is set to the
+-- found date only because the record requires a value; no subsection (2)
+-- path reads it. `in the United Kingdom` FALSE means found in a
+-- qualifying territory instead.
+GIVEN `found date`            IS A DATE
+      `in the United Kingdom` IS A BOOLEAN
+      `contrary shown`        IS A BOOLEAN
+GIVETH A PersonProfile
+`a foundling found on` `found date` `in the United Kingdom` `contrary shown` MEANS PersonProfile WITH
+    name                                              IS "a foundling"
+    `born in the United Kingdom`                      IS FALSE
+    `born in a qualifying territory`                  IS FALSE
+    `date of birth`                                   IS `found date`
+    `father or mother a British citizen at the time of the birth`                                          IS FALSE
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS FALSE
+    `father or mother a member of the armed forces at the time of the birth`                               IS FALSE
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS `in the United Kingdom`
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS NOT `in the United Kingdom`
+    `date found abandoned`                            IS `found date`
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS `contrary shown`
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS FALSE
+    `while a minor, father or mother became a member of the armed forces`                                  IS FALSE
+    `while a minor, an application made for registration as a British citizen`                             IS FALSE
+    `an application for registration made after attaining the age of ten years`                            IS FALSE
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS 0
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS FALSE
+    `of good character, where the good character requirement applies`                                      IS TRUE
+
+-- A child born in the United Kingdom to parents with no qualifying status
+-- at the birth (visitors, students, unsettled migrants), varying the
+-- later-life events that drive subsections (3) and (3A).
+GIVEN dob                                    IS A DATE
+      `parent later a citizen or settled`    IS A BOOLEAN
+      `parent later in the forces`           IS A BOOLEAN
+      `application while a minor`            IS A BOOLEAN
+GIVETH A PersonProfile
+`a child of visitors born on` dob `parent later a citizen or settled` `parent later in the forces` `application while a minor` MEANS PersonProfile WITH
+    name                                              IS "a child of visitors"
+    `born in the United Kingdom`                      IS TRUE
+    `born in a qualifying territory`                  IS FALSE
+    `date of birth`                                   IS dob
+    `father or mother a British citizen at the time of the birth`                                          IS FALSE
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS FALSE
+    `father or mother a member of the armed forces at the time of the birth`                               IS FALSE
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS FALSE
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS FALSE
+    `date found abandoned`                            IS dob
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS FALSE
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS `parent later a citizen or settled`
+    `while a minor, father or mother became a member of the armed forces`                                  IS `parent later in the forces`
+    `while a minor, an application made for registration as a British citizen`                             IS `application while a minor`
+    `an application for registration made after attaining the age of ten years`                            IS FALSE
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS 0
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS FALSE
+    `of good character, where the good character requirement applies`                                      IS TRUE
+
+-- The subsection (4) family: UK-born to non-qualifying parents, varying
+-- the residence record, the over-ten application, the subsection (7)
+-- dispensation, and good character.
+GIVEN dob                     IS A DATE
+      `days absent`           IS A NUMBER
+      `application after ten` IS A BOOLEAN
+      `waiver`                IS A BOOLEAN
+      `good character`        IS A BOOLEAN
+GIVETH A PersonProfile
+`a ten-year applicant born on` dob `days absent` `application after ten` `waiver` `good character` MEANS PersonProfile WITH
+    name                                              IS "a ten-year applicant"
+    `born in the United Kingdom`                      IS TRUE
+    `born in a qualifying territory`                  IS FALSE
+    `date of birth`                                   IS dob
+    `father or mother a British citizen at the time of the birth`                                          IS FALSE
+    `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS FALSE
+    `father or mother a member of the armed forces at the time of the birth`                               IS FALSE
+    `found abandoned as a new-born infant in the United Kingdom`                                           IS FALSE
+    `found abandoned as a new-born infant in a qualifying territory`                                       IS FALSE
+    `date found abandoned`                            IS dob
+    `the contrary shown, rebutting the subsection (2) presumption`                                         IS FALSE
+    `a British citizen under section 10A`             IS FALSE
+    `while a minor, father or mother became a British citizen or became settled in the United Kingdom`     IS FALSE
+    `while a minor, father or mother became a member of the armed forces`                                  IS FALSE
+    `while a minor, an application made for registration as a British citizen`                             IS FALSE
+    `an application for registration made after attaining the age of ten years`                            IS `application after ten`
+    `greatest number of days absent from the United Kingdom in any one of the first ten years of life`     IS `days absent`
+    `the Secretary of State treats the subsection (4) residence requirement as fulfilled`                  IS `waiver`
+    `of good character, where the good character requirement applies`                                      IS `good character`
+
+GIVEN `order date`          IS A DATE
+      `adopter a citizen`   IS A BOOLEAN
+      `habitually resident` IS A BOOLEAN
+      `later ceased`        IS A BOOLEAN
+GIVETH AN AdoptionCase
+`a United Kingdom adoption order on` `order date` `adopter a citizen` `habitually resident` `later ceased` MEANS AdoptionCase WITH
+    `the adopted person a minor on the date of the order or adoption`                  IS TRUE
+    `the adopted person already a British citizen`                                     IS FALSE
+    `an order of a court in the United Kingdom authorising the adoption`               IS TRUE
+    `an order of a court in a qualifying territory authorising the adoption`           IS FALSE
+    `a Convention adoption effected under the law of a country or territory outside the United Kingdom`    IS FALSE
+    `date of the order or Convention adoption`                                         IS `order date`
+    `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`              IS `adopter a citizen`
+    `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date` IS `habitually resident`
+    `the order or Convention adoption since ceased to have effect, whether on annulment or otherwise`      IS `later ceased`
+
+GIVEN `adoption date`       IS A DATE
+      `adopter a citizen`   IS A BOOLEAN
+      `habitually resident` IS A BOOLEAN
+GIVETH AN AdoptionCase
+`a Convention adoption on` `adoption date` `adopter a citizen` `habitually resident` MEANS AdoptionCase WITH
+    `the adopted person a minor on the date of the order or adoption`                  IS TRUE
+    `the adopted person already a British citizen`                                     IS FALSE
+    `an order of a court in the United Kingdom authorising the adoption`               IS FALSE
+    `an order of a court in a qualifying territory authorising the adoption`           IS FALSE
+    `a Convention adoption effected under the law of a country or territory outside the United Kingdom`    IS TRUE
+    `date of the order or Convention adoption`                                         IS `adoption date`
+    `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`              IS `adopter a citizen`
+    `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date` IS `habitually resident`
+    `the order or Convention adoption since ceased to have effect, whether on annulment or otherwise`      IS FALSE
+
+-- Exercises the qualifying-territory court limb of (5)(a), AND the (5A)(b)
+-- proviso: the adopters are NOT habitually resident in the UK or a
+-- designated territory, but (5A)(b) binds only in Convention cases, so the
+-- adoption still confers citizenship.
+`a Gibraltar adoption order case` MEANS AdoptionCase WITH
+    `the adopted person a minor on the date of the order or adoption`                  IS TRUE
+    `the adopted person already a British citizen`                                     IS FALSE
+    `an order of a court in the United Kingdom authorising the adoption`               IS FALSE
+    `an order of a court in a qualifying territory authorising the adoption`           IS TRUE
+    `a Convention adoption effected under the law of a country or territory outside the United Kingdom`    IS FALSE
+    `date of the order or Convention adoption`                                         IS YMD 2005 4 1
+    `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`              IS TRUE
+    `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date` IS FALSE
+    `the order or Convention adoption since ceased to have effect, whether on annulment or otherwise`      IS FALSE
+
+-- The Gibraltar case with the order made before the appointed day: the
+-- qualifying-territory limb of (5)(a) is not engaged.
+`a pre-appointed-day Gibraltar order case` MEANS AdoptionCase WITH
+    `the adopted person a minor on the date of the order or adoption`                  IS TRUE
+    `the adopted person already a British citizen`                                     IS FALSE
+    `an order of a court in the United Kingdom authorising the adoption`               IS FALSE
+    `an order of a court in a qualifying territory authorising the adoption`           IS TRUE
+    `a Convention adoption effected under the law of a country or territory outside the United Kingdom`    IS FALSE
+    `date of the order or Convention adoption`                                         IS YMD 2001 4 1
+    `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`              IS TRUE
+    `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date` IS FALSE
+    `the order or Convention adoption since ceased to have effect, whether on annulment or otherwise`      IS FALSE
+
+-- The chapeau negative: subsection (5) reaches only "a minor who is not a
+-- British citizen".
+`an adoption of a person already a British citizen` MEANS AdoptionCase WITH
+    `the adopted person a minor on the date of the order or adoption`                  IS TRUE
+    `the adopted person already a British citizen`                                     IS TRUE
+    `an order of a court in the United Kingdom authorising the adoption`               IS TRUE
+    `an order of a court in a qualifying territory authorising the adoption`           IS FALSE
+    `a Convention adoption effected under the law of a country or territory outside the United Kingdom`    IS FALSE
+    `date of the order or Convention adoption`                                         IS YMD 2010 9 15
+    `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`              IS TRUE
+    `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date` IS TRUE
+    `the order or Convention adoption since ceased to have effect, whether on annulment or otherwise`      IS FALSE
+
+-- Named lead cases.
+`the foundling`           MEANS `a foundling found on` (YMD 2020 6 1) TRUE FALSE
+`the rebutted foundling`  MEANS `a foundling found on` (YMD 2020 6 1) TRUE TRUE
+`the forces child`        MEANS `a child born in the United Kingdom on` (YMD 2015 6 1) FALSE FALSE TRUE
+`the child of visitors`   MEANS `a child of visitors born on` (YMD 2012 5 10) TRUE FALSE TRUE
+`the ten-year lead case`  MEANS `a ten-year applicant born on` (YMD 1995 3 1) 90 TRUE FALSE TRUE
+`the applicant of bad character` MEANS `a ten-year applicant born on` (YMD 1995 3 1) 90 TRUE FALSE FALSE
+
+§§ `Group 1 — subsection (1), boundaries at commencement and the appointed day`
+
+-- Sergot et al.'s Peter, on the current text: born in the UK in 1983 to a
+-- British-citizen parent.
+#ASSERT     `a British citizen by virtue of subsection (1) or (2)` `Peter`
+-- Born on commencement day itself, to a settled (not citizen) parent:
+-- limb (b), and the "after commencement" boundary.
+#ASSERT     `a British citizen by virtue of subsection (1) or (2)` (`a child born in the United Kingdom on` (YMD 1983 1 1) FALSE TRUE FALSE)
+-- One day earlier: the 1981 Act confers nothing (the 1948 Act governed).
+#ASSERT NOT `a British citizen by virtue of subsection (1) or (2)` (`a child born in the United Kingdom on` (YMD 1982 12 31) TRUE FALSE FALSE)
+-- Born in the UK to parents with no qualifying status: not a citizen at birth.
+#ASSERT NOT `a British citizen by virtue of subsection (1) or (2)` `the child of visitors`
+-- Born in a qualifying territory ON the appointed day, settled parent: in.
+#ASSERT     `a British citizen by virtue of subsection (1) or (2)` (`a child born in a qualifying territory on` (YMD 2002 5 21) FALSE TRUE FALSE)
+-- One day before the appointed day: out.
+#ASSERT NOT `a British citizen by virtue of subsection (1) or (2)` (`a child born in a qualifying territory on` (YMD 2002 5 20) FALSE TRUE FALSE)
+
+§§ `Group 2 — subsection (1A), boundary at the relevant day (13 January 2010)`
+
+-- Born in the UK ON the relevant day to an armed-forces parent: in.
+#ASSERT     `a British citizen by virtue of subsection (1A)` (`a child born in the United Kingdom on` (YMD 2010 1 13) FALSE FALSE TRUE)
+-- One day earlier: out.
+#ASSERT NOT `a British citizen by virtue of subsection (1A)` (`a child born in the United Kingdom on` (YMD 2010 1 12) FALSE FALSE TRUE)
+-- The route also runs in a qualifying territory.
+#ASSERT     `a British citizen by virtue of subsection (1A)` (`a child born in a qualifying territory on` (YMD 2012 3 1) FALSE FALSE TRUE)
+#ASSERT     `a British citizen by virtue of subsection (1A)` `the forces child`
+-- No armed-forces parent: the limb fails.
+#ASSERT NOT `a British citizen by virtue of subsection (1A)` (`a child born in the United Kingdom on` (YMD 2015 6 1) FALSE FALSE FALSE)
+
+§§ `Group 3 — subsection (2), the foundling presumption`
+
+#ASSERT     `deemed by subsection (2) to satisfy subsection (1)` `the foundling`
+-- The deeming feeds subsection (1): the foundling is a citizen at birth.
+#ASSERT     `a British citizen by virtue of subsection (1) or (2)` `the foundling`
+-- The presumption is rebuttable: the contrary shown, the deeming fails.
+#ASSERT NOT `a British citizen by virtue of subsection (1) or (2)` `the rebutted foundling`
+-- Found before commencement: the deeming does not run.
+#ASSERT NOT `deemed by subsection (2) to satisfy subsection (1)` (`a foundling found on` (YMD 1982 6 1) TRUE FALSE)
+
+§§ `Group 4 — subsection (3), registration after a parent qualifies`
+
+#ASSERT     `entitled to be registered under subsection (3)` `the child of visitors`
+-- No application made while a minor: limb (b) fails.
+#ASSERT NOT `entitled to be registered under subsection (3)` (`a child of visitors born on` (YMD 2012 5 10) TRUE FALSE FALSE)
+-- The parent never becomes a citizen or settled: limb (a) fails.
+#ASSERT NOT `entitled to be registered under subsection (3)` (`a child of visitors born on` (YMD 2012 5 10) FALSE FALSE TRUE)
+-- Peter is already a British citizen by virtue of subsection (1). On plain
+-- Peter this negative is overdetermined — limbs (a) and (b) fail on his
+-- facts too — so by itself it does not demonstrate the chapeau.
+#ASSERT NOT `entitled to be registered under subsection (3)` `Peter`
+-- The chapeau in isolation: both while-a-minor limbs satisfied, and the
+-- entitlement still fails, solely because Peter is already a British
+-- citizen by virtue of subsection (1).
+#ASSERT NOT `entitled to be registered under subsection (3)` `Peter with the subsection (3) limbs satisfied`
+
+§§ `Group 5 — subsection (3A), registration after a parent joins the forces`
+
+#ASSERT     `entitled to be registered under subsection (3A)` (`a child of visitors born on` (YMD 2012 5 10) FALSE TRUE TRUE)
+-- Born before the relevant day: the (3A) chapeau fails (though (3) may
+-- still serve such a person on its own facts).
+#ASSERT NOT `entitled to be registered under subsection (3A)` (`a child of visitors born on` (YMD 2005 5 10) FALSE TRUE TRUE)
+-- No application made while a minor: limb (b) fails.
+#ASSERT NOT `entitled to be registered under subsection (3A)` (`a child of visitors born on` (YMD 2012 5 10) FALSE TRUE FALSE)
+
+§§ `Group 6 — subsection (4) with (7), boundary at 90 days; and the C3 grant gate`
+
+-- Exactly 90 days absent in the worst year: within the ceiling.
+#ASSERT     `entitled to be registered under subsection (4)` `the ten-year lead case`
+-- One day more: outside.
+#ASSERT NOT `entitled to be registered under subsection (4)` (`a ten-year applicant born on` (YMD 1995 3 1) 91 TRUE FALSE TRUE)
+-- The same excess, but the Secretary of State exercises the subsection (7)
+-- dispensation: entitled.
+#ASSERT     `entitled to be registered under subsection (4)` (`a ten-year applicant born on` (YMD 1995 3 1) 91 TRUE TRUE TRUE)
+-- No application made after attaining ten: the application limb fails.
+#ASSERT NOT `entitled to be registered under subsection (4)` (`a ten-year applicant born on` (YMD 1995 3 1) 90 FALSE FALSE TRUE)
+-- The s 41A good-character gate (modification C3) sits on the GRANT, not
+-- the entitlement: the applicant of bad character remains entitled under
+-- s 1(4), but registration may not be granted.
+#ASSERT     `entitled to be registered under subsection (4)` `the applicant of bad character`
+#ASSERT     `registration may be granted` `the ten-year lead case` (`entitled to be registered under subsection (4)` `the ten-year lead case`)
+#ASSERT NOT `registration may be granted` `the applicant of bad character` (`entitled to be registered under subsection (4)` `the applicant of bad character`)
+
+§§ `Group 7 — subsections (5), (5A) and (6), acquisition by adoption`
+
+-- A United Kingdom adoption order, adopter a British citizen: citizen from
+-- the date of the order.
+#ASSERT     `a British citizen by virtue of subsection (5)` (`a United Kingdom adoption order on` (YMD 2004 7 1) TRUE TRUE FALSE)
+-- Adopter not a British citizen: (5A)(a) fails.
+#ASSERT NOT `a British citizen by virtue of subsection (5)` (`a United Kingdom adoption order on` (YMD 2004 7 1) FALSE TRUE FALSE)
+-- A Convention adoption, adopter a citizen and habitually resident: in.
+#ASSERT     `a British citizen by virtue of subsection (5)` (`a Convention adoption on` (YMD 2006 2 1) TRUE TRUE)
+-- A Convention adoption where the adopters are not habitually resident in
+-- the UK or a designated territory: (5A)(b) fails.
+#ASSERT NOT `a British citizen by virtue of subsection (5)` (`a Convention adoption on` (YMD 2006 2 1) TRUE FALSE)
+-- A qualifying-territory court order: (5A)(b) does not bind outside
+-- Convention cases, so non-residence does not matter.
+#ASSERT     `a British citizen by virtue of subsection (5)` `a Gibraltar adoption order case`
+-- A qualifying-territory court order made BEFORE the appointed day does not
+-- engage limb (5)(a) — only the timing differs from the Gibraltar case.
+#ASSERT NOT `1(5)(a) — a court order authorising the adoption` `a pre-appointed-day Gibraltar order case`
+-- Subsection (5) reaches only a minor who is NOT already a British citizen.
+#ASSERT NOT `a British citizen by virtue of subsection (5)` `an adoption of a person already a British citizen`
+-- Subsection (6): annulment of the order does not disturb the status.
+#ASSERT     `a British citizen notwithstanding cesser of the order — subsection (6)` (`a United Kingdom adoption order on` (YMD 2004 7 1) TRUE TRUE TRUE)
+-- But cesser cannot resurrect a citizenship that never arose.
+#ASSERT NOT `a British citizen notwithstanding cesser of the order — subsection (6)` (`a United Kingdom adoption order on` (YMD 2004 7 1) FALSE TRUE TRUE)
+
+§§ `Group 8 — the total outcome`
+
+#EVAL `section 1 outcome at birth` `Peter`
+
+#ASSERT `section 1 outcome at birth` `Peter` EQUALS `a British citizen from birth under subsection (1)`
+#ASSERT `section 1 outcome at birth` `the forces child` EQUALS `a British citizen from birth under subsection (1A)`
+#ASSERT `section 1 outcome at birth` `the child of visitors` EQUALS `not a British citizen from birth under section 1`
