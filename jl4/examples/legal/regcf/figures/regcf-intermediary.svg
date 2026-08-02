@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2054" height="180" viewBox="0 0 2054 180">
 <rect width="2054" height="180" fill="#ffffff"/>
-<rect data-fnid="3" data-value="3" class="lad-box lad-clickable" x="110.0" y="70.0" width="616.0" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<rect data-fnid="3" data-value="3" class="lad-box lad-clickable" x="110.0" y="70.0" width="616.0" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
 <text data-fnid="3" x="418.0" y="94.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`(a)(3) — conducted through a single complying intermediary` OF arrangement</text>
-<rect data-fnid="5" data-value="5" class="lad-box lad-clickable" x="770.0" y="70.0" width="514.1" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<rect data-fnid="5" data-value="5" class="lad-box lad-clickable" x="770.0" y="70.0" width="514.1" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
 <text data-fnid="5" x="1027.0" y="94.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`the 21-day public availability period has run` OF arrangement</text>
-<rect data-fnid="7" data-value="7" class="lad-box lad-clickable" x="1328.1" y="70.0" width="616.0" height="39.6" rx="7" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<rect data-fnid="7" data-value="7" class="lad-box lad-clickable" x="1328.1" y="70.0" width="616.0" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
 <text data-fnid="7" x="1636.1" y="94.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`the intermediary has discharged its investor-facing duties` OF arrangement</text>
-<polyline class="lad-wire lad-clickable" data-fold="2" points="726.0,89.8 770.0,89.8" fill="none" stroke="#555" stroke-width="1.5"/>
-<polyline class="lad-wire lad-clickable" data-fold="2" points="1284.1,89.8 1328.1,89.8" fill="none" stroke="#555" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="726.0,89.8 770.0,89.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="1284.1,89.8 1328.1,89.8" fill="none" stroke="#777" stroke-width="1.5"/>
 <polyline class="lad-wire" points="70.0,89.8 110.0,89.8" fill="none" stroke="#222" stroke-width="1.5"/>
 <circle cx="70.0" cy="89.8" r="3.5" fill="#222"/>
 <polyline class="lad-wire" points="1944.1,89.8 1984.1,89.8" fill="none" stroke="#222" stroke-width="1.5"/>
