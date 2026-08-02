@@ -1,0 +1,313 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-ITEMDEF] lossy — itemdef_entity_c2
+      `Entity`'s component `purposes` is typed `LIST OF Purpose`, and a collection needs an itemDefinition of its OWN -- isCollection is an attribute of tItemDefinition, not of a typeRef -- which this phase does not mint, so it is emitted as typeRef="Any"
+      lost: the component's declared type; nothing downstream can tell what it holds
+  [D-LITERALEXPR] advisory — decision_article_1_the_definitions_on_which_the_charity_test_depends  (charity-test.l4:67:9-71:88)
+      `Article 1 — the definitions on which the charity test depends` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_article_2_4_constitution  (charity-test.l4:81:9-85:131)
+      `Article 2(4) — constitution` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_article_2_6_purpose  (charity-test.l4:89:9-91:286)
+      `Article 2(6) — purpose` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_article_2_7_governor  (charity-test.l4:95:9-99:161)
+      `Article 2(7) — governor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_a_the_prevention_or_relief_of_poverty  (charity-test.l4:190:9-191:56)
+      `(a) — the prevention or relief of poverty` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_b_the_advancement_of_education  (charity-test.l4:197:9-198:49)
+      `(b) — the advancement of education` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_c_the_advancement_of_religion  (charity-test.l4:204:9-205:48)
+      `(c) — the advancement of religion` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_d_the_advancement_of_health  (charity-test.l4:216:9-219:85)
+      `(d) — the advancement of health` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_e_the_saving_of_lives  (charity-test.l4:225:9-226:40)
+      `(e) — the saving of lives` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_f_the_advancement_of_citizenship_or_community_development  (charity-test.l4:236:9-241:153)
+      `(f) — the advancement of citizenship or community development` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_g_the_advancement_of_the_arts_heritage_culture_or_science  (charity-test.l4:247:9-248:78)
+      `(g) — the advancement of the arts, heritage, culture or science` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_h_the_advancement_of_public_participation_in_sport  (charity-test.l4:270:9-273:68)
+      `(h) — the advancement of public participation in sport` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__2_d_the_recreational_facilities_restriction_is_satisfied  (charity-test.l4:281:9-285:116)
+      `(2)(d) — the recreational-facilities restriction is satisfied` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_i_the_provision_of_recreational_facilities_or_activities  (charity-test.l4:291:9-293:80)
+      `(i) — the provision of recreational facilities or activities` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation  (charity-test.l4:299:9-300:91)
+      `(j) — the advancement of human rights, conflict resolution or reconciliation` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_k_the_promotion_of_religious_or_racial_harmony  (charity-test.l4:306:9-307:65)
+      `(k) — the promotion of religious or racial harmony` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_l_the_promotion_of_equality_and_diversity  (charity-test.l4:313:9-314:60)
+      `(l) — the promotion of equality and diversity` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_m_the_advancement_of_environmental_protection_or_improvement  (charity-test.l4:320:9-321:79)
+      `(m) — the advancement of environmental protection or improvement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_n_the_relief_of_those_in_need  (charity-test.l4:343:9-345:131)
+      `(n) — the relief of those in need` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_o_the_advancement_of_animal_welfare  (charity-test.l4:351:9-352:54)
+      `(o) — the advancement of animal welfare` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_p_any_other_analogous_purpose  (charity-test.l4:376:9-379:105)
+      `(p) — any other analogous purpose` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_purpose_falls_within_paragraph_1  (charity-test.l4:387:9-403:52)
+      `the purpose falls within paragraph (1)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__5_the_purpose_is_excluded_as_political  (charity-test.l4:431:9-432:136)
+      `(5) — the purpose is excluded as political` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — bkm_the_purpose_is_a_charitable_purpose  (charity-test.l4:438:9-439:65)
+      `the purpose is a charitable purpose` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__7_3_b_the_entity_benefits_only_identified_natural_persons  (charity-test.l4:474:9-475:149)
+      `7(3)(b) — the entity benefits only identified natural persons` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__7_2_the_mandatory_considerations_were_had_regard_to  (charity-test.l4:496:9-500:74)
+      `7(2) — the mandatory considerations were had regard to` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__7_2_b_the_section_of_the_public_question_was_reached  (charity-test.l4:509:9-511:105)
+      `7(2)(b) — the section-of-the-public question was reached` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit  (charity-test.l4:517:9-518:124)
+      `7(3)(a) — no charitable purpose was presumed to be for the public benefit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_public_benefit_determination_was_properly_made  (charity-test.l4:538:9-539:91)
+      `the public benefit determination was properly made` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] blocking — decision_the_entity_has_at_least_one_charitable_purpose  (charity-test.l4:549:5-68)
+      `the entity has at least one charitable purpose` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_ii_the_purpose_is_purely_ancillary_or_incidental  (charity-test.l4:569:9-572:65)
+      `(ii) — the purpose is purely ancillary or incidental` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental  (charity-test.l4:578:9-580:78)
+      `the purpose is charitable, or purely ancillary or incidental` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] blocking — decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary  (charity-test.l4:600:9-602:34)
+      `5(1)(a) — all of its purposes are charitable or ancillary` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_the_entity_provides_or_intends_to_provide_public_benefit  (charity-test.l4:622:9-624:48)
+      `the entity provides or intends to provide public benefit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_applicant_s_intention_limb  (charity-test.l4:630:9-632:172)
+      `the applicant's intention limb` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__5_1_b_public_benefit  (charity-test.l4:638:9-640:83)
+      `5(1)(b) — public benefit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted  (charity-test.l4:668:9-674:181)
+      `5(2) — direction or control by a listed person is expressly permitted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__5_2_governorship_by_a_listed_person_is_expressly_permitted  (charity-test.l4:680:9-686:151)
+      `5(2) — governorship by a listed person is expressly permitted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode  (charity-test.l4:692:9-694:79)
+      `5(2) — a listed person is expressly permitted under either mode` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision__5_2_the_government_control_disqualification_applies  (charity-test.l4:703:9-708:90)
+      `5(2) — the government-control disqualification applies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_entity_meets_the_charity_test  (charity-test.l4:717:9-719:76)
+      `the entity meets the charity test` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-FIXTURE] advisory — a poverty-relief purpose  (charity-test.l4:726:1-752:89)
+      `a poverty-relief purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a sickness-prevention purpose  (charity-test.l4:756:1-782:89)
+      `a sickness-prevention purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a spectator-pastime purpose  (charity-test.l4:786:1-812:89)
+      `a spectator-pastime purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a physical-sport purpose  (charity-test.l4:815:1-841:89)
+      `a physical-sport purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a members-only recreation purpose  (charity-test.l4:844:1-870:89)
+      `a members-only recreation purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — an open recreation purpose  (charity-test.l4:873:1-899:89)
+      `an open recreation purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a philosophical-belief purpose  (charity-test.l4:903:1-929:89)
+      `a philosophical-belief purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a party-political purpose  (charity-test.l4:933:1-959:89)
+      `a party-political purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — an ancillary party-political purpose  (charity-test.l4:963:1-989:88)
+      `an ancillary party-political purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — an ancillary fundraising purpose  (charity-test.l4:992:1-1018:88)
+      `an ancillary fundraising purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a purely commercial purpose  (charity-test.l4:1021:1-1047:89)
+      `a purely commercial purpose` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a clean constitution  (charity-test.l4:1051:1-1059:81)
+      `a clean constitution` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a constitution reserving Ministerial direction  (charity-test.l4:1061:1-1069:80)
+      `a constitution reserving Ministerial direction` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a constitution reserving a States Assembly governorship  (charity-test.l4:1071:1-1079:80)
+      `a constitution reserving a States Assembly governorship` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a constitution reserving a foreign-equivalent governorship  (charity-test.l4:1081:1-1089:80)
+      `a constitution reserving a foreign-equivalent governorship` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a constitution admitting a Minister in a private capacity  (charity-test.l4:1093:1-1101:81)
+      `a constitution admitting a Minister in a private capacity` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a sound public benefit finding  (charity-test.l4:1105:1-1114:85)
+      `a sound public benefit finding` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a finding of no public benefit  (charity-test.l4:1116:1-1125:85)
+      `a finding of no public benefit` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a finding of intended but not actual public benefit  (charity-test.l4:1127:1-1136:85)
+      `a finding of intended but not actual public benefit` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a finding that benefit reaches only identified individuals  (charity-test.l4:1138:1-1147:85)
+      `a finding that benefit reaches only identified individuals` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a finding with an unduly restrictive fee  (charity-test.l4:1149:1-1158:85)
+      `a finding with an unduly restrictive fee` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a finding made on a presumption  (charity-test.l4:1160:1-1169:84)
+      `a finding made on a presumption` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a finding that skipped the section-of-the-public question  (charity-test.l4:1171:1-1180:85)
+      `a finding that skipped the section-of-the-public question` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — an entity  (charity-test.l4:1185:1-1198:87)
+      `an entity` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the St Helier poverty trust  (charity-test.l4:1200:1-1202:76)
+      `the St Helier poverty trust` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the poverty trust with a charity shop  (charity-test.l4:1204:1-1207:76)
+      `the poverty trust with a charity shop` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the charity shop with nothing behind it  (charity-test.l4:1209:1-1211:76)
+      `the charity shop with nothing behind it` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the poverty trust with a party-political object  (charity-test.l4:1213:1-1216:76)
+      `the poverty trust with a party-political object` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the poverty trust with incidental campaigning  (charity-test.l4:1218:1-1221:76)
+      `the poverty trust with incidental campaigning` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the grocery company  (charity-test.l4:1223:1-1225:76)
+      `the grocery company` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the entity with no purposes  (charity-test.l4:1227:1-1229:76)
+      `the entity with no purposes` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the entity with no purposes and no benefit  (charity-test.l4:1231:1-1233:76)
+      `the entity with no purposes and no benefit` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the disease-prevention trust  (charity-test.l4:1235:1-1237:76)
+      `the disease-prevention trust` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the pigeon fanciers' association  (charity-test.l4:1239:1-1241:76)
+      `the pigeon fanciers' association` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the island swimming association  (charity-test.l4:1243:1-1245:76)
+      `the island swimming association` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the members-only tennis club  (charity-test.l4:1247:1-1249:76)
+      `the members-only tennis club` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the public recreation ground trust  (charity-test.l4:1251:1-1253:76)
+      `the public recreation ground trust` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the humanist society  (charity-test.l4:1255:1-1257:76)
+      `the humanist society` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the Ministerially directed trust  (charity-test.l4:1259:1-1261:102)
+      `the Ministerially directed trust` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the Ministerially directed trust exempted by Order  (charity-test.l4:1263:1-1265:101)
+      `the Ministerially directed trust exempted by Order` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the States-governed foundation  (charity-test.l4:1267:1-1269:111)
+      `the States-governed foundation` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the Guernsey-governed foundation  (charity-test.l4:1271:1-1273:114)
+      `the Guernsey-governed foundation` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the trust with a Minister in a private capacity  (charity-test.l4:1275:1-1277:113)
+      `the trust with a Minister in a private capacity` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the dormant registered charity  (charity-test.l4:1279:1-1281:97)
+      `the dormant registered charity` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the applicant not yet operating  (charity-test.l4:1283:1-1285:96)
+      `the applicant not yet operating` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the grandchildren's trust  (charity-test.l4:1287:1-1289:104)
+      `the grandchildren's trust` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the school with an unduly restrictive fee  (charity-test.l4:1291:1-1293:86)
+      `the school with an unduly restrictive fee` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the church whose benefit was presumed  (charity-test.l4:1295:1-1297:77)
+      `the church whose benefit was presumed` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — the entity whose determiner skipped 7(2)(b)  (charity-test.l4:1299:1-1301:103)
+      `the entity whose determiner skipped 7(2)(b)` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-INERT] advisory — decision_article_1_the_definitions_on_which_the_charity_test_depends  (charity-test.l4:66:1-71:88)
+      `Article 1 — the definitions on which the charity test depends` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-INERT] advisory — decision_article_2_4_constitution  (charity-test.l4:80:1-85:131)
+      `Article 2(4) — constitution` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-INERT] advisory — decision_article_2_6_purpose  (charity-test.l4:88:1-91:286)
+      `Article 2(6) — purpose` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-INERT] advisory — decision_article_2_7_governor  (charity-test.l4:94:1-99:161)
+      `Article 2(7) — governor` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-PARAM-AS-INPUT] advisory — input_entity
+      the GIVEN parameter `entity` of 17 decisions (`7(3)(b) — the entity benefits only identified natural persons`, `7(2) — the mandatory considerations were had regard to`, `7(2)(b) — the section-of-the-public question was reached`, `7(3)(a) — no charitable purpose was presumed to be for the public benefit`, `the public benefit determination was properly made`, `the entity has at least one charitable purpose`, `(ii) — the purpose is purely ancillary or incidental`, `the purpose is charitable, or purely ancillary or incidental`, `5(1)(a) — all of its purposes are charitable or ancillary`, `the entity provides or intends to provide public benefit`, `the applicant's intention limb`, `5(1)(b) — public benefit`, `5(2) — direction or control by a listed person is expressly permitted`, `5(2) — governorship by a listed person is expressly permitted`, `5(2) — a listed person is expressly permitted under either mode`, `5(2) — the government-control disqualification applies`, `the entity meets the charity test`) became the one shared model input `input_entity`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_purpose
+      the GIVEN parameter `purpose` of 21 decisions (`(a) — the prevention or relief of poverty`, `(b) — the advancement of education`, `(c) — the advancement of religion`, `(d) — the advancement of health`, `(e) — the saving of lives`, `(f) — the advancement of citizenship or community development`, `(g) — the advancement of the arts, heritage, culture or science`, `(h) — the advancement of public participation in sport`, `(2)(d) — the recreational-facilities restriction is satisfied`, `(i) — the provision of recreational facilities or activities`, `(j) — the advancement of human rights, conflict resolution or reconciliation`, `(k) — the promotion of religious or racial harmony`, `(l) — the promotion of equality and diversity`, `(m) — the advancement of environmental protection or improvement`, `(n) — the relief of those in need`, `(o) — the advancement of animal welfare`, `(p) — any other analogous purpose`, `the purpose falls within paragraph (1)`, `(5) — the purpose is excluded as political`, `(ii) — the purpose is purely ancillary or incidental`, `the purpose is charitable, or purely ancillary or incidental`) became the one shared model input `input_purpose`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-BKM] advisory — bkm_the_purpose_is_a_charitable_purpose
+      `the purpose is a charitable purpose` is emitted as a businessKnowledgeModel (tier 2): it is applied to distinct argument expressions by `the entity has at least one charitable purpose`, `the purpose is charitable, or purely ancillary or incidental`. Saturated call sites render as FEEL named-argument invocations with a knowledgeRequirement edge on each caller; 2 module-level free reference(s) of its body (`_5_the_purpose_is_excluded_as_political`, `the_purpose_falls_within_paragraph_1`) are λ-lifted into extra formal parameters, supplied at every call site as `name: name` — a BKM body may read nothing beyond its parameters (measured on both engines, §6.2)
+      lost: the decision-as-variable reading: the callee no longer appears as a 0-ary decision variable, and is reachable only by invocation
+  [D-BKM-CONSUMERS] advisory — definitions
+      1 decision(s) are emitted as businessKnowledgeModels. Both target flavors execute BKMs (KIE 8.44, Camunda 8; §13.3), but two known NON-target consumers cannot: @hbtgmbh/dmn-eval-js has no BKM support and falls through to the next rule on an unresolvable callee (a plausible wrong answer), and Camunda 7 answers null, silently
+      lost: nothing on the target engines; portability to BKM-less consumers, which fail silently rather than loudly
+  [D-FLAVOR-NOSERVICE] advisory — service_article_6_charitable_purposes
+      the decisionService `Article_6_Charitable_purposes` (§ `Article 6 — Charitable purposes`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
+  [D-FLAVOR-NOSERVICE] advisory — service_article_7_public_benefit
+      the decisionService `Article_7_Public_benefit` (§ `Article 7 — Public benefit`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
+  [D-FLAVOR-NOSERVICE] advisory — service_article_5_the_charity_test
+      the decisionService `Article_5_The_charity_test` (§ `Article 5 — The charity test`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
+  [D-SVCEMPTY] advisory — Scenarios
+      the section `Scenarios` has no emitted member decisions: its 49 member decide(s) `a poverty-relief purpose`, `a sickness-prevention purpose`, `a spectator-pastime purpose`, `a physical-sport purpose`, `a members-only recreation purpose`, `an open recreation purpose`, `a philosophical-belief purpose`, `a party-political purpose`, `an ancillary party-political purpose`, `an ancillary fundraising purpose`, `a purely commercial purpose`, `a clean constitution`, `a constitution reserving Ministerial direction`, `a constitution reserving a States Assembly governorship`, `a constitution reserving a foreign-equivalent governorship`, `a constitution admitting a Minister in a private capacity`, `a sound public benefit finding`, `a finding of no public benefit`, `a finding of intended but not actual public benefit`, `a finding that benefit reaches only identified individuals`, `a finding with an unduly restrictive fee`, `a finding made on a presumption`, `a finding that skipped the section-of-the-public question`, `an entity`, `the St Helier poverty trust`, `the poverty trust with a charity shop`, `the charity shop with nothing behind it`, `the poverty trust with a party-political object`, `the poverty trust with incidental campaigning`, `the grocery company`, `the entity with no purposes`, `the entity with no purposes and no benefit`, `the disease-prevention trust`, `the pigeon fanciers' association`, `the island swimming association`, `the members-only tennis club`, `the public recreation ground trust`, `the humanist society`, `the Ministerially directed trust`, `the Ministerially directed trust exempted by Order`, `the States-governed foundation`, `the Guernsey-governed foundation`, `the trust with a Minister in a private capacity`, `the dormant registered charity`, `the applicant not yet operating`, `the grandchildren's trust`, `the school with an unduly restrictive fee`, `the church whose benefit was presumed`, `the entity whose determiner skipped 7(2)(b)` were all dropped at population time (25 as test fixtures (D-FIXTURE, §2.5.6-2); 24 as fixture-side helpers (D-FIXTURE, §2.5.6-2)), so no decisionService is emitted for it
+      lost: nothing an engine needs: the grouping shell had no members left to group; the members' own loss is carried by their D-FIXTURE notes
+  [D-SVCEMPTY] advisory — Article_1_and_Article_2_the_interpretation_provisions_the_test_needs
+      the section `Article 1 and Article 2 — the interpretation provisions the test needs` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 4 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
+      lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not

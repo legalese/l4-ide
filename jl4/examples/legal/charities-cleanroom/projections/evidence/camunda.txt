@@ -1,0 +1,10 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by org.agrona.UnsafeAccess (file:/Users/mengwong/.m2/repository/org/agrona/agrona/1.23.1/agrona-1.23.1.jar)
+WARNING: Please consider reporting this to the maintainers of class org.agrona.UnsafeAccess
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+
+=== charity-test.dmn ===
+PARSE  INVALID: FEEL expression: failed to parse expression 'any OF `the purpose is a charitable purpose`, (entity's purposes)': Expected (binaryComparison | between | instanceOf | in | "and" | "or" | end-of-input):1:5, found "OF `the pu"
+FEEL expression: failed to parse expression '... "(a) all of its purposes are –" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)': Expected (start-of-input | ifOp | forOp | quantifiedOp | disjunction):1:1, found "... \"(a) a"
+
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 0 case(s), 0 parsed, 1 error(s), 0/0 decision(s) evaluated, 0/0 value(s) as expected   <<< FAILED

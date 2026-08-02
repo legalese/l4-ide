@@ -8,6 +8,14 @@ encoded from the primary source in inert house style, with every interpretive ch
 | [`SOURCE-EXTRACT.md`](SOURCE-EXTRACT.md) | verbatim source text with fetch provenance and quote-hygiene statement            |
 | [`charity-test.l4`](charity-test.l4)     | the encoding — 1 472 lines, 45 `@ref` citations, 102 `#ASSERT`s                   |
 | `README.md`                              | this file: article map, ambiguity register, run evidence, integrity declaration   |
+| [`PROJECTIONS.md`](PROJECTIONS.md)       | the DMN/BPMN projections, both engine verdicts, and the five exporter gaps found  |
+| [`charity-test.cases.json`](charity-test.cases.json) | 25 worlds × 40 decisions, every pin L4-evaluated                      |
+| `projections/`                           | the emitted artifacts, the case generator, and the raw engine evidence            |
+
+> **The emitted DMN does not execute on either engine**, and that is the smoke test's product,
+> not a defect in this encoding: two L4 list quantifiers (`any` / `all` over `entity's purposes`)
+> have no FEEL lowering. `PROJECTIONS.md` §4 isolates the cause on both engines and shows that the
+> obvious fix would produce a *silent wrong answer*, which is the more valuable of the two findings.
 
 ---
 

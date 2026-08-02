@@ -1,0 +1,1148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_charities_jersey_law_2014_the_charity_test" name="Charities (Jersey) Law 2014 — the charity test" namespace="https://legalese.com/l4/dmn/charities_jersey_law_2014_the_charity_test" exporter="jl4">
+  <itemDefinition id="itemdef_purpose" name="Purpose">
+    <itemComponent id="itemdef_purpose_c1" name="description">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c2" name="the_prevention_or_relief_of_poverty" label="the prevention or relief of poverty">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c3" name="the_advancement_of_education" label="the advancement of education">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c4" name="the_advancement_of_religion" label="the advancement of religion">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c5" name="the_advancement_of_health" label="the advancement of health">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c6" name="the_prevention_or_relief_of_sickness_disease_or_human_suffering" label="the prevention or relief of sickness, disease or human suffering">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c7" name="the_saving_of_lives" label="the saving of lives">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c8" name="the_advancement_of_citizenship_or_community_development" label="the advancement of citizenship or community development">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c9" name="rural_or_urban_regeneration" label="rural or urban regeneration">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c10" name="the_promotion_of_civic_responsibility_volunteering_the_voluntary_sector_or_the_effectiveness_or_efficiency_of_registered_charities" label="the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c11" name="the_advancement_of_the_arts_heritage_culture_or_science" label="the advancement of the arts, heritage, culture or science">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c12" name="the_advancement_of_public_participation_in_sport" label="the advancement of public participation in sport">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c13" name="sport_that_involves_physical_skill_and_exertion" label="sport that involves physical skill and exertion">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c14" name="the_provision_of_recreational_facilities_or_the_organisation_of_recreational_activities_with_the_object_of_improving_the_conditions_of_life_for_the_persons_for_whom_they_are_primarily_intended" label="the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c15" name="primarily_intended_for_persons_who_have_need_of_them_by_reason_of_their_age_ill_health_disability_financial_hardship_or_other_disadvantage" label="primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c16" name="available_to_members_of_the_public_at_large_or_to_male_or_female_members_of_the_public_at_large" label="available to members of the public at large or to male or female members of the public at large">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c17" name="the_advancement_of_human_rights_conflict_resolution_or_reconciliation" label="the advancement of human rights, conflict resolution or reconciliation">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c18" name="the_promotion_of_religious_or_racial_harmony" label="the promotion of religious or racial harmony">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c19" name="the_promotion_of_equality_and_diversity" label="the promotion of equality and diversity">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c20" name="the_advancement_of_environmental_protection_or_improvement" label="the advancement of environmental protection or improvement">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c21" name="the_relief_of_those_in_need_by_reason_of_age_ill_health_disability_financial_hardship_or_other_disadvantage" label="the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c22" name="the_advancement_of_animal_welfare" label="the advancement of animal welfare">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c23" name="reasonably_regarded_as_analogous_to_any_of_the_purposes_listed_in_sub_paragraphs_a_to_o" label="reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c24" name="the_advancement_of_a_philosophical_belief_whether_or_not_involving_belief_in_a_god" label="the advancement of a philosophical belief (whether or not involving belief in a god)">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c25" name="for_advancing_a_political_party_or_promoting_a_candidate_for_election_to_any_office_whether_in_Jersey_or_elsewhere" label="for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_purpose_c26" name="purely_ancillary_or_incidental_to_any_of_the_entity_s_charitable_purposes" label="purely ancillary or incidental to any of the entity&apos;s charitable purposes">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_constitution" name="Constitution">
+    <itemComponent id="itemdef_constitution_c1" name="description">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c2" name="express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_Minister" label="express permission for the entity&apos;s activities to be directed or otherwise controlled by a Minister">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c3" name="express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_member_of_the_States_Assembly" label="express permission for the entity&apos;s activities to be directed or otherwise controlled by a member of the States Assembly">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c4" name="express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_any_equivalent_of_such_a_person_in_another_jurisdiction" label="express permission for the entity&apos;s activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c5" name="express_permission_for_any_of_the_entity_s_governors_to_be_a_Minister" label="express permission for any of the entity&apos;s governors to be a Minister">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c6" name="express_permission_for_any_of_the_entity_s_governors_to_be_a_member_of_the_States_Assembly" label="express permission for any of the entity&apos;s governors to be a member of the States Assembly">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c7" name="express_permission_for_any_of_the_entity_s_governors_to_be_any_equivalent_of_such_a_person_in_another_jurisdiction" label="express permission for any of the entity&apos;s governors to be any equivalent of such a person in another jurisdiction">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_constitution_c8" name="that_permission_extended_to_such_a_person_acting_in_that_capacity" label="that permission extended to such a person acting in that capacity">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_publicbenefitfinding" name="PublicBenefitFinding">
+    <itemComponent id="itemdef_publicbenefitfinding_c1" name="description">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c2" name="public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_provided_in_giving_effect_to_those_purposes" label="public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c3" name="public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_intended_to_be_provided_in_giving_effect_to_those_purposes" label="public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c4" name="benefit_provided_only_to_one_particular_natural_person_or_to_a_group_of_identified_natural_persons" label="benefit provided only to one particular natural person or to a group of identified natural persons">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c5" name="benefit_provided_to_a_section_of_the_public_only" label="benefit provided to a section of the public only">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c6" name="any_condition_on_obtaining_that_benefit_including_any_charge_or_fee_unduly_restrictive" label="any condition on obtaining that benefit (including any charge or fee) unduly restrictive">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c7" name="regard_had_to_the_comparison_required_by_Article_7_2_a" label="regard had to the comparison required by Article 7(2)(a)">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c8" name="regard_had_to_the_question_required_by_Article_7_2_b" label="regard had to the question required by Article 7(2)(b)">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_publicbenefitfinding_c9" name="a_particular_charitable_purpose_presumed_to_be_for_the_public_benefit" label="a particular charitable purpose presumed to be for the public benefit">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_entity" name="Entity">
+    <itemComponent id="itemdef_entity_c1" name="name">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_entity_c2" name="purposes">
+      <typeRef>Any</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_entity_c3" name="constitution">
+      <typeRef>Constitution</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_entity_c4" name="an_applicant" label="an applicant">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_entity_c5" name="the_public_benefit_finding" label="the public benefit finding">
+      <typeRef>PublicBenefitFinding</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_entity_c6" name="specified_in_an_Order_under_Article_5_3_disapplying_paragraph_2" label="specified in an Order under Article 5(3) disapplying paragraph (2)">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <inputData id="input_purpose" name="purpose">
+    <variable id="input_purpose_var" name="purpose" typeRef="Purpose"/>
+  </inputData>
+  <inputData id="input_entity" name="entity">
+    <variable id="input_entity_var" name="entity" typeRef="Entity"/>
+  </inputData>
+  <decision id="decision_article_1_the_definitions_on_which_the_charity_test_depends" name="Article_1_the_definitions_on_which_the_charity_test_depends" label="Article 1 — the definitions on which the charity test depends">
+    <variable id="decision_article_1_the_definitions_on_which_the_charity_test_depends_var" name="Article_1_the_definitions_on_which_the_charity_test_depends" label="Article 1 — the definitions on which the charity test depends" typeRef="boolean"/>
+    <literalExpression id="decision_article_1_the_definitions_on_which_the_charity_test_depends_literal">
+      <text>true and (true and (true and (true and true)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_article_2_4_constitution" name="Article_2_4_constitution" label="Article 2(4) — constitution">
+    <variable id="decision_article_2_4_constitution_var" name="Article_2_4_constitution" label="Article 2(4) — constitution" typeRef="boolean"/>
+    <literalExpression id="decision_article_2_4_constitution_literal">
+      <text>true and (true and (true and (true and true)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_article_2_6_purpose" name="Article_2_6_purpose" label="Article 2(6) — purpose">
+    <variable id="decision_article_2_6_purpose_var" name="Article_2_6_purpose" label="Article 2(6) — purpose" typeRef="boolean"/>
+    <literalExpression id="decision_article_2_6_purpose_literal">
+      <text>true and (true and true)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_article_2_7_governor" name="Article_2_7_governor" label="Article 2(7) — governor">
+    <variable id="decision_article_2_7_governor_var" name="Article_2_7_governor" label="Article 2(7) — governor" typeRef="boolean"/>
+    <literalExpression id="decision_article_2_7_governor_literal">
+      <text>true and (true and (true and (true and true)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_the_prevention_or_relief_of_poverty" name="a_the_prevention_or_relief_of_poverty" label="(a) — the prevention or relief of poverty">
+    <variable id="decision_a_the_prevention_or_relief_of_poverty_var" name="a_the_prevention_or_relief_of_poverty" label="(a) — the prevention or relief of poverty" typeRef="boolean"/>
+    <informationRequirement id="decision_a_the_prevention_or_relief_of_poverty_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_the_prevention_or_relief_of_poverty_literal">
+      <text>true and purpose.the_prevention_or_relief_of_poverty</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_the_advancement_of_education" name="b_the_advancement_of_education" label="(b) — the advancement of education">
+    <variable id="decision_b_the_advancement_of_education_var" name="b_the_advancement_of_education" label="(b) — the advancement of education" typeRef="boolean"/>
+    <informationRequirement id="decision_b_the_advancement_of_education_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_the_advancement_of_education_literal">
+      <text>true and purpose.the_advancement_of_education</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_c_the_advancement_of_religion" name="c_the_advancement_of_religion" label="(c) — the advancement of religion">
+    <variable id="decision_c_the_advancement_of_religion_var" name="c_the_advancement_of_religion" label="(c) — the advancement of religion" typeRef="boolean"/>
+    <informationRequirement id="decision_c_the_advancement_of_religion_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_c_the_advancement_of_religion_literal">
+      <text>true and purpose.the_advancement_of_religion</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_d_the_advancement_of_health" name="d_the_advancement_of_health" label="(d) — the advancement of health">
+    <variable id="decision_d_the_advancement_of_health_var" name="d_the_advancement_of_health" label="(d) — the advancement of health" typeRef="boolean"/>
+    <informationRequirement id="decision_d_the_advancement_of_health_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_d_the_advancement_of_health_literal">
+      <text>false or (purpose.the_advancement_of_health or (false or purpose.the_prevention_or_relief_of_sickness_disease_or_human_suffering))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_e_the_saving_of_lives" name="e_the_saving_of_lives" label="(e) — the saving of lives">
+    <variable id="decision_e_the_saving_of_lives_var" name="e_the_saving_of_lives" label="(e) — the saving of lives" typeRef="boolean"/>
+    <informationRequirement id="decision_e_the_saving_of_lives_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_e_the_saving_of_lives_literal">
+      <text>true and purpose.the_saving_of_lives</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_f_the_advancement_of_citizenship_or_community_development" name="f_the_advancement_of_citizenship_or_community_development" label="(f) — the advancement of citizenship or community development">
+    <variable id="decision_f_the_advancement_of_citizenship_or_community_development_var" name="f_the_advancement_of_citizenship_or_community_development" label="(f) — the advancement of citizenship or community development" typeRef="boolean"/>
+    <informationRequirement id="decision_f_the_advancement_of_citizenship_or_community_development_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_f_the_advancement_of_citizenship_or_community_development_literal">
+      <text>false or (purpose.the_advancement_of_citizenship_or_community_development or (false or (purpose.rural_or_urban_regeneration or (false or purpose.the_promotion_of_civic_responsibility_volunteering_the_voluntary_sector_or_the_effectiveness_or_efficiency_of_registered_charities))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science" name="g_the_advancement_of_the_arts_heritage_culture_or_science" label="(g) — the advancement of the arts, heritage, culture or science">
+    <variable id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science_var" name="g_the_advancement_of_the_arts_heritage_culture_or_science" label="(g) — the advancement of the arts, heritage, culture or science" typeRef="boolean"/>
+    <informationRequirement id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science_literal">
+      <text>true and purpose.the_advancement_of_the_arts_heritage_culture_or_science</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_h_the_advancement_of_public_participation_in_sport" name="h_the_advancement_of_public_participation_in_sport" label="(h) — the advancement of public participation in sport">
+    <variable id="decision_h_the_advancement_of_public_participation_in_sport_var" name="h_the_advancement_of_public_participation_in_sport" label="(h) — the advancement of public participation in sport" typeRef="boolean"/>
+    <informationRequirement id="decision_h_the_advancement_of_public_participation_in_sport_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_h_the_advancement_of_public_participation_in_sport_literal">
+      <text>true and (purpose.the_advancement_of_public_participation_in_sport and (true and purpose.sport_that_involves_physical_skill_and_exertion))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__2_d_the_recreational_facilities_restriction_is_satisfied" name="_2_d_the_recreational_facilities_restriction_is_satisfied" label="(2)(d) — the recreational-facilities restriction is satisfied">
+    <variable id="decision__2_d_the_recreational_facilities_restriction_is_satisfied_var" name="_2_d_the_recreational_facilities_restriction_is_satisfied" label="(2)(d) — the recreational-facilities restriction is satisfied" typeRef="boolean"/>
+    <informationRequirement id="decision__2_d_the_recreational_facilities_restriction_is_satisfied_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision__2_d_the_recreational_facilities_restriction_is_satisfied_literal">
+      <text>false or (false or (purpose.primarily_intended_for_persons_who_have_need_of_them_by_reason_of_their_age_ill_health_disability_financial_hardship_or_other_disadvantage or (false or purpose.available_to_members_of_the_public_at_large_or_to_male_or_female_members_of_the_public_at_large)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_i_the_provision_of_recreational_facilities_or_activities" name="i_the_provision_of_recreational_facilities_or_activities" label="(i) — the provision of recreational facilities or activities">
+    <variable id="decision_i_the_provision_of_recreational_facilities_or_activities_var" name="i_the_provision_of_recreational_facilities_or_activities" label="(i) — the provision of recreational facilities or activities" typeRef="boolean"/>
+    <informationRequirement id="decision_i_the_provision_of_recreational_facilities_or_activities_ir1">
+      <requiredDecision href="#decision__2_d_the_recreational_facilities_restriction_is_satisfied"/>
+    </informationRequirement>
+    <informationRequirement id="decision_i_the_provision_of_recreational_facilities_or_activities_ir2">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_i_the_provision_of_recreational_facilities_or_activities_literal">
+      <text>true and (purpose.the_provision_of_recreational_facilities_or_the_organisation_of_recreational_activities_with_the_object_of_improving_the_conditions_of_life_for_the_persons_for_whom_they_are_primarily_intended and _2_d_the_recreational_facilities_restriction_is_satisfied)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation" name="j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation" label="(j) — the advancement of human rights, conflict resolution or reconciliation">
+    <variable id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation_var" name="j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation" label="(j) — the advancement of human rights, conflict resolution or reconciliation" typeRef="boolean"/>
+    <informationRequirement id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation_literal">
+      <text>true and purpose.the_advancement_of_human_rights_conflict_resolution_or_reconciliation</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_k_the_promotion_of_religious_or_racial_harmony" name="k_the_promotion_of_religious_or_racial_harmony" label="(k) — the promotion of religious or racial harmony">
+    <variable id="decision_k_the_promotion_of_religious_or_racial_harmony_var" name="k_the_promotion_of_religious_or_racial_harmony" label="(k) — the promotion of religious or racial harmony" typeRef="boolean"/>
+    <informationRequirement id="decision_k_the_promotion_of_religious_or_racial_harmony_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_k_the_promotion_of_religious_or_racial_harmony_literal">
+      <text>true and purpose.the_promotion_of_religious_or_racial_harmony</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_l_the_promotion_of_equality_and_diversity" name="l_the_promotion_of_equality_and_diversity" label="(l) — the promotion of equality and diversity">
+    <variable id="decision_l_the_promotion_of_equality_and_diversity_var" name="l_the_promotion_of_equality_and_diversity" label="(l) — the promotion of equality and diversity" typeRef="boolean"/>
+    <informationRequirement id="decision_l_the_promotion_of_equality_and_diversity_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_l_the_promotion_of_equality_and_diversity_literal">
+      <text>true and purpose.the_promotion_of_equality_and_diversity</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_m_the_advancement_of_environmental_protection_or_improvement" name="m_the_advancement_of_environmental_protection_or_improvement" label="(m) — the advancement of environmental protection or improvement">
+    <variable id="decision_m_the_advancement_of_environmental_protection_or_improvement_var" name="m_the_advancement_of_environmental_protection_or_improvement" label="(m) — the advancement of environmental protection or improvement" typeRef="boolean"/>
+    <informationRequirement id="decision_m_the_advancement_of_environmental_protection_or_improvement_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_m_the_advancement_of_environmental_protection_or_improvement_literal">
+      <text>true and purpose.the_advancement_of_environmental_protection_or_improvement</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_n_the_relief_of_those_in_need" name="n_the_relief_of_those_in_need" label="(n) — the relief of those in need">
+    <variable id="decision_n_the_relief_of_those_in_need_var" name="n_the_relief_of_those_in_need" label="(n) — the relief of those in need" typeRef="boolean"/>
+    <informationRequirement id="decision_n_the_relief_of_those_in_need_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_n_the_relief_of_those_in_need_literal">
+      <text>true and (true and purpose.the_relief_of_those_in_need_by_reason_of_age_ill_health_disability_financial_hardship_or_other_disadvantage)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_o_the_advancement_of_animal_welfare" name="o_the_advancement_of_animal_welfare" label="(o) — the advancement of animal welfare">
+    <variable id="decision_o_the_advancement_of_animal_welfare_var" name="o_the_advancement_of_animal_welfare" label="(o) — the advancement of animal welfare" typeRef="boolean"/>
+    <informationRequirement id="decision_o_the_advancement_of_animal_welfare_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_o_the_advancement_of_animal_welfare_literal">
+      <text>true and purpose.the_advancement_of_animal_welfare</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_p_any_other_analogous_purpose" name="p_any_other_analogous_purpose" label="(p) — any other analogous purpose">
+    <variable id="decision_p_any_other_analogous_purpose_var" name="p_any_other_analogous_purpose" label="(p) — any other analogous purpose" typeRef="boolean"/>
+    <informationRequirement id="decision_p_any_other_analogous_purpose_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_p_any_other_analogous_purpose_literal">
+      <text>false or (purpose.reasonably_regarded_as_analogous_to_any_of_the_purposes_listed_in_sub_paragraphs_a_to_o or (false or purpose.the_advancement_of_a_philosophical_belief_whether_or_not_involving_belief_in_a_god))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_purpose_falls_within_paragraph_1" name="the_purpose_falls_within_paragraph_1" label="the purpose falls within paragraph (1)">
+    <variable id="decision_the_purpose_falls_within_paragraph_1_var" name="the_purpose_falls_within_paragraph_1" label="the purpose falls within paragraph (1)" typeRef="boolean"/>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir1">
+      <requiredDecision href="#decision_a_the_prevention_or_relief_of_poverty"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir2">
+      <requiredDecision href="#decision_b_the_advancement_of_education"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir3">
+      <requiredDecision href="#decision_c_the_advancement_of_religion"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir4">
+      <requiredDecision href="#decision_d_the_advancement_of_health"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir5">
+      <requiredDecision href="#decision_e_the_saving_of_lives"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir6">
+      <requiredDecision href="#decision_f_the_advancement_of_citizenship_or_community_development"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir7">
+      <requiredDecision href="#decision_g_the_advancement_of_the_arts_heritage_culture_or_science"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir8">
+      <requiredDecision href="#decision_h_the_advancement_of_public_participation_in_sport"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir9">
+      <requiredDecision href="#decision_i_the_provision_of_recreational_facilities_or_activities"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir10">
+      <requiredDecision href="#decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir11">
+      <requiredDecision href="#decision_k_the_promotion_of_religious_or_racial_harmony"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir12">
+      <requiredDecision href="#decision_l_the_promotion_of_equality_and_diversity"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir13">
+      <requiredDecision href="#decision_m_the_advancement_of_environmental_protection_or_improvement"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir14">
+      <requiredDecision href="#decision_n_the_relief_of_those_in_need"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir15">
+      <requiredDecision href="#decision_o_the_advancement_of_animal_welfare"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir16">
+      <requiredDecision href="#decision_p_any_other_analogous_purpose"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_falls_within_paragraph_1_ir17">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_purpose_falls_within_paragraph_1_literal">
+      <text>false or (a_the_prevention_or_relief_of_poverty or (b_the_advancement_of_education or (c_the_advancement_of_religion or (d_the_advancement_of_health or (e_the_saving_of_lives or (f_the_advancement_of_citizenship_or_community_development or (g_the_advancement_of_the_arts_heritage_culture_or_science or (h_the_advancement_of_public_participation_in_sport or (i_the_provision_of_recreational_facilities_or_activities or (j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation or (k_the_promotion_of_religious_or_racial_harmony or (l_the_promotion_of_equality_and_diversity or (m_the_advancement_of_environmental_protection_or_improvement or (n_the_relief_of_those_in_need or (o_the_advancement_of_animal_welfare or p_any_other_analogous_purpose)))))))))))))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_the_purpose_is_excluded_as_political" name="_5_the_purpose_is_excluded_as_political" label="(5) — the purpose is excluded as political">
+    <variable id="decision__5_the_purpose_is_excluded_as_political_var" name="_5_the_purpose_is_excluded_as_political" label="(5) — the purpose is excluded as political" typeRef="boolean"/>
+    <informationRequirement id="decision__5_the_purpose_is_excluded_as_political_ir1">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_the_purpose_is_excluded_as_political_literal">
+      <text>true and purpose.for_advancing_a_political_party_or_promoting_a_candidate_for_election_to_any_office_whether_in_Jersey_or_elsewhere</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__7_3_b_the_entity_benefits_only_identified_natural_persons" name="_7_3_b_the_entity_benefits_only_identified_natural_persons" label="7(3)(b) — the entity benefits only identified natural persons">
+    <variable id="decision__7_3_b_the_entity_benefits_only_identified_natural_persons_var" name="_7_3_b_the_entity_benefits_only_identified_natural_persons" label="7(3)(b) — the entity benefits only identified natural persons" typeRef="boolean"/>
+    <informationRequirement id="decision__7_3_b_the_entity_benefits_only_identified_natural_persons_ir1">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__7_3_b_the_entity_benefits_only_identified_natural_persons_literal">
+      <text>true and entity.the_public_benefit_finding.benefit_provided_only_to_one_particular_natural_person_or_to_a_group_of_identified_natural_persons</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__7_2_the_mandatory_considerations_were_had_regard_to" name="_7_2_the_mandatory_considerations_were_had_regard_to" label="7(2) — the mandatory considerations were had regard to">
+    <variable id="decision__7_2_the_mandatory_considerations_were_had_regard_to_var" name="_7_2_the_mandatory_considerations_were_had_regard_to" label="7(2) — the mandatory considerations were had regard to" typeRef="boolean"/>
+    <informationRequirement id="decision__7_2_the_mandatory_considerations_were_had_regard_to_ir1">
+      <requiredDecision href="#decision__7_2_b_the_section_of_the_public_question_was_reached"/>
+    </informationRequirement>
+    <informationRequirement id="decision__7_2_the_mandatory_considerations_were_had_regard_to_ir2">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__7_2_the_mandatory_considerations_were_had_regard_to_literal">
+      <text>true and (true and (entity.the_public_benefit_finding.regard_had_to_the_comparison_required_by_Article_7_2_a and (true and _7_2_b_the_section_of_the_public_question_was_reached)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__7_2_b_the_section_of_the_public_question_was_reached" name="_7_2_b_the_section_of_the_public_question_was_reached" label="7(2)(b) — the section-of-the-public question was reached">
+    <variable id="decision__7_2_b_the_section_of_the_public_question_was_reached_var" name="_7_2_b_the_section_of_the_public_question_was_reached" label="7(2)(b) — the section-of-the-public question was reached" typeRef="boolean"/>
+    <informationRequirement id="decision__7_2_b_the_section_of_the_public_question_was_reached_ir1">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__7_2_b_the_section_of_the_public_question_was_reached_literal">
+      <text>false or (not(entity.the_public_benefit_finding.benefit_provided_to_a_section_of_the_public_only) or entity.the_public_benefit_finding.regard_had_to_the_question_required_by_Article_7_2_b)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit" name="_7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit" label="7(3)(a) — no charitable purpose was presumed to be for the public benefit">
+    <variable id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit_var" name="_7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit" label="7(3)(a) — no charitable purpose was presumed to be for the public benefit" typeRef="boolean"/>
+    <informationRequirement id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit_ir1">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit_literal">
+      <text>true and not(entity.the_public_benefit_finding.a_particular_charitable_purpose_presumed_to_be_for_the_public_benefit)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_public_benefit_determination_was_properly_made" name="the_public_benefit_determination_was_properly_made" label="the public benefit determination was properly made">
+    <variable id="decision_the_public_benefit_determination_was_properly_made_var" name="the_public_benefit_determination_was_properly_made" label="the public benefit determination was properly made" typeRef="boolean"/>
+    <informationRequirement id="decision_the_public_benefit_determination_was_properly_made_ir1">
+      <requiredDecision href="#decision__7_2_the_mandatory_considerations_were_had_regard_to"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_public_benefit_determination_was_properly_made_ir2">
+      <requiredDecision href="#decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_public_benefit_determination_was_properly_made_ir3">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_public_benefit_determination_was_properly_made_literal">
+      <text>_7_2_the_mandatory_considerations_were_had_regard_to and _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_entity_has_at_least_one_charitable_purpose" name="the_entity_has_at_least_one_charitable_purpose" label="the entity has at least one charitable purpose">
+    <variable id="decision_the_entity_has_at_least_one_charitable_purpose_var" name="the_entity_has_at_least_one_charitable_purpose" label="the entity has at least one charitable purpose" typeRef="boolean"/>
+    <informationRequirement id="decision_the_entity_has_at_least_one_charitable_purpose_ir1">
+      <requiredDecision href="#decision__5_the_purpose_is_excluded_as_political"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_entity_has_at_least_one_charitable_purpose_ir2">
+      <requiredDecision href="#decision_the_purpose_falls_within_paragraph_1"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_entity_has_at_least_one_charitable_purpose_ir3">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <knowledgeRequirement id="decision_the_entity_has_at_least_one_charitable_purpose_kr1">
+      <requiredKnowledge href="#bkm_the_purpose_is_a_charitable_purpose"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_the_entity_has_at_least_one_charitable_purpose_literal">
+      <text>any OF `the purpose is a charitable purpose`, (entity's purposes)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_ii_the_purpose_is_purely_ancillary_or_incidental" name="ii_the_purpose_is_purely_ancillary_or_incidental" label="(ii) — the purpose is purely ancillary or incidental">
+    <variable id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_var" name="ii_the_purpose_is_purely_ancillary_or_incidental" label="(ii) — the purpose is purely ancillary or incidental" typeRef="boolean"/>
+    <informationRequirement id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir1">
+      <requiredDecision href="#decision__5_the_purpose_is_excluded_as_political"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir2">
+      <requiredDecision href="#decision_the_entity_has_at_least_one_charitable_purpose"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir3">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir4">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <literalExpression id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_literal">
+      <text>true and (purpose.purely_ancillary_or_incidental_to_any_of_the_entity_s_charitable_purposes and (the_entity_has_at_least_one_charitable_purpose and not(_5_the_purpose_is_excluded_as_political)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental" name="the_purpose_is_charitable_or_purely_ancillary_or_incidental" label="the purpose is charitable, or purely ancillary or incidental">
+    <variable id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_var" name="the_purpose_is_charitable_or_purely_ancillary_or_incidental" label="the purpose is charitable, or purely ancillary or incidental" typeRef="boolean"/>
+    <informationRequirement id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir1">
+      <requiredDecision href="#decision__5_the_purpose_is_excluded_as_political"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir2">
+      <requiredDecision href="#decision_ii_the_purpose_is_purely_ancillary_or_incidental"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir3">
+      <requiredDecision href="#decision_the_purpose_falls_within_paragraph_1"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir4">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir5">
+      <requiredInput href="#input_purpose"/>
+    </informationRequirement>
+    <knowledgeRequirement id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_kr1">
+      <requiredKnowledge href="#bkm_the_purpose_is_a_charitable_purpose"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_literal">
+      <text>false or (the_purpose_is_a_charitable_purpose(purpose: purpose, _5_the_purpose_is_excluded_as_political: _5_the_purpose_is_excluded_as_political, the_purpose_falls_within_paragraph_1: the_purpose_falls_within_paragraph_1) or ii_the_purpose_is_purely_ancillary_or_incidental)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary" name="_5_1_a_all_of_its_purposes_are_charitable_or_ancillary" label="5(1)(a) — all of its purposes are charitable or ancillary">
+    <variable id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_var" name="_5_1_a_all_of_its_purposes_are_charitable_or_ancillary" label="5(1)(a) — all of its purposes are charitable or ancillary" typeRef="boolean"/>
+    <informationRequirement id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_ir1">
+      <requiredDecision href="#decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental"/>
+    </informationRequirement>
+    <informationRequirement id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_ir2">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_literal">
+      <text>... "(a) all of its purposes are –" AND all OF (GIVEN purpose IS purpose254 YIELD `the purpose is charitable, or purely ancillary or incidental` OF entity, purpose), (entity's purposes)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_entity_provides_or_intends_to_provide_public_benefit" name="the_entity_provides_or_intends_to_provide_public_benefit" label="the entity provides or intends to provide public benefit">
+    <variable id="decision_the_entity_provides_or_intends_to_provide_public_benefit_var" name="the_entity_provides_or_intends_to_provide_public_benefit" label="the entity provides or intends to provide public benefit" typeRef="boolean"/>
+    <informationRequirement id="decision_the_entity_provides_or_intends_to_provide_public_benefit_ir1">
+      <requiredDecision href="#decision_the_applicant_s_intention_limb"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_entity_provides_or_intends_to_provide_public_benefit_ir2">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_entity_provides_or_intends_to_provide_public_benefit_literal">
+      <text>false or (entity.the_public_benefit_finding.public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_provided_in_giving_effect_to_those_purposes or the_applicant_s_intention_limb)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_applicant_s_intention_limb" name="the_applicant_s_intention_limb" label="the applicant&apos;s intention limb">
+    <variable id="decision_the_applicant_s_intention_limb_var" name="the_applicant_s_intention_limb" label="the applicant&apos;s intention limb" typeRef="boolean"/>
+    <informationRequirement id="decision_the_applicant_s_intention_limb_ir1">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_applicant_s_intention_limb_literal">
+      <text>true and (entity.an_applicant and entity.the_public_benefit_finding.public_benefit_in_Jersey_or_elsewhere_to_a_reasonable_degree_intended_to_be_provided_in_giving_effect_to_those_purposes)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_1_b_public_benefit" name="_5_1_b_public_benefit" label="5(1)(b) — public benefit">
+    <variable id="decision__5_1_b_public_benefit_var" name="_5_1_b_public_benefit" label="5(1)(b) — public benefit" typeRef="boolean"/>
+    <informationRequirement id="decision__5_1_b_public_benefit_ir1">
+      <requiredDecision href="#decision__7_3_b_the_entity_benefits_only_identified_natural_persons"/>
+    </informationRequirement>
+    <informationRequirement id="decision__5_1_b_public_benefit_ir2">
+      <requiredDecision href="#decision_the_entity_provides_or_intends_to_provide_public_benefit"/>
+    </informationRequirement>
+    <informationRequirement id="decision__5_1_b_public_benefit_ir3">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_1_b_public_benefit_literal">
+      <text>true and (the_entity_provides_or_intends_to_provide_public_benefit and not(_7_3_b_the_entity_benefits_only_identified_natural_persons))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted" name="_5_2_direction_or_control_by_a_listed_person_is_expressly_permitted" label="5(2) — direction or control by a listed person is expressly permitted">
+    <variable id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_var" name="_5_2_direction_or_control_by_a_listed_person_is_expressly_permitted" label="5(2) — direction or control by a listed person is expressly permitted" typeRef="boolean"/>
+    <informationRequirement id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_ir1">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_literal">
+      <text>false or (false or (entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_Minister or (false or (entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_a_member_of_the_States_Assembly or (false or entity.constitution.express_permission_for_the_entity_s_activities_to_be_directed_or_otherwise_controlled_by_any_equivalent_of_such_a_person_in_another_jurisdiction)))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted" name="_5_2_governorship_by_a_listed_person_is_expressly_permitted" label="5(2) — governorship by a listed person is expressly permitted">
+    <variable id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_var" name="_5_2_governorship_by_a_listed_person_is_expressly_permitted" label="5(2) — governorship by a listed person is expressly permitted" typeRef="boolean"/>
+    <informationRequirement id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_ir1">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_literal">
+      <text>false or (false or (entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_a_Minister or (false or (entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_a_member_of_the_States_Assembly or (false or entity.constitution.express_permission_for_any_of_the_entity_s_governors_to_be_any_equivalent_of_such_a_person_in_another_jurisdiction)))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode" name="_5_2_a_listed_person_is_expressly_permitted_under_either_mode" label="5(2) — a listed person is expressly permitted under either mode">
+    <variable id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_var" name="_5_2_a_listed_person_is_expressly_permitted_under_either_mode" label="5(2) — a listed person is expressly permitted under either mode" typeRef="boolean"/>
+    <informationRequirement id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir1">
+      <requiredDecision href="#decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted"/>
+    </informationRequirement>
+    <informationRequirement id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir2">
+      <requiredDecision href="#decision__5_2_governorship_by_a_listed_person_is_expressly_permitted"/>
+    </informationRequirement>
+    <informationRequirement id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir3">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_literal">
+      <text>false or (_5_2_direction_or_control_by_a_listed_person_is_expressly_permitted or _5_2_governorship_by_a_listed_person_is_expressly_permitted)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision__5_2_the_government_control_disqualification_applies" name="_5_2_the_government_control_disqualification_applies" label="5(2) — the government-control disqualification applies">
+    <variable id="decision__5_2_the_government_control_disqualification_applies_var" name="_5_2_the_government_control_disqualification_applies" label="5(2) — the government-control disqualification applies" typeRef="boolean"/>
+    <informationRequirement id="decision__5_2_the_government_control_disqualification_applies_ir1">
+      <requiredDecision href="#decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode"/>
+    </informationRequirement>
+    <informationRequirement id="decision__5_2_the_government_control_disqualification_applies_ir2">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision__5_2_the_government_control_disqualification_applies_literal">
+      <text>true and (_5_2_a_listed_person_is_expressly_permitted_under_either_mode and (true and (entity.constitution.that_permission_extended_to_such_a_person_acting_in_that_capacity and (true and not(entity.specified_in_an_Order_under_Article_5_3_disapplying_paragraph_2)))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_entity_meets_the_charity_test" name="the_entity_meets_the_charity_test" label="the entity meets the charity test">
+    <variable id="decision_the_entity_meets_the_charity_test_var" name="the_entity_meets_the_charity_test" label="the entity meets the charity test" typeRef="boolean"/>
+    <informationRequirement id="decision_the_entity_meets_the_charity_test_ir1">
+      <requiredDecision href="#decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_entity_meets_the_charity_test_ir2">
+      <requiredDecision href="#decision__5_1_b_public_benefit"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_entity_meets_the_charity_test_ir3">
+      <requiredDecision href="#decision__5_2_the_government_control_disqualification_applies"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_entity_meets_the_charity_test_ir4">
+      <requiredInput href="#input_entity"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_entity_meets_the_charity_test_literal">
+      <text>_5_1_a_all_of_its_purposes_are_charitable_or_ancillary and (_5_1_b_public_benefit and not(_5_2_the_government_control_disqualification_applies))</text>
+    </literalExpression>
+  </decision>
+  <businessKnowledgeModel id="bkm_the_purpose_is_a_charitable_purpose" name="the_purpose_is_a_charitable_purpose" label="the purpose is a charitable purpose">
+    <variable id="bkm_the_purpose_is_a_charitable_purpose_var" name="the_purpose_is_a_charitable_purpose" label="the purpose is a charitable purpose" typeRef="boolean"/>
+    <encapsulatedLogic id="bkm_the_purpose_is_a_charitable_purpose_logic">
+      <formalParameter id="bkm_the_purpose_is_a_charitable_purpose_p1" name="purpose" typeRef="Purpose"/>
+      <formalParameter id="bkm_the_purpose_is_a_charitable_purpose_p2" name="_5_the_purpose_is_excluded_as_political" typeRef="boolean"/>
+      <formalParameter id="bkm_the_purpose_is_a_charitable_purpose_p3" name="the_purpose_falls_within_paragraph_1" typeRef="boolean"/>
+      <literalExpression id="bkm_the_purpose_is_a_charitable_purpose_literal">
+        <text>the_purpose_falls_within_paragraph_1 and not(_5_the_purpose_is_excluded_as_political)</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decisionService id="service_article_6_charitable_purposes" name="Article_6_Charitable_purposes" label="Article 6 — Charitable purposes">
+    <variable id="service_article_6_charitable_purposes_var" name="Article_6_Charitable_purposes" label="Article 6 — Charitable purposes" typeRef="Any"/>
+    <outputDecision href="#decision_the_purpose_falls_within_paragraph_1"/>
+    <outputDecision href="#decision__5_the_purpose_is_excluded_as_political"/>
+    <encapsulatedDecision href="#decision_a_the_prevention_or_relief_of_poverty"/>
+    <encapsulatedDecision href="#decision_b_the_advancement_of_education"/>
+    <encapsulatedDecision href="#decision_c_the_advancement_of_religion"/>
+    <encapsulatedDecision href="#decision_d_the_advancement_of_health"/>
+    <encapsulatedDecision href="#decision_e_the_saving_of_lives"/>
+    <encapsulatedDecision href="#decision_f_the_advancement_of_citizenship_or_community_development"/>
+    <encapsulatedDecision href="#decision_g_the_advancement_of_the_arts_heritage_culture_or_science"/>
+    <encapsulatedDecision href="#decision_h_the_advancement_of_public_participation_in_sport"/>
+    <encapsulatedDecision href="#decision__2_d_the_recreational_facilities_restriction_is_satisfied"/>
+    <encapsulatedDecision href="#decision_i_the_provision_of_recreational_facilities_or_activities"/>
+    <encapsulatedDecision href="#decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation"/>
+    <encapsulatedDecision href="#decision_k_the_promotion_of_religious_or_racial_harmony"/>
+    <encapsulatedDecision href="#decision_l_the_promotion_of_equality_and_diversity"/>
+    <encapsulatedDecision href="#decision_m_the_advancement_of_environmental_protection_or_improvement"/>
+    <encapsulatedDecision href="#decision_n_the_relief_of_those_in_need"/>
+    <encapsulatedDecision href="#decision_o_the_advancement_of_animal_welfare"/>
+    <encapsulatedDecision href="#decision_p_any_other_analogous_purpose"/>
+    <inputData href="#input_purpose"/>
+  </decisionService>
+  <decisionService id="service_article_7_public_benefit" name="Article_7_Public_benefit" label="Article 7 — Public benefit">
+    <variable id="service_article_7_public_benefit_var" name="Article_7_Public_benefit" label="Article 7 — Public benefit" typeRef="Any"/>
+    <outputDecision href="#decision__7_3_b_the_entity_benefits_only_identified_natural_persons"/>
+    <outputDecision href="#decision_the_public_benefit_determination_was_properly_made"/>
+    <encapsulatedDecision href="#decision__7_2_the_mandatory_considerations_were_had_regard_to"/>
+    <encapsulatedDecision href="#decision__7_2_b_the_section_of_the_public_question_was_reached"/>
+    <encapsulatedDecision href="#decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit"/>
+    <inputData href="#input_entity"/>
+  </decisionService>
+  <decisionService id="service_article_5_the_charity_test" name="Article_5_The_charity_test" label="Article 5 — The charity test">
+    <variable id="service_article_5_the_charity_test_var" name="Article_5_The_charity_test" label="Article 5 — The charity test" typeRef="boolean"/>
+    <outputDecision href="#decision_the_entity_meets_the_charity_test"/>
+    <encapsulatedDecision href="#decision_the_entity_has_at_least_one_charitable_purpose"/>
+    <encapsulatedDecision href="#decision_ii_the_purpose_is_purely_ancillary_or_incidental"/>
+    <encapsulatedDecision href="#decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental"/>
+    <encapsulatedDecision href="#decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary"/>
+    <encapsulatedDecision href="#decision_the_entity_provides_or_intends_to_provide_public_benefit"/>
+    <encapsulatedDecision href="#decision_the_applicant_s_intention_limb"/>
+    <encapsulatedDecision href="#decision__5_1_b_public_benefit"/>
+    <encapsulatedDecision href="#decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted"/>
+    <encapsulatedDecision href="#decision__5_2_governorship_by_a_listed_person_is_expressly_permitted"/>
+    <encapsulatedDecision href="#decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode"/>
+    <encapsulatedDecision href="#decision__5_2_the_government_control_disqualification_applies"/>
+    <inputDecision href="#decision__5_the_purpose_is_excluded_as_political"/>
+    <inputDecision href="#decision_the_purpose_falls_within_paragraph_1"/>
+    <inputDecision href="#decision__7_3_b_the_entity_benefits_only_identified_natural_persons"/>
+    <inputData href="#input_entity"/>
+    <inputData href="#input_purpose"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_charities_jersey_law_2014_the_charity_test_diagram" name="Charities (Jersey) Law 2014 — the charity test">
+      <dmndi:DMNShape id="input_purpose_shape" dmnElementRef="input_purpose">
+        <dc:Bounds x="60" y="1500" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_entity_shape" dmnElementRef="input_entity">
+        <dc:Bounds x="280" y="1500" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_article_1_the_definitions_on_which_the_charity_test_depends_shape" dmnElementRef="decision_article_1_the_definitions_on_which_the_charity_test_depends">
+        <dc:Bounds x="60" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_article_2_4_constitution_shape" dmnElementRef="decision_article_2_4_constitution">
+        <dc:Bounds x="280" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_article_2_6_purpose_shape" dmnElementRef="decision_article_2_6_purpose">
+        <dc:Bounds x="500" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_article_2_7_governor_shape" dmnElementRef="decision_article_2_7_governor">
+        <dc:Bounds x="720" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_the_prevention_or_relief_of_poverty_shape" dmnElementRef="decision_a_the_prevention_or_relief_of_poverty">
+        <dc:Bounds x="940" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_the_advancement_of_education_shape" dmnElementRef="decision_b_the_advancement_of_education">
+        <dc:Bounds x="1160" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_c_the_advancement_of_religion_shape" dmnElementRef="decision_c_the_advancement_of_religion">
+        <dc:Bounds x="1380" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_d_the_advancement_of_health_shape" dmnElementRef="decision_d_the_advancement_of_health">
+        <dc:Bounds x="1600" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_e_the_saving_of_lives_shape" dmnElementRef="decision_e_the_saving_of_lives">
+        <dc:Bounds x="1820" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_f_the_advancement_of_citizenship_or_community_development_shape" dmnElementRef="decision_f_the_advancement_of_citizenship_or_community_development">
+        <dc:Bounds x="2040" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science_shape" dmnElementRef="decision_g_the_advancement_of_the_arts_heritage_culture_or_science">
+        <dc:Bounds x="2260" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_h_the_advancement_of_public_participation_in_sport_shape" dmnElementRef="decision_h_the_advancement_of_public_participation_in_sport">
+        <dc:Bounds x="2480" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__2_d_the_recreational_facilities_restriction_is_satisfied_shape" dmnElementRef="decision__2_d_the_recreational_facilities_restriction_is_satisfied">
+        <dc:Bounds x="2700" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation_shape" dmnElementRef="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation">
+        <dc:Bounds x="2920" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_k_the_promotion_of_religious_or_racial_harmony_shape" dmnElementRef="decision_k_the_promotion_of_religious_or_racial_harmony">
+        <dc:Bounds x="3140" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_l_the_promotion_of_equality_and_diversity_shape" dmnElementRef="decision_l_the_promotion_of_equality_and_diversity">
+        <dc:Bounds x="3360" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_m_the_advancement_of_environmental_protection_or_improvement_shape" dmnElementRef="decision_m_the_advancement_of_environmental_protection_or_improvement">
+        <dc:Bounds x="3580" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_n_the_relief_of_those_in_need_shape" dmnElementRef="decision_n_the_relief_of_those_in_need">
+        <dc:Bounds x="3800" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_o_the_advancement_of_animal_welfare_shape" dmnElementRef="decision_o_the_advancement_of_animal_welfare">
+        <dc:Bounds x="4020" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_p_any_other_analogous_purpose_shape" dmnElementRef="decision_p_any_other_analogous_purpose">
+        <dc:Bounds x="4240" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_the_purpose_is_excluded_as_political_shape" dmnElementRef="decision__5_the_purpose_is_excluded_as_political">
+        <dc:Bounds x="4460" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__7_3_b_the_entity_benefits_only_identified_natural_persons_shape" dmnElementRef="decision__7_3_b_the_entity_benefits_only_identified_natural_persons">
+        <dc:Bounds x="4680" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__7_2_b_the_section_of_the_public_question_was_reached_shape" dmnElementRef="decision__7_2_b_the_section_of_the_public_question_was_reached">
+        <dc:Bounds x="4900" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit_shape" dmnElementRef="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit">
+        <dc:Bounds x="5120" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_applicant_s_intention_limb_shape" dmnElementRef="decision_the_applicant_s_intention_limb">
+        <dc:Bounds x="5340" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_shape" dmnElementRef="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted">
+        <dc:Bounds x="5560" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_shape" dmnElementRef="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted">
+        <dc:Bounds x="5780" y="1340" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_i_the_provision_of_recreational_facilities_or_activities_shape" dmnElementRef="decision_i_the_provision_of_recreational_facilities_or_activities">
+        <dc:Bounds x="60" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__7_2_the_mandatory_considerations_were_had_regard_to_shape" dmnElementRef="decision__7_2_the_mandatory_considerations_were_had_regard_to">
+        <dc:Bounds x="280" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_entity_provides_or_intends_to_provide_public_benefit_shape" dmnElementRef="decision_the_entity_provides_or_intends_to_provide_public_benefit">
+        <dc:Bounds x="500" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_shape" dmnElementRef="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode">
+        <dc:Bounds x="720" y="1180" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_purpose_falls_within_paragraph_1_shape" dmnElementRef="decision_the_purpose_falls_within_paragraph_1">
+        <dc:Bounds x="60" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_public_benefit_determination_was_properly_made_shape" dmnElementRef="decision_the_public_benefit_determination_was_properly_made">
+        <dc:Bounds x="280" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_1_b_public_benefit_shape" dmnElementRef="decision__5_1_b_public_benefit">
+        <dc:Bounds x="500" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_2_the_government_control_disqualification_applies_shape" dmnElementRef="decision__5_2_the_government_control_disqualification_applies">
+        <dc:Bounds x="720" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_entity_has_at_least_one_charitable_purpose_shape" dmnElementRef="decision_the_entity_has_at_least_one_charitable_purpose">
+        <dc:Bounds x="60" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_shape" dmnElementRef="decision_ii_the_purpose_is_purely_ancillary_or_incidental">
+        <dc:Bounds x="60" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_shape" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental">
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_shape" dmnElementRef="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_entity_meets_the_charity_test_shape" dmnElementRef="decision_the_entity_meets_the_charity_test">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="bkm_the_purpose_is_a_charitable_purpose_shape" dmnElementRef="bkm_the_purpose_is_a_charitable_purpose">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_article_6_charitable_purposes_shape" dmnElementRef="service_article_6_charitable_purposes">
+        <dc:Bounds x="40" y="1000" width="4620" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_article_7_public_benefit_shape" dmnElementRef="service_article_7_public_benefit">
+        <dc:Bounds x="260" y="1000" width="5060" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_article_5_the_charity_test_shape" dmnElementRef="service_article_5_the_charity_test">
+        <dc:Bounds x="40" y="200" width="5940" height="1240"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_a_the_prevention_or_relief_of_poverty_ir1_edge" dmnElementRef="decision_a_the_prevention_or_relief_of_poverty_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="1030" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_the_advancement_of_education_ir1_edge" dmnElementRef="decision_b_the_advancement_of_education_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="1250" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_c_the_advancement_of_religion_ir1_edge" dmnElementRef="decision_c_the_advancement_of_religion_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="1470" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_d_the_advancement_of_health_ir1_edge" dmnElementRef="decision_d_the_advancement_of_health_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="1690" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_e_the_saving_of_lives_ir1_edge" dmnElementRef="decision_e_the_saving_of_lives_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="1910" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_f_the_advancement_of_citizenship_or_community_development_ir1_edge" dmnElementRef="decision_f_the_advancement_of_citizenship_or_community_development_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="2130" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_g_the_advancement_of_the_arts_heritage_culture_or_science_ir1_edge" dmnElementRef="decision_g_the_advancement_of_the_arts_heritage_culture_or_science_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="2350" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_h_the_advancement_of_public_participation_in_sport_ir1_edge" dmnElementRef="decision_h_the_advancement_of_public_participation_in_sport_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="2570" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__2_d_the_recreational_facilities_restriction_is_satisfied_ir1_edge" dmnElementRef="decision__2_d_the_recreational_facilities_restriction_is_satisfied_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="2790" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_the_provision_of_recreational_facilities_or_activities_ir1_edge" dmnElementRef="decision_i_the_provision_of_recreational_facilities_or_activities_ir1">
+        <di:waypoint x="2790" y="1340"/>
+        <di:waypoint x="150" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_i_the_provision_of_recreational_facilities_or_activities_ir2_edge" dmnElementRef="decision_i_the_provision_of_recreational_facilities_or_activities_ir2">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="150" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation_ir1_edge" dmnElementRef="decision_j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="3010" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_k_the_promotion_of_religious_or_racial_harmony_ir1_edge" dmnElementRef="decision_k_the_promotion_of_religious_or_racial_harmony_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="3230" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_l_the_promotion_of_equality_and_diversity_ir1_edge" dmnElementRef="decision_l_the_promotion_of_equality_and_diversity_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="3450" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_m_the_advancement_of_environmental_protection_or_improvement_ir1_edge" dmnElementRef="decision_m_the_advancement_of_environmental_protection_or_improvement_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="3670" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_n_the_relief_of_those_in_need_ir1_edge" dmnElementRef="decision_n_the_relief_of_those_in_need_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="3890" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_o_the_advancement_of_animal_welfare_ir1_edge" dmnElementRef="decision_o_the_advancement_of_animal_welfare_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="4110" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_p_any_other_analogous_purpose_ir1_edge" dmnElementRef="decision_p_any_other_analogous_purpose_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="4330" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir1_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir1">
+        <di:waypoint x="1030" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir2_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir2">
+        <di:waypoint x="1250" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir3_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir3">
+        <di:waypoint x="1470" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir4_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir4">
+        <di:waypoint x="1690" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir5_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir5">
+        <di:waypoint x="1910" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir6_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir6">
+        <di:waypoint x="2130" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir7_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir7">
+        <di:waypoint x="2350" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir8_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir8">
+        <di:waypoint x="2570" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir9_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir9">
+        <di:waypoint x="150" y="1180"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir10_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir10">
+        <di:waypoint x="3010" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir11_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir11">
+        <di:waypoint x="3230" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir12_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir12">
+        <di:waypoint x="3450" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir13_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir13">
+        <di:waypoint x="3670" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir14_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir14">
+        <di:waypoint x="3890" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir15_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir15">
+        <di:waypoint x="4110" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir16_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir16">
+        <di:waypoint x="4330" y="1340"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_falls_within_paragraph_1_ir17_edge" dmnElementRef="decision_the_purpose_falls_within_paragraph_1_ir17">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="150" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_the_purpose_is_excluded_as_political_ir1_edge" dmnElementRef="decision__5_the_purpose_is_excluded_as_political_ir1">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="4550" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__7_3_b_the_entity_benefits_only_identified_natural_persons_ir1_edge" dmnElementRef="decision__7_3_b_the_entity_benefits_only_identified_natural_persons_ir1">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="4770" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__7_2_the_mandatory_considerations_were_had_regard_to_ir1_edge" dmnElementRef="decision__7_2_the_mandatory_considerations_were_had_regard_to_ir1">
+        <di:waypoint x="4990" y="1340"/>
+        <di:waypoint x="370" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__7_2_the_mandatory_considerations_were_had_regard_to_ir2_edge" dmnElementRef="decision__7_2_the_mandatory_considerations_were_had_regard_to_ir2">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="370" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__7_2_b_the_section_of_the_public_question_was_reached_ir1_edge" dmnElementRef="decision__7_2_b_the_section_of_the_public_question_was_reached_ir1">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="4990" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit_ir1_edge" dmnElementRef="decision__7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit_ir1">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="5210" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_public_benefit_determination_was_properly_made_ir1_edge" dmnElementRef="decision_the_public_benefit_determination_was_properly_made_ir1">
+        <di:waypoint x="370" y="1180"/>
+        <di:waypoint x="370" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_public_benefit_determination_was_properly_made_ir2_edge" dmnElementRef="decision_the_public_benefit_determination_was_properly_made_ir2">
+        <di:waypoint x="5210" y="1340"/>
+        <di:waypoint x="370" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_public_benefit_determination_was_properly_made_ir3_edge" dmnElementRef="decision_the_public_benefit_determination_was_properly_made_ir3">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="370" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_has_at_least_one_charitable_purpose_ir1_edge" dmnElementRef="decision_the_entity_has_at_least_one_charitable_purpose_ir1">
+        <di:waypoint x="4550" y="1340"/>
+        <di:waypoint x="150" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_has_at_least_one_charitable_purpose_ir2_edge" dmnElementRef="decision_the_entity_has_at_least_one_charitable_purpose_ir2">
+        <di:waypoint x="150" y="1020"/>
+        <di:waypoint x="150" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_has_at_least_one_charitable_purpose_ir3_edge" dmnElementRef="decision_the_entity_has_at_least_one_charitable_purpose_ir3">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="150" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir1_edge" dmnElementRef="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir1">
+        <di:waypoint x="4550" y="1340"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir2_edge" dmnElementRef="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir2">
+        <di:waypoint x="150" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir3_edge" dmnElementRef="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir3">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir4_edge" dmnElementRef="decision_ii_the_purpose_is_purely_ancillary_or_incidental_ir4">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir1_edge" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir1">
+        <di:waypoint x="4550" y="1340"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir2_edge" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir2">
+        <di:waypoint x="150" y="700"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir3_edge" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir3">
+        <di:waypoint x="150" y="1020"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir4_edge" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir4">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir5_edge" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_ir5">
+        <di:waypoint x="150" y="1500"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_ir1_edge" dmnElementRef="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_ir1">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_ir2_edge" dmnElementRef="decision__5_1_a_all_of_its_purposes_are_charitable_or_ancillary_ir2">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_provides_or_intends_to_provide_public_benefit_ir1_edge" dmnElementRef="decision_the_entity_provides_or_intends_to_provide_public_benefit_ir1">
+        <di:waypoint x="5430" y="1340"/>
+        <di:waypoint x="590" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_provides_or_intends_to_provide_public_benefit_ir2_edge" dmnElementRef="decision_the_entity_provides_or_intends_to_provide_public_benefit_ir2">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="590" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_applicant_s_intention_limb_ir1_edge" dmnElementRef="decision_the_applicant_s_intention_limb_ir1">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="5430" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_1_b_public_benefit_ir1_edge" dmnElementRef="decision__5_1_b_public_benefit_ir1">
+        <di:waypoint x="4770" y="1340"/>
+        <di:waypoint x="590" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_1_b_public_benefit_ir2_edge" dmnElementRef="decision__5_1_b_public_benefit_ir2">
+        <di:waypoint x="590" y="1180"/>
+        <di:waypoint x="590" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_1_b_public_benefit_ir3_edge" dmnElementRef="decision__5_1_b_public_benefit_ir3">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="590" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_ir1_edge" dmnElementRef="decision__5_2_direction_or_control_by_a_listed_person_is_expressly_permitted_ir1">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="5650" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_ir1_edge" dmnElementRef="decision__5_2_governorship_by_a_listed_person_is_expressly_permitted_ir1">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="5870" y="1420"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir1_edge" dmnElementRef="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir1">
+        <di:waypoint x="5650" y="1340"/>
+        <di:waypoint x="810" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir2_edge" dmnElementRef="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir2">
+        <di:waypoint x="5870" y="1340"/>
+        <di:waypoint x="810" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir3_edge" dmnElementRef="decision__5_2_a_listed_person_is_expressly_permitted_under_either_mode_ir3">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="810" y="1260"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_the_government_control_disqualification_applies_ir1_edge" dmnElementRef="decision__5_2_the_government_control_disqualification_applies_ir1">
+        <di:waypoint x="810" y="1180"/>
+        <di:waypoint x="810" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision__5_2_the_government_control_disqualification_applies_ir2_edge" dmnElementRef="decision__5_2_the_government_control_disqualification_applies_ir2">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="810" y="1100"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_meets_the_charity_test_ir1_edge" dmnElementRef="decision_the_entity_meets_the_charity_test_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_meets_the_charity_test_ir2_edge" dmnElementRef="decision_the_entity_meets_the_charity_test_ir2">
+        <di:waypoint x="590" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_meets_the_charity_test_ir3_edge" dmnElementRef="decision_the_entity_meets_the_charity_test_ir3">
+        <di:waypoint x="810" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_meets_the_charity_test_ir4_edge" dmnElementRef="decision_the_entity_meets_the_charity_test_ir4">
+        <di:waypoint x="370" y="1500"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_entity_has_at_least_one_charitable_purpose_kr1_edge" dmnElementRef="decision_the_entity_has_at_least_one_charitable_purpose_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="150" y="860"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_kr1_edge" dmnElementRef="decision_the_purpose_is_charitable_or_purely_ancillary_or_incidental_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="150" y="540"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>
