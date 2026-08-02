@@ -89,12 +89,22 @@ describe('the emitted SVG', () => {
     expect(svg).toContain('offering is within the offering limit')
   })
 
-  it('emits NO inline style attribute — which is what keeps style-src strict', () => {
+  it('emits NO inline style attribute — the `sceneToSvg` half of style-src', () => {
     // The app's CSP is `style-src 'self'` with no 'unsafe-inline'. An embed that
     // emitted style="…" would be silently unstyled in the BUILT app while
     // looking fine in dev. `sceneToSvg` uses presentational SVG attributes only,
     // and `LadderController` writes styles through the CSSOM, which style-src
     // does not govern.
+    //
+    // SCOPE, so this is not read as more than it is: the assertion covers
+    // `sceneToSvg`, which is the path the TEST uses — the app renders through
+    // `LadderController` instead. The served page therefore DOES contain
+    // `style=` attributes (the controller's CSSOM writes, serialised; plus
+    // SvelteKit's own `#svelte-announcer`), and it logs one benign
+    // `style-src-attr` violation per load. Both were measured in headless
+    // Chrome on 2026-08-02 and are written up in `svelte.config.js`. Keep this
+    // test for what it does guard — that the emitter never starts baking styles
+    // into markup — and do not treat it as a statement about the built page.
     for (const valuation of [
       new Map<NodeId, UBoolValue>(),
       new Map<NodeId, UBoolValue>([[3, 'TrueV']]),

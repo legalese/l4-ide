@@ -777,9 +777,9 @@ Two findings the whole programme should take, not just C2:
 Deployment: `nix/jl4-service/configuration.nix` used to hardcode two pre-seeded bundles
 (`classic`, `thailand-cosmetics`); prod `jl4.legalese.com/service/health` reports
 `ready:2, total:2`, dev reports 4. **Neither `housing-wizard` nor `regcf` is deployed
-anywhere — that is still true.** A `regcf` entry now sits in that `bundles` default and a
-`regcf-wizard` nginx module is imported (both landed with C2b), but the module defaults to off
-and no rebuild has been run; see §3.6. CORS is permissive (`Application.hs:168-172`); the
+anywhere — that is still true.** A `regcf-wizard` nginx module is imported and contributes the
+`regcf` bundle, but both sit under the module's `mkIf`, the module defaults to off, and no
+rebuild has been run; see §3.6. CORS is permissive (`Application.hs:168-172`); the
 binding constraint is the wizard's own `<meta>` CSP `connect-src` — pinned to
 `http://localhost:8080` in `housing-wizard`, and a list including the loopback and Legalese
 origins in `regcf-wizard`, where same-origin serving makes `'self'` sufficient in production.
@@ -823,6 +823,18 @@ investor about audited financials. The **ladder is embedded in the entry page** 
 G3) — static on the hub, interactive inside the step-by-step surface, both via the PR #177
 `LadderController`.
 
+The static half is **machine-verified in a real browser** (headless Chrome over the built app
+on a loopback preview, 2026-08-02), which the build itself could not do: the hub issues exactly
+one service call, `GET …/can this company raise/ladder`, and mounts one `<svg>` with
+`viewBox="0 0 1062 180"` rendering at 685×116, holding 2 `rect.lad-box` and 3
+`polyline.lad-wire`, whose two `<text>` nodes are the endpoint's `name.label` fields verbatim.
+That last equality is the load-bearing one — it is what distinguishes the corpus's own picture
+from a plausible placeholder, and it is the check to repeat if the embed is ever reworked. One
+CSP violation is logged per load (`style-src-attr`, from SvelteKit's own `#svelte-announcer`,
+no visible effect); the earlier claim that the app ships zero inline `style=` attributes was
+wrong and has been corrected in `svelte.config.js`. Interaction, pan/zoom and the R8 override
+toggle still need hands — see the app README's gate.
+
 **Progressive disclosure.** §3.5 recorded that this "does not exist client-side at all — the
 backend loop is finished and unexercised". It is now exercised, over
 `POST …/can this company raise/query-plan`: one question at a time, in the service's `ranked`
@@ -860,13 +872,24 @@ explains.
 
 **C2c stops before the deploy.** Committed and inert: `nix/regcf-wizard/package.nix` (the SPA
 build, `BASE_PATH` + `VITE_JL4_BASE_URL` baked in), `nix/regcf-wizard/configuration.nix` (an
-nginx location at `/regcf/`, **`enable` defaulting to false**), the `regcf` entry in
-`nix/jl4-service/configuration.nix`'s `bundles`, and the import in `nix/configuration.nix`.
-The bundle half is verified by replicating the module's own `ExecStartPre` — copying the whole
-corpus directory into a store and starting the service, which reported `exportCount: 6` and
-`ready:1, total:1`, ignoring `figures/`, `tests/` and the two `.md` files. Same-origin serving
-means the app's CSP `connect-src 'self'` already covers the service, so **no CSP edit is
-needed to deploy**.
+nginx location at `/regcf/` **and** the `regcf` bundle, both under one `mkIf`, with `enable`
+defaulting to false), and the import in `nix/configuration.nix`. The bundle half is verified by
+replicating `jl4-service`'s `ExecStartPre` — copying the whole corpus directory into a store
+and starting the service, which reported `exportCount: 6` and `ready:1, total:1`, ignoring
+`figures/`, `tests/` and the two `.md` files. Same-origin serving means the app's CSP
+`connect-src 'self'` already covers the service, so **no CSP edit is needed to deploy**.
+
+**The bundle was gated during review, and the reason generalises.** As first written, `regcf`
+sat in `services.jl4-service.bundles`'s **default**. Every host imports `nix/configuration.nix`
+— `jl4-demo`, `jl4-dev`, and `jl4-aws-2505`, which is `jl4.legalese.com` — so the corpus would
+have been pre-seeded and served publicly by the next `nixos-rebuild switch` performed for any
+unrelated reason, with nobody having enabled the wizard and no deploy having been authorised.
+The rule this yields for the whole programme: **a feature's corpus is contributed inside the
+feature's own `mkIf`, never into a shared default**, so that `enable = true` is the single act
+that publishes anything. Doing that needed one module-system correction — `bundles` now carries
+an empty default with the base two moved to a `config` definition, because an `attrsOf` option
+merges definitions but discards its default the moment anything defines it, so the naive gated
+version would have silently dropped `classic` and `thailand-cosmetics`.
 
 Two things are true and must not be read past: **the nix expressions have not been evaluated**
 (there is no `nix` in the environment they were written in — they are reviewed by eye against

@@ -146,9 +146,32 @@ So, against a loopback service, in a real browser:
 6. **Full raise check** with a clean US company raising $3,000,000: "You
    qualify", headroom $5,000,000, audited financial statements, and the
    as-at-date line at the foot.
-7. Devtools console is **empty of CSP violations** on every screen. This is the
-   one that must be checked against the BUILT app (`npm run build && npm run
-preview`), not the dev server: the two emit different policies.
+7. Devtools console shows **exactly one** CSP violation per load and no others.
+   This is the one that must be checked against the BUILT app (`npm run build &&
+npm run preview`), not the dev server: the two emit different policies.
+
+### What step 1 and step 7 look like when measured
+
+Steps 1 and 7 were run in headless Chrome (Playwright, system Chrome channel)
+against the built app on a loopback preview, 2026-08-02. Recording the numbers
+here so the next reader is comparing against something, not re-deriving it:
+
+| check                      | measured                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| service calls from the hub | one — `GET …/can this company raise/ladder`; no failed requests                                         |
+| ladder mounts              | 1 `<svg>`, `viewBox="0 0 1062 180"`, rendered 685×116 (so `max-width:100%` is live)                     |
+| it is the corpus's         | 2 `rect.lad-box`, 3 `polyline.lad-wire`, and the two `<text>` nodes are the leaf labels verbatim        |
+| CSP violations             | exactly 1 — `style-src-attr`, `blockedURI:"inline"`, empty sample, from SvelteKit's `#svelte-announcer` |
+| that violation's effect    | none visible: the announcer still computes to `position:absolute`, 1×1, `clip-path:inset(50%)`          |
+
+The two `<text>` contents are `` `issuer is eligible` OF (`issuer profile from`
+OF plan) `` and `` `offering is within the offering limit` OF (`offering from`
+OF plan) `` — byte-identical to the `name.label` fields the loopback
+`/ladder` endpoint returned, which is what makes them the corpus's picture and
+not a placeholder.
+
+Steps 2, 3, 5 (interaction, pan/zoom, the R8 override toggle) remain hand-run:
+they need input events, and the automation above only loads and reads.
 
 ---
 
@@ -156,10 +179,23 @@ preview`), not the dev server: the two emit different policies.
 
 Everything needed is committed:
 
-- `nix/jl4-service/configuration.nix` pre-seeds the **`regcf` bundle**. Verified
-  by replicating its `ExecStartPre` exactly — copying the whole corpus directory
-  and starting the service — which reported `exportCount: 6` and
-  `ready:1, total:1`, ignoring `figures/`, `tests/` and the two `.md` files.
+- `nix/regcf-wizard/configuration.nix` contributes the **`regcf` bundle** to
+  `services.jl4-service.bundles`, from inside the same `mkIf` as the page.
+  Verified by replicating `jl4-service`'s `ExecStartPre` exactly — copying the
+  whole corpus directory and starting the service — which reported
+  `exportCount: 6` and `ready:1, total:1`, ignoring `figures/`, `tests/` and the
+  two `.md` files.
+
+  It is contributed there and **not** in `jl4-service`'s bundle defaults, which
+  is where it first landed. Every host imports `nix/configuration.nix`,
+  production included, so a bundle sitting in that default would have been
+  pre-seeded and served publicly by the next unrelated `nixos-rebuild switch`,
+  with nobody having enabled the wizard. Note the module-system detail that
+  makes the gated version work: `bundles` now carries an empty `default` and the
+  base two are a `config` definition, because an `attrsOf` option merges its
+  definitions but discards its default as soon as anything defines it — the
+  naive gated version would have dropped `classic` and `thailand-cosmetics`.
+
 - `nix/regcf-wizard/{package.nix,configuration.nix}` build the SPA and serve it
   at `/regcf/`, with `VITE_JL4_BASE_URL` derived from the same domain as the
   service — so `connect-src 'self'` covers it and **no CSP edit is needed** to

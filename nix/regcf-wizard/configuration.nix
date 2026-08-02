@@ -25,6 +25,21 @@
   };
 
   config = lib.mkIf config.services.regcf-wizard.enable {
+    # The corpus the wizard asks. It is contributed HERE, under the same `mkIf`
+    # as the page, and deliberately NOT in `jl4-service`'s bundle defaults: a
+    # bundle in that default is pre-seeded by EVERY host that imports
+    # `nix/configuration.nix` — which includes production, `jl4.legalese.com` —
+    # so the corpus would have gone public on the next unrelated
+    # `nixos-rebuild switch`, with nobody having enabled the wizard. Keeping it
+    # here is what makes `enable = true` the single act that publishes anything.
+    #
+    # Copying the WHOLE directory is safe, and is what the pre-seed script does:
+    # the loader takes the two .l4 files and ignores `figures/`, `tests/`,
+    # `README.md` and `PROJECTIONS.md`. Verified by replicating that script
+    # against a loopback service, which reported `exportCount: 6` from
+    # `regcf-wizard.l4` and `ready:1, total:1`.
+    services.jl4-service.bundles.regcf = ../../jl4/examples/legal/regcf;
+
     services.nginx.virtualHosts.${config.networking.domain}.locations = {
       ${config.services.regcf-wizard.path} = {
         alias =

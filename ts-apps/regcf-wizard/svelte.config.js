@@ -35,12 +35,31 @@ const config = {
     // entries are what `npm run dev`/`vite preview` talk to; 18099 is the port
     // this app was verified against (see README).
     //
-    // style-src stays strict 'self' (no 'unsafe-inline'):
-    //   - the app ships ZERO inline style="" attributes; and
-    //   - the embedded ladder is safe under it because `sceneToSvg` emits only
-    //     presentational SVG attributes (font-style, fill, font-weight) and
-    //     `LadderController` writes every style through the CSSOM
-    //     (`el.style.x = …`), which `style-src` does not govern.
+    // style-src stays strict 'self' (no 'unsafe-inline'). What that costs and
+    // what it does not, MEASURED in headless Chrome against the built app on a
+    // loopback preview (2026-08-02) — not reasoned about:
+    //
+    //   - The embedded ladder is safe. `sceneToSvg` emits only presentational
+    //     SVG attributes (font-style, fill, font-weight), and `LadderController`
+    //     writes every style through the CSSOM (`el.style.x = …`), which
+    //     `style-src` does not govern. Those CSSOM writes DO serialise into a
+    //     `style=` attribute you can read back — the served SVG shows
+    //     `style="transition: opacity 320ms;"` on `polyline.lad-wire` and
+    //     `max-width:100%;height:auto;display:block` on the root — and they take
+    //     effect: computed `transition-duration` is `0.32s`. So do not "fix" a
+    //     style attribute you find in the live SVG; reading one back is not
+    //     evidence that anything was blocked.
+    //
+    //   - It is NOT true that the app ships zero inline `style=` attributes. An
+    //     earlier version of this comment said so and was wrong. SvelteKit emits
+    //     its own `#svelte-announcer` live-region with an inline style, so every
+    //     page load logs exactly ONE violation — `style-src-attr`, `blockedURI:
+    //     "inline"`, empty sample, sourced to Svelte's hydration chunk. Nothing
+    //     visibly degrades (the announcer still computes to a 1×1 clipped box,
+    //     because the prerendered markup is parsed before hydration), so this is
+    //     console noise, not breakage. It is recorded rather than silenced:
+    //     relaxing style-src to quiet one benign warning would give up the
+    //     directive that makes the ladder embed safe in the first place.
     csp: {
       mode: 'hash',
       directives: {
