@@ -23,14 +23,27 @@ WHAT IT WOULD DO
   carries its resolution, and preload TYPICALLY defaults where world
   knowledge supports one.
 
+NO LONGER BLOCKING (was, until 2026-08-02)
+  R4 is ruled: R4-FORK-REPRESENTATION.md §7 adopts the Interpretation-
+  parameter shape, extended to regulative rules. The register format now
+  exists:
+    specs/todo/single-instruction-demo/schemas/fork-register.schema.json
+  with a validator (etc/go/lib/register-validate.mjs fork-register <file>
+  [peers]) and worked fixtures under schemas/fixtures/ -- the valid one
+  being the BNA smoke's twelve ambiguities transcribed. R4's 1:1 map (a
+  materialised fork IS an Interpretation field) is enforced, as is the
+  cross-reference into P2's register.
+
 BLOCKER
-  Ruling R4 was ruled 2026-08-02: R4-FORK-REPRESENTATION.md §7 adopts the
-  Interpretation-parameter shape, and its §6 says explicitly that no code
-  changes until the demo's encode phase runs. SPEC.md defines no machine-readable fork
-  register anywhere, so P5's fork-register completeness check has nothing to
-  join over. specs/todo/single-instruction-demo/schemas/fork-register.schema
-  .json does NOT exist: that directory is empty, and this blocker used to
-  claim the schema shipped.
+  NOTHING TO FORK. A fork is opened at a site in an encoding, and no encode
+  phase produces one: p3-encode.sh is itself scaffolded, so this stage has a
+  format, a validator and no input. R4-FORK-REPRESENTATION.md §6 says the
+  same thing from the design side -- no code changes until the demo's encode
+  phase runs.
+  Also unmechanisable by construction: fork-register COMPLETENESS. No
+  procedure establishes that every ambiguity was found, so the register can
+  be checked for internal and cross-file consistency (which it now is) and
+  never for exhaustiveness. That judgement is the skill's and HG1's.
 
 Nothing was written and no receipt was recorded.
 MSG

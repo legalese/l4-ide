@@ -1,0 +1,582 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "bna",
+  "note": "FIXTURE, NOT A COMMITTED REGISTER. This is a faithful transcription of the twelve-row ambiguity table in jl4/examples/legal/bna/README.md and the `-- AMBIGUITY:` comment blocks it mirrors in bna.l4 (PR #195, unmerged at this writing — neither file is on this branch, so the site paths and line numbers point forward). It exists to hold this schema against the only fork inventory anyone has actually produced. The BNA encoding deliberately used no fork machinery — R4 was unruled when it was written — so every entry here is `resolved-at-encode` or `delegated-to-fact` and none is materialised as an Interpretation field. That is the fixture's chief evidence: a schema that had made `interpretation_field` unconditional could not have recorded a single real row.",
+  "entries": [
+    {
+      "id": "A1",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "commencement",
+        "line": 62,
+        "provisions": [
+          "British Nationality Act 1981 s 1(1)",
+          "British Nationality Act 1981 s 1(2)",
+          "British Nationality Act 1981 s 1(3)",
+          "British Nationality Act 1981 s 1(4)"
+        ]
+      },
+      "source": {
+        "quote": "after commencement",
+        "citation": "British Nationality Act 1981 s 1(1), and the same words in ss 1(2), (3) and (4)"
+      },
+      "readings": [
+        {
+          "id": "instantCommencement",
+          "description": "Commencement is an instant — the Act commenced at the first moment of 1 January 1983 — so a person born ON 1 January 1983 is born after commencement. Encoded as AT LEAST 1983-01-01.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 50(1) — \"commencement\", without more, means the commencement of this Act: 1 January 1983"
+            }
+          ]
+        },
+        {
+          "id": "afterTheWholeCommencementDay",
+          "description": "Strictly after the whole commencement day, i.e. a date of birth at least 1983-01-02.",
+          "status": "rejected",
+          "rejection_rationale": "It would leave commencement-day births governed by neither the old law nor the new.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "instantCommencement",
+        "mechanism": "encoded",
+        "rationale": "The instant reading is the settled understanding and is the only one that leaves no day ungoverned."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "`a British citizen by virtue of subsection (1) or (2)` — boundary pair at 1983-01-01 / 1982-12-31"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "A2",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "1(1)(b) — father or mother settled in the United Kingdom or that territory",
+        "line": 183,
+        "provisions": ["British Nationality Act 1981 s 1(1)(b)"]
+      },
+      "source": {
+        "quote": "(b) settled in the United Kingdom or that territory.",
+        "citation": "British Nationality Act 1981 s 1(1)(b)"
+      },
+      "readings": [
+        {
+          "id": "theTerritoryOfBirth",
+          "description": "\"That territory\" refers back to the particular qualifying territory of the birth: the parent must be settled in the United Kingdom or in the SAME territory where the birth occurred.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(1)(b); s 50(2)-(5) construe \"settled\""
+            }
+          ]
+        },
+        {
+          "id": "anyQualifyingTerritory",
+          "description": "Settled in the United Kingdom or in ANY qualifying territory.",
+          "status": "rejected",
+          "rejection_rationale": "\"That\" is a bound anaphor, not \"a\".",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "theTerritoryOfBirth",
+        "mechanism": "encoded",
+        "rationale": "The anaphor resolves to the birth territory, and the input field is worded \"or the territory of birth\" so the burden sits with the fact-supplier."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "The taken reading is carried by the wording of the input field rather than by a computation, so the encoding cannot exhibit the difference between the readings."
+      ]
+    },
+    {
+      "id": "A3",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "PersonProfile's `found abandoned as a new-born infant in the United Kingdom` (and the qualifying-territory twin)",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "found abandoned in the United Kingdom after commencement",
+        "line": 215,
+        "provisions": ["British Nationality Act 1981 s 1(2)"]
+      },
+      "source": {
+        "quote": "new-born infant",
+        "citation": "British Nationality Act 1981 s 1(2); the term is undefined by the Act"
+      },
+      "readings": [
+        {
+          "id": "abandonedWithinDaysOrWeeksOfBirth",
+          "description": "An infant abandoned within days or weeks of birth, as assessed by the decision-maker.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(2) — \"found abandoned as a new-born infant\""
+            }
+          ]
+        },
+        {
+          "id": "anyAbandonedChildOfQualifyingAge",
+          "description": "Any abandoned child of apparently qualifying age.",
+          "status": "rejected",
+          "rejection_rationale": "It reads \"new-born\" out of the text.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "abandonedWithinDaysOrWeeksOfBirth",
+        "mechanism": "fact-supplied",
+        "rationale": "The boolean input field asserts new-born-ness as a found fact, leaving the vague boundary where the Act left it — with the decision-maker."
+      },
+      "status": "resolved",
+      "cross_refs": []
+    },
+    {
+      "id": "A4",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "deemed by subsection (2) to satisfy subsection (1)",
+        "line": 222,
+        "provisions": ["British Nationality Act 1981 s 1(2)"]
+      },
+      "source": {
+        "quote": "unless the contrary is shown",
+        "citation": "British Nationality Act 1981 s 1(2)"
+      },
+      "readings": [
+        {
+          "id": "eitherDeemedFactRebuts",
+          "description": "Showing the contrary of EITHER deemed fact — the deemed birth facts of limb (a) or the deemed parentage of limb (b) — defeats the deeming. Encoded as one rebuttal flag: subsection (1) needs both limbs, so rebutting either defeats the s 1(1) route and a single flag is extensionally adequate.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(2)"
+            },
+            {
+              "kind": "scholarship",
+              "cite": "Sergot, Sadri, Kowalski, Kriwaczek, Hammond & Cory, \"The British Nationality Act as a Logic Program\", CACM 29(5) 370-386 (1986), §\"Some Difficulties with the Formalization of Negation\", pp. 378-381 — the same default, likewise encoded with rebuttal as an explicit input"
+            }
+          ]
+        },
+        {
+          "id": "bothLimbsJointlyRebut",
+          "description": "Only a showing against both limbs jointly rebuts the presumption.",
+          "status": "rejected",
+          "rejection_rationale": "It would deem a child known to have been born abroad to have been born here.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "eitherDeemedFactRebuts",
+        "mechanism": "encoded",
+        "rationale": "One rebuttal flag is extensionally adequate for the s 1(1) route, and the alternative deems facts known to be false."
+      },
+      "status": "resolved",
+      "divergence": "extensionally-equivalent",
+      "cross_refs": [],
+      "notes": [
+        "The equivalence claim is about the single-flag ENCODING of the taken reading, not about the two readings, which do diverge."
+      ]
+    },
+    {
+      "id": "A5",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "a British citizen by virtue of subsection (1A)",
+        "line": 278,
+        "provisions": ["British Nationality Act 1981 s 1(1A)"]
+      },
+      "source": {
+        "quote": "born in the United Kingdom or a qualifying territory on or after the relevant day",
+        "citation": "British Nationality Act 1981 s 1(1A)"
+      },
+      "readings": [
+        {
+          "id": "oneThresholdForBothPlaces",
+          "description": "\"On or after the relevant day\" qualifies both places of birth: one date threshold governs the whole subsection.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "instrument",
+              "cite": "Borders, Citizenship and Immigration Act 2009 (c. 11) s 42(2); S.I. 2009/2731 art. 4(a) — s 1(1A) inserted whole on 13 January 2010"
+            }
+          ]
+        },
+        {
+          "id": "dateAttachesToTerritoryBirthsOnly",
+          "description": "The date attaches only to the qualifying-territory limb, so United Kingdom births under this subsection reach back to commencement.",
+          "status": "rejected",
+          "rejection_rationale": "It would apply an inserted provision to two decades before its insertion.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "oneThresholdForBothPlaces",
+        "mechanism": "encoded",
+        "rationale": "The subsection was inserted whole in 2010, and a United Kingdom birth before the relevant day cannot have an armed-forces route either."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "`a British citizen by virtue of subsection (1A)` — boundary pair at 2010-01-13 / 2010-01-12"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "A6",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A",
+        "line": 297,
+        "provisions": [
+          "British Nationality Act 1981 s 1(3) chapeau",
+          "British Nationality Act 1981 s 1(3A) chapeau",
+          "British Nationality Act 1981 s 1(4) chapeau"
+        ]
+      },
+      "source": {
+        "quote": "who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A",
+        "citation": "British Nationality Act 1981 s 1(3), (3A), (4) chapeau; s 10A"
+      },
+      "readings": [
+        {
+          "id": "subsectionOneAsReadWithTwo",
+          "description": "Subsection (2) confers nothing by itself — it deems facts \"for the purposes of subsection (1)\" — so \"by virtue of ... (2)\" means \"by virtue of subsection (1) as read with (2)\". The chapeau enumerates only these routes, so a person who is a British citizen some other way (descent under s 2, registration under s 3, naturalisation) is not excluded by its words, and the encoding follows the words.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(2) — \"deemed for the purposes of subsection (1)\"; s 1(3), (3A), (4) chapeau; s 10A"
+            }
+          ]
+        },
+        {
+          "id": "subsectionTwoAsAnIndependentRoute",
+          "description": "\"By virtue of subsection (2)\" names a citizenship route of its own, excluded independently of subsection (1).",
+          "status": "rejected",
+          "rejection_rationale": "Subsection (2) confers no citizenship; it deems facts for the purposes of subsection (1), so there is no such route to be excluded.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "subsectionOneAsReadWithTwo",
+        "mechanism": "encoded",
+        "rationale": "Encoded as the combined predicate, and the enumerated list is followed literally rather than widened to \"a British citizen by any route\"."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "`Peter with the subsection (3) limbs satisfied` — both limbs TRUE, entitlement FALSE solely because he is already a citizen under (1)"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "A7",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "entitled to be registered under subsection (3)",
+        "line": 315,
+        "provisions": ["British Nationality Act 1981 s 1(3)"]
+      },
+      "source": {
+        "quote": "if, while he is a minor— (a) ... and (b) ...",
+        "citation": "British Nationality Act 1981 s 1(3)"
+      },
+      "readings": [
+        {
+          "id": "minorityDistributesOverBothLimbs",
+          "description": "Both the parent's change of status AND the application must occur during minority.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(3) — the temporal adverbial sits in the chapeau"
+            }
+          ]
+        },
+        {
+          "id": "onlyLimbAIsTimeBounded",
+          "description": "Only limb (a) is time-bounded; the application may be made at any age.",
+          "status": "rejected",
+          "rejection_rationale": "An adult registrant has the s 4 routes, and the settled understanding requires an in-minority application.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "minorityDistributesOverBothLimbs",
+        "mechanism": "encoded",
+        "rationale": "The temporal adverbial sits in the chapeau and distributes over the enumerated list; both input fields are worded \"while a minor, ...\"."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "The taken reading is carried in the wording of the two input fields, so the encoding cannot exhibit the alternative."
+      ]
+    },
+    {
+      "id": "A8",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "1(4) — absences within the ninety-day ceiling in each of the first ten years",
+        "line": 382,
+        "provisions": ["British Nationality Act 1981 s 1(4)"]
+      },
+      "source": {
+        "quote": "as regards each of the first ten years of that person's life",
+        "citation": "British Nationality Act 1981 s 1(4)"
+      },
+      "readings": [
+        {
+          "id": "yearsOfLife",
+          "description": "The first ten years of life, measured from birth anniversary to birth anniversary.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(4) — \"of that person's life\""
+            }
+          ]
+        },
+        {
+          "id": "calendarYears",
+          "description": "The ten calendar years containing the person's first decade.",
+          "status": "rejected",
+          "rejection_rationale": "It makes the test depend on the accident of a January or December birthday.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "yearsOfLife",
+        "mechanism": "encoded",
+        "rationale": "\"Of that person's life\" anchors the years to the person, not the calendar. The statute's per-year universal (\"as regards each ... does not exceed 90\") is encoded extensionally as max-over-the-ten-years <= 90, which is equivalent."
+      },
+      "status": "resolved",
+      "divergence": "extensionally-equivalent",
+      "cross_refs": [],
+      "notes": [
+        "The equivalence recorded here is the per-year-universal to max-over-years rewriting, not an equivalence between the two readings."
+      ]
+    },
+    {
+      "id": "A9",
+      "kind": "fact-convention",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "PersonProfile's `greatest number of days absent from the United Kingdom in any one of the first ten years of life`",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "1(4) — absences within the ninety-day ceiling in each of the first ten years",
+        "line": 390,
+        "provisions": ["British Nationality Act 1981 s 1(4)"]
+      },
+      "source": {
+        "quote": "the number of days on which he was absent from the United Kingdom in that year",
+        "citation": "British Nationality Act 1981 s 1(4)"
+      },
+      "readings": [
+        {
+          "id": "wholeDayAbsent",
+          "description": "A day counts as absent only if the person was outside the United Kingdom for the whole of it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(4) — \"the number of days on which he was absent\""
+            }
+          ]
+        },
+        {
+          "id": "anyDayTouchedByAbsence",
+          "description": "Any day touched by absence — including a day of departure or arrival part-spent in the United Kingdom — counts.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(4) — the text does not rule this reading out"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "wholeDayAbsent",
+        "mechanism": "fact-supplied",
+        "rationale": "Stated as the input convention: the NUMBER field carries whatever count the fact-supplier certifies, and the burden of the convention sits with them. Neither reading is rejected — the text does not choose."
+      },
+      "status": "open",
+      "cross_refs": [],
+      "notes": [
+        "The only entry of the twelve where both readings remain live: the statute simply does not settle the counting convention."
+      ]
+    },
+    {
+      "id": "A10",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "order of a court in a qualifying territory on or after the appointed day",
+        "line": 483,
+        "provisions": ["British Nationality Act 1981 s 1(5)(a)"]
+      },
+      "source": {
+        "quote": "or, on or after the appointed day, any court in a qualifying territory makes an order",
+        "citation": "British Nationality Act 1981 s 1(5)(a)"
+      },
+      "readings": [
+        {
+          "id": "dateQualifiesTheMakingOfTheOrder",
+          "description": "The appointed-day condition qualifies the MAKING of qualifying-territory court orders, so a territory order made before 21 May 2002 does not engage limb (a). No date condition attaches to United Kingdom courts, whose competence runs from the 2003 substitution of the whole subsection — the text in force and the only text encoded.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(5)(a)"
+            },
+            {
+              "kind": "instrument",
+              "cite": "British Overseas Territories Act 2002 (c. 8) Sch. 1 para. 1(4); S.I. 2002/1252 art. 2 — words inserted 21 May 2002"
+            }
+          ]
+        },
+        {
+          "id": "dateQualifiesTheCitizenshipEffect",
+          "description": "The appointed-day condition attaches to the citizenship consequence rather than to the making of the order, so a pre-2002 territory order could still found citizenship from the appointed day.",
+          "status": "rejected",
+          "rejection_rationale": "The words sit inside the limb describing the order, before \"any court in a qualifying territory makes an order\", not in the operative subsection (5) consequence.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "dateQualifiesTheMakingOfTheOrder",
+        "mechanism": "encoded",
+        "rationale": "Encoded as order date AT LEAST the appointed day for territory courts, with no date condition for United Kingdom courts."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "`a British citizen by virtue of subsection (5)` — Gibraltar adoption order boundary pair at 2002-05-21 / 2002-05-20"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "A11",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "1(5A)(b) — habitual residence, in a Convention case",
+        "line": 534,
+        "provisions": ["British Nationality Act 1981 s 1(5A)(b)"]
+      },
+      "source": {
+        "quote": "(b) in a case within subsection (5)(b), the adopter or, in the case of a joint adoption, both of the adopters are habitually resident in the United Kingdom or in a designated territory.",
+        "citation": "British Nationality Act 1981 s 1(5A)(b); s 50(1) \"designated territory\""
+      },
+      "readings": [
+        {
+          "id": "eachAdopterIndependently",
+          "description": "Each adopter is habitually resident somewhere within the listed places; they need not be in the same place.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(5A)(b) — the disjunction distributes over the adopters"
+            }
+          ]
+        },
+        {
+          "id": "bothInOneAndTheSamePlace",
+          "description": "Both adopters must be habitually resident in one and the same place.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "British Nationality Act 1981 s 1(5A)(b) — the words do not compel either distribution"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "eachAdopterIndependently",
+        "mechanism": "encoded",
+        "rationale": "The disjunction distributes over the adopters, and the input field carries the statutory phrase whole. Neither reading is rejected: the words do not compel one, and nothing in the encoding turns on it because the field arrives pre-construed."
+      },
+      "status": "open",
+      "divergence": "none",
+      "cross_refs": []
+    },
+    {
+      "id": "A12",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/bna/bna.l4",
+        "anchor": "registration may be granted",
+        "line": 451,
+        "provisions": [
+          "British Nationality Act 1981 s 41A",
+          "Immigration, Asylum and Nationality Act 2006 (c. 13) s 58",
+          "modification C3 to British Nationality Act 1981 s 1(3), (4)"
+        ]
+      },
+      "source": {
+        "quote_absent_reason": "The restriction lives in s 41A, not in the s 1 text this bundle retrieved; its words were never fetched verbatim, so quoting them would be invention. The ambiguity is about where the restriction belongs in the encoding, not about how any fetched words read.",
+        "citation": "British Nationality Act 1981 s 41A, as applied to s 1(3) and (4) by Immigration, Asylum and Nationality Act 2006 (c. 13) ss 58, 62; S.I. 2006/2838 art. 4(1)"
+      },
+      "readings": [
+        {
+          "id": "separateGrantGate",
+          "description": "The s 1 entitlement subsists as s 1 states it, and s 41A separately forbids GRANTING the application to a person not of good character. Encoded as a separate `registration may be granted` predicate, leaving the s 1 predicates textually pure.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "instrument",
+              "cite": "Immigration, Asylum and Nationality Act 2006 (c. 13) ss 58, 62; S.I. 2006/2838 art. 4(1) (subject to art. 4(2)) — legislation.gov.uk modification note C3, which records s 1(3)(4) as \"restricted\", not amended"
+            }
+          ]
+        },
+        {
+          "id": "foldedIntoEachEntitlement",
+          "description": "Fold good character into each s 1 entitlement predicate.",
+          "status": "rejected",
+          "rejection_rationale": "It would misstate what s 1 itself says; and the s 41A text was not fetched verbatim, so it could not ride inline as inert prose.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "separateGrantGate",
+        "mechanism": "encoded",
+        "rationale": "The restriction is drafted against the registration provisions, not woven into s 1, so it is encoded as a separate grant gate."
+      },
+      "status": "resolved",
+      "cross_refs": ["EM-C3"],
+      "notes": [
+        "Not an ambiguity of the source words at all — the row that forced this schema's `kind` discriminator. The README table records it as \"C3 (not s 1 text)\"."
+      ]
+    }
+  ]
+}

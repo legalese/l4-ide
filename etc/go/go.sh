@@ -197,9 +197,12 @@ stages_for() {
       echo "go.sh: milestone g2 is UNBUILT." >&2
       echo "  R4 (ambiguity-fork representation) was ruled 2026-08-02 — the Interpretation" >&2
       echo "  parameter, R4-FORK-REPRESENTATION.md §7 — but none of the de novo tooling it" >&2
-      echo "  unblocks exists yet. The stages p1-ingest, p2-sweep, p3-encode, p4-forks," >&2
-      echo "  p5-gate and the §8 diff oracle exist as entry points that refuse; run one" >&2
-      echo "  directly to see its blocker." >&2
+      echo "  unblocks exists yet. What DOES exist, since 2026-08-02, is the three deposit" >&2
+      echo "  contracts those stages write into -- source bundle, external modifications," >&2
+      echo "  fork register -- under specs/todo/single-instruction-demo/schemas/, with one" >&2
+      echo "  validator at etc/go/lib/register-validate.mjs. The stages p1-ingest, p2-sweep," >&2
+      echo "  p3-encode, p4-forks, p5-gate and the §8 diff oracle still exist only as entry" >&2
+      echo "  points that refuse; run one directly to see its blocker." >&2
       return 3
       ;;
     *)

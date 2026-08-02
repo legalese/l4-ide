@@ -27,9 +27,16 @@ BLOCKER
   as good as it can be'. Two of its five checks are automatable and already run inside
   p3-check.sh (house style, temporal closure); the other three — isomorphism
   spot-checks, fork-register completeness, and disposition of every P2 entry
-  — are not mechanisable, and two of them are joins over registers whose
-  format does not exist yet. A script cannot hold this gate; the skill's P5
+  — are not mechanisable. A script cannot hold this gate; the skill's P5
   checklist and HG1 do.
+  What changed on 2026-08-02: the two register-joining checks now have a
+  format and a validator (etc/go/lib/register-validate.mjs over
+  specs/todo/single-instruction-demo/schemas/), so 'every entry disposed'
+  and 'every fork cross-reference resolves' are exit codes rather than
+  reading. That does not unblock this stage: no P1/P2/P4 output exists to
+  join over, and neither check was ever the judgement. Completeness in
+  particular stays unfalsifiable — no procedure establishes that every
+  ambiguity was found.
 
 Nothing was written and no receipt was recorded.
 MSG

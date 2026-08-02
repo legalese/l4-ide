@@ -108,6 +108,56 @@ node etc/go/selftest.mjs [--with-driver]
 node etc/go/lib/assert-report.selftest.mjs
 ```
 
+## The de novo deposit contracts
+
+The three registers the G2 stages write into — source bundle (P1), external modifications (P2),
+fork register (P4) — are defined under
+[`specs/todo/single-instruction-demo/schemas/`](../../specs/todo/single-instruction-demo/schemas/)
+and checked by one validator:
+
+```
+node etc/go/lib/register-validate.mjs <fork-register|external-modifications|source-bundle> <file> [peer-file ...]
+node etc/go/lib/register-validate.mjs --rules <schema>
+```
+
+Peer files let the cross-file rules run — a fork citing a modification, a modification routing to
+a fork, a disposition table joined against the bundle's annotation inventory. A cross-file rule
+whose peer is absent prints `skip` with a reason; it never passes quietly. Exit `0` clean · `1` a
+finding · `2` usage or a schema the validator cannot fully enforce.
+
+**Nothing in the pipeline writes one yet.** P1 and P2 need outward network access this
+orchestrator does not take, and P4 needs an encoding `p3-encode` does not produce. The formats
+exist so those stages have an interface and an acceptance condition; that is progress on the
+contract, not on the stages.
+
+## The §8 diff oracle
+
+G2's acceptance comparator: two encodings of one body of law, compared by **what they answer**
+rather than by their text (they share no identifiers, so a textual diff is 100% different and 0%
+informative).
+
+```
+node etc/go/lib/denovo-diff.mjs run --map <surface-map.json> --out <dir> [--max-rows N]
+```
+
+The map — schema `specs/todo/single-instruction-demo/schemas/surface-map.schema.json`, fixture
+`schemas/fixtures/regcf-identity.surface-map.json` — declares the pairing: two modules, the shared
+fact slots with each side's L4 type name, and one entry per compared decision. The oracle seeds a
+battery from the subject's cases file, perturbs it one field at a time, evaluates both sides
+through a generated probe module, and emits `denovo-diff.{json,md,rows.json}`. Exit `0` total
+agreement · `1` at least one divergence, which under SPEC.md §8 is the **better** outcome · `2`
+usage · `4` broken.
+
+It **never triages**: every witness reads `UNTRIAGED`, because SPEC.md §8's three dispositions are
+judgements and belong to the reviewer. Read the report's **Sensitivity** table alongside its
+agreement counts — a (pair, fact) leaf the battery perturbed without ever moving an answer is a
+surface on which agreement is silence rather than evidence.
+
+Design, limits and the verbatim self-tests:
+[`DENOVO-DIFF-ORACLE.md`](../../specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md). **No
+stage calls it** — `p3-encode` produces nothing to compare — so it has been run only against the
+committed corpus and against scratch copies of it with one constant moved.
+
 `selftest.mjs` proves the status lattice can still say no: that every status is
 producible, that `PASS` is rejected with a null, failing, or _weak_ oracle, that
 a `BROKEN` receipt cannot yield a `COMPLETE` milestone, and that editing,

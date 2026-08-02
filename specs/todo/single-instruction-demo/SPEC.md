@@ -72,7 +72,9 @@ only what an earlier stage committed.
 Pull the current and historical rule text (the 2016 adoption, the 2017 and 2022 inflation
 adjustments, the 2021 amendments, the COVID-19 temporary rules) with Federal Register citations
 attached. Deliverable: a source bundle with provenance (URL, retrieval date, FR cites) that P3
-encodes from and P9 cites.
+encodes from and P9 cites. Machine-readable format:
+[`schemas/source-bundle.schema.json`](./schemas/source-bundle.schema.json) — defined and
+validated 2026-08-02; no stage writes one yet.
 
 ### P2 — External-modification sweep (added by Meng 2026-07-31; runs concurrent with P1)
 
@@ -97,7 +99,11 @@ Deliverable: an **external-modification register**, one entry per finding, with 
 
 Searching is read-only and triggers no human gate. Misses matter as much as hits: the P9
 report states what was searched, not only what was found, so "no post-enactment modification
-found" is a checked claim rather than an assumption.
+found" is a checked claim rather than an assumption. Machine-readable format:
+[`schemas/external-modifications.schema.json`](./schemas/external-modifications.schema.json) —
+defined and validated 2026-08-02, with a `searches[]` section carrying that last sentence's
+contract (a search records its scope and, required, what it does **not** cover) and a
+completeness join over the source bundle's annotation inventory.
 
 ### P3 — Encode, isomorphically, in inert style
 
@@ -127,7 +133,11 @@ an authority has already settled carries that resolution rather than presenting 
 world knowledge supports a sensible default, preload it as a `TYPICALLY` metadata default (the
 feature is merged — PR #92). Representation of forks is ruled (R4, ANSWERED 2026-08-02): one
 `Interpretation` record parameter, fork register entries mapping 1:1 to its fields — see
-[R4-FORK-REPRESENTATION.md](./R4-FORK-REPRESENTATION.md).
+[R4-FORK-REPRESENTATION.md](./R4-FORK-REPRESENTATION.md). Machine-readable format:
+[`schemas/fork-register.schema.json`](./schemas/fork-register.schema.json) — defined and
+validated 2026-08-02, enforcing that 1:1 map. It also records forks that are **not**
+materialised: the BNA smoke's twelve ambiguities were all resolved at encode time or delegated
+to a fact-supplier, so `materialisation` is a discriminator rather than an assumption.
 
 ### P5 — Adversarial gate
 
@@ -215,7 +225,7 @@ unstable now.
 | inert-style guidance       | repo skill `.claude/skills/writing-l4-rules/` (inert guidance in `drafting-patterns.md`); fuller treatment in the user-level `l4` skill                                                                                                                                                                                                                                                                                  |
 | adversarial workflows      | proven pattern (#175, #176, #178 merged; #177 built the same way and since merged); not yet packaged as a reusable pipeline stage                                                                                                                                                                                                                                                                                        |
 | P8 verifier toolchain      | not inventoried here — R5 asks which existing machinery or external tool goes first                                                                                                                                                                                                                                                                                                                                      |
-| P2 sweep tooling           | no repo component needed — agent web search; the register format is defined in P2 itself                                                                                                                                                                                                                                                                                                                                 |
+| P2 sweep tooling           | no repo component needed for the searching — that is agent web search. The register format is now machine-readable: `schemas/external-modifications.schema.json`, validated by `etc/go/lib/register-validate.mjs` (added 2026-08-02, alongside the P1 and P4 contracts)                                                                                                                                                  |
 | orchestrator ("go")        | **milestone G1 runs today** — `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every reachable projection and emits report v0; seven stages (P1, P2, P3-encode, P4, P5, P8, P10) are scaffolded and refuse with a named blocker; R4 is ruled (2026-08-02) so G2's blocker is now unbuilt tooling, not an open ruling. Present-tense inventory: [ORCHESTRATOR.md](./ORCHESTRATOR.md) |
 | corpus-of-law repo         | **does not exist yet** — R1 ruled in full 2026-08-02: `legalese/canon`, public from day one with inspectable gates and encoding versions, sidecar class/instance layout, Apache-2.0 + carried source-terms + optional CC-BY prose. Creation itself is an HG2 act                                                                                                                                                         |
 
@@ -231,7 +241,10 @@ unstable now.
   with oracle class `execution` on both engines (ORCHESTRATOR.md §5.4).
 - **G2 — de novo run.** P1–P6 executed from the SEC source by agents; acceptance = the §8
   diff oracle. Entry condition satisfied 2026-08-02: fork representation ruled (R4, the
-  `Interpretation` parameter). The P1–P6 tooling itself remains to be built.
+  `Interpretation` parameter). The P1–P6 tooling itself remains to be built. The acceptance
+  comparator does not: it was built 2026-08-02 as `etc/go/lib/denovo-diff.mjs`, designed in
+  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md), and has never been run against a second
+  encoding because none exists.
 - **G3 — execution parity.** Every P7 leg executes: BKM emission (DMN spec Phase 5, with
   whatever of Phase 4 it needs — the owning spec sequences them) landed and the corpus DMN
   runs on both engines (**done 2026-08-02** — PRs #188 + #194, measured in ORCHESTRATOR.md
@@ -280,6 +293,15 @@ then diffs its encoding against `jl4/examples/legal/regcf/regcf.l4`:
   the fork register), or improvement over the hand corpus (backport).
 - The triage table goes into the conversion report. A de novo run that merely reproduces the
   corpus is a pass; one that finds a defect in it is a better pass.
+
+**Built 2026-08-02, unexercised.** The comparator is `etc/go/lib/denovo-diff.mjs` and its pairing
+format is `schemas/surface-map.schema.json`; the design, the two self-tests verbatim, and the list
+of what the comparison cannot see are in [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md). It is
+behavioural, not textual — two encodings of one statute share no names, so it pairs decisions by
+declared correspondence and diffs answers over a shared fact battery. The three dispositions above
+are judgements: the script emits the table with every row `UNTRIAGED` and never fills one in.
+Its largest blind spot is stated there and repeated in every report it writes: the battery
+exercises decisions, so a divergence confined to the deontic layer would not appear.
 
 ## 9. Open rulings
 

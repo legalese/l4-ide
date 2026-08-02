@@ -1,0 +1,149 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "bna",
+  "note": "INVALID FIXTURE. Structurally well-formed on purpose, so the x-rules actually run rather than being short-circuited by a shape error. Every entry below trips a named rule, and etc/go/selftest.mjs asserts the rule names. Rules expected to fire: entry-ids-unique, taken-names-a-live-reading, at-least-one-live-reading, materialisation-implies-field, materialisation-implies-mechanism, interpretation-fields-unique, non-live-readings-explain, live-readings-cite-their-licence, settled-or-demoted-requires-authority, demoted-requires-a-demoted-reading, quote-or-absent-reason, materialised-forks-declare-divergence, observable-divergence-requires-witnesses, witnesses-only-when-observable, and cross-refs-resolve when the external-modifications peer is given.",
+  "entries": [
+    {
+      "id": "X1",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "delegated_field": "wrong arm: interpretation-field forbids this and requires interpretation_field",
+      "site": {
+        "file": "nowhere.l4",
+        "anchor": "x",
+        "provisions": ["s 1"]
+      },
+      "source": {
+        "quote": "both a quote",
+        "quote_absent_reason": "and an absent reason",
+        "citation": "s 1"
+      },
+      "readings": [
+        {
+          "id": "alpha",
+          "description": "a live reading with no citation",
+          "status": "live",
+          "citations": []
+        },
+        {
+          "id": "beta",
+          "description": "a rejected reading with no rationale",
+          "status": "rejected",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "beta",
+        "mechanism": "encoded",
+        "rationale": "takes a rejected reading, and the mechanism does not match the materialisation"
+      },
+      "status": "resolved",
+      "witnesses": ["a witness with no observable divergence declared"],
+      "cross_refs": ["EM-DOES-NOT-EXIST"]
+    },
+    {
+      "id": "X1",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "interpretation_field": "claimed",
+      "delegated_field": "also claimed",
+      "site": {
+        "file": "nowhere.l4",
+        "anchor": "y",
+        "provisions": ["s 2"]
+      },
+      "source": { "citation": "s 2" },
+      "readings": [
+        {
+          "id": "gamma",
+          "description": "rejected",
+          "status": "rejected",
+          "rejection_rationale": "because",
+          "citations": []
+        },
+        {
+          "id": "delta",
+          "description": "also rejected, so nothing is live",
+          "status": "rejected",
+          "rejection_rationale": "because",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "gamma",
+        "mechanism": "fact-supplied",
+        "rationale": "no live reading exists to take"
+      },
+      "status": "demoted",
+      "cross_refs": []
+    },
+    {
+      "id": "X3",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "claimed",
+      "site": {
+        "file": "nowhere.l4",
+        "anchor": "z",
+        "provisions": ["s 3"]
+      },
+      "source": { "quote": "words", "citation": "s 3" },
+      "readings": [
+        {
+          "id": "epsilon",
+          "description": "live and cited",
+          "status": "live",
+          "citations": [{ "kind": "provision", "cite": "s 3" }]
+        },
+        {
+          "id": "zeta",
+          "description": "live and cited",
+          "status": "live",
+          "citations": [{ "kind": "provision", "cite": "s 3" }]
+        }
+      ],
+      "taken": {
+        "reading": "epsilon",
+        "mechanism": "TYPICALLY",
+        "rationale": "correct mechanism, but no divergence is declared for a materialised fork"
+      },
+      "status": "settled",
+      "cross_refs": []
+    },
+    {
+      "id": "X4",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "nowhere.l4",
+        "anchor": "w",
+        "provisions": ["s 4"]
+      },
+      "source": { "quote": "words", "citation": "s 4" },
+      "readings": [
+        {
+          "id": "eta",
+          "description": "live and cited",
+          "status": "live",
+          "citations": [{ "kind": "provision", "cite": "s 4" }]
+        },
+        {
+          "id": "theta",
+          "description": "rejected with a rationale",
+          "status": "rejected",
+          "rejection_rationale": "because",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "eta",
+        "mechanism": "encoded",
+        "rationale": "everything here is fine except the divergence claim"
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "cross_refs": []
+    }
+  ]
+}
