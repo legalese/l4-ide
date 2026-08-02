@@ -594,7 +594,7 @@ when Rule 100(a)(2)'s carve-out applies:
 
 They were plain `NUMBER`s until 2026-07-27, computed with the carve-out ignored, so an accredited
 investor was told `"your 12 month limit": 10000` — a cap that does not exist in law, and which
-`regcf.l4:806` contradicts outright by asserting that the very same investor is within the limit
+`regcf.l4:922` contradicts outright by asserting that the very same investor is within the limit
 at $5,000,000. The prose field said the right thing and the numbers did not. A citizen asking "may
 I invest $50,000?" would have compared against 10000 and concluded no; an LLM reading the
 structured fields would have reported the same. A wrong number in a field a form renders as its
