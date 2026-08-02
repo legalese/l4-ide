@@ -247,12 +247,38 @@ instance LayoutPrinterWithName a => LayoutPrinter (OptionallyNamedType a) where
     MkOptionallyNamedType _ _ ty ->
       printWithLayout ty
 
+-- | Does this type mention an inference variable?
+--
+-- An 'InfVar' is a hole the CHECKER opened while inferring, and the 'Type''
+-- instance renders it as its seed name plus a global counter — @x809@,
+-- @purpose254@. That gensym is not an identifier in any scope, so emitting one
+-- turns a binder the author deliberately left unannotated into a reference to
+-- something undefined. See 'OptionallyTypedName' below.
+hasInferenceVariable :: Type' a -> Bool
+hasInferenceVariable = \ case
+  InfVar{}        -> True
+  Type _          -> False
+  TyApp _ _ ps    -> any hasInferenceVariable ps
+  Fun _ args ty   -> any (hasInferenceVariable . ontType) args || hasInferenceVariable ty
+  Forall _ _ ty   -> hasInferenceVariable ty
+  where
+    ontType (MkOptionallyNamedType _ _ t) = t
+
 instance LayoutPrinterWithName a => LayoutPrinter (OptionallyTypedName a) where
   printWithLayout = \ case
     MkOptionallyTypedName _ a ty typically ->
+      -- Drop an annotation the checker invented. `GIVEN x YIELD x` type-checks
+      -- to `MkOptionallyTypedName x (Just (InfVar "x" 12))`, which printed as
+      -- `GIVEN x IS x12 YIELD x` — source that parses and then fails with "I
+      -- could not find a definition for the identifier x12". The binder's type
+      -- is optional in the grammar precisely because it can be re-inferred, so
+      -- the repair is to emit what the author wrote and let the checker do its
+      -- job again. This is the gensym leak PR legalese#206 reported as
+      -- `GIVEN purpose IS purpose254` reaching the DMN exporter's raw-L4
+      -- fallback.
       printWithLayout a <> case ty of
-        Nothing -> mempty
-        Just ty' -> space <> "IS" <+> printWithLayout ty'
+        Just ty' | not (hasInferenceVariable ty') -> space <> "IS" <+> printWithLayout ty'
+        _ -> mempty
       <> case typically of
         Nothing -> mempty
         Just e -> space <> "TYPICALLY" <+> printWithLayout e
