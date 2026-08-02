@@ -5960,3 +5960,126 @@ prediction above held, with one pin corrected under measurement (`the_over_limit
 qualifies` — the λ-lift closure binding, recorded in the cases file and §15.7). (Those are the
 single-base-case banners; after R-C's relocation cases — §15.12.1 — and the 2026-08-03 seed
 cases, the same artifact measures `20 case(s) … 1340/1340` on both engines.)
+
+## 17. List quantifiers, and the binder that has to actually bind — R14, 2026-08-03
+
+Upstream `smucclaw/l4-ide#936`, found by the Jersey Charities cleanroom smoke test
+(`legalese/l4-ide#201`) and measured on both engines. Two gaps, and the issue insists they land
+together; §17.3 is why.
+
+### 17.1 Gap 1 — `all` / `any` had no FEEL lowering
+
+A wholly constitutive statute leans on `all` / `any` over a list. Both quantifier sites emitted raw
+L4 inside boxed literal expressions (blocking `D-LITERALEXPR`) and **both engines refused the whole
+file** — KIE 4 errors, Camunda a parse error. FEEL has quantified expressions (DMN 1.3 grammar
+rule 1: `some|every <name> in <expr> satisfies <expr>`), so the notation was never the obstacle.
+The lowering is the same class of omission `YMD` was before #196.
+
+`all` and `any` are ordinary **prelude `DECIDE`s**, not builtins with a `Unique` to match on, so
+they are recognised by **provenance** — `fromPrelude`, the same predicate shape `fromDaydate` uses
+for date constructors (§15.4, and `smucclaw#933`). A module that defines its own `all` is not the
+prelude's and is not lowered as though it were.
+
+### 17.2 Gap 2 — `D-PARAM-AS-INPUT` is UNSOUND under a binder
+
+Phase 4 un-lifts a tier-1 decide's parameters into module-level `inputData` (§2.1) and renders a
+saturated call as the callee's **bare decision name**, discarding the argument. Phase 5 binds a
+BKM's λ-lifted closure parameters `name: name` to the same globals (§6.2). Both are ruled, reported
+losses — and both are **wrong answers, not lossy ones, under a quantifier**: the bound variable
+never varies, because every figure inside the predicate reaches the artifact through a global the
+element is supposed to be varying.
+
+The measured shape, from the cleanroom's cause-isolation probe (only the two quantifier `<text>`
+bodies hand-patched to `some`/`every`, nothing else changed): 25 cases run end to end, and **both
+engines disagree with L4 on the same 7/1000 pins, in the same three worlds — every world whose
+entity holds more than one purpose.** A single-purpose entity masks it exactly, because the sole
+element coincides with the global. A cases file built only from single-purpose entities would have
+certified the broken lowering at 1000/1000.
+
+### 17.3 Why one change and not two
+
+Today Gap 2 is masked by Gap 1's refusal in the enclosing body. Shipping the `some`/`every`
+lowering alone removes the refusal and leaves the wrong answers underneath it: **a loud refusal
+becomes a silent wrong answer on multi-element inputs.** So the lowering installs a binder
+environment, and every arm that environment feeds refuses rather than guesses.
+
+### 17.4 The binder environment
+
+Three fields on `NameEnv`, all empty except under a quantifier:
+
+- **`neBinderSubst`**, keyed by the L4 **name** the bound variable shadows. Name-keyed is not a
+  shortcut: un-lifting merges parameters into `inputData` **by verbatim L4 name** (§2.5.3), so two
+  parameters spelled the same _are_ the same global, and a binder named `purpose` shadows exactly
+  the global every `purpose`-parameterised decide reads. It is the same shadowing rule §6.2's
+  λ-lift already depends on.
+- **`neInlineHere`** — the decides that name carries, i.e. those with a `GIVEN` of that name.
+- **`neParamDecls`** — every kept parameterised decide's binders and prepared body
+  (`carameliseExpr`, then `peelLocals`), which is the raw material for re-rendering one against the
+  bound element.
+
+Under the binder, three rules replace three unsound renderings:
+
+| site                                  | before                                 | after                                                                                                                      |
+| ------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| saturated call to an un-lifted decide | bare decision name, argument discarded | body inlined with **every** parameter bound to its argument                                                                |
+| bare reference to such a decide       | bare decision name                     | body inlined with the **shadowed** parameters bound to the element; the rest keep reading their globals, exactly as before |
+| a BKM's λ-lifted closure              | `name: name`, the global               | the lifted decide's body, inlined against the element                                                                      |
+
+A reference the binder covers that will not inline is **refused verbatim**. There is no fallback to
+the global: falling back is the silent wrong answer this ruling exists to prevent. `BkmCallInfo`
+gained the `Unique` beside each closure name for exactly this — `name: name` cannot tell a
+binder-relative closure from an ordinary one without knowing what is being lifted.
+
+The predicate's binder comes from one of two shapes — a one-parameter `Lam`, or an **eta-expansion**
+of a callee applied to one argument short. The eta-expansion reuses the **callee's own `GIVEN`** as
+the binder rather than inventing one, which is what makes the binder shadow precisely the global
+that callee would otherwise have read. Anything else refuses.
+
+The bound variable's FEEL name is deliberately **not** the shadowed global's: keeping the two
+distinguishable is what leaves a leaked global reference visible in the emitted text instead of
+laundered by the binder.
+
+### 17.5 The DRG follows the inline
+
+What the lowering inlines is in the emitted text, so it is in the requirement graph. Without this
+the artifact invokes a BKM it declares no `knowledgeRequirement` to — a whole-model KIE compile
+error and a **silent Camunda null** — which is what `D-KNOWLEDGEREQ` (§6.2 / §13.3) exists to
+catch, and it did catch it during this build, on `5(1)(a)`. `binderInlinedBodies` mirrors
+`renderFeelIn`'s rules exactly (same binder shapes, same name-keyed shadowing, same fuel), because
+a DRG computed by a different rule from the text is the defect class this whole module is against.
+It only **adds** edges: an edge the inline made redundant stays, since a spurious
+`requiredDecision` to a real decision is inert where a missing one is fatal.
+
+### 17.6 [E] MEASURED 2026-08-03 — the regression gate
+
+The gate #936 sets is the cleanroom corpus's own cases file executing from the **raw emitted** DMN,
+no hand patch, with the three multi-purpose worlds in it. Emitting
+`jl4/examples/legal/charities-cleanroom/charity-test.l4` (PR #201's branch; the corpus is evidence
+here, not a golden of this tree) with this tree's exporter gives **zero blocking notes** — down
+from 1 blocking `D-LITERALEXPR` per quantifier site — and verbatim:
+
+```
+KIE 8.44.0.Final VERDICT: 1 file(s), 25 case(s), 0 error(s), 0 warning(s), 1000/1000 decision(s) SUCCEEDED, 1000/1000 value(s) as expected, 125/125 service output value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 25 case(s), 1 parsed, 0 error(s), 1000/1000 decision(s) evaluated, 1000/1000 value(s) as expected
+```
+
+both exit 0. The three discriminating worlds are cases 1, 3 and 4 (two purposes each); the
+hand-patched Gap-1-only probe answered **993/1000** on the same file, and the 7 it missed are
+theirs.
+
+Golden churn: **none.** The binder environment is empty outside a quantifier, so every arm it feeds
+is unreachable in a module that has none, and no expected artifact in this tree moved a byte.
+
+### 17.7 Still open from #936
+
+Two smaller notes in the same issue are **not** closed here, and neither is a wrong answer:
+
+- **`LIST OF τ` mints no collection itemDefinition** (`D-ITEMDEF`, Lossy): `isCollection` is an
+  attribute of `tItemDefinition`, not of a `typeRef`, so a collection needs a definition of its
+  own. Emitted `typeRef="Any"`; both engines tolerate it, and the loss is type information only.
+  Closing it means an `idfCollection` flag through `IR` and `Emit`, an element type out of
+  `classifyType` (which today answers `DmnAny` plus `tfList`), and one minted definition per
+  distinct element type — and it moves `sumtype.fidelity.txt`.
+- **A gensym leaks into the raw-L4 fallback** — `GIVEN purpose IS purpose254`, an inference
+  variable printed in a binder's declared-type slot. Cosmetic, on a refusal path, and it lives in
+  `L4.Print` where a repair would move exactprint goldens well outside this exporter.

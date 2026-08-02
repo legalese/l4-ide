@@ -216,6 +216,34 @@ data NameEnv = MkNameEnv
     -- literal @{f: e, …}@ — the same reading the hydration design gives a
     -- record (a FEEL context IS the record) — iff every stored field is
     -- supplied exactly once; anything else stays verbatim.
+  , neParamDecls :: !(Map Unique DecideShape)
+    -- ^ every kept, parameterised decide: its @GIVEN@ binders and its PREPARED
+    -- body (caramelised, @WHERE@\/@LET@ peeled — the same two preparations
+    -- every other body gets). Read only under a quantifier binder, where an
+    -- un-lifted decide's GLOBAL value is the wrong value and its body has to be
+    -- re-rendered against the bound element instead (#936, Gap 2).
+  , neBinderSubst :: !(Map Text (Expr Resolved))
+    -- ^ __under a list quantifier only.__ The L4 @GIVEN@ NAME the bound
+    -- variable shadows, to the expression standing for the bound element.
+    --
+    -- Keyed by NAME, and that is not a shortcut: Phase 4 un-lifts a decide's
+    -- parameters into module-level @inputData@ MERGED BY VERBATIM L4 NAME
+    -- (§2.5.3), so two parameters with the same name ARE the same global. A
+    -- binder named @purpose@ therefore shadows exactly the global that every
+    -- @purpose@-parameterised decide reads — the same shadowing rule §6.2's
+    -- λ-lift already relies on.
+  , neInlineHere :: !(Set Unique)
+    -- ^ __under a list quantifier only.__ Decides whose emitted global value is
+    -- binder-relative — those carrying a @GIVEN@ named by 'neBinderSubst' — and
+    -- which must therefore be INLINED against the bound element rather than
+    -- referenced by name. A reference this set covers and 'inlineBody' cannot
+    -- discharge is refused verbatim, never rendered: that is the whole point of
+    -- #936 landing both halves together.
+  , neInlineFuel :: !Int
+    -- ^ inline depth remaining. The DMN-safe call graph is acyclic
+    -- (@D-RECURSIVE@ refuses cycles before lowering), so this is a belt against
+    -- a future caller handing 'renderFeelIn' an unchecked environment, not a
+    -- live hazard; at zero the inline refuses instead of looping.
   , neComputedInline :: !(Map Unique (Unique, Expr Resolved))
     -- ^ self-contained computed selectors (§4.4 × §6.2): selector 'Unique' →
     -- (the @_self@ binder's 'Unique', the prepared body). A computed read
@@ -249,12 +277,19 @@ data BkmCallInfo = MkBkmCallInfo
   , bciParams   :: ![Text]
     -- ^ the resolved FEEL names of the L4 @GIVEN@ parameters, positional — the
     -- position→name map fixed once at the BKM and reused at every call site.
-  , bciClosure  :: ![Text]
+  , bciClosure  :: ![(Text, Maybe Unique)]
     -- ^ the λ-lifted closure parameters (§6.2's measured boundary: a BKM body
     -- may read nothing beyond its parameters and knowledge requirements),
     -- each named exactly as the module element it lifts; the call site
     -- supplies each as @name: name@, which the caller has in scope through
     -- its own requirement edges.
+    --
+    -- The 'Unique' beside each name is the module element it lifts
+    -- ('EnvDirect'; 'Nothing' for a hydrator), and it exists for one reason:
+    -- @name: name@ binds the GLOBAL, and under a quantifier binder the global
+    -- is the wrong value — the bound element's is wanted. Without the identity
+    -- of what is being lifted, the call site cannot tell the two apart, which
+    -- is precisely #936's Gap 2.
   }
 
 -- | The resolved 'Unique's of the prelude's @isJust@ and @isNothing@.
@@ -285,7 +320,19 @@ emptyNameEnv = MkNameEnv
   , neBkmParams  = Set.empty
   , neServiceCalls = Map.empty
   , neRecordCtors = Map.empty
+  , neParamDecls = Map.empty
+  , neBinderSubst = Map.empty
+  , neInlineHere = Set.empty
+  , neInlineFuel = 16
   , neComputedInline = Map.empty
+  }
+
+-- | A parameterised decide, as a quantifier binder needs to see it: the @GIVEN@
+-- binders in order, and the body already through the two preparations every
+-- rendered body gets ('carameliseExpr', then 'peelLocals').
+data DecideShape = MkDecideShape
+  { dsParams :: ![Resolved]
+  , dsBody   :: !(Expr Resolved)
   }
 
 -- | What a single table needs to know beyond its rows.
@@ -908,6 +955,15 @@ foldDateLiteral oracle e = case e of
   ymdHead r = fromDaydate r && named r ["YMD", "Year month day"]
   named r ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
 
+-- | Provenance: does this reference resolve to a definition in the standard
+-- @prelude@?
+--
+-- Asked of @all@ \/ @any@ before either is lowered to a FEEL quantifier
+-- (#936): they are ordinary prelude @DECIDE@s, so the same reasoning as
+-- 'fromDaydate' applies unchanged.
+fromPrelude :: Resolved -> Bool
+fromPrelude = definedIn "prelude.l4"
+
 -- | Provenance: does this reference resolve to a definition in the @daydate@
 -- library?
 --
@@ -929,8 +985,13 @@ foldDateLiteral oracle e = case e of
 -- that shadows it while ALSO being called @daydate.l4@ is the library, by
 -- resolution.
 fromDaydate :: Resolved -> Bool
-fromDaydate r =
-  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') uriText == "daydate.l4"
+fromDaydate = definedIn "daydate.l4"
+
+-- | The basename of the module that minted this reference's defining
+-- occurrence. See 'fromDaydate' for why the BASENAME is the right granularity.
+definedIn :: Text -> Resolved -> Bool
+definedIn base r =
+  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') uriText == base
  where
   uriText = (fromNormalizedUri (getUnique r).moduleUri).getUri
 
@@ -1752,6 +1813,17 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                -- a decision variable — rendering it bare would be valid-looking
                -- FEEL that KIE refuses and Camunda nulls. Verbatim, Blocking.
                | Map.member (getUnique r) names.neBkms        -> verbatim e
+               -- #936 Gap 2. Under a quantifier binder, a BARE reference to a
+               -- decide the binder shadows names a GLOBAL decision computed
+               -- from the global input — the very value the binder is meant to
+               -- vary. Re-render its body instead, with the shadowed
+               -- parameters bound to the element (its OTHER parameters are
+               -- left, so they still read their globals, which is exactly the
+               -- @D-PARAM-AS-INPUT@ semantics they already had). If the body
+               -- will not inline, REFUSE: rendering the bare name here is the
+               -- silent wrong answer the issue is about.
+               | Set.member (getUnique r) names.neInlineHere  ->
+                   maybe (verbatim e) goIn (inlineBody names (getUnique r) [])
                | otherwise                                    -> (atomPrec, nullaryText r, SFeel)
     -- JUST x IS x. FEEL has one flat null and no tag, so the constructor has no
     -- image; the payload does. (R8-d′)
@@ -1932,6 +2004,55 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- (see 'constantOf').
     App _ _ (_ : _) | Just d <- foldDateLiteral oracle e ->
       (atomPrec, renderFeelValue (VDate d), SFeel)
+    -- #936 Gap 1: `all f xs` / `any f xs` over a list. FEEL spells both —
+    -- @every x in xs satisfies p@ and @some x in xs satisfies p@ (DMN 1.3
+    -- grammar rule 1's quantified expression) — so the notation was never the
+    -- obstacle; the lowering was simply missing, and both sites fell to raw L4
+    -- that neither engine parses.
+    --
+    -- Recognised by PROVENANCE, the way 'fromDaydate' recognises a date
+    -- constructor and for the same reason: `all`\/`any` are ordinary prelude
+    -- @DECIDE@s, not builtins with a `Unique` to match on, and a module that
+    -- defines its own `all` must not be lowered as though it were the
+    -- prelude's.
+    --
+    -- __Landed together with Gap 2, deliberately__ (#936's "why one issue, not
+    -- two"). This lowering ALONE would have removed a loud refusal while
+    -- leaving the wrong answers underneath it: the bound variable would be
+    -- inert, because every figure inside the predicate reaches the emitted
+    -- artifact through a global the element is supposed to vary. The binder
+    -- environment installed here is what makes the bound variable actually
+    -- bind, and every arm it feeds refuses rather than guesses.
+    App _ q [predE, listE]
+      | Just kw <- listQuantKeyword q ->
+          case quantBinder names predE of
+            Nothing -> verbatim e
+            Just (bRes, bodyE) ->
+              let bLName = nameOf bRes
+                  v      = binderFeelName names bLName
+                  names' = names
+                    { neVars        = Map.insert (getUnique bRes) v names.neVars
+                    , neBinderSubst =
+                        Map.insert bLName (App emptyAnno bRes []) names.neBinderSubst
+                    , neInlineHere  =
+                        Set.union names.neInlineHere (shadowedDecides names bLName)
+                    }
+                  (_, listT, listF) = go listE
+                  bodyR = renderFeelIn names' ctors oracle bodyE
+              in if listF == L4Verbatim || bodyR.feFragment == L4Verbatim
+                   then verbatim e
+                   else ( atomPrec
+                        , "(" <> kw <> " " <> v <> " in " <> listT
+                            <> " satisfies " <> bodyR.feText <> ")"
+                        , FullFeel
+                        )
+    -- #936 Gap 2, the saturated-call half. Checked BEFORE un-lifting, because
+    -- un-lifting is what discards the argument: under a binder that argument is
+    -- the bound element and discarding it is the defect.
+    App _ f as@(_ : _)
+      | Set.member (getUnique f) names.neInlineHere
+      , not (Map.member (getUnique f) names.neBkms) ->
+          maybe (verbatim e) goIn (inlineBody names (getUnique f) as)
     -- Phase 4 un-lifting (§2.1): a saturated call to a tier-1, DMN-SAFE
     -- decision renders as the callee's bare FEEL name. The decision's
     -- parameters are module-level inputData now, so the FEEL name resolves to
@@ -1957,17 +2078,23 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
       | Just info <- Map.lookup (getUnique f) names.neBkms
       , length es == length info.bciParams ->
           let parts = map go es
-          in if any (\(_, _, fr) -> fr == L4Verbatim) parts
-               then verbatim e
-               else ( atomPrec
-                    , info.bciFeelName <> "("
-                        <> Text.intercalate ", "
-                             ( zipWith (\p (_, t, _) -> p <> ": " <> t) info.bciParams parts
-                                 <> [c <> ": " <> c | c <- info.bciClosure]
-                             )
-                        <> ")"
-                    , FullFeel
-                    )
+              closures = traverse closureArg info.bciClosure
+          in case closures of
+               _ | any (\(_, _, fr) -> fr == L4Verbatim) parts -> verbatim e
+               -- A closure the binder shadows that will not inline is a REFUSAL,
+               -- not a fallback to `name: name`: falling back is what would turn
+               -- #936's loud refusal into a silent wrong answer.
+               Nothing -> verbatim e
+               Just cs ->
+                 ( atomPrec
+                 , info.bciFeelName <> "("
+                     <> Text.intercalate ", "
+                          ( zipWith (\p (_, t, _) -> p <> ": " <> t) info.bciParams parts
+                              <> cs
+                          )
+                     <> ")"
+                 , FullFeel
+                 )
     -- §13.5's one flavor bit, the call-site half: on `kie`, a saturated call
     -- to a §-invocable decide renders as a named-argument invocation of the
     -- SERVICE, binding the service's inputData names (§2.3.1). Empty map on
@@ -2139,6 +2266,101 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
 
     parenIf True t  = "(" <> t <> ")"
     parenIf False t = t
+
+  -- Re-enter with a modified environment. Loses the precedence of the
+  -- sub-render, so it claims the LOWEST precedence and lets every enclosing
+  -- operator parenthesise it; a spurious pair of brackets is the right price
+  -- for never emitting an unbracketed one.
+  goIn :: Expr Resolved -> (Int, Text, FeelFragment)
+  goIn x =
+    let r = renderFeelIn (names { neInlineFuel = names.neInlineFuel - 1 }) ctors oracle x
+    in (0, r.feText, r.feFragment)
+
+  -- @every@ \/ @some@, or not a list quantifier at all.
+  listQuantKeyword :: Resolved -> Maybe Text
+  listQuantKeyword r
+    | not (fromPrelude r) = Nothing
+    | named ["all"]       = Just "every"
+    | named ["any"]       = Just "some"
+    | otherwise           = Nothing
+   where
+    named ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
+
+  -- The predicate's binder and the body to render under it. Three shapes, and
+  -- nothing else — an unrecognised predicate falls to 'verbatim', which is the
+  -- refusal.
+  --
+  -- The two ETA-EXPANDED shapes reuse the CALLEE's own @GIVEN@ as the binder
+  -- rather than inventing one. That is not a convenience: the un-lift merges
+  -- parameters by name, so binding the callee's own parameter is what makes the
+  -- binder shadow exactly the global the callee would otherwise have read.
+  quantBinder :: NameEnv -> Expr Resolved -> Maybe (Resolved, Expr Resolved)
+  quantBinder env = \case
+    Lam _ (MkGivenSig _ [MkOptionallyTypedName _ n _ _]) body -> Just (n, body)
+    App _ f as
+      | Just ds <- Map.lookup (getUnique f) env.neParamDecls
+      , length ds.dsParams == length as + 1
+      , Just p <- lastMay ds.dsParams ->
+          Just (p, App emptyAnno f (as <> [App emptyAnno p []]))
+    _ -> Nothing
+   where
+    lastMay xs = if null xs then Nothing else Just (last xs)
+
+  -- Which decides the binder shadows: those carrying a @GIVEN@ of the binder's
+  -- L4 name. Name-keyed because the un-lift is (§2.5.3).
+  shadowedDecides :: NameEnv -> Text -> Set Unique
+  shadowedDecides env n = Set.fromList
+    [ u | (u, ds) <- Map.toList env.neParamDecls, any ((== n) . nameOf) ds.dsParams ]
+
+  -- A FEEL name for the bound variable that collides with NOTHING already in
+  -- scope. Deliberately not the shadowed global's own name: keeping the two
+  -- distinguishable is what lets a leaked global reference stay visible in the
+  -- emitted text instead of being laundered by the binder.
+  binderFeelName :: NameEnv -> Text -> Text
+  binderFeelName env base = pick (0 :: Int)
+   where
+    taken = Set.fromList (Map.elems env.neVars <> Map.elems env.neFields)
+    stem  = feelIdentText base <> "_elem"
+    pick k =
+      let cand = if k == 0 then stem else stem <> "_" <> tshow k
+      in if Set.member cand taken then pick (k + 1) else cand
+
+  -- A binder-shadowed decide's body, with the shadowed parameters bound to the
+  -- element. With ARGUMENTS (a saturated call) every parameter is bound to its
+  -- argument, which is strictly more faithful than un-lifting's discard; with
+  -- NONE (a bare reference, or a λ-lifted closure) only the shadowed ones are,
+  -- and the rest keep reading their globals exactly as before.
+  inlineBody :: NameEnv -> Unique -> [Expr Resolved] -> Maybe (Expr Resolved)
+  inlineBody env u args = do
+    guard (env.neInlineFuel > 0)
+    ds <- Map.lookup u env.neParamDecls
+    sub <-
+      if null args
+        then Just (Map.fromList
+                    [ (getUnique p, x)
+                    | p <- ds.dsParams
+                    , Just x <- [Map.lookup (nameOf p) env.neBinderSubst]
+                    ])
+        else do
+          guard (length args == length ds.dsParams)
+          Just (Map.fromList (zip (map getUnique ds.dsParams) args))
+    guard (not (Map.null sub))
+    pure (substLocals sub ds.dsBody)
+
+  -- One λ-lifted closure argument at a call site. @name: name@ everywhere
+  -- EXCEPT under a binder that shadows what the closure lifts, where the global
+  -- is the wrong value; there the lifted decide's body is inlined against the
+  -- bound element. Refuses (by rendering the whole invocation verbatim, via the
+  -- 'L4Verbatim' the caller checks) rather than fall back to the global.
+  closureArg :: (Text, Maybe Unique) -> Maybe Text
+  closureArg (c, mu) = case mu of
+    Just u
+      | Set.member u names.neInlineHere -> do
+          b <- inlineBody names u []
+          let (_, t, f) = goIn b
+          guard (f /= L4Verbatim)
+          pure (c <> ": " <> t)
+    _ -> Just (c <> ": " <> c)
 
   nullaryText r = case constantRefIn ctors r of
     Just v  -> renderFeelValue v
@@ -4441,7 +4663,33 @@ lowerModule opts modul@(MkModule _ uri _) =
     , neServiceCalls = svcCallInfos
     , neRecordCtors = recordCtorFields
     , neComputedInline = selfContainedSelectors
+    , neParamDecls = paramDeclShapes
+    , neBinderSubst = Map.empty
+    , neInlineHere = Set.empty
+    , neInlineFuel = 16
     }
+
+  -- #936 Gap 2's raw material: every KEPT, PARAMETERISED decide, with its body
+  -- already through the two preparations a rendered body gets. Built for the
+  -- whole population rather than for the un-lifted set alone, because a
+  -- quantifier's own predicate is often a tier-2 (BKM) decide and the ETA
+  -- expansion in 'quantBinder' needs its parameter list to build the
+  -- application; the INLINE trigger is 'neInlineHere', which is empty except
+  -- under a binder.
+  paramDeclShapes :: Map Unique DecideShape
+  paramDeclShapes = Map.fromList
+    [ ( getUnique (decideResolved d)
+      , MkDecideShape
+          { dsParams = ps
+          , dsBody   =
+              let caramelised = carameliseExpr (view decideBody d)
+              in either (const caramelised) fst (peelLocals caramelised)
+          }
+      )
+    | d <- decides
+    , let ps = map fst (A.decideParams d)
+    , not (null ps)
+    ]
 
   -- RECORD constructors only — see 'neRecordCtors'. An enum's constructors
   -- (payload-carrying or not) are deliberately absent.
@@ -4519,6 +4767,14 @@ lowerModule opts modul@(MkModule _ uri _) =
                     ]
               )
       in if m' == m then m else go m'
+
+  -- Which module element a closure member lifts, when it is one a binder can
+  -- shadow. A hydrator is 'Nothing': it stands for a global INSTANCE, which no
+  -- element binder ranges over.
+  closureUnique :: ClosureRef -> Maybe Unique
+  closureUnique = \case
+    EnvDirect u   -> Just u
+    EnvHydrator _ -> Nothing
 
   closureFeelName :: ClosureRef -> Text
   closureFeelName = \case
@@ -4599,7 +4855,7 @@ lowerModule opts modul@(MkModule _ uri _) =
       , MkBkmCallInfo
           { bciFeelName = Map.findWithDefault "" u feelNameByDecideU
           , bciParams   = [gn | (_, _, gn, _) <- givens]
-          , bciClosure  = [cn | (_, cn, _) <- closures]
+          , bciClosure  = [(cn, closureUnique cr) | (cr, cn, _) <- closures]
           }
       )
     | (u, (givens, closures)) <- Map.toList bkmSignatures
@@ -6078,6 +6334,7 @@ lowerModule opts modul@(MkModule _ uri _) =
             in sort . nubOrd $
                  RequiredInput lawId
                    : mapMaybe (classifyRef did) survivors <> hydratorEdges touched
+                       <> binderEdges did bodies
           _ -> case verdictLowering of
             -- R13 × R11: a verdict table's requirements are computed from what
             -- SURVIVES into the artifact — the GUARDS, and nothing else. The
@@ -6098,6 +6355,7 @@ lowerModule opts modul@(MkModule _ uri _) =
                   kept = [r | r <- survivors, Set.member (getUnique r) free]
               in sort . nubOrd $
                    mapMaybe (classifyRef did) kept <> hydratorEdges touched
+                     <> binderEdges did (map fst rs.grRows)
             Nothing ->
               let (survivors, touched) = survivingRefs [view decideBody d]
                   -- 'freeRefs' bounds the survivors to what this decide does not
@@ -6106,6 +6364,7 @@ lowerModule opts modul@(MkModule _ uri _) =
                   kept = [r | r <- survivors, Set.member (getUnique r) free]
               in sort . nubOrd $
                    mapMaybe (classifyRef did) kept <> hydratorEdges touched
+                     <> binderEdges did [view decideBody d]
       }
      where
       hydratorEdges touched =
@@ -6129,6 +6388,96 @@ lowerModule opts modul@(MkModule _ uri _) =
   --     inferring bodies; an earlier version of this comment asserted the
   --     opposite, reasoned from a stale TypeCheck.hs header) — and is the same
   --     SCC check's ≥ 2 arm.
+  -- #936 Gap 2, the DRG half. What the quantifier lowering INLINES ends up in
+  -- the emitted text, so it has to end up in the requirement graph too: without
+  -- this the artifact invokes a BKM it declares no knowledgeRequirement to (KIE
+  -- refuses the model at compile time; Camunda parses it and the calling
+  -- decision answers null with no message at any severity — which is exactly
+  -- what @D-KNOWLEDGEREQ@ exists to catch, and it did catch this) and names
+  -- decision variables and inputs it never required.
+  --
+  -- Returns the INLINED sub-bodies only, never the outer body: the outer body's
+  -- own references are already collected by every caller, and an edge the
+  -- inline made redundant is left in place deliberately. Removing edges is a
+  -- separate question from adding the missing ones, and a spurious
+  -- requiredDecision to a real decision is inert where a missing one is fatal.
+  --
+  -- The three rules mirror 'renderFeelIn' exactly — same binder shapes, same
+  -- name-keyed shadowing, same fuel — because a DRG computed by a different
+  -- rule from the text is the class of defect this whole module is against.
+  binderInlinedBodies :: Expr Resolved -> [(Unique, Expr Resolved)]
+  binderInlinedBodies top =
+    [ (getUnique bRes, x)
+    | App _ q [predE, _] <- toListOf (cosmosOf (gplate @(Expr Resolved))) top
+    , isListQuant q
+    , Just (bRes, predBody) <- [binderOf predE]
+    , x <- expand (16 :: Int) (nameOf bRes) predBody
+    ]
+   where
+    isListQuant r =
+      fromPrelude r
+        && ( nameOf r `elem` ["all", "any"]
+               || unqualifiedNameToText (getActual r) `elem` ["all", "any"] )
+
+    binderOf = \case
+      Lam _ (MkGivenSig _ [MkOptionallyTypedName _ n _ _]) b -> Just (n, b)
+      App _ f as
+        | Just ds <- Map.lookup (getUnique f) paramDeclShapes
+        , length ds.dsParams == length as + 1
+        , not (null ds.dsParams)
+        , let pp = last ds.dsParams ->
+            Just (pp, App emptyAnno f (as <> [App emptyAnno pp []]))
+      _ -> Nothing
+
+    shadowedBy n = Set.fromList
+      [ u | (u, ds) <- Map.toList paramDeclShapes, any ((== n) . nameOf) ds.dsParams ]
+
+    expand fuel n e
+      | fuel <= 0 = []
+      | otherwise =
+          let inl = shadowedBy n
+              sub u args =
+                Map.lookup u paramDeclShapes >>= \ds ->
+                  if null args
+                    then Just (substLocals
+                                 (Map.fromList
+                                    [ (getUnique pp, App emptyAnno pp [])
+                                    | pp <- ds.dsParams, nameOf pp == n ])
+                                 ds.dsBody)
+                    else do
+                      guard (length args == length ds.dsParams)
+                      Just (substLocals
+                              (Map.fromList (zip (map getUnique ds.dsParams) args))
+                              ds.dsBody)
+              here =
+                [ b
+                | App _ f as <- toListOf (cosmosOf (gplate @(Expr Resolved))) e
+                , Set.member (getUnique f) inl
+                , not (Map.member (getUnique f) bkmCallInfos)
+                , Just b <- [sub (getUnique f) as]
+                ]
+                  <> [ b
+                     | App _ f _ <- toListOf (cosmosOf (gplate @(Expr Resolved))) e
+                     , Just info <- [Map.lookup (getUnique f) bkmCallInfos]
+                     , (_, Just cu) <- info.bciClosure
+                     , Set.member cu inl
+                     , Just b <- [sub cu []]
+                     ]
+          in e : concatMap (expand (fuel - 1) n) here
+
+  -- The extra edges 'binderInlinedBodies' earns, as 'dcnRequirements' wants
+  -- them. The binder itself is dropped: it is bound by the quantifier, so it
+  -- names nothing the DRG supplies.
+  binderEdges :: Text -> [Expr Resolved] -> [Requirement]
+  binderEdges did bodies =
+    [ req
+    | (bu, x) <- concatMap binderInlinedBodies bodies
+    , let (survivors, touched) = survivingRefs [x]
+    , req <-
+        mapMaybe (classifyRef did) [r | r <- survivors, getUnique r /= bu]
+          <> [ RequiredDecision hid | u <- touched, Just hid <- [Map.lookup u hydratorIdByInstance] ]
+    ]
+
   -- The first parameter (the owner's id) is retained so every call site reads
   -- unchanged; nothing branches on it any more.
   classifyRef _did r = case Map.lookup u decideByUnique of
