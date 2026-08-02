@@ -1,0 +1,14 @@
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `JUST` with `GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and list of `GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `assess` with 1000
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `JUST` with `assess` with 1000
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `assess if given` with `JUST` with 1000
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 7 and 2024 and `assess if given` with `JUST` with 1000
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `assess if given` with `NOTHING`
+`assess if given` with `JUST` with 1000
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `assess if given` with `JUST` with 1000
+`VALUE AT` with `Date` with 1, 6 and 2023 and given `d` then `assess` with 1000
+`VALUE AT` with `Date` with 1, 7 and 2024 and given `d` then `assess` with 1000
+`apply to zero` with `EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `rate plus`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `apply to zero` with `rate plus`

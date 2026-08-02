@@ -1,0 +1,128 @@
+-- Regression test for the DEEP PIN ruling (smucclaw/l4-ide#934).
+--
+-- `EVAL UNDER RULES EFFECTIVE AT` (and its three sibling EVAL clause
+-- builtins, and `VALUE AT`) used to restore the ambient temporal context the
+-- moment the pinned expression reached WHNF. For a scalar that is exact
+-- (WHNF = NF), but a constructor, record or list carries UNFORCED child
+-- thunks out of the scope, and those were forced later, under the AMBIENT
+-- context. The pin silently did not hold for them.
+--
+-- Pre-fix, case A below answered 7 (pinned, correct) while case B — the SAME
+-- value, wrapped in a JUST — answered `JUST OF 9` (today's regime). Well
+-- typed, no diagnostic, wrong law.
+--
+-- The pin is now DEEP: the pinned expression is forced to the same normal
+-- form the evaluator prints, under the pin, before the context is restored.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z, so the ambient
+-- (unset-axis) rule date is 2025-01-31 — the NEW side of the 2024-01-01
+-- changeover, hence 9.
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+DECLARE Assessment
+    HAS rate    IS A NUMBER
+        payable IS A NUMBER
+
+-- GST rose from 7% to 9% for rules effective on/after 2024-01-01.
+`GST rate` MEANS
+    IF (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL (Date 1 1 2024))
+    THEN 9
+    ELSE 7
+
+GIVEN amount IS A NUMBER
+GIVETH AN Assessment
+assess amount MEANS
+    Assessment `GST rate` (amount TIMES `GST rate` DIVIDED BY 100)
+
+GIVEN d IS A MAYBE NUMBER
+GIVETH A MAYBE Assessment
+`assess if given` d MEANS
+    CONSIDER d
+    WHEN JUST x  THEN JUST (assess x)
+    WHEN NOTHING THEN NOTHING
+
+----------------------------------------------------------------------------
+-- A: scalar under the pin. WHNF = NF, so this was already right.
+----------------------------------------------------------------------------
+
+-- expected: 7
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
+
+----------------------------------------------------------------------------
+-- B-E: the same value behind one lazy constructor. Pre-fix all answered 9.
+----------------------------------------------------------------------------
+
+-- expected: JUST OF 7
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (JUST `GST rate`)
+
+-- expected: LIST 7
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (LIST `GST rate`)
+
+-- expected: Assessment OF 7, 70
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (assess 1000)
+
+-- expected: JUST OF (Assessment OF 7, 70) — two constructors deep
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (JUST (assess 1000))
+
+----------------------------------------------------------------------------
+-- F: the shape that was reported — the pin wraps a whole CONSIDER whose arm
+-- builds a MAYBE. Pre-fix this needed the pin moved INSIDE the arm to work.
+----------------------------------------------------------------------------
+
+-- expected: JUST OF (Assessment OF 7, 70)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`assess if given` (JUST 1000))
+
+-- expected: JUST OF (Assessment OF 9, 90) — the new regime, same expression
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) (`assess if given` (JUST 1000))
+
+-- expected: NOTHING (no children to force; the pin is a no-op here)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`assess if given` NOTHING)
+
+----------------------------------------------------------------------------
+-- G: the pin still RESTORES. Deep forcing must not leak the pinned context
+-- outward, and a re-force under the old regime must flip back (the T6
+-- WHNFWhen cache is revalidated per serve, not stale).
+----------------------------------------------------------------------------
+
+-- expected: JUST OF (Assessment OF 9, 90) — ambient
+#EVAL `assess if given` (JUST 1000)
+
+-- expected: JUST OF (Assessment OF 7, 70) — pinned again, after the ambient force
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`assess if given` (JUST 1000))
+
+----------------------------------------------------------------------------
+-- H: VALUE AT stamps the same axes per day and gets the same deep pin.
+----------------------------------------------------------------------------
+
+-- expected: Assessment OF 7, 70
+#EVAL `VALUE AT` (Date 1 6 2023) (GIVEN d YIELD assess 1000)
+
+-- expected: Assessment OF 9, 90
+#EVAL `VALUE AT` (Date 1 7 2024) (GIVEN d YIELD assess 1000)
+
+----------------------------------------------------------------------------
+-- I: THE REMAINING BOUNDARY, asserted deliberately.
+--
+-- A pin cannot follow a value into a scope it does not dominate. A CLOSURE
+-- returned from under the pin is opaque to the deep force (as it is to the
+-- printer): applying it later reads the AMBIENT context. This is the
+-- documented limit of the ruling, not an oversight — see
+-- specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md §1.4.1.
+----------------------------------------------------------------------------
+
+GIVETH A FUNCTION FROM NUMBER TO NUMBER
+`rate plus` MEANS GIVEN n YIELD n PLUS `GST rate`
+
+GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER
+GIVETH A NUMBER
+`apply to zero` f MEANS f 0
+
+-- expected: 9, NOT 7 — the closure escaped the pin unapplied.
+#EVAL `apply to zero` (`EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `rate plus`)
+
+-- expected: 7 — applying it INSIDE the pin is the idiom that works.
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`apply to zero` `rate plus`)

@@ -197,6 +197,9 @@ data Frame =
   | WhenLastFrame TemporalContext WHNF Time.Day
   | WhenNextFrame TemporalContext WHNF Time.Day Time.Day
   | ValueAtFrame TemporalContext
+  -- Deep pinning (smucclaw/l4-ide#934): see 'startDeepPin'
+  | DeepPinRestore TemporalContext
+  | DeepPinStep !Int !(Set Address) [(Int, Reference)] WHNF
   | UpdateThunk Reference !CtxReads !(Maybe (CtxReads, WHNF))
     -- ^ write-back frame for a thunk force; carries the ENCLOSING span's
     -- saved read accumulator, merged back in 'backward' (T6), plus the
@@ -364,6 +367,7 @@ unwindFrame = \ case
   WhenLastFrame originalCtx _ _          -> putTemporalContext originalCtx
   WhenNextFrame originalCtx _ _ _        -> putTemporalContext originalCtx
   ValueAtFrame originalCtx               -> putTemporalContext originalCtx
+  DeepPinRestore originalCtx             -> putTemporalContext originalCtx
   RestoreCurrentParty mOriginal          -> putCurrentParty mOriginal
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
@@ -408,6 +412,10 @@ unwindFrame = \ case
   EvalUnderValidTime1 {}        -> pure ()
   EvalUnderRulesEffectiveAt1 {} -> pure ()
   EvalUnderRulesEncodedAt1 {}   -> pure ()
+  -- The pinned context is restored by the 'DeepPinRestore' frame sitting
+  -- underneath every 'DeepPinStep', so the step frames themselves are pure
+  -- control flow (an abort mid-traversal unwinds through both).
+  DeepPinStep {}                -> pure ()
   -- ContractFrame sub-frames (Contract1..11, RBinOp1/2, ResolveParty) carry
   -- only continuation data (WHNFs/envs/refs), never saved global state; the
   -- party set around a followup is restored by 'RestoreCurrentParty' above.
@@ -1219,21 +1227,20 @@ backward val = withPoppedFrame $ \ case
   -- Ternary builtin handling: got all 3 args
   Just (TernaryBuiltin3 fn val1 val2) -> do
     runTernaryBuiltin fn val1 val2 val
-  -- Temporal context scoping: restore original context after thunk evaluation.
+  -- Temporal context scoping: the pinned expression is forced to normal form
+  -- BEFORE the original context is restored ('startDeepPin', #934), then the
+  -- 'DeepPinRestore' frame underneath puts the original context back.
   -- These (and the iterator frames below) are frame plumbing — context
   -- writers, not context observations (see T6).
-  Just (EvalAsOfSystemTime2 originalCtx) -> do
+  Just (EvalAsOfSystemTime2 originalCtx) -> startDeepPin originalCtx val
+  Just (EvalUnderValidTime2 originalCtx) -> startDeepPin originalCtx val
+  Just (EvalUnderRulesEffectiveAt2 originalCtx) -> startDeepPin originalCtx val
+  Just (EvalUnderRulesEncodedAt2 originalCtx) -> startDeepPin originalCtx val
+  Just (DeepPinRestore originalCtx) -> do
     putTemporalContext originalCtx
     continueBackward val
-  Just (EvalUnderValidTime2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
-  Just (EvalUnderRulesEffectiveAt2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
-  Just (EvalUnderRulesEncodedAt2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
+  Just (DeepPinStep d seen pending result) ->
+    driveDeepPin (toList val) d seen pending result
   Just (EverBetweenFrame originalCtx predicate endDay currentDay step) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1298,9 +1305,11 @@ backward val = withPoppedFrame $ \ case
             applyDatePredicate predicate nextDay
       Nothing ->
         userException $ UserError "WHEN NEXT expects predicate returning BOOLEAN"
-  Just (ValueAtFrame originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
+  -- VALUE AT is the one interval builtin whose result is not forced to a
+  -- BOOLEAN/DATE by its own frame, so it needs the same deep pin as the four
+  -- EVAL clause builtins (#934). EVER/ALWAYS BETWEEN and WHEN LAST/NEXT demand
+  -- a scalar from their predicate, for which WHNF is already normal form.
+  Just (ValueAtFrame originalCtx) -> startDeepPin originalCtx val
   Just (ConcatFrame acc [] _env) -> do
     -- All arguments evaluated, concatenate them
     runConcat (reverse (val : acc))
@@ -2970,6 +2979,173 @@ startValueAt dateVal attrVal = do
   putTemporalContext ctxForDay
   pushFrame (ValueAtFrame originalCtx)
   applyDatePredicate attrVal day
+
+-- ---------------------------------------------------------------------------
+-- Deep pinning (smucclaw/l4-ide#934)
+--
+-- An EVAL clause builtin used to restore the ambient temporal context as soon
+-- as its argument reached WHNF. For a scalar that is exact (WHNF = NF), but a
+-- constructor, record or list returned from under the pin carries UNFORCED
+-- child thunks out of the scope, and those are forced later under the AMBIENT
+-- context. The pin then silently did not hold for them: the reported symptom
+-- was `EVAL UNDER RULES EFFECTIVE AT (Date 1 6 2023) (JUST `GST rate`)`
+-- answering @JUST OF 9@ (today's regime) where the same expression without the
+-- `JUST` answered @7@ (the pinned regime), with no diagnostic and identical
+-- types.
+--
+-- RULING (recorded in specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md §1.4.1): the
+-- pin is DEEP. `EVAL UNDER … e` means "the value of @e@, computed under this
+-- context", not "the outermost constructor of @e@".
+--
+-- FORCING ALONE IS NOT ENOUGH, and this is the whole subtlety. Deep-forcing
+-- the result under the pin does NOT change the answer, because a child
+-- reference of a pinned result is usually the SHARED module-level thunk
+-- (@allocate_@ short-circuits a @Var@ argument to 'expectTerm' rather than
+-- minting a fresh thunk). Forcing it under the pin installs a 'WHNFWhen'
+-- cache fingerprinted on the pinned axes; when the printer forces it again
+-- after the context is restored, T6's 'validFor' correctly rejects that cache
+-- and RE-forces under the ambient context — back to the wrong answer. T6 is
+-- doing its job; the value simply has to leave the scope.
+--
+-- So the pin runs in two passes, both while the pinned context is installed:
+--
+--   1. FORCE every reachable child ('driveDeepPin', an explicit worklist over
+--      the frame stack, de-duplicated by 'Address'), to the same
+--      'maximumStackSize' depth budget the printer uses.
+--   2. SNAPSHOT ('snapshotRef'): rebuild the result with every reachable
+--      reference replaced by a FRESH reference holding a plain 'WHNF' — a
+--      context-independent, final cache that nothing will ever re-derive. The
+--      originals are never mutated, so the rest of the program keeps its
+--      sharing and its own context-sensitivity. Pass 2 forces nothing (pass 1
+--      already did), so it is ordinary monadic recursion rather than more
+--      frames, and it can carry a proper memo.
+--
+-- Reachability is 'Foldable' on 'Value', which is exactly what
+-- 'L4.EvaluateLazy.nfAux' traverses — the same fields, and nothing inside a
+-- 'ValClosure' or 'ValEnvironment' (whose environments are not @a@-shaped).
+--
+-- Three boundaries, all deliberate:
+--
+--   * CLOSURES are opaque to both passes, as they are to 'nfAux'. A function
+--     returned from under a pin still reads the AMBIENT context when it is
+--     later applied: a pin cannot follow a value into a scope it does not
+--     dominate. Asserted by case I of the fixture.
+--   * A BACK-EDGE into a force we are still inside ('blackholedHere') is
+--     skipped rather than forced, so a self-referential value whose recursion
+--     runs through the pin keeps printing instead of raising "Infinite loop".
+--   * Beyond the depth budget the original reference is kept, exactly where
+--     the printer would have printed @…@ anyway.
+--
+-- The cost is strictness: a field the consumer never demands is now forced,
+-- so an error or a divergence hiding in an undemanded field of a pinned
+-- result becomes reachable. Measured against the corpus, nothing in the tree
+-- relies on that laziness.
+
+-- | Pass 1 entry: force @val@'s reachable children while the pinned context is
+-- still installed. The 'DeepPinRestore' frame pushed underneath restores
+-- @originalCtx@ once pass 2 has handed the snapshot back.
+startDeepPin :: TemporalContext -> WHNF -> Machine Config
+startDeepPin originalCtx val = do
+  pushFrame (DeepPinRestore originalCtx)
+  driveDeepPin (toList val) maximumStackSize Set.empty [] val
+
+-- | One step of pass 1. @kids@ are the children of the value just forced,
+-- which sat at depth @d@; @seen@ are the addresses already scheduled;
+-- @pending@ is the rest of the worklist; @result@ is the pinned value, handed
+-- to pass 2 once the worklist drains.
+driveDeepPin :: [Reference] -> Int -> Set Address -> [(Int, Reference)] -> WHNF -> Machine Config
+driveDeepPin kids d seen pending result =
+  step seen ([ (d - 1, r) | d > 0, r <- kids ] <> pending)
+  where
+    step :: Set Address -> [(Int, Reference)] -> Machine Config
+    step _seen [] = do
+      (_memo, snapshot) <- snapshotVal maximumStackSize Map.empty result
+      continueBackward snapshot
+    step seen' ((d', r) : rest)
+      | r.address `Set.member` seen' = step seen' rest
+      | otherwise = do
+          backEdge <- blackholedHere r
+          let seen'' = Set.insert r.address seen'
+          if backEdge
+            then step seen'' rest
+            else do
+              pushFrame (DeepPinStep d' seen'' rest result)
+              continueRef r
+
+-- | Pass 2 on a value: replace each child reference by its snapshot,
+-- threading the memo left to right. Forces nothing.
+snapshotVal :: Int -> Map Address Reference -> WHNF -> Machine (Map Address Reference, WHNF)
+snapshotVal d memo0 val = do
+  (memo', rs) <- mapAccumLM (snapshotRef d) memo0 (toList val)
+  pure (memo', refill rs val)
+  where
+    -- 'Traversable' and 'Foldable' agree on order, so refilling in list order
+    -- is the exact inverse of 'toList'.
+    refill :: [Reference] -> WHNF -> WHNF
+    refill rs v = evalState (traverse (const next) v) rs
+      where
+        next = state \ case
+          (x : xs) -> (x, xs)
+          []       -> error "internal error: deep pin snapshot lost a reference"
+
+    mapAccumLM :: Monad m => (s -> a -> m (s, b)) -> s -> [a] -> m (s, [b])
+    mapAccumLM f = go
+      where
+        go s []       = pure (s, [])
+        go s (x : xs) = do
+          (s', y) <- f s x
+          (s'', ys) <- go s' xs
+          pure (s'', y : ys)
+
+-- | Pass 2 on a reference. Returns a FRESH reference holding a plain 'WHNF'
+-- of the snapshotted value, so the pinned answer can never be re-derived
+-- under a later context. The original reference is left untouched.
+--
+-- Three cases keep the original reference instead: the depth budget is spent;
+-- the thunk is still 'Unevaluated' (pass 1 skipped it as a back-edge); or the
+-- address is already in the memo, in which case its snapshot is reused so
+-- sharing and cycles in the pinned value survive as sharing and cycles in the
+-- snapshot. The memo is seeded with a placeholder BEFORE recursing, which is
+-- what makes a cycle terminate.
+snapshotRef :: Int -> Map Address Reference -> Reference -> Machine (Map Address Reference, Reference)
+snapshotRef d memo r
+  | Just r' <- Map.lookup r.address memo = pure (memo, r')
+  | d <= 0 = pure (memo, r)
+  | otherwise = do
+      thunk <- readThunk r
+      case thunk of
+        Unevaluated {}   -> pure (memo, r)
+        WHNF v           -> freeze v
+        WHNFWhen _ v _ _ -> freeze v
+  where
+    freeze v = do
+      r' <- allocateValue v
+      let memo' = Map.insert r.address r' memo
+      (memo'', v') <- snapshotVal (d - 1) memo' v
+      liftIO (writeIORef r'.pointer (WHNF v'))
+      pure (memo'', r')
+
+-- | Is this thunk currently being forced by THIS thread?
+--
+-- Such a reference is a back-edge into a force we are still inside: a
+-- self-referential value whose recursion runs THROUGH the pin, e.g.
+-- @xs MEANS EVAL UNDER … (1 FOLLOWED BY xs)@. Forcing it would raise the
+-- blackhole \"Infinite loop detected\" error, where before the deep pin the
+-- child was simply carried out unforced and the printer expanded it to its
+-- own depth budget. Leaving it alone keeps that behaviour: the deep pin must
+-- not turn a program that printed into a program that errors.
+--
+-- This is the only child the walk skips. A ref blackholed by a DIFFERENT
+-- thread is another evaluation's business and 'continueRef' already handles
+-- it.
+blackholedHere :: Reference -> Machine Bool
+blackholedHere r = do
+  tid <- liftIO myThreadId
+  thunk <- readThunk r
+  pure $ case thunk of
+    Unevaluated tids _ _ -> tid `Set.member` tids
+    WHNF {}              -> False
+    WHNFWhen {}          -> False
 
 pattern ValFulfilled :: Value a
 pattern ValFulfilled <- (fulfilView -> True)

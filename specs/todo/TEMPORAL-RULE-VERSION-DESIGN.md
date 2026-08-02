@@ -82,16 +82,21 @@ pre-PR#80 assumptions and are **already fixed** on `55bd0452`:
 
 ### 1.4 Critique claims that remain true (and shape this design)
 
-1. **WHNF-scope boundary** (in-language KS#1): EVAL frames restore the context
-   when the wrapped thunk reaches WHNF (`Machine.hs:1192-1203`), so lazy
-   substructure (list elements, record fields) escaping the frame is forced
-   later under the _ambient_ context. This is a pre-existing property of all
-   four shipped builtins (TODAY inside `EVAL AS OF SYSTEM TIME` behaves
-   identically today); T6 guarantees the caches stay _sound_ either way — the
-   question is scoping _intent_, not cache corruption. Position: document it;
-   scalar results (NUMBER/BOOLEAN/DATE/STRING) are exact because WHNF = NF for
-   them; a lint for EVAL-wrapping-non-scalar-typed expressions is Phase 1
-   optional work; a deep-forcing EVAL variant is deferred.
+1. **WHNF-scope boundary** (in-language KS#1) — **CLOSED 2026-08-03: the pin is
+   DEEP.** See §1.4.1 below for the ruling, what it costs, and what boundary
+   remains. The original text is kept because §1.4.1 is a decision _about_ it:
+
+   > EVAL frames restore the context when the wrapped thunk reaches WHNF
+   > (`Machine.hs:1192-1203`), so lazy substructure (list elements, record
+   > fields) escaping the frame is forced later under the _ambient_ context.
+   > This is a pre-existing property of all four shipped builtins (TODAY inside
+   > `EVAL AS OF SYSTEM TIME` behaves identically today); T6 guarantees the
+   > caches stay _sound_ either way — the question is scoping _intent_, not
+   > cache corruption. Position: document it; scalar results
+   > (NUMBER/BOOLEAN/DATE/STRING) are exact because WHNF = NF for them; a lint
+   > for EVAL-wrapping-non-scalar-typed expressions is Phase 1 optional work;
+   > a deep-forcing EVAL variant is deferred.
+
 2. **Absence semantics** (in-language KS#4): a versioned rule queried before
    commencement / after repeal needs a story that does not crash interval
    scans. Resolved in §3 Phase 2: the desugar always has a total fallback
@@ -113,6 +118,116 @@ pre-PR#80 assumptions and are **already fixed** on `55bd0452`:
    decided. Recorded as an explicit Phase 1 decision point (§6 Q1); the spike
    ships the provisional "localized current day" fallback (same computation
    as TODAY), which at least matches "the rules in force now" intuition.
+
+### 1.4.1 RULING: the pin is deep (2026-08-03)
+
+_Status: **implemented** on branch `mengwong/eval-pin-and-shadowing`, cut from
+`origin/unstable` @ `71da8b09`. Fixture `jl4/examples/ok/temporal-pin-deep.l4`;
+implementation `startDeepPin` / `driveDeepPin` / `snapshotVal` / `snapshotRef`
+in `jl4-core/src/L4/EvaluateLazy/Machine.hs`. Resolves
+[smucclaw/l4-ide#934](https://github.com/smucclaw/l4-ide/issues/934)._
+
+**The defect, measured.** With the WHNF boundary as shipped, these two answer
+differently, with no visible reason in the source and no diagnostic — the
+second is the wrong legal regime:
+
+    #EVAL EVAL UNDER RULES EFFECTIVE AT (Date 1 6 2023) GST rate         -- 7
+    #EVAL EVAL UNDER RULES EFFECTIVE AT (Date 1 6 2023) (JUST GST rate)  -- JUST OF 9
+
+§1.4's "Position: document it" underrated this. It is not a scoping-intent
+nicety, and it bites precisely the shapes that carry real work: a record of
+computed fields, a `MAYBE` built in a `CONSIDER` arm, a list of assessments.
+The corpus is temporally closed across the 2017-04-12 Reg CF cliff and the
+whole law-time axis rests on this pin; anything that composes `EVAL UNDER`
+programmatically (batch harnesses, test generators, the §8 de novo diff
+oracle) naturally builds the wrapping shape rather than the working one.
+
+**The ruling.** `EVAL UNDER RULES EFFECTIVE AT`, its three sibling EVAL clause
+builtins (`AS OF SYSTEM TIME`, `UNDER VALID TIME`, `UNDER RULES ENCODED AT`)
+and `VALUE AT` now mean "the value of the argument, computed under this
+context" rather than "the outermost constructor of the argument". The other
+interval builtins need no change: EVER/ALWAYS BETWEEN and WHEN LAST/NEXT
+demand a BOOLEAN or DATE from their predicate, for which WHNF is already
+normal form.
+
+**Forcing alone does not implement that, and this is the load-bearing
+finding.** The obvious fix — deep-force the result under the pin — was
+implemented first and measured to change nothing: the control still answered
+`JUST OF 9`. A child reference of a pinned result is normally the _shared_
+module-level thunk, because `allocate_` short-circuits a `Var` argument to
+`expectTerm` instead of minting a fresh one. Forcing it under the pin installs
+a `WHNFWhen` cache fingerprinted on the pinned axes; when the printer forces
+it again after the context is restored, T6's `validFor` correctly rejects that
+cache and re-forces under the ambient context. T6 is doing exactly its job.
+**The value has to leave the scope, not merely be forced inside it.**
+
+So the pin runs two passes, both under the pinned context:
+
+1. **Force** every reachable child — an explicit worklist over the frame
+   stack, de-duplicated by `Address`, to the same `maximumStackSize` (200)
+   depth budget the printer uses.
+2. **Snapshot** — rebuild the result with every reachable reference replaced
+   by a _fresh_ reference holding a plain `WHNF`: a context-independent,
+   final cache that nothing will ever re-derive. Originals are never mutated,
+   so the rest of the program keeps its sharing and its own
+   context-sensitivity. Pass 2 forces nothing (pass 1 already did), so it is
+   ordinary monadic recursion rather than more frames, and can carry a memo
+   keyed by `Address` — seeded with a placeholder before recursing, which is
+   what makes a cycle in the pinned value terminate as a cycle in the
+   snapshot.
+
+Reachability is `Foldable` on `Value`, which is exactly what
+`L4.EvaluateLazy.nfAux` traverses. Defining it by reference rather than
+re-deriving it keeps one invariant worth stating plainly: **the pin covers
+exactly the part of the value the evaluator prints.**
+
+**Why this over the alternatives** (#934 offered three):
+
+- _(a) Lexical capture — the pin travels with the thunk._ Rejected on
+  measurement, not taste. Capture at allocation cannot fix the reported case
+  at all, for the `allocate_` reason above: nothing is allocated under the pin,
+  so there is nothing to stamp. Making capture work needs stamped _copies_ of
+  the children — which is what pass 2 does, arrived at from the other end. A
+  blunter "every thunk captures the ambient context" additionally contradicts
+  shipped T6 semantics: `temporal-thunk-leak-basic.l4` case 2 requires a
+  module-level thunk forced ambiently first to _re-evaluate_ under a later
+  override, which capture would forbid.
+- _(c) A diagnostic on lazily-escaping values._ It tells an author the answer
+  may be wrong without making it right, and the honest static approximation —
+  §6 Q4's "warn when an EVAL builtin wraps a non-scalar-typed expression" —
+  fires on the common, legitimate case of pinning a record. Still available as
+  a lint if the strictness cost below ever bites; not a substitute for a fix.
+
+**What it costs.**
+
+- _Strictness._ `EVAL UNDER` is now strict in the whole printed structure of
+  its argument, so an error or a divergence hiding in a field the consumer
+  never demands becomes reachable. Bounded by the printer's own depth budget,
+  and by the visited-`Address` set, which makes the walk strictly tighter than
+  the printer's (shared and cyclic structure is visited once per reference
+  rather than re-expanded per path).
+- _Allocation._ One fresh reference per reachable reference of a pinned
+  result, once, at the pin boundary.
+- Measured on this tree: the full suite is unchanged apart from the two new
+  fixtures.
+
+**Three boundaries, all deliberate.**
+
+- **Closures** are opaque to both passes, exactly as they are to `nfAux`. A
+  function returned from under a pin still reads the _ambient_ context when it
+  is later applied: a pin cannot follow a value into a scope it does not
+  dominate, and the working idiom is to apply inside the pin. Asserted as a
+  live expectation rather than left to prose — `temporal-pin-deep.l4` case I
+  pins a closure, applies it outside, and asserts the ambient 9, so if a later
+  change makes closures pin-aware that golden moves and the decision gets
+  re-taken on purpose.
+- **A back-edge** into a force we are still inside (a self-referential value
+  whose recursion runs _through_ the pin) is skipped rather than forced. The
+  first implementation did force it, and turned a program that printed a
+  truncated list into one that raised "Infinite loop detected"; the deep pin
+  must not do that.
+- **Beyond the depth budget** the original reference is kept — exactly where
+  the printer would have printed `…` anyway.
 
 ---
 

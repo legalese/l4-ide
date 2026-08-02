@@ -1,0 +1,31 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+temporal-pin-deep.l4:53:1-65:
+  7
+temporal-pin-deep.l4:60:1-72:
+  JUST OF 7
+temporal-pin-deep.l4:63:1-72:
+  LIST 7
+temporal-pin-deep.l4:66:1-68:
+  Assessment OF 7, 70
+temporal-pin-deep.l4:69:1-75:
+  JUST OF (Assessment OF 7, 70)
+temporal-pin-deep.l4:77:1-86:
+  JUST OF (Assessment OF 7, 70)
+temporal-pin-deep.l4:80:1-86:
+  JUST OF (Assessment OF 9, 90)
+temporal-pin-deep.l4:83:1-82:
+  NOTHING
+temporal-pin-deep.l4:92:1-36:
+  JUST OF (Assessment OF 9, 90)
+temporal-pin-deep.l4:95:1-86:
+  JUST OF (Assessment OF 7, 70)
+temporal-pin-deep.l4:102:1-61:
+  Assessment OF 7, 70
+temporal-pin-deep.l4:105:1-61:
+  Assessment OF 9, 90
+temporal-pin-deep.l4:125:1-84:
+  9
+temporal-pin-deep.l4:128:1-84:
+  7
