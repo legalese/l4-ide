@@ -751,6 +751,25 @@ work.
 > as `l4-error{phase:'parse'}`. Validation strictness is a _host-side_ concern: the producer of
 > the JSON is us. §4.6's closure gate is what keeps this true.
 
+> **Two properties of the served payload, measured 2026-08-02 against a loopback
+> `jl4-service` carrying the Reg CF bundle. Both bite any consumer, not just the element.**
+>
+> 1. **The leaf `value` is inert.** Every `UBoolVar` in `GET …/{fn}/ladder` arrives
+>    `"value":"UnknownV"`, and stays `UnknownV` when a `POST …/query-plan` in the same
+>    session binds that atom. The picture carries no valuation; the consumer's does. This is
+>    EK5 restated as a wire fact rather than a design preference, and `ts-apps/regcf-wizard`
+>    depends on it.
+> 2. **`atomId` is NOT a join key between the ladder and the query plan; `unique` is.** For
+>    the same atom of `can this company raise`, `GET …/ladder` says
+>    `64e895d0-1863-5f26-bb2b-63ef440b85d3` and the plan's `ranked` says
+>    `a87d9b26-bfef-5b0b-9c22-d77d103f93a9`; `unique` is `4` in both. The plan's `note`
+>    documents three accepted binding forms (label, `unique` as a decimal string, `atomId`),
+>    and binding by the **ladder's** atomId returns `200` and changes nothing — a
+>    silent no-op, not an error. A consumer that joined on `atomId` would draw one diagram
+>    and answer a different question. `ts-apps/regcf-wizard/src/lib/ladder-embed.test.ts`
+>    pins the disagreement against verbatim fixtures. Whether the two derivations should be
+>    reconciled upstream is not decided here; until they are, **`unique` is the contract**.
+
 **Producing a static payload today has no CLI.** `jl4/app/Main.hs:62-88` has
 `run, check, format, ast, batch, trace, state-graph, render, openfisca` — no `ladder`, no
 `export`. The one checked-in fixture was produced by driving a live `jl4-lsp` over WebSocket
@@ -764,6 +783,17 @@ emitting `sceneToAscii`/`sceneToSvg`, _is_ channel A and channel B, the only cha
 no adoption cost at all.
 
 ### 5.2 Live mode — the route, and whether it exists
+
+> **Status, 2026-08-02: surface S1 is BUILT and the rest of this section is history.** The
+> route exists — `"ladder" :> Get '[JSON] VizExpr.RenderAsLadderInfo` at
+> `jl4-service/src/DataPlane.hs:96`, landed as `d2dd71f9`. Measured against the Reg CF
+> bundle: `GET …/can this company raise/ladder` answers **200** with a 720-byte
+> `{funDecl, verDocId}`, and the corpus's other five exports answer **400** > `"Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."` So a ladder
+> exists for a `DECIDE` returning `BOOLEAN` and for nothing else, which is a corpus-design
+> constraint any embed plan has to carry: a record-returning answer surface has no picture.
+>
+> The analysis below is retained because it is why the route was cheap and why it must return
+> `cached.ladderInfo` verbatim, not because its "whether it exists" question is still open.
 
 SPEC.md §4 said:
 

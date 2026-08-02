@@ -220,15 +220,38 @@ the 2017-04-12 inflation adjustment) and the **temporal closure rule**: a functi
 dated only when every constant in its transitive read set is dated over the same window.
 Both are load-bearing for M5 and were established by adversarial review; see its §9.
 
+> **C2 status, 2026-08-02.** **C2a is landed** (`regcf-wizard.l4`, PR #162). **C2b is built**:
+> `ts-apps/regcf-wizard` is a SvelteKit SPA covering all five decision surfaces, with the
+> answer layer, progressive disclosure over `POST …/query-plan` (switching on `verdict`, never
+> on `determined`), ruling R8's fact-date question + derived-rule-date disclosure + override,
+> and the PR #177 ladder controller embedded in the entry page. 47 unit tests;
+> `check`/`lint`/`test`/`build` green; verified against a **loopback** `jl4-service` on
+> `127.0.0.1`, not against any deployed host.
+>
+> **C2c is prepared, not performed.** `nix/regcf-wizard/{package.nix,configuration.nix}`, the
+> `regcf` entry in `nix/jl4-service/configuration.nix`'s `bundles`, and the module import in
+> `nix/configuration.nix` are committed; the module defaults to **off**, and **no
+> `nixos-rebuild` has been run** — nothing is served from `dev.jl4.legalese.com` or anywhere
+> else as a result of this work. The nix expressions have **not been evaluated**: there is no
+> `nix` in the environment they were written in. The remaining act is
+> `services.regcf-wizard.enable = true;` plus the rebuild, both recorded in
+> `ts-apps/regcf-wizard/README.md`.
+
 ### Track S — surfaces
 
-| ID     | Work                                                                    | Depends on |
-| ------ | ----------------------------------------------------------------------- | ---------- |
-| **S0** | `l4 export --to=dmn\|bpmn`, with `--fidelity-report`                    | D1, P1     |
-| **S1** | `jl4-service`: `/functions/:name/ladder` returning `RenderAsLadderInfo` | —          |
-| **S2** | `jl4-service`: the export endpoints                                     | D1, P1     |
-| **S3** | Deployment-engine wiring                                                | S1, S2     |
+| ID     | Work                                                                            | Depends on |
+| ------ | ------------------------------------------------------------------------------- | ---------- |
+| **S0** | `l4 export --to=dmn\|bpmn`, with `--fidelity-report`                            | D1, P1     |
+| **S1** | **BUILT** — `jl4-service`: `GET /functions/:name/ladder` → `RenderAsLadderInfo` | —          |
+| **S2** | `jl4-service`: the export endpoints                                             | D1, P1     |
+| **S3** | Deployment-engine wiring                                                        | S1, S2     |
 
+> **S1 shipped 2026-08-02 (`d2dd71f9`), at `jl4-service/src/DataPlane.hs:96`.** Measured
+> against the Reg CF bundle: 200 with a 720-byte `{funDecl, verDocId}` for the one export that
+> returns `BOOLEAN`, and 400 `"Can only visualize, as a ladder diagram, a DECIDE that returns
+a boolean."` for the other five. The paragraph below is retained because it is why the route
+> was cheap and how it must be implemented, not as an open question.
+>
 > **S1 is nearly free — but the reason given here was half wrong, and it is not a gate.** > ~~`L4.Viz.Ladder` lives in `jl4-core`, not `jl4-lsp` … the route is plumbing.~~ There are
 > **two** ladder implementations, and `jl4-service` uses the **`jl4-lsp`** one
 > (`Backend/DecisionQueryPlan.hs:42,181` — `LadderViz.doVisualize`), not the `jl4-core` one.
