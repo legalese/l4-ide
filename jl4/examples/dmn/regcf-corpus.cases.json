@@ -24,6 +24,17 @@
     "    expected'",
     "    (before: PARSE INVALID on the raw-L4 deontic body, 0 parsed).",
     "",
+    "KEYS RENAMED 2026-08-03 (the clitic ruling). Nine IssuerProfile /",
+    "InvestorProfile / Transfer field names in regcf.l4 dropped a leading `is`",
+    "made redundant by the possessive clitic — `transfer's to the issuer of the",
+    "securities` reads 'the transfer IS to the issuer'. The sanitised FEEL names",
+    "below therefore lost their `is_` prefix (336 keys). Every VALUE was carried",
+    "across untouched and machine-checked for structural identity modulo the key",
+    "rename; nothing here was re-derived from an engine. Both banners above",
+    "re-measured on 2026-08-03 at the renamed tree and reproduced VERBATIM,",
+    "which is the point of recording them: a rename that is purely nominal must",
+    "move no number.",
+    "",
     "ACTIVATION CONTRACT, unchanged: every value below is derived from the L4",
     "SOURCE (regcf.l4), cross-checked against its own #ASSERT directives, never",
     "from a DMN engine's own output — a pin regenerated from the thing it pins",
@@ -168,10 +179,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -183,7 +194,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -226,10 +237,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -293,19 +304,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -330,21 +341,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -357,7 +368,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -379,10 +390,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -394,7 +405,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -437,10 +448,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -504,19 +515,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -541,21 +552,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -568,7 +579,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -590,10 +601,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -605,7 +616,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -648,10 +659,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -715,19 +726,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -752,21 +763,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -779,7 +790,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -801,10 +812,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -816,7 +827,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -859,10 +870,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -926,19 +937,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -963,21 +974,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -990,7 +1001,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -1012,10 +1023,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1027,7 +1038,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -1070,10 +1081,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -1137,19 +1148,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1174,21 +1185,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -1201,7 +1212,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -1223,10 +1234,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1238,7 +1249,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -1281,10 +1292,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -1348,19 +1359,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1385,21 +1396,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -1412,7 +1423,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -1434,10 +1445,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1449,7 +1460,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -1492,10 +1503,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -1559,19 +1570,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1596,21 +1607,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -1623,7 +1634,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -1645,10 +1656,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1660,7 +1671,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -1703,10 +1714,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -1770,19 +1781,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1807,21 +1818,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -1834,7 +1845,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -1856,10 +1867,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -1871,7 +1882,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -1914,10 +1925,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -1981,19 +1992,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2018,21 +2029,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2045,7 +2056,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -2067,10 +2078,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2082,7 +2093,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -2125,10 +2136,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -2192,19 +2203,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2229,21 +2240,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2256,7 +2267,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -2278,10 +2289,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2293,7 +2304,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2336,10 +2347,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -2403,19 +2414,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2440,21 +2451,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2467,7 +2478,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000,
@@ -2489,10 +2500,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2504,7 +2515,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2547,10 +2558,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -2614,19 +2625,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2651,21 +2662,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2678,7 +2689,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000,
@@ -2700,10 +2711,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2715,7 +2726,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -2758,10 +2769,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -2825,19 +2836,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2862,21 +2873,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -2889,7 +2900,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -2911,10 +2922,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -2926,7 +2937,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -2969,10 +2980,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -3036,19 +3047,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -3073,21 +3084,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -3100,7 +3111,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -3122,10 +3133,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -3137,7 +3148,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -3180,10 +3191,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -3247,19 +3258,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -3284,21 +3295,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -3311,7 +3322,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
@@ -3333,10 +3344,10 @@
         "annual_cycles": 2,
         "issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -3348,7 +3359,7 @@
         },
         "investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
@@ -3391,10 +3402,10 @@
         },
         "transfer": {
           "days_since_the_securities_were_issued": 400,
-          "is_to_the_issuer_of_the_securities": false,
-          "is_to_an_accredited_investor": false,
-          "is_as_part_of_an_offering_registered_with_the_Commission": false,
-          "is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
+          "to_the_issuer_of_the_securities": false,
+          "to_an_accredited_investor": false,
+          "as_part_of_an_offering_registered_with_the_Commission": false,
+          "to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance": false
         }
       },
       "expect": {
@@ -3458,19 +3469,19 @@
         "transfer_is_permitted": true,
         "a_clean_issuer": {
           "name": "Clean Co",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": false,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
         "a_delinquent_issuer": {
           "name": "Late Filer Inc",
-          "is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
-          "is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
-          "is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
-          "is_subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
+          "organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia": true,
+          "subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act": false,
+          "an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c": false,
+          "subject_to_a_disqualification_as_specified_in_section_227_503_a": false,
           "has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement": true,
           "has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies": false
         },
@@ -3495,21 +3506,21 @@
         },
         "I_3_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 110000,
           "net_worth": 115000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "I_4_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 1240000,
           "net_worth": 1240000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0
         },
         "A_investor": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": true,
+          "an_accredited_investor_as_defined_in_Rule_501": true,
           "annual_income": 1000000,
           "net_worth": 1000000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 200000
@@ -3522,7 +3533,7 @@
         },
         "investor_hydrated": {
           "name": "Test Investor",
-          "is_an_accredited_investor_as_defined_in_Rule_501": false,
+          "an_accredited_investor_as_defined_in_Rule_501": false,
           "annual_income": 60000,
           "net_worth": 200000,
           "aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months": 0,
