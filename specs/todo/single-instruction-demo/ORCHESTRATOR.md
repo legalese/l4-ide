@@ -14,8 +14,9 @@ What that means precisely, in the present tense:
 - **Seven stages are scaffolded and cannot run**: `p1-ingest`, `p2-sweep`, `p3-encode`,
   `p4-forks`, `p5-gate`, `p8-verify`, `p10-publish`. Each is an entry point that prints what it
   would do and what is blocking it, then exits 3. Since R4 was ruled (2026-08-02) the
-  encode/fork stages are blocked on engineering — the tooling is unbuilt — while `p8-verify`
-  (R5) and `p10-publish` (R1/R2) still wait on open rulings. §5 names each blocker.
+  encode/fork stages are blocked on engineering — the tooling is unbuilt. R5 is now ruled too
+  (2026-08-02, the ROBDD-first ladder), so `p8-verify` is engineering as well; only
+  `p10-publish` still waits on a ruling (R1's remainder). §5 names each blocker.
 - **Milestone G2 is unbuilt.** `go.sh plan --milestone g2` refuses and says why: R4 is ruled
   but none of the de novo tooling it unblocks exists yet. The §8 diff oracle does not exist
   either.
@@ -360,12 +361,13 @@ milestone's declared stage list, so its absence cannot make a milestone `INCOMPL
 | `p3-encode`   | the stage is unbuilt. R4 was its ruling blocker until 2026-08-02; the ruled `Interpretation` representation now waits on tooling, and the isomorphism judgement stays HG1's                                                                                     |
 | `p4-forks`    | R4 ruled 2026-08-02, and the design note's own §6 says no code changes until the encode phase runs; the fork register still has no machine-readable format (the BNA smoke's register shape, PR #195, is the leading candidate)                                  |
 | `p5-gate`     | its condition is explicitly a judgement; two of its five checks already run inside `p3-check`, and two of the remaining three join over registers that do not exist                                                                                             |
-| `p8-verify`   | **R5** open, no CLI footing at all; SPEC.md §5's `P8 verifier toolchain` row inventories nothing ("not inventoried here — R5 asks which existing machinery or external tool goes first") and §6 gives it no pass condition. Gates nothing in G0–G4              |
+| `p8-verify`   | R5 ruled 2026-08-02 (ROBDD first, fork-space sweep second, external MC last) — the blocker is now engineering: no CLI footing exposes the query-planner ROBDD to a script, and SPEC.md §6 gives P8 no pass condition yet. Gates nothing in G0–G4                |
 | `p10-publish` | **R1** open (owner: Meng), **R2** open, and every outward-facing act here is HG2's                                                                                                                                                                              |
 
 Until 2026-08-02 five of the seven were blocked on a ruling rather than on engineering — a
 deliberate stance: building against an unruled representation is building to be rewritten. With
-R4 ruled, only `p8-verify` (R5) and `p10-publish` (R1/R2) still wait on rulings; the rest wait on
+R4 and R5 ruled, only `p10-publish` still waits on a ruling (R1's remainder: name/org and the
+license instrument — R2's pathway is ruled); the rest wait on
 tooling.
 
 ### 5.3 The `l4 run` workaround, and its expiry

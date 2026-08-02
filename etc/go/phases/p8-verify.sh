@@ -24,10 +24,11 @@ WHAT IT WOULD DO
   exploit hunting.
 
 BLOCKER
-  Ruling R5 is OPEN: the toolchain is undecided between in-compiler
-  exhaustiveness machinery, the query-planner ROBDD for unsat and dead-
-  branch detection, and an external model checker. There is also no CLI
-  footing at all — the verified command list is
+  Ruling R5 was RULED 2026-08-02 as a ladder: the query-planner ROBDD
+  first (unsat, dead branches, vacuous guards over the boolean skeleton),
+  the R4 fork-space agreement/divergence sweep second, an external model
+  checker last (deferred until the LTS semantics stabilise). The remaining
+  blocker is engineering: no CLI footing at all — the verified command list is
   run/check/format/ast/batch/trace/state-graph/render/export/openfisca and
   none of them verifies anything. SPEC.md §5's 'P8 verifier toolchain' row
   inventories nothing ('not inventoried here -- R5 asks which existing

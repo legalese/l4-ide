@@ -5,7 +5,9 @@
 reachable projection and emits conversion report v0; the seven de novo and publish stages are
 scaffolded entry points that refuse with a named blocker. With R4 ruled (2026-08-02), the
 encode/fork stages' blocker is unbuilt tooling; only P8 (R5) and P10 (R1/R2) still wait on open
-rulings. The orchestrator's own present-tense inventory is
+rulings — and since then R5 has been ruled too (the ROBDD-first ladder) and R2's pathway
+ruled (probe now, note at G4, contact only with a live page), so what still waits on a ruling
+is R1's remainder: repo name/org and the license instrument. The orchestrator's own present-tense inventory is
 [ORCHESTRATOR.md](./ORCHESTRATOR.md); §5 below still names what does not exist (BKM emission, the
 ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo — and P8's component row
 inventories nothing, pending R5). §5 is the verified inventory and §6 is the gap register.
@@ -298,9 +300,14 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   keeping the open-core → freemium-enrichment pathway; the exact license _class_
   (software-style vs content-style) was under discussion at this writing. **Still open:** repo
   name + org confirmation; the license instrument.
-- **R2 — lexipedia compatibility**: probe their DokuWiki format, contribution route, and
-  licensing; fallback is the comparison note in P9. Needs a read-only probe first; any contact
-  is HG2.
+- **R2 — lexipedia compatibility**: **ANSWERED 2026-08-02 (Meng), as a three-step pathway:**
+  **probe now** (read-only: their DokuWiki format, contribution route, licensing — measured
+  2026-08-02: the site is CC BY-SA 4.0, so a comparison note must be written in our own words
+  with quotation, and our prose artifacts want CC-BY-4.0 so they can flow into BY-SA one-way
+  without ShareAlike reaching the encodings); **comparison note at G4** (published on our side —
+  that publication is the HG2 moment); **contact only with a live page in hand** (the superset
+  entry deployed, not a spec). Meng owns the outreach and will ask Anson whether a different
+  draft pathway for contribution is preferred; any contact remains HG2 regardless.
 - **R3 — ANSWERED 2026-08-02, see [ORCHESTRATOR.md](./ORCHESTRATOR.md)**: orchestrator
   packaging is §7.2's shape — a thin skill (`.claude/skills/running-the-l4-pipeline/`) plus one
   workflow script per phase (`etc/go/phases/`), driven by a single deterministic, resumable entry
@@ -322,9 +329,17 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   and extended it to regulative rules: rules tend to be returned by `MEANS` functions anyway,
   so the `interp` argument threads through the scope of the deontic chain. Ruled, not built — the P1–P5 tooling
   remains scaffolded.
-- **R5 — P8 toolchain**: which verifier first (the in-compiler exhaustiveness machinery, the
-  query-planner ROBDD for unsat/dead-branch detection, an external model checker)? Stretch;
-  does not gate G0–G4.
+- **R5 — P8 toolchain**: **ANSWERED 2026-08-02 (Meng), as a ladder rather than a choice.**
+  (1) **The query-planner ROBDD goes first** (PR #92's hand-rolled model counter): unsat
+  conditions, dead branches and vacuously-true guards over the boolean skeleton — shipped
+  machinery, zero new dependencies, script-side with exit codes, so `p8-verify` gets an honest
+  `structural` oracle. (2) **The fork-space sweep second** (post-P4): R4's agreement/divergence
+  properties, `∀ interp`, are quantified verification and P8 is their natural owner. (3)
+  **External model checking last** — deontic/temporal properties (double binds, the reporting
+  loop) wait for the LTS semantics to stabilise; deferred, not rejected. Honest bound on rung 1:
+  the ROBDD is propositional — atoms are opaque, so arithmetic relations between atoms and
+  temporal properties are invisible to it; those are rungs 2–3's business. Still gates nothing
+  in G0–G4.
 - **R6 — WITHDRAWN 2026-07-31, same day it was drafted**: it asked to "land
   `mengwong/typically-salvage`" — but that landed as PR #92 on 2026-07-08 (53dda002, in this
   worktree's base). The draft was written from a stale session memory; the adversarial
