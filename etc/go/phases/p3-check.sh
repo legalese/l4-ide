@@ -131,7 +131,52 @@ else
   note "temporal closure: all $DATED_ARMS dated arm(s) carry an @ref inside their own declaration block (floor: $MIN_DATED_ARMS)"
 fi
 
-# --- 4. the half that is not checkable, recorded rather than omitted --------
+# --- 4. label order over the surviving label-only inert strings -------------
+# Under the enumeration-label ruling (2026-08-03) an inert string that restates
+# the active node beside it is deleted, and the item's statutory label survives
+# on the node's own line: `.. "(1)" ... transfer's `to the issuer``. What is left
+# is a sequence, and a sequence can be read.
+#
+# WARNING LEVEL, deliberately, and Meng's ruling is the reason: "real legislation
+# goes wobbly". A consolidated Act quotes repealed limbs by omission, so (a) (c)
+# (d) is the normal shape of live text — GAPS are counted and reported as
+# information, never as a warning. Out-of-ORDER labels are rarer and earn a
+# warning line. NEITHER moves this stage's status: a check that turned a corpus
+# red for quoting its source faithfully would be worse than no check.
+#
+# The scheme reading is in etc/go/lib/label-order.mjs, which reads each run under
+# every scheme its tokens admit — (i) is both a letter and a roman one — and
+# calls a run disordered only when NO reading orders it.
+LABEL_OUT=$(node "$GO_LIB/label-order.mjs" "${MODULES[@]}")
+LABELS=$(printf '%s\n' "$LABEL_OUT" | head -1 | /usr/bin/awk '{print $1}')
+LABEL_GAPS=$(printf '%s\n' "$LABEL_OUT" | head -1 | /usr/bin/awk '{print $2}')
+LABEL_WARNINGS=$(printf '%s\n' "$LABEL_OUT" | head -1 | /usr/bin/awk '{print $3}')
+LABEL_LINES=$(printf '%s\n' "$LABEL_OUT" | tail -n +2)
+
+note ""
+if [[ "$LABEL_WARNINGS" -gt 0 ]]; then
+  note "WARNING: $LABEL_WARNINGS rule(s) quote their statutory labels out of order:"
+  note "$LABEL_LINES"
+  note "  This does NOT affect this stage's status. Legislation goes wobbly, and a"
+  note "  quotation that follows its source is not a defect; read the source before"
+  note "  reordering anything."
+else
+  note "label order: $LABELS label-only inert string(s), none out of order"
+fi
+note "label gaps: $LABEL_GAPS missing step(s) between consecutive labels (informational — a repealed limb is a legitimate gap)"
+
+# The warning rides in the receipt's own notes as well as in $LOG, because a
+# reader of the journal must not have to open an artifact to learn that a
+# warning fired. Gaps get a note too, and say in the note that they are not one.
+declare -a LABEL_NOTES=()
+if [[ "$LABEL_WARNINGS" -gt 0 ]]; then
+  LABEL_NOTES+=(--note "WARNING (does not affect status): $LABEL_WARNINGS rule(s) quote their statutory labels out of order; see $LOG")
+fi
+if [[ "$LABEL_GAPS" -gt 0 ]]; then
+  LABEL_NOTES+=(--note "$LABEL_GAPS gap(s) in the label sequences — informational, not a warning: a repealed or omitted limb is a legitimate gap in a consolidated text")
+fi
+
+# --- 5. the half that is not checkable, recorded rather than omitted --------
 note ""
 note "NOT CHECKED HERE, and not checkable in principle:"
 note "  P3's 'isomorphic — a domain expert can review it against $GO_S_CITATION"
@@ -144,12 +189,13 @@ note "  module typechecks. It does not mean the encoding is faithful."
 # used to live only in $LOG, which the journal names by path and sha256 — and a
 # sha256 is not invertible, so "nine ELSE IF sites" was a number nobody could
 # get back out of the journal it was said to come from.
-METRICS=(--metric "else_if_sites=$ELSEIF_N" --metric "dated_arms=$DATED_ARMS" --metric "min_dated_arms=$MIN_DATED_ARMS")
+METRICS=(--metric "else_if_sites=$ELSEIF_N" --metric "dated_arms=$DATED_ARMS" --metric "min_dated_arms=$MIN_DATED_ARMS" \
+         --metric "label_only_strings=$LABELS" --metric "label_order_warnings=$LABEL_WARNINGS" --metric "label_gaps=$LABEL_GAPS")
 
 if [[ $FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "$FINDINGS of the automatable P3 house-style checks failed; see $LOG" \
-    --artifact "$LOG" "${METRICS[@]}"
+    --artifact "$LOG" "${METRICS[@]}" ${LABEL_NOTES[@]+"${LABEL_NOTES[@]}"}
   exit "$GO_EXIT_FINDING"
 fi
 
@@ -160,5 +206,5 @@ go_receipt \
   --oracle-exit 0 \
   --oracle-class structural \
   --oracle-because "typechecking is the compiler's own verdict on the module; the two grep checks are the mechanisable half of P3's house rules, and the dated-arm floor stops the second one passing over an empty matched set. Faithfulness to the source regulation is NOT covered and is carried by HG1." \
-  --artifact "$LOG" "${METRICS[@]}" \
+  --artifact "$LOG" "${METRICS[@]}" ${LABEL_NOTES[@]+"${LABEL_NOTES[@]}"} \
   --note "isomorphism against $GO_S_CITATION is unverified by this stage and is HG1's subject"
