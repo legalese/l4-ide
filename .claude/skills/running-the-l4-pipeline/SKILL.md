@@ -94,12 +94,12 @@ p3-check:     DEGRADED
 p6-tests:     PASS
 p7-dmn:       PASS
 p7-bpmn:      DEGRADED
-p7-tnr:       NOT-REGENERATED
+p7-tnr:       PASS
 p7-akn:       UNVERIFIED
 go: VERDICT: g1 COMPLETE
 ```
 
-That is a **successful** run. `COMPLETE` means every declared stage has a receipt, nothing is `BROKEN`, every non-`PASS` receipt carries a reason that appears in the report, and every gate is signed or explicitly waived. It is completeness of accounting, not greenness. (Until 2026-08-02 the `p7-dmn` row here read `NOT-EXECUTABLE` — permitted at G1 only because the report said so in Blocking terms, per SPEC.md §6; PR #194's corpus cases file flipped it to `PASS` with oracle class `execution`.)
+That is a **successful** run. `COMPLETE` means every declared stage has a receipt, nothing is `BROKEN`, every non-`PASS` receipt carries a reason that appears in the report, and every gate is signed or explicitly waived. It is completeness of accounting, not greenness. (Until 2026-08-02 the `p7-dmn` row here read `NOT-EXECUTABLE` — permitted at G1 only because the report said so in Blocking terms, per SPEC.md §6; PR #194's corpus cases file flipped it to `PASS` with oracle class `execution`. The `p7-tnr` row read `NOT-REGENERATED` until `l4 nlg` gave the leg something to regenerate; it now reproduces the committed `.nlg.golden`s and carries oracle class `differential`.)
 
 **Key idioms:**
 
