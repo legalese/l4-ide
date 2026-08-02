@@ -25,18 +25,19 @@ document during the research pass; everything else is marked. §11 lists what is
 
 **Updated 2026-07-27 by the integration pass that folded in R3–R6.**
 
-| ruling                              | state                                     | detail                                                        |
-| ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
-| R1 — scope unit                     | **ANSWERED** 2026-07-26                   | §2.3                                                          |
-| R2 — strictness                     | **ANSWERED** 2026-07-27, revised same day | §2.4                                                          |
-| R3 — Unicode in `feelBase`          | **ANSWERED** 2026-07-27                   | §5.3                                                          |
-| R4 — tagged unions                  | **ANSWERED** 2026-07-27                   | §4.2.1                                                        |
-| R5 — acyclicity                     | **ANSWERED** 2026-07-27                   | §6.4                                                          |
-| R6 — the uncalled population        | **ANSWERED** 2026-07-27                   | §2.5                                                          |
-| R7 — target engine                  | **ANSWERED** 2026-07-27, elsewhere        | §13, arriving with PR #160 (branch `feat/dmn-engine-flavors`) |
-| **R8 — builtin `MAYBE` / `EITHER`** | **ANSWERED 2026-07-29**, opened by R4     | §4.2.1-6, §11                                                 |
-| R12 — rule-date-rebinding decides   | **ANSWERED 2026-08-02 (Meng)**            | §15.12: not emitted; `D-RULEDATE-UNBOUND` Blocking → Lossy    |
-| R13 — the deontic verdict lowering  | **ANSWERED 2026-08-02 (Meng)**            | §16: verdict decision table over the guards; lifecycle → BPMN |
+| ruling                              | state                                     | detail                                                                                 |
+| ----------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| R1 — scope unit                     | **ANSWERED** 2026-07-26                   | §2.3                                                                                   |
+| R2 — strictness                     | **ANSWERED** 2026-07-27, revised same day | §2.4                                                                                   |
+| R3 — Unicode in `feelBase`          | **ANSWERED** 2026-07-27                   | §5.3                                                                                   |
+| R4 — tagged unions                  | **ANSWERED** 2026-07-27                   | §4.2.1                                                                                 |
+| R5 — acyclicity                     | **ANSWERED** 2026-07-27                   | §6.4                                                                                   |
+| R6 — the uncalled population        | **ANSWERED** 2026-07-27                   | §2.5                                                                                   |
+| R7 — target engine                  | **ANSWERED** 2026-07-27, elsewhere        | §13, arriving with PR #160 (branch `feat/dmn-engine-flavors`)                          |
+| **R8 — builtin `MAYBE` / `EITHER`** | **ANSWERED 2026-07-29**, opened by R4     | §4.2.1-6, §11                                                                          |
+| R12 — rule-date-rebinding decides   | **ANSWERED 2026-08-02 (Meng)**            | §15.12: not emitted; `D-RULEDATE-UNBOUND` Blocking → Lossy                             |
+| R13 — the deontic verdict lowering  | **ANSWERED 2026-08-02 (Meng)**            | §16: verdict decision table over the guards; lifecycle → BPMN                          |
+| R-C — R12's successor question      | **ANSWERED 2026-08-02 (Meng)**            | §15.12.1: BKM/Reader elaboration rejected for now; truths relocate to the case harness |
 
 ### Is #923 unblocked? **Yes.**
 
@@ -5455,6 +5456,11 @@ as expected, 14/14 service output value(s) as expected` (the last clause is the 
 > closure parameters bind the GLOBAL decisions (§6.2's `name: name`), so the per-call investor
 > never reaches the limit check. The cases file records the corrected derivation; the quartet of
 > deliberately-pinned-'wrong' values is now four for four.
+>
+> _(The `1 case(s) … 67/67` banners above are the measurement at that commit and stand as
+> history. Later the same day, R-C — §15.12.1 — relocated the 15 dropped rule-date fixtures into
+> the cases file as dated cases; the current measured banners read `16 case(s) … 1072/1072`, and
+> are quoted [E] there.)_
 
 > **The blocking total falls by only 8 net, because 15 new Blocking notes appear — and that is the
 > point.** The complaint this section answers is that the report was _silent_ about law time; making
@@ -5688,6 +5694,65 @@ instead, and the spec text was written to the measured shape. The plan also unde
 unverified-fixture interaction; the exclusion now covers `pvFixtureUnverified` too, with a fixture
 case pinning it.
 
+#### 15.12.1 The successor question — R-C, ruled 2026-08-02 (Meng)
+
+**The question R12 left open.** Dropping the 15 rebinding decides says what the artifact will NOT
+carry; it does not say what should carry those truths instead, nor whether the exporter should ever
+learn to express a scoped rule date. Both halves are ruled here.
+
+**The elaboration R12 enables, named precisely.** `EVAL UNDER RULES EFFECTIVE AT` is Reader-monad
+`local`: it re-binds an ambient value around a sub-computation. To express that in a DRG, the
+sub-computation must be **reified as something that takes the rule date as an argument**, and DMN
+has exactly one reification mechanism: a `businessKnowledgeModel` formal parameter. Phase 5 built
+the BKM emission machinery, and §6.2's probe measured BKM invocation as the ONLY tabular-predicate
+mechanism portable across both target engines — so a `rules-in-force(date)` BKM with per-call-site
+date arguments is now buildable, not hypothetical. That is the elaboration this ruling declines.
+
+**REJECTED for now, on two grounds.**
+
+1. **Legibility.** Invocation arguments are invisible in DRG diagram interchange: two invocations
+   of one BKM with two different date arguments draw **identical dashed `knowledgeRequirement`
+   edges**, so the diagram cannot show which regime a caller asked for — the one fact the
+   elaboration exists to express. And the wrapper-pair scheme (a parameterised BKM plus a wrapper
+   decision per rebinding call site) roughly **doubles the requirement cone** around every dated
+   constant. The exhibit gets structurally larger and semantically less readable at once.
+2. **Sufficiency.** The regimes are **finite and enumerated** (four, §15's own axis), and Reader
+   over a finite domain collapses to specialization: every one of the 15 dropped fixtures asks ONE
+   question under ONE date, which is answerable by running the un-elaborated model N times with N
+   values of `RULES_EFFECTIVE_DATE`. Only a decision that mixes regimes INSIDE the model — one
+   limb under the 2019 rules, another under the 2023 rules, in the same evaluation — would need
+   the elaboration, and the corpus has none.
+
+**The relocation duty this creates, discharged [E].** If the harness owns the dates, the dropped
+fixtures' truths must actually live in the harness — otherwise R12 quietly deleted 15 measured
+facts. `jl4/examples/dmn/regcf-corpus.cases.json` now carries 16 cases: the base world plus 15
+dated cases, one per dropped fixture, each pinning all 67 decisions to L4-evaluated ground truth
+(the file's note block records every derivation, including why the λ-lifted closure binding —
+§6.2's `name: name` — is exactly what makes global-inputData delivery equivalent to the fixture's
+per-call question). **[E] MEASURED 2026-08-02, both harnesses, verbatim:** KIE 8.44.0.Final:
+`1 file(s), 16 case(s), 0 error(s), 0 warning(s), 1072/1072 decision(s) SUCCEEDED, 1072/1072
+value(s) as expected, 224/224 service output value(s) as expected`; Camunda 8.7.6 (zeebe-dmn):
+`1 file(s), 16 case(s), 1 parsed, 0 error(s), 1072/1072 decision(s) evaluated, 1072/1072 value(s)
+as expected`. CI-gated at those counts (`.github/workflows/pr-checks.yml`, dmn-engines;
+`jl4/tests-cli/Main.hs` corpus legs).
+
+**The successor ladder, if intra-model cross-regime reference ever arrives.** Grandfather clauses,
+transition provisions and lex-mitior rules are the genuine article — one rule reading another
+rule's OLD version in the same breath — and the British Nationality Act, the planned de-novo
+corpus, is expected to contain them. When one does, escalate in this order, stopping at the first
+rung that suffices:
+
+1. **Named-old-rule encoding**: bind the old figure as its own named L4 constant (`the pre-2021
+offering maximum`) and reference it directly — no rebinding construct at all;
+2. **Literal-date specialization**: export-time constant folding of the regime selection when the
+   rebinding date is a literal — the decision emits with the selected regime's value baked in;
+3. **Finite-regime dispatch** through the already-emitted interval tables: a decision per regime
+   plus a dispatching table over the finite regime set;
+4. **Full BKM elaboration** (the wrapper-pair scheme above) — probably never needed, precisely
+   because regimes stay finite and enumerated.
+
+**The maxim, for citation:** _the model owns the law under a date; the harness owns the dates._
+
 ## 16. The deontic verdict lowering — R13, ruled 2026-08-02 (Meng)
 
 **The ruling.** A decision whose (flattened) guarded chain has row bodies that are ALL single
@@ -5793,4 +5858,6 @@ is not marked measured is a prediction, not evidence.
 banners: KIE `VALID clean` / `BUILD clean` / `67/67 decision(s) SUCCEEDED, 67/67 value(s) as
 expected`; Camunda `1 parsed` / `67/67 decision(s) evaluated, 67/67 value(s) as expected`. The
 prediction above held, with one pin corrected under measurement (`the_over_limit_investor_case_
-qualifies` — the λ-lift closure binding, recorded in the cases file and §15.7).
+qualifies` — the λ-lift closure binding, recorded in the cases file and §15.7). (Those are the
+single-base-case banners; after R-C's relocation cases — §15.12.1 — the same artifact measures
+`16 case(s) … 1072/1072` on both engines.)

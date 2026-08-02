@@ -45,9 +45,12 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn \
 `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** 67 `<decision>` elements — 9 decision
 tables, 57 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
 tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 149 `<informationRequirement>`
-edges, 31 `<knowledgeRequirement>`s, one diagram. Loads clean in `dmn-moddle` — and **evaluates**:
-KIE 8.44.0.Final answers 67/67 decisions, 67/67 values as expected (14/14 decision-service output
-values); Camunda 8.7.6 (zeebe-dmn) parses and answers 67/67. The verbatim verdict lines live in
+edges, 31 `<knowledgeRequirement>`s, one diagram. Loads clean in `dmn-moddle` — and **evaluates**,
+over the 16 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world plus 15 dated
+relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec §15.12.1):
+KIE 8.44.0.Final answers 1072/1072 decisions, 1072/1072 values as expected (224/224
+decision-service output values); Camunda 8.7.6 (zeebe-dmn) parses and answers 1072/1072. The
+verbatim verdict lines live in
 `jl4/examples/dmn/README.md` and are CI-gated (`.github/workflows/pr-checks.yml`, dmn-engines).
 
 **A note on the neighbour.** `jl4/examples/dmn/reg-cf.l4` is a 101-line **toy** — five decisions

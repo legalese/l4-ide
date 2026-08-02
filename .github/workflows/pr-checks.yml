@@ -607,21 +607,25 @@ jobs:
       # The CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
       # the whole 67-decision Reg CF corpus, built and value-checked on both
       # engines. This is deliverable R0's gate — "the execution is the exhibit"
-      # — and its counts are pinned to the LOCALLY MEASURED verdict lines at
-      # commit 81ece880 (2026-08-02, the commit that landed the harness's
-      # service-leg value checks and the regenerated fidelity golden), not to
-      # round numbers: before R12/R13 the same file was VALID 16 error(s) on
-      # KIE and PARSE INVALID on Camunda.
+      # — and its counts are pinned to the LOCALLY MEASURED verdict lines
+      # (2026-08-02) at the R-C dated-relocation commit (spec §15.12.1, the
+      # commit that grew regcf-corpus.cases.json from 1 case to 16: the base
+      # world plus 15 dated cases relocating the rule-date-rebinding fixtures
+      # R12 dropped from the artifact), not to round numbers. 16 cases x 67
+      # decisions = 1072; before R12/R13 the same file was VALID 16 error(s)
+      # on KIE and PARSE INVALID on Camunda. An earlier pin (81ece880) read
+      # '1 case(s) ... 67/67'.
       #
-      # The KIE pin includes the service clause on purpose: 14/14 is the
+      # The KIE pin includes the service clause on purpose: 224/224 is the
       # decision-service sweep VALUE-checking every declared outputDecision
-      # (fed its inputDecisions' computed values), and "0 warning(s)" counts
-      # runtime WARNs too since the same commit — both were blind spots before.
+      # (fed its inputDecisions' computed values; 7 services, 14 outputs, per
+      # case), and "0 warning(s)" counts runtime WARNs too since 81ece880 —
+      # both were blind spots before.
       #
       # regcf-corpus.cases.json's expect block is SYMMETRIC with the model's
-      # decision population (67/67 both ways), so a decision added to the
-      # corpus without a pin, or a pin left behind by a dropped decision, fails
-      # here rather than passing silently.
+      # decision population (67/67 both ways, in every case), so a decision
+      # added to the corpus without a pin, or a pin left behind by a dropped
+      # decision, fails here rather than passing silently.
       - name: The Reg CF corpus -- both engines, end to end (R12/R13)
         env:
           KIE_CHECK_REQUIRED: "1"
@@ -633,12 +637,12 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/regcf-corpus.dmn \
             --cases jl4/examples/dmn/regcf-corpus.cases.json | tee kie-corpus.log
-          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 67/67 decision(s) SUCCEEDED, 67/67 value(s) as expected, 14/14 service output value(s) as expected' kie-corpus.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 16 case(s), 0 error(s), 0 warning(s), 1072/1072 decision(s) SUCCEEDED, 1072/1072 value(s) as expected, 224/224 service output value(s) as expected' kie-corpus.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/regcf-corpus.dmn \
             --cases jl4/examples/dmn/regcf-corpus.cases.json | tee camunda-corpus.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 67/67 decision(s) evaluated, 67/67 value(s) as expected' camunda-corpus.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 16 case(s), 1 parsed, 0 error(s), 1072/1072 decision(s) evaluated, 1072/1072 value(s) as expected' camunda-corpus.log
 
       # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
       #
