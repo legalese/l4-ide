@@ -431,8 +431,17 @@ document: the analysis is propositional — every leaf (a projection, a comparis
 test, a call to another `DECIDE`) is an opaque atom, so no numeric, interval, date or string
 contradiction is in range. Each `DECIDE` is read on its own without inlining callees, and in a
 corpus written as many small named limbs that is most of the corpus: regcf's `issuer is eligible`
-has exactly **one** atom, the call to `issuer is excluded by Rule 100(b)`. Findings are sound;
-silence is not a consistency proof. `l4 verify --help` carries the full statement, which is why
+has exactly **one** atom, the call to `issuer is excluded by Rule 100(b)`. Measured over the 42
+analysed decisions in `regcf.l4`, **25 have a single atom** and the widest has 6 — so most of the
+corpus has no room for a propositional contradiction to appear in. A third category exists
+besides analysed and skipped: **7 decisions across the two modules are defined inside a `WHERE`
+clause and are never visited at all**, because the ladder's own entry point
+(`foldTopLevelDecides`) does not descend into one and a verifier that disagreed with the ladder
+about what a rule is would be reporting on a program the wizard never shows anyone. That figure
+is on the receipt as `nested_not_visited` rather than in prose: `analysed + skipped` does not
+total the corpus, and a hand-count of the source gets it wrong — grepping `regcf.l4` and
+`regcf-wizard.l4` for `WHERE`-local definitions answers 5 and 0 against the AST's 5 and 2.
+Findings are sound; silence is not a consistency proof. `l4 verify --help` carries the full statement, which is why
 that one subcommand wires in `helper` when the older ones do not.
 
 Two smaller measurements worth keeping. The ladder body is in **conjunctive** normal form, and

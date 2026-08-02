@@ -720,12 +720,13 @@ dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
 verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture :: FilePath
-verifyVacuousGuardFixture, verifySeamFixture :: FilePath
+verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
 verifyDeadBranchFixture   = fixtureDir </> "verify-dead-branch.l4"
 verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
+verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
@@ -774,7 +775,7 @@ main = do
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
        , shadowExtraEntry, shadowImporterEntry
        , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
-       , verifyVacuousGuardFixture, verifySeamFixture
+       , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
        , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
        , exportTwoRulesFixture, exportNothingFixture
        , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
@@ -2217,6 +2218,33 @@ spec bin = do
       case objField env "summary" >>= (`objField` "skipped") of
         Just (Number n) -> n `shouldSatisfy` (> 0)
         other -> expectationFailure ("expected summary.skipped, got " ++ show other)
+
+    -- The third category, and the reason it is a NUMBER. `analysed + skipped`
+    -- does not total the file: a WHERE-local definition is a DECIDE and the
+    -- ladder's entry point does not descend into one, so neither does this. An
+    -- exclusion nobody can size is an exclusion nobody believes — and a
+    -- hand-count of the Reg CF source got it wrong in exactly that way (5 and
+    -- 0 by grep, against the AST's 5 and 2).
+    it "counts the WHERE-nested decisions it did not visit" $ do
+      env <- jsonEnvelope bin ["verify", verifyNestedFixture, "--format", "json"]
+      case objField env "summary" >>= (`objField` "nestedNotVisited") of
+        Just (Number n) -> n `shouldBe` 1
+        other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
+
+    -- The nested body is `y AND NOT y`. It stays invisible, and this test
+    -- exists so that a future change which starts descending announces itself
+    -- here rather than by silently altering what a clean run means.
+    it "does not report a contradiction that lives only in a WHERE clause" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyNestedFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` (not . ("unsat" `isInfixOf`))
+
+    -- The corpus figure the p8-verify receipt now carries.
+    it "reports the Reg CF corpus's own nested count" $ do
+      env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]
+      case objField env "summary" >>= (`objField` "nestedNotVisited") of
+        Just (Number n) -> n `shouldBe` 5
+        other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
 
     it "fails on a module that does not typecheck" $
       expectFail bin ["verify", errorFixture]

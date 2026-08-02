@@ -140,6 +140,7 @@ TOTAL_DECISIONS=0
 TOTAL_ANALYSED=0
 TOTAL_SKIPPED=0
 TOTAL_MERGED=0
+TOTAL_NESTED=0
 
 {
   echo
@@ -166,10 +167,11 @@ for SRC in "${MODULES[@]}"; do
   # delimiter, and the prelude runs under `set -e`, so a summary line without
   # one aborted this stage between the controls and the receipt — silently,
   # because the abort happened before the log was echoed.
-  read -r D A S F M < <(node -e '
+  read -r D A S F M N < <(node -e '
     const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
     const s = j.summary;
-    process.stdout.write([s.decisions, s.analysed, s.skipped, s.findings, s.mergedAtomOccurrences].join(" ") + "\n");
+    process.stdout.write([s.decisions, s.analysed, s.skipped, s.findings,
+                          s.mergedAtomOccurrences, s.nestedNotVisited].join(" ") + "\n");
   ' "$OUT")
 
   TOTAL_DECISIONS=$((TOTAL_DECISIONS + D))
@@ -177,13 +179,15 @@ for SRC in "${MODULES[@]}"; do
   TOTAL_SKIPPED=$((TOTAL_SKIPPED + S))
   TOTAL_FINDINGS=$((TOTAL_FINDINGS + F))
   TOTAL_MERGED=$((TOTAL_MERGED + M))
+  TOTAL_NESTED=$((TOTAL_NESTED + N))
 
-  printf '  %-24s %s decisions, %s analysed, %s skipped (non-boolean), %s finding(s)\n' \
-    "$STEM" "$D" "$A" "$S" "$F" >>"$LOG"
+  printf '  %-24s %s decisions, %s analysed, %s skipped (non-boolean), %s nested-not-visited, %s finding(s)\n' \
+    "$STEM" "$D" "$A" "$S" "$N" "$F" >>"$LOG"
 
   METRICS+=(--metric "$STEM.decisions=$D")
   METRICS+=(--metric "$STEM.analysed=$A")
   METRICS+=(--metric "$STEM.skipped=$S")
+  METRICS+=(--metric "$STEM.nested_not_visited=$N")
   METRICS+=(--metric "$STEM.findings=$F")
   ARTS+=(--artifact "$OUT" --artifact "$TXT")
 done
@@ -195,12 +199,13 @@ METRICS+=(--metric "controls_reproduced=$CTRL_OK/${#CONTROLS[@]}")
 METRICS+=(--metric "decisions=$TOTAL_DECISIONS")
 METRICS+=(--metric "analysed=$TOTAL_ANALYSED")
 METRICS+=(--metric "skipped_non_boolean=$TOTAL_SKIPPED")
+METRICS+=(--metric "nested_not_visited=$TOTAL_NESTED")
 METRICS+=(--metric "findings=$TOTAL_FINDINGS")
 METRICS+=(--metric "merged_atom_occurrences=$TOTAL_MERGED")
 
 BOUND_NOTE="A clean run is a WEAK statement and the receipt refuses to imply otherwise. The analysis is propositional: every leaf (a projection, a comparison, an arithmetic test, a call to another DECIDE) is an opaque atom, so no numeric, interval, date or string contradiction is in range, and neither is anything that only appears once two named rules are unfolded against each other. Each DECIDE is read on its own. Findings are sound; silence is not a consistency proof. Full statement: l4 verify --help."
 
-RUNG_NOTE="Rung 1 of 3. R5 (2026-08-02) ordered the P8 ladder as ROBDD first, the R4 fork-space agreement/divergence sweep second, an external model checker (TLA+/NuSMV/UPPAAL class) last. Rungs 2 and 3 are unbuilt: rung 2 needs the fork register P4 does not yet produce, rung 3 waits on the LTS semantics. $TOTAL_SKIPPED of $TOTAL_DECISIONS decisions are outside rung 1 entirely because they do not return BOOLEAN — they are counted, named in the artifact, and not reported as clean."
+RUNG_NOTE="Rung 1 of 3. R5 (2026-08-02) ordered the P8 ladder as ROBDD first, the R4 fork-space agreement/divergence sweep second, an external model checker (TLA+/NuSMV/UPPAAL class) last. Rungs 2 and 3 are unbuilt: rung 2 needs the fork register P4 does not yet produce, rung 3 waits on the LTS semantics. $TOTAL_SKIPPED of $TOTAL_DECISIONS decisions are outside rung 1 entirely because they do not return BOOLEAN — they are counted, named in the artifact, and not reported as clean. A further $TOTAL_NESTED are outside it for a different reason: they are defined inside a WHERE clause, and neither this command nor the ladder's own entry point descends into one, so they are in NEITHER the analysed nor the skipped column. That is why the figure is on the receipt: 'analysed + skipped' does not total the corpus, and an exclusion nobody can size is an exclusion nobody believes."
 
 if [[ $TOTAL_FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \

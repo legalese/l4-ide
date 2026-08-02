@@ -115,6 +115,14 @@ propositionalBound =
     , "  leaf here too. A DECIDE that does not return BOOLEAN is not analysed,"
     , "  and is reported as skipped rather than as clean."
     , ""
+    , "  Only TOP-LEVEL decisions are visited. A definition inside a WHERE"
+    , "  clause is a DECIDE too, and this command does not descend into one --"
+    , "  the ladder's own entry point does not either, and the two must not"
+    , "  disagree about what a rule is. So `analysed + skipped' does NOT total"
+    , "  the decisions in the file. The count that is missing is reported as"
+    , "  summary.nestedNotVisited, and it is a number rather than a caveat"
+    , "  because an exclusion nobody can size is an exclusion nobody believes."
+    , ""
     , "  Each decision is read ON ITS OWN. A call to another DECIDE is a leaf,"
     , "  not an inlined body, so a contradiction that only appears once two"
     , "  named rules are unfolded against each other is out of range. In a"
@@ -279,7 +287,8 @@ verifyCmd opts = do
       putDiagnostics errs
       let reports = analyseModule opts tc
           total = length (concatMap reportFindings reports)
-      emit opts (render opts reports total)
+          nested = nestedNotVisited tc
+      emit opts (render opts reports total nested)
       if total > 0 then exitWith (ExitFailure 1) else exitSuccess
 
 emit :: VerifyOptions -> Either BSL8.ByteString Text -> IO ()
@@ -298,7 +307,7 @@ emit opts = \case
 analyseModule :: VerifyOptions -> Rules.TypeCheckResult -> [DecisionReport]
 analyseModule opts tc =
   [ r
-  | decide <- foldTopLevelDecides (\d -> [d]) tc.module'
+  | decide <- topLevelDecides tc
   , let r = analyseDecide opts tc decide
   , wanted r.drName
   ]
@@ -308,6 +317,30 @@ analyseModule opts tc =
       | otherwise = any (`matches` nm) opts.verifyDecisions
     -- A decision's rendered name carries L4's backticks; match with or without.
     matches want nm = want == nm || want == stripBackticks nm
+
+topLevelDecides :: Rules.TypeCheckResult -> [Decide Resolved]
+topLevelDecides tc = foldTopLevelDecides (\d -> [d]) tc.module'
+
+-- | How many decisions this command never looked at.
+--
+-- @foldTopLevelDecides@ is one level deep, so a definition in a @WHERE@ clause
+-- is invisible to the analysis — and, being invisible, would otherwise also be
+-- invisible to the /accounting/, which is the part that matters. A reader who
+-- sees @analysed + skipped@ equal to nothing in particular has no way to tell
+-- whether the remainder is two definitions or two hundred.
+--
+-- @foldDecides@ is the cosmos fold: it yields a decision and everything nested
+-- inside it, so subtracting the top-level count leaves exactly the nested ones.
+--
+-- Descending into them is deliberately NOT done: "LSP.L4.Viz.Ladder"'s own
+-- entry point is @foldTopLevelDecides@, and a verifier that disagreed with the
+-- ladder about what a rule is would be reporting on a program the wizard never
+-- shows anyone.
+nestedNotVisited :: Rules.TypeCheckResult -> Int
+nestedNotVisited tc =
+  sum [length (foldDecides (\_ -> [() :: ()]) d) | d <- tops] - length tops
+  where
+    tops = topLevelDecides tc
 
 analyseDecide :: VerifyOptions -> Rules.TypeCheckResult -> Decide Resolved -> DecisionReport
 analyseDecide opts tc decide =
@@ -617,13 +650,13 @@ analyseBody labels order body
 -- Rendering
 ----------------------------------------------------------------------------
 
-render :: VerifyOptions -> [DecisionReport] -> Int -> Either BSL8.ByteString Text
-render opts reports total = case opts.verifyFormat of
-  VfJson -> Left (Aeson.encode (jsonEnvelope opts reports total))
-  VfText -> Right (textReport opts reports total)
+render :: VerifyOptions -> [DecisionReport] -> Int -> Int -> Either BSL8.ByteString Text
+render opts reports total nested = case opts.verifyFormat of
+  VfJson -> Left (Aeson.encode (jsonEnvelope opts reports total nested))
+  VfText -> Right (textReport opts reports total nested)
 
-jsonEnvelope :: VerifyOptions -> [DecisionReport] -> Int -> Aeson.Value
-jsonEnvelope opts reports total =
+jsonEnvelope :: VerifyOptions -> [DecisionReport] -> Int -> Int -> Aeson.Value
+jsonEnvelope opts reports total nested =
   Aeson.object
     [ "file" .= opts.verifyFile
     , "ok" .= (total == 0)
@@ -638,6 +671,10 @@ jsonEnvelope opts reports total =
           , "findings" .= total
           , "byKind" .= Map.fromListWith (+) [(f.findingKind, 1 :: Int) | f <- allFindings]
           , "mergedAtomOccurrences" .= sum [a.anAtoms - a.anAtomClasses | a <- analysed]
+          , -- Decisions nested in a WHERE clause: neither analysed nor skipped,
+            -- because never visited. Reported so that the three numbers above
+            -- cannot be mistaken for a total. See 'nestedNotVisited'.
+            "nestedNotVisited" .= nested
           ]
     ]
   where
@@ -649,8 +686,8 @@ boundOneLine =
   "propositional only: every leaf is an opaque atom, so no numeric, interval, date or \
   \string contradiction is visible. Findings are sound; silence is not a consistency proof."
 
-textReport :: VerifyOptions -> [DecisionReport] -> Int -> Text
-textReport opts reports total =
+textReport :: VerifyOptions -> [DecisionReport] -> Int -> Int -> Text
+textReport opts reports total nested =
   Text.unlines $
     [ "l4 verify — propositional consistency of the boolean decision skeleton"
     , "file: " <> Text.pack opts.verifyFile
@@ -701,6 +738,14 @@ textReport opts reports total =
         <> " skipped, "
         <> Text.pack (show total)
         <> " finding(s)."
+        <> ( if nested == 0
+              then ""
+              else
+                " "
+                  <> Text.pack (show nested)
+                  <> " further decision(s) nested in a WHERE clause were NOT visited\n  \
+                     \(neither analysed nor skipped) \8212 see the bound below."
+           )
 
 -- | Strip the backticks L4 uses to quote identifiers containing spaces. The
 -- wizard's JSON does the same thing for the same reason.

@@ -214,8 +214,12 @@ shown capable of going red, and of going red for the reason it claims.
 
 The pass is bounded and the receipt must carry the bound, not merely a spec paragraph: rung 1 is
 propositional (every leaf is an opaque atom, so no numeric, interval, date or string
-contradiction is in range), reads each `DECIDE` on its own without inlining callees, and is sound
-but not complete. Rungs 2 (R4 fork-space sweep) and 3 (external model checker) are unbuilt, and a
+contradiction is in range), reads each `DECIDE` on its own without inlining callees, visits only
+**top-level** decisions — a `WHERE`-local definition is a `DECIDE` and neither this command nor
+the ladder's own entry point descends into one — and is sound but not complete. That last
+exclusion is reported as a **number** (`summary.nestedNotVisited`, `nested_not_visited` on the
+receipt: 7 across the Reg CF corpus), because `analysed + skipped` does not total the file and an
+exclusion nobody can size is an exclusion nobody believes. Rungs 2 (R4 fork-space sweep) and 3 (external model checker) are unbuilt, and a
 P8 receipt says which rung it is reporting. Implementation and measurement:
 [ORCHESTRATOR.md](./ORCHESTRATOR.md) §5.1a.
 
