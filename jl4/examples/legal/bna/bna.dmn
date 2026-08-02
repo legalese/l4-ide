@@ -232,7 +232,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision__1_1_satisfied_on_the_actual_facts_of_the_birth_literal">
-      <text>true and (_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day and _1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled)</text>
+      <text>true and _1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day and _1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled</text>
     </literalExpression>
   </decision>
   <decision id="decision_found_abandoned_in_the_united_kingdom_after_commencement" name="found_abandoned_in_the_United_Kingdom_after_commencement" label="found abandoned in the United Kingdom after commencement">
@@ -283,7 +283,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision_deemed_by_subsection_2_to_satisfy_subsection_1_literal">
-      <text>true and (_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time and (not(person.the_contrary_shown_rebutting_the_subsection_2_presumption) and (true and true)))</text>
+      <text>true and _1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time and (not(person.the_contrary_shown_rebutting_the_subsection_2_presumption) and (true and true))</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_british_citizen_by_virtue_of_subsection_1_or_2" name="a_British_citizen_by_virtue_of_subsection_1_or_2" label="a British citizen by virtue of subsection (1) or (2)">
@@ -313,7 +313,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision_a_british_citizen_by_virtue_of_subsection_1a_literal">
-      <text>true and (born_in_the_United_Kingdom_or_a_qualifying_territory and (person.date_of_birth &gt;= the_relevant_day and person.father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth))</text>
+      <text>true and born_in_the_United_Kingdom_or_a_qualifying_territory and (person.date_of_birth &gt;= the_relevant_day and person.father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth)</text>
     </literalExpression>
   </decision>
   <decision id="decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a" name="not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A" label="not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A">
@@ -367,7 +367,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision_entitled_to_be_registered_under_subsection_3_literal">
-      <text>true and (born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled and _1_3_b_an_application_is_made_while_a_minor)))</text>
+      <text>true and born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled and _1_3_b_an_application_is_made_while_a_minor))</text>
     </literalExpression>
   </decision>
   <decision id="decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces" name="_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces" label="1(3A)(a) — father or mother becomes a member of the armed forces">
@@ -406,7 +406,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision_entitled_to_be_registered_under_subsection_3a_literal">
-      <text>true and (born_in_the_United_Kingdom_on_or_after_the_relevant_day and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces and _1_3A_b_an_application_is_made_while_a_minor)))</text>
+      <text>true and born_in_the_United_Kingdom_on_or_after_the_relevant_day and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces and _1_3A_b_an_application_is_made_while_a_minor))</text>
     </literalExpression>
   </decision>
   <decision id="decision__1_4_application_made_after_attaining_the_age_of_ten_years" name="_1_4_application_made_after_attaining_the_age_of_ten_years" label="1(4) — application made after attaining the age of ten years">
@@ -415,7 +415,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision__1_4_application_made_after_attaining_the_age_of_ten_years_literal">
-      <text>true and person.an_application_for_registration_made_after_attaining_the_age_of_ten_years</text>
+      <text>person.an_application_for_registration_made_after_attaining_the_age_of_ten_years</text>
     </literalExpression>
   </decision>
   <decision id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years" name="_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years" label="1(4) — absences within the ninety-day ceiling in each of the first ten years">
@@ -427,7 +427,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years_literal">
-      <text>true and person.greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life &lt;= permitted_days_of_absence_in_each_of_the_first_ten_years</text>
+      <text>person.greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life &lt;= permitted_days_of_absence_in_each_of_the_first_ten_years</text>
     </literalExpression>
   </decision>
   <decision id="decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled" name="_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled" label="1(7) — the Secretary of State treats the residence requirement as fulfilled">
@@ -472,7 +472,7 @@
       <requiredInput href="#input_person"/>
     </informationRequirement>
     <literalExpression id="decision_entitled_to_be_registered_under_subsection_4_literal">
-      <text>true and (born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_4_application_made_after_attaining_the_age_of_ten_years and _1_4_the_residence_requirement_met_or_treated_as_met)))</text>
+      <text>true and born_in_the_United_Kingdom_after_commencement and (not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A and (_1_4_application_made_after_attaining_the_age_of_ten_years and _1_4_the_residence_requirement_met_or_treated_as_met))</text>
     </literalExpression>
   </decision>
   <decision id="decision_registration_may_be_granted" name="registration_may_be_granted" label="registration may be granted">
@@ -592,7 +592,7 @@
       <requiredInput href="#input_adoption"/>
     </informationRequirement>
     <literalExpression id="decision_a_british_citizen_by_virtue_of_subsection_5_literal">
-      <text>true and (the_adopted_person_a_minor_and_not_already_a_British_citizen and (_1_5_an_order_is_made_or_a_Convention_adoption_is_effected and _1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption))</text>
+      <text>the_adopted_person_a_minor_and_not_already_a_British_citizen and (_1_5_an_order_is_made_or_a_Convention_adoption_is_effected and _1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption)</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6" name="a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6" label="a British citizen notwithstanding cesser of the order — subsection (6)">

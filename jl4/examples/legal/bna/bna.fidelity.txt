@@ -1,182 +1,182 @@
 fidelity report — DMN 1.3 (XML), camunda flavor
-  [D-LITERALEXPR] advisory — decision_commencement  (bna.l4:72:22-34)
+  [D-LITERALEXPR] advisory — decision_commencement  (bna.l4:83:22-34)
       `commencement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_appointed_day  (bna.l4:76:27-40)
+  [D-LITERALEXPR] advisory — decision_the_appointed_day  (bna.l4:87:27-40)
       `the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_relevant_day  (bna.l4:85:26-39)
+  [D-LITERALEXPR] advisory — decision_the_relevant_day  (bna.l4:96:26-39)
       `the relevant day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_permitted_days_of_absence_in_each_of_the_first_ten_years  (bna.l4:89:66-68)
+  [D-LITERALEXPR] advisory — decision_permitted_days_of_absence_in_each_of_the_first_ten_years  (bna.l4:100:66-68)
       `permitted days of absence in each of the first ten years` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_born_in_the_united_kingdom_after_commencement  (bna.l4:143:9-144:57)
+  [D-LITERALEXPR] advisory — decision_born_in_the_united_kingdom_after_commencement  (bna.l4:154:9-155:57)
       `born in the United Kingdom after commencement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:150:9-151:62)
+  [D-LITERALEXPR] advisory — decision_born_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:161:9-162:62)
       `born in a qualifying territory on or after the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_born_in_the_united_kingdom_or_a_qualifying_territory  (bna.l4:157:9-158:50)
+  [D-LITERALEXPR] advisory — decision_born_in_the_united_kingdom_or_a_qualifying_territory  (bna.l4:168:9-169:50)
       `born in the United Kingdom or a qualifying territory` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_born_in_the_united_kingdom_on_or_after_the_relevant_day  (bna.l4:164:9-165:61)
+  [D-LITERALEXPR] advisory — decision_born_in_the_united_kingdom_on_or_after_the_relevant_day  (bna.l4:175:9-176:61)
       `born in the United Kingdom on or after the relevant day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:173:9-174:78)
+  [D-LITERALEXPR] advisory — decision__1_1_born_in_the_united_kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:184:9-185:78)
       `1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_1_a_father_or_mother_a_british_citizen  (bna.l4:180:9-181:79)
+  [D-LITERALEXPR] advisory — decision__1_1_a_father_or_mother_a_british_citizen  (bna.l4:191:9-89)
       `1(1)(a) — father or mother a British citizen` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory  (bna.l4:195:9-196:117)
+  [D-LITERALEXPR] advisory — decision__1_1_b_father_or_mother_settled_in_the_united_kingdom_or_that_territory  (bna.l4:205:9-127)
       `1(1)(b) — father or mother settled in the United Kingdom or that territory` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled  (bna.l4:202:9-203:92)
+  [D-LITERALEXPR] advisory — decision__1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled  (bna.l4:211:9-212:92)
       `1(1) — at the time of the birth his father or mother is a citizen or settled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_1_satisfied_on_the_actual_facts_of_the_birth  (bna.l4:209:9-211:94)
+  [D-LITERALEXPR] advisory — decision__1_1_satisfied_on_the_actual_facts_of_the_birth  (bna.l4:218:9-219:94)
       `1(1) — satisfied on the actual facts of the birth` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_found_abandoned_in_the_united_kingdom_after_commencement  (bna.l4:238:9-239:64)
+  [D-LITERALEXPR] advisory — decision_found_abandoned_in_the_united_kingdom_after_commencement  (bna.l4:246:9-247:64)
       `found abandoned in the United Kingdom after commencement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:245:9-246:69)
+  [D-LITERALEXPR] advisory — decision_found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:253:9-254:69)
       `found abandoned in a qualifying territory on or after the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time  (bna.l4:252:9-253:89)
+  [D-LITERALEXPR] advisory — decision__1_2_found_abandoned_in_the_united_kingdom_or_a_qualifying_territory_in_time  (bna.l4:260:9-261:89)
       `1(2) — found abandoned in the United Kingdom or a qualifying territory in time` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_deemed_by_subsection_2_to_satisfy_subsection_1  (bna.l4:263:9-267:147)
+  [D-LITERALEXPR] advisory — decision_deemed_by_subsection_2_to_satisfy_subsection_1  (bna.l4:271:9-274:147)
       `deemed by subsection (2) to satisfy subsection (1)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_british_citizen_by_virtue_of_subsection_1_or_2  (bna.l4:273:9-274:68)
+  [D-LITERALEXPR] advisory — decision_a_british_citizen_by_virtue_of_subsection_1_or_2  (bna.l4:280:9-281:68)
       `a British citizen by virtue of subsection (1) or (2)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_british_citizen_by_virtue_of_subsection_1a  (bna.l4:290:9-293:90)
+  [D-LITERALEXPR] advisory — decision_a_british_citizen_by_virtue_of_subsection_1a  (bna.l4:297:9-299:90)
       `a British citizen by virtue of subsection (1A)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a  (bna.l4:309:9-311:59)
+  [D-LITERALEXPR] advisory — decision_not_already_a_british_citizen_by_virtue_of_subsection_1_1a_or_2_or_section_10a  (bna.l4:315:9-317:59)
       `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled  (bna.l4:334:9-335:116)
+  [D-LITERALEXPR] advisory — decision__1_3_a_father_or_mother_becomes_a_british_citizen_or_settled  (bna.l4:340:9-126)
       `1(3)(a) — father or mother becomes a British citizen or settled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_3_b_an_application_is_made_while_a_minor  (bna.l4:341:9-342:92)
+  [D-LITERALEXPR] advisory — decision__1_3_b_an_application_is_made_while_a_minor  (bna.l4:346:9-102)
       `1(3)(b) — an application is made while a minor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_entitled_to_be_registered_under_subsection_3  (bna.l4:348:9-352:64)
+  [D-LITERALEXPR] advisory — decision_entitled_to_be_registered_under_subsection_3  (bna.l4:352:9-355:64)
       `entitled to be registered under subsection (3)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces  (bna.l4:360:9-361:87)
+  [D-LITERALEXPR] advisory — decision__1_3a_a_father_or_mother_becomes_a_member_of_the_armed_forces  (bna.l4:363:9-97)
       `1(3A)(a) — father or mother becomes a member of the armed forces` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_3a_b_an_application_is_made_while_a_minor  (bna.l4:367:9-368:92)
+  [D-LITERALEXPR] advisory — decision__1_3a_b_an_application_is_made_while_a_minor  (bna.l4:369:9-102)
       `1(3A)(b) — an application is made while a minor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_entitled_to_be_registered_under_subsection_3a  (bna.l4:374:9-378:65)
+  [D-LITERALEXPR] advisory — decision_entitled_to_be_registered_under_subsection_3a  (bna.l4:375:9-378:65)
       `entitled to be registered under subsection (3A)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_4_application_made_after_attaining_the_age_of_ten_years  (bna.l4:405:9-406:93)
+  [D-LITERALEXPR] advisory — decision__1_4_application_made_after_attaining_the_age_of_ten_years  (bna.l4:405:5-89)
       `1(4) — application made after attaining the age of ten years` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years  (bna.l4:412:9-413:183)
+  [D-LITERALEXPR] advisory — decision__1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years  (bna.l4:411:5-179)
       `1(4) — absences within the ninety-day ceiling in each of the first ten years` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled  (bna.l4:423:9-424:103)
+  [D-LITERALEXPR] advisory — decision__1_7_the_secretary_of_state_treats_the_residence_requirement_as_fulfilled  (bna.l4:421:9-113)
       `1(7) — the Secretary of State treats the residence requirement as fulfilled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_4_the_residence_requirement_met_or_treated_as_met  (bna.l4:430:9-431:93)
+  [D-LITERALEXPR] advisory — decision__1_4_the_residence_requirement_met_or_treated_as_met  (bna.l4:427:9-428:93)
       `1(4) — the residence requirement met or treated as met` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_entitled_to_be_registered_under_subsection_4  (bna.l4:437:9-441:72)
+  [D-LITERALEXPR] advisory — decision_entitled_to_be_registered_under_subsection_4  (bna.l4:434:9-437:72)
       `entitled to be registered under subsection (4)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_registration_may_be_granted  (bna.l4:466:9-467:83)
+  [D-LITERALEXPR] advisory — decision_registration_may_be_granted  (bna.l4:462:9-463:83)
       `registration may be granted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:495:9-496:91)
+  [D-LITERALEXPR] advisory — decision_order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day  (bna.l4:491:9-492:91)
       `order of a court in a qualifying territory on or after the appointed day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_5_a_a_court_order_authorising_the_adoption  (bna.l4:502:9-504:92)
+  [D-LITERALEXPR] advisory — decision__1_5_a_a_court_order_authorising_the_adoption  (bna.l4:498:9-500:92)
       `1(5)(a) — a court order authorising the adoption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_5_b_adopted_under_a_convention_adoption  (bna.l4:510:9-511:119)
+  [D-LITERALEXPR] advisory — decision__1_5_b_adopted_under_a_convention_adoption  (bna.l4:506:9-129)
       `1(5)(b) — adopted under a Convention adoption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected  (bna.l4:517:9-518:65)
+  [D-LITERALEXPR] advisory — decision__1_5_an_order_is_made_or_a_convention_adoption_is_effected  (bna.l4:512:9-513:65)
       `1(5) — an order is made or a Convention adoption is effected` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_adopted_person_a_minor_and_not_already_a_british_citizen  (bna.l4:524:9-525:70)
+  [D-LITERALEXPR] advisory — decision_the_adopted_person_a_minor_and_not_already_a_british_citizen  (bna.l4:519:9-520:70)
       `the adopted person a minor and not already a British citizen` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen  (bna.l4:531:9-532:109)
+  [D-LITERALEXPR] advisory — decision__1_5a_a_the_adopter_or_one_joint_adopter_a_british_citizen  (bna.l4:526:9-119)
       `1(5A)(a) — the adopter, or one joint adopter, a British citizen` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_5a_b_habitual_residence_in_a_convention_case  (bna.l4:550:9-552:160)
+  [D-LITERALEXPR] advisory — decision__1_5a_b_habitual_residence_in_a_convention_case  (bna.l4:544:9-546:160)
       `1(5A)(b) — habitual residence, in a Convention case` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption  (bna.l4:558:9-560:71)
+  [D-LITERALEXPR] advisory — decision__1_5a_the_requirements_are_met_on_the_date_of_the_order_or_adoption  (bna.l4:552:9-554:71)
       `1(5A) — the requirements are met on the date of the order or adoption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_british_citizen_by_virtue_of_subsection_5  (bna.l4:566:9-569:89)
+  [D-LITERALEXPR] advisory — decision_a_british_citizen_by_virtue_of_subsection_5  (bna.l4:560:5-562:89)
       `a British citizen by virtue of subsection (5)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6  (bna.l4:580:9-581:65)
+  [D-LITERALEXPR] advisory — decision_a_british_citizen_notwithstanding_cesser_of_the_order_subsection_6  (bna.l4:573:9-75)
       `a British citizen notwithstanding cesser of the order — subsection (6)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-FIXTURE] advisory — Peter  (bna.l4:615:1-634:115)
+  [D-FIXTURE] advisory — Peter  (bna.l4:607:1-626:115)
       `Peter` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — Peter with the subsection (3) limbs satisfied  (bna.l4:640:1-659:115)
+  [D-FIXTURE] advisory — Peter with the subsection (3) limbs satisfied  (bna.l4:632:1-651:115)
       `Peter with the subsection (3) limbs satisfied` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a child born in the United Kingdom on  (bna.l4:663:1-687:115)
+  [D-FIXTURE] advisory — a child born in the United Kingdom on  (bna.l4:655:1-679:115)
       `a child born in the United Kingdom on` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a child born in a qualifying territory on  (bna.l4:690:1-714:115)
+  [D-FIXTURE] advisory — a child born in a qualifying territory on  (bna.l4:682:1-706:115)
       `a child born in a qualifying territory on` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a foundling found on  (bna.l4:721:1-744:115)
+  [D-FIXTURE] advisory — a foundling found on  (bna.l4:713:1-736:115)
       `a foundling found on` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a child of visitors born on  (bna.l4:749:1-773:115)
+  [D-FIXTURE] advisory — a child of visitors born on  (bna.l4:741:1-765:115)
       `a child of visitors born on` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a ten-year applicant born on  (bna.l4:778:1-803:127)
+  [D-FIXTURE] advisory — a ten-year applicant born on  (bna.l4:770:1-795:127)
       `a ten-year applicant born on` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a United Kingdom adoption order on  (bna.l4:805:1-819:125)
+  [D-FIXTURE] advisory — a United Kingdom adoption order on  (bna.l4:797:1-811:125)
       `a United Kingdom adoption order on` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a Convention adoption on  (bna.l4:821:1-834:116)
+  [D-FIXTURE] advisory — a Convention adoption on  (bna.l4:813:1-826:116)
       `a Convention adoption on` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a Gibraltar adoption order case  (bna.l4:840:1-849:116)
+  [D-FIXTURE] advisory — a Gibraltar adoption order case  (bna.l4:832:1-841:116)
       `a Gibraltar adoption order case` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a pre-appointed-day Gibraltar order case  (bna.l4:853:1-862:116)
+  [D-FIXTURE] advisory — a pre-appointed-day Gibraltar order case  (bna.l4:845:1-854:116)
       `a pre-appointed-day Gibraltar order case` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — an adoption of a person already a British citizen  (bna.l4:866:1-875:116)
+  [D-FIXTURE] advisory — an adoption of a person already a British citizen  (bna.l4:858:1-867:116)
       `an adoption of a person already a British citizen` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the foundling  (bna.l4:878:1-81)
+  [D-FIXTURE] advisory — the foundling  (bna.l4:870:1-81)
       `the foundling` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the rebutted foundling  (bna.l4:879:1-80)
+  [D-FIXTURE] advisory — the rebutted foundling  (bna.l4:871:1-80)
       `the rebutted foundling` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the forces child  (bna.l4:880:1-104)
+  [D-FIXTURE] advisory — the forces child  (bna.l4:872:1-104)
       `the forces child` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the child of visitors  (bna.l4:881:1-94)
+  [D-FIXTURE] advisory — the child of visitors  (bna.l4:873:1-94)
       `the child of visitors` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the ten-year lead case  (bna.l4:882:1-97)
+  [D-FIXTURE] advisory — the ten-year lead case  (bna.l4:874:1-97)
       `the ten-year lead case` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the applicant of bad character  (bna.l4:883:1-105)
+  [D-FIXTURE] advisory — the applicant of bad character  (bna.l4:875:1-105)
       `the applicant of bad character` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
   [D-PARAM-AS-INPUT] advisory — input_adoption
@@ -224,12 +224,12 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-SVCEMPTY] advisory — The_good_character_restriction_on_granting_registration_modification_C3
       the section `The good-character restriction on granting registration (modification C3)` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 1 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
       lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
-  [D-UNDECOMPOSABLE] advisory — decision_section_1_outcome_at_birth  (bna.l4:598:15-76)
+  [D-UNDECOMPOSABLE] advisory — decision_section_1_outcome_at_birth  (bna.l4:590:15-76)
       the guard ``a British citizen by virtue of subsection (1) or (2)` OF person` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_section_1_outcome_at_birth  (bna.l4:599:15-70)
+  [D-UNDECOMPOSABLE] advisory — decision_section_1_outcome_at_birth  (bna.l4:591:15-70)
       the guard ``a British citizen by virtue of subsection (1A)` OF person` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-ORDERDEPENDENT] advisory — decision_section_1_outcome_at_birth  (bna.l4:598:15-76)
+  [D-ORDERDEPENDENT] advisory — decision_section_1_outcome_at_birth  (bna.l4:590:15-76)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it

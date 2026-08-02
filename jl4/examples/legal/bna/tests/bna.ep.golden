@@ -48,7 +48,18 @@ TIMEZONE IS "Europe/London"
 --
 -- MODELLING NOTE. Constitutive material (who is, or is entitled to be
 -- registered as, a British citizen) is encoded as `DECIDE`/`MEANS`
--- predicates carrying the verbatim rule text inline as inert prose. Section
+-- predicates carrying the Act's own words in the FIELD NAMES, with the
+-- subsection or paragraph label riding beside its node as a truncated inert
+-- string: `"(a)" ... person's `father or mother a British citizen at the time
+-- of the birth``.
+--
+-- Under the enumeration-label ruling (2026-08-03) an inert string that merely
+-- restates the node beside it is deleted -- inert never shadows active -- so a
+-- verbatim quotation survives ONLY where no active node carries its words:
+-- s 1(2)(a)-(b), whose facts are DEEMED rather than tested, and the s 1(5A)
+-- chapeau, whose date framing the two limbs below it do not repeat. Three
+-- mid-sentence fragments with no label of their own (in s 1(4) twice and in
+-- the s 1(5) tail) are gone outright. Section
 -- 1 imposes no obligations on anyone, so there is no regulative layer.
 -- Facts about a person are threaded as one GIVEN PersonProfile record;
 -- facts about an adoption as one GIVEN AdoptionCase record. Out-of-scope
@@ -177,8 +188,7 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(1)(a) — father or mother a British citizen` person MEANS
-        "(a) a British citizen; or"
-    ... person's `father or mother a British citizen at the time of the birth`
+        "(a)" ... person's `father or mother a British citizen at the time of the birth`
 
 -- AMBIGUITY: "(b) settled in the United Kingdom or that territory" — "that
 -- territory" refers back to the particular qualifying territory of the
@@ -192,8 +202,7 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(1)(b) — father or mother settled in the United Kingdom or that territory` person MEANS
-        "(b) settled in the United Kingdom or that territory."
-    ... person's `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`
+        "(b)" ... person's `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`
 
 @ref British Nationality Act 1981 s 1(1)(a)-(b) — the parent-status disjunction
 GIVEN person IS A PersonProfile
@@ -206,8 +215,7 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(1) — satisfied on the actual facts of the birth` person MEANS
-        "(1) A person born in the United Kingdom after commencement, or in a qualifying territory on or after the appointed day, shall be a British citizen if at the time of the birth his father or mother is—"
-    ... `1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day` person
+        "(1)" ... `1(1) — born in the United Kingdom after commencement or in a qualifying territory on or after the appointed day` person
     AND `1(1) — at the time of the birth his father or mother is a citizen or settled` person
 
 §§ `Subsection (2) — the foundling presumption`
@@ -260,8 +268,7 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 DECIDE `deemed by subsection (2) to satisfy subsection (1)` person IF
-        "(2) A new-born infant who, after commencement, is found abandoned in the United Kingdom, or on or after the appointed day is found abandoned in a qualifying territory, shall, unless the contrary is shown, be deemed for the purposes of subsection (1)—"
-    ... `1(2) — found abandoned in the United Kingdom or a qualifying territory in time` person
+        "(2)" ... `1(2) — found abandoned in the United Kingdom or a qualifying territory in time` person
     AND NOT person's `the contrary shown, rebutting the subsection (2) presumption`
     AND "(a) to have been born in the United Kingdom after commencement or in that territory on or after the appointed day; and"
     AND "(b) to have been born to a parent who at the time of the birth was a British citizen or settled in the United Kingdom or that territory."
@@ -287,8 +294,7 @@ DECIDE `a British citizen by virtue of subsection (1) or (2)` person IF
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 DECIDE `a British citizen by virtue of subsection (1A)` person IF
-        "(1A) A person born in the United Kingdom or a qualifying territory on or after the relevant day shall be a British citizen if at the time of the birth his father or mother is a member of the armed forces."
-    ... `born in the United Kingdom or a qualifying territory` person
+        "(1A)" ... `born in the United Kingdom or a qualifying territory` person
     AND person's `date of birth` AT LEAST `the relevant day`
     AND person's `father or mother a member of the armed forces at the time of the birth`
 
@@ -331,22 +337,19 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(3)(a) — father or mother becomes a British citizen or settled` person MEANS
-        "(a) his father or mother becomes a British citizen or becomes settled in the United Kingdom; and"
-    ... person's `while a minor, father or mother became a British citizen or became settled in the United Kingdom`
+        "(a)" ... person's `while a minor, father or mother became a British citizen or became settled in the United Kingdom`
 
 @ref British Nationality Act 1981 s 1(3)(b)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(3)(b) — an application is made while a minor` person MEANS
-        "(b) an application is made for his registration as a British citizen."
-    ... person's `while a minor, an application made for registration as a British citizen`
+        "(b)" ... person's `while a minor, an application made for registration as a British citizen`
 
 @ref British Nationality Act 1981 s 1(3)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 DECIDE `entitled to be registered under subsection (3)` person IF
-        "(3) A person born in the United Kingdom after commencement who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A shall be entitled to be registered as a British citizen if, while he is a minor—"
-    ... `born in the United Kingdom after commencement` person
+        "(3)" ... `born in the United Kingdom after commencement` person
     AND `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person
     AND `1(3)(a) — father or mother becomes a British citizen or settled` person
     AND `1(3)(b) — an application is made while a minor` person
@@ -357,22 +360,19 @@ DECIDE `entitled to be registered under subsection (3)` person IF
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(3A)(a) — father or mother becomes a member of the armed forces` person MEANS
-        "(a) his father or mother becomes a member of the armed forces; and"
-    ... person's `while a minor, father or mother became a member of the armed forces`
+        "(a)" ... person's `while a minor, father or mother became a member of the armed forces`
 
 @ref British Nationality Act 1981 s 1(3A)(b)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(3A)(b) — an application is made while a minor` person MEANS
-        "(b) an application is made for his registration as a British citizen"
-    ... person's `while a minor, an application made for registration as a British citizen`
+        "(b)" ... person's `while a minor, an application made for registration as a British citizen`
 
 @ref British Nationality Act 1981 s 1(3A)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 DECIDE `entitled to be registered under subsection (3A)` person IF
-        "(3A) A person born in the United Kingdom on or after the relevant day who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A shall be entitled to be registered as a British citizen if, while he is a minor—"
-    ... `born in the United Kingdom on or after the relevant day` person
+        "(3A)" ... `born in the United Kingdom on or after the relevant day` person
     AND `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person
     AND `1(3A)(a) — father or mother becomes a member of the armed forces` person
     AND `1(3A)(b) — an application is made while a minor` person
@@ -402,15 +402,13 @@ DECIDE `entitled to be registered under subsection (3A)` person IF
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(4) — application made after attaining the age of ten years` person MEANS
-        "on an application for his registration as a British citizen made at any time after he has attained the age of ten years"
-    ... person's `an application for registration made after attaining the age of ten years`
+    person's `an application for registration made after attaining the age of ten years`
 
 @ref British Nationality Act 1981 s 1(4) — the residence limb
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(4) — absences within the ninety-day ceiling in each of the first ten years` person MEANS
-        "if, as regards each of the first ten years of that person's life, the number of days on which he was absent from the United Kingdom in that year does not exceed 90."
-    ... person's `greatest number of days absent from the United Kingdom in any one of the first ten years of life` AT MOST `permitted days of absence in each of the first ten years`
+    person's `greatest number of days absent from the United Kingdom in any one of the first ten years of life` AT MOST `permitted days of absence in each of the first ten years`
 
 -- Subsection (7) is encoded HERE, as the discretionary escape from the
 -- subsection (4) residence limb. The EXERCISE of the discretion is an
@@ -420,8 +418,7 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 `1(7) — the Secretary of State treats the residence requirement as fulfilled` person MEANS
-        "(7) If in the special circumstances of any particular case the Secretary of State thinks fit, he may for the purposes of subsection (4) treat the person to whom the application relates as fulfilling the requirement specified in that subsection although, as regards any one or more of the first ten years of that person's life, the number of days on which he was absent from the United Kingdom in that year or each of the years in question exceeds 90."
-    ... person's `the Secretary of State treats the subsection (4) residence requirement as fulfilled`
+        "(7)" ... person's `the Secretary of State treats the subsection (4) residence requirement as fulfilled`
 
 @ref British Nationality Act 1981 s 1(4), (7)
 GIVEN person IS A PersonProfile
@@ -434,8 +431,7 @@ GIVETH A BOOLEAN
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
 DECIDE `entitled to be registered under subsection (4)` person IF
-        "(4) A person born in the United Kingdom after commencement who is not a British citizen by virtue of subsection (1), (1A) or (2) or section 10A shall be entitled, on an application for his registration as a British citizen made at any time after he has attained the age of ten years, to be registered as such a citizen"
-    ... `born in the United Kingdom after commencement` person
+        "(4)" ... `born in the United Kingdom after commencement` person
     AND `not already a British citizen by virtue of subsection (1), (1A) or (2) or section 10A` person
     AND `1(4) — application made after attaining the age of ten years` person
     AND `1(4) — the residence requirement met or treated as met` person
@@ -499,7 +495,7 @@ GIVETH A BOOLEAN
 GIVEN adoption IS AN AdoptionCase
 GIVETH A BOOLEAN
 `1(5)(a) — a court order authorising the adoption` adoption MEANS
-        "(a) any court in the United Kingdom or, on or after the appointed day, any court in a qualifying territory makes an order authorising the adoption of a minor who is not a British citizen; or"
+        "(a)"
     ..  adoption's `an order of a court in the United Kingdom authorising the adoption`
     ..  `order of a court in a qualifying territory on or after the appointed day` adoption
 
@@ -507,8 +503,7 @@ GIVETH A BOOLEAN
 GIVEN adoption IS AN AdoptionCase
 GIVETH A BOOLEAN
 `1(5)(b) — adopted under a Convention adoption` adoption MEANS
-        "(b) a minor who is not a British citizen is adopted under a Convention adoption effected under the law of a country or territory outside the United Kingdom,"
-    ... adoption's `a Convention adoption effected under the law of a country or territory outside the United Kingdom`
+        "(b)" ... adoption's `a Convention adoption effected under the law of a country or territory outside the United Kingdom`
 
 @ref British Nationality Act 1981 s 1(5)(a)-(b)
 GIVEN adoption IS AN AdoptionCase
@@ -528,8 +523,7 @@ GIVETH A BOOLEAN
 GIVEN adoption IS AN AdoptionCase
 GIVETH A BOOLEAN
 `1(5A)(a) — the adopter, or one joint adopter, a British citizen` adoption MEANS
-        "(a) the adopter or, in the case of a joint adoption, one of the adopters is a British citizen; and"
-    ... adoption's `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`
+        "(a)" ... adoption's `the adopter or, in a joint adoption, one of the adopters a British citizen on that date`
 
 -- AMBIGUITY: "(b) ... both of the adopters are habitually resident in the
 -- United Kingdom or in a designated territory" — must joint adopters be
@@ -547,7 +541,7 @@ GIVETH A BOOLEAN
 GIVEN adoption IS AN AdoptionCase
 GIVETH A BOOLEAN
 `1(5A)(b) — habitual residence, in a Convention case` adoption MEANS
-        "(b) in a case within subsection (5)(b), the adopter or, in the case of a joint adoption, both of the adopters are habitually resident in the United Kingdom or in a designated territory."
+        "(b)"
     ..  NOT adoption's `a Convention adoption effected under the law of a country or territory outside the United Kingdom`
     ..  adoption's `the adopter or, in a joint adoption, both of the adopters habitually resident in the United Kingdom or a designated territory on that date`
 
@@ -563,8 +557,7 @@ GIVETH A BOOLEAN
 GIVEN adoption IS AN AdoptionCase
 GIVETH A BOOLEAN
 DECIDE `a British citizen by virtue of subsection (5)` adoption IF
-        "that minor shall, if the requirements of subsection (5A) are met, be a British citizen as from the date on which the order is made or the Convention adoption is effected, as the case may be."
-    ... `the adopted person a minor and not already a British citizen` adoption
+    `the adopted person a minor and not already a British citizen` adoption
     AND `1(5) — an order is made or a Convention adoption is effected` adoption
     AND `1(5A) — the requirements are met on the date of the order or adoption` adoption
 
@@ -577,8 +570,7 @@ DECIDE `a British citizen by virtue of subsection (5)` adoption IF
 GIVEN adoption IS AN AdoptionCase
 GIVETH A BOOLEAN
 DECIDE `a British citizen notwithstanding cesser of the order — subsection (6)` adoption IF
-        "(6) Where an order or a Convention adoption in consequence of which any person became a British citizen by virtue of subsection (5) ceases to have effect, whether on annulment or otherwise, the cesser shall not affect the status of that person as a British citizen."
-    ... `a British citizen by virtue of subsection (5)` adoption
+        "(6)" ... `a British citizen by virtue of subsection (5)` adoption
 
 §§ `The section 1 outcome at birth, as one total answer`
 

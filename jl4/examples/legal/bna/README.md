@@ -129,8 +129,8 @@ legislation could be executed as a logic program; the running demonstration (Dec
 128-kbyte micro) was a ~150-rule subset dealing with acquisition of British citizenship, the paper
 estimating the complete act at about 500 rules. This encoding covers only section 1, but of the **current
 consolidated text** — qualifying territories (2002), the armed-forces route (2010), the s 10A
-exclusion (2021), the substituted adoption provisions — with the verbatim statutory prose riding
-inline as inert carriers and boundary tests asserting each limb, so the file is auditable against
-the statute line by line. Where the paper leaned on negation as failure for the foundling
+exclusion (2021), the substituted adoption provisions — with the statutory prose in the field names
+themselves, each subsection's label riding beside its node as a truncated inert string, and boundary
+tests asserting each limb, so the file is auditable against the statute line by line. Where the paper leaned on negation as failure for the foundling
 presumption, this encoding makes rebuttal an explicit input fact, and it separates the s 1
 entitlement from the s 41A grant restriction that post-dates the paper by twenty years.
