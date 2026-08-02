@@ -224,14 +224,34 @@ jobs:
       # rule, valid -> PASS) are exercised in etc/go/selftest.mjs, which this job
       # already runs. Removing them here without that coverage would have deleted
       # the only check they had.
+      #
+      # p8-verify left it the same way, one PR later: `l4 verify` landed, so it is
+      # an implemented stage and has the NEXT step's contract instead. A stage may
+      # leave this list only by being implemented — never by being made quieter.
       - name: Every still-scaffolded stage refuses loudly
         run: |
-          for s in p8-verify p10-publish; do
+          for s in p10-publish; do
             out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0; a scaffolded stage must refuse"; exit 1; }
             rc=$?
             [ "$rc" = "3" ] || { echo "::error::$s exited $rc, expected 3"; exit 1; }
             echo "$out" | grep -q 'BLOCKER' || { echo "::error::$s refused without naming a blocker"; exit 1; }
             echo "ok $s refuses with exit 3 and names its blocker"
+          done
+
+      # An implemented stage has the opposite failure mode: not "exits 0 doing
+      # nothing" but "runs somewhere it cannot be measured". Launched outside the
+      # driver it has no run directory, no journal and no artifact hashes, so it
+      # must decline and say who launches it — and it must never exit 0. This job
+      # has no `l4` binary, which is precisely the environment that would tempt a
+      # stage into a vacuous success.
+      - name: An implemented stage declines to run outside the driver
+        run: |
+          for s in p8-verify; do
+            out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0 outside the driver"; exit 1; }
+            rc=$?
+            [ "$rc" != "0" ] || { echo "::error::$s exited 0"; exit 1; }
+            echo "$out" | grep -q 'go.sh' || { echo "::error::$s declined without naming the driver"; exit 1; }
+            echo "ok $s declines with exit $rc and names the driver"
           done
 
       # The report template may not carry a typed number. This is the mechanical
