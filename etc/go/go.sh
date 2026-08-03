@@ -231,8 +231,16 @@ for s in "${P7_LEG_ORDER[@]}"; do
     gated_by_HG1="$gated_by_HG1 $s"
   fi
 done
-G1_STAGES+=(p9-report)
-gated_by_HG1="$gated_by_HG1 p9-report"
+# p9-explain follows p9-report: both read the journal, and the explainer also
+# reads the report's own presence. Declared, so that a run which produced no
+# explainer says so in its milestone verdict rather than staying silent; and
+# HG1-gated on the SAME LINE as it is declared, so the two cannot drift apart.
+# An ungated stage here would publish HG1-unreviewed narrative and every
+# downstream honesty check would report clean — the gate test below defaults to
+# UNGATED, and verify-run.mjs reads the gated set out of run_begin, so it would
+# agree with the omission. selftest.mjs asserts the invariant directly.
+G1_STAGES+=(p9-report p9-explain)
+gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 
 # SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the only stage after
 # P5 is the report, so that is what HG1 gates — and, as at g1, a g2 run stops
@@ -775,6 +783,11 @@ EOF
   # hashed, preliminary render p9-report produced lives in artifacts/.
   if [[ -f "$RUN/journal.ndjson" ]]; then
     node "$GO_ROOT/etc/go/report/render-report.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+    # The explainer's final render, for the same reason and with the same
+    # status. It may legitimately not exist — a subject with no declared
+    # narrative, or a milestone that does not declare the stage — so a failure
+    # here is silent and leaves no file, rather than inventing one.
+    node "$GO_ROOT/etc/go/report/render-explainer.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
   fi
 
   echo
@@ -787,6 +800,11 @@ EOF
   fi
   echo "go: journal  $RUN/journal.ndjson"
   [[ -f "$RUN/report.md" ]] && echo "go: report   $RUN/report.md"
+  # The explainer is announced here and NOWHERE ELSE. report.md deliberately
+  # does not link to it: the explainer can legitimately not exist for a run, and
+  # a report linking to a document that was never produced would be making a
+  # claim about the run that the journal does not support.
+  [[ -f "$RUN/explainer.html" ]] && echo "go: explainer $RUN/explainer.html  (and explainer.md)"
   exit "$vexit"
 }
 
