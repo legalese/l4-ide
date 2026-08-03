@@ -37,7 +37,7 @@
 // Exit:  0 rendered · 2 usage · 4 template defect, unresolved placeholder,
 //        no run_begin, or a malformed narrative deposit
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sha256File, verify } from "../lib/ledger.mjs";
