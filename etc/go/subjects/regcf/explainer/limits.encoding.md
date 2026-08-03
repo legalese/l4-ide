@@ -5,9 +5,16 @@ the rest was oversold.
 **Scope.** This is not a formalisation of the whole of 17 CFR Part 227. It
 mirrors one external summary of the regulation, which presents it as eight
 requirement groups, and encodes those eight to the depth that summary reaches.
-Left out: the funding-portal registration regime in Subpart C, the bad-actor
-detail in Rule 503, the Rule 201 disclosure itemisation beyond the financial
-statement tiers, and Rules 205 and 206.
+Left out, in the corpus's own words:
+[Subpart C's funding-portal registration regime (Rules 400-404), the bad-actor disqualification detail (Rule 503), and the Rule 201 disclosure itemisation beyond the financial statement tiers](src:jl4/examples/legal/regcf/regcf.l4#L28-L31 "verbatim"),
+along with Rules 205 and 206.
+
+**And a scope note about this document rather than the encoding.** The sections
+above cover seven of the eight groups. The eighth — the intermediary's own
+obligations — has no section of its own, because what the encoding has to say
+about it is one accepted boolean, which is said under **The bargain**. A reader
+who wants the funding-portal regime will not find it here and will not find it
+in the encoding either.
 
 **Things the encoding says more precisely than the regulation does.** Each of
 these is a decision somebody made, not a fact about the law:
@@ -41,16 +48,25 @@ reporting default costs the next offering, not this one — is documented at the
 site and is not enforced structurally. Integration under Rule 152 is a reference,
 not a computation.
 
-**Dead limbs.** The corpus declares two acts that no rule ever performs, and one
-period that only the citizen-facing wizard's prose reads. The decision-table
-exporter flags the unused period as an inert decision, which is how they were
-found.
+**Dead limbs.** Three of the acts the corpus declares are performed by no rule
+at all — they occur exactly once each, in the declaration:
+[file a Form C offering statement](src:jl4/examples/legal/regcf/regcf.l4#L96 "verbatim"),
+[file a Form C-U progress update](src:jl4/examples/legal/regcf/regcf.l4#L97 "verbatim")
+and
+[transmit funds to the issuer](src:jl4/examples/legal/regcf/regcf.l4#L101 "verbatim").
+There is also one period that only the citizen-facing wizard's prose reads; the
+decision-table exporter flags it as an inert decision —
+[advisory — decision_business_days_to_file_a_progress_update](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L281 "verbatim")
+— which is how it was found. A projection noticing something dead in the source
+is not what a projection is for, and it is the second-best argument in this
+document for building them.
 
-**One house rule broken and tolerated.** The corpus contains chained
+**One house rule the corpus does not follow, and the pipeline tolerates.** The corpus contains chained
 `ELSE IF` constructs where the project's own drafting guidance calls for a
-`BRANCH`. The pipeline's encoding check rides degraded on that count rather than
-forgiving it, and the subject's notes say plainly: tolerated, not endorsed, and
-do not add more.
+`BRANCH`. The pipeline's encoding check reports the count against the corpus
+rather than forgiving it, and the subject's notes say plainly: tolerated, not
+endorsed, and do not add more. What that check said about _this_ run is in the
+audit report, not here.
 
 **And one limit of the checker rather than the corpus.** The check that counts
 dated arms matches on a single physical line, so reflowing a dated `BRANCH`

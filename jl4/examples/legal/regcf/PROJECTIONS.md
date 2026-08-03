@@ -349,7 +349,7 @@ figure still passes. Run `demo:regcf` for the real thing.
 
 The corpus carries **zero** `@export` annotations by design, and
 `tests/regcf.schema.golden` still reads `No @export annotations found in file`. A façade
-(`regcf-wizard.l4`, `IMPORT regcf`) carries the deployment surface: five `@export`s, plain-English
+(`regcf-wizard.l4`, `IMPORT regcf`) carries the deployment surface: six `@export`s, plain-English
 field names, and prose fields that splice their figures out of corpus constants rather than
 restating them. §7 of `README.md` covers it in full.
 
@@ -383,6 +383,12 @@ curl -X POST http://HOST/deployments -F id=regcf -F sources=@/tmp/regcf.zip
   `/.well-known/{mcp,mcp/manifest,webmcp}` and `/.webmcp/embed.js` are all 200.
 
 ### Measured live (own service, own store, port 21877, torn down)
+
+**This block predates the sixth `@export`.** `investment-limit-under-the-rules-effective-on` — the
+law-time control — is absent from it, so the counts below are nine and five where a service run
+against the current façade reports ten and six. Re-measured 2026-08-03 by `etc/go/phases/p7-mcp.sh`,
+which records the count and the tool names on its receipt. The dated measurement is left as it was
+taken rather than rewritten.
 
 ```
 tools/list on /regcf/.mcp  → 9 tools

@@ -300,9 +300,18 @@ export function mdToHtml(text, { raw = {} } = {}) {
       while (i < lines.length && lines[i].trim().startsWith("|"))
         body.push(cells(lines[i++].trim()));
       i--;
-      out.push('<div class="scroll"><table><thead><tr>');
-      for (const c of head) out.push(`<th>${inline(c)}</th>`);
-      out.push("</tr></thead><tbody>");
+      out.push('<div class="scroll"><table>');
+      // A header row whose every cell is empty is the markdown idiom for a
+      // two-column key/value table with no headings — the explainer's own run
+      // facts table is one. Emitting <thead><tr><th></th><th></th></tr> for it
+      // draws a shaded empty band above the first real row. MEASURED on run
+      // 2026-08-03-3f45e62b-004, where that band sat above the header table.
+      if (head.some((c) => c.trim() !== "")) {
+        out.push("<thead><tr>");
+        for (const c of head) out.push(`<th>${inline(c)}</th>`);
+        out.push("</tr></thead>");
+      }
+      out.push("<tbody>");
       for (const row of body) {
         out.push("<tr>");
         for (const c of row) out.push(`<td>${inline(c)}</td>`);

@@ -33,6 +33,86 @@ usually a run of comment lines, so a byte-literal check could only ever quote a 
 than a line. "Verbatim" therefore means "these words, in this order, in the cited window", not
 "these bytes", and `etc/go/lib/narrative.mjs` says so at the function._
 
+---
+
+### Adversarial review, 2026-08-03 — what it found and what is still true
+
+_Three reviewers attacked the v0 build on three axes: the pipeline invariants, the licensing of
+every claim in the shipped narrative, and the document as a lay reader meets it. Everything below
+is the state of the tree after the repairs, re-proved by run `2026-08-03-fb0d33bc-001` (`g1`,
+subject `regcf`, HG1 waived on the record, verdict `COMPLETE`, `verify --gates` = 55 recorded / 55
+still hash as recorded). That run rendered **87 citations, 0 unchecked, 0 unresolved, 0 deposit
+findings**, up from 45/0/0/0, and every non-`PASS` receipt's reason now reaches the audit report._
+
+**Two claims this spec used to make that were false, and are now repaired in code:**
+
+1. **"P9 is untouched" was true of the files and false of the report.** `render-report.mjs`
+   narrates `p7-*` by filter and every other stage by name; `p9-explain` had no site, and it is
+   `DEGRADED` by construction while any narrative section is unreviewed — which is its normal
+   state. So `report.md` printed, under its own verdict, "every non-PASS receipt carries a reason
+   that appears below", and one did not. Measured on run `2026-08-03-3f45e62b-004`: five of six.
+   The fix adds a `## Every other stage that reported` section computed **by subtraction** from a
+   named set, so a future stage lands there by default rather than vanishing —
+   `render-report.mjs`, `report/template.md` and `p9-report.sh`'s heading list each moved by a few
+   lines. **D2's invariant is what survives untouched, and it was re-proved**: a typed number
+   appended to either template still exits 4 (`TEMPLATE DEFECT`), and the structural check still
+   reports every required section present. `selftest.mjs` gained the general assertion whose
+   absence allowed this — every non-`PASS` reason reaches the report, including a stage no section
+   narrates — replacing a hard-coded five-stage list that could only ever confirm what somebody
+   had already thought of.
+
+2. **HG1 did not cover the narrative it gates.** `p9-explain` is HG1-gated because it publishes
+   prose, but the gate binds to `corpus_digest`, which covered the two L4 modules and nothing else.
+   Measured: waive HG1, edit `explainer/orientation.md`, re-run `--only p9-explain` with no new
+   grant — the gate stayed open and the replaced prose went into the document; `--bless` then
+   cleared the drift banner too. `go.sh` now folds the whole deposit into that digest at `g1`
+   (25 files, printed by `go.sh plan`), so editing a narrative file — or blessing one, which
+   rewrites `provenance.json` — re-opens the gate. `selftest.mjs` asserts it against the driver.
+
+**Repairs to what the document said about itself.** It claimed every statement about the law
+carried a link while its own table recorded five sections at zero citations; the coverage
+paragraph is now computed from that table and names the sections that carry none (two remain, both
+framing prose: `pictures.intro` and `sweep`). It printed `run verdict COMPLETE` with no gates row
+over a journal whose HG1 was waived; the gates now ride in the header. The attested copy printed
+`INCOMPLETE` while the derived copy printed `COMPLETE` over the same run, because a render taken
+before `run_end` recomputed a verdict; it now declines to state one, so neither copy is wrong and
+the two differ only in a record count and that row. The review banner described a signature
+mechanism in the present tense; it now says the gap is a missing **verifier**, not a missing key.
+The markdown carrier emitted six repo-relative image links from a document under `TMPDIR` — six
+broken links, measured — and now names each figure's file instead, with the header saying only the
+HTML carries pictures.
+
+**Repairs to the narrative itself**, each of which was an unlicensed or wrong claim: the call to
+action's first command started nothing (`./dev-start.sh` prints instructions; `service-only` runs
+the service), its poll used `--fail` against a route whose normal first answer is 404, it
+enumerated five tool kinds against six exports, and it reused a deployment id that collides with a
+stale one in the default store. Tool names now ride on the `p7-mcp` receipt as a metric, so the
+document prints the measured list and the prose enumerates nothing. Three dead acts were reported
+as two; a 2022 enumeration of five moved figures was six; a sentence read "by a different
+instruction" where its own cited line reads "by the same instruction"; the accredited-investor
+carve-out was stated undated and uncited; the reporting-exit fidelity quotation stopped
+mid-sentence, before the half that says the exporter chose a different lowering rather than
+refusing.
+
+**One leg was reporting a stale absence as a live finding.** `p7-bpmn` said the BPMN-to-DMN
+`businessRuleTask` wiring was "NOT BUILT and has no checker", citing `PROCESS-TRACK.md` §8.3 —
+which now reads "BUILT 2026-08-02". The goldens carry two `businessRuleTask` each and
+`etc/check-bpmn-dmn-refs.mjs` is the checker CI already runs. The leg now runs it against the
+committed DMN and reports `PASS`; the explainer was republishing the stale text verbatim to a lay
+reader beside a table row showing the wiring present.
+
+_**Still not built, and not fixed by this pass.** (1) **E17's signature verification** — unchanged
+and now stated plainly in the document itself rather than described as a missing signer.
+(2) **E14's diagram-interchange serializer** (§8.4). (3) The **derived copy of the explainer is
+attested by nothing** — only the preliminary copy under `artifacts/` carries a hash. The audit
+report has the same property; making the reader-facing copy the receipted one needs a journal
+record written after `run_end`, which nothing in the ledger can do today. (4) **Citations render
+as coordinates, not links** — a reader cannot click through to a source line. (5) The
+**law thread is shorter than the encoding thread** — measured 1.8:1 by word count before this
+pass, narrowed by lengthening the two shortest law sections, not eliminated. (6) The
+**intermediary-obligations requirement group still has no section of its own**; the document now
+says so in three places instead of dropping it silently._
+
 **One-line summary.** The conversion report is an **audit** document: it accounts for what a run
 did, refuses to print a number that has no journal row, and is unreadable to anyone who is not
 already inside the project. The explainer is its **reader-facing sibling**: it explains
@@ -162,6 +242,27 @@ somewhere a third party can see it is publication, which is P10, which is HG2's.
 **Never write into `$GO_OUT` after the receipt has hashed it.** `verify-run.mjs` re-hashes every
 artifact a receipt names and files a `CHANGED` finding, and `go.sh` flips the verify exit to 1
 **[G]**. That is precisely why the final render targets `$RUN`.
+
+### 2.1a Amendment 2026-08-03 — where D2's "P9 untouched" actually bit
+
+D2 says the audit report's strict no-typed-numbers invariant must survive completely untouched, and
+it does — re-proved by appending a typed number to each template and watching both renderers exit 4
+with `TEMPLATE DEFECT`, and by re-running `p9-report.sh`'s own section-presence check.
+
+Three files in the report's closure nevertheless moved, deliberately, and the reason is that
+leaving them alone would have made `report.md` print a false sentence about itself on every run.
+The gloss under a `COMPLETE` verdict promises "every non-PASS receipt carries a reason that appears
+below"; `render-report.mjs` narrates `p7-*` by filter and everything else by hard-wired name, so a
+stage outside both had no site. That hole was latent while `p9-report` was the only such stage
+(it emits `PASS` or a hard failure and nothing else) and became live the moment `p9-explain`
+existed, because `p9-explain` is `DEGRADED` whenever any narrative section is unreviewed, which is
+its normal state.
+
+The repair is a `## Every other stage that reported` section whose membership is computed by
+**subtraction** from a named set, in `render-report.mjs`, plus the heading in `report/template.md`
+and in `p9-report.sh`'s required list. Reading "P9 untouched" as "no byte of these files may move"
+would have preserved the letter of D2 by publishing a falsehood, which is the trade this whole
+document exists to refuse.
 
 ### 2.2 What is _not_ produced
 
@@ -619,6 +720,16 @@ sources:
 Verification lives in a new `etc/go/lib/narrative-verify.sh`, shaped on `etc/go/gate-verify.sh`
 (which is 0/3/2 for verified/refused/usage **[M]**).
 
+**Status 2026-08-03: NOT BUILT, and the document now says the right thing about it.**
+`grep -rn 'l4-go-narrative\|narrative-verify' etc/go/` matches nothing. `driftFor` reads
+`record.review.state`, a plain JSON string, so a hand-written `"state": "reviewed"` with matching
+digests renders as reviewed, with a named reviewer, behind no banner and past no check. The v0
+banner said the gap was that "this repository has no enrolled signer" — true, and the wrong gap to
+name: the missing piece is a **verifier**, not a key, and a reader deciding what a future
+`reviewed` row is worth needs to know which. The banner now says so. Nothing in this deposit claims
+review, so the document is honest today by having nothing to be wrong about; that is not the same
+as the mechanism being closed.
+
 #### Why not fold narrative digests into the HG1 payload
 
 Because they are different objects with different lifetimes. HG1's payload is **journal-derived and
@@ -807,6 +918,22 @@ certify this rule" is a claim about the encoding, licensed by a citation into th
 and is exactly the second-thread content this document wants. The rule bans **status words about
 this run**, not vocabulary about the work.
 
+#### Amended 2026-08-03 — case
+
+The check was anchored to the uppercase literal, so it caught `DEGRADED` and missed `degraded`.
+MEASURED on the shipped deposit: `limits.encoding.md` carried "The pipeline's encoding check rides
+degraded on that count" — a run status frozen into prose, true only because `p3-check` happened to
+be `DEGRADED` on the run that drafted it, and invisible to the one check that exists to catch that.
+
+Seven of the ten words are now matched **in any case**: `DEGRADED`, `NOT-EXECUTABLE`,
+`NOT-REGENERATED`, `UNVERIFIED`, `NOT-BUILT`, `SKIPPED`, `INCOMPLETE`
+(`narrative.mjs`'s `CASE_INSENSITIVE_STATUS_WORDS`). Three are **not**: `PASS`, `BROKEN` and
+`COMPLETE` are ordinary English and occur in ordinary sentences — "one house rule broken and
+tolerated" was a real false positive in this deposit — and a lint that cries wolf is a lint a
+drafter routes around. All ten remain banned in their uppercase spelling, where they are
+unambiguous. The split is recorded here because it is a real hole: a narrative writing "the leg
+passed" in lower case is still uncaught.
+
 ---
 
 ## 7. The renderer
@@ -901,8 +1028,16 @@ on the page chrome only — the figures are handled by §8.1.
 #### The ruling
 
 The six committed ladder SVGs at `jl4/examples/legal/regcf/figures/` are inlined into
-`explainer.html` **byte-for-byte**, and referenced by path from `explainer.md`. They are not
-edited, not re-laid-out, and not trimmed.
+`explainer.html` **byte-for-byte**. They are not edited, not re-laid-out, and not trimmed.
+
+**Amended 2026-08-03.** `explainer.md` used to carry `![slug](jl4/examples/…/figures/x.svg)`, a
+repo-relative path emitted into a document that lives under `TMPDIR` — MEASURED on run
+`2026-08-03-3f45e62b-004`, six of six targets did not resolve relative to the file, so the record
+carried six broken links and called them figures. An absolute path would resolve on the machine
+that rendered it and nowhere else. The markdown carrier now **names** each figure's source file and
+draws nothing, and the document's second paragraph says so above the fold: only the HTML carries
+pictures. The same applies to the state-machine figures, which previously carried an italic caption
+with no image markup at all and no note that the picture was elsewhere.
 
 Each is wrapped in a `<figure>` whose caption is the `why` string that already exists beside the
 figure's entry in the subject's demo entry point — so the "key decisions" selection is read from
@@ -1095,10 +1230,15 @@ first branch printed a count under that label.** The `p7-mcp` receipt of run
 the names** — the names are printed only into that leg's log artifact. The renderer read
 `metrics.tools` and rendered `Tools the deployment reported: \`10\``, which labelled a number as a
 list and used the total where the leg's own reason is careful to say the module contributed 6 and
-the remaining 4 are jl4-service's generic file-browsing tools. It now prints both counts, labelled
-as counts, and says where the names live. Recovering the names would mean either scraping that log
-or adding a `tool_names`metric to`p7-mcp.sh`; the second is the right fix and is not made here,
-because `p7-mcp.sh` is outside this build's blast radius (D2's neighbouring discipline).
+the remaining 4 are jl4-service's generic file-browsing tools.
+
+**Closed 2026-08-03.** The interim fix — print both counts and say where the names live — left the
+narrative free to enumerate the tools by hand, which it did, describing **five** kinds against six
+exports. `p7-mcp.sh` now records `tool_names` as a metric on both the `PASS` and the count-mismatch
+receipt, the renderer prints the measured list, and the CTA prose enumerates nothing. Adding the
+metric touches `p7-mcp.sh`, which the earlier note declined to touch as neighbouring discipline;
+that was the wrong call, because the alternative was a hand-typed list in a document whose entire
+argument is that hand-typed lists go stale — and it did, within one build.
 
 ### Three named traps the CTA must route around
 
@@ -1109,18 +1249,57 @@ Each was measured elsewhere and each would make the CTA wrong:
    of the module — a green-looking zero-tool result that blames the corpus. The CTA **must** poll
    `/deployments/<id>` for `.status == "ready"` first **[G]**.
 2. **`GET` on any `.mcp` route is HTTP 405 by design** (MCP Streamable HTTP is POST-only); a `curl`
-   without `--fail` swallows it **[G]**. Every CTA `curl` carries `--fail`.
+   without `--fail` swallows it **[G]**. Every CTA `curl` on a `.mcp` route carries `--fail`.
+
+   **Amended 2026-08-03: `--fail` is wrong on the polling step, and the CTA had it there.**
+   `GET /deployments/<id>` answers **404 while the deployment record does not yet exist** — measured
+   in this run's own `p7-mcp` log, `HTTP 404 state=unreachable functions=0 (waited 0s)` as the first
+   poll — and `p7-mcp.sh` deliberately omits `--fail` for exactly that reason. A reader following
+   the CTA verbatim got a non-zero exit on the normal first answer. `--fail` belongs on every
+   `.mcp` call and on the deploy POST; it does not belong on the poll.
+
 3. **Two documentation defects must not be copied.** `GET /webmcp.js` is **404, not the documented
    301** — the string does not appear in `jl4-service/src` at all; and `data-tools=auto`'s
    threshold is **≤ 10, not ≤ 20** **[G]**. The CTA uses `/.webmcp/embed.js` and does not quote a
    threshold it has not read from the source.
 
+   The CTA also does not claim to have exercised the browser embed. It says so at the site: the
+   `data-scope` block is documented rather than measured here, and the run's own evidence covers
+   the JSON-RPC endpoint only.
+
+4. **The trace does not quote the regulation, and the CTA used to say it did.** A reasoning node
+   carries the resolved name and a pretty-printed expression; there is no citation field. What
+   makes this corpus's trace readable as law is that its field names ARE the regulation's words —
+   a property of the encoding, not of the tool. The CTA now states that dependency instead of
+   claiming the tool supplies it, and quotes the service README's own sentence for the route. Note
+   also that `?trace=full` is a **REST** parameter on
+   `/deployments/{id}/functions/{fn}/evaluation`, not something to append to the `.mcp` JSON-RPC
+   endpoint the previous step introduced; the CTA had the two adjacent with no route in between.
+
 And the CTA must not hide the three limitations that a reader will otherwise discover as breakage:
 `/state-graphs` returns `{"graphs":[]}` for the deployed façade because `extractStateGraphs` does
 not follow `IMPORT`; the façade's `/ladder` has two leaves and `/query-plan` returns empty `asks`
 and `inputs`, which is a structural consequence of proper single-sourcing rather than an oversight;
-and a client must join query-plan and ladder responses on `unique`, not `atomId`, whose
-intersection is empty **[G]**.
+and a client must join query-plan and ladder responses on `unique`, not `atomId`.
+
+**Amended 2026-08-03: "whose intersection is empty" was a borrowed claim, sharpened.**
+`PROJECTIONS.md` measures an empty intersection **inside a single `/query-plan` payload** (the
+`ranked` atom ids against the embedded ladder's), and concludes a client cannot join those two.
+`ts-apps/regcf-wizard/README.md` measures **across two responses** and names the working key,
+`unique`. The CTA took the cross-response framing from one source and the "empty intersection"
+from the other, producing a generalisation neither had measured — and the literal intersection
+across two responses is not empty, because the query-plan payload embeds the ladder. The narrative
+now says only what both sources support: join on `unique`, because the two sides number their atoms
+independently. This is the user-level `CLAUDE.md` rule 2 failing inside the document written to make
+that failure impossible.
+
+**And a fourth trap, added 2026-08-03: a stale deployment of the same id.** `dev-start.sh`'s default
+store is `/tmp/jl4-store`, deployment ids are reused, and a `regcf` left there by an earlier session
+answers `ready` **immediately** — so trap 1's poll, which exists to stop you reading a half-compiled
+deployment, does not fire, and you read somebody else's corpus with no error anywhere. Reproduced:
+a stale deployment served five module tools where the current façade has six, and the missing one
+was the temporal control the CTA calls out by name. The CTA now starts the service with a fresh
+`JL4_SERVICE_STORE`. (`p7-mcp.sh` was never exposed: its deployment id carries the run id.)
 
 ---
 

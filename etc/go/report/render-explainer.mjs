@@ -41,7 +41,6 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sha256File, verify } from "../lib/ledger.mjs";
-import { milestoneVerdict } from "../lib/verdict.mjs";
 import { loadSubject } from "../lib/subject.mjs";
 import {
   driftFor,
@@ -191,15 +190,45 @@ const gateStates = [...new Map(gateRecs.map((g) => [g.gate, g])).values()].map(
     seq: g.seq,
   }),
 );
-const mv = milestoneVerdict({
-  declared,
-  receipts: stageEnds,
-  gates: gateStates,
-});
-// The RECORDED verdict wins over a recomputation, exactly as the audit report
-// does. A sibling document that "corrected" the recorded verdict would say
-// something about the run that report.md does not.
-const verdict = end?.verdict ?? mv.verdict;
+// The RECORDED verdict is the only verdict this document will print.
+//
+// It used to fall back to `milestoneVerdict(...)` when no `run_end` existed
+// yet, and that produced a FALSE STATEMENT in the copy that carries a hash:
+// `p9-explain` renders inside its own stage, before its own `stage_end` and
+// before `run_end`, so the recomputation saw a declared stage with no receipt
+// and printed `run verdict | **INCOMPLETE**` — while the derived copy the run
+// writes afterwards printed `COMPLETE` over the same run. MEASURED on run
+// 2026-08-03-3f45e62b-004: 29 records vs 31, INCOMPLETE vs COMPLETE, and the
+// attested copy was the wrong one. A recomputation mid-run is not a verdict; it
+// is a partial sum. So where the run has not ended, say exactly that.
+const verdict = end?.verdict
+  ? `**${end.verdict}**`
+  : "not yet recorded — this render was taken before `run_end`, so the run had not reached a verdict. " +
+    "The audit report carries it; re-render this page after the run ends and this row fills in.";
+
+/**
+ * The gates, in the header, because a verdict without them is half a sentence.
+ *
+ * The audit report prints a Gates table and defines COMPLETE as including
+ * "every gate is signed or explicitly waived". This document printed the
+ * verdict and NOT the gates, so a reader of run 2026-08-03-3f45e62b-004 saw
+ * `run verdict COMPLETE` under a header claiming the document may make no claim
+ * the audit report cannot support — while the report, three lines from the same
+ * journal row, recorded HG1 as waived with its reason. MEASURED: the string
+ * "HG1" did not occur anywhere in that explainer. A waiver is the single fact
+ * that most changes what a green verdict means, so it rides in the header.
+ */
+const gatesSummary = gateStates.length
+  ? gateStates
+      .map((g) => {
+        if (g.state === "satisfied")
+          return `**${g.gate}** satisfied by \`${g.signature_file ?? "(no signature file recorded)"}\``;
+        if (g.state === "waived")
+          return `**${g.gate} WAIVED** — ${String(g.reason ?? "(no reason recorded)").replace(/\|/g, "\\|")}. Nobody reviewed what this gate covers.`;
+        return `**${g.gate} ${String(g.state).toUpperCase()}** — ${String(g.reason ?? "(no reason recorded)").replace(/\|/g, "\\|")}`;
+      })
+      .join("; ")
+  : "no gate row is on this journal, so no human gate was recorded either way";
 
 // ------------------------------------------------------------------- helpers
 const esc = (s) =>
@@ -222,8 +251,14 @@ const absent = (what, who) => `**ABSENT.** ${what} ${who}`;
  * the deployment line read that way.
  */
 const legLine = (what, r) => {
-  const says = r.reason ?? r.oracle?.because ?? "";
-  return `${what} reports **${r.status}**${r.label ? ` (${r.label})` : ""}${says ? ` — ${says}` : "."}`.trim();
+  const says = String(r.reason ?? r.oracle?.because ?? "").trim();
+  // A terminal stop, added only where the fragment does not already end in
+  // punctuation. This is typography, not editing: nothing is re-cased, nothing
+  // is re-worded, and no character inside the quoted evidence changes. MEASURED
+  // on run 2026-08-03-3f45e62b-004, where two of four leg lines ran into the
+  // next paragraph ("…never as a pass", "…and agreed") and two did not.
+  const stopped = says && !/[.!?…]$/.test(says) ? `${says}.` : says;
+  return `${what} reports **${r.status}**${r.label ? ` (${r.label})` : ""}${stopped ? ` — ${stopped}` : "."}`.trim();
 };
 const short = (s) => String(s ?? "").slice(0, 23) + "…";
 
@@ -571,17 +606,21 @@ function ladderSubsection() {
         : "");
     rawBlocks[key] =
       `<figure class="fig${wide ? " wide" : ""}"><div class="scroll">${svg}</div><figcaption>${mdToHtml(caption).replace(/^<p>|<\/p>$/g, "")}</figcaption></figure>`;
+    // NOT AN IMAGE LINK. It used to be `![slug](jl4/examples/…/figures/x.svg)`,
+    // a REPO-relative path emitted into a document that lives under TMPDIR, so
+    // all six embeds were broken links in the markdown carrier — MEASURED on
+    // run 2026-08-03-3f45e62b-004: 6 of 6 targets did not exist relative to the
+    // file. An absolute path would resolve on the machine that rendered it and
+    // nowhere else. So the markdown says where the picture is and does not
+    // pretend to draw it, and the header says the same thing above the fold.
     mdBlocks[key] = [
-      `![${slug}](${a.path.startsWith(REPO) ? a.path.slice(REPO.length + 1) : a.path})`,
+      `*Figure \`${slug}\` — drawn in \`explainer.html\`. The source SVG is \`${a.path.startsWith(REPO) ? a.path.slice(REPO.length + 1) : a.path}\`.*`,
       "",
       `*${caption}*`,
     ].join("\n");
     out.push(rawToken(key), "");
     n++;
   }
-  out.push(
-    `The drift guard on these figures is **one-directional**: a leaf added to the L4 and absent from a figure still passes. This document inherits that limit; it does not repair it.`,
-  );
   return out.join("\n");
 }
 
@@ -635,7 +674,8 @@ function ltsSubsection() {
     const key = `lts-${basename(p, ".svg")}`;
     rawBlocks[key] =
       `<figure class="fig"><div class="scroll">${namespaceIds(svg, key)}</div><figcaption>${escapeText(label)} — rendered from the emitted DOT by the <code>dot</code> binary on the machine that ran this.</figcaption></figure>`;
-    mdBlocks[key] = `*State machine: ${label} (\`${basename(p)}\`)*`;
+    mdBlocks[key] =
+      `*State machine: ${label} — drawn in \`explainer.html\`. The rendered SVG is \`${basename(p)}\` and its GraphViz source is \`${basename(dot)}\`, both under this run's \`artifacts/\`.*`;
     out.push(rawToken(key), "");
     namespaced++;
   }
@@ -931,18 +971,25 @@ function ctaSection() {
           "The subject's manifest declares no call-to-action narrative.",
         );
   const r = byStage.get("p7-mcp");
-  // COUNTS, LABELLED AS COUNTS. This used to read
-  // `Tools the deployment reported: \`10\``, which was wrong twice over: it
-  // labelled a number as if it were a list, and 10 is the service's TOTAL,
-  // where the leg's own reason is careful to say the module contributed 6 and
-  // the other 4 are jl4-service's generic file-browsing tools. MEASURED on run
-  // 2026-08-03-3f45e62b-002, whose p7-mcp receipt carries `tools=10` and
-  // `corpus_tools=6` and NO metric holding the names at all — the names are
-  // printed only into that leg's log. So this prints what the receipt has and
-  // says where the names live, rather than scraping a log or implying a list.
+  // COUNTS, LABELLED AS COUNTS — and now the NAMES, because a count is not a
+  // list. This block has been wrong twice. It first read
+  // `Tools the deployment reported: \`10\``, which used the service's TOTAL
+  // where the leg's own reason says the module contributed 6 and the other 4
+  // are jl4-service's generic file-browsing tools. It then printed both counts
+  // and said the names lived only in a log — true at the time, and it left the
+  // narrative free to enumerate the tools by hand, which it did, and got the
+  // number wrong. `p7-mcp.sh` now records `tool_names` on the receipt, so the
+  // list is a run fact like every other number here and the prose enumerates
+  // nothing.
+  const names = String(r?.metrics?.tool_names ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean);
   const both =
     r && r.metrics?.tools && r.metrics?.corpus_tools
-      ? `\nThe service enumerated \`${esc(r.metrics.tools)}\` tools for this deployment, of which \`${esc(r.metrics.corpus_tools)}\` are the module's own exported entry points and the rest are jl4-service's generic file-browsing tools, which say nothing about this corpus. The receipt records those counts and not the names; the names are in the leg's own log artifact.`
+      ? `\nThe service enumerated \`${esc(r.metrics.tools)}\` tools for this deployment, of which \`${esc(r.metrics.corpus_tools)}\` are the module's own exported entry points and the rest are jl4-service's generic file-browsing tools, which say nothing about this corpus.` +
+        (names.length
+          ? ` The module's tools, as the service named them: ${names.map((n) => `\`${esc(n)}\``).join(", ")}.`
+          : ` This run's receipt carries no \`tool_names\` metric, so the names are only in the leg's own log artifact and are not repeated here.`)
       : "";
   const measured = r
     ? ["", legLine("The deployment leg of this run", r), both].join("\n")
@@ -971,8 +1018,23 @@ function provenanceSection() {
   const findingRows = findings.map(
     (f) => `| \`${f.kind}\` | \`${esc(f.file)}\` | ${esc(f.detail)} |`,
   );
+  // MEASURED COVERAGE, not a slogan. This paragraph used to open "Every claim
+  // in this document is either a run fact resolved from the journal, or a
+  // citation …", and the table three lines below it refuted that on run
+  // 2026-08-03-3f45e62b-004: five sections carried `0 (0 unchecked)`, two of
+  // them whole sections of law. A document that publishes its own coverage
+  // table must not print a summary the table contradicts, so the summary is
+  // computed FROM the table.
+  const uncited = sectionStates.filter((s) => s.citations === 0);
+  const coverage =
+    `Every **run fact** in this document — every count, status, verdict and figure read out of an artifact — resolves from a row of this run's journal; none is typed into the template, and the renderer refuses to start if one is. ` +
+    `Every **figure about the law or the encoding** that carries a citation had its source line re-opened and matched while this page was rendering: ${citationsTotal} citation(s), ${citationsUnchecked} of them exempted from the digit check with a stated reason, ${citationsUnresolved} that did not resolve.` +
+    (uncited.length
+      ? ` **${uncited.length} of the ${sectionStates.length} narrative sections carry no citation at all** — ${uncited.map((s) => `\`${s.slot}\``).join(", ")} — so nothing mechanical stands behind their prose, and the review that would is the one this repository cannot yet perform. They are listed here rather than left for a reader to derive from the table.`
+      : ` Every narrative section carries at least one citation.`) +
+    " This section is where a sceptic starts.";
   return [
-    "Every claim in this document is either a run fact resolved from the journal, or a citation whose source line was opened and matched while the document was being rendered. This section is where a sceptic starts.",
+    coverage,
     "",
     "### Every narrative section, and what backs it",
     "",
@@ -993,14 +1055,18 @@ function provenanceSection() {
     "- **The `anchor` field in a provenance record is documentation, not a check.** Line ranges move; the digest is the check, and the anchor tells a human reviewer where to look.",
     "- **A review is per section and per source digest.** It goes stale automatically when the text or a cited source moves, and a stale review renders as a draft.",
     "",
+    "### Which copy of this document has a hash, and which one you are reading",
+    "",
+    "`p9-explain` renders a PRELIMINARY copy into this run's `artifacts/` directory and records its sha256 on its own receipt. That copy is taken inside the stage, before the stage's own `stage_end` and before `run_end`, so it is a few journal rows short of this one and its verdict row says so in as many words. The copy at the run's top level — the one you are almost certainly reading — is rendered after `run_end` and is **derived, not attested**: no receipt hashes it. That is deliberate and it is the weaker-sounding of two guarantees that only look alike. A hash says *these bytes are the ones the stage wrote*. Re-derivation says *these bytes are what the journal, the narrative and the artifacts produce*, which is the claim worth having, and the command below is how you take it rather than being given it.",
+    "",
     "### Re-derive this document without trusting it",
     "",
     "```",
-    `node etc/go/report/render-explainer.mjs ${rundir}`,
+    `node etc/go/report/render-explainer.mjs ${resolve(rundir)} --format md,html`,
     `etc/go/go.sh verify --run-id ${begin.run_id} --gates`,
     "```",
     "",
-    "The first re-renders this page from the journal, the narrative and the artifacts; the second re-reads the journal, re-hashes every artifact a receipt names, and recomputes the milestone verdict. Neither runs a build, calls a model, or makes a network request.",
+    "The first re-renders this page — both carriers — from the journal, the narrative and the artifacts; the second re-reads the journal, re-hashes every artifact a receipt names, and recomputes the milestone verdict. Neither runs a build, calls a model, or makes a network request.",
   ].join("\n");
 }
 
@@ -1021,13 +1087,36 @@ const cta = ctaSection();
 const provenance = provenanceSection();
 
 const draftCount = sectionStates.filter((s) => s.state !== "reviewed").length;
+// THE BANNER STATES THE GAP THAT EXISTS, NOT THE ONE THAT WOULD BE TIDIER.
+//
+// It used to say review "is a detached signature over the section's text and
+// the digests of the sources it was drafted from; today this repository has no
+// enrolled signer" — present tense, describing a mechanism that is not built.
+// MEASURED: `grep -rn 'l4-go-narrative\|narrative-verify' etc/go/` matches
+// nothing. `driftFor` reads `record.review.state`, which is a plain JSON string,
+// so a hand-written `"state": "reviewed"` with matching digests renders as
+// reviewed, with a named reviewer, behind no banner and past no check. The
+// missing piece is a VERIFIER, not a key. That is the sentence a reader needs,
+// because it tells them what a future `reviewed` row would and would not be
+// worth.
+const REVIEW_MECHANISM =
+  "What `reviewed` would mean here is not yet decided by any code: `provenance.json` carries a `review` field, this renderer re-checks that the text and the cited sources still hash as that field recorded them, and it goes stale automatically when either moves — but **nothing verifies a signature over a narrative section**, because no such verifier is built (the gate signatures under `etc/go/gate-verify.sh` are a different mechanism, over a different payload). Until one is, a `reviewed` row would be believed rather than checked. No row in this deposit claims to be reviewed, so the document is honest today by having nothing to be wrong about.";
 const banner = draftCount
-  ? `> **${draftCount} of ${sectionStates.length} narrative sections in this document are AGENT-DRAFTED AND NOT REVIEWED.** They are marked individually below. A drafted section is a claim, not a finding. Review is a detached signature over the section's text and the digests of the sources it was drafted from; today this repository has no enrolled signer, so the state below is the correct one and not an oversight.`
-  : `> Every narrative section in this document carries a review signature over its text and its sources.`;
+  ? `> **${draftCount} of ${sectionStates.length} narrative sections in this document are AGENT-DRAFTED AND NOT REVIEWED.** They are marked individually below. A drafted section is a claim, not a finding.\n>\n> ${REVIEW_MECHANISM}`
+  : `> Every narrative section in this document records a review over its text and its sources.\n>\n> ${REVIEW_MECHANISM}`;
 
-const reportPointer = existsSync(resolve(rundir, "report.md"))
-  ? `[\`report.md\`](report.md) — the audit account of this same run`
-  : "`report.md` — not present in this run directory; re-render it with `etc/go/report/render-report.mjs`";
+// JOURNAL-DERIVED, not disk-derived. Testing `existsSync(rundir/report.md)`
+// made this row disagree between the two renders of the same run: inside
+// `p9-explain` the report exists only under `artifacts/`, so the attested copy
+// said "not present in this run directory" while the derived copy carried a
+// link. Whether `p9-report` ran is a fact about the run and belongs on the
+// journal; whether a file has been copied yet is a fact about the clock.
+const p9r = byStage.get("p9-report");
+const reportPointer = p9r
+  ? `[\`report.md\`](report.md) — the audit account of this same run; \`p9-report\` reported **${p9r.status}**`
+  : declared.includes("p9-report")
+    ? "`report.md` — `p9-report` is declared at this milestone and left no receipt, so no audit report is accounted for"
+    : "`report.md` — `p9-report` is not declared for this run, so there is no audit account to link to";
 
 const values = {
   "explainer.title": manifest.title,
@@ -1045,6 +1134,7 @@ const values = {
     ? "verifies"
     : `**DOES NOT VERIFY** — ${chain.problems.join("; ")}`,
   "run.verdict": verdict,
+  "gates.summary": gatesSummary,
   "report.pointer": reportPointer,
   "narrative.banner": banner,
   "narrative.draft_count": String(draftCount),
@@ -1125,7 +1215,7 @@ if (formats.includes("html")) {
 const summary = {
   run_id: begin.run_id,
   subject: subjectId,
-  verdict,
+  verdict: end?.verdict ?? null,
   sections: sectionStates.length,
   draft_sections: draftCount,
   citations_total: citationsTotal,

@@ -52,6 +52,26 @@ if [[ -z "${GO_S_EXPLAINER_DIR:-}" ]]; then
   go_skip "subject '$GO_S_ID' declares no 'explainer' section in subject.json, so it has no checked-in narrative to render. Declaring the directory is deliberate rather than discovered: a mistyped directory name would otherwise yield a fully-absent document with no error anywhere."
 fi
 
+# Refuse to render into a run that never declared this stage.
+#
+# `milestoneVerdict` checks declared -> receipt and never receipt -> declared,
+# so a stage resumed into an older run directory writes a receipt and four
+# hashed artifacts that the run's own verdict cannot see, while the artifacts
+# land in the audit report's artifact table. MEASURED: run
+# 2026-08-02-97b15013-005, whose `run_begin` lists thirteen stages and not this
+# one, was resumed with this driver and reported `VERDICT: g1 COMPLETE` with a
+# full explainer beside it. That is a general property of the driver, not of
+# this stage — but this stage is the one that would publish a DOCUMENT out of
+# it, so it declines here rather than waiting for the general fix.
+if ! node -e '
+  const fs = require("node:fs");
+  const rows = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const b = rows.find((r) => r.kind === "run_begin");
+  process.exit(!b || (b.declared_stages ?? []).includes("p9-explain") ? 0 : 1);
+' "$GO_RUN/journal.ndjson" 2>/dev/null; then
+  go_skip "this run's own run_begin record does not declare p9-explain, so the run's milestone verdict cannot account for a receipt from it. Rendering anyway would put a document — and four hashed artifacts — into a run whose verdict is blind to them. Start a run that declares the stage instead."
+fi
+
 # Preliminary render into the ARTIFACTS directory, hashed on this stage's own
 # receipt. go.sh renders the final $RUN/explainer.{md,html} after run_end, when
 # the run's own verdict exists; that one is deliberately unattested, because

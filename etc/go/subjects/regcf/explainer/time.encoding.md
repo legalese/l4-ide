@@ -15,7 +15,9 @@ first:
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 ```
 
-Four named dates, each carrying its Federal Register citation. One shared guard,
+Four named dates, each carrying the Federal Register citation printed against it
+in the list above — those are read off the encoding, not looked up separately.
+One shared guard,
 `the rules in force include`, which reads the rule date. A typed floor at the
 bottom, so that asking about a day before commencement stops and names the
 binding rather than inventing a figure. And a timezone —
@@ -28,11 +30,12 @@ _every constant it transitively reads_ is dated over the same window. Dating a
 proper subset is not a partial improvement; it is a defect, because the
 half-dated function answers **confidently and wrongly inside its own answerable
 window**. The corpus pins that with a dedicated regression: an investor above
-the second limb's cap, where the answer _is_ the cap — which moved in the same
-release, by a different instruction, on the same day. Under a partially dated
-module the assertion at
+the second limb's cap, where
+[the answer IS the cap — which also moved on 2022-09-20, in the same release, by the same instruction](src:jl4/examples/legal/regcf/regcf.l4#L1166-L1167 "verbatim").
+Under a partially dated module the assertion at
 [$107,000](src:jl4/examples/legal/regcf/regcf.l4#L1174) silently returns the
-current figure instead.
+current figure instead — the right shape of answer, from the wrong regime, with
+nothing to notice it.
 
 **Shapes are dated too, not only numbers.** The change from _lesser_ to
 _greater_ is a change in the shape of the formula, and the accredited-investor

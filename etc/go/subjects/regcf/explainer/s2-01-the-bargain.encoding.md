@@ -29,10 +29,24 @@ offerings by the same issuer, one after a default, are not linked by anything
 the machine checks. That is recorded in the corpus's own list of honest limits;
 it is a real gap, not a stylistic one.
 
+**One conjunct swallows an entire regime.** `intermediary obligations are met`
+looks like the other four. The deepest thing under it is a single yes-or-no
+field the encoding simply accepts as given:
+
+> [`the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part` IS A BOOLEAN](src:jl4/examples/legal/regcf/regcf.l4#L548 "verbatim")
+
+Behind that one boolean stand the funding-portal registration rules and the
+platform conduct rules — the part of 17 CFR Part 227 this encoding does not
+reach at all. It is the same move as the bad-actor limb in the next section, at
+a larger scale, and it is worth naming here because a reader looking at the
+five-conjunct decision above would reasonably take the five to be comparable in
+weight. They are not. The encoding can represent the consequence of the
+intermediary regime being satisfied without being able to decide whether it is.
+
 Notice also the first line of the decision. `"(a) Exemption. An issuer may offer
 or sell securities …"` is a double-quoted string sitting inside a conjunction,
-and it computes nothing at all: it evaluates to the identity of the context it
-sits in, so deleting every such string would change no answer this file gives.
-It is there so the statute reads down the left margin as prose while the
-arithmetic happens in the backticked names beside it. This is the house style,
-and most of what follows is only readable because of it.
+and it computes nothing at all. Inside an `AND` it behaves exactly like `TRUE`,
+so deleting every such string would change no answer this file gives. It is
+there so the statute reads down the left margin as prose while the arithmetic
+happens in the backticked names beside it. This is the house style, and most of
+what follows is only readable because of it.

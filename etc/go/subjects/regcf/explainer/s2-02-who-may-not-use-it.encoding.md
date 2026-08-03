@@ -30,9 +30,12 @@ against the regulation limb by limb.
 paraphrases. Limb five's field is literally
 `has sold securities in reliance on section 4(a)(6) and has not filed the
 ongoing annual reports required during the two years immediately preceding the
-filing of the offering statement`. That is why the ladder figure for this
-decision is worth looking at and the figure for the top-level decision is not:
-this one is six short rungs, and a rung that is missing is visible.
+filing of the offering statement`. That is what makes the ladder figure for this
+decision the useful one: six short rungs, where a rung that is missing is
+visible. The top-level decision's ladder is in **Pictures** too, because that
+section prints what the run produced rather than what this document would have
+chosen, but it is five calls in a row and it teaches nothing that the five lines
+above do not.
 
 **And this is where isomorphic encoding paid.** A published summary of this
 regulation that the corpus was checked against lists **four** eligibility

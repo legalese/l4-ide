@@ -21,6 +21,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -882,6 +883,65 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
     "the never-replaying stages are declared g1 members, and the plan names them",
     NEVER_REPLAY.every((s) => rows.some((r) => r.stage === s)),
   );
+  // HG1 MUST RE-OPEN WHEN THE NARRATIVE MOVES.
+  //
+  // `p9-explain` is HG1-gated because it publishes narrative prose, but the
+  // gate binds to `corpus_digest`, and that digest covered the L4 modules
+  // alone. MEASURED against a scratch copy of the tree: waive HG1, edit
+  // `explainer/orientation.md`, re-run `--only p9-explain` with no new grant —
+  // the gate stayed open, the stage re-ran, and the replaced prose went into
+  // the rendered document. `--bless` then cleared the drift banner too.
+  //
+  // This asks the driver, via `plan`, for the digest it would bind a gate to,
+  // and checks that touching a narrative file moves it. A source-text
+  // assertion about go.sh would pass over a `GO_CORPUS_FILES` array that was
+  // built and then overwritten.
+  {
+    const digestOf = () => {
+      const p = spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "plan",
+          "--milestone",
+          "g1",
+          "--subject",
+          FIXTURE_SUBJECT,
+        ],
+        { encoding: "utf8" },
+      );
+      return /sha256:[0-9a-f]{64}/.exec(p.stdout)?.[0] ?? null;
+    };
+    const subj = spawnSync(
+      "node",
+      [resolve(HERE, "lib/subject.mjs"), FIXTURE_SUBJECT],
+      { encoding: "utf8" },
+    ).stdout;
+    const dir = /GO_S_EXPLAINER_DIR='([^']+)'/.exec(subj)?.[1] ?? null;
+    const file = dir
+      ? readdirSync(dir)
+          .filter((f) => f.endsWith(".md"))
+          .sort()[0]
+      : null;
+    check(
+      "the digest a gate binds to moves when a narrative file is edited",
+      (() => {
+        if (!dir || !file) return false; // no deposit: nothing to bind, nothing to check
+        const p = resolve(dir, file);
+        const before = digestOf();
+        if (!before) return false;
+        const original = readFileSync(p, "utf8");
+        try {
+          writeFileSync(p, original + "\n<!-- selftest probe -->\n");
+          const after = digestOf();
+          return !!after && after !== before;
+        } finally {
+          writeFileSync(p, original);
+        }
+      })(),
+    );
+  }
+
   check(
     "every never-replaying stage declares an EMPTY --inputs block",
     NEVER_REPLAY.every((s) => {
@@ -1278,7 +1338,84 @@ process.stdout.write("\n-- the explainer --\n");
       "every citation in the shipped narrative resolves against its source",
       summary.citations_total > 0 && summary.citations_unresolved === 0,
     );
+    // The gate is the fact that most changes what a verdict means, and the
+    // explainer printed the verdict without it: MEASURED on run
+    // 2026-08-03-3f45e62b-004, `run verdict COMPLETE` over a journal whose
+    // HG1 row reads `waived`, with the string "HG1" nowhere in the document.
+    check(
+      "a waived gate reaches the explainer's header, not only the audit report's",
+      (() => {
+        const d = fixtureRun();
+        const j = resolve(d, "journal.ndjson");
+        append(j, {
+          kind: "gate",
+          gate: "HG1",
+          state: "waived",
+          reason: "«WAIVER-REASON»",
+        });
+        const r = runRender(d);
+        if (r.status !== 0) return false;
+        const t = readFileSync(resolve(d, "explainer.md"), "utf8");
+        return /HG1 WAIVED/.test(t) && t.includes("«WAIVER-REASON»");
+      })(),
+    );
+    // A markdown carrier that emits `![x](repo/relative/path.svg)` from a
+    // document living under TMPDIR ships six broken links and calls them
+    // figures. MEASURED on the same run: 6 of 6 targets did not exist.
+    check(
+      "the markdown carrier links to no image it cannot resolve",
+      (() => {
+        const links = [...md.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(
+          (m) => m[1],
+        );
+        return links.every((l) => existsSync(resolve(d0, l)));
+      })(),
+    );
+    check(
+      "the coverage summary counts the uncited sections rather than claiming there are none",
+      /citation\(s\), \d+ of them exempted/.test(md) &&
+        (summary.sections ===
+          (md.match(/\| `[a-z0-9._-]+` \| `[^`]+\.md` \|/g) ?? []).length ||
+          /carry no citation at all|Every narrative section carries at least one citation/.test(
+            md,
+          )),
+    );
   }
+
+  // A render taken BEFORE `run_end` may not print a verdict, because there is
+  // none yet. It used to fall back to a recomputation, which saw the declared
+  // stages that had not run and printed `**INCOMPLETE**` — into the copy that
+  // carries a hash, over a run that ended COMPLETE. MEASURED on run
+  // 2026-08-03-3f45e62b-004: the attested copy said INCOMPLETE, the derived one
+  // said COMPLETE, and the wrong one was the one a verifier re-hashes.
+  check(
+    "a render with no run_end declines to state a verdict rather than recomputing one",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-noend-"));
+      const j = resolve(d, "journal.ndjson");
+      append(j, {
+        kind: "run_begin",
+        run_id: "no-run-end",
+        milestone: "g1",
+        subject: FIXTURE_SUBJECT,
+        repo_head: "0000000",
+        tree_state: "clean",
+        fixed_now: "2025-01-31T00:00:00Z",
+        l4_binary: "/nonexistent",
+        declared_stages: ["p6-tests", "p9-report", "p9-explain"],
+        gated_stages: JSON.stringify({ HG1: ["p9-explain"], HG2: [] }),
+      });
+      append(j, base({ stage: "p6-tests", artifacts: [] }));
+      const r = runRender(d);
+      if (r.status !== 0) return false;
+      const t = readFileSync(resolve(d, "explainer.md"), "utf8");
+      return (
+        /run verdict\s*\|\s*not yet recorded/.test(t) &&
+        !/\*\*INCOMPLETE\*\*/.test(t) &&
+        !/\*\*COMPLETE\*\*/.test(t)
+      );
+    })(),
+  );
 
   // THE EQUALITY ORACLE for the duplicated journal fold (EXPLAINER-REPORT-SPEC
   // §3.5). The duplication is defended by this test, not by care: if the two
@@ -2686,6 +2823,59 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
     "every de novo receipt's reason reaches the report — all five, not three",
     ["«P2-REASON»", "«P3-REASON»", "«P4-REASON»"].every((s) => md.includes(s)),
   );
+  // THE GENERAL FORM OF THE CHECK ABOVE, which is the one that would have
+  // caught the defect the check above did not.
+  //
+  // The five-stage list is hard-coded, so it can only ever confirm the five
+  // stages somebody already thought of. `render-report.mjs` narrates `p7-*` by
+  // filter and every other stage by name, and the verdict gloss it prints
+  // claims that on a COMPLETE run "every non-PASS receipt carries a reason that
+  // appears below". `p9-report` never falsified that only because it can emit
+  // nothing but PASS or a hard failure; `p9-explain` is DEGRADED whenever a
+  // narrative section is unreviewed, which is its normal state, so its reason
+  // reached the journal and no reader — MEASURED on run
+  // 2026-08-03-3f45e62b-004, five of six non-PASS reasons in the report.
+  //
+  // This fixture puts a non-PASS receipt on a stage with NO narrated site, and
+  // asserts what the gloss promises. It fails for any future stage added
+  // without a home, which is the property the hard-coded list cannot have.
+  {
+    const o = mkdtempSync(resolve(tmpdir(), "l4-go-orphanreason-"));
+    const oj = resolve(o, "journal.ndjson");
+    append(oj, {
+      kind: "run_begin",
+      run_id: "orphan-reason-test",
+      milestone: "g1",
+      subject: FIXTURE_SUBJECT,
+      declared_stages: ["p6-tests", "p9-report", "p9-explain", "pZ-invented"],
+    });
+    append(oj, base({ stage: "p6-tests", status: "PASS", reason: null }));
+    append(
+      oj,
+      base({ stage: "p9-report", status: "DEGRADED", reason: "«P9REPORT»" }),
+    );
+    append(
+      oj,
+      base({ stage: "p9-explain", status: "DEGRADED", reason: "«P9EXPLAIN»" }),
+    );
+    append(
+      oj,
+      base({ stage: "pZ-invented", status: "UNVERIFIED", reason: "«PZ»" }),
+    );
+    append(oj, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    const orr = spawnSync(
+      "node",
+      [resolve(HERE, "report/render-report.mjs"), o],
+      { encoding: "utf8" },
+    );
+    const omd =
+      orr.status === 0 ? readFileSync(resolve(o, "report.md"), "utf8") : "";
+    check(
+      "EVERY non-PASS receipt's reason reaches the report, including a stage no section narrates",
+      ["«P9REPORT»", "«P9EXPLAIN»", "«PZ»"].every((s) => omd.includes(s)),
+    );
+    rmSync(o, { recursive: true, force: true });
+  }
   check(
     "p4-forks and p5-gate have their own rendered blocks, not just a mention in ABSENT prose",
     /\*\*Ambiguity forks:\*\*/.test(md) &&

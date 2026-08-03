@@ -22,21 +22,23 @@ executable. The two threads interleave, because the second is only interesting
 where it lands on the first._
 
 _`explainer.html` is the document; `explainer.md` is the record. Both carry the
-same text, the same banners and the same citations. They differ only in how a
-figure travels._
+same text, the same banners and the same citations. **Only the HTML carries the
+pictures**: it inlines every figure, and the markdown names each figure's file
+and draws nothing._
 
 {{narrative.banner}}
 
-|              |                                                                                  |
-| ------------ | -------------------------------------------------------------------------------- |
-| subject      | {{run.subject}} — {{run.citation}}                                               |
-| run id       | `{{run.id}}`                                                                     |
-| milestone    | {{run.milestone_upper}}                                                          |
-| repo HEAD    | `{{run.repo_head}}` ({{run.tree_state}})                                         |
-| clock        | `{{run.fixed_now}}`                                                              |
-| journal      | `{{run.journal_path}}` — {{run.record_count}} records, chain {{run.chain_state}} |
-| run verdict  | **{{run.verdict}}**                                                              |
-| audit report | {{report.pointer}}                                                               |
+|              |                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| subject      | {{run.subject}} — {{run.citation}}                                                         |
+| run id       | `{{run.id}}`                                                                               |
+| milestone    | {{run.milestone_upper}}                                                                    |
+| repo HEAD    | `{{run.repo_head}}` ({{run.tree_state}})                                                   |
+| clock        | `{{run.fixed_now}}`                                                                        |
+| journal      | `{{run.journal_path}}` — {{run.record_count}} records read here, chain {{run.chain_state}} |
+| gates        | {{gates.summary}}                                                                          |
+| run verdict  | {{run.verdict}}                                                                            |
+| audit report | {{report.pointer}}                                                                         |
 
 > This document may make no claim the audit report cannot support. Every run
 > fact above and below resolves from the same journal, folded the same way. Where

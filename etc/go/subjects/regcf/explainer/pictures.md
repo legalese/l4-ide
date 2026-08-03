@@ -6,7 +6,8 @@ something visible that the others hide.
   an `OR` a parallel one, and each leaf carries the regulation's own words. It
   shows you a missing limb; it cannot show you what happens inside a call.
 - A **state machine** shows that a duty is a thing with a life: live, fulfilled,
-  breached, renewed. Only the three regulative rules have one.
+  breached, renewed. Only a regulative rule has one — a decision has no state to
+  draw, so it gets no figure here and its absence is not a gap.
 - A **process diagram** shows the same duty as a workflow — the branch that
   imposes no duty at all, the renewal loop, the guards. It has no shape for a
   prohibition, and says so.

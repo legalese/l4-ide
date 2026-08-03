@@ -54,6 +54,35 @@ export const RESERVED_STATUS_WORDS = [
   "COMPLETE",
   "INCOMPLETE",
 ];
+
+/**
+ * The subset checked in ANY CASE, rather than only as the uppercase literal.
+ *
+ * The ban was anchored to the uppercase spelling, so it caught `DEGRADED` and
+ * missed `degraded` — and MEASURED on the shipped deposit, `limits.encoding.md`
+ * carried "The pipeline's encoding check rides degraded on that count", which is
+ * a run status frozen into prose, true only because one stage happened to be
+ * DEGRADED on the run that drafted it, and invisible to the one check that
+ * exists to catch exactly that.
+ *
+ * It is a SUBSET and not the whole list, because the cost of a lint is measured
+ * in false positives: "pass", "broken" and "complete" are ordinary English and
+ * occur in ordinary sentences ("one house rule broken and tolerated"), where
+ * flagging them would train a drafter to work around the check rather than
+ * obey it. The words below have no such ordinary use in this genre — a
+ * narrative sentence containing "degraded" or "skipped" is nearly always a run
+ * fact somebody typed. In their uppercase spelling ALL ten remain banned,
+ * because uppercase is unambiguous.
+ */
+export const CASE_INSENSITIVE_STATUS_WORDS = [
+  "DEGRADED",
+  "NOT-EXECUTABLE",
+  "NOT-REGENERATED",
+  "UNVERIFIED",
+  "NOT-BUILT",
+  "SKIPPED",
+  "INCOMPLETE",
+];
 export const RESERVED_STATUS_PHRASES = [
   "all tests pass",
   "all assertions pass",
@@ -278,12 +307,16 @@ export function lintNarrative(text) {
     if (inFence) return;
 
     for (const w of RESERVED_STATUS_WORDS) {
-      const re = new RegExp(`(^|[^A-Za-z0-9{-])${w}([^A-Za-z0-9}-]|$)`);
+      const anyCase = CASE_INSENSITIVE_STATUS_WORDS.includes(w);
+      const re = new RegExp(
+        `(^|[^A-Za-z0-9{-])${w}([^A-Za-z0-9}-]|$)`,
+        anyCase ? "i" : "",
+      );
       if (re.test(line))
         out.push({
           line: n,
           code: "N-STATUS",
-          message: `reserved run-status word '${w}'; a run fact belongs in a placeholder resolved from the journal, never frozen into prose`,
+          message: `reserved run-status word '${w}'${anyCase ? " (in any case)" : ""}; a run fact belongs in a placeholder resolved from the journal, never frozen into prose`,
         });
     }
     for (const p of RESERVED_STATUS_PHRASES) {

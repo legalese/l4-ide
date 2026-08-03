@@ -33,9 +33,13 @@ not keystrokes; it is that the two can never drift apart, which in a hand-drafte
 document they eventually do.
 
 **What the type system refused.** Renaming the record fields to drop a redundant
-leading verb once made the wizard's fixture named `an accredited investor`
-collide with a field of that same new name. That is a real type error, not a
-style complaint, and it was resolved by taking Rule 100(a)(2)'s own noun —
-`an accredited purchaser`. The encoding is full of small events like this, where
-a naming decision stopped being a matter of taste because the checker had an
-opinion about it.
+leading verb once made a test fixture collide with a field of the same new name:
+the record `InvestorFacts` declares
+[`an accredited investor` IS A BOOLEAN](src:jl4/examples/legal/regcf/regcf-wizard.l4#L123 "verbatim"),
+and the fixture that had been called the same thing now had to be something
+else. It was resolved by taking Rule 100(a)(2)'s own noun, so the fixture is
+[`an accredited purchaser` MEANS InvestorFacts WITH](src:jl4/examples/legal/regcf/regcf-wizard.l4#L680 "verbatim").
+That is a real type error and not a style complaint, and it is the smallest
+possible illustration of the difference this whole exercise is about: in prose,
+two things with the same name are a reader's problem, and here they were the
+checker's, at the moment of writing rather than the moment of dispute.

@@ -8,9 +8,18 @@ plainly, there are five conditions:
 3. **Respect each investor's personal cap.** Rule 100(a)(2) is a formula, not a
    table, and it is the part of this regulation a member of the public is most
    likely to need.
-4. **Go through one registered intermediary, exclusively**, and leave the
-   offering publicly visible on its platform for at least
-   [21 days](src:jl4/examples/legal/regcf/regcf.l4#L231) before any sale.
+4. **Go through one registered intermediary, exclusively.** Rule 100(a)(3)
+   requires the transaction to be
+   [conducted exclusively through the intermediary's platform](src:jl4/examples/legal/regcf/regcf.l4#L560 "verbatim"),
+   and the Instruction to that paragraph fixes the number of intermediaries at
+   one. This condition drags the intermediary's own regime in behind it. The
+   requirement that an offering sit publicly on the platform for
+   [21 days](src:jl4/examples/legal/regcf/regcf.l4#L230-L231) before any sale is
+   not in Rule 100 at all — it is
+   [17 CFR 227.303(a)(2)](src:jl4/examples/legal/regcf/regcf.l4#L229 "verbatim"),
+   a duty on the platform rather than on the issuer, which the issuer
+   nevertheless has to care about because its exemption depends on the
+   platform's compliance.
 5. **File a Form C** with the prescribed disclosure, including financial
    statements at a level of assurance set by how much is being raised.
 

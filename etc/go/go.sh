@@ -220,6 +220,27 @@ if [[ "$MILESTONE" == "g2" ]]; then
   # A subject with no `denovo` section at all still needs a digest to bind a
   # gate to; `text:` entries are literal digest contributors (digestSet).
   [[ ${#GO_CORPUS_FILES[@]} -eq 0 ]] && GO_CORPUS_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
+else
+  # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
+  #
+  # `p9-explain` is HG1-gated because it publishes narrative prose about a body
+  # of law. But the gate binds to this digest, and this digest used to cover the
+  # L4 modules alone — MEASURED: editing `explainer/orientation.md`, re-running
+  # `--only p9-explain` with no new grant, and watching the gate stay open while
+  # the replaced prose went straight into the rendered document. The drift
+  # detector fired (an inline `UNRECORDED EDIT` banner, a `narrative-drift`
+  # finding), and `--bless` cleared all of it in one command with nothing left
+  # to compare. A gate that does not re-open over the thing it gates is not a
+  # gate over that thing.
+  #
+  # Folding the deposit in here also closes the `--bless` hole for free:
+  # blessing rewrites `provenance.json`, which is in this set, so the digest
+  # moves and HG1 shuts.
+  if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]]; then
+    for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
+      [[ -e "$_f" ]] && GO_CORPUS_FILES+=("$_f")
+    done
+  fi
 fi
 
 # Assemble the declared stage list and the HG1 set from the sidecar's legs.
@@ -343,6 +364,15 @@ cmd_plan() {
     [[ " $gated_by_HG2 " == *" $s "* ]] && gate="HG2"
     printf '  %-14s gate=%-4s %s\n' "$s" "$gate" "$PHASES/$s.sh"
   done <<<"$stages"
+  echo
+  # WHAT A GATE WOULD BIND TO, printed rather than left to be inferred. A gate
+  # grant covers one digest and nothing else, so "which files are in it" is the
+  # question a reader of a waiver actually has — and it is the question that was
+  # answered wrongly for the explainer's narrative deposit, which the gate was
+  # supposed to cover and did not.
+  echo "the digest a gate on this run would bind to, over ${#GO_CORPUS_FILES[@]} file(s):"
+  echo "  $(node "$LIB/digest.mjs" "${GO_CORPUS_FILES[@]}")"
+  for s in "${GO_CORPUS_FILES[@]}"; do printf '  %s\n' "${s#"$GO_ROOT"/}"; done
   echo
   echo "entry points that exist and refuse, each with a named blocker:"
   for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
@@ -573,7 +603,7 @@ EOF
     if [[ "$MILESTONE" == "g2" ]]; then
       echo "go:   the waiver covers the de novo deposit set $corpus_digest and nothing else; deposit or edit one and $gname re-opens."
     else
-      echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file and $gname re-opens."
+      echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file, or any file of the subject's explainer narrative deposit, and $gname re-opens."
     fi
   done
 

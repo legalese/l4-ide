@@ -68,6 +68,12 @@
 
 ---
 
+## Every other stage that reported
+
+{{sections.other_stages}}
+
+---
+
 ## Where another system published its own representation of the same rule
 
 {{sections.comparison}}
