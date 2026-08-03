@@ -26,7 +26,25 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { append, hashRecord, read, verify } from "./lib/ledger.mjs";
+import {
+  append,
+  hashRecord,
+  read,
+  sha256File as hashOf,
+  verify,
+} from "./lib/ledger.mjs";
+import {
+  driftFor,
+  lintNarrative,
+  loadManifest,
+  resolveCitations,
+} from "./lib/narrative.mjs";
+import {
+  escapeAttr,
+  lintMarkdown,
+  mdToHtml,
+  rawToken,
+} from "./report/md-lite.mjs";
 import {
   checkReceipt,
   milestoneVerdict,
@@ -811,6 +829,75 @@ process.stdout.write("\n-- the register schemas --\n");
 // ------------------------------------------------------------- 4. the driver
 process.stdout.write("\n-- the driver --\n");
 
+// The stages that declare no inputs and therefore never replay. Each is a pure
+// function of the journal, which grows while it runs. Keep this list and
+// go.sh's two `--inputs` no-op blocks in step; the idempotence checks below
+// compare against it as a SET, not as a count.
+const NEVER_REPLAY = ["p9-report", "p9-explain"];
+
+// THE ASSERTION THAT DID NOT EXIST, and whose absence is total when it bites.
+//
+// go.sh's gate test is `[[ " $gated_by_HG1 " == *" $s "* ]]` with an EMPTY
+// default: an unlisted stage runs ungated, gate-verify.sh is never consulted,
+// run_begin's gated_stages does not name it so verify-run.mjs's ordering check
+// cannot fire for it, and the report's Gates table prints gate ROWS rather than
+// gate COVERAGE, so it says nothing either. A stage omitted from gated_by_HG1
+// therefore publishes HG1-unreviewed work while every downstream honesty check
+// reports clean.
+//
+// SPEC.md §7.3's rule is "HG1 blocks P6 onward". This asks the DRIVER, not the
+// source text: `plan` derives its gate column from the same two shell strings
+// the dispatch loop tests, and the p7 legs enter both through a conditional
+// loop that no static reader of go.sh can evaluate.
+{
+  const plan = spawnSync(
+    "bash",
+    [
+      resolve(HERE, "go.sh"),
+      "plan",
+      "--milestone",
+      "g1",
+      "--subject",
+      FIXTURE_SUBJECT,
+    ],
+    { encoding: "utf8" },
+  );
+  const rows = [...plan.stdout.matchAll(/^ {2}(\S+)\s+gate=(\S+)/gm)].map(
+    (m) => ({ stage: m[1], gate: m[2] }),
+  );
+  const from = rows.findIndex((r) => r.stage === "p6-tests");
+  const ungated = rows
+    .slice(from < 0 ? rows.length : from)
+    .filter((r) => r.gate === "-")
+    .map((r) => r.stage);
+  if (ungated.length)
+    process.stdout.write(
+      `     ungated at or after p6-tests: ${ungated.join(", ")}\n`,
+    );
+  check(
+    "every declared g1 stage sequenced at or after p6-tests is gated",
+    plan.status === 0 && from >= 0 && ungated.length === 0,
+  );
+  check(
+    "the never-replaying stages are declared g1 members, and the plan names them",
+    NEVER_REPLAY.every((s) => rows.some((r) => r.stage === s)),
+  );
+  check(
+    "every never-replaying stage declares an EMPTY --inputs block",
+    NEVER_REPLAY.every((s) => {
+      const p = resolve(HERE, "phases", `${s}.sh`);
+      if (!existsSync(p)) return false;
+      const t = readFileSync(p, "utf8");
+      const m =
+        /if \[\[ "\$\{1:-\}" == "--inputs" \]\]; then([\s\S]*?)\nfi/.exec(t);
+      // The block must reach `exit 0` without printing a path: a stage that
+      // digests its own future would report `replayed` over a journal that has
+      // since grown.
+      return !!m && /exit 0/.test(m[1]) && !/printf|echo/.test(m[1]);
+    }),
+  );
+}
+
 if (!process.argv.includes("--with-driver")) {
   skip(
     "idempotence under replay",
@@ -869,18 +956,30 @@ if (!process.argv.includes("--with-driver")) {
     .pop()?.verdict;
 
   // The idempotence property, stated so it is falsifiable: on the second run,
-  // every stage that CAN replay must replay. p9-report is the sole declared
-  // exception and declares no inputs precisely so it re-renders every time.
+  // every stage that CAN replay must replay. The exceptions are the stages that
+  // declare NO inputs, deliberately, because they are functions of the journal
+  // and the journal grows while they run — a stage cannot digest its own
+  // future. They are named as a SET rather than counted: this assertion used to
+  // read `executed.length === 1 && executed[0] === "p9-report"`, and adding the
+  // second such stage broke it in a way that invited bumping the constant to 2,
+  // which is how the next one breaks it again.
   const executed = secondPass
     .filter((r) => !r.replayed_from)
-    .map((r) => r.stage);
+    .map((r) => r.stage)
+    .sort();
+  const sameSet = (a, b) =>
+    a.length === b.length && a.every((x, i) => x === b[i]);
   check(
-    "a second run re-executes nothing but the report",
-    executed.length === 1 && executed[0] === "p9-report",
+    `a second run re-executes nothing but the never-replaying stages (${NEVER_REPLAY.join(", ")})`,
+    sameSet(
+      executed,
+      NEVER_REPLAY.filter((s) => secondPass.some((r) => r.stage === s)).sort(),
+    ),
   );
   check(
     "every other stage of the second run is marked replayed",
-    secondPass.filter((r) => r.replayed_from).length === secondPass.length - 1,
+    secondPass.filter((r) => r.replayed_from).length ===
+      secondPass.length - executed.length,
   );
   check(
     "the milestone verdict is unchanged by replay",
@@ -1099,6 +1198,417 @@ check(
     );
   })(),
 );
+
+// ---------------------------------------------------------- 5b. the explainer
+//
+// The explainer is the reader-facing sibling of the report, and it is a bigger
+// honesty surface than the report is: it carries prose, figures and numbers
+// about a body of law. Everything below attacks the mechanisms that stop it
+// becoming a second place where numbers are typed by hand.
+process.stdout.write("\n-- the explainer --\n");
+{
+  const RENDER = resolve(HERE, "report/render-explainer.mjs");
+  const runRender = (dir, extra = []) =>
+    spawnSync("node", [RENDER, dir, ...extra], { encoding: "utf8" });
+
+  // A journal that describes a real-enough run, so the renderer gets past its
+  // preconditions and reaches the narrative.
+  const fixtureRun = () => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-explain-"));
+    const j = resolve(d, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "explainer-selftest",
+      milestone: "g1",
+      subject: FIXTURE_SUBJECT,
+      repo_head: "0000000",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      l4_binary: "/nonexistent",
+      declared_stages: ["p6-tests", "p9-report", "p9-explain"],
+      gated_stages: JSON.stringify({ HG1: ["p9-explain"], HG2: [] }),
+    });
+    append(j, base({ stage: "p6-tests", artifacts: [] }));
+    append(j, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    return d;
+  };
+
+  const d0 = fixtureRun();
+  const r0 = runRender(d0);
+  const rendered = r0.status === 0;
+  check(
+    "the explainer renders from a journal alone, with no build and no network",
+    rendered || (process.stdout.write(`     ${r0.stderr}\n`), false),
+  );
+
+  if (rendered) {
+    const md = readFileSync(resolve(d0, "explainer.md"), "utf8");
+    const summary = JSON.parse(
+      readFileSync(resolve(d0, "explainer.summary.json"), "utf8"),
+    );
+    check(
+      "an unreviewed narrative section renders a draft banner, and the header count matches the number of banners",
+      (() => {
+        const banners = (md.match(/\*\*DRAFT — claimed, not verified/g) ?? [])
+          .length;
+        return (
+          summary.draft_sections === banners &&
+          banners > 0 &&
+          md.includes(
+            `**${summary.draft_sections} of ${summary.sections} narrative sections in this document are AGENT-DRAFTED AND NOT REVIEWED.**`,
+          )
+        );
+      })(),
+    );
+    check(
+      "a projection with no receipt renders ABSENT with a stated reason, never omitted",
+      /\*\*ABSENT\.\*\*/.test(md) && md.includes("## Pictures"),
+    );
+    check(
+      "the never-searched section quotes the audit report's refusal rather than softening it",
+      md.includes(
+        "Nothing was searched, so nothing may be reported as searched",
+      ) && md.includes("no-action letters"),
+    );
+    check(
+      "the explainer never claims a hosted deployment",
+      !/jl4\.legalese\.com|dev\.jl4\.legalese\.com/.test(md),
+    );
+    check(
+      "every citation in the shipped narrative resolves against its source",
+      summary.citations_total > 0 && summary.citations_unresolved === 0,
+    );
+  }
+
+  // THE EQUALITY ORACLE for the duplicated journal fold (EXPLAINER-REPORT-SPEC
+  // §3.5). The duplication is defended by this test, not by care: if the two
+  // renderers ever disagree about one journal, two documents about the same run
+  // disagree, which is the exact failure the explainer exists to avoid.
+  //
+  // The fixture is chosen for the four cases the fold has to get right: a
+  // resumed stage (two rows, latest wins), a replayed receipt, a BROKEN row,
+  // and a stage_end written AFTER run_end.
+  // Distinctive sentinels. A bare word like "first" occurs in both documents'
+  // ordinary prose, which made this check pass for the wrong reason.
+  const SUPERSEDED = "SUPERSEDED-ROW-MUST-NOT-APPEAR";
+  const LATEST = "LATEST-ROW-IS-WHAT-BOTH-READ";
+  check(
+    "both renderers fold one journal the same way — verdict and per-stage status",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-fold-"));
+      const j = resolve(d, "journal.ndjson");
+      append(j, {
+        kind: "run_begin",
+        run_id: "fold-equality",
+        milestone: "g1",
+        subject: FIXTURE_SUBJECT,
+        repo_head: "0000000",
+        tree_state: "clean",
+        fixed_now: "2025-01-31T00:00:00Z",
+        l4_binary: "/nonexistent",
+        declared_stages: ["p6-tests", "p7-dmn", "p9-report", "p9-explain"],
+        gated_stages: JSON.stringify({ HG1: ["p9-explain"], HG2: [] }),
+      });
+      append(
+        j,
+        base({ stage: "p7-dmn", status: "DEGRADED", reason: SUPERSEDED }),
+      );
+      const replayed = append(
+        j,
+        base({ stage: "p7-dmn", status: "DEGRADED", reason: LATEST }),
+      );
+      append(
+        j,
+        base({
+          stage: "p7-dmn",
+          status: "DEGRADED",
+          reason: LATEST,
+          oracle: null,
+          replayed_from: replayed.hash,
+        }),
+      );
+      append(j, base({ stage: "p6-tests" }));
+      append(j, { kind: "run_end", verdict: "INCOMPLETE", exit: 1 });
+      // A stage_end AFTER run_end: a directly-invoked phase script writes one,
+      // and both folds must see it.
+      append(
+        j,
+        base({ stage: "p9-report", status: "BROKEN", reason: "after run_end" }),
+      );
+
+      const rep = spawnSync(
+        "node",
+        [resolve(HERE, "report/render-report.mjs"), d],
+        {
+          encoding: "utf8",
+        },
+      );
+      const exp = runRender(d);
+      if (rep.status !== 0 || exp.status !== 0) return false;
+      const repMd = readFileSync(resolve(d, "report.md"), "utf8");
+      const expMd = readFileSync(resolve(d, "explainer.md"), "utf8");
+      // The RECORDED verdict wins in both, over any recomputation.
+      const bothVerdict =
+        /verdict\s*\|\s*\*\*INCOMPLETE\*\*/.test(repMd) &&
+        /run verdict\s*\|\s*\*\*INCOMPLETE\*\*/.test(expMd);
+      // Latest row per stage: the earlier `first` reason must appear in
+      // NEITHER document, and the replayed row is what both read.
+      const bothLatest =
+        !repMd.includes(SUPERSEDED) &&
+        !expMd.includes(SUPERSEDED) &&
+        repMd.includes(LATEST) &&
+        expMd.includes(LATEST);
+      // The record count and chain state agree.
+      const bothChain =
+        repMd.includes("chain verifies") && expMd.includes("chain verifies");
+      return bothVerdict && bothLatest && bothChain;
+    })(),
+  );
+
+  // The template gets the SAME digit check the audit report's template gets,
+  // and it needs its own: the CI leg that exercises the report's check names
+  // render-report.mjs by path, so a sibling template gets no coverage from it.
+  check(
+    "the explainer template carries no transcribed measurement",
+    (() => {
+      const t = readFileSync(
+        resolve(HERE, "report/explainer-template.md"),
+        "utf8",
+      );
+      const scrubbed = t
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/```[\s\S]*?```/g, "")
+        .replace(/\{\{[^}]*\}\}/g, "")
+        .replace(/\b17 CFR Part 227\b/g, "")
+        .replace(/§ ?\d+(\.\d+)*/g, "");
+      return !/\d{2,}/.test(scrubbed);
+    })(),
+  );
+  check(
+    "the explainer refuses a journal with no run_begin",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-noexpbegin-"));
+      writeFileSync(resolve(d, "journal.ndjson"), "");
+      const r = runRender(d);
+      return r.status === 4 && /no run_begin/.test(r.stderr);
+    })(),
+  );
+  check(
+    "the explainer prints a chain failure rather than refusing to render",
+    (() => {
+      const d = fixtureRun();
+      const j = resolve(d, "journal.ndjson");
+      const lines = readFileSync(j, "utf8").trim().split("\n");
+      const rec = JSON.parse(lines[1]);
+      // A hand edit, exactly what the chain exists to expose. It must CHANGE
+      // something: base() already writes PASS with a null reason, and setting a
+      // field to the value it already has leaves the canonical hash intact,
+      // which made this check pass over a journal that still verified.
+      rec.status = "DEGRADED";
+      rec.reason = "laundered by hand";
+      lines[1] = JSON.stringify(rec);
+      writeFileSync(j, lines.join("\n") + "\n");
+      const r = runRender(d);
+      if (r.status !== 0) return false;
+      const md = readFileSync(resolve(d, "explainer.md"), "utf8");
+      return /\*\*DOES NOT VERIFY\*\*/.test(md);
+    })(),
+  );
+
+  // --- the narrative lint and the citation checker, attacked directly -------
+  check(
+    "a bare digit-run in narrative prose is a lint finding",
+    lintNarrative("The ceiling is 5000000 dollars.").some(
+      (f) => f.code === "N-DIGIT",
+    ) &&
+      lintNarrative(
+        "The ceiling is [$5,000,000](src:x/y.l4#L1) dollars, under Rule 100(a)(1).",
+      ).length === 0,
+  );
+  check(
+    "a reserved run-status word in narrative prose is a lint finding",
+    lintNarrative("Every assertion is a PASS.").some(
+      (f) => f.code === "N-STATUS",
+    ) &&
+      lintNarrative("the milestone is COMPLETE").some(
+        (f) => f.code === "N-STATUS",
+      ) &&
+      lintNarrative("the run passed and the corpus is complete").length === 0,
+  );
+  check(
+    "a markdown construct outside the subset is a lint finding at its line",
+    (() => {
+      const codes = (t) => lintMarkdown(t).map((f) => f.code);
+      return (
+        codes("[ref]: https://example.com").includes("MD-REFLINK") &&
+        codes("text\n<!-- hidden -->").includes("MD-COMMENT") &&
+        codes("![a](b.png)").includes("MD-IMAGE") &&
+        codes("<script>x</script>").includes("MD-HTML") &&
+        codes("> a\n> > b").includes("MD-NESTEDQUOTE") &&
+        codes("##### too deep").includes("MD-HEADING-DEPTH") &&
+        lintMarkdown("# fine\n\n- a\n- b\n\n| x |\n| - |\n| 1 |\n").length === 0
+      );
+    })(),
+  );
+  check(
+    "a citation whose figure is not at the cited line does not resolve",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-cite-"));
+      writeFileSync(resolve(d, "src.txt"), "line one\nthe answer is 42\n");
+      const ctx = {
+        resolveSrc: (p) => (existsSync(resolve(d, p)) ? resolve(d, p) : null),
+        resolveArt: () => null,
+      };
+      const good = resolveCitations("[42](src:src.txt#L2)", ctx);
+      const bad = resolveCitations("[43](src:src.txt#L2)", ctx);
+      const gone = resolveCitations("[42](src:nope.txt#L2)", ctx);
+      const art = resolveCitations("[42](art:nothing.dmn#L1)", ctx);
+      return (
+        good.findings.length === 0 &&
+        !/CITATION DOES NOT RESOLVE/.test(good.text) &&
+        bad.findings.length === 1 &&
+        /CITATION DOES NOT RESOLVE/.test(bad.text) &&
+        gone.findings[0]?.code === "C-MISSING" &&
+        art.findings[0]?.code === "C-ARTIFACT-UNKNOWN"
+      );
+    })(),
+  );
+  check(
+    "an unchecked citation is counted, and its reason is rendered",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-unchecked-"));
+      writeFileSync(resolve(d, "src.txt"), "nothing numeric here\n");
+      const out = resolveCitations(
+        '[1340 cases](src:src.txt#L1 "unchecked: reported by the leg, not by this line")',
+        {
+          resolveSrc: (p) => resolve(d, p),
+          resolveArt: () => null,
+        },
+      );
+      return (
+        out.unchecked === 1 &&
+        out.findings.length === 0 &&
+        /reported by the leg/.test(out.text)
+      );
+    })(),
+  );
+  check(
+    "the HTML carrier escapes quotes in attribute contexts",
+    // render-report.mjs's escapeHtml deliberately does NOT escape quotes, which
+    // is safe there because it only ever writes text nodes. Copying it into an
+    // attribute context is an injection bug; this is the guard.
+    escapeAttr(`a" onload="x`) === "a&quot; onload=&quot;x" &&
+      mdToHtml('[t](https://e.com "plain")').includes('title="plain"'),
+  );
+  check(
+    "a raw block reaches the HTML verbatim and its markdown twin does not leak a sentinel",
+    (() => {
+      const html = mdToHtml(`para\n\n${rawToken("k")}\n`, {
+        raw: { k: "<figure>X</figure>" },
+      });
+      const missing = mdToHtml(`${rawToken("absent")}\n`, { raw: {} });
+      return (
+        html.includes("<figure>X</figure>") &&
+        missing.includes("MISSING RAW BLOCK")
+      );
+    })(),
+  );
+  check(
+    "a narrative deposit whose manifest names a missing file is refused, not rendered",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-badman-"));
+      writeFileSync(
+        resolve(d, "manifest.json"),
+        JSON.stringify({
+          explainer_schema: 1,
+          title: "t",
+          spine: {
+            orientation: { file: "nope.md" },
+            body: [],
+            pictures: { declined: "no figures" },
+            time: { declined: "no dates" },
+            limits: { declined: "none" },
+            sweep: { declined: "none" },
+            call_to_action: { declined: "none" },
+          },
+        }),
+      );
+      const { problems } = loadManifest(d);
+      return problems.some((p) => p.includes("nope.md"));
+    })(),
+  );
+  check(
+    "a spine slot declined without a reason is a schema error, not a silent decline",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-nodecline-"));
+      writeFileSync(
+        resolve(d, "manifest.json"),
+        JSON.stringify({
+          explainer_schema: 1,
+          title: "t",
+          spine: {
+            orientation: { declined: null },
+            body: [],
+            pictures: { declined: "x" },
+            time: { declined: "x" },
+            limits: { declined: "x" },
+            sweep: { declined: "x" },
+            call_to_action: { declined: "x" },
+          },
+        }),
+      );
+      return loadManifest(d).problems.some((p) =>
+        p.includes("declined must be a non-empty reason"),
+      );
+    })(),
+  );
+  check(
+    "narrative drift, source drift and review drift are each detected",
+    (() => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-drift-"));
+      writeFileSync(resolve(d, "a.md"), "hello\n");
+      writeFileSync(resolve(d, "srcfile"), "source\n");
+      const fileSha = hashOf(resolve(d, "a.md"));
+      const srcSha = hashOf(resolve(d, "srcfile"));
+      const rec = (over = {}) => ({
+        file: "a.md",
+        sha256: fileSha,
+        drafted_from: [{ path: "srcfile", sha256: srcSha }],
+        review: { state: "unreviewed" },
+        ...over,
+      });
+      const clean = driftFor(rec(), { repoRoot: d, dir: d });
+      const narrativeMoved = driftFor(rec({ sha256: "sha256:different" }), {
+        repoRoot: d,
+        dir: d,
+      });
+      const sourceMoved = driftFor(
+        rec({
+          drafted_from: [{ path: "srcfile", sha256: "sha256:different" }],
+        }),
+        { repoRoot: d, dir: d },
+      );
+      const reviewStale = driftFor(
+        rec({
+          review: {
+            state: "reviewed",
+            reviewed_sha256: "sha256:different",
+            reviewed_sources: [],
+          },
+        }),
+        { repoRoot: d, dir: d },
+      );
+      return (
+        !clean.narrative &&
+        clean.sources.length === 0 &&
+        clean.state === "unreviewed" &&
+        narrativeMoved.narrative?.kind === "changed" &&
+        sourceMoved.sources.length === 1 &&
+        reviewStale.state === "stale"
+      );
+    })(),
+  );
+}
 
 // ===== BEGIN denovo-diff-oracle checks (owner: denovo-diff agent) ===========
 //

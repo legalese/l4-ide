@@ -209,6 +209,7 @@ jobs:
           etc/go/go.sh plan --milestone g1 | tee /tmp/plan.txt
           grep -q 'p0-preflight' /tmp/plan.txt
           grep -q 'entry points that exist and refuse' /tmp/plan.txt
+          grep -q 'p9-explain' /tmp/plan.txt
           etc/go/go.sh plan --milestone g2 | tee /tmp/plan-g2.txt
           grep -q 'p1-ingest' /tmp/plan-g2.txt
           grep -q 'NOT WIRED' /tmp/plan-g2.txt
@@ -276,6 +277,77 @@ jobs:
             exit 1
           }
           echo "ok the template contains no literal measurement, and the renderer refuses a runless journal"
+
+      # The SAME check for the explainer's template, and it needs its own step:
+      # the leg above names render-report.mjs by path, so a sibling template
+      # gets no coverage from it. Same two assertions, for the same reason —
+      # the second proves the digit check was actually reached.
+      - name: The explainer template carries no transcribed measurement
+        run: |
+          mkdir -p /tmp/empty-run
+          printf '' > /tmp/empty-run/journal.ndjson
+          out=$(node etc/go/report/render-explainer.mjs /tmp/empty-run 2>&1) || true
+          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
+          echo "$out" | grep -q 'no run_begin' || {
+            echo "::error::expected the explainer renderer to get past the template check and refuse the empty journal; it said: $out"
+            exit 1
+          }
+          echo "ok the explainer template contains no literal measurement, and the renderer refuses a runless journal"
+
+      # Every figure in the shipped narrative must still resolve against the
+      # source line it cites. This is the check that stops the explainer from
+      # becoming a second place where numbers are typed: it re-reads every cited
+      # line, and it goes red when the corpus moves underneath the prose.
+      - name: Every citation in the shipped narrative resolves
+        run: |
+          node - <<'EOF'
+          import("./etc/go/lib/narrative.mjs").then(async (n) => {
+            const { readFileSync, readdirSync, existsSync } = await import("node:fs");
+            const { resolve } = await import("node:path");
+            let total = 0, unresolved = 0, lint = 0;
+            for (const sub of readdirSync("etc/go/subjects")) {
+              const dir = resolve("etc/go/subjects", sub, "explainer");
+              if (!existsSync(dir)) continue;
+              for (const f of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
+                const text = readFileSync(resolve(dir, f), "utf8");
+                for (const p of n.lintNarrative(text)) {
+                  lint++;
+                  console.log(`::error file=${dir}/${f},line=${p.line}::[${p.code}] ${p.message}`);
+                }
+                const r = n.resolveCitations(text, {
+                  resolveSrc: (p) => (existsSync(resolve(p)) ? resolve(p) : null),
+                  resolveArt: () => null,
+                });
+                total += r.total;
+                for (const c of r.findings) {
+                  // An `art:` citation names a RUN artifact and cannot resolve
+                  // outside a run; everything else must.
+                  if (c.code === "C-ARTIFACT-UNKNOWN") continue;
+                  unresolved++;
+                  console.log(`::error file=${dir}/${f}::[${c.code}] ${c.target} — ${c.detail}`);
+                }
+              }
+            }
+            console.log(`narrative: ${total} citation(s) checked, ${unresolved} unresolved, ${lint} lint finding(s)`);
+            process.exit(unresolved + lint === 0 ? 0 : 1);
+          });
+          EOF
+
+      # Provenance drift is a PROMPT TO RE-READ, not a defect, so this warns and
+      # does not block. The blocking check is the one above: a source that moved
+      # far enough to break a citation fails the build. A source that moved
+      # without breaking one means somebody should re-read the paragraph, and
+      # making that fatal would block every unrelated corpus PR and teach people
+      # to re-bless without reading — which is the one thing the provenance
+      # record exists to prevent.
+      - name: Narrative provenance is in step with its sources
+        run: |
+          for s in $(node etc/go/lib/subject.mjs --list); do
+            out=$(node etc/go/lib/narrative-provenance.mjs "$s" --check 2>&1) || true
+            echo "$out"
+            echo "$out" | grep -qE 'drifted, 0 narrative' && continue
+            echo "::warning::narrative provenance for '$s' has drifted; re-read the affected sections, then: node etc/go/lib/narrative-provenance.mjs $s --bless"
+          done
 
   bpmn:
     name: BPMN Soundness
