@@ -13,15 +13,37 @@
 #
 # Fix: this workflow runs ON main (the default branch), so anything it saves
 # lands in main's cache scope — the one scope merge_group CAN read. It checks
-# out `unstable`, builds unstable's dependency set, and saves the cabal store
-# under a dedicated `mq-warmup-` key prefix. pr-checks.yml adds that prefix as a
-# restore-key ONLY on the merge_group path, so merge_group runs get a warm store
-# while pull_request-into-main runs never match it (they keep restoring the
-# `pr-checks-` namespace only) — main PRs are completely unaffected.
+# out `unstable`, builds unstable's dependency set AND its dist-newstyle, and
+# saves both under a dedicated `mq-warmup-` key prefix. pr-checks.yml adds that
+# prefix as a restore-key ONLY on the merge_group path, so merge_group runs get
+# a warm store while pull_request-into-main runs never match it (they keep
+# restoring the `pr-checks-` namespace only) — main PRs are completely
+# unaffected.
 #
-# This is a probe/first cut: it warms only the cabal STORE (the ~20 min pain),
-# not dist-newstyle build artifacts. If it demonstrably lands merge_group cache
-# hits, extend it to dist too.
+# ############################################################################
+# # THIS FILE IS INERT UNLESS IT IS ON THE DEFAULT BRANCH (main).            #
+# ############################################################################
+#
+# `schedule` and `workflow_dispatch` both fire only from the default branch. A
+# copy living on `unstable` alone never runs — not on cron, not manually, and it
+# does not even appear in `gh workflow list`. That is not hypothetical: this file
+# was deleted from main on 2026-07-13 by #112 ("Revert mengwong's direct-to-main
+# changes pending review" — a blanket revert, not a decision about caching), and
+# the cron has not fired since. The dependency half kept working purely by luck,
+# on a frozen 24-day-old store that still happened to satisfy the plan. So when
+# you change this file, land the change on `main` too, or it changes nothing.
+# `pr-checks.yml`'s "The merge-queue warm cache must be fresh" step exists to
+# say so out loud when this goes stale again.
+#
+# The original version of this file warmed only the cabal STORE and said: "This
+# is a probe/first cut … If it demonstrably lands merge_group cache hits, extend
+# it to dist too." It did land them — `Cache hit for restore-key:
+# mq-warmup-Linux-ghc-9.10.2-cabal-…` on 10/10 merge_group runs measured
+# 2026-08-01/02, with `Install dependencies` down to 0.4 s and "Up to date" — so
+# this is that extension. dist-newstyle was the remaining ~8 min: those same ten
+# runs all logged `Cache not found for input keys:
+# pr-checks-Linux-ghc-9.10.2-dist-…` and spent 382-522 s in `cabal build all`,
+# against 16-19 s for the pull_request and push runs that could read it.
 name: Merge-queue cache warm-up
 
 on:
@@ -51,6 +73,14 @@ jobs:
     steps:
       - name: Update repositories
         run: apt update
+      # Keep this list IDENTICAL to the Haskell job's in pr-checks.yml, and in
+      # particular keep `zstd` out of BOTH. `actions/cache` derives a cache
+      # *version* from the paths AND the compression method, and matches on
+      # key+version — a container with zstd writes `cache.tzst`, one without
+      # writes `cache.tgz`, and the two never see each other's entries however
+      # well the keys line up. The mlir job in pr-checks.yml runs on the bare
+      # host, which HAS zstd, and that is precisely why it has never once hit
+      # these caches despite asking for the right prefix.
       - name: Install deps
         run: >
           apt install -y
@@ -101,35 +131,69 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/*.cabal', 'cabal.project') }}
           restore-keys: ${{ env.key }}-
 
+      # Same idea for the first-party build artifacts. The key mirrors the
+      # `pr-checks-*-dist-*` key exactly — `hashFiles('**/*.hs', '**/*.cabal')`
+      # — so a merge_group run whose queued PR touches no Haskell gets an
+      # equivalent of an exact hit off the prefix, and one that does touch
+      # Haskell gets the same incremental base a pull_request run gets.
+      - name: Restore warm dist-newstyle
+        uses: actions/cache/restore@v5
+        id: warm-dist
+        env:
+          key: mq-warmup-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist
+        with:
+          path: dist-newstyle
+          key: ${{ env.key }}-${{ hashFiles('**/*.hs', '**/*.cabal') }}
+          restore-keys: ${{ env.key }}-
+
       - name: Configure the build
         run: |
           cabal update
           cabal configure --enable-tests --disable-documentation
           cabal build all --dry-run
 
-      - name: Install dependencies
-        if: steps.warm-cache.outputs.cache-hit != 'true'
-        run: cabal build all --only-dependencies
+      # `cabal build all`, not `--only-dependencies`: warming dist-newstyle means
+      # compiling the first-party packages too, which is the whole point of the
+      # extension. It is a superset of what the old dependency-only step did, so
+      # a cabal-store miss is still covered. Tests are enabled by the configure
+      # above, so the test components are built here as well — those are what
+      # `cabal test all` in pr-checks.yml would otherwise rebuild.
+      #
+      # This makes a cron run cost a full build (~15-20 min) whenever unstable's
+      # sources changed, instead of only when its dependencies changed. That is
+      # the trade being bought: one background build against ~8 min off every
+      # queued PR. If unstable is quiet, both restores hit exactly and the step
+      # is skipped entirely.
+      - name: Build unstable's dependency set and build artifacts
+        if: steps.warm-cache.outputs.cache-hit != 'true' || steps.warm-dist.outputs.cache-hit != 'true'
+        run: cabal build all
 
       # Trim superseded mq-warmup-* entries BEFORE saving the fresh one, so this
       # family self-limits to a single entry and never pressures the 10 GB cap.
       # It matches ONLY the mq-warmup- prefix, so it can never touch the
       # pr-checks-* caches that PRs and pushes depend on.
       - name: Prune superseded warm caches
-        if: steps.warm-cache.outputs.cache-hit != 'true'
+        if: steps.warm-cache.outputs.cache-hit != 'true' || steps.warm-dist.outputs.cache-hit != 'true'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
-            const prefix = `mq-warmup-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-`;
-            const keep = '${{ steps.warm-cache.outputs.cache-primary-key }}';
+            const base = `mq-warmup-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-`;
+            const prefixes = [`${base}cabal-`, `${base}dist-`];
+            // Never delete THIS run's primary keys: on an exact hit the matching
+            // Save step is skipped, so pruning it would throw away a good cache
+            // — and each family is pruned even when only the OTHER one missed.
+            const keep = new Set([
+              '${{ steps.warm-cache.outputs.cache-primary-key }}',
+              '${{ steps.warm-dist.outputs.cache-primary-key }}',
+            ]);
             const caches = await github.paginate(
               github.rest.actions.getActionsCacheList,
               { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 },
             );
             let freed = 0;
             for (const c of caches) {
-              if (c.key.startsWith(prefix) && c.key !== keep) {
+              if (prefixes.some((p) => c.key.startsWith(p)) && !keep.has(c.key)) {
                 core.info(`Deleting superseded warm cache ${c.key} (${Math.round(c.size_in_bytes / 1048576)} MB, ref ${c.ref})`);
                 try {
                   await github.rest.actions.deleteActionsCacheById({
@@ -149,3 +213,13 @@ jobs:
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.warm-cache.outputs.cache-primary-key }}
+
+      # ~356 MB, measured off the equivalent pr-checks-*-dist-* entry. Both
+      # families are single-entry by construction (the prune above), so this
+      # workflow's whole footprint is ~500 MB of the repo's 10 GB cap.
+      - name: Save warm dist-newstyle
+        uses: actions/cache/save@v5
+        if: steps.warm-dist.outputs.cache-hit != 'true'
+        with:
+          path: dist-newstyle
+          key: ${{ steps.warm-dist.outputs.cache-primary-key }}
