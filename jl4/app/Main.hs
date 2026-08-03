@@ -81,7 +81,11 @@ commandParser =
              (progDesc "Dump the parsed AST of an L4 file"))
       <> command "batch"
            (info (CmdBatch <$> batchOptionsParser)
-             (progDesc "Evaluate an @export function against many input rows (NDJSON streaming)"))
+             -- "NDJSON" here is the OUTPUT default (--output-format); the input
+             -- side reads json|yaml|csv and has no ndjson reader. The summary
+             -- used to say just "NDJSON streaming", which read as if
+             -- `--input-format ndjson` were available (smucclaw/l4-ide#932).
+             (progDesc "Evaluate an @export function against many input rows (json|yaml|csv in, NDJSON streaming out)"))
       <> command "trace"
            (info (CmdTrace <$> traceOptionsParser)
              (progDesc "Render #EVALTRACE evaluation traces as GraphViz (dot|png|svg)"))

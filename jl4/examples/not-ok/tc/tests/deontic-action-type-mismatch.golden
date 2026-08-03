@@ -26,8 +26,8 @@ File: deontic-action-type-mismatch.l4
   Message:
     The type of this definition must match its type signature at deontic-action-type-mismatch.l4:28:8-38, namely
 
-      DEONTIC OF Party, Action OF Court
+      DEONTIC OF Party, (Action OF Court)
 
     but is here of type
 
-      DEONTIC OF Party, Action OF Landlord
+      DEONTIC OF Party, (Action OF Landlord)

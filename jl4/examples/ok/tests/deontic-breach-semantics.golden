@@ -34,19 +34,13 @@ deontic-breach-semantics.l4:79:1-80:21:
   DEONTIC BREACHED:
     BREACH
     BY Alice
-    BECAUSE "missed payment" OR PARTY Bob
-  MUST deliver
-  WITHIN 3
-  HENCE FULFILLED
+    BECAUSE "missed payment" OR PARTY Bob MUST deliver WITHIN 3 HENCE FULFILLED
 deontic-breach-semantics.l4:94:1-95:30:
   FULFILLED
 deontic-breach-semantics.l4:105:1-106:30:
   FULFILLED
 deontic-breach-semantics.l4:117:1-118:30:
-  PARTY Alice
-  MUST pay 2
-  WITHIN 3
-  HENCE FULFILLED
+  PARTY Alice MUST pay 2 WITHIN 3 HENCE FULFILLED
 deontic-breach-semantics.l4:130:1-133:31:
   FULFILLED
 deontic-breach-semantics.l4:143:1-144:30:
@@ -54,10 +48,7 @@ deontic-breach-semantics.l4:143:1-144:30:
 deontic-breach-semantics.l4:156:1-157:32:
   FULFILLED
 deontic-breach-semantics.l4:160:1-161:19:
-  PARTY Alice
-  MUST pay 100
-  WITHIN 0
-  HENCE FULFILLED
+  PARTY Alice MUST pay 100 WITHIN 0 HENCE FULFILLED
 deontic-breach-semantics.l4:164:1-165:19:
   DEONTIC BREACHED:
     party
@@ -93,15 +84,8 @@ deontic-breach-semantics.l4:190:1-191:33:
 deontic-breach-semantics.l4:211:1-212:31:
   FULFILLED
 deontic-breach-semantics.l4:216:1-217:33:
-  PARTY Bob
-  MUST deliver
-  WITHIN 10
-  HENCE FULFILLED
+  PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED
 deontic-breach-semantics.l4:225:1-226:19:
   FULFILLED
 deontic-breach-semantics.l4:245:1-246:30:
-  PARTY Alice
-  MUST pay 1
-  WITHIN 0 MINUS 1
-  HENCE FULFILLED
-  LEST `recursive lest`
+  PARTY Alice MUST pay 1 WITHIN (0 MINUS 1) HENCE FULFILLED LEST `recursive lest`

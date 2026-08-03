@@ -2,7 +2,7 @@ Parsing successful
 Typechecking successful
 Evaluation successful
 cross-section-qualified.l4:60:1-13:
-  Verdict (qualified at section Section A)
+  `Section A`.Verdict
 cross-section-qualified.l4:61:1-12:
   BOOLEAN
 cross-section-qualified.l4:62:1-17:

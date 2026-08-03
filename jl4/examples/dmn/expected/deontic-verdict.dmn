@@ -165,7 +165,7 @@
       <requiredInput href="#input_trigger"/>
     </informationRequirement>
     <literalExpression id="decision_joint_duty_literal">
-      <text>IF trigger THEN (PARTY IssuerMUST `file jointly`WITHIN 5 RAND PARTY IssuerMUST `notify investors`WITHIN 5) ELSE FULFILLED</text>
+      <text>IF trigger THEN ((PARTY Issuer MUST `file jointly` WITHIN 5) RAND (PARTY Issuer MUST `notify investors` WITHIN 5)) ELSE FULFILLED</text>
     </literalExpression>
   </decision>
   <decision id="decision_invoked_joint_duty" name="invoked_joint_duty" label="invoked joint duty">
