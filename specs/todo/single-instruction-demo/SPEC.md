@@ -426,7 +426,9 @@ elsewhere should say "SI-Rn".
   ShareAlike ever reaching the encodings. The open-core → freemium-enrichment pathway stays
   open by construction. Nothing in R1 remains open; **creating** `legalese/canon` is a
   distinct outward-facing act and is HG2's, per §7.3 — the ruling names the repo, it does not
-  create it.
+  create it. **Update 2026-08-03: it has since been created** — public, holding
+  `subjects/README.md` and zero subjects. Creating it was the HG2 act; **depositing** a subject
+  is a further one, and remains blocked. See R8 for how a contributor's work reaches it.
 - **R2 — lexipedia compatibility**: **ANSWERED 2026-08-02 (Meng), as a three-step pathway:**
   **probe now** (read-only: their DokuWiki format, contribution route, licensing — measured
   2026-08-02: the site is CC BY-SA 4.0, so a comparison note must be written in our own words
@@ -474,6 +476,36 @@ elsewhere should say "SI-Rn".
   verification pass caught it. Nothing blocks G2 on this axis.
 - **R7 — report versioning**: one report per run, versioned by run date + source retrieval
   date, or a living document? Proposal: per-run, immutable, latest linked.
+- **R8 — how contributors get work INTO `legalese/canon`**: **ANSWERED 2026-08-03 (Meng),
+  PROVISIONALLY — and the provisionality is the ruling's most important clause.** Contributors
+  work in a **fork** and open a **pull request**; canon's own branches are not per-contributor.
+  Meng first proposed a per-user branch (`legalese/<github-username>`, e.g. an `aswathy`
+  branch) and then observed that a fork already does that job. It does, and it does it better
+  on the dimension that matters here: a per-user branch requires granting **write access to
+  canon** to everyone who wants to contribute, whereas a fork requires granting nothing at all.
+  For a corpus whose whole proposition is that outward-facing writes are gated, handing out
+  write bits to obtain per-user isolation would trade away the property the gate exists to
+  protect.
+
+  **The cost is named rather than wished away: somebody has to merge the PRs, and that is
+  unenviable work.** It is a real, recurring, human cost, and it scales with adoption — which
+  is to say it gets worse precisely when things go well. This ruling accepts it as the price of
+  the simplest thing that works today.
+
+  **Standing instruction: this yields.** Thomas has a better model in mind. When it arrives it
+  supersedes this ruling without further argument, and R8 should be rewritten rather than
+  defended. Nothing downstream may assume fork-and-PR is permanent; in particular, do not build
+  tooling that hard-codes it where a seam would do.
+
+  **One consequence that falls out of the gate design and must not be discovered during a
+  merge.** An HG1 signature is a detached signature **over a digest of the reviewed content**.
+  So a maintainer who edits a contributor's encoding while merging — a rebase that touches
+  content, a conflict resolved by hand, a lint fix, a reformat — **invalidates that
+  contributor's signature**, and the subject arrives in canon signed by nobody. The merge
+  workflow must therefore be **content-preserving**, or the signature must be re-obtained from
+  the contributor after the edit. This is not a policy we chose; it is what "binds to content,
+  not to a moment" means when the content moves. Whatever supersedes R8 inherits this
+  constraint.
 
 ---
 
