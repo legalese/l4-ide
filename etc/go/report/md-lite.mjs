@@ -116,6 +116,20 @@ export function lintMarkdown(text) {
         code: "MD-HEADING-DEPTH",
         message: "heading below level four",
       });
+    // Two adjacent backticks outside a fence. In the subset a code span is
+    // delimited by ONE backtick, so `` is either a double-backtick span (which
+    // this renderer does not carry) or a span that closed where the writer
+    // meant it to keep going. Either way inline() mangles it silently rather
+    // than failing: MEASURED on a rendered explainer, where a narrative line
+    // reading `"(1)" ... transfer's `to the issuer of the securities`` drew as
+    // an unstyled sentence with a bare pair of backticks trailing it.
+    if (/``/.test(line))
+      out.push({
+        line: n,
+        code: "MD-BACKTICK",
+        message:
+          "two adjacent backticks; a code span in this subset takes one backtick and cannot nest, so quote the excerpt in a fenced block instead",
+      });
     if (/^\s*<[a-zA-Z/]/.test(line) && !HTML_WHITELIST.test(line.trim()))
       out.push({
         line: n,
@@ -146,6 +160,17 @@ export function lintMarkdown(text) {
  * Inline rendering. Code spans and links are lifted out FIRST so that escaping
  * cannot corrupt a URL and emphasis cannot fire inside a code span; the rest is
  * escaped as a text node and only then given emphasis.
+ *
+ * HOLDS NEST, SO THE RESTORE MUST ITERATE. A link whose text is a code span —
+ * [`report.md`](report.md), which is exactly how this renderer writes the
+ * pointer to the audit report — holds the code span first and then holds the
+ * whole anchor, whose body still carries the inner sentinel. A single-pass
+ * restore therefore emitted an anchor whose text was two NUL bytes around a
+ * stray digit: a browser draws that as the bare character `0`, and it made the
+ * whole file read as binary to grep. MEASURED in the explainer of run
+ * 2026-08-03-3f45e62b-002, before this loop existed. Restoring to a FIXED POINT
+ * is what makes the nesting safe, and it terminates because a held entry can
+ * only refer to holds taken before it.
  */
 function inline(src) {
   const held = [];
@@ -167,7 +192,8 @@ function inline(src) {
   s = escapeText(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[\s(])_([^_]+)_(?=$|[\s).,;:!?])/g, "$1<em>$2</em>");
-  s = s.replace(/\u0000(\d+)\u0000/g, (_, i) => held[Number(i)]);
+  for (let pass = 0; pass <= held.length && /\u0000\d+\u0000/.test(s); pass++)
+    s = s.replace(/\u0000(\d+)\u0000/g, (_, i) => held[Number(i)] ?? "");
   return s;
 }
 

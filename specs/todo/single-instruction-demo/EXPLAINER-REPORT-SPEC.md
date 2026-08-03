@@ -15,6 +15,17 @@ document is honest in practice and the mechanism is not yet closed. (2) **E14's
 diagram-interchange serializer**, deferred by this spec to v1 (§8.4). (3) The g2 declaration
 (§3.7), deliberately. Everything else below describes behaviour measured against the tree._
 
+_**First proved end to end on 2026-08-03.** A real `g1` run of subject `regcf` —
+`2026-08-03-3f45e62b-004`, HG1 waived on the record, verdict `COMPLETE` — rendered the document from
+its own journal: 21 narrative sections, 45 citations with 0 unchecked and 0 unresolved, 0 deposit
+findings, all 8 spine slots present, 1 slot rendered `ABSENT` with its reason, 9 figures inlined
+(6 ladder + 3 state machines). `p9-explain` reports `DEGRADED`, which is the correct state while no
+signer is enrolled. Four reader-visible defects were found by looking at the rendered HTML rather
+than at the renderer, and are fixed: a nested code-span-inside-link left two NUL bytes in the
+anchor text (§7.2), three inlined GraphViz pictures collided on `graph0`/`node1`/`edge1` (§8.2), a
+narrative line with nested backticks drew its backticks as text (§7.2), and the deployment
+subsection printed a tool COUNT under the label "Tools the deployment reported" (§9)._
+
 _**One deviation from the text below**, recorded where it was made rather than left to be
 discovered: §6.2's "verbatim" check compares the quotation and the cited window with leading `--`
 comment markers dropped and whitespace runs collapsed, on both sides. A sentence in the corpus is
@@ -835,7 +846,18 @@ passthrough restricted to a **whitelist of exactly `<figure>`, `<figcaption>`, `
 and links, which must use one of the schemes in §6.2 or be an external `https:` URL.
 
 Anything outside the subset — reference links, setext headings, HTML comments, images with a
-non-repo path, nested block quotes, footnotes — is **rejected by the lint** (§6.3) at file:line.
+non-repo path, nested block quotes, footnotes, and **two adjacent backticks** — is **rejected by the
+lint** (§6.3) at file:line.
+
+`MD-BACKTICK` was added on 2026-08-03 because the "rejected rather than mangled" property above was
+being asserted and not held. A code span in this subset takes one backtick and cannot nest, so a
+narrative line reading `` `"(1)" ... transfer's `to the issuer of the securities`` ``closed the
+span at the inner backtick and drew the remainder — including a bare pair of backticks — as ordinary
+sentence text. MEASURED in the rendered explainer of run`2026-08-03-3f45e62b-002`. The narrative was
+repaired to quote the excerpt in a fenced block; the lint is what stops the next one being silent.
+The check deliberately fires on the two-backtick sequence rather than on backtick PARITY, because a
+code span **wrapped across two source lines** is legal — `mdToHtml` joins a paragraph's lines before
+rendering it, and two Reg CF narrative files rely on that.
 
 #### Why a lint rather than a tolerant renderer
 
@@ -943,6 +965,23 @@ one-directional, §8.1); a committed LTS render would have none at all, and a co
 silently stops matching its source is worse than an absent one. That is the ruling's whole basis,
 and building a drift guard is what would overturn it.
 
+#### The identifier collision, found by inlining them for the first time
+
+The first branch above was unexercised until run `2026-08-03-3f45e62b-002`, which had `dot` on PATH
+and inlined all three. `dot` numbers its nodes and edges from one **per file**, so each graph
+defines `graph0`, `node1`, `edge1` and so on; an `<svg>` element is not an identifier scope, so all
+three landed in one document namespace — MEASURED: 27 definitions of 9 names, against 31 distinct
+ids in the whole page. Nothing referenced them, so nothing drew wrong, but a DOT using a gradient or
+a clip path emits `url(#…)` and the first definition would then win for every picture.
+
+**So the renderer prefixes each LTS figure's identifiers with that figure's own key, in the HTML
+carrier only**, and the subsection says so in its own prose with the count. The `.svg` and `.dot`
+artifacts on disk are untouched. This is consistent with §8.1 rather than an exception to it: the
+ladder subsection tells the reader its figures are inlined byte for byte, and the ladder exporter
+emits **no `id` at all** (MEASURED: zero across all six committed figures), so a ladder figure is
+never rewritten. The LTS caption claims only that the picture was rendered from the emitted DOT by
+the local `dot`, which stays true.
+
 #### What this ruling costs
 
 Meng's brief asks for "an LTS visualisation of key processes". On a machine without graphviz the
@@ -1049,6 +1088,17 @@ corpus is deployed. It renders at two levels:
   `**ABSENT.** No deployment was reached in this run, so no tool list is reported. Deploying to a host other people can reach is outward-facing and is gated (HG2); this document therefore describes how to run it on your own machine and claims nothing about a hosted service.`
 
 It must **never** name `jl4.legalese.com` or `dev.jl4.legalese.com`.
+
+**Correction, 2026-08-03: "the measured tool list" above is not available from the receipt, and the
+first branch printed a count under that label.** The `p7-mcp` receipt of run
+`2026-08-03-3f45e62b-002` carries `tools=10`, `corpus_tools=6`, `functions=6` and **no metric holding
+the names** — the names are printed only into that leg's log artifact. The renderer read
+`metrics.tools` and rendered `Tools the deployment reported: \`10\``, which labelled a number as a
+list and used the total where the leg's own reason is careful to say the module contributed 6 and
+the remaining 4 are jl4-service's generic file-browsing tools. It now prints both counts, labelled
+as counts, and says where the names live. Recovering the names would mean either scraping that log
+or adding a `tool_names`metric to`p7-mcp.sh`; the second is the right fix and is not made here,
+because `p7-mcp.sh` is outside this build's blast radius (D2's neighbouring discipline).
 
 ### Three named traps the CTA must route around
 

@@ -1446,6 +1446,14 @@ process.stdout.write("\n-- the explainer --\n");
         codes("<script>x</script>").includes("MD-HTML") &&
         codes("> a\n> > b").includes("MD-NESTEDQUOTE") &&
         codes("##### too deep").includes("MD-HEADING-DEPTH") &&
+        // The construct that was MEASURED being mangled rather than refused: a
+        // code span containing another code span. inline() closes at the first
+        // inner backtick and leaves the trailing pair to draw as literal text.
+        codes("a \`x \`inner\`\` b").includes("MD-BACKTICK") &&
+        // A code span WRAPPED ACROSS TWO LINES is legal and must not fire it:
+        // mdToHtml joins a paragraph's lines before rendering, so the span
+        // closes correctly, and two of the regcf narrative files rely on that.
+        !codes("a \`long name\nspanning lines\` b").includes("MD-BACKTICK") &&
         lintMarkdown("# fine\n\n- a\n- b\n\n| x |\n| - |\n| 1 |\n").length === 0
       );
     })(),
@@ -1499,6 +1507,22 @@ process.stdout.write("\n-- the explainer --\n");
     // attribute context is an injection bug; this is the guard.
     escapeAttr(`a" onload="x`) === "a&quot; onload=&quot;x" &&
       mdToHtml('[t](https://e.com "plain")').includes('title="plain"'),
+  );
+  check(
+    "a link whose text is a code span renders the code, not a leftover sentinel",
+    // The nesting bug this exists for: inline() lifts code spans out first, then
+    // lifts links out — so the anchor it builds still carries the code span's
+    // sentinel inside it, and a single-pass restore left two NUL bytes around a
+    // stray digit in the output. It was MEASURED in a rendered explainer, where
+    // the pointer to the audit report — written [\`report.md\`](report.md) — drew
+    // as the bare character 0 and made the whole file read as binary to grep.
+    (() => {
+      const html = mdToHtml("see [\`report.md\`](report.md) for the audit\n");
+      return (
+        html.includes('<a href="report.md"><code>report.md</code></a>') &&
+        !/\u0000/.test(html)
+      );
+    })(),
   );
   check(
     "a raw block reaches the HTML verbatim and its markdown twin does not leak a sentinel",

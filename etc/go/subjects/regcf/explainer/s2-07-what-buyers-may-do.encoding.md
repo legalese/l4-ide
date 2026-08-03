@@ -22,9 +22,14 @@ of limits, which is the useful distinction: one is a defect somebody could
 repair this afternoon, and the other is a hole in the regulation.
 
 **The inert-style showcase.** This decision's four exceptions are written with
-each statutory paragraph label riding beside its operative limb —
-`"(1)" ... transfer's `to the issuer of the securities`` — so the reading is a
-visible choice rather than an accident of punctuation. It is also, by some
+each statutory paragraph label riding beside its operative limb:
+
+```
+..  "(1)" ... transfer's `to the issuer of the securities`
+```
+
+So the reading is a visible choice rather than an accident of punctuation, and
+the statutory label travels with the limb it labels. It is also, by some
 distance, the widest figure the ladder generator produces from this corpus, for
 a reason that is not a defect: the fourth exception's field name is the
 regulation's own sentence, and leaf labels do not wrap. Trimming it would be

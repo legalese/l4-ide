@@ -207,6 +207,24 @@ const esc = (s) =>
     .replace(/\|/g, "\\|")
     .replace(/\n/g, " ");
 const absent = (what, who) => `**ABSENT.** ${what} ${who}`;
+/**
+ * One leg's status line.
+ *
+ * The explanation is the receipt's `reason`, or failing that its oracle's
+ * `because`, and it is printed VERBATIM — never re-cased, never given a
+ * terminal stop. Those strings are written as sentence FRAGMENTS ("the emitted
+ * DMN was executed by both target engines on committed cases and agreed"),
+ * because in the audit report they follow a label. Joining one after a full
+ * stop produced "reports **PASS**. the emitted DMN was executed …", which reads
+ * as a broken sentence, and capitalising it here would be editing the evidence
+ * to make the prose tidy. An em dash makes the fragment a clause, which is what
+ * it is. MEASURED on run 2026-08-03-3f45e62b-002, where all four leg lines and
+ * the deployment line read that way.
+ */
+const legLine = (what, r) => {
+  const says = r.reason ?? r.oracle?.because ?? "";
+  return `${what} reports **${r.status}**${r.label ? ` (${r.label})` : ""}${says ? ` — ${says}` : "."}`.trim();
+};
 const short = (s) => String(s ?? "").slice(0, 23) + "…";
 
 /** Artifacts this run attests, indexed by basename, each re-hashed now. */
@@ -507,7 +525,7 @@ function ladderSubsection() {
     ].join("\n");
 
   const out = [
-    `The ladder leg reports **${r.status}**${r.label ? ` (${r.label})` : ""}. ${r.reason ?? r.oracle?.because ?? ""}`.trim(),
+    legLine("The ladder leg", r),
     "",
     "Each figure below is the committed SVG, inlined byte-for-byte after its recorded sha256 was re-checked. None is edited, re-laid-out or trimmed — **trimming is transcription**, and a trimmed ladder is a different rule. The caption is the reason the decision was selected, read from the subject's own demo entry point rather than re-decided here.",
     "",
@@ -589,8 +607,7 @@ function ltsSubsection() {
   const dots = (r.artifacts ?? [])
     .filter((a) => !a.absent && a.path.endsWith(".dot"))
     .map((a) => `\`${basename(a.path)}\``);
-  const head =
-    `The state-graph leg reports **${r.status}**${r.label ? ` (${r.label})` : ""}. ${r.reason ?? r.oracle?.because ?? ""}`.trim();
+  const head = legLine("The state-graph leg", r);
   if (!svgs.length)
     return [
       intro,
@@ -604,6 +621,7 @@ function ltsSubsection() {
     ].join("\n");
 
   const out = [intro, "", head, ""];
+  let namespaced = 0;
   for (const a of svgs) {
     const p = isAbsolute(a.path) ? a.path : resolve(rundir, a.path);
     if (!existsSync(p) || sha256File(p) !== a.sha256) continue;
@@ -616,11 +634,45 @@ function ltsSubsection() {
       : basename(p);
     const key = `lts-${basename(p, ".svg")}`;
     rawBlocks[key] =
-      `<figure class="fig"><div class="scroll">${svg}</div><figcaption>${escapeText(label)} — rendered from the emitted DOT by the <code>dot</code> binary on the machine that ran this.</figcaption></figure>`;
+      `<figure class="fig"><div class="scroll">${namespaceIds(svg, key)}</div><figcaption>${escapeText(label)} — rendered from the emitted DOT by the <code>dot</code> binary on the machine that ran this.</figcaption></figure>`;
     mdBlocks[key] = `*State machine: ${label} (\`${basename(p)}\`)*`;
     out.push(rawToken(key), "");
+    namespaced++;
   }
+  if (namespaced > 1)
+    out.push(
+      `Inlining ${namespaced} GraphViz pictures into one page collides their internal identifiers: \`dot\` numbers its nodes and edges from one per file, so every graph here defines \`graph0\`, \`node1\` and \`edge1\`. An \`<svg>\` element is **not** an identifier scope, so all of them would land in one document namespace. MEASURED on this document before the fix: ${namespaced * 9} definitions of 9 names. Nothing referenced them, so nothing drew wrong — but a DOT that used a gradient or a clip path would emit \`url(#…)\`, the first definition would win for every picture, and two of the three would silently render with the first one's fill. So each figure's identifiers are prefixed with its own slug **in this page only**. The \`.svg\` and \`.dot\` artifacts on disk are untouched and remain the evidence; nothing above this paragraph claims these pictures are inlined byte for byte, and the ladder figures — which do make that claim — carry no identifiers at all.`,
+      "",
+    );
   return out.join("\n");
+}
+
+/**
+ * Prefix every `id` an inlined SVG defines, and every intra-document reference
+ * to one, with that figure's own key.
+ *
+ * ONLY the LTS figures go through this, and the distinction is load-bearing:
+ * the ladder subsection tells the reader its SVGs are inlined byte for byte
+ * after a hash check, so rewriting one would make that sentence false. The
+ * ladder exporter emits no `id` at all (MEASURED: zero in all six committed
+ * figures), so it never needs this and never gets it.
+ */
+function namespaceIds(svg, prefix) {
+  const names = [
+    ...new Set([...svg.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])),
+  ];
+  let out = svg;
+  for (const n of names) {
+    const lit = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out
+      .replace(new RegExp(`(\\sid=")${lit}(")`, "g"), `$1${prefix}--${n}$2`)
+      .replace(new RegExp(`url\\(#${lit}\\)`, "g"), `url(#${prefix}--${n})`)
+      .replace(
+        new RegExp(`((?:xlink:)?href=")#${lit}(")`, "g"),
+        `$1#${prefix}--${n}$2`,
+      );
+  }
+  return out;
 }
 
 function bpmnSubsection() {
@@ -638,12 +690,7 @@ function bpmnSubsection() {
           : "`p7-bpmn` is not declared for this subject.",
       ),
     ].join("\n");
-  const out = [
-    intro,
-    "",
-    `The BPMN leg reports **${r.status}**${r.label ? ` (${r.label})` : ""}. ${r.reason ?? r.oracle?.because ?? ""}`.trim(),
-    "",
-  ];
+  const out = [intro, "", legLine("The BPMN leg", r), ""];
   // What the projection CANNOT say, quoted from the fidelity report rather than
   // paraphrased — a paraphrase of a finding is a different finding.
   const fid = (r.artifacts ?? [])
@@ -711,12 +758,7 @@ function dmnSubsection() {
       ),
     ].join("\n");
 
-  const out = [
-    intro,
-    "",
-    `The DMN leg reports **${r.status}**${r.label ? ` (${r.label})` : ""}. ${r.reason ?? r.oracle?.because ?? ""}`.trim(),
-    "",
-  ];
+  const out = [intro, "", legLine("The DMN leg", r), ""];
   const dmnName = (r.artifacts ?? [])
     .map((a) => basename(a.path ?? ""))
     .find((n) => n.endsWith(".dmn"));
@@ -889,18 +931,26 @@ function ctaSection() {
           "The subject's manifest declares no call-to-action narrative.",
         );
   const r = byStage.get("p7-mcp");
-  const tools = r ? (r.metrics?.tools ?? r.metrics?.tool_names ?? null) : null;
+  // COUNTS, LABELLED AS COUNTS. This used to read
+  // `Tools the deployment reported: \`10\``, which was wrong twice over: it
+  // labelled a number as if it were a list, and 10 is the service's TOTAL,
+  // where the leg's own reason is careful to say the module contributed 6 and
+  // the other 4 are jl4-service's generic file-browsing tools. MEASURED on run
+  // 2026-08-03-3f45e62b-002, whose p7-mcp receipt carries `tools=10` and
+  // `corpus_tools=6` and NO metric holding the names at all — the names are
+  // printed only into that leg's log. So this prints what the receipt has and
+  // says where the names live, rather than scraping a log or implying a list.
+  const both =
+    r && r.metrics?.tools && r.metrics?.corpus_tools
+      ? `\nThe service enumerated \`${esc(r.metrics.tools)}\` tools for this deployment, of which \`${esc(r.metrics.corpus_tools)}\` are the module's own exported entry points and the rest are jl4-service's generic file-browsing tools, which say nothing about this corpus. The receipt records those counts and not the names; the names are in the leg's own log artifact.`
+      : "";
   const measured = r
-    ? [
-        "",
-        `The deployment leg of this run reports **${r.status}**${r.label ? ` (${r.label})` : ""}. ${r.reason ?? r.oracle?.because ?? ""}`.trim(),
-        tools ? `\nTools the deployment reported: \`${esc(tools)}\`` : "",
-      ].join("\n")
+    ? ["", legLine("The deployment leg of this run", r), both].join("\n")
     : [
         "",
         absent(
-          "Where a deployment was reached, the tool list below is the one the service reported.",
-          "No deployment was reached in this run, so no tool list is reported. Deploying to a host other people can reach is outward-facing and is gated; this document therefore describes how to run it on your own machine and claims nothing about any hosted service.",
+          "Where a deployment was reached, the counts below are the ones the service reported.",
+          "No deployment was reached in this run, so nothing is reported about one. Deploying to a host other people can reach is outward-facing and is gated; this document therefore describes how to run it on your own machine and claims nothing about any hosted service.",
         ),
       ].join("\n");
   return narrative + "\n" + measured;
@@ -910,7 +960,13 @@ function ctaSection() {
 function provenanceSection() {
   const rows = sectionStates.map(
     (s) =>
-      `| \`${s.slot}\` | \`${s.file}\` | ${s.state === "reviewed" ? "reviewed" : `**${s.state}**`} | ${s.state === "reviewed" ? `\`${s.reviewer ?? "(unrecorded)"}\`` : "—"} | \`${s.drafted_by ?? "—"}\` | ${s.drafted_on ?? "—"} | ${s.citations} (${s.unchecked} unchecked) | ${s.sources.map((p) => `\`${basename(p)}\``).join(", ") || "—"} |`,
+      // The source column carries the FULL repo-relative path, not the
+      // basename. Basenames rendered `README.md, README.md` for a section
+      // drafted from two different READMEs — MEASURED on run
+      // 2026-08-03-3f45e62b-003, where four sections cite two READMEs each and
+      // one cites three files whose basenames collide. A provenance table whose
+      // reader cannot tell which file is meant is not a provenance table.
+      `| \`${s.slot}\` | \`${s.file}\` | ${s.state === "reviewed" ? "reviewed" : `**${s.state}**`} | ${s.state === "reviewed" ? `\`${s.reviewer ?? "(unrecorded)"}\`` : "—"} | \`${s.drafted_by ?? "—"}\` | ${s.drafted_on ?? "—"} | ${s.citations} (${s.unchecked} unchecked) | ${s.sources.map((p) => `\`${esc(p)}\``).join(", ") || "—"} |`,
   );
   const findingRows = findings.map(
     (f) => `| \`${f.kind}\` | \`${esc(f.file)}\` | ${esc(f.detail)} |`,
