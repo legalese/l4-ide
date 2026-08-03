@@ -26,6 +26,9 @@
     "min_dated_arms": 2,
     "min_assertions": 20
   },
+  "explainer": {
+    "dir": "etc/go/subjects/regcf/explainer"
+  },
   "denovo": {
     "bundle": "jl4/examples/legal/regcf/denovo/source-bundle.json",
     "register": "jl4/examples/legal/regcf/denovo/external-modifications.json",

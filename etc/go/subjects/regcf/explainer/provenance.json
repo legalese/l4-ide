@@ -1,0 +1,521 @@
+{
+  "narrative_schema": 1,
+  "records": [
+    {
+      "file": "orientation.md",
+      "sha256": "sha256:c958dfb210321b5dd590452c6a99563c16d62aa711112ddb6caaca2c9647d5d4",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§ scope note and § Parties and acts, L11-L93"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§1 what this corpus is"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-01-the-bargain.law.md",
+      "sha256": "sha256:4b332b958cd4d1d8c878f9c51a05c5a872183d54ce037dc017d8259b0fa8ce61",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§ Top-level, L755-L777; § Thresholds, L104-L250"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-01-the-bargain.encoding.md",
+      "sha256": "sha256:a046af20d9428e77ae6e807a27e3c6ae6eb6b85b6ae505abd43ad02a0a62d097",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§ Top-level, L755-L777; modelling note, L69-L85"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§5 honest limits"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-02-who-may-not-use-it.law.md",
+      "sha256": "sha256:59a5214462bdb67ea20ee4f33d14bfc11aaa6889cb62d2bc02d6c60a346d5b67",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§1 Issuer eligibility, L252-L322"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-02-who-may-not-use-it.encoding.md",
+      "sha256": "sha256:c1277689cb92d1fe01d5210307d86de71cc781c93c23575e88e25ff997179f35",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§1 Issuer eligibility, L252-L322"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§3.6 the omitted limb"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/figures/README.md",
+          "sha256": "sha256:cc2e2c347037ace4a66e76a147ec8c531c08b6b876717674ff1c0bf05d2a783c",
+          "anchor": "§ the six figures"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-03-how-much.law.md",
+      "sha256": "sha256:2336146c22a127e8d0da38381cd258956438b4532a4b30af7c13875b7da2b973",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§2 and §3, L325-L457; group 3 assertions, L900-L920"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-03-how-much.encoding.md",
+      "sha256": "sha256:66b92e62b49dcc8ff4f8f66e6bc39f2acea5407ae4ab75bda0291eb303f93a7e",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§3 shape change L373-L404; rule-version tests L1176-L1182"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§3.1 the greater-of change"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-04-what-must-be-disclosed.law.md",
+      "sha256": "sha256:47f2d4f0e83430d5c88d92347b3a09451e14144ae4f8065bf86967bfc9798f17",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§4 Disclosure requirements, L458-L545"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-04-what-must-be-disclosed.encoding.md",
+      "sha256": "sha256:d1ddf86de3f7532a04d53a59a069965b66a8be7fd90fc3222ed2527573900f80",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§4 COVID refusal L465-L503; assurance ordering L505-L524"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§5.8 the assurance ordering"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-05-what-the-issuer-may-say.law.md",
+      "sha256": "sha256:597a868c82dafbe56417a2ba4e79a91b5abb068d28dbc2ba29062659efef3a0b",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§6 Advertising restrictions, L586-L636"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-05-what-the-issuer-may-say.encoding.md",
+      "sha256": "sha256:32a623a9b42065b2ae87b30a4fcf3c426fa3163f9b2fe24fe8f873abf22b701f",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§6 Advertising restrictions, L586-L636; modelling note L69-L85"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-06-what-is-owed-afterwards.law.md",
+      "sha256": "sha256:da509e90b8ceb8a44329f4b0f7782de6e062f74c51ad1cd84f7400265e81dcb1",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§7 Ongoing reporting, L638-L706"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-06-what-is-owed-afterwards.encoding.md",
+      "sha256": "sha256:a2e2509fb3f3497ef5b0e4e54815725c617486a1fdb95e16a7f76c59c4c9d40e",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§7 Ongoing reporting, L638-L706"
+        },
+        {
+          "path": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
+          "sha256": "sha256:22fc09f982b7d8479cddc0e1998d148f174bfe5847cb1a0091ebe86d2f1b18c0",
+          "anchor": "the D-PARTIAL finding on the reporting spine"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-07-what-buyers-may-do.law.md",
+      "sha256": "sha256:e6f80929a90671a1f192f51e82fd1a4eb467b355772201c641c73d7ed81bc6af",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§8 Resale restrictions, L708-L753"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "s2-07-what-buyers-may-do.encoding.md",
+      "sha256": "sha256:2adb52ed836b9d327f3b70785f2d7ffc05ad29580617355d047acdfe702bf415",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§8 endpoint note L718-L723; resale period L250"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§5.2 the two infidelities"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "pictures.md",
+      "sha256": "sha256:6e79a9adc02e7f4ce08afcd15e9b9f1ebd8ae3722a01fa793999db5d34b0c43d",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/figures/README.md",
+          "sha256": "sha256:cc2e2c347037ace4a66e76a147ec8c531c08b6b876717674ff1c0bf05d2a783c",
+          "anchor": "the per-figure rationale"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/PROJECTIONS.md",
+          "sha256": "sha256:c416b733cf6692b92c0be4b63ac56fd77bf701d8034a8adc4a190ada1f0f7fd5",
+          "anchor": "§1-§4 what each projection preserves and loses"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "time.law.md",
+      "sha256": "sha256:cf9590118d1523c75a64355d8a221cd738c55f5586dda87cacf75723b7f10037",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§ Thresholds L104-L225; rule-version tests L1111-L1200"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "time.encoding.md",
+      "sha256": "sha256:2a6901a3f1568de35588f7b6668267b6517df1a497da64bf5cdcf4aac1623edd",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "§ Thresholds L104-L225; TIMEZONE L9"
+        },
+        {
+          "path": "specs/todo/lexipedia-superset/CORPUS-TRACK.md",
+          "sha256": "sha256:5f381b224a7e4ce9f878688f2354553f517c50d6b0a06aa191976121d9647f8f",
+          "anchor": "§2.4 the temporal traps, and trap 5 on closure"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§5.9 what the rule-version axis costs"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "limits.encoding.md",
+      "sha256": "sha256:04886b0abf1ccb9253bd5cfdbc9ea5d803a8dd4f8e97751873a3159c2638f02b",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4/examples/legal/regcf/README.md",
+          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "anchor": "§5 the nine honest limits"
+        },
+        {
+          "path": "etc/go/subjects/regcf/NOTES.md",
+          "sha256": "sha256:7c96e9322de2abb66bc23bae9fe95a569df857b11c2a9eac23b3df05ef1134b2",
+          "anchor": "the ELSE IF tolerance and the dated-arm floor"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "anchor": "scope note, L28-L31"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "sweep.md",
+      "sha256": "sha256:31aba88e5c9900ea98c467ae6e07679385d5cac3d1537d95706bc33cfddbaa88",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "specs/todo/single-instruction-demo/SPEC.md",
+          "sha256": "sha256:524a4a9c9d5718abf227e3ac3b5b0bec51747247c1d314fba82a683baf0e6313",
+          "anchor": "§P2 what an external-modification sweep is for"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "call-to-action.md",
+      "sha256": "sha256:9c8db8d6a23dbab72b89b2beb6825b7bcc550b10dca2213df4ff8df7562db3d9",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-03",
+      "drafted_from": [
+        {
+          "path": "jl4-service/README.md",
+          "sha256": "sha256:24f3153e66c5b0e989a66e70edb862c4a21b06f83f2d62f2af7687a56d5b2a76",
+          "anchor": "the MCP and WebMCP route tables"
+        },
+        {
+          "path": "jl4/examples/legal/regcf/PROJECTIONS.md",
+          "sha256": "sha256:c416b733cf6692b92c0be4b63ac56fd77bf701d8034a8adc4a190ada1f0f7fd5",
+          "anchor": "§5 the measured deployment and its gaps"
+        },
+        {
+          "path": "ts-apps/regcf-wizard/README.md",
+          "sha256": "sha256:dd901eb9a6979af96bb240685af6a584b4e87e47a3d2c402f83748857d0fa6bd",
+          "anchor": "the join-on-unique measurement"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    }
+  ]
+}
