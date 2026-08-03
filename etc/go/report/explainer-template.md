@@ -1,0 +1,93 @@
+<!--
+  The explainer template — the reader-facing sibling of report/template.md.
+
+  THIS FILE CONTAINS NO MEASURED NUMBERS, BY RULE, AND render-explainer.mjs
+  ENFORCES THAT with the same bare-digit-run check render-report.mjs applies to
+  the audit report's template. Every run fact is a {{placeholder}} resolved from
+  journal.ndjson; every figure about the law or the encoding lives in a
+  checked-in narrative file, where it must be a placeholder or a citation whose
+  source line this renderer re-reads and matches before printing it.
+
+  The prose is NOT here. Narrative comes from etc/go/subjects/<id>/explainer/,
+  is drafted, checked in and reviewed, and arrives as blocks. A template that
+  carried the argument would put the argument out of reach of the provenance
+  record, the review signature, and the drift check.
+-->
+
+# {{explainer.title}}
+
+_{{run.subject_display}} — {{run.citation}}. This document has two jobs: to
+explain the law, and to explain what happened when somebody tried to make it
+executable. The two threads interleave, because the second is only interesting
+where it lands on the first._
+
+_`explainer.html` is the document; `explainer.md` is the record. Both carry the
+same text, the same banners and the same citations. They differ only in how a
+figure travels._
+
+{{narrative.banner}}
+
+|              |                                                                                  |
+| ------------ | -------------------------------------------------------------------------------- |
+| subject      | {{run.subject}} — {{run.citation}}                                               |
+| run id       | `{{run.id}}`                                                                     |
+| milestone    | {{run.milestone_upper}}                                                          |
+| repo HEAD    | `{{run.repo_head}}` ({{run.tree_state}})                                         |
+| clock        | `{{run.fixed_now}}`                                                              |
+| journal      | `{{run.journal_path}}` — {{run.record_count}} records, chain {{run.chain_state}} |
+| run verdict  | **{{run.verdict}}**                                                              |
+| audit report | {{report.pointer}}                                                               |
+
+> This document may make no claim the audit report cannot support. Every run
+> fact above and below resolves from the same journal, folded the same way. Where
+> the two disagree, the audit report governs and this one has a defect.
+
+---
+
+## What this is, and who it binds
+
+{{sections.orientation}}
+
+---
+
+## The rules
+
+{{sections.body}}
+
+---
+
+## Pictures
+
+{{sections.pictures}}
+
+---
+
+## Time
+
+{{sections.time}}
+
+---
+
+## Limits
+
+{{sections.limits}}
+
+---
+
+## What was never searched
+
+{{sections.sweep}}
+
+---
+
+## Use it
+
+{{sections.cta}}
+
+---
+
+## How to check this document
+
+{{sections.provenance}}
+
+{{footer.generated}}
