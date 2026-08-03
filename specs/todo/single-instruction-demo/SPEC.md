@@ -22,8 +22,8 @@ ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo, and P8's ru
 §5 is the verified inventory and §6 is the gap register.
 This document owns the pipeline decisions; per-projection rulings stay in their own specs
 (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, `lexipedia-superset/SPEC.md`,
-`ladder-diagrams-2026/DESIGN.md`, `QUESTION-ORDERING-SPEC.md`), which this spec cites but does
-not override.
+`ladder-diagrams-2026/DESIGN.md`, `QUESTION-ORDERING-SPEC.md`,
+`EXPLAINER-REPORT-SPEC.md`), which this spec cites but does not override.
 
 ---
 
@@ -236,6 +236,49 @@ externally-settled resolution), what each projection preserved and lost (the fid
 are the raw material), test results, and — where an alternative system has published its own
 representation of the same rule — a factual note of where we disagree with it.
 
+#### P9.1 — The explainer report (a sibling, not a rewrite)
+
+**Status (2026-08-03): DESIGNED, NOT BUILT.** No stage, template, renderer or narrative file
+exists. The design is [EXPLAINER-REPORT-SPEC.md](./EXPLAINER-REPORT-SPEC.md), which owns every
+decision about it; its ruling series is the **E-series**, cited elsewhere as `EXP-En`.
+
+The conversion report above is an **audit** document, and its central rule — no digit-run may be
+typed into `etc/go/report/template.md`, enforced by `render-report.mjs` before it opens a journal
+and again in CI — makes it structurally incapable of explaining a regulation to anybody. The
+explainer is its reader-facing sibling. It does a **dual** job that interleaves rather than
+splitting: it explains **the law** to a lay reader, and alongside each substantive part it explains
+**the L4 treatment of the formalization** — where the prose was vague and the code could not be,
+what the type system refused, where an ambiguity had to fork, what each projection makes visible
+that the others hide, and what the encoding honestly failed to capture. That second thread is what
+makes the document an argument for the method rather than a summary of the rule, and it is held to
+the same discipline: a claim about the encoding is licensed by the encoding, cited to a line.
+
+Three rulings by Meng, 2026-08-03, recorded here and expanded in the owning spec:
+
+- **D1 — narrative provenance.** The lay narrative is **agent-drafted, checked in, and
+  HG1-reviewed**. It lives in the subject directory (`etc/go/subjects/<id>/explainer/`) with a
+  provenance record naming the source it was drafted from, so a later run detects drift when the
+  source text changes. Unreviewed narrative renders visibly marked as draft / "claimed, not
+  verified". See EXPLAINER-REPORT-SPEC.md §5 for the file layout, the record's fields, the three
+  drift classes, and the three-level draft marking.
+- **D2 — a separate sibling artifact.** `explainer.md` + `explainer.html`, beside the existing
+  `report.md` / `report.html`, from a separate stage. **P9's "no typed numbers in the template"
+  invariant survives completely untouched** — `render-report.mjs` and `template.md` are not opened
+  by that build. The two documents cross-link; per `EXP-E16` the link is one-way (explainer →
+  report), because the explainer may legitimately not exist for a run and the report may not assert
+  it does. See §2.
+- **D3 — Reg CF first; the design is not Reg CF-shaped.** The BNA is the planned second subject and
+  is **not in scope** for the v0 build. The spine is fixed by the spec; the body sections are
+  declared per subject in that subject's `explainer/manifest.json`. See §4.1.
+
+Constraints the design records rather than solves, because recording them is the point:
+**there is no in-repo DOT→SVG path** (graphviz is a machine dependency, DOT carries no coordinates,
+so a renderer would be a layout engine — `EXP-E12`); **BPMN/DMN are the opposite case**, since both
+exporters already emit diagram interchange with computed coordinates, so a picture needs a
+serializer and not a layout engine, deferred to v1 with the measurement attached (`EXP-E14`); and
+**no live-deployment claim is available from this repo**, so the call to action is
+stand-it-up-yourself (`EXP-E15`).
+
 ### P10 — Publish
 
 GitHub first: a corpus-of-law repository **separate from l4-ide** (`jl4/examples/` and
@@ -350,7 +393,8 @@ exercises decisions, so a divergence confined to the deontic layer would not app
 ## 9. Open rulings
 
 R-numbers are scoped to this document (house precedent: the DMN spec has its own R-series, the
-lexipedia-superset spec its K-series). Cross-references from elsewhere should say "SI-Rn".
+lexipedia-superset spec its K-series, the explainer spec its E-series). Cross-references from
+elsewhere should say "SI-Rn".
 
 - **R0 — ANSWERED 2026-07-31**: the execution is the exhibit (§2).
 - **R1 — corpus-of-law repository**: name, org, license, layout. Owner: Meng. **ANSWERED IN
