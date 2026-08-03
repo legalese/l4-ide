@@ -1,13 +1,26 @@
 # The Explainer Report — a lay-and-encoding companion to the conversion report
 
-_Status (2026-08-03): **NOTHING IS BUILT.** No `p9-explainer` stage exists, no
-`etc/go/report/explainer-template.md` exists, no narrative directory exists under any subject, and
-no run has ever produced an `explainer.md`. This document is a design, written on branch
-`mengwong/go-explainer` against the tree at `5f79ff64`, and every sentence below describing
-behaviour describes behaviour that **would** exist if it were built. The only things that exist
-today are the audit report (`etc/go/report/render-report.mjs` + `template.md`, driven by
-`etc/go/phases/p9-report.sh`) and the artifacts §8 proposes to draw from, all of which are
-committed and were measured for this spec._
+_Status (2026-08-03): **BUILT at v0**, on branch `mengwong/go-explainer`. What exists in the
+tree: the stage `etc/go/phases/p9-explain.sh`, declared in `G1_STAGES` and gated by HG1; the
+renderer `etc/go/report/render-explainer.mjs` over `etc/go/report/explainer-template.md`; the
+supporting libraries `etc/go/lib/narrative.mjs` (provenance, drift, the citation checker, the
+lint), `etc/go/lib/dmn-tables.mjs` and `etc/go/report/md-lite.mjs`; and the Reg CF narrative at
+`etc/go/subjects/regcf/explainer/` — twenty-one parts, a manifest, and a provenance record._
+
+_**What is NOT built, named rather than implied.** (1) **E17's signature verification.** There is
+no `etc/go/lib/narrative-verify.sh` and no `reviews/` directory; the provenance record carries a
+review state and the renderer derives `stale` from moved digests, but nothing checks a signature,
+so a hand-written `"state": "reviewed"` would be believed. No section claims review today, so the
+document is honest in practice and the mechanism is not yet closed. (2) **E14's
+diagram-interchange serializer**, deferred by this spec to v1 (§8.4). (3) The g2 declaration
+(§3.7), deliberately. Everything else below describes behaviour measured against the tree._
+
+_**One deviation from the text below**, recorded where it was made rather than left to be
+discovered: §6.2's "verbatim" check compares the quotation and the cited window with leading `--`
+comment markers dropped and whitespace runs collapsed, on both sides. A sentence in the corpus is
+usually a run of comment lines, so a byte-literal check could only ever quote a fragment shorter
+than a line. "Verbatim" therefore means "these words, in this order, in the cited window", not
+"these bytes", and `etc/go/lib/narrative.mjs` says so at the function._
 
 **One-line summary.** The conversion report is an **audit** document: it accounts for what a run
 did, refuses to print a number that has no journal row, and is unreadable to anyone who is not
@@ -33,7 +46,7 @@ the explainer's decisions and overrides none of theirs.
 | **E1** — narrative is drafted, checked in, reviewed                                | **ANSWERED 2026-08-03 (Meng)** — D1 | §5     |
 | **E2** — separate sibling artifact; P9 untouched                                   | **ANSWERED 2026-08-03 (Meng)** — D2 | §2     |
 | **E3** — Reg CF first; subject-generic; BNA out of scope                           | **ANSWERED 2026-08-03 (Meng)** — D3 | §4.1   |
-| **E4** — a declared, HG1-gated stage `p9-explainer`, g1 only                       | **ANSWERED 2026-08-03 (this spec)** | §3     |
+| **E4** — a declared, HG1-gated stage `p9-explain`, g1 only                         | **ANSWERED 2026-08-03 (this spec)** | §3     |
 | **E5** — duplicate the journal fold; do not refactor `render-report.mjs`           | **ANSWERED 2026-08-03 (this spec)** | §3.5   |
 | **E6** — every figure is placeholder-resolved or citation-checked                  | **ANSWERED 2026-08-03 (this spec)** | §6.2   |
 | **E7** — no number may be sourced from `README.md` or `PROJECTIONS.md` prose       | **ANSWERED 2026-08-03 (this spec)** | §6.4   |
@@ -119,8 +132,8 @@ Exactly two files, named as siblings of the audit report's two:
 
 | file             | written to                       | by                                      | attested?                                   |
 | ---------------- | -------------------------------- | --------------------------------------- | ------------------------------------------- |
-| `explainer.md`   | `$GO_OUT` (`$GO_RUN/artifacts/`) | `p9-explainer.sh` (preliminary render)  | **yes** — hashed on the stage's own receipt |
-| `explainer.html` | `$GO_OUT`                        | `p9-explainer.sh` (preliminary render)  | **yes**                                     |
+| `explainer.md`   | `$GO_OUT` (`$GO_RUN/artifacts/`) | `p9-explain.sh` (preliminary render)    | **yes** — hashed on the stage's own receipt |
+| `explainer.html` | `$GO_OUT`                        | `p9-explain.sh` (preliminary render)    | **yes**                                     |
 | `explainer.md`   | `$GO_RUN`                        | `go.sh`, after `run_end` (final render) | **no** — derived, re-derivable by anyone    |
 | `explainer.html` | `$GO_RUN`                        | `go.sh`, after `run_end`                | **no**                                      |
 
@@ -184,14 +197,14 @@ links, because at that point both documents exist and are immutable. That is P10
 
 ### 3.1 The ruling
 
-The explainer is a **new phase script `etc/go/phases/p9-explainer.sh`**, declared in `G1_STAGES`
+The explainer is a **new phase script `etc/go/phases/p9-explain.sh`**, declared in `G1_STAGES`
 immediately after `p9-report`, added to `gated_by_HG1` on the adjacent line, declaring **no**
 `--inputs`, and **not declared at g2**.
 
 ```sh
 # etc/go/go.sh, replacing the current :234-235
-G1_STAGES+=(p9-report p9-explainer)
-gated_by_HG1="$gated_by_HG1 p9-report p9-explainer"
+G1_STAGES+=(p9-report p9-explain)
+gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 ```
 
 The two appends stay adjacent so they cannot drift **[M:** they are adjacent today at
@@ -231,7 +244,7 @@ declaring them and not the journal is the under-declared-digest hazard in its mo
 Their digests are instead recorded as **receipt metrics** (§5.4), which is where a claim about
 content belongs.
 
-**The cost, named.** `p9-explainer` becomes a **second** never-replaying stage, and two selftest
+**The cost, named.** `p9-explain` becomes a **second** never-replaying stage, and two selftest
 assertions are written against there being exactly one (`selftest.mjs:877-880` asserts
 `executed.length === 1 && executed[0] === "p9-report"`; `:881-884` asserts
 `secondPass.length - 1`) **[M]**. §11 rewrites both as set comparisons against a named
@@ -249,7 +262,7 @@ should be exercised by §11's harness before the build lands.
 
 #### The ruling
 
-`p9-explainer`'s renderer **copies** the journal fold rather than importing a lifted helper.
+`p9-explain`'s renderer **copies** the journal fold rather than importing a lifted helper.
 Specifically it re-implements, byte-for-behaviour:
 
 - `begin` = **first** `run_begin`; `end` = **last** `run_end`;
@@ -1104,31 +1117,32 @@ intersection is empty **[G]**.
 
 ## 11. Verification plan
 
-Nothing below exists yet; this is what the build must land alongside itself.
+_Landed 2026-08-03 alongside the build, except where a row says otherwise. `node
+etc/go/selftest.mjs` runs all of it with no binary and no network._
 
 **Selftest, `etc/go/selftest.mjs`.** New assertions:
 
-| #   | assertion                                                                                                                                                                                                               |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V1  | **the two folds agree** — both renderers over one fixture journal containing a resume, a replayed receipt, a `BROKEN` row and a post-`run_end` `stage_end`, producing identical verdict and per-stage status map (§3.5) |
-| V2  | **every declared stage sequenced after `p6-tests` is in `gated_by_HG1`** — the assertion that does not exist today (§3.3)                                                                                               |
-| V3  | an unreviewed narrative section renders the draft banner, and the document header's draft count matches the number of banners                                                                                           |
-| V4  | narrative drift, source drift and review drift each render their banner and each degrade the receipt (§5.4)                                                                                                             |
-| V5  | a citation that does not resolve renders `⚠ CITATION DOES NOT RESOLVE` and degrades the receipt; a resolving one renders clean                                                                                         |
-| V6  | a bare digit-run in a narrative file that is neither placeholder nor citation fails the lint at file:line                                                                                                               |
-| V7  | a reserved status word in a narrative file fails the lint (§6.5)                                                                                                                                                        |
-| V8  | a markdown construct outside §7.2's subset fails the lint                                                                                                                                                               |
-| V9  | the rendered HTML escapes quotes in every attribute context (§7.3)                                                                                                                                                      |
-| V10 | an explainer template containing a bare digit-run exits 4 with `TEMPLATE DEFECT`                                                                                                                                        |
-| V11 | an unresolved `{{…}}` exits 4                                                                                                                                                                                           |
-| V12 | **rewrite** `selftest.mjs:877-884` as a set comparison against the named never-replaying stages, not a hard-coded count (§3.4)                                                                                          |
+| #   | assertion                                                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1  | **the two folds agree** — both renderers over one fixture journal containing a resume, a replayed receipt, a `BROKEN` row and a post-`run_end` `stage_end`, producing identical verdict and per-stage status map (§3.5)                                       |
+| V2  | **every declared stage sequenced after `p6-tests` is in `gated_by_HG1`** — the assertion that does not exist today (§3.3)                                                                                                                                     |
+| V3  | an unreviewed narrative section renders the draft banner, and the document header's draft count matches the number of banners — **landed**                                                                                                                    |
+| V4  | narrative drift, source drift and review drift each render their banner and each degrade the receipt (§5.4) — **landed at the unit level** (`driftFor` over a fixture, all three classes); the end-to-end rendering of each banner is not separately asserted |
+| V5  | a citation that does not resolve renders `⚠ CITATION DOES NOT RESOLVE` and degrades the receipt; a resolving one renders clean                                                                                                                               |
+| V6  | a bare digit-run in a narrative file that is neither placeholder nor citation fails the lint at file:line                                                                                                                                                     |
+| V7  | a reserved status word in a narrative file fails the lint (§6.5)                                                                                                                                                                                              |
+| V8  | a markdown construct outside §7.2's subset fails the lint                                                                                                                                                                                                     |
+| V9  | the rendered HTML escapes quotes in every attribute context (§7.3) — **landed** as a check on `escapeAttr` and on a rendered `title=` attribute, not as a sweep over every attribute the renderer emits                                                       |
+| V10 | an explainer template containing a bare digit-run exits 4 with `TEMPLATE DEFECT`                                                                                                                                                                              |
+| V11 | an unresolved `{{…}}` exits 4                                                                                                                                                                                                                                 |
+| V12 | **rewrite** `selftest.mjs:877-884` as a set comparison against the named never-replaying stages, not a hard-coded count (§3.4)                                                                                                                                |
 
 **CI, `.github/workflows/pr-checks.yml`.** Two new steps, mirroring the existing template check's
 two-assertion shape (assert no `TEMPLATE DEFECT` **and** assert the renderer got far enough for the
 check to have run):
 
 - the **explainer** template carries no transcribed measurement;
-- `go.sh plan --milestone g1` names `p9-explainer` (the existing self-description step greps for
+- `go.sh plan --milestone g1` names `p9-explain` (the existing self-description step greps for
   stage names and would otherwise go stale silently **[G]**).
 
 **Formatting.** `.prettierignore` does not exclude `etc/`, and `package.json` runs

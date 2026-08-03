@@ -61,6 +61,7 @@ A subject sidecar is four files in `etc/go/subjects/<id>/`:
 | `pins.json`          | the CLI surface the stage table reads, measured against that subject's corpus                                                                                                                                                                                                                                                                                                                                                                                   |
 | `known-defects.json` | measured defects used as negative controls; empty groups say why they are empty                                                                                                                                                                                                                                                                                                                                                                                 |
 | `NOTES.md`           | free-prose idiosyncrasies of the corpus, for humans and the skill. **No script reads it.**                                                                                                                                                                                                                                                                                                                                                                      |
+| `explainer/`         | optional. The subject's checked-in explainer narrative — `manifest.json` (the document's spine), `provenance.json` (per file: its digest, who drafted it, the sources it was drafted from with their digests, and its review state) and one markdown file per part. Declared explicitly in `subject.json`'s `explainer.dir`, never discovered, so a mistyped directory is an error rather than a silently empty document.                                       |
 
 `etc/go/lib/subject.mjs` resolves and validates a sidecar (unknown keys refused; a leg entry
 naming a missing golden is a hard error naming the path) and exports it to the driver as
@@ -175,8 +176,45 @@ subject resolver refuses an unknown subject (listing the available sidecars), a
 descriptor naming a nonexistent golden, and a descriptor carrying an unknown
 key. `--with-driver` also
 drives the whole G1 pipeline twice and asserts that the second run re-executes
-nothing but the report — the only mechanical check that `replayed` means
-anything.
+nothing but the two stages that declare no inputs (`p9-report`, `p9-explain`) —
+the only mechanical check that `replayed` means anything. It also asserts that
+every declared g1 stage sequenced at or after `p6-tests` is gated by HG1, which
+is the one invariant whose violation is silent in every other direction.
+
+## The two documents a run produces
+
+| file             | what it is                                                                                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `report.md`      | the AUDIT account, rendered by `p9-report` from `journal.ndjson` and nothing else. Its template may not contain a two-digit number; every figure is a placeholder resolved from a journal row.     |
+| `explainer.html` | the READER-facing sibling, rendered by `p9-explain`. It explains the body of law and, interleaved with that, what happened when somebody made it executable. `explainer.md` carries the same text. |
+
+Both are written into the run directory and never into the tree; copying either
+anywhere a third party can see it is publication, which is P10, which is HG2's.
+
+The explainer's discipline is the report's, adapted to a document that must
+carry prose and figures. Run facts are placeholders resolved from the journal.
+Every OTHER number lives in a narrative file under
+`etc/go/subjects/<id>/explainer/`, where it must be a placeholder or a citation
+— `[$5,000,000](src:path#L151)` — whose source line the renderer re-opens and
+matches before printing it. A citation that does not resolve prints the figure
+followed by a visible complaint and degrades the stage. Narrative that has not
+been reviewed renders behind a draft banner; no signer is enrolled today, so all
+of it does, and `p9-explain` rides `DEGRADED` for that reason. Design and
+rulings: [`EXPLAINER-REPORT-SPEC.md`](../../specs/todo/single-instruction-demo/EXPLAINER-REPORT-SPEC.md).
+
+Provenance is maintained with:
+
+```
+node etc/go/lib/narrative-provenance.mjs <subject> [--check | --bless]
+```
+
+`--check` (the default) reports every narrative file whose text or whose cited
+sources have moved since the record was written, and exits 1 if any has.
+`--bless` rewrites those digests **and clears the affected records' review
+state**, because a review signed over one text and one set of sources says
+nothing about a different text or different sources. It will not invent a
+`drafted_from` for a file that has no record: what a paragraph was drafted from
+is a fact about how it was written, and no tool can observe it afterwards.
 
 `assert-report.selftest.mjs` mutates a real captured `l4 run --json` envelope
 ten ways to prove the assertion checker can be red. It exists because `l4 run`

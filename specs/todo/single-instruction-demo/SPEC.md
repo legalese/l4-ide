@@ -238,9 +238,16 @@ representation of the same rule — a factual note of where we disagree with it.
 
 #### P9.1 — The explainer report (a sibling, not a rewrite)
 
-**Status (2026-08-03): DESIGNED, NOT BUILT.** No stage, template, renderer or narrative file
-exists. The design is [EXPLAINER-REPORT-SPEC.md](./EXPLAINER-REPORT-SPEC.md), which owns every
-decision about it; its ruling series is the **E-series**, cited elsewhere as `EXP-En`.
+**Status (2026-08-03): BUILT at v0, with one named gap.** The stage is `p9-explain`, declared in
+`G1_STAGES` and gated by HG1; the renderer is `etc/go/report/render-explainer.mjs` over
+`etc/go/report/explainer-template.md`; the Reg CF narrative is checked in at
+`etc/go/subjects/regcf/explainer/`. **The gap is E17's signature verification**: the provenance
+model carries a per-section review state and derives `stale` when the text or a source moves, but
+nothing verifies a signature yet, so a hand-written `"state": "reviewed"` would be believed. Since
+no section claims review today, every section renders as draft and the stage rides `DEGRADED` —
+which is the correct v0 state and not a near miss. The design is
+[EXPLAINER-REPORT-SPEC.md](./EXPLAINER-REPORT-SPEC.md), which owns every decision about it; its
+ruling series is the **E-series**, cited elsewhere as `EXP-En`.
 
 The conversion report above is an **audit** document, and its central rule — no digit-run may be
 typed into `etc/go/report/template.md`, enforced by `render-report.mjs` before it opens a journal
