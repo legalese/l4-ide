@@ -794,11 +794,20 @@ function dmnSubsection() {
       "```",
       "",
     );
+    // The two artifacts spell the SAME decision differently — the markdown
+    // dialect keeps the L4 name in backticks (`ongoing reporting obligation`),
+    // the DMN sanitises it (ongoing_reporting_obligation) — so a naive
+    // name-equality join silently matches nothing and the cross-check becomes a
+    // loop that never runs. Normalise both sides to letters and digits.
+    const key = (s) =>
+      String(s)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+    let compared = 0;
     for (const h of mdHeads) {
-      const t = tables.find(
-        (x) => (x.name ?? "").toLowerCase() === h.toLowerCase(),
-      );
+      const t = tables.find((x) => key(x.name ?? "") === key(h));
       if (!t) continue;
+      compared++;
       const rows = (mdText.split(`## ${h}`)[1] ?? "").split(/\n##\s/)[0];
       const n = (rows.match(/^\|\s*\d/gm) ?? []).length;
       if (n && n !== t.rules.length)
@@ -808,6 +817,17 @@ function dmnSubsection() {
           detail: `'${h}': the markdown dialect renders ${n} rule row(s) where the emitted DMN carries ${t.rules.length}`,
         });
     }
+    // An oracle that compared nothing must say so. "No disagreement" and "no
+    // comparison" look identical in a report and mean opposite things.
+    out.push(
+      compared
+        ? `Where both projections produced a table for the same decision — ${compared} of them — their rule counts were compared, and a disagreement would be a finding in this document's own provenance section rather than a silent difference.`
+        : absent(
+            "Where both projections produce a table for the same decision, their shapes are cross-checked against each other.",
+            "No decision has a table in both, so nothing was cross-checked here. That is a statement about coverage, not a clean result.",
+          ),
+      "",
+    );
   }
   return out.join("\n");
 }
