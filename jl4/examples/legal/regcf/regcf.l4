@@ -67,9 +67,21 @@ TIMEZONE IS "America/New_York"
 -- guesses. See the note at that function, and README §5.
 --
 -- MODELLING NOTE. Constitutive material (eligibility, limits, tiers) is encoded
--- as `DECIDE`/`MEANS` predicates carrying the verbatim rule text inline as
--- inert prose. The obligation tail (Forms C-U / C-AR / C-TR, the advertising
--- prohibition, the resale restriction) is encoded as regulative rules.
+-- as `DECIDE`/`MEANS` predicates carrying the CFR's own words in the FIELD
+-- NAMES, with the paragraph's label riding beside its node as a truncated inert
+-- string: `"(1)" ... transfer's `to the issuer of the securities``.
+--
+-- Under the enumeration-label ruling (2026-08-03) an inert string that merely
+-- restates the node beside it is deleted -- inert never shadows active -- so a
+-- verbatim quotation survives ONLY where no active node carries its words:
+-- the four chapeaux that introduce a list, Rule 204(b)(1)-(3) (the closed
+-- permitted-content list that `includes information beyond that permitted by
+-- paragraph (b)` names only by cross-reference), and Rule 204(e) (a definition
+-- whose node is literally TRUE). The `@ref` above each rule carries the
+-- citation; the field name carries the words; the label carries the paragraph.
+--
+-- The obligation tail (Forms C-U / C-AR / C-TR, the advertising prohibition,
+-- the resale restriction) is encoded as regulative rules.
 -- ===========================================================================
 
 §§ `Parties and acts`
@@ -257,29 +269,25 @@ DECLARE IssuerProfile HAS
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(1) — not organized under State or territorial law` issuer MEANS
-        "(1) Is not organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia;"
-    ... NOT issuer's `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`
+        "(1)" ... NOT issuer's `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`
 
 @ref 17 CFR 227.100(b)(2)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(2) — an Exchange Act reporting company` issuer MEANS
-        "(2) Is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Securities Exchange Act of 1934;"
-    ... issuer's `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
+        "(2)" ... issuer's `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
 
 @ref 17 CFR 227.100(b)(3)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(3) — an investment company` issuer MEANS
-        "(3) Is an investment company, as defined in section 3 of the Investment Company Act of 1940, or is excluded from the definition of investment company by section 3(b) or section 3(c) of that Act;"
-    ... issuer's `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`
+        "(3)" ... issuer's `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`
 
 @ref 17 CFR 227.100(b)(4)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(4) — subject to a bad-actor disqualification` issuer MEANS
-        "(4) Is not eligible to offer or sell securities in reliance on section 4(a)(6) of the Securities Act as a result of a disqualification as specified in section 227.503(a);"
-    ... issuer's `subject to a disqualification as specified in section 227.503(a)`
+        "(4)" ... issuer's `subject to a disqualification as specified in section 227.503(a)`
 
 -- The limb the mirrored page omits entirely: an issuer delinquent in its Reg CF
 -- ongoing reports is disqualified from making a NEW offering.
@@ -287,15 +295,13 @@ GIVETH A BOOLEAN
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(5) — delinquent in ongoing annual reports` issuer MEANS
-        "(5) Has sold securities in reliance on section 4(a)(6) of the Securities Act and has not filed with the Commission and provided to investors, to the extent required, the ongoing annual reports required by this part during the two years immediately preceding the filing of the required offering statement; or"
-    ... issuer's `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
+        "(5)" ... issuer's `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
 
 @ref 17 CFR 227.100(b)(6)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(6) — no specific business plan, or a blank-check business plan` issuer MEANS
-        "(6) Has no specific business plan or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies."
-    ... issuer's `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
+        "(6)" ... issuer's `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
 
 @ref 17 CFR 227.100(b) — the disjunction of exclusions
 GIVEN issuer IS AN IssuerProfile
@@ -344,8 +350,7 @@ GIVETH A NUMBER
 GIVEN offering IS AN Offering
 GIVETH A BOOLEAN
 DECIDE `offering is within the offering limit` offering IF
-        "(1) The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;"
-    ... `aggregate offering amount` offering AT MOST `offering maximum in a 12-month period`
+        "(1)" ... `aggregate offering amount` offering AT MOST `offering maximum in a 12-month period`
 
 § `3. Investor investment limits — Rule 100(a)(2)`
 
@@ -444,7 +449,7 @@ GIVEN investor IS AN InvestorProfile
       `amount to be sold in this transaction` IS A NUMBER
 GIVETH A BOOLEAN
 `investor is within the investment limit` investor `amount to be sold in this transaction` MEANS
-        "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:"
+        "(2)"
     ..  `the accredited-investor carve-out applies to` investor
     ..      `aggregate amount sold to this investor including this transaction` investor `amount to be sold in this transaction`
         AT MOST `investment limit` investor
@@ -532,8 +537,7 @@ GIVEN filing   IS A FormCFiling
       offering IS AN Offering
 GIVETH A BOOLEAN
 `disclosure requirements are met` filing offering MEANS
-        "(1) Offering statement. ... an issuer offering or selling securities in reliance on section 4(a)(6) of the Securities Act ... must file with the Commission and provide to investors and the relevant intermediary a Form C: Offering Statement prior to the commencement of the offering of securities. ... Every Form C must include the information required by section 227.201."
-    ... filing's `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering`
+        "(1)" ... filing's `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering`
     AND filing's `the Form C includes the information required by section 227.201`
     AND `financial statement requirement is satisfied` offering (filing's `the financial statements supplied`)
 
@@ -552,28 +556,23 @@ DECLARE IntermediaryArrangement HAS
 GIVEN arrangement IS AN IntermediaryArrangement
 GIVETH A BOOLEAN
 `(a)(3) — conducted through a single complying intermediary` arrangement MEANS
-        "(3) The transaction is conducted through an intermediary that complies with the requirements in section 4A(a) of the Securities Act and the related requirements in this part, and the transaction is conducted exclusively through the intermediary's platform; and"
-    ... arrangement's `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part`
+        "(3)" ... arrangement's `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part`
     AND arrangement's `the transaction is conducted exclusively through the intermediary's platform`
-    AND     "Instruction to paragraph (a)(3). An issuer shall not conduct an offering or concurrent offerings in reliance on section 4(a)(6) of the Securities Act of 1933 using more than one intermediary."
-        ... arrangement's `the number of intermediaries used for the offering` EQUALS 1
+    AND     "Instruction to paragraph (a)(3)." ... arrangement's `the number of intermediaries used for the offering` EQUALS 1
 
 @ref 17 CFR 227.303(a)(2)
 GIVEN arrangement IS AN IntermediaryArrangement
 GIVETH A BOOLEAN
 `the 21-day public availability period has run` arrangement MEANS
-        "(2) This information must be made publicly available on the intermediary's platform for a minimum of 21 days before any securities are sold in the offering, during which time the intermediary may accept investment commitments;"
-    ... arrangement's `the days the issuer information has been publicly available on the intermediary's platform before any sale`
-        AT LEAST `minimum days publicly available before any sale`
+        "(2)" ... arrangement's `the days the issuer information has been publicly available on the intermediary's platform before any sale`
+                  AT LEAST `minimum days publicly available before any sale`
 
 @ref 17 CFR 227.302(b)(1); 227.303(b)(1)
 GIVEN arrangement IS AN IntermediaryArrangement
 GIVETH A BOOLEAN
 `the intermediary has discharged its investor-facing duties` arrangement MEANS
-        "(b) Educational materials. (1) In connection with establishing an account for an investor, an intermediary must deliver educational materials to such investor ..."
-    ... arrangement's `the intermediary delivered educational materials in connection with establishing the investor's account`
-    AND     "(b) Investor qualification. Each time before accepting any investment commitment ... an intermediary must: (1) Have a reasonable basis for believing that the investor satisfies the investment limitations established by section 4(a)(6)(B) of the Act and this part."
-        ... arrangement's `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations`
+        "(b) Educational materials. (1)" ... arrangement's `the intermediary delivered educational materials in connection with establishing the investor's account`
+    AND     "(b) Investor qualification. (1)" ... arrangement's `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations`
 
 @ref 17 CFR 227.100(a)(3); 227.302; 227.303
 GIVEN arrangement IS AN IntermediaryArrangement
@@ -601,8 +600,7 @@ DECLARE AdvertisingNotice HAS
 GIVEN notice IS AN AdvertisingNotice
 GIVETH A BOOLEAN
 `notice complies with Rule 204(b)` notice MEANS
-        "(b) A notice may advertise any of the terms of an issuer's offering made in reliance on section 4(a)(6) of the Securities Act if it directs investors to the intermediary's platform and includes no more than the following information:"
-    ... notice's `directs investors to the intermediary's platform`
+        "(b)" ... notice's `directs investors to the intermediary's platform`
     AND     "(1) A statement that the issuer is conducting an offering pursuant to section 4(a)(6) of the Securities Act, the name of the intermediary through which the offering is being conducted, and information (including a link in any written communications) directing the potential investor to the intermediary's platform;"
         ... "(2) The terms of the offering; and"
         ... "(3) Factual information about the legal identity and business location of the issuer, limited to the name of the issuer of the security, the address, phone number and Web site of the issuer, the email address of a representative of the issuer and a brief description of the business of the issuer."
@@ -651,38 +649,33 @@ DECLARE ReportingStatus HAS
 GIVEN status IS A ReportingStatus
 GIVETH A BOOLEAN
 `(b)(1) — became an Exchange Act reporting company` status MEANS
-        "(1) The issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act;"
-    ... status's `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act`
+        "(1)" ... status's `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act`
 
 @ref 17 CFR 227.202(b)(2)
 GIVEN status IS A ReportingStatus
 GIVETH A BOOLEAN
 `(b)(2) — one annual report filed and fewer than 300 holders of record` status MEANS
-        "(2) The issuer has filed, since its most recent sale of securities pursuant to this part, at least one annual report pursuant to this section and has fewer than 300 holders of record;"
-    ... status's `annual reports filed since the most recent sale of securities pursuant to this part` AT LEAST 1
+        "(2)" ... status's `annual reports filed since the most recent sale of securities pursuant to this part` AT LEAST 1
     AND status's `holders of record` LESS THAN `holders of record threshold`
 
 @ref 17 CFR 227.202(b)(3)
 GIVEN status IS A ReportingStatus
 GIVETH A BOOLEAN
 `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` status MEANS
-        "(3) The issuer has filed, since its most recent sale of securities pursuant to this part, the annual reports required pursuant to this section for at least the three most recent years and has total assets that do not exceed $10,000,000;"
-    ... status's `annual reports filed since the most recent sale of securities pursuant to this part` AT LEAST 3
+        "(3)" ... status's `annual reports filed since the most recent sale of securities pursuant to this part` AT LEAST 3
     AND status's `total assets` AT MOST `total assets threshold`
 
 @ref 17 CFR 227.202(b)(4)
 GIVEN status IS A ReportingStatus
 GIVETH A BOOLEAN
 `(b)(4) — all securities repurchased` status MEANS
-        "(4) The issuer or another party repurchases all of the securities issued in reliance on section 4(a)(6) of the Securities Act, including any payment in full of debt securities or any complete redemption of redeemable securities; or"
-    ... status's `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)`
+        "(4)" ... status's `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)`
 
 @ref 17 CFR 227.202(b)(5)
 GIVEN status IS A ReportingStatus
 GIVETH A BOOLEAN
 `(b)(5) — liquidated or dissolved` status MEANS
-        "(5) The issuer liquidates or dissolves its business in accordance with state law."
-    ... status's `the issuer has liquidated or dissolved its business in accordance with state law`
+        "(5)" ... status's `the issuer has liquidated or dissolved its business in accordance with state law`
 
 @ref 17 CFR 227.202(b)
 GIVEN status IS A ReportingStatus
@@ -732,22 +725,17 @@ DECLARE Transfer HAS
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
 `transfer is within the one-year restricted period` transfer MEANS
-        "may not be transferred by any purchaser of such securities during the one-year period beginning when the securities were issued in a transaction exempt from registration pursuant to section 4(a)(6) of the Securities Act,"
-    ... transfer's `days since the securities were issued` LESS THAN `days in the resale restricted period`
+    transfer's `days since the securities were issued` LESS THAN `days in the resale restricted period`
 
 @ref 17 CFR 227.501(a)(1)-(4)
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
 `transfer falls within an exception in Rule 501(a)` transfer MEANS
         "unless such securities are transferred:"
-    ..  "(1) To the issuer of the securities;"
-    ..  transfer's `to the issuer of the securities`
-    ..  "(2) To an accredited investor;"
-    ..  transfer's `to an accredited investor`
-    ..  "(3) As part of an offering registered with the Commission; or"
-    ..  transfer's `as part of an offering registered with the Commission`
-    ..  "(4) To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance."
-    ..  transfer's `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
+    ..  "(1)" ... transfer's `to the issuer of the securities`
+    ..  "(2)" ... transfer's `to an accredited investor`
+    ..  "(3)" ... transfer's `as part of an offering registered with the Commission`
+    ..  "(4)" ... transfer's `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
 
 @ref 17 CFR 227.501(a)
 GIVEN transfer IS A Transfer

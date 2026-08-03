@@ -121,7 +121,12 @@ regulation for correctness, section by section. House rules apply and the advers
 enforces them:
 
 - inert style, per the drafting guidance in the repo skill
-  (`.claude/skills/writing-l4-rules/references/drafting-patterns.md`);
+  (`.claude/skills/writing-l4-rules/references/drafting-patterns.md`) — including the
+  enumeration-label ruling of 2026-08-03: an inert string that restates the active node beside it
+  is deleted, and only the statutory item's label survives, on its node's line, joined by `...`.
+  `p3-check.sh` reads the surviving labels and **warns** (never fails) when a rule quotes them out
+  of order; gaps are counted and reported as information, because a repealed limb is a legitimate
+  gap in a consolidated text;
 - `GIVEN` preferred to `ASSUME` (unbound assumed terms stall `#EVAL` — they evaluate only when
   bound via `#CHECK … WITH` / `#TRACE … WITH` or promoted to caller-supplied parameters by
   `@export` — so plain `#EVAL` goldens over ASSUME-style modules do not exercise the logic;

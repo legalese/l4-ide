@@ -229,7 +229,7 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
   task. This is the single most important sentence on the page, because the wiki's hand-drawn BPMN
   has the same defect and no note.
 - **No deadline is a timer.** `P-DEADLINE` fires on **every** boundary event. The corpus binds each
-  period once (`regcf.l4:123-146`) and every consumer reads the binding, so a deadline is a _name_,
+  period once (`regcf.l4:227-250`) and every consumer reads the binding, so a deadline is a _name_,
   and BPMN cannot make a timer out of a name. Inlining `5` and `120` would draw prettier diagrams by
   reintroducing exactly the duplication the corpus exists to remove. **The single-sourcing that
   makes the L4 good is what costs the timer.**
@@ -307,14 +307,18 @@ Six decisions, four carriers each, all projected through the LSP from the corpus
   CFR's own sentence_; it prints at 301 and occupies 2387.8 px in a single box. (291/304 before the
   clitic ruling dropped its leading `is `; the box figure read "≈2380 px" and was measured at 2411.4
   when re-derived on 2026-08-03, so it is now the number the SVG actually carries.)
-- **A leading run of inert prose merges into one heading.** So in `regcf-resale-exceptions` the
-  chapeau and caption **(1)** become one text element, while (2)(3)(4) sit over their own rungs — and
-  a reader takes "(1) To the issuer of the securities" for preamble.
+- **A leading run of inert prose merges into one heading.** The mechanism is unchanged, but this
+  corpus stopped tripping it on 2026-08-03: under the enumeration-label ruling each caption is
+  truncated to its label and rides its own node (`.. "(1)" ... transfer's \`to the issuer …\``), so in
+  `regcf-resale-exceptions` the heading is now the chapeau alone and all four labels sit on the wires
+  into their rungs. Before the ruling the chapeau and caption **(1)** were one text element and a
+  reader took "(1) To the issuer of the securities" for preamble.
 - **The four carriers are not interchangeable.** `toMermaidRailroad` deliberately drops medial inert
   glue inside an `OR` (a railroad `choice` branch is a live path, and prose-as-branch would make the
-  disjunction trivially satisfiable — correct, and documented in `mermaid.ts`). So the `.mmd` for
-  the resale exceptions carries the merged preamble and **none** of limbs (2)(3)(4); the `.svg`,
-  `.txt` and `.sentences` carry all four. **Do not treat one carrier as a stand-in for another.**
+  disjunction trivially satisfiable — correct, and documented in `mermaid.ts`). That discard is still
+  there and still bites any rule that puts prose between two live `..` rungs; it no longer bites this
+  one, because the labels are now inside their branches and the `.mmd` carries all four. **Do not
+  treat one carrier as a stand-in for another.**
 
 ### The prose carrier, and its own limit
 

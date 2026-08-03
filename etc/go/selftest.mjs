@@ -2208,6 +2208,96 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
 }
 // ===== END de-novo deposit-stage checks =====================================
 
+// ===== BEGIN label-order checks (owner: p3-check label lint) ================
+//
+// p3-check.sh's label-order lint is WARNING level and never moves a status.
+// That is exactly the shape that rots unnoticed: nothing goes red when it stops
+// firing, and nothing goes red when it starts firing on faithful text either.
+// So both directions are pinned here — a disordered run must warn, and a GAPPED
+// run must NOT, because Meng's ruling is that "real legislation goes wobbly" and
+// a repealed limb is a legitimate gap. The third check pins the invariant that
+// makes the lint safe to leave on: neither outcome touches status.
+{
+  const { scanText, scoreRun, parseLabel } = await import(
+    "./lib/label-order.mjs"
+  );
+
+  // The shape the ruling produces: a label-only inert string joined to its node
+  // by `...`, inside a `..` disjunction. Built as a template so the two fixtures
+  // differ ONLY in their labels.
+  const rule = (labels) =>
+    [
+      "",
+      "GIVEN x IS A BOOLEAN",
+      "GIVETH A BOOLEAN",
+      "`r` x MEANS",
+      ...labels.map((l) => `    ..  "${l}" ... x`),
+      "",
+    ].join("\n");
+
+  check(
+    "an out-of-order label run warns",
+    (() => {
+      const r = scanText(rule(["(1)", "(3)", "(2)"]), "fixture.l4");
+      return (
+        r.warnings.length === 1 &&
+        /out of order/.test(r.warnings[0]) &&
+        /\(1\)/.test(r.warnings[0])
+      );
+    })(),
+  );
+
+  check(
+    "a GAPPED label run does not warn — a repealed limb is a legitimate gap",
+    (() => {
+      const r = scanText(rule(["(a)", "(c)", "(d)"]), "fixture.l4");
+      return r.warnings.length === 0 && r.gaps === 1;
+    })(),
+  );
+
+  // The status invariant, stated where a future editor of p3-check.sh will trip
+  // over it: the lint contributes to FINDINGS nowhere. Read the phase source
+  // rather than assert it about a mock, because the mock is not what ships.
+  check(
+    "neither the warning nor the gap count can move p3-check's status",
+    (() => {
+      const src = readFileSync(resolve(HERE, "phases/p3-check.sh"), "utf8");
+      const block = src.slice(src.indexOf("--- 4. label order"));
+      const upToStatus = block.slice(0, block.indexOf("--- 5."));
+      return (
+        /LABEL_WARNINGS/.test(upToStatus) &&
+        /LABEL_GAPS/.test(upToStatus) &&
+        !/FINDINGS=/.test(upToStatus)
+      );
+    })(),
+  );
+
+  // The scheme reader is the part most likely to be "improved" into crying
+  // wolf. `(i)` is both the ninth letter and roman one; an inserted `(1A)` is
+  // not a gap; and a run is disordered only when NO scheme orders it.
+  check(
+    "roman (i)(ii)(iv) reads as roman, one gap, in order",
+    (() => {
+      const s = scoreRun(["i", "ii", "iv"]);
+      return s.scheme === "roman" && s.ordered && s.gaps === 1;
+    })(),
+  );
+  check(
+    "an inserted (1A) sits between (1) and (2) and is not a gap",
+    (() => {
+      const s = scoreRun(["1", "1A", "2"]);
+      return s.ordered && s.gaps === 0;
+    })(),
+  );
+  check(
+    "a string carrying a rubric is not a label, so it is never ordered",
+    parseLabel("(b) Educational materials. (1)") === null &&
+      parseLabel("(1) To the issuer of the securities;") === null &&
+      parseLabel("(2)(b)(ii)") !== null,
+  );
+}
+// ===== END label-order checks ===============================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

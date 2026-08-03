@@ -557,6 +557,69 @@ operative outcome** (no `DECIDE`/deontic). Keeps the corpus gap-free and auditab
 #EVAL `former Ground 3 text (REPEALED)`
 ```
 
+### Inert never shadows active — quote the label, not the sentence
+
+**Ruling (Meng, 2026-08-03), applied to the Reg CF, BNA and Jersey charities corpora.** An inert string
+that restates the words of the active node beside it is **deleted**. What survives is the statutory item's
+**label**, truncated, on the **same line as its node**, joined by the `...` continuation token:
+
+```l4
+`transfer falls within an exception in Rule 501(a)` transfer MEANS
+        "unless such securities are transferred:"
+    ..  "(1)" ... transfer's `to the issuer of the securities`
+    ..  "(2)" ... transfer's `to an accredited investor`
+```
+
+The reason is what a reader sees. A ladder diagram renders inert prose as italic text beside the node it
+sits on, so a full quotation next to a field name that already _is_ that quotation prints the same sentence
+twice — once as law, once as code — and the reader has to diff them by eye to learn they agree. **The active
+node is the authority; the inert string must never compete with it.** The `@ref` above the rule already
+carries the citation, so the label is enough to find the source.
+
+Three parts of the ruling that are easy to get wrong:
+
+1. **Same line, joined by `...`.** Two `..` rungs — the label on one, the node on the next — make the label
+   its own operand, which is a separate box in the ladder. The `...` join attaches it to the node instead.
+2. **ASCII three dots.** `…` is not a token. The lexer says so:
+   ```
+   11 |   ..  "(1)" … transfer's `to the issuer`
+      |             ^
+   unexpected '…'
+   expecting "'s", "--", "..", "...", "/*", "//", …
+   ```
+3. **Never bare juxtaposition.** Dropping the `...` is function application, and it type-errors on any
+   node whose head is a record binder:
+
+   ```
+   You are trying to apply
+
+     transfer (defined at single-line.l4:9:21-29) of type Transfer
+
+   (which is not a function) to 1 argument here.
+   ```
+
+   Measured 2026-08-03 (`l4 check` exit 1). The `...` form checks clean, preserves the OR semantics
+   ((T,F)→TRUE, (F,F)→FALSE, (F,T)→TRUE) and `l4 format` round-trips it byte-identically.
+
+**Labels do not move into terms.** A field is named for the fact it asserts, not for the paragraph that
+asserts it — `` transfer's `to the issuer of the securities` ``, never `` transfer's `501(a)(1)` ``.
+
+**Two strings still stay whole.** A **chapeau** — text ending in a colon or dash that introduces the limbs
+below it — keeps its own line, _unless_ its substance duplicates the limbs, in which case it truncates to
+its own label like anything else. And an inert string whose content appears in **no** active node stays
+verbatim: a deemed fact (BNA s 1(2)(a)-(b), which are deemed rather than tested), a closed permitted-content
+list that an active node references only by cross-reference (Reg CF Rule 204(b)(1)-(3)), or a pure
+definition carrier whose node is literally `TRUE` (Rule 204(e)). Those are not shadows; they are the only
+place the words live.
+
+**The lint.** `etc/go/phases/p3-check.sh` reads the surviving label-only strings within each rule and warns
+when a run is out of order. It is **warning level and never affects status**, because — Meng again — "real
+legislation goes wobbly": a consolidated Act quotes repealed limbs by omitting them, so `(a) (c) (d)` is
+normal and **gaps are counted as information, not as a warning**. The scheme reader
+(`etc/go/lib/label-order.mjs`) handles `(1)(2)`, inserted `(1A)`, `(a)(b)` and roman `(i)(ii)(iv)`, and calls
+a run disordered only when no scheme orders it — `(i)` is both a letter and a roman one, and guessing wrong
+would cry wolf.
+
 ### Provenance — pin every inert string; resolve amendments to the in-force reading
 
 **Practice:** pin every inert string to authoritative text. Resolve textual-amendment markers

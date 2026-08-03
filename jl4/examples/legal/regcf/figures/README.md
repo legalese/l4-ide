@@ -9,12 +9,16 @@ Generated, never hand-drawn. Six decisions from `../regcf.l4`, four carriers eac
 | `.mmd`       | Mermaid `railroad-beta`                 | `@repo/ladder-core` `toMermaidRailroad`      |
 | `.sentences` | **readable prose** — one per way to satisfy | `@repo/ladder-core` `expandSentences`     |
 
-**The four are not interchangeable.** `toMermaidRailroad` deliberately drops medial
-inert glue inside an `OR` (a railroad `choice` branch is a live path, and
-prose-as-branch would make the disjunction trivially satisfiable — correct, and
-documented in `mermaid.ts`), so `regcf-resale-exceptions.mmd` carries the chapeau and
-**none** of limbs (2)(3)(4)'s captions while the other three carry all four. Do not
-treat one carrier as a stand-in for another.
+**The four are not interchangeable**, though as of 2026-08-03 this corpus no longer
+demonstrates it. `toMermaidRailroad` still deliberately drops medial inert glue inside
+an `OR` (a railroad `choice` branch is a live path, and prose-as-branch would make the
+disjunction trivially satisfiable — correct, and documented in `mermaid.ts`). Until the
+enumeration-label ruling, `transfer falls within an exception in Rule 501(a)` put each
+caption on its own rung, so `regcf-resale-exceptions.mmd` carried the chapeau and
+**none** of limbs (2)(3)(4). The labels now ride their own nodes via `...`, so each is
+inside a `sequence(terminal("(n)"), nonterminal(…))` branch and all four survive. The
+mechanism is unchanged; nothing in this corpus trips it. Still do not treat one carrier
+as a stand-in for another — see §3 and §4.
 
 The `.sentences` carrier is a **disjunction** view and degrades on conjunctions:
 `regcf-rule-100b.sentences` is six clean numbered limbs, while
@@ -63,12 +67,26 @@ absent from a figure still passes, and layout is not checked at all. Run
 
 | Slug                         | Decision (`regcf.l4`)                                  | Scene       | Longest leaf |
 | ---------------------------- | ------------------------------------------------------- | ----------- | ------------ |
-| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:211)              | 912 × 571   | 78 ch        |
-| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:550)     | 1006 × 505  | 90 ch        |
-| `regcf-transfer-permitted`   | `transfer is permitted` (:615)                          | 846 × 269   | 63 ch        |
-| `regcf-intermediary`         | `intermediary obligations are met` (:452)               | 2054 × 180  | 75 ch        |
-| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:601) | 2683 × 444 | **304 ch**   |
-| `regcf-exemption`            | `the transaction qualifies…` (:643)                     | **3027 × 185** | 61 ch     |
+| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:309)              | 912 × 571   | 78 ch        |
+| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:683)     | 1006 × 505  | 90 ch        |
+| `regcf-transfer-permitted`   | `transfer is permitted` (:743)                          | 846 × 269   | 63 ch        |
+| `regcf-intermediary`         | `intermediary obligations are met` (:580)               | 2054 × 180  | 75 ch        |
+| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:733) | 2751 × 440 | **301 ch**   |
+| `regcf-exemption`            | `the transaction qualifies…` (:771)                     | **3027 × 185** | 61 ch     |
+
+Every scene size in that table is the emitted SVG's `viewBox`, and every line reference
+is the line of the decision's `MEANS`/`DECIDE` head in `regcf.l4` as it stands in this
+commit. Both were checked on 2026-08-03 by reading the SVGs and the corpus, not carried
+over from a previous run.
+
+Nothing regenerates these numbers, and they have now drifted twice, so re-derive them
+whenever you regenerate the figures — and re-derive them **last**, after the corpus has
+stopped moving. The refs this table carried before the enumeration-label ruling read
+`:211 :550 :615 :452 :601 :643` against a corpus whose actual lines were
+`303 690 755 581 741 783`. The first attempt at repairing them, made in this same
+branch, replaced them with `297 671 731 568 721 759` — measured correctly but *before*
+the last twelve lines of corpus edits landed above them, so every one was uniformly
+twelve short. Measuring early is the failure mode here, not measuring wrongly.
 
 The corpus has **34** visualisable decisions in total (every boolean-returning
 `DECIDE`/`MEANS`; the LSP code lens does not require `@export`). These six were
@@ -103,42 +121,54 @@ wide on its own. Only **inert** prose wraps, and only to two balanced lines
 (`balanceTwoLines`, gated at `STRADDLE_MIN_WIDTH`), and only when it is riding a
 wire; an `OR` heading is a single line however long.
 
-### 3. A leading run of inert prose is merged into ONE heading
+### 3. A leading run of inert prose is merged into ONE heading — REPAIRED AT THE SOURCE 2026-08-03
 
-`leadingInert` collects the whole leading run of `InertE` children and joins them
-with a space (`layout.ts:349-355`). In `transfer falls within an exception`, the
-corpus interleaves each paragraph's caption with its operative limb:
+`leadingInert` still collects the whole leading run of `InertE` children and joins
+them with a space (`layout.ts:349-355`). Until 2026-08-03 the corpus interleaved each
+paragraph's caption with its operative limb, one `..` rung each:
 
 ```
 "unless such securities are transferred:"
-"(1) To the issuer of the securities;"        <- caption
+"(1) To the issuer of the securities;"        <- caption, its own rung
 transfer's `to the issuer of the securities`
-"(2) To an accredited investor;"              <- caption
+"(2) To an accredited investor;"              <- caption, its own rung
 transfer's `to an accredited investor`
 …
 ```
 
-so the chapeau and caption **(1)** are both in the leading run. The figure's
-heading therefore reads
+so the chapeau and caption **(1)** both fell in the leading run and the group heading
+read `unless such securities are transferred: (1) To the issuer of the securities;` as
+one line, while (2), (3) and (4) sat over their own rungs. The figure was asymmetric,
+and a reader took "(1) To the issuer of the securities" for part of the preamble.
 
-> unless such securities are transferred: (1) To the issuer of the securities;
+The enumeration-label ruling removed the cause rather than the symptom. The caption no
+longer restates the field beside it, and what survives of it rides its own node:
 
-as a single line at the top of the group, while captions (2), (3) and (4) sit
-directly above their own rungs. The figure is asymmetric, and a reader takes
-"(1) To the issuer of the securities" for part of the preamble. Verifiable in
-`regcf-resale-exceptions.svg`: one `<text>` prim at `y=87.8` carries both.
+```
+    ..  "(1)" ... transfer's `to the issuer of the securities`
+```
 
-### 4. Mermaid drops the medial captions altogether
+so the leading run is the chapeau alone and each label sits on the wire into its own
+rung. Verify in `regcf-resale-exceptions.svg`: four italic `<text>` prims reading
+`(1)` `(2)` `(3)` `(4)`, and one heading `<text>` at `y=87.8` carrying the chapeau and
+nothing else. **The layout mechanism is unchanged** — feed it two leading inert strings
+and it will still merge them.
+
+### 4. Mermaid drops the medial captions altogether — no longer triggered here
 
 `toMermaidRailroad` hoists the leading inert run in front of the fan and
 **deliberately discards medial inert glue** in an `OR` — because every child of a
 railroad `choice` is a live branch, and emitting prose as a branch would add a
 free pass-through that makes the disjunction trivially satisfiable. The reasoning
-is right and it is documented in `mermaid.ts`. The consequence for an
-inert-style statutory corpus is that `regcf-resale-exceptions.mmd` carries the
-merged "chapeau + (1)" preamble and **none** of (2), (3) or (4). The SVG and
-ASCII carriers keep all four. Do not treat the three carriers as interchangeable
-for inert-style sources.
+is right and it is documented in `mermaid.ts`. Until 2026-08-03 the consequence for
+this corpus was that `regcf-resale-exceptions.mmd` carried the merged "chapeau + (1)"
+preamble and **none** of (2), (3) or (4).
+
+Once each label rides its node, there is no medial inert glue left to discard: the
+`.mmd` now emits `choice(sequence(terminal("(1)"), nonterminal(…)), …)` and carries all
+four. **The discard is still there** and will still bite any rule that puts prose
+between two live `..` rungs, so the carriers remain non-interchangeable for
+inert-style sources.
 
 ## What is right about them
 
