@@ -351,7 +351,7 @@
     },
     {
       "file": "s2-05-what-the-issuer-may-say.law.md",
-      "sha256": "sha256:d057721b1ee4502e0883d2d2f6365a8b01f0e79e9cafb884fad677248cfc7c48",
+      "sha256": "sha256:5bef8af299778dfe7e660d65e457ed92236bdb25960b1b33340707446cded452",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
@@ -445,7 +445,7 @@
     },
     {
       "file": "s2-07-what-buyers-may-do.law.md",
-      "sha256": "sha256:e70bc66e65f3c9fe65be626aaa3e134c30cb2b5a5379dbe36f76e0670e8362ea",
+      "sha256": "sha256:7c143dbc016f45899007affe7c80ae5a6c03495e2159a1b1d0ec9dd9c97f7034",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [

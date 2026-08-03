@@ -1,6 +1,6 @@
 Whoever buys in a Regulation Crowdfunding offering may not resell for one year.
 Rule 501(a) restricts transfer
-[during the one-year period beginning when the securities were issued](src:jl4/examples/legal/regcf/regcf.l4#L718-L719 "verbatim"),
+"[during the one-year period beginning when the securities were issued](src:jl4/examples/legal/regcf/regcf.l4#L718-L719 "verbatim")",
 [unless such securities are transferred:](src:jl4/examples/legal/regcf/regcf.l4#L734 "verbatim")
 
 1. [to the issuer of the securities](src:jl4/examples/legal/regcf/regcf.l4#L735 "verbatim");
