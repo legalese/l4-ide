@@ -242,10 +242,35 @@ boolean-returning `DECIDE`s can be visualized — anything else is a `400`, as i
 any decision whose ladder exceeds `--max-ladder-nodes` (see [Resource
 Limits](#resource-limits)).
 
-> **Caveat.** The `atomId` on each ladder leaf is not currently in the same
-> namespace as the keys of `query-plan`'s `impactByAtomId`, so the two cannot be
-> joined. See `ladderHandler` in `src/DataPlane.hs` for why, and the `KNOWN GAP`
-> case in `test/IntegrationSpec.hs` for the pinned behaviour.
+Ladder leaves and `query-plan` atoms are now in **one** `atomId` namespace. Every
+`atomId` the plan reports — in `ranked`, `stillNeeded`, `asks[].atoms`, and as a
+key of `impactByAtomId` — appears on the diagram, and **is** accepted as a binding
+key in `arguments`. Fetch the diagram once, then post answers keyed by what the
+diagram calls its leaves.
+
+> **The containment runs one way.** Every plan atom is a ladder leaf; not every
+> ladder leaf is a plan atom. The standing exception is the boolean **arguments of
+> an `App`**: the visualiser draws them, but `vizExprToBoolExpr` compiles the whole
+> application to a single BDD variable and does not descend, so the arguments are
+> not atoms, carry no `impactByAtomId` entry, and binding one does nothing. That
+> was true before this change and is still true; what changed is that they now keep
+> a UUID instead of being rewritten to a bare decimal that a client could not tell
+> apart from a `unique` binding key. `QueryPlanSpec`'s
+> `atom identity, across shapes` group pins both the containment and its exception.
+
+> **An atomId names a QUESTION, not a node.** It is a UUID5 over
+> `"function | label | refs"`, so two occurrences of one condition — which a
+> ladder in AND/OR normal form produces routinely, since reaching that form
+> distributes OR over AND — carry the **same** `atomId` and different `unique`s.
+> That is intended: binding the atomId binds every occurrence at once, which is
+> what "the user answered that question" means. If you need to address a single
+> occurrence, bind its `unique` (as a decimal string) instead.
+>
+> This was broken until 2026-08-03 (upstream `smucclaw/l4-ide#935`): the two
+> surfaces minted ids in different namespaces, so a binding keyed by a ladder
+> `atomId` returned `200` and silently did nothing. `QueryPlanSpec`'s
+> `atom identity` group and the `ladder` cases in `test/IntegrationSpec.hs` pin
+> both halves, including end-to-end that such a binding moves `determined`.
 
 ### MCP (Model Context Protocol)
 

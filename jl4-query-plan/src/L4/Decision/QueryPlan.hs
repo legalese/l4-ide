@@ -271,10 +271,24 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     atomIdByUniqueMap :: Map Int Text
     atomIdByUniqueMap = atomIdByUnique name paramsByUnique cached
 
-    uniqueByAtomId :: Map Text Int
-    uniqueByAtomId =
-      Map.fromList
-        [ (aid, u)
+    -- | The inverse of 'atomIdByUniqueMap', kept ONE-TO-MANY on purpose.
+    --
+    -- An atomId is a hash of (function, label, input refs) — it names a
+    -- QUESTION, not an occurrence. Two occurrences of one compound leaf get
+    -- fresh @unique@s from 'L4.Viz.Ladder.leafFromExpr' but identical labels and
+    -- identical ref closures, so they are twins under one atomId: one question,
+    -- two BDD variables.
+    --
+    -- This used to be a @Map.fromList@, which is last-wins. A user who answered
+    -- that question bound exactly one twin and the other stayed unknown forever
+    -- — so a decision that the answer settles outright stayed Undetermined, and
+    -- the wizard kept asking a question it had already been told the answer to.
+    -- Keeping the whole list is what makes answering a question reach every
+    -- occurrence of it.
+    uniquesByAtomId :: Map Text [Int]
+    uniquesByAtomId =
+      Map.fromListWith (<>)
+        [ (aid, [u])
         | (u, aid) <- Map.toList atomIdByUniqueMap
         ]
 
@@ -368,7 +382,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       Map.lookup k labelToUniques
         <|> Map.lookup ("`" <> k <> "`") labelToUniques  -- Try with backticks if key has spaces
         <|> (pure <$> parseUniqueKey k)
-        <|> (pure <$> Map.lookup k uniqueByAtomId)
+        <|> Map.lookup k uniquesByAtomId
 
     -- Apply boolean bindings to atoms by:
     -- - exact label match (including dotted keys)
@@ -419,12 +433,48 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
         )
         res.impact
 
+    -- | Impact keyed by atomId, i.e. BY QUESTION.
+    --
+    -- For the ordinary case — one atomId, one unique — this is exactly the
+    -- per-variable impact 'BDQ.queryDecision' already computed, unchanged.
+    --
+    -- For a twin group it cannot be, and using either twin's entry would be a
+    -- lie in the direction that matters: a binding keyed by this atomId now
+    -- reaches EVERY twin (see 'uniquesByAtomId'), so the honest answer to "what
+    -- happens if I answer this question true" is the outcome with all of the
+    -- group's variables set, not one of them. Answering a question is one move,
+    -- and its impact must be the impact of that move.
+    --
+    -- Costs two extra BDD restrictions per group of size > 1 and nothing at all
+    -- otherwise, so single-atom models keep both their old numbers and their old
+    -- runtime. An entry is emitted only for a group at least one of whose
+    -- members the decision still turns on — for a singleton that is exactly the
+    -- old @Map.member u impactJson@ guard, so a model without twins keeps the
+    -- same keys and the same values it had before.
+    impactOfGroup :: [Int] -> Maybe QueryImpact
+    impactOfGroup us =
+      case us of
+        [] -> Nothing
+        [u] -> Map.lookup u impactJson
+        _ | not (any (`Map.member` impactJson) us) -> Nothing
+        _ ->
+          let
+            outcomeWith :: Bool -> QueryOutcome
+            outcomeWith b =
+              let r =
+                    BDQ.queryDecision
+                      cached.compiled
+                      cached.priorsByUnique
+                      (knownBindings <> Map.fromList [(u, b) | u <- us])
+               in QueryOutcome r.determined r.verdict (atomsOfSet r.support)
+           in Just (QueryImpact (outcomeWith True) (outcomeWith False))
+
     impactByAtomIdJson :: Map Text QueryImpact
     impactByAtomIdJson =
       Map.fromList
-        [ (atomIdByUniqueMap Map.! u, imp)
-        | (u, imp) <- Map.toList impactJson
-        , Map.member u atomIdByUniqueMap
+        [ (aid, imp)
+        | (aid, us) <- Map.toList uniquesByAtomId
+        , Just imp <- [impactOfGroup (List.nub us)]
         ]
 
     atomParamDeps :: Int -> [Int]

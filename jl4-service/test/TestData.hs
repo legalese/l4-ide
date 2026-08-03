@@ -18,6 +18,7 @@ module TestData (
   importedRecordDeclJL4,
   importedRecordMainJL4,
   dnfBlowupJL4,
+  twinLeavesJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -175,6 +176,29 @@ GIVEN walks IS A BOOLEAN
       drinks IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
+|]
+
+-- | A decision with TWIN atoms: one compound leaf written twice.
+--
+-- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes
+-- through 'L4.Viz.Ladder.leafFromExpr', which mints a fresh @unique@ per
+-- occurrence. The two occurrences share a label and an input-ref closure, so
+-- 'L4.Viz.Ladder.generateAtomId' gives them one atomId between them: one
+-- question, two BDD variables.
+--
+-- Answering that question FALSE refutes both disjuncts and settles the whole
+-- decision — but only if the binding reaches both variables. That makes "did
+-- the answer land" observable on the wire as a change in @determined@, rather
+-- than as a property of a map. Used by the atomId tests in 'IntegrationSpec'.
+twinLeavesJL4 :: Text
+twinLeavesJL4 =
+  [i|
+@export twins
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE twins IF (n GREATER THAN 5 AND p) OR (n GREATER THAN 5 AND q)
 |]
 
 -- | @(x0 AND x1) OR (x2 AND x3) OR …@ over @n@ boolean parameters, as an
