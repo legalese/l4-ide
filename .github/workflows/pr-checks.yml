@@ -175,6 +175,23 @@ jobs:
   # resolve "whatever is newest today"). That pinning is what makes the cache
   # key stable.
   #
+  # No `needs`, no `if`, no paths filter — deliberately. This check exists BECAUSE
+  # the filters cannot see the failure it catches: a `.l4` added under
+  # jl4/examples/ matches no filter, so the Haskell job does not run, so the PR
+  # that ships a corpus without its goldens is green and the golden suite goes red
+  # on somebody else's branch instead. That happened twice in one day (PR #202,
+  # the BNA; PR #212, the Jersey charities cleanroom). Node-only, ~1 s, no build.
+  corpus-goldens:
+    name: Corpus Goldens Present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      - name: Every corpus .l4 ships its four goldens
+        run: node etc/check-corpus-goldens.mjs
+
   # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
   # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
   # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,

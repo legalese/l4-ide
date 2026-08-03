@@ -86,7 +86,7 @@ the string anywhere is `-Wno-name-shadowing` in `jl4-wasm`.
 Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-lsp-test`,
 `jl4-service-test`, `jl4-mlir-test`, `jl4-websessions-test`.
 
-### 3.1 Two traps that produce fake failures
+### 3.1 Three traps that produce fake failures
 
 **Pin `JL4_LIBRARY_PATH` when running goldens locally.** CI sets it
 (`.github/workflows/pr-checks.yml`); without it you get unrelated failures that look like
@@ -97,6 +97,21 @@ machine-independence.
 **Use the pinned prettier.** A bare `npx prettier` resolves to whatever is current, which reformats
 markdown tables differently from `3.4.2` and fails `format:check` on files you did not mean to
 touch. Run `npx prettier@3.4.2` or the repo-local binary.
+
+**A new corpus ships its goldens in the same commit as its `.l4`.** `jl4-test` writes four goldens
+per file (`<dir>/tests/<stem>.{golden,ep.golden,nlg.golden,schema.golden}`) and `failFirstTime` is
+`True`, so a `.l4` with no `tests/` directory turns the whole suite red. You will not see it: no
+paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not run on your PR, and
+the failure surfaces on the next person's branch instead. Generate them by running `cabal test
+jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the
+`.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
+looked at is how a wrong answer becomes the expected answer.
+
+> **Why.** This went off twice in one day. The BNA corpus landed without goldens in PR #195 and was
+> repaired by #202; eleven hours later the Jersey charities cleanroom did the same in #201 and was
+> repaired by #212 — after it had already knocked another PR out of the merge queue. `etc/check-corpus-goldens.mjs`
+> now runs in CI on every event with no filter and no build, and names the missing files. If you are
+> reading this because that check failed, it has done its job.
 
 ---
 
