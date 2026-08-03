@@ -507,6 +507,51 @@ elsewhere should say "SI-Rn".
   not to a moment" means when the content moves. Whatever supersedes R8 inherits this
   constraint.
 
+- **R9 — canon as an INDEX rather than a monorepo**: **PROPOSED 2026-08-03 (Meng); not yet
+  ruled.** Adopt the model Claude Code uses for plugins and skills: a **marketplace** that is a
+  thin index layer over GitHub. Encodings live in their authors' own repositories; canon
+  maintains an index of known L4 encodings — name, jurisdiction, citation, source repo, version,
+  licence — and resolves them on demand. The mechanism is not speculative: this repository
+  already ships `.claude-plugin/marketplace.json` in exactly that shape (`name`, `owner`,
+  `metadata`, `plugins[]`, each carrying a `source` of `{source: github, repo, path}`), so the
+  pattern is one we already operate rather than one we would be inventing.
+
+  **This does not mitigate R8's worst consequence; it dissolves it.** R8 must make merges
+  content-preserving, because a maintainer's edit invalidates the contributor's HG1 signature.
+  Under an index **nobody merges content at all** — the maintainer accepts or rejects an index
+  entry, the encoding never moves, and the signature keeps verifying indefinitely. The
+  unenviable job shrinks from reviewing an encoding to reviewing a row.
+
+  **Two further fits, the second substantive.** (a) It matches the **cottage industry** in
+  _Deep Dive: The Supply Side_ (l4-pitch): a firm keeps its encodings in its own repository
+  under its own name — better for the firm than donating them into somebody else's monorepo —
+  and the index points at them. (b) It makes **competing encodings of the same statute
+  first-class**. Two firms may index two readings of the same section, each signed by its own
+  author. That is not a collision to disambiguate away; it is the **fork register at repository
+  scale**, and this project already holds that under-determination is a property of law rather
+  than a defect in an encoding.
+
+  **The costs, which are why this says PROPOSED:**
+
+  1. **Availability.** A monorepo holds content; an index holds a pointer. Indexed repos get
+     renamed, force-pushed, made private, deleted. Mitigation: pin each entry by **commit SHA
+     plus content digest**; whether canon also mirrors is a separate decision.
+  2. **Verification moves to fetch time.** A consumer must retrieve before checking anything, so
+     each entry must carry the digest of what was indexed — otherwise "indexed" says nothing
+     about what you actually got.
+  3. **Indexed is not reviewed is not signed.** Three distinct claims; the index must keep them
+     structurally distinct or listing becomes implied endorsement.
+  4. **Namespace.** Who holds `uk/housing-act-1988`? If competing encodings are first-class then
+     names cannot be exclusive, and entries need author-qualified identity.
+  5. **Supply chain.** The pipeline runs exporters over indexed L4. Fetching and processing a
+     stranger's encoding is a trust decision a monorepo made implicitly and an index makes
+     explicit.
+
+  **Open for Meng:** whether R9 supersedes R8 outright or the two coexist (canon holding a small
+  curated set _and_ indexing the rest); whether entries pin by SHA; whether canon mirrors against
+  link rot. **Until ruled, R8 stands** — and R8's own standing instruction already anticipates
+  replacement, so nothing need be argued to retire it.
+
 ---
 
 _What review changed (adversarial pass, 2026-07-31 — three read-only Opus lenses, 95 claims
