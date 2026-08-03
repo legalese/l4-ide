@@ -328,6 +328,46 @@ export function lintNarrative(text) {
         });
     }
 
+    // N-UNDATED. A figure asserted in the bare present goes stale silently, and
+    // the reader has no way to know when it was true. This is not a hypothetical
+    // failure mode for this project: the comparison note in the Lexipedia
+    // section is precisely about a superseded threshold surviving in four places
+    // on somebody else's page. Reg CF's own caps have already moved once
+    // ($107,000 -> $124,000, $1,070,000 -> $5,000,000), so every one of them
+    // WILL go stale.
+    //
+    // House form: `at time of writing ({{as_of}}), $5,000,000`. The date is a
+    // placeholder resolved from the section's own `drafted_on` in
+    // provenance.json, never typed -- a typed date is the same defect one level
+    // up, and re-blessing a narrative file moves it automatically.
+    //
+    // Satisfied by {{as_of}}, by an explicit ISO date, or by naming the regime
+    // the figure belongs to (the temporal axis makes that the strongest form).
+    if (
+      /[$\u00a3\u20ac][0-9]/.test(line) ||
+      /\bper cent\b|\bpercent\b/.test(line)
+    ) {
+      const present =
+        /(^|[^A-Za-z])(currently|today|presently|nowadays|at present|right now|as of (now|today))([^A-Za-z]|$)/i.test(
+          line,
+        );
+      const dated =
+        line.includes("{{as_of}}") ||
+        /\b\d{4}-\d{2}-\d{2}\b/.test(line) ||
+        /at time of writing/i.test(line) ||
+        /\bunder the (earlier|former|previous|old) (rule|regime)\b/i.test(
+          line,
+        ) ||
+        /\bbefore\b|\bafter\b|\bsince\b|\buntil\b/i.test(line);
+      if (present && !dated)
+        out.push({
+          line: n,
+          code: "N-UNDATED",
+          message:
+            "a figure asserted in the bare present; write `at time of writing ({{as_of}}), $X` so the claim carries the date it was true, or name the regime it belongs to",
+        });
+    }
+
     // A citation-looking construct that does not parse is worse than none: it
     // reads as checked and is not. Every `](src:` / `](art:` in the line must
     // fall inside a span that the full grammar matched.

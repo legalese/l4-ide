@@ -13,7 +13,7 @@ rolling twelve months. It is the provision most likely to matter to a member of
 the public, and it is a formula rather than a table.
 
 There are two limbs, and which one applies turns on a single cut point,
-currently [$124,000](src:jl4/examples/legal/regcf/regcf.l4#L163):
+at time of writing ({{as_of}}) [$124,000](src:jl4/examples/legal/regcf/regcf.l4#L163):
 
 - **If either annual income or net worth is below the cut point**, the cap is the
   greater of [$2,500](src:jl4/examples/legal/regcf/regcf.l4#L172) and five per

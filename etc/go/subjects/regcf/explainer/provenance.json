@@ -15,7 +15,7 @@
         {
           "path": "jl4/examples/legal/regcf/PROJECTIONS.md",
           "sha256": "sha256:595d06f2251ea94bbfab501d4f8450de9a8f419ffa1c3438953ed9f3b73c953b",
-          "anchor": "\u00a75 the deployable surface \u2014 its route recipe and its three 'what this projection cannot say' items. NOT its export or tool counts: \u00a75's prose said five @exports and its dated live measurement recorded nine tools, both taken before the sixth export landed. The counts in this section come from the run's own p7-mcp receipt."
+          "anchor": "§5 the deployable surface — its route recipe and its three 'what this projection cannot say' items. NOT its export or tool counts: §5's prose said five @exports and its dated live measurement recorded nine tools, both taken before the sixth export landed. The counts in this section come from the run's own p7-mcp receipt."
         },
         {
           "path": "ts-apps/regcf-wizard/README.md",
@@ -25,7 +25,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
           "sha256": "sha256:5c83e7a81b7991b95c11470d63ffaa2af9ce99dc14287b889bace26915f652f8",
-          "anchor": "\u00a7 The exported entry points, L540-L622 \u2014 the authoritative export set"
+          "anchor": "§ The exported entry points, L540-L622 — the authoritative export set"
         }
       ],
       "review": {
@@ -46,7 +46,7 @@
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a75 the nine honest limits"
+          "anchor": "§5 the nine honest limits"
         },
         {
           "path": "etc/go/subjects/regcf/NOTES.md",
@@ -82,12 +82,12 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a7 scope note and \u00a7 Parties and acts, L11-L93"
+          "anchor": "§ scope note and § Parties and acts, L11-L93"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a71 what this corpus is"
+          "anchor": "§1 what this corpus is"
         }
       ],
       "review": {
@@ -113,7 +113,7 @@
         {
           "path": "jl4/examples/legal/regcf/PROJECTIONS.md",
           "sha256": "sha256:595d06f2251ea94bbfab501d4f8450de9a8f419ffa1c3438953ed9f3b73c953b",
-          "anchor": "\u00a71-\u00a74 what each projection preserves and loses"
+          "anchor": "§1-§4 what each projection preserves and loses"
         }
       ],
       "review": {
@@ -134,12 +134,12 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a7 Top-level, L755-L777; modelling note, L69-L85"
+          "anchor": "§ Top-level, L755-L777; modelling note, L69-L85"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a75 honest limits"
+          "anchor": "§5 honest limits"
         }
       ],
       "review": {
@@ -153,14 +153,14 @@
     },
     {
       "file": "s2-01-the-bargain.law.md",
-      "sha256": "sha256:7022c27dbaf81e1958bf01aa4a5eff2e51d4a54fa0e6fed1d6e71b6fd5255442",
+      "sha256": "sha256:5cae9ac85aec34a609546f4944d8a66b9dec39fb91a8b67108d114d45536930c",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a7 Top-level, L755-L777; \u00a7 Thresholds, L104-L250"
+          "anchor": "§ Top-level, L755-L777; § Thresholds, L104-L250"
         }
       ],
       "review": {
@@ -181,17 +181,17 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a71 Issuer eligibility, L252-L322"
+          "anchor": "§1 Issuer eligibility, L252-L322"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a73.6 the omitted limb"
+          "anchor": "§3.6 the omitted limb"
         },
         {
           "path": "jl4/examples/legal/regcf/figures/README.md",
           "sha256": "sha256:cc2e2c347037ace4a66e76a147ec8c531c08b6b876717674ff1c0bf05d2a783c",
-          "anchor": "\u00a7 the six figures"
+          "anchor": "§ the six figures"
         }
       ],
       "review": {
@@ -212,7 +212,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a71 Issuer eligibility, L252-L322"
+          "anchor": "§1 Issuer eligibility, L252-L322"
         }
       ],
       "review": {
@@ -226,19 +226,19 @@
     },
     {
       "file": "s2-03-how-much.encoding.md",
-      "sha256": "sha256:30e604eef69792dd080789cc077fb2ed29c051b8a226feb42d33f84a0ac42fdb",
+      "sha256": "sha256:bfb116ced63ab7e890429407d60a04c7f7e97e27cdae7ce8f518c54376c12f51",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a73 shape change L373-L404; rule-version tests L1176-L1182"
+          "anchor": "§3 shape change L373-L404; rule-version tests L1176-L1182"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a73.1 the greater-of change"
+          "anchor": "§3.1 the greater-of change"
         },
         {
           "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
@@ -257,14 +257,14 @@
     },
     {
       "file": "s2-03-how-much.law.md",
-      "sha256": "sha256:bfaa82f2320839014a6002081fa6181129a8ca79b5f544e3a15e7d8a63468509",
+      "sha256": "sha256:3c5b8ddac1bf879c0c46e4de73f353bd7065554950bb591841c2d53105740b62",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a72 and \u00a73, L325-L457; group 3 assertions, L900-L920"
+          "anchor": "§2 and §3, L325-L457; group 3 assertions, L900-L920"
         },
         {
           "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
@@ -290,12 +290,12 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a74 COVID refusal L465-L503; assurance ordering L505-L524"
+          "anchor": "§4 COVID refusal L465-L503; assurance ordering L505-L524"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a75.8 the assurance ordering"
+          "anchor": "§5.8 the assurance ordering"
         }
       ],
       "review": {
@@ -316,7 +316,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a74 Disclosure requirements, L458-L545"
+          "anchor": "§4 Disclosure requirements, L458-L545"
         }
       ],
       "review": {
@@ -337,7 +337,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a76 Advertising restrictions, L586-L636; modelling note L69-L85"
+          "anchor": "§6 Advertising restrictions, L586-L636; modelling note L69-L85"
         }
       ],
       "review": {
@@ -358,7 +358,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a76 Advertising restrictions, L586-L636"
+          "anchor": "§6 Advertising restrictions, L586-L636"
         }
       ],
       "review": {
@@ -379,7 +379,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a77 Ongoing reporting, L638-L706"
+          "anchor": "§7 Ongoing reporting, L638-L706"
         },
         {
           "path": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
@@ -405,7 +405,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a77 Ongoing reporting, L638-L706"
+          "anchor": "§7 Ongoing reporting, L638-L706"
         }
       ],
       "review": {
@@ -426,12 +426,12 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a78 endpoint note L718-L723; resale period L250"
+          "anchor": "§8 endpoint note L718-L723; resale period L250"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a75.2 the two infidelities"
+          "anchor": "§5.2 the two infidelities"
         }
       ],
       "review": {
@@ -452,7 +452,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a78 Resale restrictions, L708-L753"
+          "anchor": "§8 Resale restrictions, L708-L753"
         }
       ],
       "review": {
@@ -473,7 +473,7 @@
         {
           "path": "specs/todo/single-instruction-demo/SPEC.md",
           "sha256": "sha256:524a4a9c9d5718abf227e3ac3b5b0bec51747247c1d314fba82a683baf0e6313",
-          "anchor": "\u00a7P2 what an external-modification sweep is for"
+          "anchor": "§P2 what an external-modification sweep is for"
         }
       ],
       "review": {
@@ -494,17 +494,17 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a7 Thresholds L104-L225; TIMEZONE L9"
+          "anchor": "§ Thresholds L104-L225; TIMEZONE L9"
         },
         {
           "path": "specs/todo/lexipedia-superset/CORPUS-TRACK.md",
           "sha256": "sha256:5f381b224a7e4ce9f878688f2354553f517c50d6b0a06aa191976121d9647f8f",
-          "anchor": "\u00a72.4 the temporal traps, and trap 5 on closure"
+          "anchor": "§2.4 the temporal traps, and trap 5 on closure"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
           "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
-          "anchor": "\u00a75.9 what the rule-version axis costs"
+          "anchor": "§5.9 what the rule-version axis costs"
         }
       ],
       "review": {
@@ -525,7 +525,7 @@
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
-          "anchor": "\u00a7 Thresholds L104-L225; rule-version tests L1111-L1200"
+          "anchor": "§ Thresholds L104-L225; rule-version tests L1111-L1200"
         }
       ],
       "review": {

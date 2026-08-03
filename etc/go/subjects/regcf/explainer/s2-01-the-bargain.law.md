@@ -3,7 +3,7 @@ plainly, there are five conditions:
 
 1. **Be an eligible company.** Rule 100(b) disqualifies six kinds of issuer.
 2. **Do not raise more than the ceiling in any rolling twelve months** —
-   currently [$5,000,000](src:jl4/examples/legal/regcf/regcf.l4#L151), counting
+   at time of writing ({{as_of}}) [$5,000,000](src:jl4/examples/legal/regcf/regcf.l4#L151), counting
    only prior sales made in reliance on section 4(a)(6).
 3. **Respect each investor's personal cap.** Rule 100(a)(2) is a formula, not a
    table, and it is the part of this regulation a member of the public is most

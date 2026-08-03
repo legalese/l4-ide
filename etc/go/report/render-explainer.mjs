@@ -444,10 +444,35 @@ function narrativePart(rel, { slot }) {
     unchecked: cited.unchecked,
   });
 
+  // {{as_of}} — the date this section's prose was written, resolved from its own
+  // provenance record. A figure asserted in the bare present goes stale with no
+  // way for a reader to know when it was true; the house form is
+  // `at time of writing ({{as_of}}), $5,000,000`, and `lintNarrative`'s
+  // N-UNDATED enforces it. The date is DERIVED, never typed: typing it would be
+  // the same defect one level up, and re-blessing a narrative file moves it for
+  // free. Per section, not per run, because the run date is not when the claim
+  // was checked against the law.
+  let body = cited.text;
+  if (body.includes("{{as_of}}")) {
+    if (rec?.drafted_on) {
+      body = body.split("{{as_of}}").join(rec.drafted_on);
+    } else {
+      findings.push({
+        kind: "as-of-unresolved",
+        file: rel,
+        detail:
+          "{{as_of}} used but the provenance record carries no drafted_on",
+      });
+      body = body
+        .split("{{as_of}}")
+        .join("date unrecorded — this section has no `drafted_on`");
+    }
+  }
+
   const bannerBlock = banners.length
     ? banners.map((b) => `> ${b}`).join("\n>\n") + "\n\n"
     : "";
-  return bannerBlock + cited.text.trim() + "\n";
+  return bannerBlock + body.trim() + "\n";
 }
 
 /** A spine slot that the manifest declined, rendered as a stated declination. */
