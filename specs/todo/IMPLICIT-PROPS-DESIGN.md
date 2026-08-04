@@ -311,10 +311,85 @@ question if promoted. Some fraction of the 418 is that, not operator demos.
    argument that this spec and `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` should cite each other, which
    as of this snapshot neither does.
 
-### 10.5 Bottom line as of 2026-08-04
+### 10.5 Correction: a partial deprecation ruling already exists, and it couples to DMN export
 
-There is no spec for deprecating `ASSUME`; this section is the current thinking. Deprecation from
-**authored models** looks feasible and desirable: `props` subsumes the term role with strictly
-better properties, at a corpus migration cost of ~53 lines plus whatever in `experiments/` is real
-modelling in disguise. What blocks a clean "remove the keyword" is items 2 and 3 above — the
-scaffolding constituency and the uninterpreted-type role — both of which are separable decisions.
+An earlier draft of this section said no spec for deprecating `ASSUME` exists. That is wrong in
+one important particular: **`specs/todo/lexipedia-superset/CORPUS-TRACK.md` §1.3** already
+declares house style — "GIVEN/record throughout — no `ASSUME`" — and elsewhere calls the
+module-parameter style "deprecated" by name (its regcf annotations distinguish a deliberate
+`ASSUME` bottom from "the deprecated module-parameter ASSUME style"). What does not exist is a
+*language-level* deprecation plan; §1.3 is house style for one corpus, enforced by convention.
+
+The same section records the fact that makes this spec's fate and the DMN exporter's fate one
+question. The `dmn-exporter-assume-shaped` finding: **the exporter models a module as global
+scalars plus decisions — the `ASSUME` shape — and it is the GIVEN/record house style it handles
+worst** (duplicate-named `inputData`, unevaluable `f(x)` invocations, no BKM, records erased to
+`Any`). `regcf.l4`, the flagship corpus and the canonical GIVEN/record module, cannot be demoed
+through DMN export without exporter work. So today the codebase is pulled two ways: house style
+deprecates the one module shape the DMN exporter can lower.
+
+`props` resolves that tension, and this is the concrete thing it buys for DMN lowering: **a
+`props` environment is isomorphic to a DMN input namespace.** DMN's evaluation model is a flat
+set of typed `inputData` plus decisions over them — a Reader, not a lambda calculus. A module
+written against typed `props` lowers naturally: props fields → `inputData`, functions over props
+→ decisions, the inferred per-function props requirement (§5.2) → exactly the DRG's information
+requirements. The exporter stops reverse-engineering an environment out of parameter threading
+and reads it off the type. (What `props` does **not** buy: §4.4 `local` remains unlowerable —
+see 10.4 item 5.)
+
+### 10.6 The 53 legal-corpus uses, case by case (measured 2026-08-04)
+
+The 53 lines reduce to 39 unique declarations — `tests/imaginary-alcohol-act.l4` is a
+byte-identical copy of `imaginary-alcohol-act.l4` (verified with `git diff`, exit 0). They fall
+into four dispositions, none of which is "keep as-is forever":
+
+**(a) Module-parameter scalars — 14 unique declarations (28 lines), `imaginary-alcohol-act.l4`
+×2.** Fourteen 0-ary `IS BOOLEAN` facts (`the person is a body corporate`, …) consumed by 0-ary
+`DECIDE`s. This is precisely the style CORPUS-TRACK §1.3 deprecates, and precisely the shape
+that is DMN-ready today: each fact is an `inputData` column, each `DECIDE` a one-row decision
+table. **Disposition: the flagship `props` migration candidate** — the file reads naturally as
+"functions over an implicit fact environment", which is what it already is, untyped.
+
+**(b) Uninterpreted sorts + predicates over them — 21 lines, `anti-social.l4` (14) and
+`british-citizen-act.l4` (7).** `ASSUME Person IS A TYPE` plus `is authorised : Person →
+BOOLEAN`, `mother of : Person → Person`, etc. The pain is already written into the source:
+`anti-social.l4` carries a comment explaining its main function is deliberately **not**
+`@export` because calling it hits assumed-term errors on every invocation — a model that cannot
+be run. **Disposition: `DECLARE` records** — `Person`/`Receiver`/`Conduct`/`Effect` become
+records whose Boolean fields replace the predicates, making the modules evaluable *and*
+exportable; the instance data then arrives via `props` or `GIVEN`. `british-citizen-act.l4` is
+half-migrated already: the same file's "Improved Readability Version" uses `DECLARE Place`.
+(`mother of`/`father of` want optional self-referential fields — the one genuinely non-trivial
+case in the corpus.)
+
+**(c) Sentinel values — 2 lines, `promissory-note.l4`.** `ASSUME NaN IS A NUMBER` (the comment
+says "JS coders rejoice :D") and `ASSUME NO_COLLATERAL IS A STRING`. Not environment, not
+modelling — absent-value hacks. **Disposition: defined constants or an optional/`MAYBE` type.**
+Trivial; nothing to do with `props`.
+
+**(d) Deliberate typed bottoms (curated refusals) — 2 lines, `regcf.l4`.** Both carry
+paragraph-length comments: an arm that reaches them stops evaluation with "…is an assumed
+term", *naming the refusal* — "no Regulation Crowdfunding figure exists before commencement",
+"the COVID-19 temporary rules … are not modelled here". This is a **fifth role** for `ASSUME`
+that neither the term/type taxonomy in 10.1 nor `props` covers: refusal-with-provenance. One of
+the two already names its designed replacement (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3's
+generated "not in force" arm) and says "delete this when it lands". **Disposition: keep until a
+first-class refusal construct exists** — a `REFUSE "…"`-style typed bottom would let `ASSUME`
+drop this job too, and is worth a line in any props-era deprecation plan.
+
+**Reading of the whole:** the corpus does not argue for keeping `ASSUME`; it argues for building
+`props`. Categories (a) and (b) — 49 of 53 lines — are authors reaching for an implicit typed
+environment that does not exist yet, and paying for it with modules that either cannot be
+evaluated (b) or cannot be supplied values without editing source (a). Category (c) is unrelated
+debt. Category (d) is the only principled survivor, and it wants its own construct, not
+`ASSUME`.
+
+### 10.7 Bottom line as of 2026-08-04
+
+Deprecation from **authored models** is feasible, desirable, and already half-ruled (CORPUS-TRACK
+§1.3 as house style). `props` subsumes the term role with strictly better properties, at a
+corpus migration cost of ~49 lines across five files — and, per 10.5, it is also the missing
+piece that lets the DMN exporter handle idiomatic L4 at all. What blocks a clean "remove the
+keyword": the fixture/experiment constituency (10.4 item 2), the uninterpreted-type role (10.4
+item 3), and the curated-refusal role (10.6 d) — all three separable, the third wanting a
+dedicated `REFUSE` construct.
