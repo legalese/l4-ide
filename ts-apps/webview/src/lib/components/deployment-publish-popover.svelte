@@ -11,7 +11,7 @@
   } from 'jl4-client-rpc'
 
   const TERMS_VERSION = '2026-08'
-  const TERMS_URL = 'https://legalese.com/provable/publisher-terms'
+  const TERMS_URL = 'https://provable.legalese.com/terms/publisher'
 
   let {
     deploymentId,
