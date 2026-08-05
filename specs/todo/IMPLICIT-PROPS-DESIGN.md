@@ -239,20 +239,20 @@ There are two categories, not more (an earlier three-way split into types / pred
 turned out to be arity dressed up as semantics — `ASSUME x IS A BOOLEAN` and
 `ASSUME f IS A FUNCTION FROM Order TO BOOLEAN` are the same construct, an uninterpreted symbol):
 
-| category                                     | count |
-| -------------------------------------------- | ----- |
-| uninterpreted **type** (`… IS A TYPE`)       | 101   |
-| uninterpreted **term**, any arity            | ~547  |
+| category                               | count |
+| -------------------------------------- | ----- |
+| uninterpreted **type** (`… IS A TYPE`) | 101   |
+| uninterpreted **term**, any arity      | ~547  |
 
 ### 10.2 `ASSUME` already is an implicit environment — with every property §4 asks for missing
 
-| §4 wants                                | `ASSUME` gives                                        |
-| --------------------------------------- | ----------------------------------------------------- |
-| a value you can supply                  | none — an assumed name cannot be bound from outside   |
-| `§`-scoped visibility                   | module-wide, flat                                     |
-| provenance in the trace                 | nothing to trace                                      |
-| `local` for hypothetical rebinding      | no rebinding; already bound, cannot be shadowed       |
-| inferred structural requirements (§5.2) | untyped ambient reachability                          |
+| §4 wants                                | `ASSUME` gives                                      |
+| --------------------------------------- | --------------------------------------------------- |
+| a value you can supply                  | none — an assumed name cannot be bound from outside |
+| `§`-scoped visibility                   | module-wide, flat                                   |
+| provenance in the trace                 | nothing to trace                                    |
+| `local` for hypothetical rebinding      | no rebinding; already bound, cannot be shadowed     |
+| inferred structural requirements (§5.2) | untyped ambient reachability                        |
 
 The "cannot be bound from outside" row has a measured cost: the dmnmd↔L4 differential harness
 (`etc/dmn-differential/`, PR #216) has to **generate one driver file per test case**, rewriting
@@ -264,12 +264,12 @@ varying worlds and one you have to edit.
 
 697 `ASSUME` lines total:
 
-| where               | lines | note                                                        |
-| ------------------- | ----- | ----------------------------------------------------------- |
-| `jl4/experiments`   | 418   | 60% — but see the caveat below                              |
-| `jl4/examples` (all)| 204   | of which `examples/ok` 97, `examples/legal` 53              |
-| `doc/reference`     | 71    | documentation                                               |
-| everything else     | 4     | `tests-cli` 2, `jl4-core/libraries` 2                       |
+| where                | lines | note                                           |
+| -------------------- | ----- | ---------------------------------------------- |
+| `jl4/experiments`    | 418   | 60% — but see the caveat below                 |
+| `jl4/examples` (all) | 204   | of which `examples/ok` 97, `examples/legal` 53 |
+| `doc/reference`      | 71    | documentation                                  |
+| everything else      | 4     | `tests-cli` 2, `jl4-core/libraries` 2          |
 
 Of the 101 type declarations, 88 are in `jl4/experiments`; 6 are in the legal corpus.
 
@@ -280,19 +280,19 @@ The **legal corpus** uses `ASSUME` in six files, 53 lines: `anti-social.l4` (14)
 
 **Caveat on "experiments = scaffolding":** the directory name tells you maturity, not intent.
 `jl4/experiments/macma3.l4` is a genuine draft formalisation of the Mutual Assistance in Criminal
-Matters Act — `ASSUME`-heavy early-stage *real* modelling that would face the same migration
+Matters Act — `ASSUME`-heavy early-stage _real_ modelling that would face the same migration
 question if promoted. Some fraction of the 418 is that, not operator demos.
 
 ### 10.4 What this adds to the spec's open questions
 
 1. **The migration story for ~547 term uses is unwritten**, and it is probably the largest single
-   piece of work this design implies. For the *authored* corpus it is small (53 lines, six files);
+   piece of work this design implies. For the _authored_ corpus it is small (53 lines, six files);
    for experiments and fixtures it is large and arguably shouldn't be paid at all (next item).
 2. **Fixtures and experiments are a real constituency, and `props` is worse for them.** A
    two-line example demonstrating one operator should not need an environment to exist. Either
    `ASSUME` survives as an explicitly test-and-experiment construct (possibly under a name that
    says so), or the teaching story (§8 Q7) has to cover "how do I write a minimal example".
-3. **Uninterpreted *types* need their own spelling.** `props` carries terms; `ASSUME x IS A TYPE`
+3. **Uninterpreted _types_ need their own spelling.** `props` carries terms; `ASSUME x IS A TYPE`
    introduces an uninterpreted sort. That is an opaque/abstract type declaration and wants its own
    keyword. Six uses in the legal corpus; small and separable.
 4. **Failure-time semantics change.** Today an under-specified model runs and fails at the point
@@ -318,7 +318,7 @@ one important particular: **`specs/todo/lexipedia-superset/CORPUS-TRACK.md` §1.
 declares house style — "GIVEN/record throughout — no `ASSUME`" — and elsewhere calls the
 module-parameter style "deprecated" by name (its regcf annotations distinguish a deliberate
 `ASSUME` bottom from "the deprecated module-parameter ASSUME style"). What does not exist is a
-*language-level* deprecation plan; §1.3 is house style for one corpus, enforced by convention.
+_language-level_ deprecation plan; §1.3 is house style for one corpus, enforced by convention.
 
 The same section records the fact that makes this spec's fate and the DMN exporter's fate one
 question. The `dmn-exporter-assume-shaped` finding: **the exporter models a module as global
@@ -356,7 +356,7 @@ BOOLEAN`, `mother of : Person → Person`, etc. The pain is already written into
 `anti-social.l4` carries a comment explaining its main function is deliberately **not**
 `@export` because calling it hits assumed-term errors on every invocation — a model that cannot
 be run. **Disposition: `DECLARE` records** — `Person`/`Receiver`/`Conduct`/`Effect` become
-records whose Boolean fields replace the predicates, making the modules evaluable *and*
+records whose Boolean fields replace the predicates, making the modules evaluable _and_
 exportable; the instance data then arrives via `props` or `GIVEN`. `british-citizen-act.l4` is
 half-migrated already: the same file's "Improved Readability Version" uses `DECLARE Place`.
 (`mother of`/`father of` want optional self-referential fields — the one genuinely non-trivial
@@ -369,7 +369,7 @@ Trivial; nothing to do with `props`.
 
 **(d) Deliberate typed bottoms (curated refusals) — 2 lines, `regcf.l4`.** Both carry
 paragraph-length comments: an arm that reaches them stops evaluation with "…is an assumed
-term", *naming the refusal* — "no Regulation Crowdfunding figure exists before commencement",
+term", _naming the refusal_ — "no Regulation Crowdfunding figure exists before commencement",
 "the COVID-19 temporary rules … are not modelled here". This is a **fifth role** for `ASSUME`
 that neither the term/type taxonomy in 10.1 nor `props` covers: refusal-with-provenance. One of
 the two already names its designed replacement (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3's
