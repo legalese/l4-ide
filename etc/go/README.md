@@ -106,6 +106,69 @@ the LTS DOT to SVG. `mvn` + JDK 17/21 for the DMN engine harnesses on the
 absence produces a `SKIPPED` receipt naming what is missing and what it was
 needed for.
 
+### Getting `l4` and `jl4-lsp` without building them
+
+`L4` and `JL4_LSP_CMD` want prebuilt binaries, and this driver never builds
+them. Building them yourself needs GHC 9.10.x, Cabal and a slow `cabal build`
+— which is fine on a workstation and impossible inside a cloud sandbox whose
+setup script is capped at a few minutes.
+
+The alternative is a prerelease archive from GitHub Releases.
+`.github/workflows/unstable-prerelease.yml` is the workflow that builds and
+attaches them: one archive per platform, built from `unstable`, published under
+tags of the form `unstable-<YYYYMMDD>-<short-sha>`.
+
+**Status 2026-08-05: that workflow has never been run, so no such release
+exists yet.** It is dispatched by hand, and — because GitHub only offers the
+Run-workflow button for files present on the default branch — it becomes
+dispatchable only once it has reached `main`. Until then, building the binaries
+yourself is still the only route. The rest of this section describes what the
+archives look like once one has been cut.
+
+The URL is constructible from the tag and the platform, so no page-scraping:
+
+```
+https://github.com/legalese/l4-ide/releases/download/<tag>/l4-<tag>-<platform>.tar.gz
+```
+
+with `<platform>` one of `linux-x64`, `darwin-arm64`, `win32-x64`. Each archive
+extracts to a directory of its own name holding `l4`, `jl4-lsp`, a `libraries/`
+copy of the standard library, and a `BUILD-INFO.txt` naming the commit it came
+from. A `SHA256SUMS` file covering all three archives is attached to the same
+release.
+
+```bash
+TAG=<pick one from the releases page>
+PLATFORM=linux-x64   # or darwin-arm64, win32-x64
+BASE=https://github.com/legalese/l4-ide/releases/download/$TAG
+
+curl -fsSLO "$BASE/l4-$TAG-$PLATFORM.tar.gz"
+curl -fsSLO "$BASE/SHA256SUMS"
+sha256sum --ignore-missing -c SHA256SUMS   # macOS without coreutils: shasum -a 256 --ignore-missing -c SHA256SUMS
+tar -xzf "l4-$TAG-$PLATFORM.tar.gz"
+
+export L4="$PWD/l4-$TAG-$PLATFORM/l4"
+export JL4_LSP_CMD="$PWD/l4-$TAG-$PLATFORM/jl4-lsp"
+```
+
+Three things worth knowing:
+
+- **These are prereleases, and they say so.** They are built from `unstable`,
+  the integration branch, and are flagged `prerelease` so they never appear as
+  the repository's "Latest release". `/releases/latest` will not find them —
+  read the releases list, or use the tag you were given.
+- **Leave `JL4_LIBRARY_PATH` alone.** The standard library is compiled into the
+  binary; the `libraries/` directory in the archive is there for standalone use
+  outside a checkout. Inside the repo the driver already points it at
+  `<repo>/jl4-core/libraries`.
+- **macOS may quarantine the download.** Clear it with
+  `xattr -dr com.apple.quarantine "l4-$TAG-darwin-arm64"`.
+
+Do not use the binary bundled inside the published VS Code extension for this.
+As of 2026-08-05 the most recent extension build is the one `main-tag.yml`
+produced on 2026-07-18, which predates the `l4 export` subcommand, so it cannot
+drive the DMN or BPMN legs.
+
 ## Selftests
 
 ```
