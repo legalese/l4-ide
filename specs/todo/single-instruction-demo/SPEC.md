@@ -507,8 +507,22 @@ elsewhere should say "SI-Rn".
   not to a moment" means when the content moves. Whatever supersedes R8 inherits this
   constraint.
 
-- **R9 — canon as an INDEX rather than a monorepo**: **PROPOSED 2026-08-03 (Meng); not yet
-  ruled.** Adopt the model Claude Code uses for plugins and skills: a **marketplace** that is a
+  **Scope narrowed 2026-08-05 by R9's ruling: R8 is now the VENDORED lane's mechanism, not the
+  only lane.** The two coexist. A contributor who would rather keep their encoding in their own
+  repository takes the pointer lane instead, and for them the merge-invalidates-the-signature
+  problem above **does not arise at all** — nobody merges content, the encoding never moves, and
+  the signature keeps verifying where it was made. R8's provisionality clause is unaffected and
+  still stands: it yields to Thomas's model when that arrives. Two facts about the merge problem
+  survive R9 and are worth keeping in view: it still binds the vendored lane in full, and the
+  reorganisation-only case is separately safe because gate payloads bind **basenames plus
+  sha256** and embed no canon path (verified in `etc/go/phases/p0-preflight.sh:91`), so moving a
+  subject between directories does not invalidate anything.
+
+- **R9 — canon as an INDEX rather than a monorepo**: **ANSWERED 2026-08-05 (Meng), in the
+  coexistence form** — canon holds vendored encodings _and_ indexes external ones through one row
+  grammar. The concrete on-disk shape is `docs/directory-conventions.md` §4 in `legalese/canon`,
+  ruled via that document's §10; this bullet records the ruling, that document owns the mechanism.
+  Adopt the model Claude Code uses for plugins and skills: a **marketplace** that is a
   thin index layer over GitHub. Encodings live in their authors' own repositories; canon
   maintains an index of known L4 encodings — name, jurisdiction, citation, source repo, version,
   licence — and resolves them on demand. The mechanism is not speculative: this repository
@@ -531,7 +545,8 @@ elsewhere should say "SI-Rn".
   scale**, and this project already holds that under-determination is a property of law rather
   than a defect in an encoding.
 
-  **The costs, which are why this says PROPOSED:**
+  **The costs, which are why this said PROPOSED for two days — each is answered, partially
+  answered or structurally preserved by the sub-rulings below, and none is wished away:**
 
   1. **Availability.** A monorepo holds content; an index holds a pointer. Indexed repos get
      renamed, force-pushed, made private, deleted. Mitigation: pin each entry by **commit SHA
@@ -547,10 +562,34 @@ elsewhere should say "SI-Rn".
      stranger's encoding is a trust decision a monorepo made implicitly and an index makes
      explicit.
 
-  **Open for Meng:** whether R9 supersedes R8 outright or the two coexist (canon holding a small
-  curated set _and_ indexing the rest); whether entries pin by SHA; whether canon mirrors against
-  link rot. **Until ruled, R8 stands** — and R8's own standing instruction already anticipates
-  replacement, so nothing need be argued to retire it.
+  **The three sub-rulings, 2026-08-05, and what each does to the costs above:**
+
+  1. **Pins are mandatory.** Every pointer row carries a commit `sha` **and** a `tree_sha`
+     integrity digest of the indexed subtree; `ref` is advisory and `sha` wins. This is cost 2
+     answered in full — verification happens at fetch time against a digest recorded at index
+     time.
+  2. **No mirroring.** Canon does not copy an indexed repository, because mirroring is itself
+     redistribution and carries licence consequences. So **cost 1 is only PARTIALLY answered, and
+     the residual is accepted deliberately**: pins make rot _detectable_, nothing makes it
+     _survivable_. A deleted upstream means that encoding is gone from canon, leaving a tombstone
+     row. The one durability path is vendoring through the R8 lane **at the encoder's own choice**
+     — never canon copying unilaterally.
+  3. **No curated primary.** Every encoding of a subject is an **equal row**; canon takes no
+     editorial position on which to use. This resolves cost 4 by subject-owned paths carrying
+     encoder-qualified rows, and it retires the first draft's curated-primary-plus-`alt/` shape
+     entirely — with no first-class rows there are no second-class ones, so the name went with the
+     concept. Cost 3 survives structurally: `status`, `status_checked` and the encoding-level
+     descriptor keep _indexed_, _reviewed_ and _signed_ distinct, and a registry that refuses to
+     choose must instead make choosing cheap, which is what the derived index's columns are for.
+
+  Note the interaction of (2) and (3), recorded as a consequence rather than an objection: with no
+  curated copy standing behind a pointer and no mirror either, **an externally-hosted encoding has
+  exactly one copy in the world.**
+
+  **Ruled for Meng (2026-08-05):** R9 and R8 **coexist** rather than R9 superseding — R8 stands as
+  the **vendored lane's** mechanism, and its standing yield-to-Thomas instruction is inherited
+  untouched. Entries **do** pin by SHA (mandatory, per sub-ruling 1). Canon does **not** mirror
+  against link rot (sub-ruling 2).
 
 ---
 
