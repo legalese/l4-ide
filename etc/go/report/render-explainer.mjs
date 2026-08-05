@@ -985,6 +985,126 @@ function sweepSection() {
   );
 }
 
+// ------------------------------------------ S9, WHERE THE LAW IS UNSETTLED
+/**
+ * E28 (EXPLAINER-REPORT-SPEC.md §14.8). Interpretive forks get a STRUCTURAL
+ * slot, fed by the subject's `fork-register.json`, rather than depending on a
+ * drafter happening to notice.
+ *
+ * WHY A SLOT AND NOT PROSE. Measured on the `g1` run of 2026-08-03: the Reg CF
+ * explainer discussed ambiguity exactly twice, both inside one section, and the
+ * word `fork` appeared nowhere in the template. The coverage that existed was
+ * prose someone chose to write, which is precisely the thing that goes missing
+ * on the next subject and that the spine's ABSENT-with-a-reason design exists
+ * to prevent.
+ *
+ * A MISSING REGISTER IS A CLAIM, NOT A GAP. When no register is declared this
+ * renders ABSENT saying so in those terms, because "this encoding found nothing
+ * under-determined" is a substantive assertion about the law that a reader
+ * should be able to disagree with — not an absence nobody notices.
+ *
+ * WHAT IT MAY NEVER CLAIM. Completeness is unfalsifiable here by construction,
+ * exactly as for `sweepSection`: a register listing one fork validates as
+ * cleanly as one listing fifty, and no procedure enumerates the ambiguities
+ * that should have been found. The slot therefore reports what was registered
+ * and never characterises it as exhaustive.
+ */
+function forksSection() {
+  const head = manifest.spine?.forks;
+  if (head && "declined" in head)
+    return declined(
+      "This document's spine has a `forks` slot: the places where the law does not decide a question and the encoding had to pick a reading.",
+      head.declined,
+    );
+  const narrative =
+    head && head.file
+      ? narrativePart(head.file, { slot: "forks" }) + "\n\n"
+      : "";
+
+  const rel = head?.register;
+  if (!rel)
+    return (
+      narrative +
+      absent(
+        "Where a statute does not decide a question, an encoding cannot abstain — it has to pick a reading in order to compute anything at all. This slot is where those picks are declared: both readings, the one taken, and why.",
+        "This subject's manifest declares no `register`, so **this encoding registers no interpretive forks**. Read that as a claim rather than a gap: it says the encoder found nothing under-determined worth recording, and it is the kind of claim a reader who knows the law can disagree with.",
+      )
+    );
+
+  const abs = resolve(REPO, rel);
+  if (!existsSync(abs)) {
+    findings.push({ kind: "fork-register", file: rel, detail: "missing" });
+    return (
+      narrative +
+      absent(
+        "This subject's manifest declares a fork register.",
+        `\`${esc(rel)}\` is not on disk, so the forks this encoding recorded cannot be shown. The declaration is evidence they exist; this document will not invent them.`,
+      )
+    );
+  }
+
+  let reg;
+  try {
+    reg = JSON.parse(readFileSync(abs, "utf8"));
+  } catch (e) {
+    findings.push({ kind: "fork-register", file: rel, detail: "unparseable" });
+    return (
+      narrative +
+      absent(
+        "This subject's manifest declares a fork register.",
+        `\`${esc(rel)}\` did not parse as JSON (${esc(e.message)}), so nothing from it is shown.`,
+      )
+    );
+  }
+
+  const entries = Array.isArray(reg.entries) ? reg.entries : [];
+  if (!entries.length)
+    return (
+      narrative +
+      absent(
+        "This subject's fork register was read.",
+        `\`${esc(rel)}\` records no entries.`,
+      )
+    );
+
+  const out = [narrative.trimEnd(), ""].filter(Boolean);
+  out.push(
+    `\`${esc(rel)}\` records **${entries.length}** interpretive ${entries.length === 1 ? "fork" : "forks"} — places where the source does not settle a question and this encoding had to choose. Each is shown with the readings that were open, the one taken, and the reason.`,
+    "",
+    "**This is not a completeness claim.** No procedure enumerates the ambiguities a statute contains, so a register naming twenty forks and one naming two validate identically. What follows is what was registered.",
+    "",
+  );
+
+  for (const e of entries) {
+    const id = e.id ? `\`${esc(e.id)}\`` : "(unidentified)";
+    out.push(`#### ${id}${e.kind ? ` — ${esc(e.kind)}` : ""}`, "");
+    if (e.source?.quote)
+      out.push(`> ${esc(String(e.source.quote)).replace(/\n+/g, " ")}`, "");
+    const readings = Array.isArray(e.readings) ? e.readings : [];
+    const takenId = e.taken?.reading;
+    if (readings.length) {
+      out.push("| reading | | what it says |", "| --- | --- | --- |");
+      for (const r of readings)
+        out.push(
+          `| \`${esc(r.id ?? "?")}\` | ${r.id && r.id === takenId ? "**taken**" : ""} | ${esc(String(r.description ?? "")).replace(/\n+/g, " ")} |`,
+        );
+      out.push("");
+    }
+    if (e.taken?.rationale)
+      out.push(
+        `**Why that reading.** ${esc(String(e.taken.rationale)).replace(/\n+/g, " ")}`,
+        "",
+      );
+    const facts = [
+      e.status ? `status \`${esc(e.status)}\`` : null,
+      e.divergence ? `divergence \`${esc(e.divergence)}\`` : null,
+      e.taken?.mechanism ? `mechanism \`${esc(e.taken.mechanism)}\`` : null,
+    ].filter(Boolean);
+    if (facts.length) out.push(facts.join(" · "), "");
+  }
+  return out.join("\n").trimEnd();
+}
+
 // -------------------------------------------------------------------- S7, CTA
 function ctaSection() {
   const s = manifest.spine?.call_to_action;
@@ -1107,6 +1227,7 @@ const time = slotBlock("time", {
 // encoding end to end, so a sub-heading separating it from a law thread that
 // does not exist would announce a division the section does not have.
 const limits = slotBlock("limits", { slot: "limits" });
+const forks = forksSection();
 const sweep = sweepSection();
 const cta = ctaSection();
 const provenance = provenanceSection();
@@ -1172,6 +1293,7 @@ const values = {
   "sections.pictures": pictures,
   "sections.time": time,
   "sections.limits": limits,
+  "sections.forks": forks,
   "sections.sweep": sweep,
   "sections.cta": cta,
   "sections.provenance": provenance,
