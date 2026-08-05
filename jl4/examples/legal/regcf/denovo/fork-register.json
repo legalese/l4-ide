@@ -1,0 +1,1444 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "regcf",
+  "interpretation_type": "Interpretation",
+  "note": "P4 for the DE NOVO encoding of 17 CFR part 227 at jl4/examples/legal/regcf/denovo/regcf-denovo.l4. Twenty-six entries: the six forks P2 committed as the P2->P4 contract, all six materialised as fields of the Interpretation record under R4, plus twenty judgements the encoder made where the text left two readings standing.\n\nCOMPLETENESS IS NOT CLAIMED, and cannot be. No procedure establishes that every ambiguity in part 227 was found. What is claimed is internal consistency: every entry names the text it interprets, every reading that survives is licensed by a citation, every reading that does not says why, and the reading taken is one of the live ones.\n\nTHREE PLACES WHERE THIS REGISTER AND THE ENCODING DO NOT SHARE ONE VOCABULARY, stated here rather than left for a reader to trip over:\n(1) READING IDS ARE TRANSLITERATIONS. The schema's reading-id pattern is ^[A-Za-z][A-Za-z0-9]*$, which cannot hold an L4 constructor name with spaces — and every constructor in this encoding has spaces, because the house style carries the regulation's own words. So the ids below are camelCase transliterations and each materialised entry's notes give the exact backticked constructor. The R4 1:1 map holds; the shared vocabulary does not.\n(2) THERE IS NO TYPICALLY ANYWHERE IN THE ENCODING. The schema requires mechanism 'TYPICALLY' on a materialised fork. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal, so the six Interpretation fields carry no defaults and the two poles are supplied as named record values, `the staff reading` and `the text alone`. A caller must pass one. 'taken' on the six materialised entries therefore records which pole this register nominates as the citable one, not a value the encoding applies by default.\n(3) SEC STAFF INTERPRETATIONS ARE CITED AS 'scholarship', NOT 'authority'. The schema reserves 'authority' for a court or regulator whose word SETTLES, and Corporation Finance Interpretations and Trading and Markets FAQs are staff statements that bind nobody. Classifying them as authority would make every one of the six read as resolved when none of them is. The single 'authority' citation in this register is the Commission's own adjudication in DreamFunded, at A-301C2-FRAUD-CONCERN.\n\nWHY ALL SIX MATERIALISED FORKS ARE status 'open': each has two live readings and no authority has settled any of them. Staff guidance is not settlement.\n\nWHAT WAS CONSIDERED AND NOT REGISTERED, so a reader can see the line: § 227.503(b)(1) (\"with respect to any conviction ... that occurred or was issued before May 16, 2016\") was applied per event rather than once at the end — one reading survives \"with respect to\", so it is a construction and not a fork. § 227.100(d)'s \"as the context requires\" is carried inert and decides nothing in this module, so the encoder never faced the choice; where it does bite, it is registered as F-HOLDERS-OF-RECORD. § 227.404(f)'s longer-period rule and the paragraph (a) retention guard have a stated seam in the encoding; that is an incompleteness, not two readings.\n\nWITNESSES. Six entries carry witnesses that are committed #ASSERTs in the module. Four carry witnesses measured 2026-08-05 in a scratch probe against the committed module but not yet asserted (F-CAP-12MONTH-ANCHOR's second arm, F-ANNUAL-INCOME-PERIOD, F-REPORTING-DISQUALIFICATION, F-ONE-INTERMEDIARY-SCOPE) — in each case because the committed fixture constructor hardcodes the discriminating field. Four carry witnesses derived from the encoded expression rather than run. Every one says which it is.",
+  "entries": [
+    {
+      "id": "F-INVLIMIT-NONNATURAL",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "non-natural investor limit basis",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the first of the investor's two measured quantities",
+        "line": 1409,
+        "provisions": [
+          "17 CFR 227.100(a)(2)",
+          "17 CFR 227.100(a)(2)(i)",
+          "17 CFR 227.100(a)(2)(ii)",
+          "17 CFR 227.100(a)(2) Instruction 1"
+        ]
+      },
+      "source": {
+        "quote": "Instruction 1 to paragraph (a)(2). To determine the investment limit for a natural person, the person's annual income and net worth shall be calculated as those values are calculated for purposes of determining accredited investor status in accordance with § 230.501 of this chapter.",
+        "citation": "17 CFR 227.100(a)(2) and Instruction 1 thereto; the operative words of (a)(2)(i)-(ii) are \"the greater of the investor's annual income or net worth\""
+      },
+      "readings": [
+        {
+          "id": "revenueOrNetAssets",
+          "description": "The limits apply to a non-natural person, which computes them on its REVENUE or its NET ASSETS as of its most recent fiscal year end. Two quantities that appear nowhere in part 227 are substituted for the rule's own pair. Encoded as the ELSE arm of `the first`/`the second of the investor's two measured quantities`, reading the InvestorProfile fields `revenue for the most recent fiscal year` and `net assets as of the most recent fiscal year end`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Corporation Finance, Regulation Crowdfunding Compliance and Disclosure / Corporation Finance Interpretation 100.02 [March 12, 2025] — \"Instead of calculating investment limits based on annual income or net worth, a non-natural person calculates the limits based on its revenue or net assets (as of its most recent fiscal year end).\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding"
+            }
+          ]
+        },
+        {
+          "id": "annualIncomeOrNetWorth",
+          "description": "The rule says what it says: the limit is a function of \"the greater of the investor's annual income or net worth\", and Instruction 1 supplies a calculation method only \"for a natural person\". An entity therefore falls inside the limit and outside the only method the text provides, and is measured on annual income and net worth like anyone else — which for most entities is zero on both, putting them on the $2,500 floor.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(2)(i)-(ii) — \"5 percent of the greater of the investor's annual income or net worth\"; Instruction 1 is expressly limited to \"a natural person\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "revenueOrNetAssets",
+        "mechanism": "TYPICALLY",
+        "rationale": "Nominated as the citable pole because it is what a portal or issuer asking \"what would the SEC say\" is told, and it is where the CFI attaches. The opposite pole is equally executable: pass `the text alone`."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "`the investment limit for the investor` on the committed fixture `an entity investor` (Eek Ltd: not a natural person, revenue $1,000,000, net assets $900,000, annual income and net worth 0) — $100,000 under `the staff reading` and $2,500 under `the text alone`. Both are committed #ASSERTs (regcf-denovo.l4:3355-3356). A forty-fold difference on one investor."
+      ],
+      "cross_refs": [
+        "EM-CFI-100-02-ENTITY-LIMITS",
+        "EM-CFI-100-06-ANNUAL-PERIOD"
+      ],
+      "notes": [
+        "MECHANISM CAVEAT. The schema requires mechanism 'TYPICALLY' on a materialised fork, and this module has no TYPICALLY clause anywhere. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal (\"must be a literal: a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING\"), so the six fields carry no defaults. The two poles are supplied instead as named Interpretation values, `the staff reading` and `the text alone`. Neither is a default: a caller must pass one. 'taken' below therefore records which pole this register nominates as the citable one, not a value the encoding silently applies.",
+        "L4 constructor names, which the schema's reading-id pattern (^[A-Za-z][A-Za-z0-9]*$) cannot hold: revenueOrNetAssets = `revenue or net assets`; annualIncomeOrNetWorth = `annual income or net worth`",
+        "Interacts with F-ANNUAL-INCOME-PERIOD: on the staff's own two readings a natural person is measured on the calendar year and an entity as of its most recent fiscal year end, so an encoding that used one period for both would be wrong on one of them. This encoding carries both periods as separate input fields.",
+        "The InvestorProfile carries BOTH readings' quantities as paired input fields, so the fork is not hidden inside a number the fact-supplier chose the meaning of. That pairing is P2's explicit instruction for F-CAP-12MONTH-ANCHOR, applied here too."
+      ]
+    },
+    {
+      "id": "F-CAP-12MONTH-ANCHOR",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "twelve month window anchor",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the amount already sold in the twelve month window",
+        "line": 1349,
+        "provisions": [
+          "17 CFR 227.100(a)(1)"
+        ]
+      },
+      "source": {
+        "quote": "The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;",
+        "citation": "17 CFR 227.100(a)(1)"
+      },
+      "readings": [
+        {
+          "id": "rollingFromEachClosing",
+          "description": "The cap is measured on a rolling 12 months FROM THE DATE OF EACH CLOSING, so a closing drops out of the aggregate only when its own twelve-month anniversary passes. Encoded as a sum over `closings in reliance on section 4(a)(6)` (a LIST OF Closing, each with its own date and amount) filtered to those whose anniversary has not passed.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Corporation Finance, Regulation Crowdfunding Compliance and Disclosure / Corporation Finance Interpretation 100.05 [February 17, 2026] — \"The offering limit in Rule 100(a)(1) is based on a rolling 12-month calculation from the date of each closing.\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding"
+            },
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Trading and Markets, Frequently Asked Questions Regarding Regulation Crowdfunding and Intermediary Requirements, Question 304.3 (page dated Sept. 25, 2018; last reviewed Mar. 17, 2026) — \"If an issuer chooses to engage in a rolling close, the applicable requirements of Regulation Crowdfunding must be met at the time of each closing.\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/trading-markets-frequently-asked-questions/cfportal-faqs"
+            }
+          ]
+        },
+        {
+          "id": "fromTheDateOfSuchOfferOrSale",
+          "description": "The rule fixes one anchor and it is not each closing: \"during the 12-month period preceding the date of such offer or sale\". One window, opening twelve months before the offer or sale in question, and the aggregate is whatever was sold inside it. Encoded as the single IssuerProfile field `amount sold in reliance on section 4(a)(6) during the 12-month period preceding the date of such offer or sale`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(1) — \"during the 12-month period preceding the date of such offer or sale\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "rollingFromEachClosing",
+        "mechanism": "TYPICALLY",
+        "rationale": "Nominated as the citable pole: it is supported by two SEC divisions eight years apart, and rolling closes are ordinary practice rather than an edge case. The opposite pole is the rule's own words and is equally executable."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "CFI 100.05's own worked example, reproduced as committed fixtures `an issuer that has closed twice` ($500,000 closed 2025-06-15, $4,500,000 closed 2025-09-30, and $5,000,000 recorded as sold in the preceding-12-months field) with `the offering on the anniversary`: `the issuer's headroom under the twelve month cap` on 2026-06-16 is $500,000 under `the staff reading` (committed #ASSERT, regcf-denovo.l4:3375) and $0 under `the text alone` (measured 2026-08-05 in a scratch probe; not yet a committed #ASSERT).",
+        "The same pair on 2026-06-15 — the day before the first closing's anniversary — is $0 under BOTH readings (committed #ASSERT at regcf-denovo.l4:3379 for the staff arm), so the divergence is a one-day boundary and the seed agrees on either side of it."
+      ],
+      "cross_refs": [
+        "EM-CFI-100-05-ROLLING-CAP",
+        "EM-TMFAQ-304-03-CLOSINGS"
+      ],
+      "notes": [
+        "MECHANISM CAVEAT. The schema requires mechanism 'TYPICALLY' on a materialised fork, and this module has no TYPICALLY clause anywhere. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal (\"must be a literal: a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING\"), so the six fields carry no defaults. The two poles are supplied instead as named Interpretation values, `the staff reading` and `the text alone`. Neither is a default: a caller must pass one. 'taken' below therefore records which pole this register nominates as the citable one, not a value the encoding silently applies.",
+        "L4 constructor names, which the schema's reading-id pattern (^[A-Za-z][A-Za-z0-9]*$) cannot hold: rollingFromEachClosing = `rolling from each closing`; fromTheDateOfSuchOfferOrSale = `from the date of such offer or sale`",
+        "P2 instructed in terms that the encoding must not collapse this fork into a single 'amount raised in the last 12 months' input, because that would hide the fork inside a fact the user supplies. The IssuerProfile accordingly carries BOTH: a LIST OF Closing for reading A and the single preceding-12-months figure for reading B.",
+        "P6 owes the `the text alone` arm of the headroom witness as a committed #ASSERT; it is measured but not asserted."
+      ]
+    },
+    {
+      "id": "F-ANNUAL-INCOME-PERIOD",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "annual income period",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the investor's annual income",
+        "line": 1396,
+        "provisions": [
+          "17 CFR 227.100(a)(2)(i)",
+          "17 CFR 227.100(a)(2)(ii)",
+          "17 CFR 227.100(a)(2) Instruction 1",
+          "17 CFR 230.501(a)(6)"
+        ]
+      },
+      "source": {
+        "quote": "The greater of $2,500, or 5 percent of the greater of the investor's annual income or net worth, if either the investor's annual income or net worth is less than $124,000; or",
+        "citation": "17 CFR 227.100(a)(2)(i); the word \"annual\" is undefined in part 227, and Instruction 1 sends the calculation to § 230.501, which speaks of income \"in each of the two most recent years\" without defining the year"
+      },
+      "readings": [
+        {
+          "id": "theCalendarYear",
+          "description": "\"Annual\" means a calendar year, for consistency with Regulation D. Encoded by reading the InvestorProfile field `annual income for the calendar year`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Corporation Finance, Regulation Crowdfunding Compliance and Disclosure / Corporation Finance Interpretation 100.06 [February 17, 2026] — \"The annual period is a calendar year. Instruction 1 to paragraph (a)(2) of Rule 100 specifically calls for the approach to be consistent with Regulation D. See Securities Act Release No. 6389 (Mar. 16, 1982), at footnote 15.\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding"
+            }
+          ]
+        },
+        {
+          "id": "theInvestorsOwnFiscalYear",
+          "description": "Neither part 227 nor § 230.501 says calendar year. \"Annual income\" is the investor's income over a year, and the year that is natural to an investor who keeps accounts is the investor's own fiscal year — which is also the period CFI 100.02 itself uses for an entity (\"as of its most recent fiscal year end\"). Encoded by reading `annual income for the investor's own fiscal year`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(2)(i)-(ii) and Instruction 1 thereto; 17 CFR 230.501(a)(6) — \"in each of the two most recent years\", the year undefined"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theCalendarYear",
+        "mechanism": "TYPICALLY",
+        "rationale": "Nominated as the citable pole on CFI 100.06. Note the interpretation's own authority is a 1982 Regulation D release footnote that P2 did not retrieve, so the chain is cited but the footnote is not in evidence here."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "An investor with calendar-year income $150,000, own-fiscal-year income $50,000 and net worth $50,000: `the investment limit for the investor` is $7,500 under `the staff reading` (5% of $150,000) and $2,500 under `the text alone` (5% of $50,000, floored). Measured 2026-08-05 in a scratch probe against the committed module; the committed `an investor` fixture sets both income fields to the same value and so cannot exhibit it."
+      ],
+      "cross_refs": [
+        "EM-CFI-100-06-ANNUAL-PERIOD",
+        "EM-CFI-100-02-ENTITY-LIMITS"
+      ],
+      "notes": [
+        "MECHANISM CAVEAT. The schema requires mechanism 'TYPICALLY' on a materialised fork, and this module has no TYPICALLY clause anywhere. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal (\"must be a literal: a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING\"), so the six fields carry no defaults. The two poles are supplied instead as named Interpretation values, `the staff reading` and `the text alone`. Neither is a default: a caller must pass one. 'taken' below therefore records which pole this register nominates as the citable one, not a value the encoding silently applies.",
+        "L4 constructor names, which the schema's reading-id pattern (^[A-Za-z][A-Za-z0-9]*$) cannot hold: theCalendarYear = `the calendar year`; theInvestorsOwnFiscalYear = `the investor's own fiscal year`",
+        "The witness is measured but has no committed fixture: `an investor` supplies one `income` argument to both period fields. P6 owes a split-year fixture."
+      ]
+    },
+    {
+      "id": "F-REPORTING-DISQUALIFICATION",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "reporting disqualification tense",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the issuer is caught by the Exchange Act reporting limb",
+        "line": 1536,
+        "provisions": [
+          "17 CFR 227.100(b)(2)"
+        ]
+      },
+      "source": {
+        "quote": "Is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Securities Exchange Act of 1934 (the “Exchange Act”) (15 U.S.C. 78m or 78o(d));",
+        "citation": "17 CFR 227.100(b)(2)"
+      },
+      "readings": [
+        {
+          "id": "presentlySubjectToTheReportingRequirement",
+          "description": "\"Is subject to\" is the present tense and means presently subject: a former reporting company whose obligation has been terminated or suspended is not caught. Encoded as the bare `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` field.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Corporation Finance, Regulation Crowdfunding Compliance and Disclosure / Corporation Finance Interpretation 100.04 [February 17, 2026] — Q: would Rule 100(b)(2) disqualify former Exchange Act reporting companies whose obligations have been terminated or suspended? A: \"No.\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding"
+            }
+          ]
+        },
+        {
+          "id": "everSubjectToTheReportingRequirement",
+          "description": "The limb is drafted as a class of issuer that the crowdfunding exemption is closed to, and an issuer that has been an Exchange Act reporting company is such an issuer whether or not the duty currently subsists — the exemption is for companies that have never had public-market disclosure obligations. Encoded as the disjunction of the present-tense field with `formerly subject to section 13 or 15(d) reporting, since terminated or suspended`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(b) chapeau — \"shall not apply to transactions involving the offer or sale of securities by any issuer that:\", a class description rather than a state test; the text supplies no tense rule"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "presentlySubjectToTheReportingRequirement",
+        "mechanism": "TYPICALLY",
+        "rationale": "Nominated as the citable pole on CFI 100.04. Worth recording that the interpretation is a bare \"No.\" with no reasoning: it settles the outcome without supplying a rule for the neighbouring cases (an obligation suspended mid-year, or terminated after the offering began), so encoding it is itself an extrapolation."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "An issuer not presently subject to section 13 or 15(d) but formerly subject and since terminated: `the issuer is caught by the Exchange Act reporting limb` is FALSE under `the staff reading` and TRUE under `the text alone`, and the whole-issuer decision `the crowdfunding exemption does not apply to the issuer` flips with it (FALSE / TRUE). Measured 2026-08-05 in a scratch probe against the committed module; the committed `an issuer` fixture hardcodes the former-reporting field FALSE and so cannot exhibit it."
+      ],
+      "cross_refs": [
+        "EM-CFI-100-04-REPORTING-DQ"
+      ],
+      "notes": [
+        "MECHANISM CAVEAT. The schema requires mechanism 'TYPICALLY' on a materialised fork, and this module has no TYPICALLY clause anywhere. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal (\"must be a literal: a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING\"), so the six fields carry no defaults. The two poles are supplied instead as named Interpretation values, `the staff reading` and `the text alone`. Neither is a default: a caller must pass one. 'taken' below therefore records which pole this register nominates as the citable one, not a value the encoding silently applies.",
+        "L4 constructor names, which the schema's reading-id pattern (^[A-Za-z][A-Za-z0-9]*$) cannot hold: presentlySubjectToTheReportingRequirement = `presently subject to the reporting requirement`; everSubjectToTheReportingRequirement = `ever subject to the reporting requirement`",
+        "This is the only one of the six whose divergence propagates all the way to whether the exemption is available at all, rather than to a number inside it.",
+        "P6 owes a former-reporting-company fixture."
+      ]
+    },
+    {
+      "id": "F-HOLDERS-OF-RECORD",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "holders of record basis",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the issuer may cease its ongoing reporting",
+        "line": 1919,
+        "provisions": [
+          "17 CFR 227.202(b)(2)",
+          "17 CFR 227.100(d)",
+          "17 CFR 270.3a-9"
+        ]
+      },
+      "source": {
+        "quote": "The issuer has filed, since its most recent sale of securities pursuant to this part, at least one annual report pursuant to this section and has fewer than 300 holders of record;",
+        "citation": "17 CFR 227.202(b)(2), read against 17 CFR 227.100(d) (\"A crowdfunding vehicle (as defined in § 270.3a-9 of this chapter) is not considered an investor for the purposes of this part.\")"
+      },
+      "readings": [
+        {
+          "id": "theInvestorsWhoInvestedInTheOffering",
+          "description": "\"Record holders\" for the purpose of ending the ongoing reporting duty means the investors who invested in the offering, looking through a § 270.3a-9 crowdfunding vehicle to the people behind it. Encoded by counting the IssuerProfile field `investors who invested in the offering`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Corporation Finance, Regulation Crowdfunding Compliance and Disclosure / Corporation Finance Interpretation 202.02 [July 9, 2026], citing Securities Act Release No. 10884 (Nov. 2, 2020), Section F.1.c — \"For purposes of Rule 202(b), \\\"record holders\\\" means investors who invested in the offering.\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding"
+            }
+          ]
+        },
+        {
+          "id": "theRegisterOfHoldersOfRecord",
+          "description": "\"Holders of record\" carries its ordinary registry meaning, under which a crowdfunding vehicle holding for 350 investors is one holder — and § 227.100(d) reinforces that result by saying in terms that a crowdfunding vehicle is not considered an investor for the purposes of this part. Encoded by counting the IssuerProfile field `holders of record`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.202(b)(2) — \"holders of record\"; 17 CFR 227.100(d) second sentence; 17 CFR 270.3a-9"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theInvestorsWhoInvestedInTheOffering",
+        "mechanism": "TYPICALLY",
+        "rationale": "Nominated as the citable pole on CFI 202.02, which is the newest thing in P2's register (2026-07-09). It is also the reading under which the duty is harder to escape, which is the conservative direction for an issuer deciding whether it may stop reporting."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "The committed fixture `an issuer behind a crowdfunding vehicle` (Lox Inc: one annual report filed, one holder on the register, 350 investors behind a single crowdfunding vehicle): `the issuer may cease its ongoing reporting` is TRUE under `the text alone` and FALSE under `the staff reading`. Both are committed #ASSERTs (regcf-denovo.l4:3444, 3448)."
+      ],
+      "cross_refs": [
+        "EM-CFI-202-02-HOLDERS"
+      ],
+      "notes": [
+        "MECHANISM CAVEAT. The schema requires mechanism 'TYPICALLY' on a materialised fork, and this module has no TYPICALLY clause anywhere. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal (\"must be a literal: a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING\"), so the six fields carry no defaults. The two poles are supplied instead as named Interpretation values, `the staff reading` and `the text alone`. Neither is a default: a caller must pass one. 'taken' below therefore records which pole this register nominates as the citable one, not a value the encoding silently applies.",
+        "L4 constructor names, which the schema's reading-id pattern (^[A-Za-z][A-Za-z0-9]*$) cannot hold: theInvestorsWhoInvestedInTheOffering = `the investors who invested in the offering`; theRegisterOfHoldersOfRecord = `the register of holders of record`",
+        "The most interesting of the six because the readings do not merely differ, they pull against two provisions of the same part: § 227.100(d) supports the register reading and CFI 202.02 reads through it. An encoding that picked either silently would have decided a live tension between § 227.100(d) and § 227.202(b)(2) without saying so.",
+        "The two counts are carried as two separate IssuerProfile fields, `holders of record` and `investors who invested in the offering`, so the fork cannot hide inside one number."
+      ]
+    },
+    {
+      "id": "F-ONE-INTERMEDIARY-SCOPE",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "one intermediary scope",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "more than one intermediary has been used",
+        "line": 1503,
+        "provisions": [
+          "17 CFR 227.100(a)(3)",
+          "17 CFR 227.100(a)(3) Instruction"
+        ]
+      },
+      "source": {
+        "quote": "Instruction to paragraph (a)(3). An issuer shall not conduct an offering or concurrent offerings in reliance on section 4(a)(6) of the Securities Act of 1933 (15 U.S.C. 77d(a)(6)) using more than one intermediary.",
+        "citation": "17 CFR 227.100(a)(3) and the Instruction thereto"
+      },
+      "readings": [
+        {
+          "id": "theProhibitionBindsTheOffering",
+          "description": "The Instruction constrains a single OFFERING, so an issuer that cancels its offering on the first platform, removes its materials there and files a new Form C to begin again is conducting a different offering and does not breach it. Encoded by reading the OfferingProfile field `more than one intermediary used in this offering`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "SEC Division of Corporation Finance, Regulation Crowdfunding Compliance and Disclosure / Corporation Finance Interpretation 100.03 [February 17, 2026] — \"Yes, assuming compliance with Rule 303(a) and Rule 100(a)(3) and the instruction thereto. The issuer should cancel its offering on the initial platform, its offering materials should be removed from that platform, and the issuer should then file a new Form C to begin the offering anew on the new platform.\"",
+              "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding"
+            }
+          ]
+        },
+        {
+          "id": "theProhibitionBindsTheIssuer",
+          "description": "The Instruction's subject is the ISSUER — \"An issuer shall not conduct an offering or concurrent offerings ... using more than one intermediary\" — and it reaches concurrent offerings expressly, so it binds the capital raise rather than the paperwork. On this reading a cancel-and-refile onto a second platform for the same raise is still one issuer using two intermediaries. Encoded by reading `more than one intermediary used by the issuer for this capital raise`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(3) Instruction — \"An issuer shall not conduct an offering or concurrent offerings ... using more than one intermediary\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theProhibitionBindsTheOffering",
+        "mechanism": "TYPICALLY",
+        "rationale": "Nominated as the citable pole on CFI 100.03. Note that the interpretation states its conditions in permissive language — \"should cancel\", \"should then file\" — which is weaker than the Instruction's \"shall not\", so the second reading is not obviously foreclosed."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "An offering with `more than one intermediary used in this offering` FALSE and `more than one intermediary used by the issuer for this capital raise` TRUE — the cancel-and-refile pattern CFI 100.03 blesses: `100(a)(3) — conducted through one compliant intermediary, exclusively` is TRUE under `the staff reading` and FALSE under `the text alone`. Measured 2026-08-05 in a scratch probe against the committed module; the committed `an offering` fixture hardcodes both fields FALSE and so cannot exhibit it."
+      ],
+      "cross_refs": [
+        "EM-CFI-100-03-PLATFORM-MOVE",
+        "EM-CFI-100-05-ROLLING-CAP"
+      ],
+      "notes": [
+        "MECHANISM CAVEAT. The schema requires mechanism 'TYPICALLY' on a materialised fork, and this module has no TYPICALLY clause anywhere. Measured 2026-08-05: the typechecker refuses a user-declared nullary constructor as a TYPICALLY literal (\"must be a literal: a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING\"), so the six fields carry no defaults. The two poles are supplied instead as named Interpretation values, `the staff reading` and `the text alone`. Neither is a default: a caller must pass one. 'taken' below therefore records which pole this register nominates as the citable one, not a value the encoding silently applies.",
+        "L4 constructor names, which the schema's reading-id pattern (^[A-Za-z][A-Za-z0-9]*$) cannot hold: theProhibitionBindsTheOffering = `the prohibition binds the offering`; theProhibitionBindsTheIssuer = `the prohibition binds the issuer`",
+        "Interacts with F-CAP-12MONTH-ANCHOR: even if a re-filed offering is a new offering, the § 227.100(a)(1) cap arithmetic still runs across both, because (a)(1) aggregates by issuer and not by offering.",
+        "P6 owes a second-platform fixture."
+      ]
+    },
+    {
+      "id": "A-501A5-DOUBLE-COUNT",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "(B) — the increase in the indebtedness in the 60 days before the sale",
+        "line": 547,
+        "provisions": [
+          "17 CFR 230.501(a)(5)(i)(B)",
+          "17 CFR 230.501(a)(5)(i)(C)"
+        ]
+      },
+      "source": {
+        "quote": "Indebtedness that is secured by the person's primary residence, up to the estimated fair market value of the primary residence at the time of the sale of securities, shall not be included as a liability (except that if the amount of such indebtedness outstanding at the time of sale of securities exceeds the amount outstanding 60 days before such time, other than as a result of the acquisition of the primary residence, the amount of such excess shall be included as a liability); and",
+        "citation": "17 CFR 230.501(a)(5)(i)(B), read with (C), reached from 17 CFR 227.100(a)(2) Instruction 1"
+      },
+      "readings": [
+        {
+          "id": "cumulativeLimbs",
+          "description": "Where the mortgage BOTH exceeds fair market value and grew in the last 60 days, limb (C) counts the excess over fair market value as a liability and limb (B)'s exception separately counts the 60-day increase, so the overlapping amount is counted twice. The words say so and supply no netting rule. Encoded as the sum of the two limbs.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 230.501(a)(5)(i)(B) and (C) — two separately stated liabilities with no words of set-off between them"
+            }
+          ]
+        },
+        {
+          "id": "limbCSubsumesTheOverlap",
+          "description": "(C) already captures everything above fair market value, so only the part of (B)'s 60-day increase that sits BELOW fair market value should be added; otherwise the same dollar is a liability twice.",
+          "status": "rejected",
+          "rejection_rationale": "The text supplies no netting rule, and inventing one would put arithmetic into § 230.501 that nobody wrote. The double count is what the words produce and it is recorded at the site rather than silently repaired.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "cumulativeLimbs",
+        "mechanism": "encoded",
+        "rationale": "Encoded as written, cumulatively, with the overlap stated in an AMBIGUITY comment at the site. This is the direction that does not invent law."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "A homeowner whose primary residence is worth less than the mortgage AND whose mortgage grew in the 60 days before the sale for a reason other than acquiring the residence: the two encodings differ by min(excess over FMV, 60-day increase). No committed fixture exercises the overlap — the committed `a homeowner` fixture (regcf-denovo.l4:3585, net worth $900,000 from $1,200,000 of assets) exercises (C) alone."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "The witness is described, not measured: it is derived from the arithmetic of the two limbs rather than from a run. P6 owes it as a fixture."
+      ]
+    },
+    {
+      "id": "A-503-LOOKBACK-ANCHOR",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "falls within the lookback of",
+        "line": 1026,
+        "provisions": [
+          "17 CFR 227.503(a)(1)",
+          "17 CFR 227.503(a)(2)",
+          "17 CFR 227.503(a)(3)(ii)",
+          "17 CFR 227.503(a)(5)",
+          "17 CFR 227.503(a)(7)",
+          "17 CFR 227.503(a)(8)"
+        ]
+      },
+      "source": {
+        "quote": "Has been convicted, within 10 years before the filing of the offering statement or such sale (or five years, in the case of issuers, their predecessors and affiliated issuers), of any felony or misdemeanor:",
+        "citation": "17 CFR 227.503(a)(1), against the phrase \"within five years before the filing of the information required by section 4A(b) of the Securities Act\" used in (a)(2), (a)(3)(ii), (a)(5), (a)(7) and (a)(8)"
+      },
+      "readings": [
+        {
+          "id": "oneFilingEvent",
+          "description": "\"The filing of the offering statement\" and \"the filing of the information required by section 4A(b)\" name the same event — in practice both are the Form C — so one anchor date serves every limb. Encoded as a single `the filing` DATE parameter to `the covered person is disqualified`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.203(a)(1) — the offering statement IS Form C, and \"Every Form C must include the information required by § 227.201\"; § 227.201 is the § 4A(b) information"
+            }
+          ]
+        },
+        {
+          "id": "twoDistinctFilings",
+          "description": "The part enumerates § 227.201 and section 4A(b) separately elsewhere, so the two phrases are two events and each limb must be measured from its own.",
+          "status": "rejected",
+          "rejection_rationale": "Both are the Form C in every offering this part contemplates, so the distinction has no population; and carrying two anchor dates would ask a fact-supplier for a difference they cannot observe.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "oneFilingEvent",
+        "mechanism": "encoded",
+        "rationale": "One `the filing` parameter. Recorded at the site as an AMBIGUITY, because the two phrases really are different words and the text does not say they are the same event."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "divergence 'none': the encoding takes one anchor date from the caller, so it cannot exhibit a case where the two filings differ."
+      ]
+    },
+    {
+      "id": "A-503-CLASS-ANCHOR",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the covered person is disqualified",
+        "line": 1205,
+        "provisions": [
+          "17 CFR 227.503(a) chapeau",
+          "17 CFR 227.503(a) Instruction"
+        ]
+      },
+      "source": {
+        "quote": "Instruction to paragraph (a): With respect to any beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power, the issuer is required to determine whether a disqualifying event has occurred only as of the time of filing of the offering statement and not from the time of such sale.",
+        "citation": "17 CFR 227.503(a) Instruction, against the chapeau's \"any promoter connected with the issuer in any capacity at the time of filing, any offer after filing, or such sale\""
+      },
+      "readings": [
+        {
+          "id": "oneAnchorPerEvaluation",
+          "description": "The caller supplies one anchor date and every class is tested at it; the Instruction's narrowing for 20% owners is honoured by evaluating owners at the filing date. Encoded as the single `the filing` parameter.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.503(a) Instruction — the only class the part gives a per-class anchor to"
+            }
+          ]
+        },
+        {
+          "id": "perClassAnchor",
+          "description": "Each covered-person class carries its own temporal anchor: promoters continuously from filing to sale, 20% owners at filing only, and the remaining six classes on some third basis the text does not state.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.503(a) chapeau — \"at the time of filing, any offer after filing, or such sale\", said of promoters only; the part says nothing about the other six classes"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "oneAnchorPerEvaluation",
+        "mechanism": "encoded",
+        "rationale": "One anchor per evaluation, which lets a caller ask the question at filing and again at sale rather than forcing the encoding to invent a per-class rule the text does not supply. Both readings remain live: the text does not choose."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "'unassessed': the per-class reading is not encoded at all, so nothing measures the gap. Encoding it would require six anchor dates the part never names."
+      ]
+    },
+    {
+      "id": "A-501-ANNIVERSARY",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the transfer falls within the one-year restricted period",
+        "line": 1251,
+        "provisions": [
+          "17 CFR 227.501(a)"
+        ]
+      },
+      "source": {
+        "quote": "may not be transferred by any purchaser of such securities during the one-year period beginning when the securities were issued in a transaction exempt from registration pursuant to section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), unless such securities are transferred:",
+        "citation": "17 CFR 227.501(a)"
+      },
+      "readings": [
+        {
+          "id": "anniversaryIsOutside",
+          "description": "A one-year period that began on day X has run when day X recurs, so the first anniversary is the first unrestricted day. Encoded as `date of the transfer` LESS THAN the first anniversary.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a) — \"the one-year period beginning when the securities were issued\""
+            }
+          ]
+        },
+        {
+          "id": "anniversaryIsInside",
+          "description": "The anniversary is the last day of the one-year period, so a transfer on it is still restricted.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a) — the text fixes neither endpoint's inclusivity"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "anniversaryIsOutside",
+        "mechanism": "encoded",
+        "rationale": "A period that began on a day has run when that day recurs. Neither reading is rejected: the text does not say, and the two differ on exactly one day per holding."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "`the transfer is permitted` on the committed boundary pair (regcf-denovo.l4:3412-3413): securities issued 2025-06-01, transferred 2026-06-01 is PERMITTED and transferred 2026-05-31 is NOT. Flipping to the other reading moves the boundary by one day."
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "A-100A1-DOLLARS-OR-COUNT",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "100(a)(1) — the aggregate amount does not exceed the cap",
+        "line": 1373,
+        "provisions": [
+          "17 CFR 227.100(a)(1)"
+        ]
+      },
+      "source": {
+        "quote": "The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;",
+        "citation": "17 CFR 227.100(a)(1)"
+      },
+      "readings": [
+        {
+          "id": "dollars",
+          "description": "\"Aggregate amount of securities\" means the dollar amount. Encoded throughout as NUMBER dollars.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(1) — the ceiling it is compared against is \"$5,000,000\", a dollar figure"
+            }
+          ]
+        },
+        {
+          "id": "countOfSecurities",
+          "description": "\"Amount of securities\" is a count of securities, which is what the noun most literally denotes.",
+          "status": "rejected",
+          "rejection_rationale": "The comparand is a dollar figure, and § 227.100(a)(2)(ii)'s \"not to exceed an amount sold of $124,000\" makes the same identification. A count could not be compared to $5,000,000 at all.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "dollars",
+        "mechanism": "encoded",
+        "rationale": "Everything else in the section is dollars and the cap is a dollar figure."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "divergence 'none': the alternative is not encoded and could not be, since the rule's comparand is a dollar figure."
+      ]
+    },
+    {
+      "id": "A-100A1-OFFERED-AMOUNT",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the amount attributable to this transaction",
+        "line": 1355,
+        "provisions": [
+          "17 CFR 227.100(a)(1)",
+          "17 CFR 227.201(t) Instruction 1"
+        ]
+      },
+      "source": {
+        "quote": "including the securities offered in such transaction",
+        "citation": "17 CFR 227.100(a)(1)"
+      },
+      "readings": [
+        {
+          "id": "maximumWhereOversubscriptionsAccepted",
+          "description": "For an offering that has not closed, the amount \"offered in such transaction\" is the maximum the issuer will accept where it accepts oversubscriptions, and the target offering amount otherwise — by parity with Instruction 1 to § 227.201(t), which says exactly that for the neighbouring aggregation.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.201(t) Instruction 1, which aggregates on the same basis for the financial-statement tiers; 17 CFR 227.100(a)(1)"
+            }
+          ]
+        },
+        {
+          "id": "targetAmountAlways",
+          "description": "The target offering amount is what the issuer has offered; anything above it is contingent on oversubscription and is not yet offered.",
+          "status": "rejected",
+          "rejection_rationale": "It would let an issuer sit under the cap on paper while accepting more, which is the outcome the neighbouring Instruction 1 exists to prevent.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "maximumWhereOversubscriptionsAccepted",
+        "mechanism": "encoded",
+        "rationale": "Parity with Instruction 1 to § 227.201(t). § 227.100 itself does not say, and the borrowing is recorded at the site."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "Any offering with `the issuer will accept investments in excess of the target offering amount` TRUE and a maximum above the target: `the amount attributable to this transaction` returns the maximum on the reading taken and the target on the alternative, and the difference propagates into `100(a)(1) — the aggregate amount does not exceed the cap`. No committed fixture sets the oversubscription flag TRUE; the committed `an offering` constructor exposes it as a parameter."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "The witness is described from the encoding's own branch, not measured. P6 owes an oversubscribed-offering fixture."
+      ]
+    },
+    {
+      "id": "A-100A2-JOINT-SPOUSAL",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the amount tested against the investor's limit",
+        "line": 1466,
+        "provisions": [
+          "17 CFR 227.100(a)(2) Instruction 2"
+        ]
+      },
+      "source": {
+        "quote": "Instruction 2 to paragraph (a)(2). A person's annual income and net worth may be calculated jointly with that person's spouse; however, when such a joint calculation is used, the aggregate investment of the investor spouses may not exceed the limit that would apply to an individual investor at that income or net worth level.",
+        "citation": "17 CFR 227.100(a)(2) Instruction 2"
+      },
+      "readings": [
+        {
+          "id": "oneSharedLimitForTheCouple",
+          "description": "One limit for the couple, tested against their combined investments. Encoded by testing `the aggregate investment of the investor spouses` plus this investment against the single limit whenever the joint-calculation flag is set.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(2) Instruction 2 — \"the aggregate investment of the investor spouses may not exceed the limit that would apply to an individual investor\""
+            }
+          ]
+        },
+        {
+          "id": "jointFiguresIndividualLimits",
+          "description": "The joint figures lift the couple into the higher tier while each spouse retains a full individual limit against their own investments.",
+          "status": "rejected",
+          "rejection_rationale": "It reads \"aggregate\" out of the sentence. It is nevertheless the reading a portal's per-investor form silently implements, which is why it is recorded rather than dismissed.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "oneSharedLimitForTheCouple",
+        "mechanism": "encoded",
+        "rationale": "The Instruction says so in terms: the AGGREGATE investment of the spouses may not exceed the limit."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "Any married pair using the joint calculation: the two readings disagree on every one of them, by the amount of the spouse's prior investment. No committed fixture sets `annual income and net worth calculated jointly with that person's spouse` TRUE; the committed `an investor` constructor hardcodes it FALSE."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "The witness is described from the encoding's own branch, not measured. P6 owes a joint-calculation fixture."
+      ]
+    },
+    {
+      "id": "A-201-CHAPEAU-PLACEMENT",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the offering statement discloses the information required by § 227.201",
+        "line": 1723,
+        "provisions": [
+          "17 CFR 227.201 chapeau",
+          "17 CFR 227.201(a)-(z)"
+        ]
+      },
+      "source": {
+        "quote": "must file with the Commission and provide to investors and the relevant intermediary the following information:",
+        "citation": "17 CFR 227.201 chapeau"
+      },
+      "readings": [
+        {
+          "id": "oneDutyOverACompletenessPredicate",
+          "description": "One regulative duty whose content is a constitutive completeness predicate over the twenty-six lettered paragraphs, with the three recipients named inside the act. Keeps the content list where a decision engine can execute it and the party and deadline where a process diagram can draw them.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.201 chapeau — one verb phrase governing one enumerated list"
+            }
+          ]
+        },
+        {
+          "id": "twentySixSeparateObligations",
+          "description": "Twenty-six separate obligations, one per lettered paragraph, which is what the plural \"the following information\" most literally licenses; or three parallel duties, one per recipient.",
+          "status": "rejected",
+          "rejection_rationale": "It would scatter the disclosure test across twenty-six deontics and put nothing where an engine could execute the completeness question, which is the question a filer actually asks. The alternative is defensible and is recorded rather than argued away.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "oneDutyOverACompletenessPredicate",
+        "mechanism": "encoded",
+        "rationale": "The completeness-predicate-plus-PROVIDED-guard split, used at ten sites in this module (§§ 227.201, 202(a), 302(b)(1), 303(d), 303(f)(1), 304(b)(2), 404(a), 204(b), 206(b), 303(b)(2)). It is an encoding choice, not the text's."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "Not an ambiguity of the source words at all — this is the BNA A12 analogue, an ambiguity of encoding placement. The module's own header states the choice and names the alternative."
+      ]
+    },
+    {
+      "id": "A-201T3-PREVIOUSLY-SOLD",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the financial statements required",
+        "line": 1806,
+        "provisions": [
+          "17 CFR 227.201(t)(3)",
+          "17 CFR 227.100(c)"
+        ]
+      },
+      "source": {
+        "quote": "provided, however, that for issuers that have not previously sold securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), offerings that have a target offering amount of more than $618,000, but not more than $1,235,000, financial statements of the issuer reviewed by a public accountant that is independent of the issuer.",
+        "citation": "17 CFR 227.201(t)(3) proviso"
+      },
+      "readings": [
+        {
+          "id": "everPreviouslySold",
+          "description": "\"Previously\" means ever. Encoded as the IssuerProfile boolean `previously sold securities in reliance on section 4(a)(6)`, with no window.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.201(t)(3) — the phrase carries no window; 17 CFR 227.100(c), which tells us WHO counts for this test (controlled entities and predecessors) and says nothing about WHEN"
+            }
+          ]
+        },
+        {
+          "id": "withinTheAggregationWindow",
+          "description": "\"Previously\" means within the same twelve months the paragraph otherwise aggregates over, so an issuer whose only prior Reg CF sale was three years ago is a first-time issuer for the proviso.",
+          "status": "rejected",
+          "rejection_rationale": "The paragraph attaches a window to the AMOUNT and not to the prior-sale test, and § 227.100(c) extends the prior-sale test by person rather than by time, which would be odd if it also carried a period.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "everPreviouslySold",
+        "mechanism": "encoded",
+        "rationale": "The phrase carries no window and the neighbouring scoping provision extends it by person, not by time."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "An issuer with a $1,000,000 target whose only prior Reg CF sale closed more than twelve months ago: `the financial statements required` is AUDITED on the reading taken and REVIEWED on the alternative. The committed fixtures `a first-time issuer` and `a repeat issuer` at `a large offering` (regcf-denovo.l4:3399-3400) pin the two answers apart at that target amount; they differ on the ever/window question only for an issuer whose prior sale is outside the window."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "The committed pair is the (t)(3) proviso trap, not this fork; it shows the two ANSWERS are distinguishable at $1,000,000, which is what makes this fork observable."
+      ]
+    },
+    {
+      "id": "A-202B-TERMINATION-MOMENT",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the issuer may cease its ongoing reporting",
+        "line": 1919,
+        "provisions": [
+          "17 CFR 227.202(b)",
+          "17 CFR 227.203(b)(3)"
+        ]
+      },
+      "source": {
+        "quote": "An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:",
+        "citation": "17 CFR 227.202(b) chapeau, against 17 CFR 227.203(b)(3) (\"within five business days from the date on which the issuer becomes eligible to terminate its reporting obligation\")"
+      },
+      "readings": [
+        {
+          "id": "eligibilityEndsTheDuty",
+          "description": "A paragraph (b) event ends the duty and the Form C-TR is a notice of that fact. Encoded as `the issuer may cease its ongoing reporting` turning on the five events alone, with the C-TR filing as a separate regulative rule.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.202(b) — \"must continue to comply ... until one of the following occurs\", and filing a Form C-TR is not one of the five"
+            }
+          ]
+        },
+        {
+          "id": "filingEndsTheDuty",
+          "description": "The duty continues until the Form C-TR is filed, so a late C-TR extends the reporting obligation. § 227.203(b)(3) gives the issuer five business days from ELIGIBILITY, which implies eligibility and termination are different moments.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.203(b)(3) — \"from the date on which the issuer becomes eligible to terminate its reporting obligation\", which distinguishes eligibility from termination"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "eligibilityEndsTheDuty",
+        "mechanism": "encoded",
+        "rationale": "§ 227.202(b) enumerates five events and filing the C-TR is not among them. Neither reading is rejected: § 227.203(b)(3)'s wording really does distinguish the two moments and the part never says which one ends the duty."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "'unassessed': only the eligibility reading is encoded, so the module cannot exhibit the gap. Encoding the alternative would need a C-TR filing date the module does not carry."
+      ]
+    },
+    {
+      "id": "A-203B2-PRACTICABLE",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the issuer's Form C-AR amendment duty",
+        "line": 2018,
+        "provisions": [
+          "17 CFR 227.203(b)(2)"
+        ]
+      },
+      "source": {
+        "quote": "An issuer must file with the Commission an amendment to the annual report filed on Form C: Annual Report (Form C-AR) (§ 239.900 of this chapter) to make a material change to the previously filed annual report as soon as practicable after discovery of the need for the material change.",
+        "citation": "17 CFR 227.203(b)(2)"
+      },
+      "readings": [
+        {
+          "id": "fiveBusinessDaysByAnalogy",
+          "description": "\"As soon as practicable\" is given the five-business-day deadline the neighbouring paragraphs use, so the duty has a WITHIN a process engine can time. Encoded as WITHIN `five business days`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.203(a)(2), (a)(3)(i)-(iii) and (b)(3), all of which state five business days for the neighbouring filings"
+            }
+          ]
+        },
+        {
+          "id": "noStatableDeadline",
+          "description": "\"As soon as practicable\" has one reading whose boundary is undecidable on the facts of any particular case, so no deadline should be encoded and the duty should carry none.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.203(b)(2) — the part fixes no period for this filing and fixes one for every neighbouring filing, which is some evidence the omission is deliberate"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "fiveBusinessDaysByAnalogy",
+        "mechanism": "encoded",
+        "rationale": "A deontic with no WITHIN cannot be timed at all, and the analogy is the least invented number available. Both readings are live: the analogy is an encoding choice, not the text, and it is stated as such at the site."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "Vagueness with no competing PARSE — the two readings above are about what to encode, not about what the words mean. The kind is 'vagueness' because that is what makes the encoding question arise."
+      ]
+    },
+    {
+      "id": "A-304A-48H-ACCEPTANCE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the investor may still cancel for any reason",
+        "line": 2332,
+        "provisions": [
+          "17 CFR 227.304(a)",
+          "17 CFR 227.304(b)(2)(iii)"
+        ]
+      },
+      "source": {
+        "quote": "During the 48 hours prior to such deadline, an investment commitment may not be cancelled except as provided in paragraph (c) of this section.",
+        "citation": "17 CFR 227.304(a), against 17 CFR 227.304(b)(2)(iii) (notice of \"whether the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline\")"
+      },
+      "readings": [
+        {
+          "id": "acceptanceStillPermitted",
+          "description": "New commitments may be accepted in the final 48 hours of an ordinary offering, because nothing forbids it; the (b)(2)(iii) notice exists because an early close shortens the window, not because acceptance is otherwise barred. Encoded by omission — no limb of this module forbids it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.304(a), which forbids CANCELLATION only; 17 CFR 227.304(b)(2)(iii), which contemplates the issuer choosing"
+            }
+          ]
+        },
+        {
+          "id": "symmetricFreeze",
+          "description": "The 48-hour freeze is symmetric: if an investor cannot cancel, an issuer cannot accept, because an investor who commits inside the window would have no cancellation right at all.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.304(a) — the part nowhere says a commitment may be accepted inside the window in an ordinary offering"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "acceptanceStillPermitted",
+        "mechanism": "encoded",
+        "rationale": "Taken by omission: the module forbids nothing the text does not forbid. Neither reading is rejected — the point is that the part is simply silent."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "'unassessed': the alternative would be an extra prohibition the module does not carry, so nothing measures the gap."
+      ]
+    },
+    {
+      "id": "A-304A-DEADLINE-DATUM",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the investor may still cancel for any reason",
+        "line": 2332,
+        "provisions": [
+          "17 CFR 227.304(a)",
+          "17 CFR 227.201(g)",
+          "17 CFR 227.201(j)(1)",
+          "17 CFR 227.303(d)(4)"
+        ]
+      },
+      "source": {
+        "quote": "An investor may cancel an investment commitment for any reason until 48 hours prior to the deadline identified in the issuer's offering materials.",
+        "citation": "17 CFR 227.304(a), against 17 CFR 227.303(d)(4) (\"The date and time by which the investor may cancel the investment commitment.\")"
+      },
+      "readings": [
+        {
+          "id": "theDeadlineIsADate",
+          "description": "The \"deadline identified in the issuer's offering materials\" is a date — that is what § 227.201(g) asks the issuer to disclose — so a 48-hour offset is drawn in whole days. Encoded with every date as a DATE and the cancellation line drawn two whole days before the deadline date.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.201(g) — \"the target offering amount and the deadline to reach the target offering amount\""
+            }
+          ]
+        },
+        {
+          "id": "theDeadlineIsADateAndTime",
+          "description": "The deadline carries a time of day, because § 227.303(d)(4) requires the intermediary to notify the investor of \"the date and time by which the investor may cancel\" and § 227.201(j)(1) speaks in the same register. On this reading the 48 hours is a true clock offset.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.303(d)(4) and 17 CFR 227.201(j)(1)"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theDeadlineIsADate",
+        "mechanism": "encoded",
+        "rationale": "Every date in this module is a calendar DATE, so the line is drawn two whole days before the deadline date rather than 48 clock hours before it. The difference is up to twenty-four hours and falls on the investor's side — the window closes slightly early. Stated at the site as a granularity gap; carrying the deadline as a DATETIME would close it and is a modelling change, not a repair."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "This is the source of the granularity gap the encoding reports at § 227.304(a). It is registered here rather than as a defect because the part itself gives the deadline two different data (a date in § 227.201(g), a date and time in § 227.303(d)(4)) and does not choose."
+      ]
+    },
+    {
+      "id": "A-21DAY-ANCHORS",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the intermediary has made the issuer information publicly available as § 227.303(a) requires",
+        "line": 2465,
+        "provisions": [
+          "17 CFR 227.303(a)(2)",
+          "17 CFR 227.303(e)(3)(i)",
+          "17 CFR 227.304(b)(1)"
+        ]
+      },
+      "source": {
+        "quote": "This information must be made publicly available on the intermediary's platform for a minimum of 21 days before any securities are sold in the offering, during which time the intermediary may accept investment commitments;",
+        "citation": "17 CFR 227.303(a)(2), against 17 CFR 227.303(e)(3)(i) (\"earlier than 21 days after the date on which the intermediary makes publicly available on its platform the information required to be provided by the issuer under §§ 227.201 and 227.203(a)\") and 17 CFR 227.304(b)(1) (\"The offering remains open for a minimum of 21 days pursuant to § 227.303(a)\")"
+      },
+      "readings": [
+        {
+          "id": "oneAnchorSeenThreeTimes",
+          "description": "All three periods run from one event — the date the § 227.201 and § 227.203(a) information was first made publicly available on the platform — so they are one period described three times. Encoded as a single OfferingProfile date field that all three tests read.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.304(b)(1) — \"pursuant to § 227.303(a)\", which is that anchor; 17 CFR 227.303(e)(3)(i), which names the same publication event"
+            }
+          ]
+        },
+        {
+          "id": "threeIndependentPeriods",
+          "description": "Three separate periods with three separate anchors: publication-before-sale, publication-before-funds-move, and offering-open. On this reading an offering could satisfy one and not another.",
+          "status": "rejected",
+          "rejection_rationale": "§ 227.304(b)(1) cross-refers to § 227.303(a) expressly and § 227.303(e)(3)(i) names the same publication event, so the text supplies one anchor date and three descriptions of it.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "oneAnchorSeenThreeTimes",
+        "mechanism": "encoded",
+        "rationale": "The cross-references in the text tie the three descriptions to one event."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "divergence 'none': the encoding carries one publication date, so it cannot exhibit three independent periods."
+      ]
+    },
+    {
+      "id": "A-301C2-FRAUD-CONCERN",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "IntermediaryProfile's `a reasonable basis for believing that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection`",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the intermediary's duty to deny access for fraud concerns",
+        "line": 2611,
+        "provisions": [
+          "17 CFR 227.301(c)(2)",
+          "17 CFR 227.303(d)"
+        ]
+      },
+      "source": {
+        "quote": "Has a reasonable basis for believing that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection.",
+        "citation": "17 CFR 227.301(c)(2); \"promptly\" in the same paragraph and in 17 CFR 227.303(d)"
+      },
+      "readings": [
+        {
+          "id": "asAssessedByTheIntermediary",
+          "description": "The boundary is where the intermediary, exercising a reasonable basis, puts it — the standard is a state of the intermediary's belief and the part supplies no test for it. Carried as a boolean input field asserting the belief as a found fact.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.301(c)(2) — \"Has a reasonable basis for believing\""
+            }
+          ]
+        },
+        {
+          "id": "asAssessedOnReview",
+          "description": "The boundary is objective and reviewable after the fact by the Commission or the association, so the intermediary's own view is not the last word.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "In the Matter of the Application of DreamFunded Marketplace, LLC — the Commission (not the staff) applied § 227.301(c)(2) in a contested adjudication, sustaining FINRA's findings against a funding portal, which establishes that the standard is reviewable rather than self-certifying"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "asAssessedByTheIntermediary",
+        "mechanism": "fact-supplied",
+        "rationale": "The boolean input field asserts the reasonable basis as a found fact, leaving the vague boundary where the part left it. Neither reading is rejected: the Commission's own adjudication shows the assessment is reviewable, which the input field does not deny — it only records who asserts it first."
+      },
+      "status": "open",
+      "cross_refs": [
+        "EM-SEC-OPINION-DREAMFUNDED"
+      ],
+      "notes": [
+        "\"Promptly\", in § 227.301(c)(2)'s remove-cancel-return chain and in § 227.303(d), is the same shape and is delegated the same way; it is not given its own entry because it is one vague adverb with no competing parse, delegated at the same site."
+      ]
+    },
+    {
+      "id": "A-502A3-KNOWLEDGE-LIMB",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "502(a)(3) — the issuer's knowledge limb",
+        "line": 3000,
+        "provisions": [
+          "17 CFR 227.502(a)(3)"
+        ]
+      },
+      "source": {
+        "quote": "The issuer did not know of such failure where the failure to comply with a term, condition or requirement of this part was the result of the failure of the intermediary to comply with the requirements of section 4A(a) of the Securities Act (15 U.S.C. 77d-1(a)) and the related rules, or such failure by the intermediary occurred solely in offerings other than the issuer's offering.",
+        "citation": "17 CFR 227.502(a)(3)"
+      },
+      "readings": [
+        {
+          "id": "bitesOnlyOnIntermediaryFailures",
+          "description": "The paragraph bites only when the failure was the intermediary's, and is then satisfied either by the issuer's ignorance or by the intermediary's failure having been confined to other offerings. Encoded as: NOT (the failure was the intermediary's) OR the issuer did not know OR the intermediary's failure was confined to other offerings.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.502(a)(3) — \"where the failure ... was the result of the failure of the intermediary\", a restrictive clause governing the whole sentence"
+            }
+          ]
+        },
+        {
+          "id": "freestandingKnowledgeRequirement",
+          "description": "\"The issuer did not know of such failure\" is a freestanding requirement in every case, and the \"where ...\" clause merely describes the commonest situation rather than restricting the rule.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.502(a)(3) — one sentence, two limbs, and no comma to separate them cleanly"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "bitesOnlyOnIntermediaryFailures",
+        "mechanism": "encoded",
+        "rationale": "The \"where\" clause reads as restrictive. Neither reading is rejected: the punctuation does not settle it, and the two differ on every failure that was the issuer's own and that the issuer knew about."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "A DeviationClaim with `the failure resulted from the intermediary's failure...` FALSE and `the issuer did not know of such failure` FALSE: `502(a)(3) — the issuer's knowledge limb` is TRUE on the reading taken (the paragraph does not bite) and FALSE on the alternative. Derived from the encoded expression, not measured; no committed fixture builds a DeviationClaim."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "P6 owes a DeviationClaim fixture; no test in this module constructs one."
+      ]
+    },
+    {
+      "id": "A-502A1-INSIGNIFICANT",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "DeviationClaim's `the failure to comply was insignificant with respect to the offering as a whole`",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "the failure to comply does not cost the exemption for a particular purchaser",
+        "line": 3010,
+        "provisions": [
+          "17 CFR 227.502(a)(1)"
+        ]
+      },
+      "source": {
+        "quote": "The failure to comply was insignificant with respect to the offering as a whole;",
+        "citation": "17 CFR 227.502(a)(1)"
+      },
+      "readings": [
+        {
+          "id": "significanceIsRelativeToTheOffering",
+          "description": "\"With respect to the offering as a whole\" makes significance a proportion of the offering — a dollar or disclosure failure small relative to the raise. Carried as a boolean input field asserting the assessment as a found fact.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.502(a)(1) — \"insignificant with respect to the offering as a whole\""
+            }
+          ]
+        },
+        {
+          "id": "significanceIsRelativeToTheRequirementBreached",
+          "description": "Significance attaches to which requirement was breached rather than to how much of the offering it touched, so a small failure of a central requirement is still significant.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.502(a) chapeau — \"a term, condition or requirement of this part\", which is what the failure is a failure of"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "significanceIsRelativeToTheOffering",
+        "mechanism": "fact-supplied",
+        "rationale": "The input field carries the statutory phrase whole, so the burden of the assessment sits with the fact-supplier and the vague boundary stays where the part left it. Neither reading is rejected."
+      },
+      "status": "open",
+      "cross_refs": []
+    },
+    {
+      "id": "A-TIMEZONE",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "TIMEZONE IS \"America/New_York\"",
+        "line": 16,
+        "provisions": [
+          "17 CFR part 227 as a whole"
+        ]
+      },
+      "source": {
+        "quote_absent_reason": "There is nothing to quote: 17 CFR part 227 fixes no timezone anywhere, and the ambiguity is the absence. Quoting a provision that does not mention time zones would misrepresent what the source says.",
+        "citation": "17 CFR part 227; the EDGAR/SEC Eastern-time filing convention is not in the P1 bundle and is world knowledge"
+      },
+      "readings": [
+        {
+          "id": "americaNewYork",
+          "description": "The Commission's own clock is Eastern, so filing deadlines, offering deadlines and the module's `RULES EFFECTIVE DATE` localise to America/New_York. Declared as the module's TIMEZONE.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR part 227 supplies no zone; the choice is the EDGAR filing convention, declared rather than assumed"
+            }
+          ]
+        },
+        {
+          "id": "etcUtc",
+          "description": "The part fixes no zone, so no zone should be asserted and the evaluator's default (Etc/UTC) should stand, leaving localisation to the caller.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR part 227 — the absence of any timezone provision is the whole of the licence for this reading"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "americaNewYork",
+        "mechanism": "encoded",
+        "rationale": "A zone had to be chosen: an unpinned `RULES EFFECTIVE DATE` read outside an EVAL UNDER RULES EFFECTIVE AT scope needs one to localise today. The choice is stated in the module header as a convention and as world knowledge rather than bundle knowledge. Neither reading is rejected."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "The surface map declares the zone per side, so a diff against another encoding that chose differently would show the difference rather than absorb it."
+      ]
+    },
+    {
+      "id": "A-BUSINESS-DAY-CALENDAR",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "business days after",
+        "line": 438,
+        "provisions": [
+          "17 CFR 227.201(t) Instruction 4",
+          "17 CFR 227.203(a)(2)",
+          "17 CFR 227.203(a)(3)(i)-(iii)",
+          "17 CFR 227.203(b)(3)",
+          "17 CFR 227.304(b)(3)",
+          "17 CFR 227.304(c)(1)-(2)",
+          "17 CFR 227.304(d)"
+        ]
+      },
+      "source": {
+        "quote": "If the 120th day falls on a Saturday, Sunday, or holiday, the next business day shall be considered the 120th day for purposes of determining the age of the financial statements.",
+        "citation": "17 CFR 227.201(t) Instruction 4 — the only mention of a holiday in the part, which uses \"business day\" twelve times and never defines it"
+      },
+      "readings": [
+        {
+          "id": "weekendsAndHolidays",
+          "description": "A business day is a day that is not a Saturday, a Sunday or a holiday, as Instruction 4's own enumeration implies — with the holiday calendar (federal? exchange? state?) supplied from outside the part.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.201(t) Instruction 4 — \"a Saturday, Sunday, or holiday\""
+            }
+          ]
+        },
+        {
+          "id": "weekendsOnly",
+          "description": "A business day is a day that is not a Saturday or a Sunday. \"Business day\" is undefined in the part, and this is the reading that requires no calendar the part does not supply. Encoded: `business days after` rolls weekends only.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.203(a)(2) and the eleven other uses of \"business day\", none of which defines it or names a calendar"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "weekendsOnly",
+        "mechanism": "encoded",
+        "rationale": "MEASURED 2026-08-05: no holiday calendar exists in any L4 library — /usr/bin/grep -rn over jl4-core/libraries/*.l4 for \"business\" and \"holiday\" finds only ACTUS's NoCalendar enum constructor and an unrelated jurisdiction string. Keeping the weekend arithmetic visible and the calendar burden explicit beats delegating the whole computation to an already-resolved date supplied by the fact-giver, which would hide the gap rather than record it. Neither reading is rejected; the part names a holiday once and never says whose."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "The shortfall is one-sided and knowable: every deadline this module computes falls no later than the reading it does not take, because holidays only push a business-day deadline further out.",
+        "No input field carries a holiday count, so this is resolved-at-encode and not delegated-to-fact: there is currently nobody to delegate to."
+      ]
+    },
+    {
+      "id": "A-100B7-RESERVED-STUB",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+        "anchor": "100(b)(7) — reserved",
+        "line": 1563,
+        "provisions": [
+          "17 CFR 227.100(b)(7)",
+          "17 CFR 227.201(aa)"
+        ]
+      },
+      "source": {
+        "quote": "(7) [Reserved]",
+        "citation": "17 CFR 227.100(b)(7); the same shape at 17 CFR 227.201(aa)"
+      },
+      "readings": [
+        {
+          "id": "labelledStubCarryingProvenanceNotWords",
+          "description": "Carry the reserved paragraph as a labelled inert stub that records WHAT WAS THERE and WHEN (the COVID-era expedited offering route added by 86 FR 3590 on 2021-01-14, lapsed 2023-03-01) but NOT the superseded words, which the P1 bundle does not hold.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(b)(7) as in force — \"[Reserved]\""
+            }
+          ]
+        },
+        {
+          "id": "reproduceTheHistoricText",
+          "description": "Carry the reserved paragraph as a historic arm on the rule-version axis with the superseded words in it, so the corpus records the paragraph's whole life.",
+          "status": "rejected",
+          "rejection_rationale": "The words are not in the bundle: P1 captured only the text in force from 2023-03-01. An arm that appeared to carry them would be fabricated, and a corpus cannot recover from that. Silent omission was the other alternative and was rejected because it loses the fact that a paragraph existed there.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "labelledStubCarryingProvenanceNotWords",
+        "mechanism": "encoded",
+        "rationale": "The stub carries the dates and says in terms that the words are deliberately not reproduced."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "Same treatment for § 227.201(aa) [Reserved].",
+        "Not an ambiguity of any words — it is where a repealed limb belongs in an encoding whose bundle does not hold its text."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1433 @@
+{
+  "schema": "l4-go/surface-map@1",
+  "subject": "regcf",
+  "note": [
+    "THE G2 SURFACE MAP for Reg CF: the committed corpus on the left, the de novo",
+    "encoding at jl4/examples/legal/regcf/denovo/regcf-denovo.l4 on the right.",
+    "",
+    "COVERAGE IS FOUR PAIRS, AND THAT IS A FINDING RATHER THAN A CHOICE. The de novo",
+    "encoding parameterises six interpretation forks on an `Interpretation` record",
+    "threaded as an ordinary GIVEN (R4), and every one of its high-value decisions —",
+    "the investment limit, the issuer's 12-month cap, the financial-statement tier,",
+    "whether the exemption is available, whether ongoing reporting may cease — takes",
+    "that record as its first argument. The oracle cannot supply it.",
+    "",
+    "WHY, MEASURED 2026-08-05 against this very module. The oracle's own Limits",
+    "section already says an enum-typed input field cannot be fed, because JSONDECODE",
+    "delivers a constructor name as a string. This run sharpens that: the failure is",
+    "at the IMPORT BOUNDARY, not in JSONDECODE generally. In a probe that IMPORTs",
+    "regcf-denovo, `JSONDECODE` into a LOCALLY declared enum with spaces in its",
+    "constructor names returns the constructor (`RIGHT OF \\u0060the calendar year here\\u0060`),",
+    "while the same decode into the IMPORTED `annual income period reading` returns a bare",
+    "string (`RIGHT OF \"the calendar year\"`), and the first CONSIDER over it raises",
+    "\"The value \\\"the calendar year\\\" reached a CONSIDER that has no branch for it.\"",
+    "Imported RECORD types decode correctly, so the gap is specific to nullary",
+    "constructor resolution across a module boundary (jl4-core/src/L4/EvaluateLazy/",
+    "Machine.hs:2211-2229, the enum arm of jsonValueToWHNFTyped, with",
+    "isNullaryConstructorReturning at :2041). It bites both sides symmetrically — it is",
+    "why the identity fixture drops FormCFiling — so it is an engine limitation and not",
+    "a defect in either encoding.",
+    "",
+    "TWO REMEDIES, neither taken here because both are outside P4: teach the decoder to",
+    "resolve imported nullary constructors; or add a small declared facade module beside",
+    "the deposit that IMPORTs it and re-exports each fork-bearing decision with",
+    "`the staff reading` pinned, so the map can point `sides.right.module` at the facade",
+    "and say in terms which reading is being compared. The eight pairs that would unlock",
+    "are listed under `blocked_pairs` in this note's tail.",
+    "",
+    "PERTURBATION IS OFF, deliberately. The two encodings do not share a fact vocabulary",
+    "field for field: the corpus's Transfer carries `days since the securities were",
+    "issued` where the de novo carries two DATEs, and the corpus's AdvertisingNotice",
+    "carries `includes information beyond that permitted by paragraph (b)` where the de",
+    "novo carries its negation. A generator that mutates one canonical leaf at a time",
+    "cannot preserve the invariant that both sides still describe the same world — it",
+    "would desynchronise the dual representations and report the desynchronisation as a",
+    "divergence. So the battery is twenty hand-built rows that each move ONE fact and",
+    "keep every representation of it consistent, and minimality is carried by",
+    "construction rather than by the generator.",
+    "",
+    "ROWS ARE UNIONS. Each row carries the union of both sides' field names. The decoder",
+    "ignores extra fields (Postel's Law, Machine.hs:2240), so each side sees only what it",
+    "declares. `rename` is used only where the two sides name the SAME fact differently —",
+    "one key, two names, consistent by construction. Where they represent the fact",
+    "DIFFERENTLY, both representations are in the row and are kept consistent by hand.",
+    "",
+    "BLOCKED PAIRS, declared here so the pairing survives even though it cannot run:",
+    "  issuer-eligible          left `issuer is eligible` / right `the crowdfunding exemption does not apply to the issuer` (negated) — right takes interp",
+    "  issuer-excluded          left `issuer is excluded by Rule 100(b)` / right `the crowdfunding exemption does not apply to the issuer` — right takes interp",
+    "  offering-within-limit    left `offering is within the offering limit` / right `100(a)(1) — the aggregate amount does not exceed the cap` — right takes interp",
+    "  aggregate-offering-amount left `aggregate offering amount` / right `the amount already sold in the twelve month window` PLUS `the amount attributable to this transaction` — right takes interp",
+    "  investment-limit         left `investment limit` / right `the investment limit for the investor` — right takes interp",
+    "  investor-within-limit    left `investor is within the investment limit` / right `100(a)(2) — the investor's limit is not exceeded` — right takes interp",
+    "  financial-statements     left `financial statements required` / right `the financial statements required` — right takes interp",
+    "  reporting-may-terminate  left `ongoing reporting obligation may terminate` / right `the issuer may cease its ongoing reporting` — right takes interp",
+    "Two further corpus decisions are unpairable for reasons that are not the interp",
+    "blocker: `the transaction qualifies for the section 4(a)(6) exemption` and any pair",
+    "over `disclosure requirements are met` take a FormCFiling, whose",
+    "`the financial statements supplied` is enum-typed and hits the same decoder gap on",
+    "the LEFT; and `intermediary obligations are met` aggregates § 227.100(a)(3) with",
+    "§§ 227.301-303 over an IntermediaryArrangement, which the de novo side splits across",
+    "four separate predicates over two different records, so there is no single decision",
+    "to pair it with and pairing a part against the whole would manufacture divergence."
+  ],
+  "sides": {
+    "left": {
+      "label": "corpus",
+      "module": "jl4/examples/legal/regcf/regcf.l4",
+      "timezone": "America/New_York",
+      "note": "The committed hand-built encoding. At G2 this side is the diff oracle's reference, per SPEC.md §5."
+    },
+    "right": {
+      "label": "de novo",
+      "module": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+      "timezone": "America/New_York",
+      "note": [
+        "The P3 deposit, unmodified. Its own TIMEZONE declaration is America/New_York, taken",
+        "on the EDGAR convention and registered as fork A-TIMEZONE — the two sides agreeing",
+        "on the zone here is a coincidence of convention, not evidence about the source."
+      ]
+    }
+  },
+  "slots": {
+    "transfer": {
+      "kind": "record",
+      "perturb": false,
+      "left": {
+        "type": "Transfer"
+      },
+      "right": {
+        "type": "Transfer",
+        "rename": {
+          "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of such a family member, or in connection with the death or divorce of the purchaser or other similar circumstance"
+        },
+        "note": "The de novo Transfer carries two DATEs where the corpus carries `days since the securities were issued`; both are in every row and are kept arithmetically consistent by hand. The family limb is the same fact under two slightly different wordings, so it is renamed rather than duplicated."
+      },
+      "note": "17 CFR 227.501(a) and its four exceptions."
+    },
+    "notice": {
+      "kind": "record",
+      "perturb": false,
+      "left": {
+        "type": "AdvertisingNotice"
+      },
+      "right": {
+        "type": "Communication",
+        "note": "The de novo Communication serves §§ 227.204(b), 227.205 and 227.206(b) at once, so it has ten fields where the corpus's AdvertisingNotice has five. `includes no more than the information specified in § 227.204(b)(1) through (3)` is the negation of the corpus's `includes information beyond that permitted by paragraph (b)`; a rename cannot invert a boolean, so both keys are in every row and are kept opposite by hand."
+      },
+      "note": "17 CFR 227.204(b)."
+    },
+    "investor": {
+      "kind": "record",
+      "perturb": false,
+      "left": {
+        "type": "InvestorProfile"
+      },
+      "right": {
+        "type": "InvestorProfile",
+        "note": "Same type name, different content. The corpus takes accreditation as one boolean input (`an accredited investor as defined in Rule 501`); the de novo COMPUTES it from § 230.501(a)(5)-(6), including the primary-residence arithmetic. Every row therefore sets the corpus's boolean to what the de novo side should compute, and a divergence on this pair is a claim about the arithmetic, not about the pairing."
+      },
+      "note": "17 CFR 230.501(a), reached from 17 CFR 227.100(a)(2)."
+    }
+  },
+  "battery": {
+    "rows": [
+      {
+        "name": "base — restricted transfer, compliant notice, non-accredited investor",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "The seed world. Every other row moves one thing."
+      },
+      {
+        "name": "transfer one day before the anniversary",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 364,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-06-01",
+            "date of the transfer": "2026-05-31"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Issued 2025-06-01, transferred 2026-05-31: 364 days."
+      },
+      {
+        "name": "transfer on the anniversary",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 365,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-06-01",
+            "date of the transfer": "2026-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Issued 2025-06-01, transferred 2026-06-01: 365 days. Fork A-501-ANNIVERSARY sits exactly here."
+      },
+      {
+        "name": "transfer one day after the anniversary",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 366,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-06-01",
+            "date of the transfer": "2026-06-02"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Issued 2025-06-01, transferred 2026-06-02: 366 days."
+      },
+      {
+        "name": "the 365th day of a leap-spanning holding",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 365,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2023-03-01",
+            "date of the transfer": "2024-02-29"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Issued 2023-03-01, transferred 2024-02-29. 365 days have elapsed but the first anniversary (2024-03-01) has NOT arrived, because February 2024 has 29 days. A day-count encoding and a date-arithmetic encoding part company here, and nowhere else. Built deliberately as a divergence probe."
+      },
+      {
+        "name": "inside the period, transferred to the issuer",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": true,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2026-01-01",
+            "date of the transfer": "2026-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "inside the period, transferred to an accredited investor",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": true,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2026-01-01",
+            "date of the transfer": "2026-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "inside the period, transferred in a registered offering",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": true,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2026-01-01",
+            "date of the transfer": "2026-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "inside the period, transferred to family",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": true,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2026-01-01",
+            "date of the transfer": "2026-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "notice that carries information beyond paragraph (b)",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": true,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": false,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "notice that does not direct investors to the platform",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": false,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "notice that neither directs nor stays inside paragraph (b)",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": false,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": true,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": false,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ann",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "investor accredited on income",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ben",
+            "an accredited investor as defined in Rule 501": true,
+            "annual income": 250000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 250000,
+            "annual income for the investor's own fiscal year": 250000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 250000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Individual income $250,000 in each of the two most recent years, with a reasonable expectation of the same this year."
+      },
+      {
+        "name": "investor accredited on net worth",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Cy",
+            "an accredited investor as defined in Rule 501": true,
+            "annual income": 50000,
+            "net worth": 2000000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 2000000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 2000000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Assets other than the primary residence $2,000,000, no liabilities."
+      },
+      {
+        "name": "investor just below the net-worth threshold",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Dee",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 1000000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 1000000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 1000000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Net worth $1,000,000 exactly; § 230.501(a)(5) requires it to EXCEED $1,000,000."
+      },
+      {
+        "name": "investor just above the net-worth threshold",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Eve",
+            "an accredited investor as defined in Rule 501": true,
+            "annual income": 50000,
+            "net worth": 1000001,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 1000001,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 1000001,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "investor just below the income threshold",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Fay",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 200000,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 200000,
+            "annual income for the investor's own fiscal year": 200000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 200000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "Individual income $200,000 exactly; § 230.501(a)(6) requires income IN EXCESS of $200,000."
+      },
+      {
+        "name": "investor just above the income threshold",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Gus",
+            "an accredited investor as defined in Rule 501": true,
+            "annual income": 200001,
+            "net worth": 50000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 200001,
+            "annual income for the investor's own fiscal year": 200001,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 50000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 50000,
+            "individual income in each of the two most recent years": 200001,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        }
+      },
+      {
+        "name": "homeowner whose mortgage exceeds the value of the residence",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Hal",
+            "an accredited investor as defined in Rule 501": false,
+            "annual income": 50000,
+            "net worth": 1200000,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": true,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": false,
+            "annual income for the calendar year": 50000,
+            "annual income for the investor's own fiscal year": 50000,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 1200000,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 500000,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 800000,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 800000,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 1200000,
+            "individual income in each of the two most recent years": 50000,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "§ 230.501(a)(5)(i)(C): assets other than the residence $1,200,000, residence worth $500,000, mortgage $800,000. The $300,000 excess is a liability, so net worth is $900,000 and the investor is not accredited."
+      },
+      {
+        "name": "non-natural person already construed as accredited",
+        "slots": {
+          "transfer": {
+            "days since the securities were issued": 151,
+            "to the issuer of the securities": false,
+            "to an accredited investor": false,
+            "as part of an offering registered with the Commission": false,
+            "to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance": false,
+            "date the securities were issued in a transaction exempt under section 4(a)(6)": "2025-01-01",
+            "date of the transfer": "2025-06-01"
+          },
+          "notice": {
+            "directs investors to the intermediary's platform": true,
+            "states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform": true,
+            "states the terms of the offering": true,
+            "states factual information about the legal identity and business location of the issuer": true,
+            "includes information beyond that permitted by paragraph (b)": false,
+            "includes no more than the information specified in § 227.204(b)(1) through (3)": true,
+            "made through communication channels provided by an intermediary on the intermediary's platform": false,
+            "the issuer identifies itself as the issuer in the communication": true,
+            "a person acting on behalf of the issuer identifies that affiliation in the communication": true,
+            "states that no money or other consideration is being solicited, and if sent in response, will not be accepted": false,
+            "states that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform": false,
+            "states that a person's indication of interest involves no obligation or commitment of any kind": false,
+            "clearly discloses the receipt, past or prospective, of compensation with the communication": false,
+            "made before the filing of the offering statement": false
+          },
+          "investor": {
+            "name": "Ivy Ltd",
+            "an accredited investor as defined in Rule 501": true,
+            "annual income": 0,
+            "net worth": 0,
+            "aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "a natural person": false,
+            "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": true,
+            "annual income for the calendar year": 0,
+            "annual income for the investor's own fiscal year": 0,
+            "revenue for the most recent fiscal year": 0,
+            "net assets as of the most recent fiscal year end": 0,
+            "total assets other than the primary residence": 0,
+            "total liabilities other than indebtedness secured by the primary residence": 0,
+            "estimated fair market value of the primary residence at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding at the time of the sale": 0,
+            "indebtedness secured by the primary residence outstanding 60 days before the sale": 0,
+            "the increase in that indebtedness was the result of the acquisition of the primary residence": false,
+            "the purchase is made in accordance with a right to purchase such securities": false,
+            "that right was held by the person on July 20, 2010": false,
+            "qualified as an accredited investor on the basis of net worth at the time the right was acquired": false,
+            "held securities of the same issuer, other than such right, on July 20, 2010": false,
+            "net worth calculated without the paragraph (a)(5)(i) adjustments": 0,
+            "individual income in each of the two most recent years": 0,
+            "joint income with a spouse or spousal equivalent in each of those years": 0,
+            "a reasonable expectation of reaching the same income level in the current year": true,
+            "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": 0,
+            "annual income and net worth calculated jointly with that person's spouse": false,
+            "the aggregate investment of the investor spouses": 0
+          }
+        },
+        "note": "An entity within § 230.501(a)(1)-(4) or (7)-(13). The de novo side takes that as one already-construed input; the corpus side takes accreditation as a single input."
+      }
+    ],
+    "perturbation": {
+      "enabled": false,
+      "note": "Off by construction; see the map note. The seed rows are already one-fact-apart from each other, so a divergence row names its own minimal witness."
+    },
+    "note": [
+      "Twenty hand-built rows. The subject sidecar's p7-dmn cases file is NOT used: its",
+      "context is in the corpus's field vocabulary, and the de novo records declare many",
+      "fields it does not supply, which the decoder reports as `Missing required field`",
+      "rather than defaulting. Rows are written in the corpus's vocabulary where both",
+      "sides have a corresponding field, per the schema, and carry the de novo side's",
+      "extra fields under their own names."
+    ]
+  },
+  "pairs": [
+    {
+      "id": "transfer-permitted",
+      "citation": "17 CFR 227.501",
+      "rule_date": "2026-08-05",
+      "fork": "A-501-ANNIVERSARY",
+      "left": {
+        "call": "transfer is permitted",
+        "args": [
+          "transfer"
+        ]
+      },
+      "right": {
+        "call": "the transfer is permitted",
+        "args": [
+          "transfer"
+        ]
+      }
+    },
+    {
+      "id": "restricted-period",
+      "citation": "17 CFR 227.501(a)",
+      "rule_date": "2026-08-05",
+      "fork": "A-501-ANNIVERSARY",
+      "left": {
+        "call": "transfer is within the one-year restricted period",
+        "args": [
+          "transfer"
+        ]
+      },
+      "right": {
+        "call": "the transfer falls within the one-year restricted period",
+        "args": [
+          "transfer"
+        ]
+      },
+      "note": "The one place the two encodings' date models meet head-on: a day count against date arithmetic. Row `the 365th day of a leap-spanning holding` is built to find the difference if there is one."
+    },
+    {
+      "id": "advertising-notice",
+      "citation": "17 CFR 227.204(b)",
+      "rule_date": "2026-08-05",
+      "left": {
+        "call": "notice complies with Rule 204(b)",
+        "args": [
+          "notice"
+        ]
+      },
+      "right": {
+        "call": "the notice qualifies under § 227.204(b)",
+        "args": [
+          "notice"
+        ]
+      }
+    },
+    {
+      "id": "accredited-investor",
+      "citation": "17 CFR 230.501(a), reached from 17 CFR 227.100(a)(2)",
+      "rule_date": "2026-08-05",
+      "left": {
+        "call": "the accredited-investor carve-out applies to",
+        "args": [
+          "investor"
+        ]
+      },
+      "right": {
+        "call": "the investor is an accredited investor",
+        "args": [
+          "investor"
+        ]
+      },
+      "note": "Asymmetric by design: the corpus asks for accreditation as a fact, the de novo derives it. The eight income/net-worth boundary rows are where that difference either shows up or does not."
+    }
+  ]
+}
