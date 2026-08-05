@@ -7,8 +7,8 @@ measured.
 ## The one-sentence version
 
 `etc/kie-dmn-check` and `etc/camunda-dmn-check` already compare a model's answers against each
-case's `expect` block, but that block is **hand-written**, so a green run says *the DMN agrees with
-what a human typed*. Derive `expect` from `l4` instead and their existing comparison becomes a
+case's `expect` block, but that block is **hand-written**, so a green run says _the DMN agrees with
+what a human typed_. Derive `expect` from `l4` instead and their existing comparison becomes a
 differential between L4 and the lowering — with no change to either harness.
 
 ## Use

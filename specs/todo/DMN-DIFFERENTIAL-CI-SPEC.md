@@ -24,14 +24,14 @@ advisory**, and both engines evaluate end to end: KIE `1340/1340 values as expec
 That is real progress and this document does not dispute it. But the 32 → 0 decomposes into two
 very different halves, and only one of them is a fix:
 
-| family | at #188 | at `c873bb5d` | what happened |
-|---|---|---|---|
-| `D-LITERALEXPR` | 16 blocking (+64 advisory) | 0 blocking (64 advisory) | **genuinely gone.** The 64 advisory notes were already there at #188 and are unchanged; this was never a reclassification of the same notes. |
-| `D-RULEDATE-UNBOUND` | 15 blocking | **15 lossy** | **the same 15 notes, downgraded.** R12 "drops the rebinding decides at population time (Lossy-noted, no longer emitted)". |
+| family               | at #188                    | at `c873bb5d`            | what happened                                                                                                                                |
+| -------------------- | -------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `D-LITERALEXPR`      | 16 blocking (+64 advisory) | 0 blocking (64 advisory) | **genuinely gone.** The 64 advisory notes were already there at #188 and are unchanged; this was never a reclassification of the same notes. |
+| `D-RULEDATE-UNBOUND` | 15 blocking                | **15 lossy**             | **the same 15 notes, downgraded.** R12 "drops the rebinding decides at population time (Lossy-noted, no longer emitted)".                    |
 
 The second row is the point. Those 15 constructs are exactly as un-lowerable as they were at #188.
-What changed is that they went from *emitted verbatim, engine refuses loudly, board red* to
-*silently not emitted, engine green, one line in a text file*.
+What changed is that they went from _emitted verbatim, engine refuses loudly, board red_ to
+_silently not emitted, engine green, one line in a text file_.
 
 **The failure mode inverted from loud to silent.** A green board is more dangerous than a red one
 when the question "does the DMN mean the L4?" is still unasked, and #188's red board was at least
@@ -42,8 +42,8 @@ unmissable.
 
 ## 2. The date axis works; scoped rebinding is a different problem
 
-This was checked because it is the obvious first objection — *didn't we already solve dated rules
-by shoehorning a date column into the tables?* — and the answer is **yes, and it is deployed, and
+This was checked because it is the obvious first objection — _didn't we already solve dated rules
+by shoehorning a date column into the tables?_ — and the answer is **yes, and it is deployed, and
 it does not cover this case.**
 
 `gst-rate.l4` is temporally parameterised: `RULES_EFFECTIVE_DATE` is a DMN input, two decisions
@@ -57,13 +57,13 @@ rebinding**, and the fidelity note already says so exactly:
 > a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful `<decision>`
 > exists and it is not emitted
 
-`W within the limit in 2016` and `W within the limit in 2021 June` require the *same sub-graph
-evaluated at different dates within one model run*. A DMN decision is a 0-ary variable holding one
+`W within the limit in 2016` and `W within the limit in 2021 June` require the _same sub-graph
+evaluated at different dates within one model run_. A DMN decision is a 0-ary variable holding one
 value per evaluation; it cannot hold three. No column shape fixes that, because the problem is the
 DRG's evaluation model rather than a table's signature.
 
-**But the note's own remedy is the design of this gate:** *"evaluate it in L4, or vary
-`RULES_EFFECTIVE_DATE` across engine invocations."* N invocations, one per date, is precisely what
+**But the note's own remedy is the design of this gate:** _"evaluate it in L4, or vary
+`RULES_EFFECTIVE_DATE` across engine invocations."_ N invocations, one per date, is precisely what
 a case-driven harness does. The 15 decisions are **unlowerable in the model and still checkable in
 the harness** — see §4.3.
 
@@ -84,7 +84,7 @@ What is **not** proved, and is the whole of this document:
 > **Nothing evaluates the same inputs through `l4` and through the engines and compares.**
 
 `reg-cf.cases.json` **is hand-written, not generated** — the README says so in those words. So
-`1340/1340 values as expected` means *the DMN agrees with values a human typed*. If a lossy
+`1340/1340 values as expected` means _the DMN agrees with values a human typed_. If a lossy
 lowering changes an answer, and the expectation was authored to match the lowered behaviour, both
 sides agree and CI is green. The one thing the README calls a "differential" is the XML leg versus
 the markdown (dmnmd) leg, and it is explicit that those "are not two independent checks of the
@@ -111,7 +111,7 @@ No new engine integration, no second Java job, no change to either harness. The 
 `values as expected` line becomes a statement about L4 rather than about an author.
 
 **The hand-written cases do not go away.** They are a second, independent opinion: a human saying
-what the law ought to answer. Derived cases say what L4 *does* answer. Both are wanted, and a
+what the law ought to answer. Derived cases say what L4 _does_ answer. Both are wanted, and a
 disagreement between them is interesting in its own right — it means the L4 and the author's
 understanding differ, which is the bug the whole project exists to surface. Keep both files; gate
 on both.
@@ -120,15 +120,15 @@ on both.
 
 For each (case, decision), one of:
 
-| verdict | meaning | CI |
-|---|---|---|
-| `AGREE` | DMN answer == L4 answer | pass |
-| `DIVERGE-DECLARED` | differs, **and** a Lossy/Blocking note names this decision | pass, and the note is now *tested* rather than merely written |
-| `DIVERGE-UNDECLARED` | differs with no note licensing it | **fail** — the wrong-lowering case |
-| `ABSENT-DECLARED` | not in the DMN, and a note says it was dropped | pass |
-| `ABSENT-UNDECLARED` | not in the DMN, no note | **fail** — a silent drop |
-| `XPASS` | a note says lost/lossy, but DMN and L4 **agree** | **fail** — see §4.4 |
-| `UNEVALUABLE` | L4 could not produce a value (e.g. unbound `ASSUME`) | report, do not pass silently |
+| verdict              | meaning                                                    | CI                                                            |
+| -------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| `AGREE`              | DMN answer == L4 answer                                    | pass                                                          |
+| `DIVERGE-DECLARED`   | differs, **and** a Lossy/Blocking note names this decision | pass, and the note is now _tested_ rather than merely written |
+| `DIVERGE-UNDECLARED` | differs with no note licensing it                          | **fail** — the wrong-lowering case                            |
+| `ABSENT-DECLARED`    | not in the DMN, and a note says it was dropped             | pass                                                          |
+| `ABSENT-UNDECLARED`  | not in the DMN, no note                                    | **fail** — a silent drop                                      |
+| `XPASS`              | a note says lost/lossy, but DMN and L4 **agree**           | **fail** — see §4.4                                           |
+| `UNEVALUABLE`        | L4 could not produce a value (e.g. unbound `ASSUME`)       | report, do not pass silently                                  |
 
 This turns each of the 21 Lossy notes from prose into an assertion with a truth value. A note that
 cannot be attached to a concrete (case, decision) divergence is either wrong or untested, and both
@@ -136,14 +136,14 @@ are worth knowing.
 
 ### 4.3 The 15 `D-RULEDATE-UNBOUND` decisions become checkable
 
-They have no `<decision>`, so they can never be `AGREE`. What the harness *can* assert, and should:
+They have no `<decision>`, so they can never be `AGREE`. What the harness _can_ assert, and should:
 
 - L4 still evaluates them (via `EVAL UNDER RULES EFFECTIVE AT` at the pinned date) — so the loss is
   demonstrably a DMN limitation and not an L4 one;
 - the DMN genuinely does not contain them (`ABSENT-DECLARED`, not `ABSENT-UNDECLARED`);
-- **and the per-date reconstruction agrees.** For each rebind site at date *d*, run the engines
+- **and the per-date reconstruction agrees.** For each rebind site at date _d_, run the engines
   with `RULES_EFFECTIVE_DATE = d` and compare against L4's pinned answer. If the N-invocation
-  reconstruction disagrees with L4, the *lowering of the surrounding rules* is wrong even though
+  reconstruction disagrees with L4, the _lowering of the surrounding rules_ is wrong even though
   the rebind itself was honestly dropped.
 
 That last bullet is the part with real defect-finding power, and it is available today because the
@@ -163,7 +163,7 @@ weakened. Both need a human; neither should be silent.
 
 ### 4.5 Stop gating on counts
 
-`95 → 32 → 0 blocking` cannot distinguish *fixed* from *dropped* from *downgraded* — §1's table is
+`95 → 32 → 0 blocking` cannot distinguish _fixed_ from _dropped_ from _downgraded_ — §1's table is
 the proof, since the `D-RULEDATE-UNBOUND` family contributed 15 to that fall without one construct
 becoming lowerable. Pin **per-note identity** — (decision × code × severity) as a set — so that a
 note changing severity, or a construct silently ceasing to be emitted, is a diff a reviewer reads
@@ -209,7 +209,7 @@ KIE 8.44.0.Final VERDICT: 1 file(s), 10 case(s), 0 error(s), 0 warning(s),
 than anything CI makes today.
 
 **The negative control, which is what makes the green run worth anything.** Perturb the L4 (`THEN 9`
-→ `THEN 7` in `GST rate percent`), re-derive, and re-run the *unchanged* golden DMN:
+→ `THEN 7` in `GST rate percent`), re-derive, and re-run the _unchanged_ golden DMN:
 
 ```
 GST_rate_percent    SUCCEEDED  = 9   <<< EXPECTED 7
@@ -268,7 +268,7 @@ Also executed, on 2026-08-04, with an `l4` built from `c873bb5d` itself (§5a):
 - **The Camunda leg was not run.** Only KIE. The design needs nothing from Camunda that KIE does not
   also provide (both take `--cases`), but that is an argument, not a measurement.
 - **The corpus was not run** — only `gst-rate`, which is small, fully lowerable and has no Lossy
-  notes. So §4.2's classification table is *designed and not exercised*: no `DIVERGE-DECLARED`,
+  notes. So §4.2's classification table is _designed and not exercised_: no `DIVERGE-DECLARED`,
   `ABSENT-DECLARED` or `XPASS` verdict has ever actually been produced. That is the next step and
   it is where the design could still be wrong.
 - `read_signatures` parses `GIVEN`/`GIVETH` with regexes over source lines. It is adequate for
