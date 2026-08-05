@@ -1,6 +1,6 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_sec_regulation_crowdfunding_17_cfr_part_227
-      dmnmd is a table format, not a graph: the 149 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 153 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-MD-NOBKM] blocking — bkm_the_rules_in_force_include
       `the rules in force include` is a businessKnowledgeModel — a named function of 2 parameter(s) — and dmnmd has no function form, so it is omitted, along with every invocation of it inside the decisions that remain
@@ -146,8 +146,8 @@ fidelity report — dmnmd
   [D-MD-NOLITERAL] blocking — decision_business_days_to_file_a_progress_update
       `business days to file a progress update` is a formula (5), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
-  [D-MD-NOLITERAL] blocking — decision_days_in_the_resale_restricted_period
-      `days in the resale restricted period` is a formula (365), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+  [D-MD-NOLITERAL] blocking — decision_the_resale_restriction_in_years
+      `the resale restriction in years` is a formula (1), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_b_1_not_organized_under_state_or_territorial_law
       `(b)(1) — not organized under State or territorial law` is a formula (true and not(issuer.organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
@@ -239,8 +239,14 @@ fidelity report — dmnmd
   [D-MD-NOLITERAL] blocking — decision_ongoing_reporting_obligation_may_terminate
       `ongoing reporting obligation may terminate` is a formula (false or (b_1_became_an_Exchange_Act_reporting_company or (b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record or (b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000 or (b_4_all_securities_repurchased or b_5_liquidated_or_dissolved))))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_first_anniversary_of_the_issuance
+      `the first anniversary of the issuance` is a formula (transfer.date_the_securities_were_issued + floor(the_resale_restriction_in_years) * duration("P1Y")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_days_until_the_first_anniversary_of_the_issuance
+      `days until the first anniversary of the issuance` is a formula ((the_first_anniversary_of_the_issuance - transfer.date_the_securities_were_issued).days), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_transfer_is_within_the_one_year_restricted_period
-      `transfer is within the one-year restricted period` is a formula (transfer.days_since_the_securities_were_issued < days_in_the_resale_restricted_period), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `transfer is within the one-year restricted period` is a formula (transfer.date_of_the_transfer < the_first_anniversary_of_the_issuance), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_transfer_falls_within_an_exception_in_rule_501_a
       `transfer falls within an exception in Rule 501(a)` is a formula (false or (true and transfer.to_the_issuer_of_the_securities or (true and transfer.to_an_accredited_investor or (true and transfer.as_part_of_an_offering_registered_with_the_Commission or true and transfer.to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance)))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

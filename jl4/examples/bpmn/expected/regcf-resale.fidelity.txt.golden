@@ -6,7 +6,7 @@ fidelity report — BPMN 2.0
       A prohibition is not an activity at all and BPMN has no negative shape for one, so read literally this diagram instructs the reader to perform the very act the rule forbids.
       lost: the difference between a required act and a forbidden one; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force
   [P-DEADLINE] blocking — Boundary_2
-      Deadline ‘`days in the resale restricted period`’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
+      Deadline ‘`days until the first anniversary of the issuance` OF transfer’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
       lost: the deadline as a machine-checkable timer
   [F2] lossy — Process_resale_restriction
       A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: Purchaser).

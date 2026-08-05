@@ -330,13 +330,39 @@ Honest list. Nothing below is hidden behind a `TRUE`.
    weekend or holiday intervenes. Expressing it properly needs a business-day calendar over
    `daydate`, which the deadline arithmetic does not currently consult.
 
-2. **The 1-year resale period is rendered as 365 days, and its endpoint is a guess.**
+2. **The 1-year resale period: the unit is now right; its endpoint is still a guess, and its
+   leap-day anniversary is a disclosed fork.**
    Rule 501(a) restricts transfer "during the one-year period beginning when the securities
-   were issued" and does not say whether the first anniversary is inside or outside. Modelled
-   as the half-open interval `[issuance, issuance + 365)`. Two separate infidelities: the
-   leap-year one (a real anniversary is 365 or 366 days out — `daydate` could fix this, at
-   the cost of carrying an issuance *date* rather than an elapsed count), and the endpoint
-   one, which **no encoding can fix because the rule does not decide it**. Flagged inline.
+   were issued". This entry used to record three infidelities. One is **fixed**, two remain,
+   and the two that remain are of a different kind — they are places the rule does not decide,
+   not places the encoding gave up.
+
+   - **FIXED 2026-08-05 — the unit.** The period was encoded as the constant `365`, which is
+     wrong by one day for any holding spanning a 29 February, i.e. roughly one in four. It is
+     now a calendar anniversary (`add years`, in `daydate`'s Calendar Arithmetic), and the
+     `Transfer` record carries two dates instead of an elapsed count — exactly the trade this
+     entry predicted. Note what that means for testing: while the record held only "days since
+     issue", the leap case was **inexpressible**, so neither this corpus's tests nor the de
+     novo encoding's could reach it. Only the §8 differential comparison between the two
+     found it. The case is now pinned in `regcf.l4` and, per R0, executed on both DMN engines
+     from `regcf-corpus.cases.json`.
+   - **OPEN — the endpoint.** The rule does not say whether the first anniversary is inside
+     or outside the period. Modelled as the half-open interval `[issuance, first anniversary)`:
+     the day before the anniversary is restricted, the anniversary itself is free. **No
+     encoding can fix this, because the rule does not decide it.** Flagged inline.
+   - **OPEN — the leap-day anniversary.** What is "one year after 29 February 2024"? There is
+     no single right answer, and we have three measured candidates:
+
+     | reading | answer | where it comes from |
+     | --- | --- | --- |
+     | clamp to the month end | 2025-02-28 | Excel `EDATE`; FEEL `date + duration("P1Y")` on both DMN engines |
+     | roll forward | 2025-03-01 | L4's lenient `Date d m y` constructor |
+     | no such date | *null* | FEEL `date(2025, 2, 29)` on both engines |
+
+     The corpus takes **the clamp** as its primary reading, because it is what both engines do
+     natively and what the anniversary convention generally implies — so the L4 answer and the
+     exported-DMN answer cannot drift apart. **1 March is the disclosed alternative**, and a
+     drafter who cared could remove the question in four words.
 
 3. **Reasonable-belief standards are inputs, not derivations.** Rules 301(a)–(c) and
    303(b)(1) turn on whether an intermediary "has a reasonable basis for believing" something.
@@ -414,7 +440,7 @@ projection *cannot* say. What follows is the summary.
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
-| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1340/1340 over 20 cases on both engines** — see below |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1449/1449 over 21 cases on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 
 Every BPMN golden, and the DMN **markdown** golden, reproduces byte for byte from a bare
@@ -424,18 +450,19 @@ from the CLI's bytes in exactly its 23 source-range annotation labels (`main.l4:
 2026-08-02, see `../../dmn/README.md` "From the CLI"). The `<definitions>` name comes
 from this file's own outermost `§` heading.
 
-### 6.1 DMN: 67 decisions, 12 tables, and a model both engines evaluate
+### 6.1 DMN: 69 decisions, 12 tables, and a model both engines evaluate
 
-**Measured 2026-08-02 on the shipped goldens (R12 + R13,
+**Measured 2026-08-05 on the shipped goldens (R12 + R13,
 `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** `l4 export --to=dmn` on
 this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
 since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
 reporting spine to a verdict decision table — **both engines evaluate it end to end**,
-over the 20 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 21 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec
-§15.12.1 — and 4 seed cases added 2026-08-03): KIE 8.44.0.Final answers 1340/1340
-decisions with 1340/1340 values as expected (plus 280/280 decision-service output
-values), and Camunda 8.7.6 (zeebe-dmn) parses it and answers 1340/1340. An earlier revision of this section — "102 decisions, 11 tables, and a model no
+§15.12.1 — 4 seed cases added 2026-08-03, and the leap case added 2026-08-05):
+KIE 8.44.0.Final answers 1449/1449 decisions with 1449/1449 values as expected (plus
+315/315 decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and
+answers 1449/1449. An earlier revision of this section — "102 decisions, 11 tables, and a model no
 engine can bind" — described the pre-BKM, pre-R12/R13 artifact; that model no longer
 ships.
 

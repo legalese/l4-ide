@@ -126,7 +126,12 @@ DECLARE InvestorFacts HAS
     `invested under Reg CF in the last 12 months` IS A NUMBER  @desc How much have you already invested under Regulation Crowdfunding in the last 12 months, across every company, in dollars?
 
 DECLARE ResaleFacts HAS
-    `days since issue`                      IS A NUMBER  @desc How many days ago were the securities issued to you?
+    -- Asked as two dates rather than an elapsed count. A holder knows when the
+    -- securities were issued and when they want to sell; nobody knows "how many
+    -- days ago" without doing the arithmetic. And the arithmetic is exactly what
+    -- the flat-count encoding got wrong across a 29 February.
+    `date the securities were issued to you` IS A DATE    @desc On what date were the securities issued to you?
+    `date of the transfer`                  IS A DATE    @desc On what date do you intend to transfer them?
     `selling back to the issuer`            IS A BOOLEAN @desc Are you transferring the securities back to the company that issued them?
     `buyer is an accredited investor`       IS A BOOLEAN @desc Is the person receiving the securities an accredited investor?
     `part of a registered offering`         IS A BOOLEAN @desc Is this transfer part of an offering registered with the SEC?
@@ -216,7 +221,8 @@ GIVEN holding IS A ResaleFacts
 GIVETH A Transfer
 `transfer from` holding MEANS
     Transfer WITH
-        `days since the securities were issued`                 IS holding's `days since issue`
+        `date the securities were issued`                       IS holding's `date the securities were issued to you`
+        `date of the transfer`                                  IS holding's `date of the transfer`
         `to the issuer of the securities`                       IS holding's `selling back to the issuer`
         `to an accredited investor`                             IS holding's `buyer is an accredited investor`
         `as part of an offering registered with the Commission` IS holding's `part of a registered offering`
@@ -458,7 +464,8 @@ GIVETH A NUMBER
     IF   `transfer falls within an exception in Rule 501(a)` (`transfer from` holding)
     THEN 0
     ELSE `never below zero`
-             (`days in the resale restricted period` MINUS holding's `days since issue`)
+             ((`the first anniversary of the issuance` (`transfer from` holding))
+              MINUS (holding's `date of the transfer`))
 
 GIVEN holding IS A ResaleFacts
 GIVETH A STRING
@@ -473,21 +480,18 @@ GIVETH A STRING
                    THEN "The transfer is to a family member or the equivalent, to a trust you control or one created for a family member's benefit, or in connection with death or divorce, which Rule 501(a)(4) excepts from the restriction."
                    ELSE IF   NOT (`transfer is within the one-year restricted period` (`transfer from` holding))
                         THEN CONCAT "The one-year restricted period has run: the securities were issued ",
-                                    ((holding's `days since issue`) AS STRING),
-                                    " days ago, and Rule 501(a) restricts transfer for ",
-                                    (`days in the resale restricted period` AS STRING), " days."
+                                    (((`transfer from` holding)'s `days since the securities were issued`) AS STRING),
+                                    " days ago, and Rule 501(a) restricts transfer for one year from issuance — here, until ",
+                                    ((`the first anniversary of the issuance` (`transfer from` holding)) AS STRING), "."
                         ELSE CONCAT "The securities were issued ",
-                                    ((holding's `days since issue`) AS STRING),
-                                    " days ago. Rule 501(a) restricts transfer for ",
-                                    (`days in the resale restricted period` AS STRING),
-                                    " days from issuance, and none of the four exceptions in Rule 501(a)(1)-(4) applies."
+                                    (((`transfer from` holding)'s `days since the securities were issued`) AS STRING),
+                                    " days ago. Rule 501(a) restricts transfer for one year from issuance — here, until ",
+                                    ((`the first anniversary of the issuance` (`transfer from` holding)) AS STRING),
+                                    " — and none of the four exceptions in Rule 501(a)(1)-(4) applies."
 
 GIVETH A LIST OF STRING
 `resale caveats` MEANS
-    LIST (CONCAT "The one-year period is measured here as ",
-                 (`days in the resale restricted period` AS STRING),
-                 " days from issuance, and the last of those days is read as OUTSIDE the period. Rule 501(a) says only 'the one-year period beginning when the securities were issued' and does not say whether the first anniversary falls inside it. That ambiguity is in the rule, not in this model, and no encoding can settle it.")
-       , "A leap year inside the period would make the true anniversary a day later than the count used here."
+    LIST "The one-year period is measured to the calendar anniversary of the issuance date, so a period spanning 29 February is 366 days and any other is 365. The anniversary itself is read as OUTSIDE the period. Rule 501(a) says only 'the one-year period beginning when the securities were issued' and does not say whether the first anniversary falls inside it. That ambiguity is in the rule, not in this model, and no encoding can settle it."
        , "'Accredited investor' takes its meaning from Rule 501 of Regulation D. This check takes your answer at face value."
        , "Rule 501 restricts transfer by a purchaser in the crowdfunding transaction. It does not, by itself, tell you what a subsequent holder may do."
 
@@ -684,14 +688,16 @@ DECIDE `can this company raise` IS
     `invested under Reg CF in the last 12 months` IS 9000
 
 `a restricted holding` MEANS ResaleFacts WITH
-    `days since issue`                      IS 100
+    `date the securities were issued to you` IS YMD 2021 6 1
+    `date of the transfer`                  IS YMD 2021 9 9
     `selling back to the issuer`            IS FALSE
     `buyer is an accredited investor`       IS FALSE
     `part of a registered offering`         IS FALSE
     `family transfer death or divorce`      IS FALSE
 
 `a holding sold to an accredited buyer` MEANS ResaleFacts WITH
-    `days since issue`                      IS 100
+    `date the securities were issued to you` IS YMD 2021 6 1
+    `date of the transfer`                  IS YMD 2021 9 9
     `selling back to the issuer`            IS FALSE
     `buyer is an accredited investor`       IS TRUE
     `part of a registered offering`         IS FALSE

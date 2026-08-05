@@ -1,89 +1,89 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-regcf.l4:878:1-50:
+regcf.l4:938:1-50:
   assertion satisfied
-regcf.l4:879:1-52:
+regcf.l4:939:1-52:
   assertion satisfied
-regcf.l4:880:1-55:
+regcf.l4:940:1-55:
   assertion satisfied
-regcf.l4:881:1-56:
+regcf.l4:941:1-56:
   assertion satisfied
-regcf.l4:884:1-87:
+regcf.l4:944:1-87:
   assertion satisfied
-regcf.l4:885:1-82:
+regcf.l4:945:1-82:
   assertion satisfied
-regcf.l4:886:1-104:
+regcf.l4:946:1-104:
   assertion satisfied
-regcf.l4:891:1-83:
+regcf.l4:951:1-83:
   assertion satisfied
-regcf.l4:893:1-87:
+regcf.l4:953:1-87:
   assertion satisfied
-regcf.l4:896:1-92:
+regcf.l4:956:1-92:
   assertion satisfied
-regcf.l4:897:1-92:
+regcf.l4:957:1-92:
   assertion satisfied
-regcf.l4:903:1-68:
+regcf.l4:963:1-68:
   2500
-regcf.l4:904:1-80:
+regcf.l4:964:1-80:
   assertion satisfied
-regcf.l4:907:1-80:
+regcf.l4:967:1-80:
   assertion satisfied
-regcf.l4:912:1-82:
+regcf.l4:972:1-82:
   assertion satisfied
-regcf.l4:916:1-118:
+regcf.l4:976:1-118:
   assertion satisfied
-regcf.l4:917:1-118:
+regcf.l4:977:1-118:
   assertion satisfied
-regcf.l4:920:1-83:
+regcf.l4:980:1-83:
   assertion satisfied
-regcf.l4:923:1-86:
+regcf.l4:983:1-86:
   assertion satisfied
-regcf.l4:926:1-86:
+regcf.l4:986:1-86:
   assertion satisfied
-regcf.l4:930:1-104:
+regcf.l4:990:1-104:
   assertion satisfied
-regcf.l4:931:1-104:
+regcf.l4:991:1-104:
   assertion satisfied
-regcf.l4:934:1-102:
+regcf.l4:994:1-102:
   assertion satisfied
-regcf.l4:950:1-93:
+regcf.l4:1010:1-93:
   assertion satisfied
-regcf.l4:951:1-92:
+regcf.l4:1011:1-92:
   assertion satisfied
-regcf.l4:954:1-92:
+regcf.l4:1014:1-92:
   assertion satisfied
-regcf.l4:957:1-90:
+regcf.l4:1017:1-90:
   assertion satisfied
-regcf.l4:960:1-92:
+regcf.l4:1020:1-92:
   assertion satisfied
-regcf.l4:961:1-93:
+regcf.l4:1021:1-93:
   assertion satisfied
-regcf.l4:962:1-92:
+regcf.l4:1022:1-92:
   assertion satisfied
-regcf.l4:966:1-103:
+regcf.l4:1026:1-103:
   assertion satisfied
-regcf.l4:967:1-103:
+regcf.l4:1027:1-103:
   assertion satisfied
-regcf.l4:971:1-89:
+regcf.l4:1031:1-89:
   assertion satisfied
-regcf.l4:972:1-89:
+regcf.l4:1032:1-89:
   assertion satisfied
-regcf.l4:973:1-76:
+regcf.l4:1033:1-76:
   assertion satisfied
-regcf.l4:975:1-76:
+regcf.l4:1035:1-76:
   assertion satisfied
-regcf.l4:976:1-102:
+regcf.l4:1036:1-102:
   assertion satisfied
-regcf.l4:1001:1-69:
+regcf.l4:1061:1-69:
   assertion satisfied
-regcf.l4:1002:1-72:
+regcf.l4:1062:1-72:
   assertion satisfied
-regcf.l4:1003:1-80:
+regcf.l4:1063:1-80:
   assertion satisfied
-regcf.l4:1007:1-1008:66:
+regcf.l4:1067:1-1068:66:
   FULFILLED
-regcf.l4:1011:1-1012:66:
+regcf.l4:1071:1-1072:66:
   DEONTIC BREACHED:
     party
       Issuer
@@ -97,26 +97,26 @@ regcf.l4:1011:1-1012:66:
       MUST NOT `advertise the terms of the offering`
     before their deadline, which was at
       10
-regcf.l4:1017:1-100:
+regcf.l4:1077:1-100:
   assertion satisfied
-regcf.l4:1018:1-100:
+regcf.l4:1078:1-100:
   assertion satisfied
-regcf.l4:1020:1-127:
+regcf.l4:1080:1-127:
   assertion satisfied
-regcf.l4:1024:1-136:
+regcf.l4:1084:1-136:
   assertion satisfied
-regcf.l4:1025:1-136:
+regcf.l4:1085:1-136:
   assertion satisfied
-regcf.l4:1027:1-136:
+regcf.l4:1087:1-136:
   assertion satisfied
-regcf.l4:1031:1-1032:62:
+regcf.l4:1091:1-1092:62:
   PARTY Issuer
   MUST `file a Form C-AR annual report`
   WITHIN `days to file the annual report after fiscal year end`
   HENCE `ongoing reporting obligation` OF status, (`annual cycles` MINUS 1)
-regcf.l4:1036:1-1037:71:
+regcf.l4:1096:1-1097:71:
   FULFILLED
-regcf.l4:1040:1-1041:72:
+regcf.l4:1100:1-1101:72:
   DEONTIC BREACHED:
     party
       Issuer
@@ -130,19 +130,31 @@ regcf.l4:1040:1-1041:72:
       MUST `file a Form C-TR termination of reporting`
     before their deadline, which was at
       5
-regcf.l4:1046:1-64:
+regcf.l4:1106:1-64:
   assertion satisfied
-regcf.l4:1048:1-64:
+regcf.l4:1108:1-64:
   assertion satisfied
-regcf.l4:1050:1-63:
+regcf.l4:1110:1-63:
   assertion satisfied
-regcf.l4:1051:1-92:
+regcf.l4:1111:1-92:
   assertion satisfied
-regcf.l4:1052:1-92:
+regcf.l4:1112:1-92:
   assertion satisfied
-regcf.l4:1056:1-1057:58:
+regcf.l4:1132:1-120:
+  assertion satisfied
+regcf.l4:1134:1-119:
+  assertion satisfied
+regcf.l4:1136:1-120:
+  assertion satisfied
+regcf.l4:1137:1-119:
+  assertion satisfied
+regcf.l4:1139:1-113:
+  366
+regcf.l4:1140:1-113:
+  365
+regcf.l4:1144:1-1145:58:
   FULFILLED
-regcf.l4:1060:1-1061:58:
+regcf.l4:1148:1-1149:58:
   DEONTIC BREACHED:
     party
       Purchaser
@@ -156,43 +168,43 @@ regcf.l4:1060:1-1061:58:
       MUST NOT `transfer the securities`
     before their deadline, which was at
       200
-regcf.l4:1105:1-38:
+regcf.l4:1193:1-38:
   assertion satisfied
-regcf.l4:1106:1-51:
+regcf.l4:1194:1-51:
   assertion satisfied
-regcf.l4:1107:1-53:
+regcf.l4:1195:1-53:
   assertion satisfied
-regcf.l4:1108:1-52:
+regcf.l4:1196:1-52:
   assertion satisfied
-regcf.l4:1109:1-58:
+regcf.l4:1197:1-58:
   assertion satisfied
-regcf.l4:1134:1-41:
+regcf.l4:1222:1-41:
   assertion satisfied
-regcf.l4:1135:1-49:
+regcf.l4:1223:1-49:
   assertion satisfied
-regcf.l4:1136:1-46:
+regcf.l4:1224:1-46:
   assertion satisfied
-regcf.l4:1145:1-73:
+regcf.l4:1233:1-73:
   assertion satisfied
-regcf.l4:1146:1-73:
+regcf.l4:1234:1-73:
   assertion satisfied
-regcf.l4:1162:1-54:
+regcf.l4:1250:1-54:
   assertion satisfied
-regcf.l4:1163:1-53:
+regcf.l4:1251:1-53:
   assertion satisfied
-regcf.l4:1174:1-55:
+regcf.l4:1262:1-55:
   assertion satisfied
-regcf.l4:1182:1-63:
+regcf.l4:1270:1-63:
   assertion satisfied
-regcf.l4:1196:1-57:
+regcf.l4:1284:1-57:
   assertion satisfied
-regcf.l4:1197:1-57:
+regcf.l4:1285:1-57:
   assertion satisfied
-regcf.l4:1209:1-62:
+regcf.l4:1297:1-62:
   assertion satisfied
-regcf.l4:1210:1-63:
+regcf.l4:1298:1-63:
   assertion satisfied
-regcf.l4:1223:1-70:
+regcf.l4:1311:1-70:
   assertion satisfied
-regcf.l4:1224:1-68:
+regcf.l4:1312:1-68:
   assertion satisfied

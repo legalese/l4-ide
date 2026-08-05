@@ -243,11 +243,22 @@ GIVETH A NUMBER
 `business days to file a progress update` MEANS 5
 
 -- Rule 501(a) states the restriction as a "one-year period beginning when the
--- securities were issued". Rendered in days for the deontic deadline; see the
--- endpoint note at `transfer is within the one-year restricted period`.
+-- securities were issued" — a UNIT, not a count. The number 365 appears nowhere
+-- in Part 227, and the Part uses both idioms apart: days where it means days
+-- (§ 227.201(c) "120 days", § 227.303(a)(2) "21 days", § 227.400 "30 days") and
+-- years where it means years (§ 227.503(a)(1) "within 10 years", § 227.404(a)
+-- "five years"). A flat 365 also fails to generalise inside its own Part: if a
+-- year is 365 days then § 227.503(a)(1)'s "within 10 years" is 3,650 days, and a
+-- conviction on the actual tenth anniversary escapes disqualification.
+--
+-- This was 365 until 2026-08-05. That constant existed because a deontic
+-- deadline needs a number, and it was then reused as the DECLARATIVE
+-- predicate's threshold — where it is wrong for any holding spanning a
+-- 29 February, by exactly one day. WITHIN accepts an arbitrary expression
+-- (measured), so the deadline no longer needs a constant either.
 @ref 17 CFR 227.501(a) — resale restricted period
 GIVETH A NUMBER
-`days in the resale restricted period` MEANS 365
+`the resale restriction in years` MEANS 1
 
 § `1. Issuer eligibility — Rule 100(b)`
 
@@ -619,8 +630,8 @@ GIVETH A BOOLEAN
 -- Deliberately UNDEADLINED. §227.204 contains no temporal limit at all — its
 -- only temporal word is "period", inside the phrase "the closing date of the
 -- offering period" in the 204(e) definition, which bounds nothing. An earlier
--- draft wrote `WITHIN `days in the resale restricted period``, borrowing the
--- 365 days from Rule 501(a); that is a different rule about a different party
+-- draft wrote `WITHIN` the resale restricted period, borrowing the one-year
+-- period from Rule 501(a); that is a different rule about a different party
 -- (resale by a Purchaser, not advertising by the Issuer). It was not merely
 -- decorative: `SHANT ... WITHIN n` SUNSETS at n, so the borrowed deadline made
 -- the prohibition expire after a year and an issuer advertising on day 400
@@ -709,23 +720,62 @@ GIVETH A DEONTIC Actor Action
 
 @ref 17 CFR 227.501(a)
 DECLARE Transfer HAS
+    `date the securities were issued`                       IS A DATE
+    `date of the transfer`                                  IS A DATE
+    -- Derived, so the dates remain the single source of truth. Retained because
+    -- the wizard asks for elapsed days and readers downstream expect the field.
     `days since the securities were issued`                 IS A NUMBER
+        MEANS `Date to days` `date of the transfer`
+        MINUS `Date to days` `date the securities were issued`
     `to the issuer of the securities`                       IS A BOOLEAN
     `to an accredited investor`                             IS A BOOLEAN
     `as part of an offering registered with the Commission` IS A BOOLEAN
     `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS A BOOLEAN
 
+-- The anniversary itself, computed rather than approximated: name the unit the
+-- rule names, and let the calendar decide how many days that is. 366 across a
+-- 29 February, 365 otherwise.
+--
+-- `add years` CLAMPS: the first anniversary of a 29 February issuance is
+-- 28 February. That is Excel's EDATE convention, and -- measured 2026-08-05 --
+-- also what FEEL's `date + duration("P1Y")` returns on both Drools/KIE 8.44.0
+-- and Camunda 8.7.6, so the L4 answer and the exported-DMN answer cannot drift
+-- apart. See the leap-day fork registered in README.md: the clamp is a READING
+-- of "one year", not a fact about it, and 1 March is the disclosed alternative.
+--
+-- Do NOT rewrite this by reconstructing components as `Date d m (y PLUS 1)`.
+-- That form is wrong twice over: L4's `Date` is lenient and rolls 29 February
+-- forward to 1 March, while FEEL's `date(2025, 2, 29)` is null on both engines,
+-- so the two would disagree with each other AND with the clamp.
+@ref 17 CFR 227.501(a) — "the one-year period beginning when the securities were issued"
+GIVEN transfer IS A Transfer
+GIVETH A DATE
+`the first anniversary of the issuance` transfer MEANS
+    `add years` (transfer's `date the securities were issued`) `the resale restriction in years`
+
 -- ENDPOINT NOTE. Rule 501(a) restricts transfer "during the one-year period
 -- beginning when the securities were issued". The rule does not say whether the
 -- first anniversary itself falls inside or outside that period. Read here as a
--- half-open interval [issuance, issuance + 365): day 364 is restricted, day 365
--- is free. A drafter who cared could remove the question with four words; a
--- reader who cares must litigate it. Flagged in README.md.
+-- half-open interval [issuance, first anniversary): the day before the
+-- anniversary is restricted, the anniversary itself is free. A drafter who
+-- cared could remove the question with four words; a reader who cares must
+-- litigate it. Flagged in README.md. This is a genuine fork; the UNIT question
+-- below was not.
+-- The deontic deadline, in days, computed from the same two dates rather than
+-- from a constant. `WITHIN` accepts an arbitrary expression; the constant that
+-- used to sit here is what leaked the wrong unit into the predicate above.
+@ref 17 CFR 227.501(a)
+GIVEN transfer IS A Transfer
+GIVETH A NUMBER
+`days until the first anniversary of the issuance` transfer MEANS
+    `Date to days` (`the first anniversary of the issuance` transfer)
+    MINUS `Date to days` (transfer's `date the securities were issued`)
+
 @ref 17 CFR 227.501(a)
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
 `transfer is within the one-year restricted period` transfer MEANS
-    transfer's `days since the securities were issued` LESS THAN `days in the resale restricted period`
+    transfer's `date of the transfer` LESS THAN `the first anniversary of the issuance` transfer
 
 @ref 17 CFR 227.501(a)(1)-(4)
 GIVEN transfer IS A Transfer
@@ -750,7 +800,8 @@ GIVETH A DEONTIC Actor Action
 `resale restriction` transfer MEANS
     IF   `transfer falls within an exception in Rule 501(a)` transfer
     THEN FULFILLED
-    ELSE PARTY Purchaser SHANT `transfer the securities` WITHIN `days in the resale restricted period`
+    ELSE PARTY Purchaser SHANT `transfer the securities`
+         WITHIN `days until the first anniversary of the issuance` transfer
 
 § `Top-level — does the transaction qualify for the section 4(a)(6) exemption?`
 
@@ -863,11 +914,20 @@ GIVETH A ReportingStatus
     `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS FALSE
     `the issuer has liquidated or dissolved its business in accordance with state law`                 IS FALSE
 
+-- A fixture constructor. It fixes an issuance date whose first anniversary is
+-- exactly 365 days away (2021-06-01 -> 2022-06-01 spans a 28-day February), so
+-- every assertion written against a day count keeps saying precisely what it
+-- said before the dates arrived. The leap-spanning cases are asserted directly
+-- from dates below, because they CANNOT be expressed through this constructor —
+-- which is why the flat-count encoding could never have tested them.
+`the fixture issuance date` MEANS YMD 2021 6 1
+
 GIVEN `days since issue` IS A NUMBER
       `to accredited`    IS A BOOLEAN
 GIVETH A Transfer
 `a transfer at` `days since issue` `to accredited` MEANS Transfer WITH
-    `days since the securities were issued`                 IS `days since issue`
+    `date the securities were issued`                       IS `the fixture issuance date`
+    `date of the transfer`                                  IS `days since issue` PLUS `the fixture issuance date`
     `to the issuer of the securities`                       IS FALSE
     `to an accredited investor`                             IS `to accredited`
     `as part of an offering registered with the Commission` IS FALSE
@@ -1050,6 +1110,34 @@ GIVETH A FinancialStatementRequirement
 #ASSERT     `transfer is permitted` (`a transfer at` 364 TRUE)
 #ASSERT     `transfer is within the one-year restricted period` (`a transfer at` 364 FALSE)
 #ASSERT NOT `transfer is within the one-year restricted period` (`a transfer at` 365 FALSE)
+
+-- THE LEAP CASE. Inexpressible before 2026-08-05, because the record carried an
+-- elapsed day count and no dates — which is exactly why neither this corpus's
+-- own tests nor a de novo encoding's could reach it, and only a differential
+-- comparison between the two did. Issued 2023-03-01, the first anniversary is
+-- 2024-03-01, which is 366 days away because February 2024 has 29. Day 365 is
+-- therefore 2024-02-29, and is still inside the period.
+GIVEN `issued` IS A DATE
+      `transferred` IS A DATE
+GIVETH A Transfer
+`a transfer from` `issued` `to` `transferred` MEANS Transfer WITH
+    `date the securities were issued`                       IS `issued`
+    `date of the transfer`                                  IS `transferred`
+    `to the issuer of the securities`                       IS FALSE
+    `to an accredited investor`                             IS FALSE
+    `as part of an offering registered with the Commission` IS FALSE
+    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE
+
+-- day 365 of a leap-spanning holding: STILL RESTRICTED (was FREE under the flat count)
+#ASSERT     `transfer is within the one-year restricted period` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 2 29))
+-- day 366, the anniversary itself: free, on the half-open reading above
+#ASSERT NOT `transfer is within the one-year restricted period` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 3 1))
+-- an ordinary year is unaffected: day 364 restricted, day 365 free
+#ASSERT     `transfer is within the one-year restricted period` (`a transfer from` (YMD 2021 6 1) `to` (YMD 2022 5 31))
+#ASSERT NOT `transfer is within the one-year restricted period` (`a transfer from` (YMD 2021 6 1) `to` (YMD 2022 6 1))
+-- and the deadline the deontic rule now computes, rather than assumes
+#EVAL `days until the first anniversary of the issuance` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 2 29))
+#EVAL `days until the first anniversary of the issuance` (`a transfer from` (YMD 2021 6 1) `to` (YMD 2022 5 31))
 
 -- The prohibition, exercised: an excepted transfer leaves no prohibition
 -- standing, so making it is not a breach.

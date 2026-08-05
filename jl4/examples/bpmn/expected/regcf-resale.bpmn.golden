@@ -32,12 +32,12 @@
     </bpmn:exclusiveGateway>
     <bpmn:endEvent id="End_1" name="Fulfilled" />
     <bpmn:task id="Task_2" name="SHANT transfer the securities">
-      <bpmn:documentation>PARTY Purchaser SHANT transfer the securities WITHIN `days in the resale restricted period` — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
+      <bpmn:documentation>PARTY Purchaser SHANT transfer the securities WITHIN `days until the first anniversary of the issuance` OF transfer — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_2" name="deadline passes, not performed" attachedToRef="Task_2" cancelActivity="true">
-      <bpmn:documentation>the deadline passes (`days in the resale restricted period`) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
+      <bpmn:documentation>the deadline passes (`days until the first anniversary of the issuance` OF transfer) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
       <bpmn:conditionalEventDefinition id="Cond_Boundary_2">
-        <bpmn:condition xsi:type="bpmn:tFormalExpression">`days in the resale restricted period`</bpmn:condition>
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">`days until the first anniversary of the issuance` OF transfer</bpmn:condition>
       </bpmn:conditionalEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_3" name="Breach">

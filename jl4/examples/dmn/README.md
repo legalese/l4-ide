@@ -28,12 +28,13 @@ deleting a golden and re-running `cabal test jl4:jl4-test` twice.
 model DMN itself has, and its **figures are illustrative** — its own header says so, and
 it must never be quoted as a statement of Reg CF. `regcf-corpus.*` is the real thing,
 and it is here to be honest about what the real thing costs. Measured 2026-08-02 on the
-shipped goldens (R12 + R13, spec §15.12/§16, on top of Phase 5's BKM emission):
-**67 decisions (12 decision tables), 10 businessKnowledgeModels, 7 decisionServices,
-15 `inputData`, and ZERO blocking notes (0 blocking / 21 lossy / 125 advisory)** — and
-both engines evaluate it end to end over the 20 cases in `regcf-corpus.cases.json`
-(the base world, 15 dated relocation cases per spec §15.12.1, and 4 seed cases added
-2026-08-03), 1340/1340 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
+shipped goldens (R12 + R13, spec §15.12/§16, on top of Phase 5's BKM emission; recounted
+2026-08-05 after Rule 501(a)'s "one year" became a calendar anniversary):
+**69 decisions (12 decision tables), 10 businessKnowledgeModels, 7 decisionServices,
+15 `inputData`, and ZERO blocking notes (0 blocking / 21 lossy / 130 advisory)** — and
+both engines evaluate it end to end over the 21 cases in `regcf-corpus.cases.json`
+(the base world, 15 dated relocation cases per spec §15.12.1, 4 seed cases added
+2026-08-03, and the leap case added 2026-08-05), 1449/1449 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
 2026-08-01 measurement counted (32 notes: the 15 `EVAL UNDER RULES EFFECTIVE AT`
 bodies with their 15 `D-RULEDATE-UNBOUND` companions, and the deontic reporting spine
 with its D-CYCLE) are **gone**: R12 drops the rebinding decides at population time
@@ -331,6 +332,34 @@ metamodel parser says:
 > Same artifact, twenty worlds: the `1 case(s) … 67/67` banners quoted above
 > were the measurement at the single base case, and `16 case(s) … 1072/1072`
 > was the measurement before the seed cases; both stand as history.
+
+> **Superseded 2026-08-05: the unit of Rule 501(a)'s "one year".** The corpus
+> encoded the resale restricted period as the constant `365`, which is wrong by
+> one day for any holding spanning a 29 February. It is now a calendar
+> anniversary (`add years`, in `daydate`'s Calendar Arithmetic, whose clamp
+> matches Excel's `EDATE` and — measured — FEEL's `date + duration("P1Y")` on
+> both engines), and `Transfer` carries two dates instead of an elapsed count.
+> That added two decisions, 67 → **69**, and one case, 20 → **21**: the transfer
+> the constant got WRONG, on day 365 of a leap-spanning holding, which the flat
+> count permitted and both engines now refuse. Measured 2026-08-05 on the
+> shipped `expected/regcf-corpus.dmn`, verbatim:
+>
+> - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 21 case(s), 0 error(s),
+>   0 warning(s), 1449/1449 decision(s) SUCCEEDED, 1449/1449 value(s) as
+>   expected, 315/315 service output value(s) as expected`
+> - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
+>   (69 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
+>   21 case(s), 1 parsed, 0 error(s), 1449/1449 decision(s) evaluated,
+>   1449/1449 value(s) as expected`
+>
+> The lowering that made this possible is two arms in `L4.Dmn.Lower`, both
+> measured against the engines before being written: `add years`/`add months`
+> render as `date + duration(...)` (with `floor(n) * duration("P1Y")` when the
+> count is a named constant rather than a literal, so the reference survives),
+> and `Day d2 MINUS Day d1` renders as `(d2 - d1).days`. Before them the two new
+> decisions emitted raw L4 and were Blocking — the fix and its export had to land
+> together, which is the whole argument for R0.
 
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json

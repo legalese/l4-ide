@@ -840,26 +840,35 @@ jobs:
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected' camunda.log
 
       # The CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
-      # the whole 67-decision Reg CF corpus, built and value-checked on both
+      # the whole 69-decision Reg CF corpus, built and value-checked on both
       # engines. This is deliverable R0's gate — "the execution is the exhibit"
       # — and its counts are pinned to the LOCALLY MEASURED verdict lines
-      # (2026-08-03), not to round numbers. 20 cases x 67 decisions = 1340:
+      # (2026-08-05), not to round numbers. 21 cases x 69 decisions = 1449:
       # the base world, the 15 dated cases relocating the rule-date-rebinding
-      # fixtures R12 dropped from the artifact (spec §15.12.1), and the 4 seed
+      # fixtures R12 dropped from the artifact (spec §15.12.1), the 4 seed
       # cases that close the total-assets and restricted-period leaves the §8
-      # diff oracle reported inert. Earlier pins on this same artifact read
+      # diff oracle reported inert, and THE LEAP CASE. Earlier pins on this
+      # same artifact read '20 case(s) ... 1340/1340 ... 280/280' (2026-08-03,
+      # while Rule 501(a)'s "one year" was the constant 365),
       # '16 case(s) ... 1072/1072 ... 224/224' (2026-08-02, before the seeds)
       # and '1 case(s) ... 67/67' (81ece880); before R12/R13 the file was
       # VALID 16 error(s) on KIE and PARSE INVALID on Camunda.
       #
-      # The KIE pin includes the service clause on purpose: 280/280 is the
+      # 67 -> 69 and 20 -> 21 on 2026-08-05, when the resale restriction became
+      # a calendar anniversary instead of a flat 365 days. The two decisions are
+      # the anniversary and the deadline computed from it; the case is the one
+      # the constant got WRONG — day 365 of a holding spanning 29 Feb 2024,
+      # which the flat count permitted and the calendar refuses. It is gated
+      # HERE, on engines we do not control, because that is what R0 means.
+      #
+      # The KIE pin includes the service clause on purpose: 315/315 is the
       # decision-service sweep VALUE-checking every declared outputDecision
-      # (fed its inputDecisions' computed values; 7 services, 14 outputs, per
+      # (fed its inputDecisions' computed values; 7 services, 15 outputs, per
       # case), and "0 warning(s)" counts runtime WARNs too since 81ece880 —
       # both were blind spots before.
       #
       # regcf-corpus.cases.json's expect block is SYMMETRIC with the model's
-      # decision population (67/67 both ways, in every case), so a decision
+      # decision population (69/69 both ways, in every case), so a decision
       # added to the corpus without a pin, or a pin left behind by a dropped
       # decision, fails here rather than passing silently.
       - name: The Reg CF corpus -- both engines, end to end (R12/R13)
@@ -873,12 +882,12 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/regcf-corpus.dmn \
             --cases jl4/examples/dmn/regcf-corpus.cases.json | tee kie-corpus.log
-          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 20 case(s), 0 error(s), 0 warning(s), 1340/1340 decision(s) SUCCEEDED, 1340/1340 value(s) as expected, 280/280 service output value(s) as expected' kie-corpus.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 21 case(s), 0 error(s), 0 warning(s), 1449/1449 decision(s) SUCCEEDED, 1449/1449 value(s) as expected, 315/315 service output value(s) as expected' kie-corpus.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/regcf-corpus.dmn \
             --cases jl4/examples/dmn/regcf-corpus.cases.json | tee camunda-corpus.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 20 case(s), 1 parsed, 0 error(s), 1340/1340 decision(s) evaluated, 1340/1340 value(s) as expected' camunda-corpus.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 21 case(s), 1 parsed, 0 error(s), 1449/1449 decision(s) evaluated, 1449/1449 value(s) as expected' camunda-corpus.log
 
       # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
       #

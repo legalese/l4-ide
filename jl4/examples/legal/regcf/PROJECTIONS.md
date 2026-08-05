@@ -41,16 +41,17 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn --fidelity-report
 ```
 
-**Measured 2026-08-02 on the shipped goldens (R12 + R13,
-`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** 67 `<decision>` elements — 9 decision
-tables, 57 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
-tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 149 `<informationRequirement>`
+**Measured 2026-08-05 on the shipped goldens (R12 + R13,
+`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16; recounted when Rule 501(a)'s "one year"
+became a calendar anniversary).** 69 `<decision>` elements — 9 decision
+tables, 59 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
+tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 153 `<informationRequirement>`
 edges, 31 `<knowledgeRequirement>`s, one diagram. Loads clean in `dmn-moddle` — and **evaluates**,
-over the 20 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 21 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec §15.12.1 —
-and 4 seed cases added 2026-08-03): KIE 8.44.0.Final answers 1340/1340 decisions, 1340/1340
-values as expected (280/280 decision-service output values); Camunda 8.7.6 (zeebe-dmn) parses and
-answers 1340/1340. The
+4 seed cases added 2026-08-03, and the leap case added 2026-08-05): KIE 8.44.0.Final answers
+1449/1449 decisions, 1449/1449 values as expected (315/315 decision-service output values);
+Camunda 8.7.6 (zeebe-dmn) parses and answers 1449/1449. The
 verbatim verdict lines live in
 `jl4/examples/dmn/README.md` and are CI-gated (`.github/workflows/pr-checks.yml`, dmn-engines).
 
@@ -103,7 +104,7 @@ refused: the 15 law-time-rebinding scenarios (dropped, Lossy-noted) and the raw-
 - **It executes — this bullet used to say "nearly inert", and stopped being true on 2026-08-02.**
   Phase 5's BKM emission retired the unevaluable `f(x)` family (tier-1 calls read shared inputs
   after un-lifting; tier-2 calls invoke `businessKnowledgeModel`s), and R12/R13 removed the last
-  two refusing families. Both engines now answer all 67 decisions with every value as expected.
+  two refusing families. Both engines now answer all 69 decisions with every value as expected.
   What is still true: a DMN decision is a 0-ary variable, and the price of making the corpus fit
   that program model is itemised in the fidelity table above (the un-lift's shared globals, the
   dropped scenarios, the verdict split).
