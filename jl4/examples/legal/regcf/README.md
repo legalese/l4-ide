@@ -341,11 +341,35 @@ Honest list. Nothing below is hidden behind a `TRUE`.
      wrong by one day for any holding spanning a 29 February, i.e. roughly one in four. It is
      now a calendar anniversary (`add years`, in `daydate`'s Calendar Arithmetic), and the
      `Transfer` record carries two dates instead of an elapsed count — exactly the trade this
-     entry predicted. Note what that means for testing: while the record held only "days since
-     issue", the leap case was **inexpressible**, so neither this corpus's tests nor the de
-     novo encoding's could reach it. Only the §8 differential comparison between the two
-     found it. The case is now pinned in `regcf.l4` and, per R0, executed on both DMN engines
-     from `regcf-corpus.cases.json`.
+     entry predicted.
+
+     **Say the provenance accurately, because an earlier draft of this bullet did not.** The
+     defect was never hidden: it was disclosed in this list from the corpus's first commit
+     (`4c6a385d`, 2026-07-25), which named the cause, the remedy and its price. What it was
+     not, for eleven days, was *fixed*. Being written down and being repaired are different
+     states, and this entry is the evidence that a disclosed defect can outlive several
+     readings of the disclosure.
+
+     What moved it was the §8 differential comparison, and the reason neither side could get
+     there alone is **not** the same on both sides:
+
+     - **This corpus could not state the case.** While `Transfer` held only "days since
+       issue", a leap-spanning holding was inexpressible in its own vocabulary.
+     - **The de novo encoding could state it, and still would not have found this.** Its
+       `Transfer` carries two dates and it computes its own anniversary
+       (`regcf-denovo.l4:1245`) — by reconstructing the components, so it *rolls forward*
+       where this corpus now clamps. Its assertions exercise the de novo. A test cannot fail
+       on a defect in a file it does not import.
+
+     So the comparison did not supply the knowledge; it supplied the **witness** — a concrete
+     pair of answers that differ, on a case both sides evaluate. The battery it runs over has
+     perturbation **off by construction**: twenty hand-built rows that are already one fact
+     apart, not generated inputs. The case is now pinned in `regcf.l4` and, per R0, executed
+     on both DMN engines from `regcf-corpus.cases.json`.
+
+     And the two encodings still disagree: this one clamps, the de novo rolls forward. That
+     divergence is not a bug in either — it is the fork below, live in the tree, with one
+     reading committed on each side.
    - **OPEN — the endpoint.** The rule does not say whether the first anniversary is inside
      or outside the period. Modelled as the half-open interval `[issuance, first anniversary)`:
      the day before the anniversary is restricted, the anniversary itself is free. **No

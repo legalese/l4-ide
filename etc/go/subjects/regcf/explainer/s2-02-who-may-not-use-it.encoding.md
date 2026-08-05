@@ -17,9 +17,9 @@ DECIDE `issuer is eligible` issuer IF
 ```
 
 Eligibility is the single negation of that disjunction:
-[issuer is eligible](src:jl4/examples/legal/regcf/regcf.l4#L321 "verbatim")
+[issuer is eligible](src:jl4/examples/legal/regcf/regcf.l4#L332 "verbatim")
 holds exactly when the issuer is not
-[excluded by Rule 100(b)](src:jl4/examples/legal/regcf/regcf.l4#L322 "verbatim").
+[excluded by Rule 100(b)](src:jl4/examples/legal/regcf/regcf.l4#L333 "verbatim").
 That one `NOT`
 is the whole translation from the regulation's polarity to the reader's. Turning
 six exclusions into a positive list of conditions would have been shorter and
@@ -48,7 +48,7 @@ nothing else.
 
 **What the encoding could not do.** The bad-actor limb collapses to a single
 yes-or-no field —
-[`subject to a disqualification as specified in section 227.503(a)`](src:jl4/examples/legal/regcf/regcf.l4#L259-L266 "verbatim")
+[`subject to a disqualification as specified in section 227.503(a)`](src:jl4/examples/legal/regcf/regcf.l4#L270-L277 "verbatim")
 — where Rule 503(a) is a sub-regime. The corpus does not pretend otherwise: the field is an
 _input_, and the encoding can represent the consequence of the standard being
 met without being able to decide the standard. That distinction — between a rule

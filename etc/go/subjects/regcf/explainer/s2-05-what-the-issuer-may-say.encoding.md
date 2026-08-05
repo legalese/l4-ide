@@ -13,9 +13,9 @@ wrote `WITHIN ` and borrowed the resale rule's one-year period, on the reasoning
 that a deadline is decoration on a prohibition. It is not. In this language a
 bounded prohibition **sunsets**: the comment now standing at the site records
 that
-[`SHANT ... WITHIN n` SUNSETS at n](src:jl4/examples/legal/regcf/regcf.l4#L625 "verbatim"),
+[`SHANT ... WITHIN n` SUNSETS at n](src:jl4/examples/legal/regcf/regcf.l4#L636 "verbatim"),
 so the borrowed deadline made the prohibition expire and
-[an issuer advertising on day 400](src:jl4/examples/legal/regcf/regcf.l4#L626 "verbatim")
+[an issuer advertising on day 400](src:jl4/examples/legal/regcf/regcf.l4#L637 "verbatim")
 evaluated to compliant. An unqualified prohibition holds for the life of the
 contract, which is what the rule says, and that is what the code now says.
 

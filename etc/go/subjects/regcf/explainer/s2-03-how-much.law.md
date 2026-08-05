@@ -29,18 +29,18 @@ defined in this Part; the wizard that asks the question puts it as
 [Are you an accredited investor, as Rule 501 of Regulation D defines that term?](src:jl4/examples/legal/regcf/regcf-wizard.l4#L123 "verbatim"),
 which is where the definition lives. The carve-out itself is dated: the corpus
 records that
-[an accredited purchaser is subject to no Reg CF investment limit at all. Added 2021-03-15 by Release 33-10884](src:jl4/examples/legal/regcf/regcf.l4#L435-L437 "verbatim"),
+[an accredited purchaser is subject to no Reg CF investment limit at all. Added 2021-03-15 by Release 33-10884](src:jl4/examples/legal/regcf/regcf.l4#L446-L448 "verbatim"),
 and before that date the limit applied to every investor without exception. This
 is the sentence in every plain-English summary of Reg CF that is right today and
 silently wrong about any transaction before that date.
 
 A worked example the corpus asserts and re-checks on every run: an investor with
-income of [$60,000](src:jl4/examples/legal/regcf/regcf.l4#L912) and net worth of
-[$200,000](src:jl4/examples/legal/regcf/regcf.l4#L912) falls in the first limb —
+income of [$60,000](src:jl4/examples/legal/regcf/regcf.l4#L972) and net worth of
+[$200,000](src:jl4/examples/legal/regcf/regcf.l4#L972) falls in the first limb —
 income is below the cut point — so the cap is five per cent of the _greater_
-figure: [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L912).
+figure: [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L972).
 
 The word "greater" in that last sentence is not a detail. Until the amendment
 described under **Time**, below, both limbs read _lesser_ of income and net
 worth, and the same investor's cap was
-[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1182).
+[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1270).

@@ -3,7 +3,7 @@ never states one.** To encode it the corpus had to invent one: an
 `assurance level` running from certified through reviewed to audited, so that
 "at least as good as the tier requires" becomes an arithmetic comparison. The
 corpus's own list of honest limits says plainly that this is
-[our invention, not the rule's](src:jl4/examples/legal/regcf/README.md#L369 "verbatim"),
+[our invention, not the rule's](src:jl4/examples/legal/regcf/README.md#L419 "verbatim"),
 and it says something sharper too: the "if available" trigger — whether the
 better statements _exist_ — is not modelled at all. The encoding answers a
 question the rule asks only in part.

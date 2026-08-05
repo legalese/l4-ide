@@ -32,9 +32,15 @@ these is a decision somebody made, not a fact about the law:
 
 - **Business days are counted as plain days.** Right only when no weekend or
   holiday intervenes.
-- **The one-year restricted period is
-  [365 days](src:jl4/examples/legal/regcf/regcf.l4#L250).** Wrong across a leap
-  year.
+
+This list used to have a second entry: the one-year resale period was rendered as
+a flat count of days, which is wrong across a leap year. It has since been fixed,
+and the fix is described under **What buyers may do**. The entry is named here
+rather than deleted, because a limit that quietly disappears between two readings
+of this document is indistinguishable from a limit that was never disclosed.
+Repairing it did not close the question — it turned a defect into a stated
+reading, which is now registered under **Where the law is unsettled** alongside
+the endpoint above.
 
 **Things it takes as given rather than deciding.** Reasonable-belief standards
 are inputs, not derivations: the encoding can represent the consequence of a
@@ -56,7 +62,7 @@ and
 [transmit funds to the issuer](src:jl4/examples/legal/regcf/regcf.l4#L101 "verbatim").
 There is also one period that only the citizen-facing wizard's prose reads; the
 decision-table exporter flags it as an inert decision —
-[advisory — decision_business_days_to_file_a_progress_update](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L281 "verbatim")
+[advisory — decision_business_days_to_file_a_progress_update](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L293 "verbatim")
 — which is how it was found. A projection noticing something dead in the source
 is not what a projection is for, and it is the second-best argument in this
 document for building them.

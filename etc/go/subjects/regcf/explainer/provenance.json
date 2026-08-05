@@ -3,7 +3,7 @@
   "records": [
     {
       "file": "call-to-action.md",
-      "sha256": "sha256:c1caf1eeebc4c0f1fa78e84469a9f70466e984f90379da72326433dd22964a73",
+      "sha256": "sha256:07b06512b1795138c811df91d39749b19bd1cfe5c5e5e1d5b2516d29fddf6383",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
@@ -14,7 +14,7 @@
         },
         {
           "path": "jl4/examples/legal/regcf/PROJECTIONS.md",
-          "sha256": "sha256:595d06f2251ea94bbfab501d4f8450de9a8f419ffa1c3438953ed9f3b73c953b",
+          "sha256": "sha256:cf1e211141b7299af990329ea93002008e007a27692362f3c6e6cab5298441d7",
           "anchor": "§5 the deployable surface — its route recipe and its three 'what this projection cannot say' items. NOT its export or tool counts: §5's prose said five @exports and its dated live measurement recorded nine tools, both taken before the sixth export landed. The counts in this section come from the run's own p7-mcp receipt."
         },
         {
@@ -24,7 +24,7 @@
         },
         {
           "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
-          "sha256": "sha256:5c83e7a81b7991b95c11470d63ffaa2af9ce99dc14287b889bace26915f652f8",
+          "sha256": "sha256:4c4a4d664561b8bb2f7458cc8d7ea1863a6c8190cd51662570980f688a749a37",
           "anchor": "§ The exported entry points, L540-L622 — the authoritative export set"
         }
       ],
@@ -39,13 +39,13 @@
     },
     {
       "file": "limits.encoding.md",
-      "sha256": "sha256:552b39cca4c0d2e9182332f7634cb0d8d50581860058de5a390a6b24fae60e51",
+      "sha256": "sha256:8a7b236537c6c1c246e70c7d1d8090ee46a4a47cd2df453d1ef568e1508befce",
       "drafted_by": "claude-opus-5",
-      "drafted_on": "2026-08-03",
+      "drafted_on": "2026-08-05",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§5 the nine honest limits"
         },
         {
@@ -55,12 +55,12 @@
         },
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "scope note, L28-L31"
         },
         {
           "path": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
-          "sha256": "sha256:22fc09f982b7d8479cddc0e1998d148f174bfe5847cb1a0091ebe86d2f1b18c0",
+          "sha256": "sha256:ff128ea582adbf4cefc469037732c0fc32fe7cebf58336de9ef417afdddd6b88",
           "anchor": "cited from this section; the citation coordinates in the text are the addresses"
         }
       ],
@@ -75,18 +75,18 @@
     },
     {
       "file": "orientation.md",
-      "sha256": "sha256:3c0a57c446e89854fa6da8a9d2bb75a3aa049e72788c1c85e4a9e915a1f08e23",
+      "sha256": "sha256:2a9112d1b2696138ab16ec486ce06a47113102ea5b4b096f723f2d495e7e03a9",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ scope note and § Parties and acts, L11-L93"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§1 what this corpus is"
         }
       ],
@@ -112,7 +112,7 @@
         },
         {
           "path": "jl4/examples/legal/regcf/PROJECTIONS.md",
-          "sha256": "sha256:595d06f2251ea94bbfab501d4f8450de9a8f419ffa1c3438953ed9f3b73c953b",
+          "sha256": "sha256:cf1e211141b7299af990329ea93002008e007a27692362f3c6e6cab5298441d7",
           "anchor": "§1-§4 what each projection preserves and loses"
         }
       ],
@@ -127,18 +127,18 @@
     },
     {
       "file": "s2-01-the-bargain.encoding.md",
-      "sha256": "sha256:f01123d1290bb301e26d080e0a01ba06b6a94bb588f80e96d94d67ee3c16a5e0",
+      "sha256": "sha256:dc387e822b97bb1605fb9f3ecb9a5225cf12919b7501e237f27f719fe34c67fb",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Top-level, L755-L777; modelling note, L69-L85"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§5 honest limits"
         }
       ],
@@ -159,7 +159,7 @@
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Top-level, L755-L777; § Thresholds, L104-L250"
         }
       ],
@@ -174,18 +174,18 @@
     },
     {
       "file": "s2-02-who-may-not-use-it.encoding.md",
-      "sha256": "sha256:168641caceaa4887cd532cbabb2e3fcabce60649e149f19bbf94a52859854ca1",
+      "sha256": "sha256:93a076231b1f76a289dc43af774e24e1e58d3145536a9d3bab3ea4b17374a704",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§1 Issuer eligibility, L252-L322"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§3.6 the omitted limb"
         },
         {
@@ -205,13 +205,13 @@
     },
     {
       "file": "s2-02-who-may-not-use-it.law.md",
-      "sha256": "sha256:59a5214462bdb67ea20ee4f33d14bfc11aaa6889cb62d2bc02d6c60a346d5b67",
+      "sha256": "sha256:fca8b0c04b24a422b87ca4568bd04af46f0960a8e9a79e86ca1d6380268abb7d",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§1 Issuer eligibility, L252-L322"
         }
       ],
@@ -226,23 +226,23 @@
     },
     {
       "file": "s2-03-how-much.encoding.md",
-      "sha256": "sha256:bfb116ced63ab7e890429407d60a04c7f7e97e27cdae7ce8f518c54376c12f51",
+      "sha256": "sha256:3d95c6f4671c85fb46edebd6aefa5eaa566d087fe3dabfad5e64b896124fb7f8",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§3 shape change L373-L404; rule-version tests L1176-L1182"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§3.1 the greater-of change"
         },
         {
           "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
-          "sha256": "sha256:5c83e7a81b7991b95c11470d63ffaa2af9ce99dc14287b889bace26915f652f8",
+          "sha256": "sha256:4c4a4d664561b8bb2f7458cc8d7ea1863a6c8190cd51662570980f688a749a37",
           "anchor": "cited from this section; see the citation coordinates in the text"
         }
       ],
@@ -257,18 +257,18 @@
     },
     {
       "file": "s2-03-how-much.law.md",
-      "sha256": "sha256:3c5b8ddac1bf879c0c46e4de73f353bd7065554950bb591841c2d53105740b62",
+      "sha256": "sha256:8ad252ed373f4134a2fd2f80afbac8433debc420f4d5a4a5e99f65e67e1a0e66",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§2 and §3, L325-L457; group 3 assertions, L900-L920"
         },
         {
           "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
-          "sha256": "sha256:5c83e7a81b7991b95c11470d63ffaa2af9ce99dc14287b889bace26915f652f8",
+          "sha256": "sha256:4c4a4d664561b8bb2f7458cc8d7ea1863a6c8190cd51662570980f688a749a37",
           "anchor": "cited from this section; see the citation coordinates in the text"
         }
       ],
@@ -283,18 +283,18 @@
     },
     {
       "file": "s2-04-what-must-be-disclosed.encoding.md",
-      "sha256": "sha256:d1ddf86de3f7532a04d53a59a069965b66a8be7fd90fc3222ed2527573900f80",
+      "sha256": "sha256:4a7c93fa1cdb2fed1c64f7cf9235f7042ded189c3e15ab61dff87ee7389a3f38",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§4 COVID refusal L465-L503; assurance ordering L505-L524"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§5.8 the assurance ordering"
         }
       ],
@@ -315,7 +315,7 @@
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§4 Disclosure requirements, L458-L545"
         }
       ],
@@ -330,13 +330,13 @@
     },
     {
       "file": "s2-05-what-the-issuer-may-say.encoding.md",
-      "sha256": "sha256:32a623a9b42065b2ae87b30a4fcf3c426fa3163f9b2fe24fe8f873abf22b701f",
+      "sha256": "sha256:2ade6ea461c63c070b64fb8eb7f4aad826224b220447c338546bad7474e23548",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§6 Advertising restrictions, L586-L636; modelling note L69-L85"
         }
       ],
@@ -351,13 +351,13 @@
     },
     {
       "file": "s2-05-what-the-issuer-may-say.law.md",
-      "sha256": "sha256:5bef8af299778dfe7e660d65e457ed92236bdb25960b1b33340707446cded452",
+      "sha256": "sha256:64b578ee0cb66a2e1274f5b5447dc2b2d77cc7efb336934b27a2984d3c9e0c97",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§6 Advertising restrictions, L586-L636"
         }
       ],
@@ -372,18 +372,18 @@
     },
     {
       "file": "s2-06-what-is-owed-afterwards.encoding.md",
-      "sha256": "sha256:2fef2bca98a9eda4d32cd2aee055d76ec1f19186f19b4619adab59cfb086088f",
+      "sha256": "sha256:0c24ac8c72bd8b7a4475457210e5a947ebc4281cba6905a09ec5e299d65cb9ed",
       "drafted_by": "claude-opus-5",
-      "drafted_on": "2026-08-03",
+      "drafted_on": "2026-08-05",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§7 Ongoing reporting, L638-L706"
         },
         {
           "path": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
-          "sha256": "sha256:22fc09f982b7d8479cddc0e1998d148f174bfe5847cb1a0091ebe86d2f1b18c0",
+          "sha256": "sha256:ff128ea582adbf4cefc469037732c0fc32fe7cebf58336de9ef417afdddd6b88",
           "anchor": "the D-PARTIAL finding on the reporting spine"
         }
       ],
@@ -398,13 +398,13 @@
     },
     {
       "file": "s2-06-what-is-owed-afterwards.law.md",
-      "sha256": "sha256:947195527de45e155f9117f0ba86641dcb786a96359632ba36664646502e529f",
+      "sha256": "sha256:cc188e0cb9595ce5162b74c3da2c55545d84c59703bd453313ac3fe0c4d61a4a",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§7 Ongoing reporting, L638-L706"
         }
       ],
@@ -419,18 +419,18 @@
     },
     {
       "file": "s2-07-what-buyers-may-do.encoding.md",
-      "sha256": "sha256:f4120c6f6e8c0fef6013e54cdf764ed01062b7697315b0d3643fbd60de46edd2",
+      "sha256": "sha256:5112ab899c4befd74bca81818564b808ef0182b6c18ba977c284bd6d8fba3423",
       "drafted_by": "claude-opus-5",
-      "drafted_on": "2026-08-03",
+      "drafted_on": "2026-08-05",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§8 endpoint note L718-L723; resale period L250"
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§5.2 the two infidelities"
         }
       ],
@@ -445,13 +445,13 @@
     },
     {
       "file": "s2-07-what-buyers-may-do.law.md",
-      "sha256": "sha256:7c143dbc016f45899007affe7c80ae5a6c03495e2159a1b1d0ec9dd9c97f7034",
+      "sha256": "sha256:afba3891a55013d0c625ce973e0f6fad9865a18e8e7280056a9498597e782c7c",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§8 Resale restrictions, L708-L753"
         }
       ],
@@ -472,7 +472,7 @@
       "drafted_from": [
         {
           "path": "specs/todo/single-instruction-demo/SPEC.md",
-          "sha256": "sha256:524a4a9c9d5718abf227e3ac3b5b0bec51747247c1d314fba82a683baf0e6313",
+          "sha256": "sha256:ed0e1a77df19b579fca9c908a7d9e72ca1fbdbf456d400baa0fd465fb4f5cf49",
           "anchor": "§P2 what an external-modification sweep is for"
         }
       ],
@@ -487,13 +487,13 @@
     },
     {
       "file": "time.encoding.md",
-      "sha256": "sha256:af6ffcb213bf48f014a5a18faa92e0cd8e6d39f83cdf8163c65461a2709caabe",
+      "sha256": "sha256:4941228ad8ce2fcbf48d3690fa8d95aa06b4ae65a5a6a1ab32babe15e9e6af48",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Thresholds L104-L225; TIMEZONE L9"
         },
         {
@@ -503,7 +503,7 @@
         },
         {
           "path": "jl4/examples/legal/regcf/README.md",
-          "sha256": "sha256:04072421efc42be54395d7dddef519e7184de487948c0a318e3137c8185d6d1b",
+          "sha256": "sha256:fb0d607aceb78fcfbb29b0bb0e0e63b10124cee6945ebb78c311b47431122a25",
           "anchor": "§5.9 what the rule-version axis costs"
         }
       ],
@@ -518,13 +518,13 @@
     },
     {
       "file": "time.law.md",
-      "sha256": "sha256:8b3c3de8df3efd3ddbd4da474f4a31c1448fa3639a9a8ecced6aa815bb06893e",
+      "sha256": "sha256:034d3b74bc04d1658db3ff2cc9834f40a043c9758d43b293e49dd1cac66c4cf3",
       "drafted_by": "claude-opus-5",
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
-          "sha256": "sha256:0da978a1f105d43631ec09e524483ca31cd4208a68914b59abee1780a9498c47",
+          "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Thresholds L104-L225; rule-version tests L1111-L1200"
         }
       ],

@@ -5,24 +5,24 @@ report — Form C-AR — filed within
 and it keeps owing one, year after year, until something specific happens.
 
 The rule's own words are that an issuer
-[must continue to comply with the ongoing reporting requirements until one of the following occurs](src:jl4/examples/legal/regcf/regcf.l4#L684 "verbatim"),
+[must continue to comply with the ongoing reporting requirements until one of the following occurs](src:jl4/examples/legal/regcf/regcf.l4#L695 "verbatim"),
 and there are five ways out:
 
 1. it
-   [became an Exchange Act reporting company](src:jl4/examples/legal/regcf/regcf.l4#L651 "verbatim")
+   [became an Exchange Act reporting company](src:jl4/examples/legal/regcf/regcf.l4#L662 "verbatim")
    — it is now required to file under section 13(a) or section 15(d) of the
    Securities Exchange Act, so a larger disclosure regime has taken over from
    this one;
-2. [one annual report filed and fewer than 300 holders of record](src:jl4/examples/legal/regcf/regcf.l4#L657 "verbatim").
+2. [one annual report filed and fewer than 300 holders of record](src:jl4/examples/legal/regcf/regcf.l4#L668 "verbatim").
    A **holder of record** is a person named on the company's own share register.
    It is not the same as the number of people who own the shares: an investor
    who bought through a broker or a nominee is usually not on the register, so a
    company can have far more investors than holders of record;
-3. [three annual reports filed and total assets not exceeding $10,000,000](src:jl4/examples/legal/regcf/regcf.l4#L664 "verbatim");
-4. [all securities repurchased](src:jl4/examples/legal/regcf/regcf.l4#L671 "verbatim")
+3. [three annual reports filed and total assets not exceeding $10,000,000](src:jl4/examples/legal/regcf/regcf.l4#L675 "verbatim");
+4. [all securities repurchased](src:jl4/examples/legal/regcf/regcf.l4#L682 "verbatim")
    — the issuer or another party has bought back everything sold under the
    exemption;
-5. it [liquidated or dissolved](src:jl4/examples/legal/regcf/regcf.l4#L677 "verbatim")
+5. it [liquidated or dissolved](src:jl4/examples/legal/regcf/regcf.l4#L688 "verbatim")
    its business under state law.
 
 When one of those occurs the annual duty converts into a single closing duty: a

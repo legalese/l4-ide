@@ -2,7 +2,7 @@ Rule 100(b) is drafted backwards from how a reader expects. It does not list
 the companies that may use the exemption; it lists the ones that may not. The
 chapeau reads:
 
-> [(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:](src:jl4/examples/legal/regcf/regcf.l4#L310 "verbatim")
+> [(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:](src:jl4/examples/legal/regcf/regcf.l4#L321 "verbatim")
 
 Six limbs follow. An issuer is disqualified if it is **not organised under the
 law of a State, a territory, or the District of Columbia**; if it is **already a

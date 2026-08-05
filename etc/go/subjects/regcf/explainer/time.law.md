@@ -37,12 +37,12 @@ encoding is willing to say.
 
 **Why this is not a footnote.** An inflation adjustment sounds like a rounding
 exercise. Consider an investor with income of
-[$110,000](src:jl4/examples/legal/regcf/regcf.l4#L1154) and net worth of
-[$115,000](src:jl4/examples/legal/regcf/regcf.l4#L1154). Before the last
+[$110,000](src:jl4/examples/legal/regcf/regcf.l4#L1242) and net worth of
+[$115,000](src:jl4/examples/legal/regcf/regcf.l4#L1242). Before the last
 adjustment both figures cleared the cut point, so the second limb applied and
-their cap was [$11,500](src:jl4/examples/legal/regcf/regcf.l4#L1162). After it,
+their cap was [$11,500](src:jl4/examples/legal/regcf/regcf.l4#L1250). After it,
 income sits _below_ the raised cut point, so the first limb applies and their
-cap is [$5,750](src:jl4/examples/legal/regcf/regcf.l4#L1163).
+cap is [$5,750](src:jl4/examples/legal/regcf/regcf.l4#L1251).
 
 Raising a threshold halved that person's capacity. Both answers are correct for
 their date, and no "last updated" stamp on a web page can express that.

@@ -873,6 +873,20 @@ code or of statute it came from.
 - **Window containment is not semantic containment.** `5000000` appearing at the cited line does
   not prove the sentence around it is true. The check bounds transcription error; it does not
   bound misreading. Say so in §S8.
+
+  **MEASURED 2026-08-05, because this stopped being hypothetical.** `limits.encoding.md` carried
+  "The one-year restricted period is [365 days](src:…/regcf.l4#L250) — wrong across a leap year".
+  The defect was then repaired, and the repair replaced line 250 with a comment arguing _against_
+  the flat count: "A flat 365 also fails to generalise inside its own Part". The digits `365` are
+  still at line 250, so **the citation kept resolving while the sentence it supported became
+  false** — and the source now says the opposite of the prose that cites it. Worse, the failure is
+  self-concealing: a check that goes green is read as evidence, so a passing citation makes the
+  stale sentence _harder_ to notice than an uncited one.
+
+  The one signal that did fire was **source drift** (§5.3): `regcf.l4`'s hash moved, so every
+  section drafted from it rendered `SOURCE MOVED`. That is the only mechanism in this design that
+  catches semantic inversion, which makes clearing it a claim rather than a chore — see **E31**.
+
 - **`art:` matches by basename.** Two artifacts with the same basename in one run would be
   ambiguous. No run produces such a pair today; the lint should refuse the ambiguity rather than
   pick one.
@@ -1442,16 +1456,20 @@ Reg CF-shaped. Explicitly out of scope now.
 
 ## 14. The 2026-08-05 rulings: the triple task, the spine, and the fabrication boundary
 
-Eight rulings from Meng on 2026-08-05, after reading the first real `g1` explainer. They do not
-replace §§1-13; they change **who the existing sections are written for** and add one slot. Numbered
-E21-E28 and appended rather than woven in, because §§1-13's numbers are cited from `SPEC.md` §P9.1
-and from `ORCHESTRATOR.md`, and renumbering a cited section is a breaking change for no benefit.
+Rulings from Meng on 2026-08-05, after reading the first real `g1` explainer, plus one of my own
+(E31) forced by the work of discharging them. They do not replace §§1-13; they change **who the
+existing sections are written for** and add two slots. Numbered from E21 and appended rather than
+woven in, because §§1-13's numbers are cited from `SPEC.md` §P9.1 and from `ORCHESTRATOR.md`, and
+renumbering a cited section is a breaking change for no benefit.
 
-**Implementation status, stated once and plainly: NONE of E21-E28 is built as of 2026-08-05.**
-They are rulings about what the narrative author must do and what the renderer must grow. The
-renderer today implements the eight-slot spine and the licensing grammar of §§4-7; it has no S9, no
-persona structure, no illustrative-block marking, and no screenshot capture. Everything below is
-therefore written as a requirement, not as a description of the tree.
+**Implementation status, per ruling, because "none of them" stopped being true within hours of
+being written.** E28's `S9` slot **is built** — renderer, template heading, deposit schema, subject
+register and the `p9-explain` required-heading gate all shipped on 2026-08-05. E31 is built,
+because it is a rule about an operation that was performed. **Everything else in §14 is a
+requirement and not a description of the tree:** there is no `S10`, no shared-block inclusion, no
+persona structure, no illustrative-block marking and no screenshot capture. Each subsection below
+restates its own status; where a subsection and this paragraph disagree, believe the subsection and
+fix this one.
 
 ### 14.1 E21 — three jobs, not two
 
@@ -1686,6 +1704,50 @@ than a per-report error a reader might catch in context. So sharing does not buy
 and no include-with-version machinery. What exists is the slot grammar S9 was built on, which is
 the right foundation and does not yet do inclusion.
 
+### 14.11 E31 — re-anchoring a provenance record is a CLAIM, not a chore
+
+**E31 — clearing `SOURCE MOVED` asserts a re-reading, and may only be done after one. RULED
+2026-08-05 (mine, not Meng's — forced by performing the operation and noticing what it would have
+let me get away with).**
+
+When a source file changes, every narrative record drafted from it stops matching and each affected
+section renders `SOURCE MOVED` (§5.3). Updating the record's `drafted_from[].sha256` clears that
+banner. Call it **re-anchoring**.
+
+**Re-anchoring asserts: somebody re-read this prose against the new source and it still holds.** It
+is a factual claim about work performed. A three-line script can do it in a second, which is
+precisely the problem — it is the cheapest lie in this design to tell, it silences the one alarm
+that catches semantic inversion (§6.2), and nothing downstream can tell a re-anchor that followed a
+re-reading from one that did not.
+
+So:
+
+1. **Re-anchor only after re-reading**, section by section, against the source as it now stands.
+   What counts as re-reading is checking each factual claim in the section, not skimming the diff.
+2. **`drafted_on` does NOT move on a re-anchor.** It is the date the prose was written, and it
+   resolves `{{as_of}}` (§6.2) — so bumping it on a section whose sentences did not change asserts
+   that section's dollar figures were re-checked against the law that day. Re-reading prose against
+   moved _code_ establishes nothing about the _law_. Move `drafted_on` only when the sentences
+   moved. **MEASURED 2026-08-05:** exactly three of the twenty-one Reg CF narrative files use
+   `{{as_of}}`, and all three are about the investment caps — the figures where the distinction
+   bites hardest.
+3. **Re-anchoring never touches `review`.** A re-anchor is not a signature. A section that was
+   unreviewed stays unreviewed and keeps its draft banner; a section that was `reviewed` and has
+   gone `stale` is not un-stale-d by re-anchoring, because the reviewer, not the drafter, is the
+   one whose claim went out of date.
+4. **Re-anchoring a CITATION is a different operation and is safe.** Moving `#L722` to `#L760`
+   because lines shifted is verified by the checker itself — it either resolves against the new
+   window or it does not. That may be done mechanically and in bulk. It is only the record-level
+   source hash, which no checker validates, that carries a claim.
+
+**What discharged it here, so the bar is legible rather than aspirational.** The 2026-08-05
+re-anchor of the Reg CF narrative re-read all twenty-one sections against their current sources
+using nine read-only agents, each finding reported with `file:line` evidence, and each finding then
+handed to a second agent whose instruction was to refute it. Two findings were raised and both were
+refuted — correctly, having been drawn against committed `HEAD` while the repair sat in the working
+tree. Confirmed findings: zero. **That number is the point of the exercise and not a formality: had
+it been non-zero, the re-anchor would have been a lie in exactly as many places.**
+
 ---
 
 _What §§1-13 do not claim: I built nothing, ran no `cabal`, `l4` or `npm` command, and made no
@@ -1699,5 +1761,6 @@ above would otherwise vouch for measurements taken two days after it was written
 exactly the drift this document spends §6 preventing. §14's **[M]** marks are reads against the
 tree at `47ea0f42`, plus the `g1` run of 2026-08-05 (`2026-08-05-d912648b-001`), which is the
 first run of the pipeline over the post-anniversary Reg CF corpus and the source of the
-`all 8 spine slots present` count and the 82 findings §14.8 relies on. §14 remains unbuilt in
-full: no ruling in it has an implementation, and none should be read as describing the renderer._
+`all 8 spine slots present` count and the 82 findings §14.8 relies on. **Two of §14's rulings are
+built and the rest are not** — see the per-ruling status in §14's preamble, which is the copy to
+believe; a blanket "§14 is unbuilt" stopped being true on the day it was written._
