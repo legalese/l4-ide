@@ -1105,6 +1105,44 @@ function forksSection() {
   return out.join("\n").trimEnd();
 }
 
+// ------------------------------------------------------- S10, how this works
+/**
+ * §14.10 E30 — "How this works, and what the words mean."
+ *
+ * The process narrative and the glossary, together, at the head of E29's third
+ * part: the point where a reader has seen what the thing does and is about to
+ * be shown how. Together and not apart, because a glossary detached from the
+ * process it names is a word list.
+ *
+ * SUBJECT-INDEPENDENT BY CONSTRUCTION, AND NOT YET SHARED. E30's shared-block
+ * rule says text that never mentions a body of law may be authored once and
+ * included verbatim in every report. The inclusion machinery — its own
+ * provenance record, the including report naming the version it took, the lint
+ * that refuses a subject-dependent citation — is NOT BUILT. So this renders a
+ * per-subject narrative file like any other slot, and the only preparation made
+ * for the eventual move is that the content is written to mention no
+ * regulation. Building half the mechanism would be worse than either end of it.
+ *
+ * ABSENCE IS A CLAIM HERE TOO. A report that does not explain its own process
+ * is asking to be taken on trust, which is the opposite of what every other
+ * slot in this spine is for — so a subject that declares no S10 says so in
+ * those terms rather than quietly rendering one section fewer.
+ */
+function howItWorksSection() {
+  const s = manifest.spine?.how_it_works;
+  if (s && "declined" in s)
+    return declined(
+      "This document's spine has a `how_it_works` slot: what formalisation is, what each part of this report is for, and what the words mean.",
+      s.declined,
+    );
+  if (!s || !s.file)
+    return absent(
+      "A reader who does not know what formalising a law involves cannot judge whether it was done well, and a reader who does not know this project's vocabulary cannot read the rest of this page. This slot carries the process, the reason for each part of it, and a glossary to return to.",
+      "This subject's manifest declares no `how_it_works` narrative, so **this report does not explain its own process or define its own terms**. Every section below still uses them.",
+    );
+  return narrativePart(s.file, { slot: "how_it_works" });
+}
+
 // -------------------------------------------------------------------- S7, CTA
 function ctaSection() {
   const s = manifest.spine?.call_to_action;
@@ -1228,6 +1266,7 @@ const time = slotBlock("time", {
 // does not exist would announce a division the section does not have.
 const limits = slotBlock("limits", { slot: "limits" });
 const forks = forksSection();
+const howItWorks = howItWorksSection();
 const sweep = sweepSection();
 const cta = ctaSection();
 const provenance = provenanceSection();
@@ -1294,6 +1333,7 @@ const values = {
   "sections.time": time,
   "sections.limits": limits,
   "sections.forks": forks,
+  "sections.how_it_works": howItWorks,
   "sections.sweep": sweep,
   "sections.cta": cta,
   "sections.provenance": provenance,

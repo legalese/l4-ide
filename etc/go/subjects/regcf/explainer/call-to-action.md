@@ -66,8 +66,8 @@ investment-limit calculation twice — once as it stands today, and once
 [under the rules in force on a chosen date — for checking a past investment against the rules that actually applied to it](src:jl4/examples/legal/regcf/regcf-wizard.l4#L589 "verbatim").
 Call the second with a `rule date` from before the substantive amendment and
 again with one from today, on the same income and net worth, and you get the two
-figures the **How much** section above describes, out of the same code, with
-nothing switched by hand.
+figures the **How much** section describes, out of the same code, with nothing
+switched by hand.
 
 **Five. Ask it to show its working.** Evaluation has a REST route of its own —
 `POST /deployments/{id}/functions/{fn}/evaluation` — and the service's own

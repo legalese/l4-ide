@@ -19,7 +19,8 @@ sell. A reader who thinks of this as "the rules for companies" will miss half of
 it: the investor has a personal spending cap, and the buyer has a lock-up.
 
 **The bargain is: accept conditions up front, and accept duties afterwards.**
-The next section takes those in turn.
+**The rules** takes those in turn. Before it come the things the encoding lets
+you do, because they are the reason to read the rest.
 
 ---
 
@@ -33,7 +34,8 @@ worth reading where it lands on the first.
 **What it covers, and what it leaves out.** The encoding deliberately mirrors
 one external summary of this regulation, which
 [presents Reg CF as eight numbered requirement groups](src:jl4/examples/legal/regcf/regcf.l4#L14-L17 "verbatim"),
-and the sections below take seven of the eight. The one with no section of its
+and the rule-by-rule sections under **The rules** take seven of the eight. The
+one with no section of its
 own is
 [Intermediary obligations](src:jl4/examples/legal/regcf/regcf.l4#L23 "verbatim"),
 the conduct regime for the funding portal. The encoding reaches it only as far

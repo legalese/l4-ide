@@ -192,6 +192,13 @@ export function loadManifest(dir) {
     "call_to_action",
   ])
     slot(key, spine[key]);
+  // OPTIONAL slots. Absence is a legitimate state that the renderer reports as
+  // a claim rather than a gap — §14.8 E28 for `forks`, §14.10 E30 for
+  // `how_it_works` — so a missing key is not a schema problem. A key that IS
+  // present must still name files that exist, or the mistake surfaces as a
+  // silently empty section instead of a refusal.
+  for (const key of ["forks", "how_it_works"])
+    if (spine[key]) slot(key, spine[key]);
   if (!Array.isArray(spine.body))
     fail(problems, "manifest.json: spine.body must be an array");
   else
@@ -367,6 +374,25 @@ export function lintNarrative(text) {
             "a figure asserted in the bare present; write `at time of writing ({{as_of}}), $X` so the claim carries the date it was true, or name the regime it belongs to",
         });
     }
+
+    // N-HEADING. The SLOT owns `##`; a narrative file that emits one competes
+    // with the spine instead of sitting inside it. The rendered page then has
+    // section headings at the same level as `## The rules`, so the outline a
+    // reader (or a table of contents) sees no longer matches the spine the
+    // whole document is organised around.
+    //
+    // MEASURED 2026-08-05: caught by rendering, not by a check. S10's deposit
+    // used `##` for its five sub-sections and put five extra headings at slot
+    // level in the finished page. Cheap to fix, invisible until printed, and
+    // certain to recur — which is the profile of something that should be a
+    // lint rather than a thing somebody remembers.
+    const h = /^(#{1,2})\s+\S/.exec(line);
+    if (h)
+      out.push({
+        line: n,
+        code: "N-HEADING",
+        message: `heading at level ${h[1].length}; the spine slot owns \`#\` and \`##\`, so a narrative file's own headings start at \`###\``,
+      });
 
     // A citation-looking construct that does not parse is worse than none: it
     // reads as checked and is not. Every `](src:` / `](art:` in the line must

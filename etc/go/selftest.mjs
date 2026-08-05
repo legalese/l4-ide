@@ -1572,6 +1572,24 @@ process.stdout.write("\n-- the explainer --\n");
       ) &&
       lintNarrative("the run passed and the corpus is complete").length === 0,
   );
+  // The SLOT owns `##`. MEASURED 2026-08-05: S10's deposit used `##` for its
+  // five sub-sections, and the rendered page carried five headings at the same
+  // level as `## The rules` — so the printed outline stopped matching the spine
+  // the document is organised around. Found by reading the output, which is
+  // exactly the kind of catch that should not depend on someone reading it.
+  check(
+    "a narrative file's own heading may not sit at the spine slot's level",
+    (() => {
+      const codes = (t) => lintNarrative(t).map((f) => f.code);
+      return (
+        codes("## Nope\n").includes("N-HEADING") &&
+        codes("# Nope\n").includes("N-HEADING") &&
+        !codes("### Fine\n").includes("N-HEADING") &&
+        // a `##` inside a fence is a code comment, not a heading
+        !codes("```\n## not a heading\n```\n").includes("N-HEADING")
+      );
+    })(),
+  );
   check(
     "a markdown construct outside the subset is a lint finding at its line",
     (() => {

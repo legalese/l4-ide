@@ -52,15 +52,27 @@ and draws nothing._
 
 ---
 
-## The rules
+## Use it
 
-{{sections.body}}
+{{sections.cta}}
 
 ---
 
 ## Pictures
 
 {{sections.pictures}}
+
+---
+
+## How this works, and what the words mean
+
+{{sections.how_it_works}}
+
+---
+
+## The rules
+
+{{sections.body}}
 
 ---
 
@@ -85,12 +97,6 @@ and draws nothing._
 ## What was never searched
 
 {{sections.sweep}}
-
----
-
-## Use it
-
-{{sections.cta}}
 
 ---
 

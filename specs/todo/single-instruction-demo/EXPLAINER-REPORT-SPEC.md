@@ -1463,13 +1463,19 @@ woven in, because §§1-13's numbers are cited from `SPEC.md` §P9.1 and from `O
 renumbering a cited section is a breaking change for no benefit.
 
 **Implementation status, per ruling, because "none of them" stopped being true within hours of
-being written.** E28's `S9` slot **is built** — renderer, template heading, deposit schema, subject
-register and the `p9-explain` required-heading gate all shipped on 2026-08-05. E31 is built,
-because it is a rule about an operation that was performed. **Everything else in §14 is a
-requirement and not a description of the tree:** there is no `S10`, no shared-block inclusion, no
-persona structure, no illustrative-block marking and no screenshot capture. Each subsection below
-restates its own status; where a subsection and this paragraph disagree, believe the subsection and
-fix this one.
+being written.** All of it shipped on 2026-08-05, within hours of the ruling.
+
+| ruling                        | status                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| E28 — `S9`, the forks slot    | **built** — renderer, heading, deposit schema, subject register, gate entry               |
+| E29 — the reading order       | **built** — the template renders context → applications → mechanism                       |
+| E30 — `S10` and the glossary  | **slot and content built; the SHARING mechanism is not.** See §14.10                      |
+| E31 — re-anchoring is a claim | **built** — it is a rule about an operation that was performed                            |
+| E21-E27                       | **not built.** No persona structure, no illustrative-block marking, no screenshot capture |
+
+Each subsection restates its own status in more detail; where a subsection and this table disagree,
+believe the subsection and fix this table. That instruction is not decorative — this paragraph has
+now been wrong twice, both times by asserting "none of these is built" after something was.
 
 ### 14.1 E21 — three jobs, not two
 
@@ -1644,6 +1650,25 @@ is lowest.
 where slots are RENDERED, not what they are called, and no slot is renumbered by it. The template's
 order is the document's order; the table's order is historical.
 
+**Status: BUILT 2026-08-05, as far as the parts that exist allow.** The template now renders
+`orientation → cta → pictures → S10 → body → time → forks → limits → sweep → provenance`, and
+`p9-explain`'s required-heading list follows it. No slot was renamed and no ID moved, exactly as the
+paragraph above requires.
+
+**What is built is parts 2 and 3, not part 1.** E29's opening — the personas of E24 meeting the
+legislation as published, before any of this exists — depends on **E24, which is not built**. What
+stands at the head of the document today is the existing orientation slot, which describes the law
+and the parties but does not walk a persona through the pre-L4 world. So the order is right and the
+first movement is thinner than E29 asks for; when E24 lands, it lands in a slot that is already in
+the correct position.
+
+**And the reorder was not free, which is the part worth recording.** Moving a section changes the
+truth of every sentence that located itself by position. Three had to be repaired: orientation's
+"the next section takes those in turn" (the next section is no longer the rules), its "the sections
+below take seven of the eight", and the call-to-action's "the **How much** section above". The
+house style of referring to sections **by name** — which most of the deposit already used — is what
+made this three sentences rather than thirty, and is the rule to keep following.
+
 ### 14.10 E30 — "How this process works", a glossary, and the shared-content rule
 
 **E30 — the report explains its own process, defines its own jargon, and may do both from text
@@ -1700,9 +1725,37 @@ than a per-report error a reader might catch in context. So sharing does not buy
 4. A shared block is **never** the place a measured number lives. Numbers are per-run and per
    subject; a shared block that quotes one has already gone stale for every other report.
 
-**Status: RULED, NOT BUILT.** There is no `S10`, no shared-block mechanism, no glossary content,
-and no include-with-version machinery. What exists is the slot grammar S9 was built on, which is
-the right foundation and does not yet do inclusion.
+**Status: the SLOT and its CONTENT are BUILT; the SHARING is NOT. 2026-08-05.**
+
+Built: `S10` is a spine slot with a renderer (`howItWorksSection`), a template heading, optional
+manifest validation, a `p9-explain` required-heading entry, and Reg CF content — process narrative,
+slot-by-slot table with the reason for each, and a glossary of the fifteen terms this ruling lists.
+Rendered under E29's order at run `2026-08-05-b4fdf406-001`: 22 sections, 92 citations, none
+unresolved.
+
+**Not built, deliberately: the inclusion machinery.** There is no shared-block store, no
+include-with-version, and no lint refusing a subject-dependent citation inside a shared block. The
+content is written to be shareable — it names no regulation, and its two citations resolve against
+`etc/go/go.sh` and `etc/go/phases/p6-tests.sh`, both subject-independent — but it lives as an
+ordinary per-subject narrative file with an ordinary provenance record.
+
+**Why stop there.** Inclusion pays off at the SECOND subject and costs at the first. One subject
+with a shared-block mechanism has all of the machinery and none of the consistency benefit the
+mechanism exists for, and a half-built store is worse than either end: it looks like sharing works.
+The move, when a second subject arrives, is a file move plus a manifest key — which is the whole
+reason the content was written subject-independent now rather than retrofitted later.
+
+**One thing E30 did not anticipate, found by building it.** The reserved-status-word lint (§6.5)
+bans `DEGRADED`, `SKIPPED` and their case variants from narrative prose — which makes a glossary
+entry for _gate_ unable to name the statuses it is defining. Fenced blocks are exempt from the lint,
+so the vocabulary can be shown in one; the constraint is real and worth knowing before drafting.
+
+**And one defect the build surfaced, now a lint.** S10's deposit used `##` for its sub-sections,
+putting five headings at the same level as `## The rules` and breaking the printed outline. The
+spine slot owns `#` and `##`; a narrative file's own headings start at `###`. This is now
+**N-HEADING** in `lintNarrative`, with a selftest, because it was invisible until the page was
+printed and certain to recur. A generated artifact inlined into a slot can do the same thing and
+N-HEADING does not reach it — see the outstanding `regcf-corpus.dmn.md` case.
 
 ### 14.11 E31 — re-anchoring a provenance record is a CLAIM, not a chore
 
@@ -1761,6 +1814,7 @@ above would otherwise vouch for measurements taken two days after it was written
 exactly the drift this document spends §6 preventing. §14's **[M]** marks are reads against the
 tree at `47ea0f42`, plus the `g1` run of 2026-08-05 (`2026-08-05-d912648b-001`), which is the
 first run of the pipeline over the post-anniversary Reg CF corpus and the source of the
-`all 8 spine slots present` count and the 82 findings §14.8 relies on. **Two of §14's rulings are
-built and the rest are not** — see the per-ruling status in §14's preamble, which is the copy to
-believe; a blanket "§14 is unbuilt" stopped being true on the day it was written._
+`all 8 spine slots present` count and the 82 findings §14.8 relies on. **Which of §14's rulings are
+built is a table in §14's preamble, and that table is the copy to believe** — do not restate it
+here, or in a commit message, or in a sibling spec. A blanket "§14 is unbuilt" stopped being true on
+the day it was written, and the count of built rulings has already moved twice since._

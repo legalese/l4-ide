@@ -68,6 +68,9 @@
     },
     "forks": {
       "register": "jl4/examples/legal/regcf/fork-register.json"
+    },
+    "how_it_works": {
+      "file": "how-it-works.md"
     }
   }
 }

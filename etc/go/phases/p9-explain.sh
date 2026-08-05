@@ -105,13 +105,14 @@ node -e '
   const t = fs.readFileSync(process.argv[1], "utf8");
   const required = [
     "## What this is, and who it binds",
-    "## The rules",
+    "## Use it",
     "## Pictures",
+    "## How this works, and what the words mean",
+    "## The rules",
     "## Time",
     "## Where the law is unsettled",
     "## Limits",
     "## What was never searched",
-    "## Use it",
     "## How to check this document",
   ];
   const missing = required.filter((h) => !t.includes(h));

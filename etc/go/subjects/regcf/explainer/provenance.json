@@ -3,9 +3,9 @@
   "records": [
     {
       "file": "call-to-action.md",
-      "sha256": "sha256:07b06512b1795138c811df91d39749b19bd1cfe5c5e5e1d5b2516d29fddf6383",
+      "sha256": "sha256:c658e7c195f3ae555828a064c22fc4d92ae02300667056e372c2117ca383fcec",
       "drafted_by": "claude-opus-5",
-      "drafted_on": "2026-08-03",
+      "drafted_on": "2026-08-05",
       "drafted_from": [
         {
           "path": "jl4-service/README.md",
@@ -75,9 +75,9 @@
     },
     {
       "file": "orientation.md",
-      "sha256": "sha256:2a9112d1b2696138ab16ec486ce06a47113102ea5b4b096f723f2d495e7e03a9",
+      "sha256": "sha256:060f2e15f89e7e872668c2338082bf125f6e437ed21c4906094ba17769cc9040",
       "drafted_by": "claude-opus-5",
-      "drafted_on": "2026-08-03",
+      "drafted_on": "2026-08-05",
       "drafted_from": [
         {
           "path": "jl4/examples/legal/regcf/regcf.l4",
@@ -526,6 +526,37 @@
           "path": "jl4/examples/legal/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Thresholds L104-L225; rule-version tests L1111-L1200"
+        }
+      ],
+      "review": {
+        "state": "unreviewed",
+        "reviewer": null,
+        "reviewed_on": null,
+        "reviewed_sha256": null,
+        "reviewed_sources": [],
+        "signature": null
+      }
+    },
+    {
+      "file": "how-it-works.md",
+      "sha256": "sha256:c8ace593ca45df85e1968b562f74360dff4b18cde3fd10d612026793719752ab",
+      "drafted_by": "claude-opus-5",
+      "drafted_on": "2026-08-05",
+      "drafted_from": [
+        {
+          "path": "specs/todo/single-instruction-demo/EXPLAINER-REPORT-SPEC.md",
+          "sha256": "sha256:81ef3a70339aa495e57ca6c5e1347b925415b62f2091db413e8aa0b90518141d",
+          "anchor": "§14.10 E30 (the slot, the glossary term list, and the shared-content rule), §14.9 E29 (the reading order and why), §4.1 (the slot table), §6.2 (what the citation check does and does not bound), §5.3 (provenance and drift)"
+        },
+        {
+          "path": "etc/go/go.sh",
+          "sha256": "sha256:ab423c3209f73d008fc01ba312a3e6259c0e34eef22a0dd5e171d4f4d7b8a3f4",
+          "anchor": "the usage block's two-gate description — HG1 waivable, HG2 not — and the stage sequence the process narrative walks"
+        },
+        {
+          "path": "specs/todo/single-instruction-demo/SPEC.md",
+          "sha256": "sha256:ed0e1a77df19b579fca9c908a7d9e72ca1fbdbf456d400baa0fd465fb4f5cf49",
+          "anchor": "the per-phase purposes P0-P10, and P2/P8's reasons for existing. NOT any measured count: this section is subject-independent by construction (E30) and carries no run figure."
         }
       ],
       "review": {
