@@ -132,6 +132,11 @@ jobs:
               # them.
               - 'jl4/tests-cli/fixtures/dmn-xsd-order/**'
               - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
+              # The date-arithmetic clamp pair: likewise hand-written, and the
+              # thing it gates is an equivalence between daydate and FEEL, so a
+              # change to EITHER side should run it.
+              - 'jl4/tests-cli/fixtures/dmn-date-arith/**'
+              - 'jl4-core/libraries/daydate.l4'
               # The engine-intersection triple: likewise hand-written.
               - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
 
@@ -1027,6 +1032,71 @@ jobs:
           fi
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-date-negative.log
           grep -q 'PARSE  INVALID' camunda-date-negative.log
+
+      # The DATE ARITHMETIC pair (added 2026-08-05). The step above settled date
+      # LITERALS and date COMPARISONS; this one settles date ARITHMETIC, which is
+      # what an anniversary needs and what Reg CF's Rule 501(a) now uses.
+      #
+      # WHAT IS ACTUALLY BEING GATED is an EQUIVALENCE, not a feature: daydate's
+      # `add months`/`add years` CLAMP the day to the target month's last day,
+      # the exporter lowers them to FEEL's `date + duration(...)`, and that is
+      # sound only if FEEL clamps the same way. DMN 1.3's own formula does NOT
+      # clamp -- it preserves the day component, which for 29 February plus one
+      # year names a date that does not exist -- so the spec text and the engines
+      # had to be treated as disagreeing until measured. They clamp, on months
+      # and years alike, and agree with L4 on all six cases. If this goes red the
+      # two lowering arms in jl4-core/src/L4/Dmn/Lower.hs are unsound and the
+      # corpus's exported resale restriction has drifted from its own #ASSERTs.
+      #
+      # THE NEGATIVE IS NOT DECORATION. It is the reason the corpus writes
+      # `add years` rather than rebuilding the date from its components:
+      # `date(2025, 2, 29)` is not a date, and neither engine clamps or rolls it.
+      # Three implementations, three answers -- L4's lenient `Date` rolls to
+      # 1 March, FEEL's `date(y+1,m,d)` is null, FEEL's duration clamps to
+      # 28 February -- which is why the idiom is fixed in the library instead of
+      # left to whoever writes the next anniversary.
+      - name: Date arithmetic -- the clamp equivalence, and its negative (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          arith=jl4/tests-cli/fixtures/dmn-date-arith
+
+          ./etc/kie-dmn-check/run.sh \
+            "$arith/clamp.dmn" --cases "$arith/clamp.cases.json" | tee kie-date-arith.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected' kie-date-arith.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$arith/clamp.dmn" --cases "$arith/clamp.cases.json" | tee camunda-date-arith.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected' camunda-date-arith.log
+
+          # The NEGATIVE control, same `&& rc=0 || rc=$?` device as above.
+          ./etc/kie-dmn-check/run.sh \
+            "$arith/reconstruct-refused.dmn" \
+            --cases "$arith/reconstruct-refused.cases.json" > kie-arith-negative.log 2>&1 && rc=0 || rc=$?
+          cat kie-arith-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::KIE produced a clamped anniversary from date(y + 1, m, d); the reconstruction refusal no longer holds"
+            exit 1
+          fi
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-arith-negative.log
+          # The CONTROL in the same file must still pass, so the red isolates to
+          # the reconstruction rather than to anything about the fixture.
+          grep -q 'anniv_duration .*SUCCEEDED .*2025-02-28' kie-arith-negative.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$arith/reconstruct-refused.dmn" \
+            --cases "$arith/reconstruct-refused.cases.json" > camunda-arith-negative.log 2>&1 && rc=0 || rc=$?
+          cat camunda-arith-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Camunda produced a clamped anniversary from date(y + 1, m, d); the reconstruction refusal no longer holds"
+            exit 1
+          fi
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-arith-negative.log
+          grep -q 'anniv_duration .*2025-02-28' camunda-arith-negative.log
 
       # The negative control for the placement rule (DMN-EXPORT-PROGRAM-MODEL-SPEC.md
       # §4.3, §9). Every other step above asserts that a gate stays GREEN, which

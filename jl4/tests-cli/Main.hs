@@ -576,6 +576,32 @@ corpusEngineCases = "examples/dmn/regcf-corpus.cases.json"
 dmnDateProbeDir :: FilePath
 dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
 
+-- The DATE ARITHMETIC axis, added 2026-08-05. `dmn-date-probe` above settled
+-- date LITERALS and date COMPARISONS; this pair settles date ARITHMETIC, which
+-- is what an anniversary needs and what the corpus's Rule 501(a) now uses.
+--
+-- Hand-written and never regenerated, same rule as its sibling. The load-bearing
+-- claim is an EQUIVALENCE the emitter cannot state about itself: `daydate`'s
+-- `add months`\/`add years` CLAMP to the target month's last day, the exporter
+-- lowers them to FEEL's @date + duration(...)@, and that is sound only if FEEL
+-- clamps identically. DMN 1.3's own formula does NOT clamp -- it preserves the
+-- day component -- so the spec and the engines had to be assumed to disagree
+-- until measured. They clamp. All six cases agree with L4.
+--
+-- `dateArithNegative` is the NEGATIVE CONTROL and is driven 'HarnessMustFail':
+-- the same anniversary written by reconstructing components, @date(y + 1, m,
+-- d)@, which is null on both engines for a 29 February issuance. Without it the
+-- positive would show only that one idiom works, not that the other cannot --
+-- and "cannot" is the whole reason `add years` exists.
+dateArithModel, dateArithCases, dateArithNegative, dateArithNegativeCases :: FilePath
+dateArithModel         = dmnDateArithDir </> "clamp.dmn"
+dateArithCases         = dmnDateArithDir </> "clamp.cases.json"
+dateArithNegative      = dmnDateArithDir </> "reconstruct-refused.dmn"
+dateArithNegativeCases = dmnDateArithDir </> "reconstruct-refused.cases.json"
+
+dmnDateArithDir :: FilePath
+dmnDateArithDir = fixtureDir </> "dmn-date-arith"
+
 -- The ENGINE-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
 -- measured note of 2026-07-30). One statute-shaped predicate — "either spouse
 -- earns under $100,000 or is a Qualifying Candidate" — spelled three ways
@@ -1731,6 +1757,42 @@ spec bin = do
     -- a fixture can ask whether Xerces objects to one -- and only the NEGATIVE
     -- half can show that it does. Same rationale, and the same construction, as
     -- the dmn-xsd-order pair.
+    -- The DATE ARITHMETIC pair. What this asserts that nothing else does: the
+    -- CLAMP that `daydate`'s `add months`/`add years` perform is the same clamp
+    -- FEEL performs, so an L4 module that computes an anniversary and the DMN it
+    -- exports to cannot answer differently. That equivalence is the licence for
+    -- the two lowering arms in "L4.Dmn.Lower"; if this goes red they are unsound
+    -- and the Reg CF corpus's exported resale restriction has silently drifted
+    -- from its own #ASSERTs.
+    it "both engines CLAMP date arithmetic, agreeing with daydate on all six" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dateArithModel [dateArithModel, "--cases", dateArithCases] \out -> do
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    it "both engines CLAMP date arithmetic, agreeing with daydate on all six (Camunda)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dateArithModel [dateArithModel, "--cases", dateArithCases] \out -> do
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    -- The negative half, and it is not decoration: it is the reason the corpus
+    -- writes `add years` instead of rebuilding the date from its components.
+    -- `date(2025, 2, 29)` is not a date, and neither engine clamps or rolls it.
+    it "reconstructing an anniversary from components is REFUSED for 29 February" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dateArithNegative [dateArithNegative, "--cases", dateArithNegativeCases] \out -> do
+          -- the control in the same file DOES clamp, so the failure isolates to
+          -- the reconstruction rather than to anything about the fixture
+          out `shouldSatisfy` ("anniv_duration" `isInfixOf`)
+          out `shouldSatisfy` ("anniv_reconstruct" `isInfixOf`)
+
+    it "reconstructing an anniversary from components is REFUSED for 29 February (Camunda)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dateArithNegative [dateArithNegative, "--cases", dateArithNegativeCases] \out -> do
+          out `shouldSatisfy` ("anniv_duration" `isInfixOf`)
+          out `shouldSatisfy` ("anniv_reconstruct" `isInfixOf`)
+
     it "the date-axis probe pair differs ONLY in the @id on the annotationEntry" $ do
       pos <- readUtf8 dateProbeModel
       neg <- readUtf8 dateProbeNegative

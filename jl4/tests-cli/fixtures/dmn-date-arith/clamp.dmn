@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  THE DATE ARITHMETIC AXIS, positive half.
+
+  Sibling of fixtures/dmn-date-probe/, which settled that `date("YYYY-MM-DD")`
+  literals, `typeRef="date"` inputs and date COMPARISONS work on both engines.
+  It never touched date ARITHMETIC, and an anniversary needs arithmetic.
+
+  THE QUESTION. `daydate`'s `add months` / `add years` CLAMP the day to the last
+  day of the target month: 31 January plus one month is 29 February in a leap
+  year, and the first anniversary of 29 February 2024 is 28 February 2025. The
+  DMN exporter lowers those to FEEL's `date + duration(...)`. That lowering is
+  only sound if FEEL clamps the SAME WAY, and the DMN 1.3 spec's own formula for
+  adding a years-and-months duration does NOT clamp: it preserves the day
+  component, which for 29 February plus one year names a date that does not
+  exist. The spec text and the engines therefore had to be assumed to disagree
+  until measured, and Camunda's published addition table makes it worse by
+  omitting the date row for years-and-months durations altogether.
+
+  Measured answer: both engines clamp, on months and years alike, and agree with
+  L4 in all six cases below. That agreement is what lets an L4 module compute an
+  anniversary and get the same answer back out of an engine we do not control.
+
+  These six are the SAME six evaluated in L4 by `add months` / `add years`. If
+  this file goes red, the corpus's exported anniversary has stopped meaning what
+  the corpus's own #ASSERTs mean, which is the failure this fixture exists to
+  catch.
+
+  NOT AN EMITTED GOLDEN, by the same rule as its dmn-date-probe sibling: the
+  emitter cannot pose the questions, only consume the answers. Never regenerate.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_date_clamp" name="date arithmetic clamp" namespace="https://legalese.com/l4/dmn/date_clamp">
+  <decision id="d_jan31_plus_1M" name="jan31_plus_1M">
+    <variable id="v_jan31_plus_1M" name="jan31_plus_1M" typeRef="date"/>
+    <literalExpression id="l_jan31_plus_1M"><text>date(2024,1,31) + duration("P1M")</text></literalExpression>
+  </decision>
+  <decision id="d_mar31_plus_1M" name="mar31_plus_1M">
+    <variable id="v_mar31_plus_1M" name="mar31_plus_1M" typeRef="date"/>
+    <literalExpression id="l_mar31_plus_1M"><text>date(2024,3,31) + duration("P1M")</text></literalExpression>
+  </decision>
+  <decision id="d_feb29_plus_4Y" name="feb29_plus_4Y">
+    <variable id="v_feb29_plus_4Y" name="feb29_plus_4Y" typeRef="date"/>
+    <literalExpression id="l_feb29_plus_4Y"><text>date(2024,2,29) + duration("P4Y")</text></literalExpression>
+  </decision>
+  <decision id="d_feb28_plus_1Y" name="feb28_plus_1Y">
+    <variable id="v_feb28_plus_1Y" name="feb28_plus_1Y" typeRef="date"/>
+    <literalExpression id="l_feb28_plus_1Y"><text>date(2023,2,28) + duration("P1Y")</text></literalExpression>
+  </decision>
+  <decision id="d_jan31_plus_13M" name="jan31_plus_13M">
+    <variable id="v_jan31_plus_13M" name="jan31_plus_13M" typeRef="date"/>
+    <literalExpression id="l_jan31_plus_13M"><text>date(2023,1,31) + duration("P13M")</text></literalExpression>
+  </decision>
+  <decision id="d_feb29_plus_12M" name="feb29_plus_12M">
+    <variable id="v_feb29_plus_12M" name="feb29_plus_12M" typeRef="date"/>
+    <literalExpression id="l_feb29_plus_12M"><text>date(2024,2,29) + duration("P12M")</text></literalExpression>
+  </decision>
+</definitions>
