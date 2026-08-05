@@ -58,6 +58,16 @@ _More topics planned: Maybe and Nothing, Type Inference_
 
 ---
 
+### 🖋️ Reviewing
+
+Who checks an encoding against the law, and what their sign-off means
+
+- **[Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)** - The `⟨law⟩: go` pipeline end to end, and the HG1 seat: the one judgement no machine is permitted to make
+
+**Key Ideas:** Human gates, detached signatures bound to content, inert style as the review artifact, fidelity reports, interpretation forks
+
+---
+
 ## How to Use Concepts
 
 ### During Learning
