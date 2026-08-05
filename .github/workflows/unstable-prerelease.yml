@@ -1,11 +1,12 @@
 # Unstable prerelease: standalone `l4` + `jl4-lsp` binaries.
 #
-# STATUS 2026-08-05: WRITTEN, NEVER RUN. Nothing in this file has been executed
-# on a runner. It is modelled step-for-step on main-tag.yml's four platform
-# build jobs, which are green (run 29636556313, 2026-07-18, all four platforms
-# `success`), but every claim below about THIS workflow's behaviour is a design
-# intention, not a measurement. Run it once with `dry_run: true` (the default)
-# before anyone trusts it. See §"What is unverified" at the foot of this file.
+# STATUS 2026-08-06: RUN, AND PUBLISHING. It went green on its first execution
+# as a dry run (31011661044) and then published for real (31015006781), both
+# from ref `unstable`, on 2026-08-05. Claims below about this workflow's
+# behaviour are therefore measurements, with the exceptions enumerated in
+# §"What is measured, and what is not" at the foot of this file — which
+# includes one measured DEFECT. `dry_run: true` remains the default, and
+# remains the right way to exercise a change to this file.
 #
 # ---------------------------------------------------------------------------
 # WHY THIS EXISTS
@@ -13,12 +14,13 @@
 # `etc/go/go.sh` — the pipeline entry point — never builds; it requires `L4` to
 # point at an already-built binary and refuses otherwise (go.sh:474-488), and
 # `JL4_LSP_CMD` likewise for the ladder leg (etc/go/phases/p7-ladder.sh:31).
-# The only `l4` we ship today is bundled inside the VS Code extension, whose
-# most recent build is from 2026-07-18 — before `l4 export` existed. So a
-# contributor who wants to run the pipeline currently has to install GHC and
-# Cabal and do a full Haskell build to obtain a binary. On a Claude Code cloud
-# sandbox, whose setup script is capped at five minutes, that is impossible;
-# downloading a tarball is not.
+# Before this file existed, the only `l4` we shipped was the copy bundled
+# inside the VS Code extension, whose most recent build is from 2026-07-18 —
+# older than `l4 export`. A contributor who wanted to run the pipeline had to
+# install GHC and Cabal and do a full Haskell build to obtain a binary. On a
+# Claude Code cloud sandbox, whose setup script is capped at five minutes, that
+# is impossible; downloading a tarball is not. This workflow produces the
+# tarball, and as of 2026-08-05 there is one on the Releases page.
 #
 # ---------------------------------------------------------------------------
 # HOW THIS STAYS DISJOINT FROM main's RELEASE TRACK (main-tag.yml)
@@ -312,6 +314,15 @@ jobs:
       #      which build the same two executables from the same cabal.project
       #      with the same GHC.
       #
+      #      MEASURED 2026-08-06: reason 2 DOES NOT HOLD IN PRACTICE, and the
+      #      keys below have never hit. main-tag.yml really does save these
+      #      families, but it is dispatched by hand every few weeks, and GitHub
+      #      evicts a cache 7 days after its last access — so by the time this
+      #      workflow runs there is usually nothing left to borrow. The keys
+      #      are kept because they are correct and cost nothing when they miss;
+      #      the reasoning that justified relying on them is not. See the foot
+      #      of this file.
+      #
       # The single `path:` and the bare-runner execution are both load-bearing.
       # actions/cache derives an internal cache VERSION from the path list and
       # the compression method, and only entries with a matching version are
@@ -324,7 +335,8 @@ jobs:
       #     this workflow runs on bare runners. I have NOT measured whether
       #     those two families are version-compatible, so this deliberately
       #     falls back only to `lsp-*`, which main-tag.yml writes from bare
-      #     runners exactly like these.
+      #     runners exactly like these. (Which it does — and which, per the
+      #     note above, have usually expired by the time we ask for them.)
       #
       # Cache SCOPE: reads are scoped to {the run's own ref, the default
       # branch}. main-tag.yml is dispatched on main (run 29636556313 reports
@@ -650,26 +662,71 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 # ---------------------------------------------------------------------------
-# WHAT IS UNVERIFIED (2026-08-05)
+# WHAT IS MEASURED, AND WHAT IS NOT (2026-08-06)
 #
-# This workflow has never executed. Everything below is untested:
+# Two runs, both from ref `unstable`, both on 2026-08-05:
 #
-#   * every step of it, end to end, on every platform;
-#   * whether the `lsp-*` restore-keys actually hit — the scope reasoning is
-#     sound but unmeasured, and a miss shows up only as a slow run;
-#   * whether `cabal configure --disable-tests` changes plan.json enough to
-#     matter to the restore (it should not: restore-keys are prefix matches);
-#   * the Windows staging path. main-tag.yml's equivalent is green, but its
-#     Windows job does not `strip`, `tar`, or run the produced binary, and
-#     this one does all three;
-#   * `l4 --help` and `jl4-lsp --help` were measured on 2026-08-05 against a
-#     local macOS/GHC-9.10.3 build, NOT against a runner-built 9.10.2 binary;
-#   * the release body's rendering, and whether `sha256sum --ignore-missing`
-#     is present on the consumer's machine (it is coreutils ≥ 8.25);
-#   * the dispatch itself: this file must be on `main` before the Run-workflow
-#     button exists, and that has not happened.
+#   * 31011661044, `dry_run: true` — four jobs green, and verified afterwards
+#     to have created NOTHING: no `unstable-*` tag, no release, `Latest` still
+#     `l4-ide-build-88`. The dry-run guard works.
+#   * 31015006781, `dry_run: false` — five jobs green. Tag
+#     `unstable-20260805-c873bb5`, annotated, dereferencing to c873bb5, which
+#     was `unstable`'s head. Release `prerelease: true`, `draft: false`, three
+#     archives plus SHA256SUMS, and `Latest` still `l4-ide-build-88`.
 #
-# Prove it with `dry_run: true` first. That path builds, packages, smoke-tests
-# and checksums without creating a tag or a release, so a failure costs
-# runner minutes and nothing else.
+# Settled by those runs — each of these was an open question here:
+#
+#   * every step, end to end, on all three platforms;
+#   * the Windows staging path that strips, tars and runs the binary;
+#   * `l4 --help` against a runner-built GHC-9.10.2 binary on all three
+#     platforms — each smoke step reported 12 subcommands, including `export`;
+#   * the release body's rendering, read back from the API;
+#   * the dispatch itself: the file reached `main` via PR #218, the
+#     Run-workflow button appeared, and it fired twice.
+#
+# Settled the other way. This is a MEASURED DEFECT, and reason 2 above is the
+# thing that is wrong:
+#
+#   * the `lsp-*` restore-keys missed at every level, on all three platforms,
+#     in both runs. Not because the keys are misspelled — they match
+#     main-tag.yml's save keys exactly — but because THE CACHES ARE NOT THERE.
+#     `gh api repos/legalese/l4-ide/actions/caches` returns zero entries whose
+#     key begins `lsp-`, on any ref. GitHub evicts a cache after 7 days without
+#     an access, and main-tag.yml is dispatched by hand every few weeks: its
+#     last run was 29636556313 on 2026-07-18. Corroborating that, on 2026-08-06
+#     no surviving cache in the whole repository had been accessed before
+#     2026-08-01 — the 7-day window is visibly doing the deleting.
+#
+#     So reason 2's "everything we need is already in main-tag.yml's `lsp-*`
+#     families" is true only inside a 7-day shadow after a main-tag run, and
+#     this workflow will normally be dispatched outside it. Every run is a cold
+#     Haskell build: in 31015006781 the build step took 1279s (win32), 1399s
+#     (darwin), 1428s (linux).
+#
+#     Note what the fix is NOT. Renaming the keys would accomplish nothing.
+#     The options are to let this workflow save its own cache — which reason 1
+#     above deliberately rejects, and that trade-off deserves re-argument now
+#     that the borrowing has been shown not to work — or to accept cold builds
+#     and delete reason 2, which is currently load-bearing and false.
+#   * `cabal configure --disable-tests` versus plan.json is consequently moot,
+#     and stays untestable until some cache exists to restore from.
+#
+# Still unverified, and cheap to leave that way:
+#
+#   * `sha256sum --ignore-missing` on an arbitrary consumer's machine. The
+#     macOS alternative the release body offers, `shasum -a 256
+#     --ignore-missing -c SHA256SUMS`, was run against the published archive
+#     and exits 0.
+#   * `linux-x64` and `win32-x64` as binaries anyone has actually USED. Both
+#     were smoke-tested by their own build jobs and by nothing since. Only
+#     `darwin-arm64` has been taken the whole way: downloaded from the release,
+#     checksum-matched, and driven through `etc/go/go.sh run --milestone g1
+#     --subject regcf --through p3-check` to `p0-preflight: PASS`, with `l4
+#     check` exiting 0 on both corpus files and `JL4_LIBRARY_PATH` unset. That
+#     path is the entire reason this workflow exists, so it is worth someone
+#     repeating it on the other two.
+#
+# When you change this file, exercise it with `dry_run: true` first. That path
+# builds, packages, smoke-tests and checksums without creating a tag or a
+# release, so a failure costs runner minutes and nothing else.
 # ---------------------------------------------------------------------------
