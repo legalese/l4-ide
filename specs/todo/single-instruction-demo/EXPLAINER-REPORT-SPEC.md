@@ -132,27 +132,36 @@ the explainer's decisions and overrides none of theirs.
 
 ## 0. Ruling register
 
-| ruling                                                                             | state                               | detail |
-| ---------------------------------------------------------------------------------- | ----------------------------------- | ------ |
-| **E1** — narrative is drafted, checked in, reviewed                                | **ANSWERED 2026-08-03 (Meng)** — D1 | §5     |
-| **E2** — separate sibling artifact; P9 untouched                                   | **ANSWERED 2026-08-03 (Meng)** — D2 | §2     |
-| **E3** — Reg CF first; subject-generic; BNA out of scope                           | **ANSWERED 2026-08-03 (Meng)** — D3 | §4.1   |
-| **E4** — a declared, HG1-gated stage `p9-explain`, g1 only                         | **ANSWERED 2026-08-03 (this spec)** | §3     |
-| **E5** — duplicate the journal fold; do not refactor `render-report.mjs`           | **ANSWERED 2026-08-03 (this spec)** | §3.5   |
-| **E6** — every figure is placeholder-resolved or citation-checked                  | **ANSWERED 2026-08-03 (this spec)** | §6.2   |
-| **E7** — no number may be sourced from `README.md` or `PROJECTIONS.md` prose       | **ANSWERED 2026-08-03 (this spec)** | §6.4   |
-| **E8** — narrative prose may not carry run-status vocabulary                       | **ANSWERED 2026-08-03 (this spec)** | §6.5   |
-| **E9** — for the explainer the HTML is the document and the markdown is the record | **ANSWERED 2026-08-03 (this spec)** | §7.1   |
-| **E10** — a closed markdown subset, lint-enforced, zero dependencies               | **ANSWERED 2026-08-03 (this spec)** | §7.2   |
-| **E11** — ladder SVGs inline verbatim: unmodified, untrimmed, boxed                | **ANSWERED 2026-08-03 (this spec)** | §8.1   |
-| **E12** — the LTS picture is environment-conditional; no committed DOT renders     | **ANSWERED 2026-08-03 (this spec)** | §8.2   |
-| **E13** — DMN tables are extracted from the emitted XML; dmnmd is a cross-check    | **ANSWERED 2026-08-03 (this spec)** | §8.3   |
-| **E14** — the BPMN/DMN diagram-interchange serializer is deferred to v1, costed    | **ANSWERED 2026-08-03 (this spec)** | §8.4   |
-| **E15** — the call to action is stand-it-up-yourself; no live-deployment claim     | **ANSWERED 2026-08-03 (this spec)** | §9     |
-| **E16** — the cross-link is one-way: explainer → report, never the reverse         | **ANSWERED 2026-08-03 (this spec)** | §2.3   |
-| **E17** — per-section narrative signatures; the run gate is not extended           | **ANSWERED 2026-08-03 (this spec)** | §5.5   |
-| **E18** — report versioning                                                        | **OPEN**, inherits `SI-R7`          | §13    |
-| **E19** — where the DI serializer belongs                                          | **OPEN**                            | §13    |
+| ruling                                                                             | state                                 | detail |
+| ---------------------------------------------------------------------------------- | ------------------------------------- | ------ |
+| **E1** — narrative is drafted, checked in, reviewed                                | **ANSWERED 2026-08-03 (Meng)** — D1   | §5     |
+| **E2** — separate sibling artifact; P9 untouched                                   | **ANSWERED 2026-08-03 (Meng)** — D2   | §2     |
+| **E3** — Reg CF first; subject-generic; BNA out of scope                           | **ANSWERED 2026-08-03 (Meng)** — D3   | §4.1   |
+| **E4** — a declared, HG1-gated stage `p9-explain`, g1 only                         | **ANSWERED 2026-08-03 (this spec)**   | §3     |
+| **E5** — duplicate the journal fold; do not refactor `render-report.mjs`           | **ANSWERED 2026-08-03 (this spec)**   | §3.5   |
+| **E6** — every figure is placeholder-resolved or citation-checked                  | **ANSWERED 2026-08-03 (this spec)**   | §6.2   |
+| **E7** — no number may be sourced from `README.md` or `PROJECTIONS.md` prose       | **ANSWERED 2026-08-03 (this spec)**   | §6.4   |
+| **E8** — narrative prose may not carry run-status vocabulary                       | **ANSWERED 2026-08-03 (this spec)**   | §6.5   |
+| **E9** — for the explainer the HTML is the document and the markdown is the record | **ANSWERED 2026-08-03 (this spec)**   | §7.1   |
+| **E10** — a closed markdown subset, lint-enforced, zero dependencies               | **ANSWERED 2026-08-03 (this spec)**   | §7.2   |
+| **E11** — ladder SVGs inline verbatim: unmodified, untrimmed, boxed                | **ANSWERED 2026-08-03 (this spec)**   | §8.1   |
+| **E12** — the LTS picture is environment-conditional; no committed DOT renders     | **ANSWERED 2026-08-03 (this spec)**   | §8.2   |
+| **E13** — DMN tables are extracted from the emitted XML; dmnmd is a cross-check    | **ANSWERED 2026-08-03 (this spec)**   | §8.3   |
+| **E14** — the BPMN/DMN diagram-interchange serializer is deferred to v1, costed    | **ANSWERED 2026-08-03 (this spec)**   | §8.4   |
+| **E15** — the call to action is stand-it-up-yourself; no live-deployment claim     | **ANSWERED 2026-08-03 (this spec)**   | §9     |
+| **E16** — the cross-link is one-way: explainer → report, never the reverse         | **ANSWERED 2026-08-03 (this spec)**   | §2.3   |
+| **E17** — per-section narrative signatures; the run gate is not extended           | **ANSWERED 2026-08-03 (this spec)**   | §5.5   |
+| **E18** — report versioning                                                        | **OPEN**, inherits `SI-R7`            | §13    |
+| **E19** — where the DI serializer belongs                                          | **OPEN**                              | §13    |
+| **E20** — narrative generated rather than drafted                                  | **OPEN**, D1 rules it drafted for now | §13    |
+| **E21** — the report has THREE jobs: the law, the encoding, and L4 itself          | **ANSWERED 2026-08-05 (Meng)**        | §14.1  |
+| **E22** — the SPINE: one interaction walked in depth; the road not taken is listed | **ANSWERED 2026-08-05 (Meng)**        | §14.2  |
+| **E23** — verbosity permitted; repetition across reports expected (reverses DRY)   | **ANSWERED 2026-08-05 (Meng)**        | §14.3  |
+| **E24** — the spine walked twice, pre-L4 and L4, through personas                  | **ANSWERED 2026-08-05 (Meng)**        | §14.4  |
+| **E25** — the exhibits; wizard screenshot capture is NEW ENGINEERING, not built    | **ANSWERED 2026-08-05 (Meng)**        | §14.5  |
+| **E26** — the fabrication boundary: invented material is structurally distinct     | **ANSWERED 2026-08-05**               | §14.6  |
+| **E27** — register: technical and CNL material in relatively simple language       | **ANSWERED 2026-08-05 (Meng)**        | §14.7  |
+| **E28** — interpretive forks get a spine slot (S9), fed by `fork-register.json`    | **ANSWERED 2026-08-05**; S9 NOT BUILT | §14.8  |
 
 **Evidence legend.** **[M]** = I ran it or read it out of the tree at `5f79ff64` while writing this
 spec. **[G]** = taken from the ground-truth research passes that preceded this document, and cited
@@ -452,7 +461,9 @@ a name in `selftest.mjs:1993-2005`, and joins the g2 `gated_by_HG1` override at 
 
 #### The ruling
 
-This spec fixes an **eight-slot spine**. It does **not** fix the body sections. The body is
+This spec fixes a **nine-slot spine** — eight as originally ruled, plus **S9** added by E28 on
+2026-08-05 and not yet implemented (see the note under the table). It does **not** fix the body
+sections. The body is
 declared per subject in `etc/go/subjects/<id>/explainer/manifest.json`, so Reg CF's thirteen
 sections and the BNA's eventual N are the same machinery with different manifests.
 
@@ -473,6 +484,13 @@ this stage exists to prevent"_ **[M:** `p9-report.sh:61-62` **]**.
 | **S6** | What was never searched    | the external-modification hole, stated in the audit report's own words           |
 | **S7** | Use it                     | the call to action                                                               |
 | **S8** | How to check this document | provenance, review states, and the re-derivation command                         |
+| **S9** | Where the law is unsettled | interpretive forks: both readings, the reading taken, and why (E28, §14.8)       |
+
+**S9 is RULED but NOT BUILT, as of 2026-08-05.** The renderer implements eight slots; the real
+`g1` run of 2026-08-05 reports `all 8 spine slots present` **[M]**, which is the count before
+S9. Until it is built the spine is eight slots in the code and nine in this spec, and that gap is
+the work item, not a discrepancy to reconcile by editing one of the numbers. See §14.8 for why the
+slot exists and what feeds it.
 
 ### 4.2 The licence table
 
@@ -1419,8 +1437,162 @@ Reg CF-shaped. Explicitly out of scope now.
 
 ---
 
-_What this document does not claim: I built nothing, ran no `cabal`, `l4` or `npm` command, and
-made no commit other than this spec and its pointer in `SPEC.md` §P9.1. Every **[M]** above is a
-read or a count against the tree at `5f79ff64` on 2026-08-03; every **[G]** is carried from the
-four ground-truth research passes that preceded this spec and is cited to the file:line it came
-from, not re-executed here. Where those two disagree with each other, believe neither and measure._
+## 14. The 2026-08-05 rulings: the triple task, the spine, and the fabrication boundary
+
+Eight rulings from Meng on 2026-08-05, after reading the first real `g1` explainer. They do not
+replace §§1-13; they change **who the existing sections are written for** and add one slot. Numbered
+E21-E28 and appended rather than woven in, because §§1-13's numbers are cited from `SPEC.md` §P9.1
+and from `ORCHESTRATOR.md`, and renumbering a cited section is a breaking change for no benefit.
+
+**Implementation status, stated once and plainly: NONE of E21-E28 is built as of 2026-08-05.**
+They are rulings about what the narrative author must do and what the renderer must grow. The
+renderer today implements the eight-slot spine and the licensing grammar of §§4-7; it has no S9, no
+persona structure, no illustrative-block marking, and no screenshot capture. Everything below is
+therefore written as a requirement, not as a description of the tree.
+
+### 14.1 E21 — three jobs, not two
+
+**E21 — the report has THREE jobs, not two. ANSWERED 2026-08-05 (Meng).** D2 and the dual brief
+had it explain **the law** and **this law's encoding**. A third is now required: **L4 itself**.
+Every reader is assumed a novice in all three, so each report doubles as a **mini-tutorial in the
+language**. This does not add a section; it changes who the existing sections are written for.
+Consequence for §6's licensing grammar: a claim about _the law_ is licensed by the source text, a
+claim about _the encoding_ by the encoding, and a claim about _the language_ by `doc/**` or by the
+construct's own appearance in the report — a tutorial sentence with no construct on the page to
+point at is a feature tour, which E22 forbids.
+
+### 14.2 E22 — the spine, and the road not taken
+
+**E22 — the SPINE. ANSWERED 2026-08-05 (Meng).** Each report picks **one** interaction with the
+law — the **most common** one, the core decision and/or the core process — and organises itself
+around it. Language features are explained **where they appear in the spine**, at the moment the
+reader meets them, and not as a systematic tour of L4. A feature that does not appear in the
+spine does not get taught. The spine is a per-subject choice and belongs in the subject's
+manifest, so the renderer can state which interaction was chosen and a reviewer can disagree
+with the choice.
+
+**And the road not taken is named. AMENDED 2026-08-05 (Meng).** Choosing one interaction to
+walk in depth risks a reader concluding the system only handles that one. So the other
+motivations for coming to this law — the less common questions, the other personas, the
+provisions the spine passes over — are **listed**, briefly, with the remark that **they receive
+the same treatment in the L4 system and can be queried the same way, and are omitted here only
+for brevity**. A list plus that sentence costs a paragraph and forecloses the misreading.
+
+**The list is DERIVED, not written.** "These are handled too" is a coverage claim, and this
+document does not print unlicensed claims. So the non-spine list is generated from the
+encoding's own decision surface — the decisions and exported entry points that exist but are
+not on the spine — rather than hand-authored. That way it cannot overclaim (it can only name
+what is actually encoded), it cannot silently go stale as the encoding grows, and a reader who
+doubts it can query any item on it and find out. Where a provision is in the source but NOT
+encoded, that is a limit and belongs in Limits, not in this list.
+
+### 14.3 E23 — verbosity permitted, repetition expected
+
+**E23 — verbosity is PERMITTED and repetition across reports is EXPECTED. ANSWERED 2026-08-05
+(Meng).** Two instructions that both cut against the usual instinct, so both are recorded
+explicitly. (a) The author **may wax verbose** and go into depth where the spine warrants it;
+brevity is not a virtue here. (b) **Every report is read alone.** A reader cannot be assumed to
+have read any other report, so a report must **not** cross-reference a sibling for its basics,
+and **the same material appearing in five reports is correct, not duplication to be factored
+out.** Do not introduce a shared "about L4" chapter and link to it. This reverses DRY on purpose:
+the unit of delivery is one report, not the corpus.
+
+### 14.4 E24 — the spine walked twice, through personas
+
+**E24 — the before/after narrative, through personas. ANSWERED 2026-08-05 (Meng).** The spine is
+walked twice. **First in a pre-L4 world**: a small cast of user personas meets the
+legislation as it is published, and the report is honest about what they actually do — read the
+prose, build a spreadsheet, phone a lawyer, guess. **Then in an L4 world**: the same personas,
+the same questions, and how the affordances change with digital support. The comparison IS the
+argument, and it is made concrete by persona rather than asserted in the abstract.
+
+### 14.5 E25 — the exhibits
+
+**E25 — the exhibits. ANSWERED 2026-08-05 (Meng), scope; engineering NOT built.** The L4 half of
+E24 is shown, not described: the **diagrams** the pipeline already emits (ladder, LTS, BPMN,
+DMN); the **wizard application** that falls out of the encoding, **with screenshots**; **worked
+conversations over MCP**; and the **exports and extractions** — OpenFisca, DMN, BPMN — each
+presented as "here is the same rule, arriving in a system that already exists". Status, stated
+plainly: the diagrams and the exports are produced by legs that run today; **wizard screenshot
+capture does not exist and is new engineering** (a headless browser capture, deposited as a run
+artifact with a receipt like any other, so a screenshot is attested rather than pasted).
+
+### 14.6 E26 — the fabrication boundary
+
+**E26 — THE FABRICATION BOUNDARY. ANSWERED 2026-08-05, the ruling this document most needs.**
+E24's personas and E25's MCP conversations are **invented**. Everything else in this document
+obeys a rule that a claim with no licence cannot be printed, and invented material collides with
+it head-on. The resolution is not to relax the rule but to make the two kinds of content
+**structurally distinguishable**:
+
+1. Invented material is **visibly marked as invented at the point of use**, in the rendered
+   document, not only in a preamble a reader may skip.
+2. Invented material **never carries a citation**. The citation grammar means "re-read at render
+   time and matched"; attaching it to a hypothetical would poison the one signal the reader has.
+3. Invented material **never asserts a measured number**. A persona may be told "you may invest
+   up to X" where X is a placeholder resolved from the encoding; the persona may not be given a
+   figure the report has not otherwise licensed.
+4. A conversation that shows a **real tool's real output** and one that **illustrates what such a
+   conversation would look like** are different artifacts and must not be confusable. If a
+   transcript is real, it is an artifact of the run with a receipt; if it is illustrative, it says
+   so where it sits.
+5. The lint enforces what it can — the reserved-status-word check already refuses run-status
+   vocabulary in narrative; an analogous check should refuse a citation inside a block flagged
+   illustrative.
+
+### 14.7 E27 — meet them where they are
+
+**E27 — register: "meet them where they are". ANSWERED 2026-08-05 (Meng).** Technical material,
+and the **low-code CNL** material especially, is introduced in **relatively simple language**. The
+reader is a domain expert, not a programmer, and the encoding style exists precisely so that they
+need not become one. Where a term of art is unavoidable it is glossed at first use, in the same
+sentence, without sending the reader elsewhere (which E23 forbids anyway).
+
+### 14.8 E28 — interpretive forks get a structural slot
+
+**E28 — interpretive forks get a STRUCTURAL SLOT, not a drafter's discretion. ANSWERED
+2026-08-05.** Meng recalled, on 2026-08-05, that the explainer already covers interpretive
+ambiguities and alternative interpretations. Measured against the real `g1` run of
+2026-08-03: it half does, and the half it does not is the half that matters.
+
+**What is there.** One genuinely good passage, in "How much may be raised", opening _"The
+statute is ambiguous, the regulator glossed it twice, and the encoding resolves neither"_ —
+the §4(a)(6)(B) greater-of/lesser-of problem, argued from the source. **[M]**
+
+**What is not.** `fork` does not appear in `explainer-template.md` at all: there is **no spine
+slot** for interpretive forks. Across the whole rendered document, ambiguity is discussed
+**twice, both in that one passage**. And Reg CF has **no committed fork register** for a slot to
+render from. **[M]**
+
+So the coverage exists as **prose a drafter happened to write**, not as **structure fed by a
+register** — which means it is at the drafter's discretion and will silently go missing on the
+next subject. That is precisely the failure mode the spine's ABSENT-with-a-reason design exists
+to prevent, and Reg CF escaped it only because whoever wrote that section noticed.
+
+**Ruled:** interpretive forks get their own spine slot, fed by the subject's
+`fork-register.json` (schema `specs/todo/single-instruction-demo/schemas/fork-register.schema.json`, R4's one-`Interpretation`-
+record shape). Where a subject has no register the slot renders **ABSENT with the reason**, like
+every other slot, so "this encoding registered no ambiguities" becomes a visible claim someone
+can disagree with rather than an absence nobody notices. Where a register exists, each fork
+renders with **both readings, the reading taken, and why** — the fields R4 already requires.
+
+This is newly buildable: the de novo run started 2026-08-05 produces the first
+`fork-register.json` Reg CF has ever had. Note the honest bound the register itself carries —
+**completeness is unfalsifiable in principle**, so the slot may claim internal consistency and
+must never claim exhaustiveness.
+
+---
+
+_What §§1-13 do not claim: I built nothing, ran no `cabal`, `l4` or `npm` command, and made no
+commit other than this spec and its pointer in `SPEC.md` §P9.1. Every **[M]** in §§1-13 is a read
+or a count against the tree at `5f79ff64` on 2026-08-03; every **[G]** is carried from the four
+ground-truth research passes that preceded this spec and is cited to the file:line it came from,
+not re-executed here. Where those two disagree with each other, believe neither and measure._
+
+_**§14 was written on 2026-08-05 and its evidence is scoped separately**, because the sentence
+above would otherwise vouch for measurements taken two days after it was written — which is
+exactly the drift this document spends §6 preventing. §14's **[M]** marks are reads against the
+tree at `47ea0f42`, plus the `g1` run of 2026-08-05 (`2026-08-05-d912648b-001`), which is the
+first run of the pipeline over the post-anniversary Reg CF corpus and the source of the
+`all 8 spine slots present` count and the 82 findings §14.8 relies on. §14 remains unbuilt in
+full: no ruling in it has an implementation, and none should be read as describing the renderer._
