@@ -234,7 +234,13 @@ etc/go/go.sh run --milestone g2 --subject <id> --only p1-ingest
 
 ### P1 — fetch with provenance
 
-Fetch the subject's source from its `source_url` and write a `source-bundle`. What the schema makes non-optional is what the BNA smoke run learned the hard way:
+Fetch the subject's source from its `source_url` and write a `source-bundle`.
+
+**Fetch the instrument it is made under, too.** A regulation is promulgated under a statute, a statutory instrument under a parent Act, a by-law under an ordinance. Fetch that with the same provenance and record it as a document with `role: "instrument"` — the specific empowering provision where the source names one, the enabling Act where it does not.
+
+This is not bookkeeping, and it is not the same job as P2. **The subject text can diverge from the text that authorises it**, and no other stage can see that: P2 sweeps _forward_ in time for what has happened to a provision since it was printed, and nothing in the pipeline looks _up_. Reg CF is the worked instance. 17 CFR 227.100(a)(2) computes the investment limit from "the greater of" the investor's annual income or net worth; 15 U.S.C. 77d(a)(6)(B), the exemption it implements, says "the lesser of". The Commission has glossed the discrepancy twice without amending the statute, so both texts are live and they disagree about money. The de novo run captured three regulations and three corroborations, never reached up, and **could not have found it** — while the corpus built the slow way had. A run that ingests only the instrument it was pointed at is not merely likely to miss this class of fork; it is incapable of finding one.
+
+What the schema makes non-optional is what the BNA smoke run learned the hard way:
 
 - **Archive fallback.** legislation.gov.uk answered an AWS WAF challenge, and the run completed through Wayback captures. Record that as `retrieval_method: "archive"` with the `archive_url` — the schema requires the URL when the method is `archive`, and forbids it otherwise.
 - **The in-force banner**, in `in_force` — the "up to date with all changes known to be in force on or before ⟨date⟩" line, or a stated reason there is none. The Jersey charities fetch recorded "Showing the law from 16 October 2025 to Current" instead, which is the same field for a different jurisdiction's phrasing.
@@ -265,7 +271,9 @@ Open a fork wherever two readings of the source survive, and record it. R4 is ru
 
 `materialisation` is a discriminator, not an assumption. The two inventories anyone has actually produced — the BNA smoke's twelve and the Jersey charities cleanroom's twelve — resolved **every** ambiguity at encode time or delegated it to a fact-supplier, and materialised none. "Twelve forks, none materialised" is a real and interesting result, and the stage records the counts per class so the report can say it.
 
-Cross-reference P2: a fork an authority has already settled carries `settled_by` rather than presenting as open, and the `cross-refs-resolve` join checks that the id it cites is real. Deposit the register; run the stage; the receipt is the fact.
+Cross-reference P2: a fork an authority has already settled carries `settled_by` rather than presenting as open, and the `cross-refs-resolve` join checks that the id it cites is real.
+
+**Cross-reference P1's `instrument` document too, and read the two texts against each other.** Where the subject says something its authorising instrument does not, that is a fork of a distinct kind — not an ambiguity in one text but a disagreement between two, and the reading with the weaker claim may be the one the subject itself states. Record both readings and say which instrument licenses each. If the bundle has no `instrument` document, this check cannot run, and P4 should say so rather than leave a reader to infer the texts agreed. Deposit the register; run the stage; the receipt is the fact.
 
 ### P5 — the adversarial gate
 

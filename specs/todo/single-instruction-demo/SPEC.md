@@ -80,8 +80,23 @@ only what an earlier stage committed.
 
 Pull the current and historical rule text (the 2016 adoption, the 2017 and 2022 inflation
 adjustments, the 2021 amendments, the COVID-19 temporary rules) with Federal Register citations
-attached. Deliverable: a source bundle with provenance (URL, retrieval date, FR cites) that P3
-encodes from and P9 cites. Machine-readable format:
+attached.
+
+**And pull the instrument the subject is made under** (added 2026-08-06): the enabling statute for
+a regulation, the parent Act for a statutory instrument — recorded as a document with
+`role: "instrument"`, a value the schema has always carried and nothing had ever asked for. The
+reason is that a subject can diverge from the text that authorises it, and no other stage looks in
+that direction: P2 sweeps forward in time for what has happened to a provision since it was
+printed, never up to the provision's own source of authority. MEASURED 2026-08-06: the Reg CF de
+novo bundle holds three `current` documents (17 CFR 227, 230.501, 270.3a-9) and three
+`corroboration` documents, and **no statute** — so it could not see that § 227.100(a)(2) computes
+the investment limit from "the greater of" annual income or net worth while 15 U.S.C. 77d(a)(6)(B),
+the exemption it implements, says "the lesser of". The committed corpus registers that as
+`F-4A6B-MEASURE`; the de novo run, which read the CFR alone, has no entry for it and could not have
+had one. P4 reads the two texts against each other and opens a fork on the disagreement.
+
+Deliverable: a source bundle with provenance (URL, retrieval date, FR cites) that P3 encodes from
+and P9 cites. Machine-readable format:
 [`schemas/source-bundle.schema.json`](./schemas/source-bundle.schema.json) — defined and
 validated 2026-08-02; no stage writes one yet.
 
