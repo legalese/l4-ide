@@ -157,8 +157,12 @@ DECIDE `contravenes s 229(4)` IF
         ..  `an advantage for himself`
         ..  `an advantage for any other person`
         ..  "or to cause"
-        ..  `detriment to the corporation`
+        OR  `detriment to the corporation`
 ```
+
+The final rung spells `OR` rather than taking the `..` sugar. That is house style — every rung of a
+chain but the last takes the sugar, the last takes the keyword — and it mirrors what the statute
+does, coordinating asyndetically and then spelling the conjunction before the final item.
 
 No warnings, and it means what it looks like: improper use **and** at least one of the three
 consequences. `#EVAL` with improper use, no advantage to anyone, but detriment caused returns TRUE;

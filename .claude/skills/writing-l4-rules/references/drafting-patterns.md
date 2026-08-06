@@ -557,6 +557,64 @@ operative outcome** (no `DECIDE`/deontic). Keeps the corpus gap-free and auditab
 #EVAL `former Ground 3 text (REPEALED)`
 ```
 
+### The genitive supplies the verb — drop it from the field name
+
+**Ruling (Meng).** The Saxon genitive `'s` reads as **both "is" and "has"**. So
+`` transfer's `to the issuer of the securities` `` already says _the transfer **is** to the issuer of
+the securities_, and `` transfer's `days since the securities were issued` `` already says _the
+transfer **has** days since…_. Writing the verb into the field name says it twice.
+
+```l4
+-- WRONG — the clitic already supplied "is".
+    `is to the issuer of the securities`     IS A BOOLEAN
+    `has a date of transfer`                 IS A DATE
+
+-- RIGHT — the name starts at the complement.
+    `to the issuer of the securities`        IS A BOOLEAN
+    `date of the transfer`                   IS A DATE
+```
+
+This is not tidiness. The field name is what the **ladder prints** beside its node and what the
+**wizard asks** the user, so a redundant verb is a stutter in the picture and in the question. And
+it costs fidelity: 17 CFR 227.501(a)(1) says "To the issuer of the securities" — the statute starts
+at the complement too, because its own chapeau ("unless such securities are transferred:") supplied
+the verb. Matching that is the whole point.
+
+### Spell the last connective — `..` … `OR`, and `...` … `AND`
+
+**Ruling (Meng, 2026-08-06).** In a chain, **every rung but the last takes the sugar; the last takes
+the keyword.**
+
+```l4
+-- RIGHT
+    ..  "(1)" ... transfer's `to the issuer of the securities`
+    ..  "(2)" ... transfer's `to an accredited investor`
+    ..  "(3)" ... transfer's `as part of an offering registered with the Commission`
+    OR  "(4)" ... `transfer falls within Rule 501(a)(4)` transfer
+
+-- WRONG — the chain never says what kind of chain it is.
+    ..  "(1)" ... transfer's `to the issuer of the securities`
+    ..  "(2)" ... transfer's `to an accredited investor`
+    ..  "(3)" ... transfer's `as part of an offering registered with the Commission`
+    ..  "(4)" ... `transfer falls within Rule 501(a)(4)` transfer
+```
+
+Three reasons, in increasing order of importance:
+
+1. **It is what the source does.** English coordinates a list asyndetically and then spells the
+   conjunction before the final item. 227.501(a) reads "…(3) As part of an offering registered with
+   the Commission; **or** (4) To a member of the family…". Legal drafting does this without
+   exception, so an isomorphic encoding should too.
+2. **The reader learns the operator without counting dots.** `..` and `...` differ by one character.
+   A keyword at the foot of the chain says _disjunction_ or _conjunction_ in a word, and it is the
+   last thing read before the result.
+3. **A chain that ends in sugar looks unfinished** — which is useful, because a chain that ends in
+   sugar because someone deleted the final rung _is_ unfinished, and nothing else catches that.
+
+Applies to `...`/`AND` identically. Note this composes with the `AndOrDepth` lint rather than
+fighting it: the spelled keyword sits at the same column as the sugar it terminates, and both are
+the same operator, so no mixed-operator warning fires.
+
 ### When the source supplies no label, DECOMPOSE — never inline the sentence
 
 **Ruling (Meng, 2026-08-06).** The ruling below says: keep the statutory item's label, delete the inert

@@ -29,6 +29,8 @@ In most programming languages, the equivalent would be dot notation: `person.age
 
 The Saxon genitive, by contrast, is immediately legible to anyone who reads English. A lawyer reviewing L4 code sees "the contract's buyer's name" and understands it without explanation. This is not a cosmetic choice -- it directly serves the goal of making L4 code reviewable by domain experts who are not programmers.
 
+**The clitic supplies the verb, so the field name should not.** `'s` reads as both "is" and "has": `` transfer's `to the issuer` `` already means _the transfer **is** to the issuer_, and `` person's `age` `` already means _the person **has** an age_. A field named `` `is to the issuer` `` says it twice. Start the name at the complement. This matters beyond neatness, because the field name is what a ladder diagram prints beside its node and what a generated wizard asks the user -- and because statutes do the same thing, letting a chapeau supply the verb for every limb beneath it.
+
 **Technical detail:** The `'s` operator chains naturally, just as it does in English. `company's ceo's name` accesses the `name` field of the `ceo` field of the `company` record. When used as an argument to a function, wrap in parentheses: `f (record's field)`.
 
 For the full syntax specification, see the [Genitive reference](../../reference/syntax/README.md).
@@ -95,6 +97,8 @@ Why does this matter? Because legislation itself uses asyndetic coordination ext
 The nested structure of conjunctions and disjunctions is implicit in the legal text. L4's ellipsis operators let the formalization preserve that same implicit structure, rather than forcing it into a fully explicit form that would look nothing like the original. This is **statutory isomorphism** in practice: the L4 encoding mirrors the structure of the statute it encodes.
 
 The choice of three dots for AND and two dots for OR is a convention: the more common operation (conjunction) gets the longer symbol.
+
+**House style: spell the last connective.** Every rung of a chain but the last takes the sugar; the last takes the keyword — `..` … `..` … `OR`, and `...` … `...` … `AND`. This mirrors English, which coordinates asyndetically and then spells the conjunction before the final item ("(1) X; (2) Y; **or** (3) Z"), and it means a reader learns whether they are looking at a conjunction or a disjunction from a word rather than by counting dots. It also makes a truncated chain visible: one that ends in sugar looks unfinished, and sometimes is.
 
 ---
 
