@@ -85,15 +85,29 @@ attached.
 **And pull the instrument the subject is made under** (added 2026-08-06): the enabling statute for
 a regulation, the parent Act for a statutory instrument — recorded as a document with
 `role: "instrument"`, a value the schema has always carried and nothing had ever asked for. The
-reason is that a subject can diverge from the text that authorises it, and no other stage looks in
-that direction: P2 sweeps forward in time for what has happened to a provision since it was
-printed, never up to the provision's own source of authority. MEASURED 2026-08-06: the Reg CF de
-novo bundle holds three `current` documents (17 CFR 227, 230.501, 270.3a-9) and three
-`corroboration` documents, and **no statute** — so it could not see that § 227.100(a)(2) computes
-the investment limit from "the greater of" annual income or net worth while 15 U.S.C. 77d(a)(6)(B),
-the exemption it implements, says "the lesser of". The committed corpus registers that as
-`F-4A6B-MEASURE`; the de novo run, which read the CFR alone, has no entry for it and could not have
-had one. P4 reads the two texts against each other and opens a fork on the disagreement.
+reason is that **a word in the subject looks compelled until you read the instrument that did not
+compel it**, and no other stage looks in that direction: P2 sweeps forward in time for what has
+happened to a provision since it was printed, never up to the provision's own source of authority.
+
+MEASURED 2026-08-06: the Reg CF de novo bundle holds three `current` documents (17 CFR 227,
+230.501, 270.3a-9) and three `corroboration` documents, and **no statute**. So it encoded
+§ 227.100(a)(2)'s "greater of the investor's annual income or net worth" as simply what the law
+says. Against 15 U.S.C. 77d(a)(6)(B) it is not: the statute says only "a given percentage of the
+annual income or net worth of such investor, as applicable" — **specifying neither measure** — and
+the Commission chose "lesser of" in 2015, held it five years, then reversed in 2021, noting that
+"[t]he statutory language does not expressly provide that the investor use the lesser of" (86 FR
+3496, n.460). The committed corpus reaches the statute, records this as `F-4A6B-MEASURE`, and
+carries both arms live on the rule-version axis (`regcf.l4:405-407`). P4 reads the two texts
+against each other and opens a fork wherever the subject decides something its authority left open.
+
+**Corrected 2026-08-06, same day, before this text had been relied on.** The first version of this
+paragraph asserted that 15 U.S.C. 77d(a)(6)(B) "says 'the lesser of'". It does not; the phrase
+appears nowhere in § 77d. The claim was copied from `F-4A6B-MEASURE`'s own rationale in
+`jl4/examples/legal/regcf/fork-register.json` and sharpened in the copying, without checking either
+the statute or `regcf.l4:394-403`, which had it right ten lines from the encoding. That register
+entry still carries the false form and is corrected in the same change. This is the failure mode
+the user-level `CLAUDE.md` rule 2 names — re-verify a borrowed claim where you copy it, and never
+sharpen it — reproduced by the change that was fixing a different instance of it.
 
 Deliverable: a source bundle with provenance (URL, retrieval date, FR cites) that P3 encodes from
 and P9 cites. Machine-readable format:
@@ -440,10 +454,22 @@ MEASURED 2026-08-06 against the two committed encodings:
 | ladder figures                        |                                 **6** |                              none | that, standing                 | run 1               |
 | wizard façade                         |                         **8 exports** |                              none | that, standing                 | run 1               |
 
-**Run 2's corpus is a strict superset of run 1's.** Every Part 227 section run 1 encodes, run 2
-encodes; run 2 adds eleven more (227.205, .206, .230, .300, .304, .305, .401, .402, .403, .502,
-.504). The superset expectation holds on the encoding axis and fails everywhere else — which is
-the useful form of the result, because it says which artifact the union should be built _from_.
+**Run 2's corpus covers every Part 227 section run 1 cites, plus ten more** (227.205, .206, .300,
+.304, .305, .401, .402, .403, .502, .504), reaching all 22 sections of the fetched part. The
+breadth expectation holds on the coverage axis. It does **not** hold on the temporal axis, and that
+exception is load-bearing: run 1 binds four regime dates and carries the pre-2021 `lesserOf` arm
+live (`regcf.l4:405-407`), where run 2 gives each of its seven constants a single arm over
+`ASSUME 'no encoding of Part 227 exists for rule dates before 2022-09-20'`
+(`regcf-denovo.l4:211`). Taking run 2's corpus outright would therefore discard `F-4A6B-MEASURE`'s
+prior arm — the very fork this section says the union must carry.
+
+**Corrected 2026-08-06, same day.** Two measurement slips in the table above, both caught by the
+cold-run audit rather than by me. The section counts came from a `227\.[0-9]+` regex over each
+corpus, which (a) counted `regcf-denovo.l4:3552`'s typo'd comment header `§ 227.230.501(a)(5)` — a
+mangled § 230.501 — as a section 227.230, inflating run 2 to 23, and (b) counts _cited_ sections,
+not encoded ones, so run 1's 12 includes 227.400/.404, which appear only in comments, and 227.503,
+which is an input boolean. Read the row as citation reach, not encoding depth. The original text
+also called run 2 "a strict superset", which the temporal axis refutes.
 
 **So the answer to "how much can we get from the de novo run" is: the law, and its provenance,
 essentially in full — and almost none of the evidence that any of it works.** Run 2 encodes 2.6×
@@ -454,10 +480,19 @@ fixtures hardcode the very field that distinguishes the readings, so the corpus 
 test data cannot exhibit. It has never been executed through DMN, BPMN, a ladder or the wizard.
 Under Knot 1 ("the execution is the exhibit") that last row is not a nice-to-have.
 
-The union therefore is: **run 2's corpus and deposits, carrying run 1's two missing forks, brought
-up to run 1's assertion density, and put through run 1's projection suite.** What a fresh run must
-supply that _neither_ has: the authorising instrument (now required by §4 P1) and the background
-rules of construction, which no run has ever ingested — see §9.
+The union therefore is: **run 2's corpus and deposits, carrying run 1's two missing forks _and its
+rule-version arms_, brought up to run 1's assertion density, and put through run 1's projection
+suite.** What a fresh run must supply that _neither_ has: the authorising instrument (now required
+by §4 P1) and the background rules of construction, which no run has ever ingested — see §9.
+
+**A fresh run cannot produce this today, and the reason is structural, not prompt quality.**
+`G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p9-report)` (`etc/go/go.sh:97`) — there
+is no assertion stage, no projection leg, and no stage calls §8's diff oracle. `p3-encode` runs
+`l4 check` and nothing else. So every axis this table assigns to run 1 is unreachable at G2 by
+construction, which §6 already names: the missing piece is "the wiring that would point
+`p3-check`, `p6-tests` and the p7 legs at a de novo module rather than at the committed corpus."
+Under R0 ("the execution is the exhibit") the demo's headline artifact is the one G2 cannot
+currently make. That wiring is the first item of work, not the last.
 
 ## 9. Open rulings
 
