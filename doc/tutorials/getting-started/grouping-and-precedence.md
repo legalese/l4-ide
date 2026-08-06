@@ -45,8 +45,24 @@ L4 adds a third mechanism, and makes it the primary one:
         AND `c`
 ```
 
-The deeper block binds first. You can check that these really differ rather than taking it on
-trust — with `a` true and `b`, `c` false, the first is FALSE and the second is TRUE:
+The deeper block binds first. And because a ladder diagram is a projection of the same tree, the
+difference is visible before you evaluate anything — the first is a parallel pair feeding a series
+element, the second is one branch against a two-element series:
+
+```
+(a OR b) AND c                     a OR (b AND c)
+
+      ┌────┐                                ┌────┐
+   ┌──┤ a  ├──┐                     ┌───────┤ a  ├──────┐
+   │  └────┘  │   ┌────┐            │       └────┘      │
+●──┤          ├───┤ c  ├──●      ●──┤                   ├──●
+   │  ┌────┐  │   └────┘            │  ┌────┐   ┌────┐  │
+   └──┤ b  ├──┘                     └──┤ b  ├───┤ c  ├──┘
+      └────┘                            └────┘   └────┘
+```
+
+You can check that they really differ rather than taking it on trust — with `a` true and `b`, `c`
+false, the first is FALSE and the second is TRUE:
 
 ```l4
 #EVAL `left grouped`  TRUE FALSE FALSE   -- FALSE
@@ -173,6 +189,8 @@ evaluates to the identity of whichever operator holds it (FALSE under OR, TRUE u
 cannot change the result either way. What it changes is the _reviewability_: the operators no longer
 tie.
 
+![Chew, as a ladder](figures/grouping-chew.svg)
+
 There is no third option where the file compiles clean and the question stays open. **The comma
 became a choice you can see.**
 
@@ -202,7 +220,11 @@ identical until you count:
     ..  "or distribution"        ... `distributes the goods`
 ```
 
-**The lesson that generalises:** a name is read as a label, not as a proposition. If you put a
+![Oakhurst, one activity](figures/grouping-oakhurst-one.svg)
+
+![Oakhurst, two activities](figures/grouping-oakhurst-two.svg)
+
+One leaf against two. **The lesson that generalises:** a name is read as a label, not as a proposition. If you put a
 disjunction inside a field name, nobody audits it — not your reviewer, not your diagram, not your
 wizard. Lift the disjuncts out and let the scaffolding carry the words. Maine later amended the
 statute to use semicolons; the encoding would have forced the question on day one.
@@ -235,6 +257,10 @@ The two readings, again as depth:
         ..  "and thereafter for successive terms"   ... `a renewal term is running`
     ... NOT `one year notice has been given`
 ```
+
+![Rogers, notice binds renewals only](figures/grouping-rogers-renewals.svg)
+
+![Rogers, notice binds both](figures/grouping-rogers-both.svg)
 
 **Rogers is the case that argues for this whole approach**, and it does so from the bench rather
 than from a manifesto. What resolved it was a _second, parallel, authoritative text_ that could not
@@ -282,6 +308,15 @@ in the part nobody looks at. Rain fell, the floods came, the winds blew and beat
 5. **Check the other language version, if there is one.** Rogers turned on it. Bilingual
    jurisdictions ship a second authoritative text for free, and it is a natural experiment in
    whether your reading is forced or merely available.
+
+---
+
+## The source, and the figures
+
+Every snippet above lives in [`grouping-and-precedence.l4`](grouping-and-precedence.l4) beside this
+page, with `#EVAL` directives asserting each result — so the page cannot drift from code that
+compiles. The ladder figures are **generated from that file through the LSP**
+(`ts-shared/ladder-svg/demo/grouping.ts`); no label in them was retyped, so none can drift either.
 
 ---
 

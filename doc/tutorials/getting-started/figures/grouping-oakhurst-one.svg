@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="606" height="185" viewBox="0 0 606 185">
+<rect width="606" height="185" fill="#ffffff"/>
+<text x="200.4" y="86.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">packing for shipment</text>
+<text x="200.4" y="106.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">or distribution</text>
+<rect data-fnid="4" data-value="4" class="lad-box lad-clickable" x="334.8" y="72.8" width="161.3" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="4" x="415.4" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`packs the goods`</text>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="290.8,92.6 334.8,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="110.0,92.6 290.8,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,92.6 110.0,92.6" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="92.6" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="496.1,92.6 536.1,92.6" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="536.1" cy="92.6" r="3.5" fill="#222"/>
+</svg>
