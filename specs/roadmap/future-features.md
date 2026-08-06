@@ -1,10 +1,27 @@
 > **Status (audited 2026-07-03):** roadmap reviewed — 1 of 7 items now implemented (plus 1 partial); see per-item annotations.
 >
-> Since this list was written, **regulative rules** (syntax + semantics) shipped: `Regulative`/`Deonton`/`DMust`/`DMustNot` in `jl4-core/src/L4/Syntax.hs` and evaluation in `jl4-core/src/L4/EvaluateLazy/Machine.hs` + `ContractFrame.hs`. **Ellipsis linting** is partially scaffolded (`jl4-core/src/L4/Lint/AndOrDepth.hs`) but is not ellipsis-specific and not yet wired into diagnostics. Remaining items (three-caret repeat, bounded deontics + reasoner backends, web-app generation, set UNION/INTERSECT, WHEN-free CONSIDER branches) are still open. Note: some referenced spec paths use a stale `dev/specs/todo/` prefix — the asyndetic spec is now in `specs/done/`.
+> Since this list was written, **regulative rules** (syntax + semantics) shipped: `Regulative`/`Deonton`/`DMust`/`DMustNot` in `jl4-core/src/L4/Syntax.hs` and evaluation in `jl4-core/src/L4/EvaluateLazy/Machine.hs` + `ContractFrame.hs`. **Ellipsis linting** is partially scaffolded (`jl4-core/src/L4/Lint/AndOrDepth.hs`) and is not ellipsis-specific. It **is** wired into diagnostics, contrary to what this line said until 2026-08-06: a mixed `AND`/`OR` at one indentation emits `DiagnosticSeverity_Warning` — "AND and OR operators appear at the same indentation level (column N)" — and it sees through the `...`/`..` sugar (MEASURED). What remains open is its coverage; see the single-line item below. Remaining items (three-caret repeat, bounded deontics + reasoner backends, web-app generation, set UNION/INTERSECT, WHEN-free CONSIDER branches) are still open. Note: some referenced spec paths use a stale `dev/specs/todo/` prefix — the asyndetic spec is now in `specs/done/`.
 
 # Future Features
 
 **Ellipsis linting**: LSP diagnostics to warn when ellipsis forms appear adjacent to mismatched operators (e.g., `...` near OR, `..` near AND). See [spec](../done/ASYNDETIC-DISJUNCTION-SPEC.md).
+
+**Warn on single-line unparenthesized mixed `AND`/`OR`** (Meng, 2026-08-06). `AndOrDepth.hs` warns
+when the two operators tie at one _indentation column_, but says nothing when the whole formula sits
+on **one line** with no parentheses — where there is no layout signal at all and the grouping falls
+to the precedence table. MEASURED 2026-08-06: `DECIDE \`one line\` IF \`a\` OR \`b\` AND \`c\``compiles with **no diagnostic** and evaluates as`a OR (b AND c)` (`TRUE FALSE FALSE`→ TRUE, versus
+FALSE for the parenthesized`(a OR b) AND c`).
+
+The coverage is inverted with respect to risk. The one-line form is the one that most resembles the
+statute it came from — a single flowing clause, no visual structure — and it is decided by a table a
+legal reviewer has never read. The warning fires where the author was being _more_ explicit and stays
+silent where they were being _least_.
+
+Open questions before building it: whether to warn always or only in some statutory/strict mode (a
+bare warning on every one-liner would be noise in ordinary code); whether parentheses should silence
+it, which they arguably should since they are then an explicit choice; and whether this belongs in
+`AndOrDepth.hs` or beside it, since the existing check is about columns and this one is about their
+absence. Occasioned by [Grouping and Precedence](../../doc/tutorials/getting-started/grouping-and-precedence.md).
 
 Three carets together will mean "repeat everything above to the end of the line".
 
