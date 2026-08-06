@@ -412,6 +412,53 @@ are judgements: the script emits the table with every row `UNTRIAGED` and never 
 Its largest blind spot is stated there and repeated in every report it writes: the battery
 exercises decisions, so a divergence confined to the deontic layer would not appear.
 
+### 8.1 The union target — what best-of-both-worlds contains (added 2026-08-06)
+
+§8 above treats the committed corpus as the reference and the de novo run as the challenger. Two
+Reg CF runs now exist, and that framing does not survive contact with them: **each found things the
+other could not**, so neither is the reference and "the diff" is not the goal. The goal is the
+union, and a fresh run doing the right thing is one that produces it without either run's history
+to lean on.
+
+MEASURED 2026-08-06 against the two committed encodings:
+
+| axis                                  |             run 1 — replay `regcf.l4` | run 2 — de novo `regcf-denovo.l4` | union target                   | supplied by         |
+| ------------------------------------- | ------------------------------------: | --------------------------------: | ------------------------------ | ------------------- |
+| Part 227 sections encoded             |                                    12 |                            **23** | 23                             | run 2, outright     |
+| decisions (`GIVETH`/`DECIDE`/`MEANS`) |                                   187 |                           **485** | 485                            | run 2               |
+| `@ref` citations                      |                                    70 |                           **245** | 245                            | run 2               |
+| authority reached beyond Part 227     |          statute + 230.501 + 270.3a-9 |                230.501 + 270.3a-9 | + statute + construction rules | neither, fully      |
+| forks registered                      |                                     3 |                            **26** | 28                             | run 2 + run 1's two |
+| forks with a measured witness         |                            **3 of 3** |                          12 of 26 | all                            | run 1's discipline  |
+| forks whose divergence is unassessed  |                                 **0** |                                 9 | 0                              | run 1's discipline  |
+| `#ASSERT`                             |                                **74** |                                40 | ≥ 190 at run 1's density       | run 1               |
+| assertions per decision               |                              **0.40** |                              0.08 | 0.40                           | run 1 — a 5× gap    |
+| source bundle with provenance         |                                  none |                   **6 documents** | 6 + an `instrument`            | run 2               |
+| external-modification sweep           |                                  none |       **11 searches, 14 entries** | that, standing                 | run 2               |
+| DMN                                   | **69 decisions, 12 tables, 21 cases** |                              none | that, standing                 | run 1               |
+| BPMN                                  |                       **3 processes** |                              none | that, standing                 | run 1               |
+| ladder figures                        |                                 **6** |                              none | that, standing                 | run 1               |
+| wizard façade                         |                         **8 exports** |                              none | that, standing                 | run 1               |
+
+**Run 2's corpus is a strict superset of run 1's.** Every Part 227 section run 1 encodes, run 2
+encodes; run 2 adds eleven more (227.205, .206, .230, .300, .304, .305, .401, .402, .403, .502,
+.504). The superset expectation holds on the encoding axis and fails everywhere else — which is
+the useful form of the result, because it says which artifact the union should be built _from_.
+
+**So the answer to "how much can we get from the de novo run" is: the law, and its provenance,
+essentially in full — and almost none of the evidence that any of it works.** Run 2 encodes 2.6×
+the decisions on 2.8× the lines and commits _fewer_ assertions than run 1 in absolute terms (40 vs
+74), a five-fold drop in density. Nine of its 26 forks record `divergence: unassessed` — nobody
+ever measured whether the two readings differ — and four more have witnesses whose committed
+fixtures hardcode the very field that distinguishes the readings, so the corpus holds forks its own
+test data cannot exhibit. It has never been executed through DMN, BPMN, a ladder or the wizard.
+Under Knot 1 ("the execution is the exhibit") that last row is not a nice-to-have.
+
+The union therefore is: **run 2's corpus and deposits, carrying run 1's two missing forks, brought
+up to run 1's assertion density, and put through run 1's projection suite.** What a fresh run must
+supply that _neither_ has: the authorising instrument (now required by §4 P1) and the background
+rules of construction, which no run has ever ingested — see §9.
+
 ## 9. Open rulings
 
 R-numbers are scoped to this document (house precedent: the DMN spec has its own R-series, the
