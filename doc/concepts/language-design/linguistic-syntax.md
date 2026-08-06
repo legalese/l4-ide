@@ -118,6 +118,35 @@ The practical effect is significant: L4 code can include the connecting tissue o
 
 Inert elements are distinguished from active boolean conditions by their quoting style. Backtick identifiers like `` `deliver` `` are resolved to boolean variables. Double-quoted strings like `"of any property to any person"` are treated as inert scaffolding.
 
+### Scaffolding is structure, not decoration
+
+It is tempting to read inert strings as comments that happen to live inside the expression. They are not: they are **nodes in the tree**, and where they sit changes what the rule says even when it cannot change what the rule computes.
+
+The clearest case is a disjunction. `OR` is associative, so every bracketing of `a OR b OR c` has the same truth value on the same facts — from which it is easy to conclude, wrongly, that indentation cannot express a choice between readings. But an inert string participating in the surrounding `AND` **scopes** whichever disjuncts fall inside its group. Consider a rule about transfers made "in connection with the death or divorce of the purchaser or other similar circumstance":
+
+```l4
+-- The catch-all is a PEER of the group: "of the purchaser" does NOT scope it.
+    ..  "in connection with" ...    "the" ... `death`
+                                          OR `divorce`
+                                      ... "of the purchaser"
+                            OR  `other similar circumstance`
+
+-- The catch-all is INSIDE the group: "of the purchaser" DOES scope it.
+    ..  "in connection with" ...    "the" ... `death`
+                                          OR `divorce`
+                                          OR `other similar circumstance`
+                                      ... "of the purchaser"
+```
+
+These evaluate identically. They are different law: one asks whether _some_ similar circumstance occurred, the other whether one occurred _to the purchaser_. In the source text the difference is carried by a comma that isn't there — the drafter wrote four `or`s and left their precedence to the reader. Here the choice is mandatory and visible, which is the same lesson as _Chew v The Queen_ elsewhere in this document: **punctuation is a false friend; layout is not.**
+
+Two consequences worth naming:
+
+- **Indentation resolves anaphora.** "other _similar_ circumstance" — similar to what? Placing the leaf as a peer of a group makes that group its referent. No punctuation can express that, and the source does not.
+- **The path is the qualifier.** A leaf named `` `death` `` reads out, along the inert strings from the root, as "in connection with / the / death / of the purchaser" — the isomorphic sentence, _assembled_ from the structure rather than stored in the identifier. So leaf names stay short and the scaffolding qualifies them.
+
+The corollary is a drafting rule: never put a sentence in a field name. A name is read as a label, not as a proposition, so disjuncts hidden inside one are readings nobody audits. Lift them out and let the scaffolding carry the words.
+
 ---
 
 ## Backtick Identifiers

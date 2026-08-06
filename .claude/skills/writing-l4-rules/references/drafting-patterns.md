@@ -557,6 +557,108 @@ operative outcome** (no `DECIDE`/deontic). Keeps the corpus gap-free and auditab
 #EVAL `former Ground 3 text (REPEALED)`
 ```
 
+### When the source supplies no label, DECOMPOSE — never inline the sentence
+
+**Ruling (Meng, 2026-08-06).** The ruling below says: keep the statutory item's label, delete the inert
+string that restates the node. It is silent on what to do when **the source numbers a limb but does not
+sub-number what is inside it** — and the silence was filled the worst possible way.
+
+17 CFR 227.501(a)(4) is one numbered exception containing four disjuncts, comma-separated, that the CFR
+does not label. The corpus encoded it as **one BOOLEAN whose name is the whole ~300-character sentence**:
+
+```l4
+-- WRONG. The device, used backwards.
+`to a member of the family of the purchaser or the equivalent, to a trust controlled by the
+ purchaser, to a trust created for the benefit of a member of the family of the purchaser or
+ the equivalent, or in connection with the death or divorce of the purchaser or other similar
+ circumstance` IS A BOOLEAN
+```
+
+This is inert style **inverted**: the verbatim prose is in the _operative atom_ and there is no inert
+scaffolding at all. Everything the device exists to do is defeated. Measured consequences, one cause and
+three consumers:
+
+| consumer     | symptom                                                                                       |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| ladder SVG   | `viewBox="0 0 2751 440"` — one leaf ~2000 units wide, the other three tiny                    |
+| `.sentences` | "4 ways this can be satisfied", then 300 characters without a break                           |
+| wizard       | one question a user cannot answer, and its paraphrase silently dropped the catch-all entirely |
+
+**A field name is a label; a reader does not read it as a proposition.** Four disjuncts hidden inside one
+are four forks nobody audits — which is why neither the corpus's fork register nor the independent de novo
+pass has an entry here, on the most open-textured phrase in the rule. **Decomposition is detection.** That
+is the argument for it, ahead of any diagram getting narrower.
+
+The repair: lift each disjunct to its own short atom and let the **scaffolding** carry the statutory words.
+Every leaf gets shorter, because the prose leaves the names.
+
+#### Layout expresses scope even where the operator is associative
+
+The tempting mistake — made and corrected in the session that produced this ruling — is: "`OR` is
+associative, so every bracketing has the same truth value, so indentation cannot express the choice."
+
+**False, because inert strings are nodes.** `"of the purchaser"` is not commentary; it is an operand in the
+`AND` group, and _which disjuncts fall inside the group it conjoins with_ is exactly what indentation
+places. The two readings of the catch-all differ by one line's depth:
+
+```l4
+-- The catch-all is a PEER of "the death or divorce of the purchaser":
+--   "of the purchaser" does NOT scope it.
+    ..  "in connection with" ...    "the" ... `death`
+                                          OR `divorce`
+                                      ... "of the purchaser"
+                            OR  `other similar circumstance`
+
+-- The catch-all is INSIDE that group: "of the purchaser" DOES scope it.
+    ..  "in connection with" ...    "the" ... `death`
+                                          OR `divorce`
+                                          OR `other similar circumstance`
+                                      ... "of the purchaser"
+```
+
+Same truth value on the same facts; different law. **Scaffolding is structure — treat an inert string's
+depth as load-bearing, never as decoration.**
+
+Two things fall out that punctuation cannot do:
+
+1. **Indentation resolves anaphora.** "other **similar** circumstance" — similar to _what_? Placing it as a
+   peer of a group makes that group the referent, visibly. The source text does not answer this.
+2. **The path is the qualifier.** A leaf named `death` reads out, along the inert strings from root, as
+   "in connection with / the / death / of the purchaser" — the isomorphic sentence, assembled rather than
+   stored. So keep leaf names short and let the path qualify them. Alpha-conversion (surfaced to the user
+   as an index) is the **fallback for leaves with identical paths** — which means the source genuinely
+   repeats itself, and the reader should see the index precisely there.
+
+#### Sorts and cardinality are evidence about bracketing
+
+A formalizer has evidence a close reader does not. Use it, and record it as evidence rather than as proof:
+
+- **Sort.** `death` is an unagentive _event_; `divorce` an event or act; `circumstance` is a _state_.
+  Coordinating a state with two events at one level is a type error, which argues the catch-all sits one
+  level up. **Caveat both ways:** natural language coerces nominals to events routinely, and a sort clash
+  is equally readable as _the drafting defect itself_ rather than as a clue to the parse.
+- **Cardinality, and the determiner that gives it away.** "**the** death or divorce of the purchaser"
+  shares one determiner across a _functional_ term (death: at most one, and terminal) and a _relational_
+  one (divorce: a purchaser may marry and divorce twice inside a one-year window). The definite article is
+  licensed by the first and not the second — so `"the"` should conjoin with `death` alone, which is again
+  a pure indentation change. Downstream this is not cosmetic: the wizard must ask about **a** divorce, not
+  **the** divorce.
+- **Splitting can change the answer to a different question.** Death is terminal, so the transferor is
+  necessarily not the purchaser; divorce leaves the purchaser alive to transfer their own securities. Two
+  disjuncts under one number, giving opposite answers to a separate fork — an independent reason to split
+  them that owes nothing to legibility.
+
+#### Do NOT decompose a term the source defines
+
+Decomposition is not always right. "a member of the family of the purchaser or the equivalent" has a
+syntactic ambiguity (does "or the equivalent" attach to "the purchaser" or to "member of the family"?) and
+**§ 227.501(c) defines the entire string as a term of art**. Splitting it would fabricate structure the
+regulator explicitly overrode by definition. It stays one atom; what is missing is not decomposition but
+the definition, which the corpus does not encode at all.
+
+**Test:** if the source defines the span, it is one atom regardless of how many `or`s are inside it. If the
+source merely runs disjuncts together without defining them, decompose.
+
 ### Inert never shadows active — quote the label, not the sentence
 
 **Ruling (Meng, 2026-08-03), applied to the Reg CF, BNA and Jersey charities corpora.** An inert string
