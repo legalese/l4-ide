@@ -1,0 +1,113 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regcf-denovo.l4:3337:1-101:
+  assertion satisfied
+regcf-denovo.l4:3341:1-112:
+  assertion satisfied
+regcf-denovo.l4:3344:1-107:
+  assertion satisfied
+regcf-denovo.l4:3348:1-119:
+  assertion satisfied
+regcf-denovo.l4:3355:1-104:
+  assertion satisfied
+regcf-denovo.l4:3356:1-102:
+  assertion satisfied
+regcf-denovo.l4:3357:1-89:
+  100000
+regcf-denovo.l4:3358:1-89:
+  2500
+regcf-denovo.l4:3374:1-136:
+  assertion satisfied
+regcf-denovo.l4:3375:1-178:
+  assertion satisfied
+regcf-denovo.l4:3379:1-172:
+  assertion satisfied
+regcf-denovo.l4:3391:1-208:
+  assertion satisfied
+regcf-denovo.l4:3392:1-202:
+  assertion satisfied
+regcf-denovo.l4:3399:1-201:
+  assertion satisfied
+regcf-denovo.l4:3400:1-196:
+  assertion satisfied
+regcf-denovo.l4:3403:1-199:
+  assertion satisfied
+regcf-denovo.l4:3407:1-91:
+  assertion satisfied
+regcf-denovo.l4:3408:1-90:
+  assertion satisfied
+regcf-denovo.l4:3409:1-91:
+  assertion satisfied
+regcf-denovo.l4:3412:1-91:
+  assertion satisfied
+regcf-denovo.l4:3413:1-92:
+  assertion satisfied
+regcf-denovo.l4:3425:1-91:
+  assertion satisfied
+regcf-denovo.l4:3428:1-94:
+  assertion satisfied
+regcf-denovo.l4:3430:1-90:
+  assertion satisfied
+regcf-denovo.l4:3433:1-95:
+  assertion satisfied
+regcf-denovo.l4:3444:1-112:
+  assertion satisfied
+regcf-denovo.l4:3448:1-119:
+  assertion satisfied
+regcf-denovo.l4:3492:1-134:
+  assertion satisfied
+regcf-denovo.l4:3494:1-135:
+  assertion satisfied
+regcf-denovo.l4:3498:1-102:
+  assertion satisfied
+regcf-denovo.l4:3499:1-93:
+  5
+regcf-denovo.l4:3520:1-82:
+  assertion satisfied
+regcf-denovo.l4:3521:1-85:
+  assertion satisfied
+regcf-denovo.l4:3522:1-85:
+  assertion satisfied
+regcf-denovo.l4:3526:1-152:
+  assertion satisfied
+regcf-denovo.l4:3531:1-109:
+  assertion satisfied
+regcf-denovo.l4:3541:1-152:
+  assertion satisfied
+regcf-denovo.l4:3548:1-107:
+  assertion satisfied
+regcf-denovo.l4:3549:1-127:
+  assertion satisfied
+regcf-denovo.l4:3550:1-112:
+  assertion satisfied
+regcf-denovo.l4:3585:1-64:
+  assertion satisfied
+regcf-denovo.l4:3586:1-67:
+  assertion satisfied
+regcf-denovo.l4:3587:1-49:
+  900000
+regcf-denovo.l4:3633:1-3635:77:
+  FULFILLED
+regcf-denovo.l4:3640:1-3641:97:
+  PARTY `the investor`
+  MUST `reconfirm the investment commitment` PROVIDED commitment's `reconfirmed within five business days of receipt of the notice`
+  WITHIN `five business days`
+  HENCE FULFILLED
+  LEST PARTY `the intermediary`
+  MUST `give or send the investor notice of the cancellation and the refund amount`
+  WITHIN `five business days`
+  HENCE PARTY `the intermediary`
+  MUST `direct the refund of investor funds`
+  WITHIN `five business days`
+  HENCE FULFILLED
+  LEST BREACH BY `the intermediary` BECAUSE "§ 227.304(c)(1)(ii): the refund of investor funds was not directed within five business days of the failure to reconfirm"
+  LEST BREACH BY `the intermediary` BECAUSE "§ 227.304(c)(1)(i): the investor was not notified of the cancellation, its reason and the refund amount within five business days of the failure to reconfirm"
+regcf-denovo.l4:3643:1-76:
+  TRUE
+regcf-denovo.l4:3644:1-103:
+  `financial statements reviewed by a public accountant that is independent of the issuer`
+regcf-denovo.l4:3645:1-99:
+  `financial statements audited by a public accountant that is independent of the issuer`
+regcf-denovo.l4:3646:1-161:
+  500000
