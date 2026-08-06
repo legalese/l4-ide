@@ -139,10 +139,33 @@ else
   WIRE_SAYS="the subject declares no DMN golden, so the businessRuleTask references were resolved against nothing"
 fi
 
+# --- 6. the picture ----------------------------------------------------------
+# `pictures.md` promises "a process diagram shows the same duty as a workflow",
+# and until now the section printed the fidelity table and no diagram. The DI
+# in each emitted file carries every coordinate, so this is a transform, not a
+# layout engine — see the header of etc/bpmn-to-svg.mjs for why it is not
+# bpmn-js. A render failure is a FINDING, not a warning: the renderer throws on
+# any element outside the exporter's closed vocabulary, and that throw is how a
+# newly-added node kind announces itself instead of silently vanishing from a
+# legal diagram.
+SVG_RC=0
+declare -a SVGS=()
+for f in "${FILES[@]}"; do
+  svg="${f%.bpmn}.svg"
+  if node "$GO_ROOT/etc/bpmn-to-svg.mjs" "$f" "$svg" >>"$LOG" 2>&1; then
+    SVGS+=("$svg")
+  else
+    SVG_RC=1
+    echo "bpmn-to-svg → FAILED on $(basename "$f")" | tee -a "$LOG"
+  fi
+done
+echo "bpmn-to-svg → ${#SVGS[@]}/${#FILES[@]} rendered, exit $SVG_RC" | tee -a "$LOG"
+
 ARTS=()
 for f in "${FILES[@]}"; do
   ARTS+=(--artifact "$f")
   [[ -f "${f%.bpmn}.fidelity.txt" ]] && ARTS+=(--artifact "${f%.bpmn}.fidelity.txt")
+  [[ -f "${f%.bpmn}.svg" ]] && ARTS+=(--artifact "${f%.bpmn}.svg")
 done
 ARTS+=(--artifact "$LOG")
 
@@ -150,6 +173,16 @@ RULE_METRIC="$(
   IFS=';'
   echo "${RULES[*]}"
 )"
+
+# Ordered after RULE_METRIC deliberately: every receipt below cites it, and an
+# unset metric would be reported as an empty rule list rather than as an error.
+if [[ $SVG_RC -ne 0 ]]; then
+  go_receipt --status DEGRADED \
+    --reason "$((${#FILES[@]} - ${#SVGS[@]})) of ${#FILES[@]} emitted processes could not be rendered to SVG. etc/bpmn-to-svg.mjs covers exactly the closed vocabulary L4.Bpmn.IR emits and throws on anything else, so this is how a new node kind reports itself rather than disappearing from a legal diagram. See $LOG for the element it refused." \
+    "${ARTS[@]}" --metric "processes=${#FILES[@]}" --metric "rules=$RULE_METRIC" \
+    --metric "svg_exit=$SVG_RC"
+  exit "$GO_EXIT_FINDING"
+fi
 
 if [[ $DIFFS -gt 0 ]]; then
   go_receipt --status DEGRADED \
@@ -191,5 +224,7 @@ go_receipt --status PASS \
   --metric "soundness_exit=$SOUND_RC" --metric "interchange_exit=$VALID_RC" \
   --metric "dmn_wiring_exit=$WIRE_RC" \
   --metric "rules=$RULE_METRIC" \
+  --metric "svg_exit=$SVG_RC" \
+  --note "each process is also rendered to a standalone SVG from its own diagram interchange, so the explainer's process subsection can show the duty rather than only describe it. The renderer is a coordinate transform, not a layout engine, and it throws on any element outside the exporter's vocabulary" \
   --note "engine execution of the process is a declared non-goal (R0): the process runs on the parties" \
   --note "the jBPM baseline comparator (etc/check-bpmn-kie-baseline.mjs) is NOT this leg's oracle: its baseline covers the whole committed BPMN corpus, so a three-file run reports the other three as NOT CHECKED and exits 1. Measured 2026-08-02."

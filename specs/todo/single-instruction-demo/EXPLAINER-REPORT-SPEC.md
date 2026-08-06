@@ -1196,6 +1196,12 @@ from the `p7-dmn` receipt's metrics. None is typed.
 
 ### 8.4 E14 — the BPMN/DMN diagram-interchange serializer is deferred to v1
 
+> **BPMN HALF DISCHARGED 2026-08-06, see §8.4.1.** The BPMN serializer is built
+> (`etc/bpmn-to-svg.mjs`), wired into `p7-bpmn`, and its output is inlined by `bpmnSubsection()`
+> on the same terms as the ladder figures. **The DMN DRG half of this ruling remains deferred and
+> is unchanged.** The text below is retained because it records why the deferral was right at the
+> time and because §13's E19 cites it.
+
 #### The measurement that makes it feasible
 
 Both exporters already emit full diagram interchange: `regcf-corpus.dmn` carries 198 `DMNShape` and
@@ -1224,6 +1230,68 @@ gain in the property being proved.
 Not "coming soon". The subsection renders the fidelity material and a stated absence with its
 reason — the same shape as every other ABSENT in this design. §13 tracks E19: whether the serializer
 belongs here or in `l4 export`, where every consumer would get it.
+
+### 8.4.1 E14-BPMN — ANSWERED 2026-08-06: build it, and light-only like the ladders
+
+#### What was measured before deciding
+
+The build-vs-buy question was settled against `bpmn-js`, the reference renderer, on evidence rather
+than preference **[M, 2026-08-06]**:
+
+| question                                    | answer                                                                                                                                                                                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Is there a headless route to `bpmn-js`?     | Only via Chromium. Camunda Modeler 5.49.0 has **no** CLI export — `--help`/`--version` are swallowed as feature flags and the GUI launches. `bpmn-to-image`'s SVG normalises to the same digest as driving puppeteer directly. |
+| Is its output reproducible across machines? | **No.** Its geometry comes from real font metrics: 14 `<tspan>` under Arial, 15 under Times, 19 under Courier — a metrically different fallback re-wraps the labels, not just shifts them.                                     |
+| Can its output be themed?                   | No — the palette is baked in as inline `style` attributes. Moot under the ruling below, but recorded.                                                                                                                          |
+| Does §8.2's objection carry over?           | **No, and this is the deciding fact.** §8.2 rejected a DOT serializer because "DOT carries no coordinates, so writing a serializer would mean writing a layout engine". The BPMN DI carries every coordinate.                  |
+| Does ruling E9 permit a runtime renderer?   | **No.** `explainer.md` references each figure by path and `explainer.html` inlines the same bytes. A picture that exists only after a JS engine runs has no bytes to reference.                                                |
+
+E14 above estimated "on the order of two hundred lines of pure node with zero dependencies". The
+built renderer is **524 lines, 352 of them code** (the balance is comment), **zero dependencies**,
+and renders **12/12** `.bpmn` files in the repo **byte-deterministically** — each rendered twice to
+equal sha256 **[M]**. The estimate was right about the order of magnitude and about the
+dependencies.
+
+#### The ruling
+
+1. **Build it, do not buy it.** `etc/bpmn-to-svg.mjs`. It covers the closed vocabulary
+   `L4.Bpmn.IR` emits and **throws** on anything else; `p7-bpmn` turns that throw into a DEGRADED
+   receipt. This is deliberate: a new node kind must announce itself, because a legal diagram that
+   is silently missing an element is worse than no diagram — the reader cannot tell anything is
+   absent.
+2. **`bpmn-js` is retained as a dev-time conformance oracle, not a pipeline phase.** It is the
+   reference, and a hand-written transform is an unattested transcription without one. Concretely:
+   the emitted DI omits `isMarkerVisible` entirely (zero occurrences corpus-wide **[M]**), so the
+   exclusive gateway draws as a bare unmarked diamond — and that is known to be _correct_ rather
+   than a defect only because `bpmn-js` does the same.
+3. **Light-theme only, on an opaque white ground — the same rule §8.1-1 already applies to the
+   ladders.** RULED by Meng 2026-08-06: **these figures may go to print.** A diagram that inverts
+   under a reader's theme is a different picture from the one that was attested, and the attestation
+   is over bytes, not over an appearance. The renderer therefore emits an opaque full-bleed
+   `<rect … fill="#ffffff"/>` and hard-codes its ink. As with the ladders, the remedy in dark mode
+   is to keep the **figure card** light, never to strip the rect.
+4. **Zero `id` attributes, no `<style>` element, no classes.** Both are inlining hazards rather
+   than aesthetics. An `<svg>` is not an identifier scope, so a shared `id` collides across the
+   figures sharing `explainer.html` — the hazard `namespaceIds()` exists to fix for the GraphViz
+   pictures. A `<style>` block is likewise unscoped, so a selector such as `.lbl` would match the
+   host document. Avoiding both is what lets these figures be inlined byte for byte on the ladders'
+   terms instead of being rewritten on the way in.
+
+#### What review changed
+
+Two claims made while deciding this were **wrong and were corrected before landing**; they are
+recorded so nobody restores them:
+
+- _"bpmn-js output breaks on a Linux runner without Arial."_ **Overstated.** Naming an absent font
+  changes nothing — the stack falls back to a metric-compatible face. Only a metrically _different_
+  face re-wraps. The risk is real but conditional on the CI image's font package, and it is **not**
+  the decisive argument; items 1, 4 and E9 are.
+- _"Theming is decisive."_ **It is not**, because ruling 3 above makes both renderers light-only.
+  It was cited as decisive before §8.1-1 was re-read.
+
+Still open, and deliberately not guessed at: what a real Linux CI image resolves `Arial,
+sans-serif` to. No container runtime exists on the machine that measured this. It is answerable in
+one command the day one does, and it bears only on the rejected option.
 
 ### 8.5 One more carrier, with a caveat
 

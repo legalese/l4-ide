@@ -801,9 +801,72 @@ function bpmnSubsection() {
       "",
     );
   }
-  out.push(
-    "No process picture is inlined. Both exporters emit full diagram interchange — the coordinates are already computed — so drawing them needs a serializer rather than a layout engine, and that serializer is not built. This paragraph is the absence, stated with its reason, rather than a promise.",
+  // The pictures. Until 2026-08-06 this slot held a paragraph explaining that
+  // no process picture was inlined "because that serializer is not built". It
+  // is built now — `etc/bpmn-to-svg.mjs`, a coordinate transform over the
+  // diagram interchange each emitted file already carries. Same terms as the
+  // ladder figures above: read from the run directory, hash-checked against the
+  // receipt, and inlined byte for byte.
+  const pics = (r.artifacts ?? []).filter(
+    (a) => !a.absent && (a.path ?? "").endsWith(".svg"),
   );
+  if (!pics.length) {
+    out.push(
+      absent(
+        "Each emitted process is also rendered to a diagram.",
+        "This run's `p7-bpmn` receipt attests no `.svg` artifact, so no process picture is inlined.",
+      ),
+      "",
+    );
+    return out.join("\n");
+  }
+  out.push(
+    `Each process below is drawn from its own diagram interchange — the \`<bpmndi:BPMNShape>\` bounds and \`<di:waypoint>\` coordinates inside the emitted file, not a layout computed here. Nothing about the picture is a second opinion on the process: it is the same bytes, read geometrically.`,
+    "",
+  );
+  for (const a of pics) {
+    const slug = basename(a.path).replace(/\.svg$/, "");
+    const key = `bpmn-${slug}`;
+    const p = isAbsolute(a.path) ? a.path : resolve(rundir, a.path);
+    let svg;
+    try {
+      svg = readFileSync(p, "utf8");
+    } catch {
+      out.push(
+        absent(
+          `The process diagram \`${basename(a.path)}\` is named by the \`p7-bpmn\` receipt.`,
+          "It is not readable from this run directory.",
+        ),
+        "",
+      );
+      continue;
+    }
+    if (sha256File(p) !== a.sha256) {
+      findings.push({
+        kind: "artifact-changed",
+        file: basename(a.path),
+        detail: "the process diagram no longer hashes as its receipt recorded",
+      });
+      out.push(
+        `**ARTIFACT CHANGED.** \`${basename(a.path)}\` no longer hashes as the \`p7-bpmn\` receipt recorded it, so it is not inlined here.`,
+        "",
+      );
+      continue;
+    }
+    const { w, h } = svgViewport(svg);
+    const caption =
+      `\`${slug}\` — the duty as a workflow. Scene ${w} × ${h}, measured off the file at render time. ` +
+      `Read it with the \`F1\` row above in hand: a prohibition has no shape in this notation, so where the diagram shows a task, the rule may forbid it.`;
+    rawBlocks[key] =
+      `<figure class="fig${Number(w) > 1400 ? " wide" : ""}"><div class="scroll">${svg}</div>` +
+      `<figcaption>${mdToHtml(caption).replace(/^<p>|<\/p>$/g, "")}</figcaption></figure>`;
+    mdBlocks[key] = [
+      `*Process diagram \`${slug}\` — drawn in \`explainer.html\`. The source SVG is \`${basename(a.path)}\`, and the BPMN it was drawn from is \`${slug}.bpmn\`, both under this run's \`artifacts/\`.*`,
+      "",
+      `*${caption}*`,
+    ].join("\n");
+    out.push(rawToken(key), "");
+  }
   return out.join("\n");
 }
 
