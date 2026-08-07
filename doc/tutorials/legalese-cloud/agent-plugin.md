@@ -37,6 +37,10 @@ Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` and registers t
 
 Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` (VS Code reads this path natively per the [Agent Skills spec](https://code.visualstudio.com/docs/copilot/customization/agent-skills)) and adds an entry to VS Code's user-level `mcp.json`. Reload the window to pick it up.
 
+### Add to GitHub Copilot CLI
+
+Writes the skill to `~/.copilot/skills/{orgSlug}-{deploymentId}/` and the MCP server to `~/.copilot/mcp-config.json`. Both honour `COPILOT_HOME` if you have set it. Restart Copilot CLI, or run `/skills reload` in an interactive session, to pick it up.
+
 ### Download plugin zip (⤓)
 
 Saves the raw plugin zip to disk. Useful for:
@@ -64,6 +68,6 @@ Authenticate with your Legalese Cloud session or an API key (`Authorization: Bea
 ## Notes
 
 - A deployment **must have an "Intended use" description** before it can be installed as a plugin. Without one the endpoint returns `422` and the install flow surfaces a clear error — a plugin with no description is one the agent will never trigger.
-- The skill folder is shared across Claude Code and VS Code (both read `~/.claude/skills/`), so installing for one target after the other doesn't duplicate files; only the MCP server registration changes.
+- The skill folder is shared across Claude Code and VS Code (both read `~/.claude/skills/`), so installing for one target after the other doesn't duplicate files; only the MCP server registration changes. Copilot CLI reads its own root (`~/.copilot/skills/`) and therefore gets its own copy.
 - Re-installing refreshes the skill in place — no need to uninstall first.
 - Per-deployment names (`{orgSlug}-{deploymentId}`) mean multiple deployments of the same org coexist as separate skills + MCP servers, each scoped to its own ruleset.

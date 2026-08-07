@@ -1114,7 +1114,8 @@ export function initializeSidebarMessenger(
   })
 
   // Install the global gateway "skills marketplace" (the org-wide rules MCP,
-  // plus the rules@legalese-cloud plugin for Claude Code) into a harness.
+  // plus the rules@legalese-cloud plugin where the harness has a plugin CLI —
+  // Claude Code and the GitHub Copilot CLI) into a harness.
   messenger.onNotification(RequestInstallMarketplace, async ({ harness }) => {
     outputChannel.appendLine(`[sidebar] Install marketplace → ${harness}`)
     try {
