@@ -22,7 +22,7 @@ import * as path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import * as vscode from 'vscode'
-import type { Harness } from 'jl4-client-rpc'
+import { HARNESSES, type Harness } from 'jl4-client-rpc'
 import { showTimedInformationMessage } from './notifications.js'
 
 const execFileAsync = promisify(execFile)
@@ -35,14 +35,15 @@ export const DISCOVERY_MCP_URL = 'https://mcp.legalese.cloud'
 const MARKETPLACE_JSON = 'https://skills.legalese.cloud/marketplace.json'
 const GATEWAY_PLUGIN = 'rules@legalese-cloud'
 
-const LABELS: Record<Harness, string> = {
-  'claude-code': 'Claude Code',
-  vscode: 'VS Code',
-  cursor: 'Cursor',
-  windsurf: 'Windsurf',
-  cline: 'Cline',
-  'claude-desktop': 'Claude Desktop',
-}
+/**
+ * Harness display names, derived from the shared `HARNESSES` list the sidebar
+ * dropdown renders. Deriving rather than restating keeps the toast ("Added the
+ * L4 Rules to VS Code (Copilot)") worded exactly like the menu entry the user
+ * just clicked — a second hand-maintained table drifts out of sync.
+ */
+const LABELS: Record<Harness, string> = Object.fromEntries(
+  HARNESSES.map((h) => [h.id, h.label])
+) as Record<Harness, string>
 
 /** Per-harness hint shown after a successful write. */
 const RELOAD_HINT: Record<Harness, string> = {
