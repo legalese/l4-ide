@@ -20,8 +20,6 @@
     ListSidebarDeployments,
     RequestSidebarDeploy,
     RequestSidebarUndeploy,
-    RequestSidebarPublishDeployment,
-    RequestSidebarUnpublishDeployment,
     RequestSidebarDownloadDeployment,
     GetSidebarDeploymentSchemas,
     GenerateSidebarIntendedUse,
@@ -51,7 +49,6 @@
   import DocsPanel from '$lib/components/docs-panel.svelte'
   import AiChatPanel from '$lib/components/ai/ai-chat-panel.svelte'
   import DeploymentIntegratePopover from '$lib/components/deployment-integrate-popover.svelte'
-  import DeploymentPublishPopover from '$lib/components/deployment-publish-popover.svelte'
   import CloudUpsell from '$lib/components/cloud-upsell.svelte'
 
   let functions: ExportedFunctionInfo[] = $state([])
@@ -628,7 +625,6 @@
   let undeployConfirm: SidebarDeploymentInfo | null = $state(null)
   // Which deployment's "Integrate" pop-over is open (deploymentId).
   let integrateForId: string | null = $state(null)
-  let publishForId: string | null = $state(null)
   // "Use in chat" hand-off to the AI panel. `nonce` makes a repeat
   // click on the same deployment re-trigger the panel-side effect.
   let deploymentChatRequest: {
@@ -685,69 +681,6 @@
       integrateForId === dep.deploymentId ? null : dep.deploymentId
   }
 
-  function togglePublish(dep: SidebarDeploymentInfo): void {
-    if (!connectionStatus.orgSlug) {
-      messenger?.sendNotification(ShowNotification, HOST_EXTENSION, {
-        type: 'warning',
-        message: 'Sign in with Legalese Cloud to use this feature',
-      })
-      return
-    }
-    openDeploymentMenuId = null
-    integrateForId = null
-    publishForId = publishForId === dep.deploymentId ? null : dep.deploymentId
-  }
-
-  async function handlePublish(
-    params: import('jl4-client-rpc').SidebarPublishParams
-  ): Promise<{
-    success: boolean
-    live?: boolean
-    url?: string
-    error?: string
-  }> {
-    if (!messenger) return { success: false, error: 'Not connected' }
-    const res = await messenger.sendRequest(
-      RequestSidebarPublishDeployment,
-      HOST_EXTENSION,
-      params
-    )
-    if (res.success) {
-      // Optimistic: the next list refresh reconciles from the read model.
-      deployments = deployments.map((d) =>
-        d.deploymentId === params.deploymentId
-          ? {
-              ...d,
-              marketplace: {
-                published: true,
-                mode: params.mode,
-                live: res.live,
-              },
-            }
-          : d
-      )
-    }
-    return res
-  }
-
-  async function handleUnpublish(
-    deploymentId: string
-  ): Promise<{ success: boolean; error?: string }> {
-    if (!messenger) return { success: false, error: 'Not connected' }
-    const res = await messenger.sendRequest(
-      RequestSidebarUnpublishDeployment,
-      HOST_EXTENSION,
-      { deploymentId }
-    )
-    if (res.success) {
-      deployments = deployments.map((d) =>
-        d.deploymentId === deploymentId ? { ...d, marketplace: undefined } : d
-      )
-      notify('info', `Unpublished "${deploymentId}".`)
-    }
-    return res
-  }
-
   function onLearnMore(url: string): void {
     integrateForId = null
     docNav = { url, nonce: ++actionNonce }
@@ -775,7 +708,6 @@
       undeployConfirm = null
       openDeploymentMenuId = null
       integrateForId = null
-      publishForId = null
     }
   })
 
@@ -2404,18 +2336,6 @@
                       <li><span class="breaking-ident">{func.name}</span></li>
                     {/each}
                   </ul>
-                  {#if undeployConfirm.marketplace?.published}
-                    <p class="warning-desc">
-                      &#9888; <strong
-                        >This skill is published on the marketplace.</strong
-                      >
-                      Undeploying delists it and breaks it for everyone who installed
-                      it. Reviews are retained; the listing is not restored by redeploying.{undeployConfirm
-                        .marketplace.mode === 'public'
-                        ? ' Anonymous traffic stops immediately.'
-                        : ''}
-                    </p>
-                  {/if}
                 </div>
               </div>
             {:else if !connectionStatus.connected}
@@ -2504,12 +2424,7 @@
                       !!dep.hasFiles &&
                       (dep.status === 'ready' || dep.status === 'pending')}
                     {@const canUndeploy = true}
-                    {@const showMenu = true}
-                    {@const publishState = dep.marketplace?.published
-                      ? dep.marketplace.live !== false
-                        ? 'published'
-                        : 'pending'
-                      : 'unpublished'}
+                    {@const showMenu = canDownload || canUndeploy}
                     <div
                       class="deployment-group"
                       class:collapsed={collapsedDeployments.has(
@@ -2560,30 +2475,18 @@
                               Chat
                             </button>
                           {/if}
-                          {#if integrateMode === 'cloud'}
-                            <button
-                              class="deployment-text-btn"
-                              class:publish-cta={publishState === 'unpublished'}
-                              class:publish-pending={publishState === 'pending'}
-                              title={publishState === 'published'
-                                ? 'Manage this marketplace listing'
-                                : publishState === 'pending'
-                                  ? 'Submitted — pending marketplace review'
-                                  : 'Publish these rules on the marketplace'}
-                              aria-haspopup="dialog"
-                              aria-expanded={publishForId === dep.deploymentId}
-                              onclick={(e: MouseEvent) => {
-                                e.stopPropagation()
-                                togglePublish(dep)
-                              }}
-                            >
-                              {publishState === 'published'
-                                ? 'Published ✓'
-                                : publishState === 'pending'
-                                  ? 'Pending review'
-                                  : 'Publish'}
-                            </button>
-                          {/if}
+                          <button
+                            class="deployment-text-btn"
+                            title="Integration endpoints for this deployment"
+                            aria-haspopup="dialog"
+                            aria-expanded={integrateForId === dep.deploymentId}
+                            onclick={(e: MouseEvent) => {
+                              e.stopPropagation()
+                              toggleIntegrate(dep)
+                            }}
+                          >
+                            Integrate
+                          </button>
                           {#if showMenu}
                             <div class="deployment-menu-wrapper">
                               <button
@@ -2609,16 +2512,6 @@
                                 <div
                                   class="dropdown-menu deployment-dropdown-menu"
                                 >
-                                  <button
-                                    class="menu-item"
-                                    onclick={(e: MouseEvent) => {
-                                      e.stopPropagation()
-                                      closeDeploymentMenu()
-                                      toggleIntegrate(dep)
-                                    }}
-                                  >
-                                    Integrate
-                                  </button>
                                   {#if canDownload}
                                     <button
                                       class="menu-item"
@@ -2759,23 +2652,6 @@
         </div>
       {/if}
     </div>
-    {#if publishForId && activeTab === 'deployments'}
-      {@const pubDep = deployments.find((d) => d.deploymentId === publishForId)}
-      <DeploymentPublishPopover
-        deploymentId={publishForId}
-        description={pubDep?.description ?? ''}
-        marketplace={pubDep?.marketplace}
-        orgSlug={connectionStatus.orgSlug ?? ''}
-        onClose={() => (publishForId = null)}
-        onPublish={handlePublish}
-        onUnpublish={() => {
-          const id = publishForId
-          return id
-            ? handleUnpublish(id)
-            : Promise.resolve({ success: false, error: 'No deployment' })
-        }}
-      />
-    {/if}
     {#if integrateForId && activeTab === 'deployments'}
       <!-- Sibling of the scroller (not inside it) so the dim + dialog
            pin to the visible tab viewport and stay centred regardless
@@ -4053,15 +3929,6 @@
     font-size: 0.85em;
     flex-shrink: 0;
     padding: 4px 6px;
-  }
-  /* Publish CTA: brighter than the default 0.6, but not the crimson
-     reserved for primary actions (VSCODE-PUBLISH-SPEC.md §1). */
-  .deployment-text-btn.publish-cta {
-    opacity: 0.85;
-  }
-  .deployment-text-btn.publish-pending {
-    opacity: 0.6;
-    font-style: italic;
     white-space: nowrap;
   }
   .deployment-text-btn:hover {

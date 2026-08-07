@@ -8,7 +8,6 @@ import type { VSCodeL4LanguageClient } from './vscode-l4-language-client.js'
 import { type AuthManager, LEGALESE_CLOUD_DOMAIN } from './auth.js'
 import type { ServiceClient } from './service-client.js'
 import { installDeploymentSkill } from './deployment-install.js'
-import { publishDeployment, unpublishDeployment } from './deployment-publish.js'
 import { installMarketplaceToHarness } from './harness-config.js'
 import { getWebviewContent } from './webview-panel.js'
 import {
@@ -31,8 +30,6 @@ import {
   RequestSidebarDeploy,
   RequestSidebarUndeploy,
   RequestSidebarDownloadDeployment,
-  RequestSidebarPublishDeployment,
-  RequestSidebarUnpublishDeployment,
   GetSidebarDeploymentSchemas,
   GetSidebarDeploymentStatus,
   GetSidebarUpdateStatus,
@@ -375,14 +372,6 @@ interface DeploymentResponse {
   id: string
   status: string
   error?: string
-  /** Owner-only marketplace state from the auth-proxy read model. */
-  marketplace?: {
-    published: boolean
-    mode?: 'account' | 'public' | 'unlisted'
-    live?: boolean
-    publishedAt?: string
-    allowedOrgs?: string[]
-  }
   metadata?: {
     functions?: Array<{
       name: string
@@ -733,7 +722,6 @@ export function initializeSidebarMessenger(
           // list means the user is allowed to read sources — gate the
           // sidebar's Download action on this.
           hasFiles: (dep.metadata?.files?.length ?? 0) > 0,
-          marketplace: dep.marketplace,
           functions: (dep.metadata?.functions ?? []).map((fn) => ({
             name: fn.name,
             description: fn.description ?? '',
@@ -844,22 +832,6 @@ export function initializeSidebarMessenger(
       outputChannel.appendLine(`[sidebar] Undeploy failed: ${msg}`)
       return { success: false, error: msg }
     }
-  })
-
-  // Marketplace publish / unpublish (cloud mode only — the popover is
-  // gated the same way as Chat, but fail politely regardless).
-  messenger.onRequest(RequestSidebarPublishDeployment, async (params) => {
-    outputChannel.appendLine(
-      `[sidebar] Publish requested: ${params.deploymentId} (${params.mode})`
-    )
-    return publishDeployment(params, auth, outputChannel)
-  })
-
-  messenger.onRequest(RequestSidebarUnpublishDeployment, async (params) => {
-    outputChannel.appendLine(
-      `[sidebar] Unpublish requested: ${params.deploymentId}`
-    )
-    return unpublishDeployment(params.deploymentId, auth, outputChannel)
   })
 
   // Handle download deployment request: prompt for a folder, fetch all

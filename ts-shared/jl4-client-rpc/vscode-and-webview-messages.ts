@@ -315,19 +315,6 @@ export const RequestSidebarLogout: NotificationType<void> = {
   method: 'requestSidebarLogout',
 }
 
-/** Marketplace publish state, as served on the deployment list by the
- *  auth-proxy read-model for owner callers. Absent = unpublished.
- *  `allowedOrgs` only arrives for callers holding l4:deploy. */
-export interface SidebarMarketplaceInfo {
-  published: boolean
-  mode?: 'account' | 'public' | 'unlisted'
-  /** True when the skill is actually serving cross-org (publisher trusted,
-   *  not suspended). False = intent recorded, pending review/suspended. */
-  live?: boolean
-  publishedAt?: string
-  allowedOrgs?: string[]
-}
-
 /** Deployment info derived from /openapi.json */
 export interface SidebarDeploymentInfo {
   deploymentId: string
@@ -342,9 +329,6 @@ export interface SidebarDeploymentInfo {
    * the file list (read scope absent), so the Download action should
    * be hidden from the deployment menu. */
   hasFiles?: boolean
-  /** Marketplace publish state; rides the same list fetch — no separate
-   *  status round-trip (VSCODE-PUBLISH-SPEC.md §4). */
-  marketplace?: SidebarMarketplaceInfo
 }
 
 /** Sidebar requests list of deployments */
@@ -415,38 +399,6 @@ export const RequestSidebarDownloadDeployment: RequestType<
   SidebarDownloadDeploymentResponse
 > = {
   method: 'requestSidebarDownloadDeployment',
-}
-
-/** Sidebar publishes a deployment to the marketplace. The listing fields
- *  are collected now and forwarded once the Provable site consumes them;
- *  the platform endpoint acts on deploymentId/mode/termsVersion. */
-export interface SidebarPublishParams {
-  deploymentId: string
-  mode: 'account' | 'public'
-  termsVersion: string
-  listing: {
-    displayName: string
-    summary: string
-    category?: string
-    tags?: string[]
-    license?: string
-    jurisdiction?: string
-    supportUrl?: string
-  }
-}
-
-export const RequestSidebarPublishDeployment: RequestType<
-  SidebarPublishParams,
-  { success: boolean; live?: boolean; url?: string; error?: string }
-> = {
-  method: 'requestSidebarPublishDeployment',
-}
-
-export const RequestSidebarUnpublishDeployment: RequestType<
-  { deploymentId: string },
-  { success: boolean; error?: string }
-> = {
-  method: 'requestSidebarUnpublishDeployment',
 }
 
 /** Sidebar polls deployment compilation status */
