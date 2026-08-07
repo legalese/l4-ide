@@ -714,7 +714,7 @@ Attacking action := Incitement to Hatred ∨ Call for violent or arbitrary measu
 Protected target := Protected Group ∨ Section of population ∨ Individual
 ```
 
-Note first what it is **not**. §3.1 sets Rulemapping against "classic expert
+Note first what it is **not**. The paper's §3.1 sets Rulemapping against "classic expert
 trees or flowchart logics such as [26]" — reference 26 being McLachlan, Kyrimi,
 Dube, Fenton & Webley, _"Lawmaps: Enabling Legal AI Development through
 Visualisation of the Implicit Structure of Legislation and Lawyerly Process"_,
@@ -762,8 +762,9 @@ source, and the bill for that arrives in the paper's own §7.
 
 **A tree does not share.** Parent–child, root to leaves, no DAG. This is the
 `permitted`-four-times defect from the flowchart section — and it becomes the
-Lexipedia update anomaly the moment a second Rulemap needs `Protected Group`, or
-the same map needs it twice. §3.2 offers what looks like a remedy: when precedent
+update anomaly this page found on Lexipedia's own page — one fact, stored twice,
+amended in only one of them — the moment a second Rulemap needs `Protected Group`,
+or the same map needs it twice. Their §3.2 offers what looks like a remedy: when precedent
 shifts, "experts update that specific leaf's context material directly … these
 local updates propagate predictably." Read it carefully — that is DRY for the
 **context corpus**, not for the **logic**. There is still no binding form, no
@@ -789,7 +790,7 @@ claim is to "mass administrative proceedings" — which is exactly where
 `PARTY/MUST/WITHIN/HENCE/LEST` starts and a Boolean tree stops.
 
 **And it welds each fact to its source.** This is the subtlest of the five, and
-the one with the least to do with logic. §3.2:
+the one with the least to do with logic. Their §3.2:
 
 > "During construction, the expert author determines for each leaf whether it
 > requires LLM interpretation of open-textured content or whether it can be
@@ -831,7 +832,7 @@ theodolite to GPS is not a map of the territory. It is a map of the surveying.
 
 ### The limitation that is an argument for the language
 
-§7 names the structural cost of strict Boolean composition:
+Their §7 names the structural cost of strict Boolean composition:
 
 > "a single false negative in a mandatory leaf node defeats the entire
 > classification. Unlike neural systems that absorb partial mistakes via soft
