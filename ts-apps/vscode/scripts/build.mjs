@@ -16,7 +16,11 @@ this is meant to extend
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const extensionRoot = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(extensionRoot, '..', '..')
-const skillSrc = path.join(repoRoot, '.claude', 'skills', 'writing-l4-rules')
+// The skill's real home is the plugin's Agent Plugins location, `skills/` at
+// the repo root. `.claude/skills/` is only a symlink to it (so the skill still
+// auto-loads for anyone working in this repo), and symlinks don't survive
+// every checkout — read through the real path, not the link.
+const skillSrc = path.join(repoRoot, 'skills', 'writing-l4-rules')
 const skillDest = path.join(
   extensionRoot,
   'static',

@@ -540,22 +540,28 @@ export const RequestOpenExtensionSettings: NotificationType<void> = {
 
 /**
  * Local AI harnesses the extension can install the L4 Rules into. Each maps
- * to a config-file writer on the extension side (Claude Code also supports
- * the full plugin via its CLI). `download-zip` is a per-deployment-only
- * pseudo-target handled separately.
+ * to a config-file writer on the extension side. Claude Code and the GitHub
+ * Copilot CLI additionally support the full plugin (skill + discovery MCP)
+ * through their own CLIs, which the marketplace install prefers, falling back
+ * to the config writer. `download-zip` is a per-deployment-only pseudo-target
+ * handled separately.
  */
 export type Harness =
   | 'claude-code'
   | 'vscode'
+  | 'copilot-cli'
   | 'cursor'
   | 'windsurf'
   | 'cline'
   | 'claude-desktop'
 
-/** Display order + labels for the install dropdowns (rendered by the webview). */
+/** Display order + labels for the install dropdowns (rendered by the webview).
+ *  This is the single source of truth for harness display names — the
+ *  extension derives its toast labels from it rather than restating them. */
 export const HARNESSES: ReadonlyArray<{ id: Harness; label: string }> = [
   { id: 'claude-code', label: 'Claude Code' },
   { id: 'vscode', label: 'VS Code (Copilot)' },
+  { id: 'copilot-cli', label: 'GitHub Copilot CLI' },
   { id: 'cursor', label: 'Cursor' },
   { id: 'windsurf', label: 'Windsurf' },
   { id: 'cline', label: 'Cline' },

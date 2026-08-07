@@ -70,7 +70,7 @@ GIVETH A NUMBER
 DECIDE `Parking cost` IS ...
 ```
 
-The `@desc` on each parameter flows into the generated OpenAPI schema and the MCP tool's `inputSchema`, so downstream LLMs know exactly how to construct a valid call. See the full working file at [.claude/skills/writing-l4-rules/assets/example-parking.l4](.claude/skills/writing-l4-rules/assets/example-parking.l4).
+The `@desc` on each parameter flows into the generated OpenAPI schema and the MCP tool's `inputSchema`, so downstream LLMs know exactly how to construct a valid call. See the full working file at [skills/writing-l4-rules/assets/example-parking.l4](skills/writing-l4-rules/assets/example-parking.l4).
 
 ## Deployment with Legalese Cloud
 
@@ -99,16 +99,16 @@ l4 run path/to/file.l4
 cabal run l4 -- run path/to/file.l4
 ```
 
-A wrapper script ships inside the skill at [.claude/skills/writing-l4-rules/scripts/validate.sh](.claude/skills/writing-l4-rules/scripts/validate.sh).
+A wrapper script ships inside the skill at [skills/writing-l4-rules/scripts/validate.sh](skills/writing-l4-rules/scripts/validate.sh).
 
 ## Documentation
 
-Inside the plugin ([.claude/skills/writing-l4-rules/](.claude/skills/writing-l4-rules/)):
+Inside the plugin ([skills/writing-l4-rules/](skills/writing-l4-rules/)):
 
-- [SKILL.md](.claude/skills/writing-l4-rules/SKILL.md) — operational guide for writing and deploying L4
-- [references/regulative.md](.claude/skills/writing-l4-rules/references/regulative.md) — obligations, `#TRACE`, and the `MUST` / `HENCE` / `LEST` / `BREACH` machinery
-- [references/builtins.md](.claude/skills/writing-l4-rules/references/builtins.md) — coercions, HTTP/JSON, temporal globals, and the library index
-- [references/gotchas.md](.claude/skills/writing-l4-rules/references/gotchas.md) — ditto `^`, asyndetic `...` / `..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix
+- [SKILL.md](skills/writing-l4-rules/SKILL.md) — operational guide for writing and deploying L4
+- [references/regulative.md](skills/writing-l4-rules/references/regulative.md) — obligations, `#TRACE`, and the `MUST` / `HENCE` / `LEST` / `BREACH` machinery
+- [references/builtins.md](skills/writing-l4-rules/references/builtins.md) — coercions, HTTP/JSON, temporal globals, and the library index
+- [references/gotchas.md](skills/writing-l4-rules/references/gotchas.md) — ditto `^`, asyndetic `...` / `..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix
 
 External:
 

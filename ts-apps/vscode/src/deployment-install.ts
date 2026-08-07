@@ -15,7 +15,12 @@ import * as vscode from 'vscode'
 import type { AuthManager } from './auth.js'
 import type { ServiceClient } from './service-client.js'
 import type { Harness } from 'jl4-client-rpc'
-import { writeHarnessMcp, announce, type HarnessCtx } from './harness-config.js'
+import {
+  writeHarnessMcp,
+  announce,
+  copilotHome,
+  type HarnessCtx,
+} from './harness-config.js'
 
 /** `download-zip` saves the raw bundle; every other target installs into that
  *  harness's config (and, where the harness reads agent skills, the SKILL.md
@@ -34,10 +39,21 @@ export interface InstallDeploymentSkillOptions {
   userDataPath: string | undefined
 }
 
-// Harnesses that read agent skills from ~/.claude/skills (per agentskills.io).
-// For these we also drop the SKILL.md folder; the rest are MCP-only.
-function readsAgentSkills(target: Harness): boolean {
-  return target === 'claude-code' || target === 'vscode'
+// Where each skill-reading harness looks for agent skills (per
+// agentskills.io); harnesses absent from this map are MCP-only and get no
+// SKILL.md folder. Claude Code and VS Code both read `~/.claude/skills`, so
+// they share one folder and installing for both doesn't duplicate it. The
+// Copilot CLI reads its own root instead, which `COPILOT_HOME` can relocate.
+function skillsRootFor(target: Harness): string | undefined {
+  switch (target) {
+    case 'claude-code':
+    case 'vscode':
+      return path.join(os.homedir(), '.claude', 'skills')
+    case 'copilot-cli':
+      return path.join(copilotHome(), 'skills')
+    default:
+      return undefined
+  }
 }
 
 /**
@@ -69,10 +85,11 @@ export async function installDeploymentSkill(
   }
 
   // Drop the skill folder for harnesses that read agent skills natively.
-  if (readsAgentSkills(target)) {
+  const skillsRoot = skillsRootFor(target)
+  if (skillsRoot) {
     const zip = await downloadBundle(deploymentId, serviceClient, outputChannel)
     if (!zip) return
-    writeSkillFolder(bundleName, parseStoreZip(zip), outputChannel)
+    writeSkillFolder(skillsRoot, bundleName, parseStoreZip(zip), outputChannel)
   }
 
   const res = writeHarnessMcp(target, bundleName, mcpUrl, ctx)
@@ -149,26 +166,22 @@ async function saveZipToDisk(
 }
 
 // ---------------------------------------------------------------------------
-// Drop the SKILL.md + references at `~/.claude/skills/{name}/`.
-//
-// VS Code Chat reads agent skills from `~/.claude/skills/` natively (along
-// with `~/.copilot/skills/` and `~/.agents/skills/`) per the Agent Skills
-// spec at agentskills.io. Claude Code reads the same path. Using one
-// canonical location means installing for one target then the other does
-// not duplicate the skill folder.
+// Drop the SKILL.md + references at `{skillsBase}/{name}/`, where the base is
+// whichever root the target harness reads (see `skillsRootFor`).
 // ---------------------------------------------------------------------------
 
 function writeSkillFolder(
+  skillsBase: string,
   bundleName: string,
   entries: ReadonlyArray<ZipEntry>,
   outputChannel: vscode.OutputChannel
 ): void {
-  const skillsRoot = path.join(os.homedir(), '.claude', 'skills', bundleName)
+  const skillsRoot = path.join(skillsBase, bundleName)
 
   // The bundle's skill content lives at
-  // `{bundleName}/skills/{bundleName}/...`. Strip that prefix so files
-  // land at `~/.claude/skills/{bundleName}/...` (matching the layout
-  // both Claude Code and VS Code Chat expect for an installed skill).
+  // `{bundleName}/skills/{bundleName}/...`. Strip that prefix so files land
+  // at `{skillsBase}/{bundleName}/...` — the layout every skill-reading
+  // harness expects for an installed skill.
   const skillPrefix = `${bundleName}/skills/${bundleName}/`
   let wrote = 0
   for (const e of entries) {

@@ -2698,8 +2698,8 @@
               {#if connectionStatus.isLegaleseCloud}
                 <div class="marketplace-block">
                   <p class="marketplace-title">
-                    Add the Legalese Cloud Skill marketplace to dicover and run
-                    your deployments as AI skills and MCP.
+                    Add the Legalese Cloud Skills Marketplace to discover and
+                    run your deployments as AI skills and MCP tools.
                   </p>
                   <div class="marketplace-row">
                     <input

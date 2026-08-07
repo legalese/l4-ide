@@ -4,7 +4,7 @@ The **Legalese Skills Marketplace** makes your deployed decision rules discovera
 
 It wires up two things behind your sign-in — a **skill** that primes your AI agent of choice on _when_ to reach for your deployed rules, and the **Legalese Rules MCP server** it calls to find and run them. Scope is resolved from auth, so nothing about your deployments is exposed in the public catalog.
 
-**Prerequisites:** a Legalese Cloud account with your deployed rules (each with an **Intended use** description, see [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md)); a supported harness (Claude Code/Desktop, VS Code, Cursor, Windsurf, Cline, …) or a shell for the CLI; a credential (OAuth sign-in, or an `sk_…` API key)
+**Prerequisites:** a Legalese Cloud account with your deployed rules (each with an **Intended use** description, see [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md)); a supported harness (Claude Code, Claude Desktop, VS Code (Copilot), Cursor, Windsurf, Cline, …) or a shell for the CLI; a credential (OAuth sign-in, or an `sk_…` API key)
 
 ---
 
@@ -14,6 +14,7 @@ The marketplace allows your AI agent of choice to discover your deployed rules a
 
 - **Agent support** — Legalese skill marketplace supports Claude Code, VS Code (Copilot), Cursor, Windsurf, Cline, and Claude Desktop.
 - **Skill and tool calls (MCP)** — Every deployment is available as individual skill bundle `SKILL.md` ([Agent Skills](https://agentskills.io) standard) so the model knows _when_ a question should be answered from your rules and _how_ to call them.
+- **Portable plugin format** — every plugin we serve carries an [Agent Plugins 1.0](https://agent-plugins.org/specification) manifest (`plugin.json` + `mcp.json` at the plugin root) alongside Claude Code's native `.claude-plugin/` pair, so the same repo installs unmodified in Claude Code, VS Code and the GitHub Copilot CLI.
 - **Rules are evaluated deterministically** — The skills allow your AI agent to evaluate your deployed rules and retrieve the programmed results with accuracy.
 - **Scoped by sign-in** — The marketplace is private and doesn't publicly reveal your deployments rules, names, descriptions and API's.
 
@@ -39,9 +40,9 @@ So the agent searches, reads the schema, and evaluates — all through the one M
 
 ### The L4 VS Code extension (one click, any harness)
 
-The easiest path for **any** supported harness is the L4 VS Code extension: open the **Deployments** tab and use **Install Skills Marketplace**, then pick your harness from the dropdown (Claude Code, VS Code/Copilot, Cursor, Windsurf, Cline, Claude Desktop).
+The easiest path for **any** supported harness is the L4 VS Code extension: open the **Deployments** tab and use **Install Skills Marketplace**, then pick your harness from the dropdown (Claude Code, VS Code (Copilot), GitHub Copilot CLI, Cursor, Windsurf, Cline, Claude Desktop).
 
-It registers the rules MCP server (`https://mcp.legalese.cloud`, org from auth) directly in that harness's own config — and for Claude Code it installs the full plugin (marketplace + skill) via the Claude CLI when available. No token is baked in; OAuth runs on first use.
+It registers the rules MCP server (`https://mcp.legalese.cloud`, org from auth) directly in that harness's own config — and where the harness ships a plugin CLI (Claude Code, GitHub Copilot CLI) it installs the full plugin (marketplace + skill) through it, falling back to the bare MCP entry if that CLI isn't on your `PATH`. No token is baked in; OAuth runs on first use.
 
 ### Claude Code & claude.ai (native plugin commands)
 
@@ -55,6 +56,19 @@ If you'd rather drive Claude Code directly — or you're on claude.ai, which onl
 (If `install` reports "not found in any marketplace," confirm `/plugin
 marketplace list` shows `legalese-cloud`. The hosted forms
 `https://skills.legalese.cloud/marketplace.json` and `…/marketplace.git` serve the same gateway plugin if you prefer a URL over the GitHub repo.)
+
+### VS Code & GitHub Copilot CLI (Agent Plugins)
+
+The **Install Skills Marketplace** dropdown covers Copilot CLI too. To drive it by hand instead — `copilot plugin marketplace add` takes an `OWNER/REPO` on github.com, not a URL:
+
+```sh
+copilot plugin marketplace add legalese/cloud-rules
+copilot plugin install rules@legalese-cloud
+```
+
+In VS Code, add `legalese/cloud-rules` (or `https://skills.legalese.cloud/marketplace.git`) to the `chat.plugins.marketplaces` setting, then search `@agentPlugins` in the Extensions view. **Chat: Install Plugin From Source** with the git URL also works.
+
+These clients read the portable `mcp.json`, which registers the rules MCP with no baked credential — Agent Plugins forbids secrets in headers — so they run the server's OAuth flow on first connect. Claude Code additionally reads `.mcp.json`, which is where the `${LEGALESE_TOKEN}` API-key form lives.
 
 ### Any MCP client (manual wiring)
 
@@ -95,7 +109,8 @@ The marketplace installs the **rules MCP server** everywhere; the bundled **skil
 | ----------------------------- | :--------------: | :---------------------: | :--------------------------: | :-: |
 | **Claude Code**               |        ✅        |           ✅            | ✅ `/plugin marketplace add` | ✅  |
 | Claude Desktop / claude.ai    |        ✅        |           ✅            |              ✅              |  —  |
-| VS Code (Copilot)             |        ✅        |           ✅            |            varies            | ✅  |
+| VS Code (Copilot)             |        ✅        |           ✅            |      ✅ `@agentPlugins`      | ✅  |
+| GitHub Copilot CLI            |        ✅        |           ✅            | ✅ `copilot plugin install`  | ✅  |
 | Cursor / Windsurf / Cline     |        ✅        |           ✅            |            varies            |  —  |
 | OpenAI Codex CLI / Gemini CLI |        ✅        |            —            |              ✅              | ✅  |
 
