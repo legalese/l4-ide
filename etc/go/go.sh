@@ -81,7 +81,8 @@ P7_LEG_ORDER=(
 #
 # p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they are
 # now real stages that validate a deposit, and they are g2's declared members.
-UNIMPLEMENTED_STAGES=(p8-verify p10-publish)
+# p8-verify left it 2026-08-09 (D3): declared at both milestones below.
+UNIMPLEMENTED_STAGES=(p10-publish)
 
 # G2's declared stages, in order. The five deposit-validating stages, the §8
 # comparator, and the report.
@@ -99,7 +100,7 @@ UNIMPLEMENTED_STAGES=(p8-verify p10-publish)
 # unbuilt; until it is, they are named in `plan --milestone g2` as NOT WIRED
 # rather than run. p9-report is included because it reads journal.ndjson and
 # nothing else, so it is correct for any milestone.
-G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-diff p9-report)
+G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p8-diff p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
@@ -272,8 +273,13 @@ fi
 export GO_MODULES GO_MODULES_ORIGIN
 
 # Assemble the declared stage list and the HG1 set from the sidecar's legs.
-G1_STAGES=(p0-preflight p3-check p6-tests)
-gated_by_HG1="p6-tests"
+# p8-verify sits directly after p6-tests (D3, 2026-08-09) and is HG1-gated on
+# the same line it is declared: SPEC.md §7.3 blocks P6 onward, and a
+# verification report about an unreviewed encoding is still analysis OF that
+# encoding. (ORCHESTRATOR.md §5.1a's gates row was retensed in the same
+# change.)
+G1_STAGES=(p0-preflight p3-check p6-tests p8-verify)
+gated_by_HG1="p6-tests p8-verify"
 for s in "${P7_LEG_ORDER[@]}"; do
   if [[ " $GO_S_LEGS " == *" $s "* ]]; then
     G1_STAGES+=("$s")
@@ -298,7 +304,7 @@ gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 # GO_CORPUS_FILES above), so a waiver over the replay corpus covers nothing
 # here, and depositing or editing a deposit — the surface map included —
 # re-opens the gate.
-if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p8-diff p9-report"; fi
+if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p8-verify p8-diff p9-report"; fi
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -364,6 +370,7 @@ cmd_plan_g2() {
     [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
     printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "compares against this subject's committed goldens, which are the replay artifacts"
   done
+  printf '  %-14s %-9s %-11s %s\n' "p8-verify" "HG1" "$mstate" "l4 verify over the de novo module set; five control fixtures license the oracle"
   local sm="${GO_S_DENOVO_SURFACE_MAP:-}" smwhat
   if [[ -n "$sm" ]]; then
     smwhat="SPEC.md §8's diff oracle over $sm"

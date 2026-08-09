@@ -27,23 +27,25 @@ What that means precisely, in the present tense:
   prints what it would do and what is blocking it, then exits 3. With R1 closed in full on
   2026-08-02 (`legalese/canon`, which exists as of 2026-08-03) it waits only on HG2 acts and
   unbuilt tooling — no stage waits on an open ruling. §5.2 names the blocker.
-- **`p8-verify` was the seventh refuser and now runs** — R5's rung 1, `l4 verify`, exists. Read
-  §5.1a for what it measures and what its `PASS` is worth. One thing is NOT yet done and the
-  distinction matters: `go.sh` still carries `p8-verify` in `UNIMPLEMENTED_STAGES` and no
-  milestone's stage list names it, so `go.sh run` does not reach the script and `go.sh plan`
-  still prints it among the refusers. The script is complete and was measured by driving it
-  directly against a real run directory; declaring it in the driver is a one-line change owned
-  by whoever next touches `go.sh`.
+- **`p8-verify` was the seventh refuser, now runs, and is DECLARED — at both milestones, as of
+  2026-08-09.** R5's rung 1, `l4 verify`, exists; read §5.1a for what it measures and what its
+  `PASS` is worth. `go.sh` names it in `G1_STAGES` (after `p6-tests`) and in `G2_STAGES`,
+  HG1-gated at both — it verifies whichever module set the driver resolved, so at g2 it runs
+  over the de novo deposit and its verdict is about the deposit. It left
+  `UNIMPLEMENTED_STAGES` in the same change.
 - **Milestone G2's de novo half is not wired.** `p3-check`, `p6-tests` and every p7 leg read the
   subject's COMMITTED corpus and goldens, so a g2 run does not execute them: measuring the replay
   artifacts under a de novo label would be a false claim. `go.sh plan --milestone g2` prints
   SPEC.md §4's full de novo order and marks each of them `NOT WIRED` with that reason.
-- **G2's acceptance comparator does exist**, as of 2026-08-02: `etc/go/lib/denovo-diff.mjs` plus
-  `schemas/surface-map.schema.json`, designed in
-  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md). It is built and self-tested and has **never
-  seen a second encoding** — no stage calls it, because nothing produces the module it would
-  compare. (An earlier version of this bullet said the §8 diff oracle "does not exist either".
-  That was true when it was written and is not now. And since: its first genuine two-encodings run arrived out-of-band — the charities cleanroom comparison, PR #201, executed from this branch's worktree.)
+- **G2's acceptance comparator exists AND is wired**, as of 2026-08-09: `etc/go/lib/denovo-diff.mjs`
+  plus `schemas/surface-map.schema.json`, designed in
+  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md), called by the declared g2 stage `p8-diff`
+  over the sidecar's `denovo.surface_map`. It has now seen a second encoding: the committed
+  regcf de novo module, via the committed surface map — first in-pipeline run measured 80/80
+  agreement over 4 pairs × 20 rows. (An earlier version of this bullet said the §8 diff oracle
+  "does not exist either"; a later one said it existed but "no stage calls it". Each was true
+  when written. Its first genuine two-encodings run arrived out-of-band — the charities
+  cleanroom comparison, PR #201, executed from this branch's worktree.)
 - **This document owns the orchestrator's own decisions.** The pipeline it serves is
   [SPEC.md](./SPEC.md); per-projection rulings stay in their own specs. Where this document
   disagrees with the tree, **the tree wins**.
@@ -71,9 +73,9 @@ etc/go/
 │                                denovo-diff · phase-prelude.sh ·
 │                                deposit-prelude.sh (the G2 deposit contract,
 │                                in one file so the five stages cannot drift)
-├── phases/                      p0 p3-check p6 p7×9 p9  (G1, run) ·
-│                                p1 p2 p3-encode p4 p5     (G2, validate a
-│                                deposit — §5.2) · p8 p10  (refuse)
+├── phases/                      p0 p3-check p6 p8-verify p7×9 p9  (G1, run) ·
+│                                p1 p2 p3-encode p4 p5 p8-diff  (G2 — validate
+│                                a deposit §5.2, or compare §8) · p10 (refuses)
 └── report/                      render-report.mjs + template.md
 
 .claude/skills/running-the-l4-pipeline/
@@ -396,9 +398,12 @@ keeps the latest few runs **and** every run holding a granted gate.
 | `p7-akn`       | shallow well-formedness                                                                                                                             | `UNVERIFIED`, declared `EXTRA`                                                                                                                                                    |
 | `p9-report`    | section-presence over the rendered report                                                                                                           | reads the journal and nothing else                                                                                                                                                |
 
-### 5.1a `p8-verify` — R5 rung 1, which runs but is not yet declared
+### 5.1a `p8-verify` — R5 rung 1, declared at both milestones
 
-This stage refused until `l4 verify` existed. It no longer refuses.
+This stage refused until `l4 verify` existed. It no longer refuses, and since 2026-08-09 it is
+declared: `G1_STAGES` names it after `p6-tests`, `G2_STAGES` names it too, and it runs over the
+module set the driver resolved for the milestone — the committed corpus at g1, the de novo
+deposit at g2 (with the deposit contract: no declared or deposited module set is `SKIPPED`).
 
 `l4 verify FILE [--format text|json]` takes each boolean `DECIDE` down the same path the web
 wizard takes — `doVisualize` → `vizExprToBoolExpr` → `compileDecisionQuery` — and reads
@@ -416,7 +421,7 @@ no seam, a decision valid outright). Exit 0 clean, 1 with findings.
 | oracle class       | `structural`                                                                                                                                                                                                                                                       |
 | **pass condition** | controls all reproduce **and** every declared corpus module analyses with zero findings → `PASS`. Controls reproduce and the corpus has findings → `DEGRADED`; that is the stage's output, not a harness failure. A control that does **not** reproduce → `BROKEN` |
 | measured (regcf)   | 5/5 controls; 154 decisions, 43 analysed, 111 skipped as non-boolean, **0 findings**, 0 merged atom occurrences                                                                                                                                                    |
-| gates              | nothing in G0–G4                                                                                                                                                                                                                                                   |
+| gates              | **HG1, at both milestones** (retensed 2026-08-09; this row read "nothing in G0–G4" while the stage was undeclared). SPEC.md §7.3 blocks P6 onward, and a verification report about an encoding under review is analysis of that encoding                           |
 
 The pass condition is deliberately not "the corpus came back clean". A consistency checker that
 can never go red reports every corpus clean, so a green corpus is evidence about the checker only
@@ -456,13 +461,14 @@ that repeat a leaf, and on regcf it is a no-op that costs nothing and proves not
 sweep → external model checker. Rung 2 needs the fork register P4 does not yet produce; rung 3
 waits on the LTS semantics.
 
-**Not yet declared, in the present tense.** `go.sh` still lists `p8-verify` in
-`UNIMPLEMENTED_STAGES`, and `G1_STAGES` does not contain it, so `go.sh run --milestone g1` does
-not reach the script and `--only p8-verify` runs nothing at all. The measurement above was taken
-by invoking `etc/go/phases/p8-verify.sh` directly against a real run directory with
-`GO_ROOT`/`GO_RUN`/`GO_STAGE` and the subject environment set, which writes an ordinary receipt
-into the ordinary hash-chained journal. Declaring it is a one-line driver change this leg does
-not own.
+**Declared, in the present tense (2026-08-09).** `go.sh` names `p8-verify` in `G1_STAGES` and
+`G2_STAGES` and no longer lists it in `UNIMPLEMENTED_STAGES`, so `go.sh run` reaches the script
+and `--only p8-verify` runs exactly it (behind its HG1 gate). The measurement above predates the
+declaration — it was taken by invoking `etc/go/phases/p8-verify.sh` directly against a real run
+directory, which writes an ordinary receipt into the ordinary hash-chained journal, and that
+direct route still works. Expected at g2 on the regcf deposit, measured 2026-08-09: `DEGRADED` —
+253 decisions, 114 analysed, **2 `vacuous-guard` findings** in `` `the investor is an accredited
+investor` `` — which is the stage doing its declared job on the deposit, not a regression.
 
 ### 5.2 The de novo stages that validate a deposit, and the two that still refuse
 
@@ -533,17 +539,14 @@ about a different file. The stage still goes `DEGRADED` — it cannot claim `PAS
 run that exited 1 — but its reason now says the bundle is internally well formed and names the
 peer, by path, that is not.
 
-#### The two that still refuse
+#### The one that still refuses
 
-Each exits 3 after printing what it would do and what is blocking it. Neither is a member of any
+It exits 3 after printing what it would do and what is blocking it. It is not a member of any
 milestone's declared stage list, so its absence cannot make a milestone `INCOMPLETE`.
-
-This list is short for a good reason and the reason is not that the work shrank: `p8-verify`
-is on it only because `go.sh plan` still prints it, not because it still refuses.
+(`p8-verify` left this table on 2026-08-09: it is declared at both milestones — §5.1a.)
 
 | stage         | blocker                                                                                                                                                                                                                                                                                                                                   |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p8-verify`   | **it runs, as of 2026-08-03** — R5's rung 1 (`l4 verify`) is built and §5.1a records what its `PASS` is worth. What remains is a driver change nobody has made: `go.sh` still carries it in `UNIMPLEMENTED_STAGES` and no milestone names it, so `go.sh plan` still prints it here and `--only p8-verify` runs nothing                    |
 | `p10-publish` | R1 ruled in full 2026-08-02 (`legalese/canon` + license + layout + public-with-inspectable-gates) and R2 ruled (probe done, PR #199). The repo **now exists** — public, scaffolded to that shape, zero subjects, as of 2026-08-03 — so what remains is that every act that would put a subject in it is HG2's, plus unbuilt stage tooling |
 
 #### What a `g2` run does NOT cover
