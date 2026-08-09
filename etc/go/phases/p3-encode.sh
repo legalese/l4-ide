@@ -13,10 +13,11 @@
 # THE FLOOR IS DELIBERATELY LOW, AND SAYING SO IS THE POINT. `l4 check` is the
 # compiler's own verdict on the module and nothing more. The two mechanisable
 # house rules — BRANCH-over-ELSE-IF and an @ref on every dated arm — live in
-# p3-check.sh, which reads the subject's COMMITTED corpus; pointing that stage
-# at a de novo deposit is unbuilt (ORCHESTRATOR.md §5.2). And isomorphism, the
-# deliverable itself, has no checkable form at all: SPEC.md §7.3 carries it as
-# HG1, and this stage records it as unverified rather than omitting it.
+# p3-check.sh, which since 2026-08-09 (D1) runs over the SAME deposit at g2:
+# the two stages are one phase's two halves, acceptance here and house rules
+# there. And isomorphism, the deliverable itself, has no checkable form at
+# all: SPEC.md §7.3 carries it as HG1, and this stage records it as
+# unverified rather than omitting it.
 #
 # Requirements source: jl4/examples/legal/bna/SMOKE-REPORT.md §2 (p3-encode) —
 # "the real stage needs: the l4 skill's inert-style guidance as the prompt
@@ -75,7 +76,7 @@ go_receipt --status PASS \
   --oracle-cmd "$ORACLE_CMD" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied (p3-check reads the committed corpus, and pointing it at a de novo deposit is unbuilt)." \
+  --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied here (that is p3-check, which runs over this same deposit in this same milestone)." \
   --artifact "$LOG" "${METRICS[@]}" \
   --note "P3's actual deliverable — 'isomorphic: a domain expert can review it against $GO_S_CITATION section by section' — is unverified by this stage and is HG1's subject (SPEC.md §7.3). A module that typechecks and says something else entirely reaches this same PASS" \
-  --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are NOT applied to the de novo deposit: p3-check.sh applies them to the subject's committed corpus, and re-pointing it is unbuilt — see ORCHESTRATOR.md §5.2"
+  --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are p3-check's half of this phase: it runs over the same resolved module set at this milestone, so read its receipt beside this one"

@@ -28,8 +28,10 @@ etc/go/go.sh help
 ```
 
 Milestone `g2` is the de novo path; its stages validate deposits rather than producing them, and
-`plan --milestone g2` says which deposits a subject has. `g2 COMPLETE` is completeness of
-accounting over those stages, not a claim that a de novo run happened.
+— since 2026-08-09 — measure the deposited encoding itself (house rules, assertions, `l4
+verify`, emit-only DMN, and the §8 comparator). `plan --milestone g2` says which deposits a
+subject has. `g2 COMPLETE` is completeness of accounting over those stages, not a claim that a
+de novo run happened: a run with every deposit absent is COMPLETE over `SKIPPED` receipts.
 
 `<id>` names a sidecar directory under `etc/go/subjects/` (today: `regcf`). While exactly
 one sidecar exists, `--subject` may be omitted and defaults to it; with several, naming one
@@ -55,13 +57,13 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 
 A subject sidecar is four files in `etc/go/subjects/<id>/`:
 
-| file                 | role                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `subject.json`       | the machine-readable descriptor: id, display name, legal citation, source entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check floors (`checks.min_dated_arms`, `checks.min_assertions`), a `legs` object — one entry per projection leg, with its golden/cases paths — and an optional `denovo` object saying where the G2 deposits live (`bundle`, `register`, `fork_register`, `modules`), whose paths need not exist |
-| `pins.json`          | the CLI surface the stage table reads, measured against that subject's corpus                                                                                                                                                                                                                                                                                                                                                                                   |
-| `known-defects.json` | measured defects used as negative controls; empty groups say why they are empty                                                                                                                                                                                                                                                                                                                                                                                 |
-| `NOTES.md`           | free-prose idiosyncrasies of the corpus, for humans and the skill. **No script reads it.**                                                                                                                                                                                                                                                                                                                                                                      |
-| `explainer/`         | optional. The subject's checked-in explainer narrative — `manifest.json` (the document's spine), `provenance.json` (per file: its digest, who drafted it, the sources it was drafted from with their digests, and its review state) and one markdown file per part. Declared explicitly in `subject.json`'s `explainer.dir`, never discovered, so a mistyped directory is an error rather than a silently empty document.                                       |
+| file                 | role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subject.json`       | the machine-readable descriptor: id, display name, legal citation, source entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check floors (`checks.min_dated_arms`, `checks.min_assertions`), a `legs` object — one entry per projection leg, with its golden/cases paths — and an optional `denovo` object saying where the G2 deposits live (`bundle`, `register`, `fork_register`, `modules`, `surface_map`; plus `checks` — the deposit's own floors — and per-leg `legs` declarations), whose paths need not exist |
+| `pins.json`          | the CLI surface the stage table reads, measured against that subject's corpus                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `known-defects.json` | measured defects used as negative controls; empty groups say why they are empty                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `NOTES.md`           | free-prose idiosyncrasies of the corpus, for humans and the skill. **No script reads it.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `explainer/`         | optional. The subject's checked-in explainer narrative — `manifest.json` (the document's spine), `provenance.json` (per file: its digest, who drafted it, the sources it was drafted from with their digests, and its review state) and one markdown file per part. Declared explicitly in `subject.json`'s `explainer.dir`, never discovered, so a mistyped directory is an error rather than a silently empty document.                                                                                                                                  |
 
 `etc/go/lib/subject.mjs` resolves and validates a sidecar (unknown keys refused; a leg entry
 naming a missing golden is a hard error naming the path) and exports it to the driver as
@@ -198,10 +200,16 @@ outward network access this orchestrator does not take, and producing an encodin
 inventory needs a model it does not call. What the stages own is the other half: since 2026-08-03,
 `p1-ingest`, `p2-sweep`, `p3-encode`, `p4-forks` and `p5-gate` are milestone `g2`'s declared
 members and each VALIDATES its deposit — `SKIPPED` when it is not there, `DEGRADED` naming every
-rule that fired against it, `PASS` over a hashed artifact. A subject says where its deposits live
-in `subject.json`'s optional `denovo` section (`bundle`, `register`, `fork_register`, `modules`);
-those paths need not exist, because an unwritten deposit is a missing prerequisite, not a
-misconfiguration. `etc/go/go.sh plan --milestone g2 --subject <id>` prints each one's state.
+rule that fired against it, `PASS` over a hashed artifact. Since 2026-08-09 the measurement
+stages run over the deposit too: the driver resolves one module set per milestone
+(`GO_MODULES`), so `p3-check` (house rules + `denovo.checks` floors), `p6-tests` (the deposit's
+own `#ASSERT`s), `p8-verify` (`l4 verify`) and `p7-dmn` (emit-only — no golden exists for a
+deposit) measure the deposited encoding itself, and `p8-diff` runs the §8 comparator below. A
+subject says where its deposits live in `subject.json`'s optional `denovo` section (`bundle`,
+`register`, `fork_register`, `modules`, `surface_map`, plus `checks` floors and per-leg `legs`
+declarations); those paths need not exist, because an unwritten deposit is a missing
+prerequisite, not a misconfiguration. `etc/go/go.sh plan --milestone g2 --subject <id>` prints
+each one's state.
 
 ## The §8 diff oracle
 
@@ -227,9 +235,12 @@ agreement counts — a (pair, fact) leaf the battery perturbed without ever movi
 surface on which agreement is silence rather than evidence.
 
 Design, limits and the verbatim self-tests:
-[`DENOVO-DIFF-ORACLE.md`](../../specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md). **No
-stage calls it** — `p3-encode` checks a de novo module, it does not write one — so it has been run
-only against the committed corpus and against scratch copies of it with one constant moved.
+[`DENOVO-DIFF-ORACLE.md`](../../specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md).
+**`p8-diff` calls it** (a declared g2 stage, 2026-08-09) over the surface map the sidecar declares
+in `denovo.surface_map`, following the deposit contract — no map declared or deposited is a
+`SKIPPED` receipt naming the key; comparator exits 2/4 (harness errors) are `DEGRADED`; exits 0/1
+are a completed measurement, because a divergence is §8's better pass, never a failure. Writing
+the map and the module, and triaging any witness, remain agent/reviewer acts.
 
 `selftest.mjs` proves the status lattice can still say no: that every status is
 producible, that `PASS` is rejected with a null, failing, or _weak_ oracle, that

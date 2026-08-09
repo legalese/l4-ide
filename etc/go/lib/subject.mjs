@@ -114,8 +114,9 @@ function refuseUnknown(id) {
       `  citation, source_url, corpus.main [+ optional corpus.wizard], checks, and a 'legs'\n` +
       `  object declaring exactly the projection legs the subject supports, each with its\n` +
       `  committed golden/cases paths, repo-root-relative, plus an optional 'denovo' object\n` +
-      `  declaring where the G2 deposits live — bundle, register, fork_register, modules —\n` +
-      `  whose existence on disk is optional because producing them is agent work),\n` +
+      `  declaring where the G2 deposits live — bundle, register, fork_register, modules,\n` +
+      `  surface_map, plus per-deposit 'checks' floors and per-leg 'legs' declarations —\n` +
+      `  whose paths' existence on disk is optional because producing them is agent work),\n` +
       `  pins.json (the CLI surface,\n` +
       `  measured against that corpus), known-defects.json (measured negative controls,\n` +
       `  empty groups say why), and NOTES.md (free-prose idiosyncrasies; scripts never\n` +
@@ -282,11 +283,23 @@ export function loadSubject(id) {
     GO_S_DENOVO_REGISTER: "",
     GO_S_DENOVO_FORKS: "",
     GO_S_DENOVO_MODULES: "",
+    GO_S_DENOVO_MIN_DATED_ARMS: "",
+    GO_S_DENOVO_MIN_ASSERTIONS: "",
+    GO_S_DENOVO_SURFACE_MAP: "",
+    GO_S_DENOVO_DMN_CASES: "",
   };
   if (dn !== undefined) {
     if (typeof dn !== "object" || dn === null || Array.isArray(dn))
       die(`subject.json: 'denovo' must be an object`);
-    checkKeys("denovo", dn, ["bundle", "register", "fork_register", "modules"]);
+    checkKeys("denovo", dn, [
+      "bundle",
+      "register",
+      "fork_register",
+      "modules",
+      "checks",
+      "surface_map",
+      "legs",
+    ]);
     const declared = {
       bundle: "GO_S_DENOVO_BUNDLE",
       register: "GO_S_DENOVO_REGISTER",
@@ -324,6 +337,79 @@ export function loadSubject(id) {
         abs.push(a);
       }
       denovo.GO_S_DENOVO_MODULES = abs.join(" ");
+    }
+    // Floors are PER-ORIGIN (D2). `checks` measures the committed corpus and
+    // `denovo.checks` measures the deposit; a stage running over the de novo
+    // module set reads the de novo floor and never the corpus one — a corpus
+    // floor over a deposit would fail a healthy deposit for not being the
+    // corpus, and a deposit floor over the corpus would let the corpus shrink
+    // unnoticed. Same two keys, same shape, deliberately: the floor's meaning
+    // ("the measured population, pinned so a vacuous pass is impossible") does
+    // not change with the origin, only the population does. Both keys are
+    // optional here because a subject may declare modules before anyone has
+    // measured them; the stages say on the receipt when a floor is undeclared.
+    if (dn.checks !== undefined) {
+      if (
+        typeof dn.checks !== "object" ||
+        dn.checks === null ||
+        Array.isArray(dn.checks)
+      )
+        die(`subject.json: 'denovo.checks' must be an object`);
+      checkKeys("denovo.checks", dn.checks, [
+        "min_dated_arms",
+        "min_assertions",
+      ]);
+      const dnEnv = {
+        min_dated_arms: "GO_S_DENOVO_MIN_DATED_ARMS",
+        min_assertions: "GO_S_DENOVO_MIN_ASSERTIONS",
+      };
+      for (const [key, envName] of Object.entries(dnEnv)) {
+        if (dn.checks[key] === undefined) continue;
+        if (!Number.isInteger(dn.checks[key]) || dn.checks[key] < 0)
+          die(`denovo.checks.${key}: must be a non-negative integer`);
+        denovo[envName] = String(dn.checks[key]);
+      }
+    }
+    // The surface map is SPEC.md §8's pairing declaration — the one deposit
+    // that names BOTH encodings, so the one file p8-diff (the one stage
+    // licensed to read both) takes its module paths from. Existence is the
+    // stage's story, like every other deposit.
+    if (dn.surface_map !== undefined) {
+      if (typeof dn.surface_map !== "string" || !dn.surface_map)
+        die(`denovo.surface_map must be a non-empty string`);
+      denovo.GO_S_DENOVO_SURFACE_MAP = resolve(REPO, dn.surface_map);
+    }
+    // Per-leg de novo declarations. NOT a reuse of LEG_KEYS: that table makes
+    // `golden`/`fidelity_golden` required, and no de novo golden exists — a
+    // deposit has nothing committed to diff against, which is exactly why the
+    // g2 projection leg runs emit-only. So the closed set of declarable de novo
+    // leg keys is its own (small) table, extended only when a g2 leg learns to
+    // read a new one.
+    const DENOVO_LEG_KEYS = { "p7-dmn": { cases: "x" } };
+    const DENOVO_LEG_ENV = { "p7-dmn": { cases: "GO_S_DENOVO_DMN_CASES" } };
+    if (dn.legs !== undefined) {
+      if (
+        typeof dn.legs !== "object" ||
+        dn.legs === null ||
+        Array.isArray(dn.legs)
+      )
+        die(`subject.json: 'denovo.legs' must be an object`);
+      checkKeys("denovo.legs", dn.legs, LEG_ORDER);
+      for (const [leg, entry] of Object.entries(dn.legs)) {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry))
+          die(`denovo.legs['${leg}'] must be an object`);
+        checkKeys(
+          `denovo.legs['${leg}']`,
+          entry,
+          Object.keys(DENOVO_LEG_KEYS[leg] ?? {}),
+        );
+        for (const key of Object.keys(DENOVO_LEG_KEYS[leg] ?? {})) {
+          if (entry[key] === undefined) continue;
+          if (typeof entry[key] !== "string" || !entry[key])
+            die(`denovo.legs['${leg}'].${key} must be a non-empty string`);
+          denovo[DENOVO_LEG_ENV[leg][key]] = resolve(REPO, entry[key]);
+        }
+      }
     }
   }
 

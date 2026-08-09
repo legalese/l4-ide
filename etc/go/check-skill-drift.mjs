@@ -95,6 +95,45 @@ if (existsSync(refDir)) {
   }
 }
 
+// --- 3b. quoted driver declarations must be verbatim-current ------------------
+// The 2026-08-09 g2 wiring left seven stale stage-membership sentences in the
+// skill, and none of the checks above could see them: they compare the command
+// table, not prose. Prose stays uncheckable — but a QUOTED declaration is not
+// prose. The skill now states stage membership by quoting the driver's own
+// arrays (`G2_STAGES=(...)` etc.), and this check holds each quote to byte
+// equality with go.sh's current declaration. When the driver's list changes,
+// this goes red and the fixer updates the quote — which is the sentence.
+// A skill file that quotes none of them asserts nothing and checks nothing.
+{
+  const arrays = ["UNIMPLEMENTED_STAGES", "G1_STAGES", "G2_STAGES"];
+  const declared = {};
+  for (const name of arrays) {
+    const m = goSrc.match(new RegExp(`^${name}=\\(([^)]*)\\)`, "m"));
+    if (m) declared[name] = m[1].trim();
+  }
+  const skillFiles = [SKILL];
+  if (existsSync(refDir))
+    for (const f of readdirSync(refDir).filter((f) => f.endsWith(".md")))
+      skillFiles.push(resolve(refDir, f));
+  for (const file of skillFiles) {
+    const text = readFileSync(file, "utf8");
+    for (const name of arrays) {
+      for (const m of text.matchAll(new RegExp(`${name}=\\(([^)]*)\\)`, "g"))) {
+        const quoted = m[1].trim();
+        if (!(name in declared)) {
+          problems.push(
+            `${file.replace(REPO + "/", "")} quotes ${name}=(...), which go.sh no longer declares`,
+          );
+        } else if (quoted !== declared[name]) {
+          problems.push(
+            `${file.replace(REPO + "/", "")} quotes ${name}=(${quoted}); go.sh declares ${name}=(${declared[name]})`,
+          );
+        }
+      }
+    }
+  }
+}
+
 // --- 4. frontmatter shape ----------------------------------------------------
 const fm = skillSrc.match(/^---\n([\s\S]*?)\n---\n/);
 if (!fm)
@@ -126,6 +165,6 @@ if (problems.length) {
 }
 
 process.stdout.write(
-  `check-skill-drift: SKILL.md and go.sh agree on ${driverCommands.size} command(s) [${[...driverCommands].sort().join(", ")}]; every flag shown exists; no reference file carries a runnable command\n`,
+  `check-skill-drift: SKILL.md and go.sh agree on ${driverCommands.size} command(s) [${[...driverCommands].sort().join(", ")}]; every flag shown exists; no reference file carries a runnable command; every quoted stage list matches go.sh\n`,
 );
 process.exit(0);

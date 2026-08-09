@@ -8,13 +8,15 @@
 # The R4 fork-space agreement/divergence sweep (rung 2) and an external model
 # checker (rung 3) are still unbuilt, and the note on the receipt says so.
 #
-# NOT A DECLARED MILESTONE STAGE. `etc/go/go.sh` still lists `p8-verify` in
-# UNIMPLEMENTED_STAGES and G1_STAGES does not contain it, so a plain
-# `go.sh run --milestone g1` does not reach this script. That one-line driver
-# change is owned elsewhere; until it lands, this leg is exercised by invoking
-# the script directly with GO_ROOT/GO_RUN/GO_STAGE and the subject environment
-# set, which writes a real receipt into a real journal. Everything below is
-# written to be correct the moment the driver declares it.
+# DECLARED AT BOTH MILESTONES since 2026-08-09 (D3): `go.sh` names p8-verify
+# in G1_STAGES (after p6-tests) and G2_STAGES, HG1-gated at both — SPEC.md
+# §7.3 blocks P6 onward, and this stage publishes analysis OF the encoding
+# under review. It verifies whichever module set the driver resolved
+# (GO_MODULES: the committed corpus at g1, the de novo deposit at g2); the
+# five control fixtures below travel with the stage regardless of origin,
+# because they are facts about the CHECKER, not about any body of law. Direct
+# invocation with GO_ROOT/GO_RUN/GO_STAGE and the subject environment still
+# works and still writes a real receipt into a real journal.
 #
 # == The pass condition, and why the negative controls carry it
 #
@@ -26,14 +28,14 @@
 # (house convention 4: every positive control ships a negative sibling) and
 # treats a control that misbehaves as BROKEN, not as a finding.
 #
-#   PASS      every control reproduces its declared verdict, AND every declared
-#             corpus module was analysed with zero findings
-#   DEGRADED  every control reproduces its declared verdict, AND some corpus
-#             module has findings — that is this stage's OUTPUT, reported in the
+#   PASS      every control reproduces its declared verdict, AND every module
+#             in the resolved set was analysed with zero findings
+#   DEGRADED  every control reproduces its declared verdict, AND some module
+#             has findings — that is this stage's OUTPUT, reported in the
 #             report's own words, not a harness failure
 #   BROKEN    a control did not reproduce its declared verdict; the checker is
 #             defective or a control has gone stale, and either way nothing this
-#             stage says about the corpus can be trusted
+#             stage says about the module set can be trusted
 #
 # == What a PASS here is worth
 #
@@ -44,9 +46,17 @@
 # its own without inlining callees, and it is sound but not complete. Silence is
 # not a consistency proof.
 
+# The milestone-scoped module set, resolved by the driver as GO_MODULES with
+# GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
+# documented direct-invocation route — the committed corpus set is the default,
+# preserving the pre-2026-08-09 contract.
+if [[ -z "${GO_MODULES+x}" ]]; then
+  GO_MODULES="${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  GO_MODULES_ORIGIN="corpus"
+fi
+
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
-    ${GO_S_WIZARD:+"$GO_S_WIZARD"} \
+  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-clean.l4" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-unsat.l4" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-dead-branch.l4" \
@@ -56,6 +66,20 @@ if [[ "${1:-}" == "--inputs" ]]; then
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
+
+# The deposit contract (ORCHESTRATOR.md §5.2): a module set the stage cannot
+# see is a missing PREREQUISITE, reported as SKIPPED with the key to declare or
+# the file to deposit — and fatal (exit 5) under L4_GO_REQUIRED=1 via go_skip.
+declare -a MODULES=()
+read -ra MODULES <<<"${GO_MODULES:-}"
+if [[ ${#MODULES[@]} -eq 0 ]]; then
+  go_skip "the '$GO_S_ID' sidecar declares no module set for this milestone's origin (${GO_MODULES_ORIGIN:-corpus}: denovo.modules), so there is nothing to verify. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
+fi
+declare -a MISSING_MODULES=()
+for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING_MODULES+=("$m"); done
+if [[ ${#MISSING_MODULES[@]} -gt 0 ]]; then
+  go_skip "the declared module set has not been fully deposited yet: ${#MISSING_MODULES[@]} of ${#MODULES[@]} module(s) are not files — ${MISSING_MODULES[*]}. Depositing them is agent work; re-run this stage after."
+fi
 
 LOG="$GO_OUT/p8-verify.txt"
 : >"$LOG"
@@ -129,12 +153,9 @@ if [[ $CTRL_BAD -gt 0 ]]; then
   go_broken "$CTRL_BAD of ${#CONTROLS[@]} control fixtures did not reproduce their declared verdict; see $LOG"
 fi
 
-# --- the corpus --------------------------------------------------------------
+# --- the module set ----------------------------------------------------------
 
-declare -a MODULES=("$GO_S_CORPUS")
-[[ -n "${GO_S_WIZARD:-}" ]] && MODULES+=("$GO_S_WIZARD")
-
-declare -a METRICS=()
+declare -a METRICS=(--metric "module_origin=${GO_MODULES_ORIGIN:-corpus}")
 TOTAL_FINDINGS=0
 TOTAL_DECISIONS=0
 TOTAL_ANALYSED=0
@@ -144,7 +165,7 @@ TOTAL_NESTED=0
 
 {
   echo
-  echo "CORPUS:"
+  echo "MODULE SET (${GO_MODULES_ORIGIN:-corpus}):"
 } >>"$LOG"
 
 for SRC in "${MODULES[@]}"; do
@@ -209,7 +230,7 @@ RUNG_NOTE="Rung 1 of 3. R5 (2026-08-02) ordered the P8 ladder as ROBDD first, th
 
 if [[ $TOTAL_FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \
-    --reason "the verifier ran over ${#MODULES[@]} corpus module(s) and reported $TOTAL_FINDINGS propositional finding(s) across $TOTAL_ANALYSED analysed decision(s). Each finding names its decision, its site in the ladder, the atoms involved and what is wrong with it; see the .verify.txt artifacts. All ${#CONTROLS[@]} controls reproduced, so the checker was working when it said so — these are findings about the corpus, not about the harness." \
+    --reason "the verifier ran over ${#MODULES[@]} ${GO_MODULES_ORIGIN:-corpus}-origin module(s) and reported $TOTAL_FINDINGS propositional finding(s) across $TOTAL_ANALYSED analysed decision(s). Each finding names its decision, its site in the ladder, the atoms involved and what is wrong with it; see the .verify.txt artifacts. All ${#CONTROLS[@]} controls reproduced, so the checker was working when it said so — these are findings about the encoding, not about the harness." \
     "${ARTS[@]}" "${METRICS[@]}" \
     --note "$BOUND_NOTE" \
     --note "$RUNG_NOTE"

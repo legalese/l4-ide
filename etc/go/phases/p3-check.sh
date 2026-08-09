@@ -1,32 +1,64 @@
 #!/usr/bin/env bash
-# P3 at G1 — CHECK the existing corpus. There is no encoding here.
+# P3-check — the mechanisable P3 house rules, over the milestone's module set.
 #
-# SPEC.md §6 G1: "orchestrator skeleton drives the EXISTING corpus through every
-# currently-green projection … No de novo encoding." The de novo half of P3 is
-# etc/go/phases/p3-encode.sh, which refuses with a named blocker.
+# These are P3 HOUSE RULES, not corpus facts, so the same checks apply to
+# whichever module set the driver resolved (2026-08-09): the committed corpus
+# at g1, the de novo deposit (denovo.modules) at g2. The de novo ACCEPTANCE
+# half of P3 — "the deposit exists and the compiler accepts it" — is
+# etc/go/phases/p3-encode.sh; the two stages deliberately layer.
 #
 # Two of P3's house rules are mechanically checkable and are checked here:
 # BRANCH-over-ELSE-IF, and an @ref FR citation on every dated arm. The third —
 # "isomorphic, reviewable section by section against the regulation" — is not
 # checkable in principle, and it is RECORDED as unverified rather than omitted.
 
+# The milestone-scoped module set, resolved by the driver as GO_MODULES with
+# GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
+# documented direct-invocation route — the committed corpus set is the default,
+# preserving the pre-2026-08-09 contract.
+if [[ -z "${GO_MODULES+x}" ]]; then
+  GO_MODULES="${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  GO_MODULES_ORIGIN="corpus"
+fi
+
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}"
+  # The dated-arm floor is a VERDICT INPUT this stage reads (sidecar-derived,
+  # via GO_S_* env), so it is a digest contributor — `text:` entries are
+  # literal contributors, per digestSet in lib/ledger.mjs. Without it a floor
+  # edit escaped the digest and a resumed run replayed the old verdict
+  # (measured 2026-08-09 on p6-tests' twin floor; this stage had the same
+  # hole). The undeclared case is a distinct contributor because it changes
+  # the receipt (the inapplicable-floor note below).
+  if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
+    _floor="${GO_S_DENOVO_MIN_DATED_ARMS:-undeclared}"
+  else
+    _floor="${GO_S_MIN_DATED_ARMS:-undeclared}"
+  fi
+  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" "text:min_dated_arms=$_floor"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
+
+# The deposit contract (ORCHESTRATOR.md §5.2): a module set the stage cannot
+# see is a missing PREREQUISITE, reported as SKIPPED with the key to declare or
+# the file to deposit — and fatal (exit 5) under L4_GO_REQUIRED=1 via go_skip.
+declare -a MODULES=()
+read -ra MODULES <<<"${GO_MODULES:-}"
+if [[ ${#MODULES[@]} -eq 0 ]]; then
+  go_skip "the '$GO_S_ID' sidecar declares no module set for this milestone's origin (${GO_MODULES_ORIGIN:-corpus}: denovo.modules), so there is nothing to hold the P3 house rules against. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
+fi
+declare -a MISSING=()
+for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING+=("$m"); done
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  go_skip "the declared module set has not been fully deposited yet: ${#MISSING[@]} of ${#MODULES[@]} module(s) are not files — ${MISSING[*]}. Depositing them is agent work; re-run this stage after."
+fi
 
 LOG="$GO_OUT/p3-check.txt"
 : >"$LOG"
 FINDINGS=0
 
 note() { echo "$*" | tee -a "$LOG"; }
-
-# The subject's module set: the corpus proper, plus the wizard companion when
-# the sidecar declares one.
-declare -a MODULES=("$GO_S_CORPUS")
-[[ -n "${GO_S_WIZARD:-}" ]] && MODULES+=("$GO_S_WIZARD")
 
 # --- 1. typecheck ------------------------------------------------------------
 for f in "${MODULES[@]}"; do
@@ -111,15 +143,42 @@ DATED_ARMS=$(cat "$COUNTFILE" 2>/dev/null || echo 0)
 #
 # So a zero, or a drop below the known population, is a finding about the
 # MATCHER and is reported as one. The floor is the subject's own measured
-# dated-arm count, pinned in its sidecar (subject.json, checks.min_dated_arms)
-# with the population census in the sidecar's NOTES.md. Raise the floor when
-# the corpus gains arms; do not lower it to make this pass.
-MIN_DATED_ARMS="$GO_S_MIN_DATED_ARMS"
+# dated-arm count for THIS ORIGIN's module set (D2, 2026-08-09: floors are
+# per-origin — subject.json checks.min_dated_arms for the corpus,
+# denovo.checks.min_dated_arms for the deposit) with the population census in
+# the sidecar's NOTES.md. Raise the floor when the module set gains arms; do
+# not lower it to make this pass.
+#
+# THE ZERO-FLOOR CASE IS NOT A GREEN. A pinned floor of 0 over a matched count
+# of 0 is exactly the vacuous pass this floor exists to prevent, so it prints
+# NOT CHECKED with the reason on the receipt instead of "all 0 dated arm(s)
+# carry an @ref". Measured on the regcf de novo deposit (2026-08-09): the
+# module IS temporally parameterised (8 decisions read the rule date, per the
+# DMN exporter's D-RULEDATE advisory) but routes every arm through a helper
+# abstraction over YMD constants, which this line-shaped matcher cannot see —
+# 0 matched arms is that module's true population under THIS matcher, and the
+# sidecar's NOTES.md carries the census.
+declare -a TEMPORAL_NOTES=()
+if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
+  MIN_DATED_ARMS="${GO_S_DENOVO_MIN_DATED_ARMS:-0}"
+  FLOOR_KEY="denovo.checks.min_dated_arms"
+  if [[ -z "${GO_S_DENOVO_MIN_DATED_ARMS:-}" ]]; then
+    TEMPORAL_NOTES+=(--note "the sidecar declares no denovo.checks.min_dated_arms; the dated-arm floor defaulted to 0, which makes the temporal-closure sub-check inapplicable rather than green. Measure the deposit and pin its floor.")
+  fi
+else
+  MIN_DATED_ARMS="$GO_S_MIN_DATED_ARMS"
+  FLOOR_KEY="checks.min_dated_arms"
+fi
 
 if [[ -n "$UNREFD" ]]; then
   note "FINDING: dated arms with no @ref anywhere in their own declaration block:"
   note "$UNREFD"
   FINDINGS=$((FINDINGS + 1))
+elif [[ "$DATED_ARMS" -eq 0 && "$MIN_DATED_ARMS" -eq 0 ]]; then
+  note "temporal closure: NOT CHECKED — the matcher found no dated arms in this module set and the pinned floor ($FLOOR_KEY) is 0."
+  note "  'every dated arm carries an @ref' over an empty matched set is a vacuous pass, and this stage refuses to print one as a green."
+  note "  A 0 floor is honest only when 0 is the measured population; the sidecar's NOTES.md must carry that census."
+  TEMPORAL_NOTES+=(--note "temporal closure NOT CHECKED (does not affect status): 0 dated arms matched and the pinned floor for this origin ($FLOOR_KEY) is 0, so the @ref-per-dated-arm rule had nothing to hold — a vacuous pass refused, not a green earned; see the sidecar's NOTES.md for the population census")
 elif [[ "$DATED_ARMS" -lt "$MIN_DATED_ARMS" ]]; then
   note "FINDING: the temporal-closure check matched only $DATED_ARMS dated arm(s), below the pinned floor of $MIN_DATED_ARMS."
   note "  An empty or near-empty matched set satisfies 'every dated arm carries an @ref' vacuously,"
@@ -189,22 +248,30 @@ note "  module typechecks. It does not mean the encoding is faithful."
 # used to live only in $LOG, which the journal names by path and sha256 — and a
 # sha256 is not invertible, so "nine ELSE IF sites" was a number nobody could
 # get back out of the journal it was said to come from.
-METRICS=(--metric "else_if_sites=$ELSEIF_N" --metric "dated_arms=$DATED_ARMS" --metric "min_dated_arms=$MIN_DATED_ARMS" \
+METRICS=(--metric "modules=${#MODULES[@]}" --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" \
+         --metric "else_if_sites=$ELSEIF_N" --metric "dated_arms=$DATED_ARMS" --metric "min_dated_arms=$MIN_DATED_ARMS" \
          --metric "label_only_strings=$LABELS" --metric "label_order_warnings=$LABEL_WARNINGS" --metric "label_gaps=$LABEL_GAPS")
 
 if [[ $FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "$FINDINGS of the automatable P3 house-style checks failed; see $LOG" \
-    --artifact "$LOG" "${METRICS[@]}" ${LABEL_NOTES[@]+"${LABEL_NOTES[@]}"}
+    --artifact "$LOG" "${METRICS[@]}" ${LABEL_NOTES[@]+"${LABEL_NOTES[@]}"} ${TEMPORAL_NOTES[@]+"${TEMPORAL_NOTES[@]}"}
   exit "$GO_EXIT_FINDING"
 fi
 
+# The oracle statement must not claim the temporal-closure half when it was
+# NOT CHECKED (zero matched arms over a zero floor).
+if [[ "$DATED_ARMS" -eq 0 && "$MIN_DATED_ARMS" -eq 0 ]]; then
+  ORACLE_TEMPORAL="temporal closure NOT CHECKED (0 matched arms, floor 0 — see note)"
+else
+  ORACLE_TEMPORAL="an @ref inside the declaration block of every dated arm, over at least $MIN_DATED_ARMS matched arms"
+fi
 ORACLE_CHECKS="$(for f in "${MODULES[@]}"; do printf 'l4 check %s && ' "$(basename "$f")"; done)"
 go_receipt \
   --status PASS \
-  --oracle-cmd "${ORACLE_CHECKS}no ELSE IF chain && an @ref inside the declaration block of every dated arm, over at least $MIN_DATED_ARMS matched arms" \
+  --oracle-cmd "${ORACLE_CHECKS}no ELSE IF chain && $ORACLE_TEMPORAL" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "typechecking is the compiler's own verdict on the module; the two grep checks are the mechanisable half of P3's house rules, and the dated-arm floor stops the second one passing over an empty matched set. Faithfulness to the source regulation is NOT covered and is carried by HG1." \
-  --artifact "$LOG" "${METRICS[@]}" ${LABEL_NOTES[@]+"${LABEL_NOTES[@]}"} \
+  --oracle-because "typechecking is the compiler's own verdict on the module; the two grep checks are the mechanisable half of P3's house rules, and the dated-arm floor stops the second one passing over an empty matched set (a 0 floor demotes that sub-check to NOT CHECKED on the receipt rather than passing it). Faithfulness to the source regulation is NOT covered and is carried by HG1." \
+  --artifact "$LOG" "${METRICS[@]}" ${LABEL_NOTES[@]+"${LABEL_NOTES[@]}"} ${TEMPORAL_NOTES[@]+"${TEMPORAL_NOTES[@]}"} \
   --note "isomorphism against $GO_S_CITATION is unverified by this stage and is HG1's subject"

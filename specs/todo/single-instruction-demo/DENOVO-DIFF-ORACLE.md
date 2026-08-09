@@ -1,17 +1,27 @@
 # The de novo diff oracle — SPEC.md §8's acceptance comparator
 
-**Status (2026-08-02): BUILT, not yet exercised by a real G2 run.** `etc/go/lib/denovo-diff.mjs`
-runs today and both of its self-tests are measured below (§7). What it has never seen is a second
-encoding: every measurement here is the committed Reg CF corpus against itself, or against a
-scratch copy of itself with one constant moved. **No pipeline stage calls it.** `p3-encode` and
-`p4-forks` stopped refusing on 2026-08-03 (`ORCHESTRATOR.md` §5.2), but what they do is VALIDATE a
-deposit an agent produced — they still do not produce the de novo module this oracle exists to
-compare, and invoking the oracle stays the agent's act (SKILL.md's G2 runbook). Where this document disagrees with the tree, the tree wins.
+**Status (2026-08-09): BUILT and WIRED — `etc/go/phases/p8-diff.sh` calls it, as a declared
+g2 stage.** `etc/go/lib/denovo-diff.mjs` runs today and both of its self-tests are measured below
+(§7). It has now seen a second encoding: `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` is
+committed, the committed surface map (`jl4/examples/legal/regcf/denovo/surface-map.json`) pairs
+the corpus against it, and the first two-encodings run over that pair measured 80/80 agreement
+across 4 pairs × 20 battery rows (2026-08-09; an out-of-band two-encodings run had already
+happened via the charities cleanroom, PR #201). Read that 80/80 with its qualifier: the
+committed map declares `battery.perturbation.enabled=false` ("off by construction"), so 0
+leaves were perturbed, the Sensitivity table is empty, and the agreement count is unweighted
+by leaf inertness — the receipt says so (`leaves_perturbed=0`, `perturbation_enabled=false`,
+added 2026-08-09 after the first run published the number unqualified). The stage follows the deposit contract — no
+declared `denovo.surface_map`, or a map not yet on disk, is `SKIPPED` with the key named — and
+maps the comparator's exit contract onto the lattice: 0 and 1 (divergence is a finding, not a
+failure) are a completed measurement, 2 and 4 are a `DEGRADED` receipt naming the harness error.
+Writing the map, the module and the triage of any witness stay agent/reviewer acts. The
+measurements below this header predate the wiring and are kept as written. Where this document
+disagrees with the tree, the tree wins.
 
-What that means for SPEC.md §6's milestone list: G2's entry condition was "R4 ruled" (satisfied
-2026-08-02) and its acceptance is "the §8 diff oracle". The oracle now exists, and the P1–P5
-stages now have an acceptance condition each — but nothing in the pipeline WRITES a de novo
-encoding, so the oracle still has nothing of its own to compare.
+What that means for SPEC.md §6's milestone list: G2's acceptance is "the §8 diff oracle", and a
+`go.sh run --milestone g2` now runs it wherever the sidecar declares a surface map. The pipeline
+still WRITES no de novo encoding — producing the deposits remains agent work by design — so a
+subject with no deposits still yields a `SKIPPED` comparator receipt, on the record.
 
 ---
 
@@ -512,6 +522,10 @@ file, not by remembering the edit):
 - **`ORCHESTRATOR.md` §8** ("Deliberately not built") listed "the de novo path and the §8 diff
   oracle" as unbuilt. The oracle is no longer in that table's row: the row now says the comparator
   is built, self-tested and unexercised, and that the de novo path it serves is still unbuilt.
+  (Moved again 2026-08-09: "unexercised" left that row when `p8-diff` wired the comparator as a
+  declared g2 stage — the row now reads built, self-tested and wired. The g2-wiring change
+  initially retensed the status header above and §5.1a/§5.2 but not §8; the repair pass caught
+  the row, which is this cross-reference doing its job.)
 - **`ORCHESTRATOR.md` §1** said "Milestone G2 is unbuilt … The §8 diff oracle does not exist
   either". The second clause was repaired in place, and the bullet says in so many words that the
   earlier version was true when written and is not now.

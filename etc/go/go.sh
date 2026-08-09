@@ -10,14 +10,14 @@
 # through every currently-reachable projection and emits conversion report v0.
 # No de novo encoding.
 #
-# MILESTONE G2 — the de novo run — runs its DEPOSIT-VALIDATING half. P1, P2, P3
-# and P4 do not fetch, search, encode or find forks: those need the network or a
-# model and this driver takes neither. They validate what an agent deposited,
-# and report SKIPPED with a named reason when the deposit is not there yet. So
-# `g2 COMPLETE` means every g2 stage is accounted for — NOT that a de novo run
-# happened. SPEC.md §6's G2 acceptance is the §8 diff oracle
-# (etc/go/lib/denovo-diff.mjs), which no stage calls. See
-# `go.sh plan --milestone g2`.
+# MILESTONE G2 — the de novo run — validates AND measures the agent's deposit.
+# P1-P4 do not fetch, search, encode or find forks (those need the network or a
+# model; this driver takes neither); p3-check, p6-tests, p8-verify and p7-dmn
+# (emit-only) measure the deposited module set, and p8-diff runs SPEC.md §6's
+# G2 acceptance — the §8 diff oracle — over the declared surface map. Every
+# stage reports SKIPPED, on the record, when its deposit is not there; so
+# `g2 COMPLETE` means every stage is accounted for — NOT that a de novo run
+# happened. See `go.sh plan --milestone g2`.
 #
 # This script NEVER runs cabal, never commits, and never pushes.
 #
@@ -81,20 +81,31 @@ P7_LEG_ORDER=(
 #
 # p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they are
 # now real stages that validate a deposit, and they are g2's declared members.
-UNIMPLEMENTED_STAGES=(p8-verify p10-publish)
+# p8-verify left it 2026-08-09 (D3): declared at both milestones below.
+UNIMPLEMENTED_STAGES=(p10-publish)
 
-# G2's declared stages, in order. The five de novo stages plus the report.
+# G2's declared stages, in order (2026-08-09, D5). The five deposit-validating
+# stages, the measurement stages over the deposit, the §8 comparator, and the
+# report.
 #
-# WHAT IS DELIBERATELY NOT HERE, and why the omission is the honest choice:
-# p3-check, p6-tests and every p7 leg read the subject's COMMITTED corpus and
-# its committed goldens (GO_S_CORPUS, legs[*].golden). Running them inside a g2
-# run would measure the replay artifacts and file the result under a de novo
-# label — "the encoding typechecks", "its assertions hold" — about a module the
-# de novo run never wrote. Re-pointing them at a `denovo.modules` deposit is
-# unbuilt; until it is, they are named in `plan --milestone g2` as NOT WIRED
-# rather than run. p9-report is included because it reads journal.ndjson and
+# LAYERING, stated where the list is declared because both P3 stages run:
+# p3-encode is deposit ACCEPTANCE — the module exists and `l4 check` accepts
+# it, nothing else — while p3-check holds the P3 HOUSE RULES (BRANCH over
+# ELSE IF, @ref per dated arm, the per-origin floors) against the same
+# deposit. They are one phase's two halves and their receipts say so.
+# p6-tests runs the deposit's own #ASSERT directives; p7-dmn runs EMIT-ONLY
+# (no goldens exist for a deposit — see the leg's g2 branch); p8-verify runs
+# `l4 verify`; p8-diff is the ONE stage licensed to read both the committed
+# corpus and the deposit, because SPEC.md §8's acceptance is precisely the
+# comparison of the two over the declared surface map.
+#
+# STILL NOT HERE: p0-preflight — so a g2 run carries no CLI-surface pin and no
+# failing-#ASSERT tripwire, while p6-tests' oracle rests on the workaround
+# that tripwire defends (§5.3); a p0 for g2 is future work. The p7 legs other
+# than p7-dmn read committed goldens/entries the deposit does not have; the
+# plan names each one's missing piece. p9-report reads journal.ndjson and
 # nothing else, so it is correct for any milestone.
-G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p9-report)
+G2_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
@@ -210,7 +221,10 @@ declare -a GO_CORPUS_FILES=("$GO_S_CORPUS")
 # §6.3 claims for a post-gate edit.
 if [[ "$MILESTONE" == "g2" ]]; then
   GO_CORPUS_FILES=()
-  for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}"; do
+  # The surface map is in the set for the same reason the narrative deposit is
+  # in g1's: HG1 covers the pairing declaration too, and a map edited after a
+  # waiver would otherwise ride the old grant into p8-diff.
+  for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
     [[ -n "$_p" ]] && GO_CORPUS_FILES+=("$_p")
   done
   if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
@@ -243,9 +257,34 @@ else
   fi
 fi
 
+# --- the milestone-scoped module set (ONE list per run) ----------------------
+# p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
+# g1 the committed corpus (corpus.main + optional corpus.wizard), at g2 the
+# subject's declared de novo deposit (denovo.modules — possibly empty, which
+# those stages report as SKIPPED under the deposit contract). GO_MODULES_ORIGIN
+# says which, so a stage selects the matching per-origin floor and never reads
+# a corpus floor over a deposit, or a deposit floor over the corpus.
+#
+# Exported EXPLICITLY: the `export "${!GO_S_@}"` glob above covers only the
+# sidecar-derived names, and the `--inputs` answers are produced by subshells
+# the dispatch loop spawns, which inherit only exported env.
+if [[ "$MILESTONE" == "g2" ]]; then
+  GO_MODULES="${GO_S_DENOVO_MODULES:-}"
+  GO_MODULES_ORIGIN="denovo"
+else
+  GO_MODULES="$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  GO_MODULES_ORIGIN="corpus"
+fi
+export GO_MODULES GO_MODULES_ORIGIN
+
 # Assemble the declared stage list and the HG1 set from the sidecar's legs.
-G1_STAGES=(p0-preflight p3-check p6-tests)
-gated_by_HG1="p6-tests"
+# p8-verify sits directly after p6-tests (D3, 2026-08-09) and is HG1-gated on
+# the same line it is declared: SPEC.md §7.3 blocks P6 onward, and a
+# verification report about an unreviewed encoding is still analysis OF that
+# encoding. (ORCHESTRATOR.md §5.1a's gates row was retensed in the same
+# change.)
+G1_STAGES=(p0-preflight p3-check p6-tests p8-verify)
+gated_by_HG1="p6-tests p8-verify"
 for s in "${P7_LEG_ORDER[@]}"; do
   if [[ " $GO_S_LEGS " == *" $s "* ]]; then
     G1_STAGES+=("$s")
@@ -263,10 +302,14 @@ done
 G1_STAGES+=(p9-report p9-explain)
 gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 
-# SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the only stage after
-# P5 is the report, so that is what HG1 gates — and, as at g1, a g2 run stops
-# there with exit 3 until the gate is signed or waived on the record.
-if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p9-report"; fi
+# SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the stages after P5
+# are the §8 comparator and the report, so those are what HG1 gates — and, as
+# at g1, a g2 run stops there with exit 3 until the gate is signed or waived on
+# the record. At g2 the gate binds to the DE NOVO deposit-set digest (see
+# GO_CORPUS_FILES above), so a waiver over the replay corpus covers nothing
+# here, and depositing or editing a deposit — the surface map included —
+# re-opens the gate.
+if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p6-tests p7-dmn p8-verify p8-diff p9-report"; fi
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -319,19 +362,47 @@ cmd_plan_g2() {
     for x in "${mm[@]}"; do [[ -f "$x" ]] || mstate=absent; done
   fi
   printf '  %-14s %-9s %-11s %s\n' "p3-encode" "-" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no denovo.modules in subject.json)")"
-  printf '  %-14s %-9s %-11s %s\n' "p3-check" "NOT WIRED" "-" "reads the committed corpus ($GO_S_CORPUS); re-pointing it at a de novo deposit is unbuilt"
+  printf '  %-14s %-9s %-11s %s\n' "p3-check" "-" "$mstate" "the P3 house rules over the SAME deposit: BRANCH over ELSE IF, @ref per dated arm, per-origin floors (denovo.checks)"
   printf '  %-14s %-9s %-11s %s\n' "p4-forks" "-" "$(deposit_state "$f")" "${f:-(no denovo.fork_register in subject.json)}"
 
   local n=0 s
   for s in "$b" "$r" "$f"; do [[ -n "$s" && -f "$s" ]] && n=$((n + 1)); done
   printf '  %-14s %-9s %-11s %s\n' "p5-gate" "-" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
   echo "  ---- HG1 ------- Meng's go on the encoding; blocks P6 onward (SPEC.md §7.3)"
-  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "NOT WIRED" "-" "reads the committed corpus; a de novo run's tests discriminate between FORKS, which is unbuilt"
-  local leg
+  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "HG1" "$mstate" "the deposit's own #ASSERT directives, via l4 run --json results[]; floor = denovo.checks.min_assertions"
+  # Every p7 leg the sidecar declares, with a PRECISE reason per leg: a plan
+  # that lists only what runs cannot tell a reader what is missing, and a
+  # generic reason ("compares against committed goldens") was true of some
+  # legs and false of others. p7-dmn is wired (emit-only, D6); the rest are
+  # not, each for its own named lack.
+  local leg legwhy
   for leg in "${P7_LEG_ORDER[@]}"; do
     [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
-    printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "compares against this subject's committed goldens, which are the replay artifacts"
+    if [[ "$leg" == "p7-dmn" ]]; then
+      printf '  %-14s %-9s %-11s %s\n' "p7-dmn" "HG1" "$mstate" "emit-only over the deposit: l4 export + dmn-moddle gate + engine-load probes; no golden exists, so no diff. Cases via denovo.legs['p7-dmn'].cases when declared"
+      continue
+    fi
+    case "$leg" in
+      p7-dmn-md) legwhy="golden-differential only, and no de novo dmn-md golden exists; re-pointing it emit-only is unbuilt" ;;
+      p7-bpmn) legwhy="needs an expected_dir + rules map for the deposit; the sidecar declares neither, and the leg's soundness gate reads committed goldens" ;;
+      p7-ladder) legwhy="needs a de novo demo entry + figures dir (no denovo demo/*.ts exists); the committed ones render the replay corpus" ;;
+      p7-lts) legwhy="its oracle cross-checks digraph count against the BPMN discovery call over the committed corpus; re-pointing both halves is unbuilt" ;;
+      p7-mcp) legwhy="needs a loopback JL4_GO_SERVICE_URL deployment of the DEPOSIT (it carries @exports); the leg today zips the committed corpus pair" ;;
+      p7-tnr) legwhy="the sidecar declares no denovo.legs['p7-tnr'].golden — a de novo .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
+      p7-wizard) legwhy="its well-formedness checks read the committed wizard module; the deposit declares no wizard split" ;;
+      p7-akn) legwhy="re-pointing its shallow well-formedness pass at the deposit is unbuilt" ;;
+      *) legwhy="re-pointing this leg at the deposit is unbuilt" ;;
+    esac
+    printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "$legwhy"
   done
+  printf '  %-14s %-9s %-11s %s\n' "p8-verify" "HG1" "$mstate" "l4 verify over the de novo module set; five control fixtures license the oracle"
+  local sm="${GO_S_DENOVO_SURFACE_MAP:-}" smwhat
+  if [[ -n "$sm" ]]; then
+    smwhat="SPEC.md §8's diff oracle over $sm"
+  else
+    smwhat="(no denovo.surface_map in subject.json)"
+  fi
+  printf '  %-14s %-9s %-11s %s\n' "p8-diff" "HG1" "$(deposit_state "$sm")" "$smwhat"
   printf '  %-14s %-9s %-11s %s\n' "p9-report" "HG1" "-" "reads journal.ndjson and nothing else"
   echo
   echo "declared by this driver at g2, and therefore run: ${G2_STAGES[*]}"
@@ -342,9 +413,11 @@ cmd_plan_g2() {
   echo "encode or find forks: those need the network or a model, and this driver takes"
   echo "neither (ORCHESTRATOR.md §2.1, §6.4). They VALIDATE what an agent deposited, and"
   echo "report SKIPPED with a named reason when the deposit is not there. So 'g2 COMPLETE'"
-  echo "means every g2 stage is accounted for — it does NOT mean a de novo run happened."
-  echo "SPEC.md §6's G2 acceptance is the §8 diff oracle, etc/go/lib/denovo-diff.mjs,"
-  echo "which no stage calls. Run with L4_GO_REQUIRED=1 to make an absent deposit fatal."
+  echo "means every g2 stage is accounted for — it does NOT mean a de novo run happened:"
+  echo "a run with every deposit absent is COMPLETE over SKIPPED receipts. SPEC.md §6's"
+  echo "G2 acceptance is the §8 diff oracle, etc/go/lib/denovo-diff.mjs, which p8-diff"
+  echo "runs over the declared surface map — its receipt above says whether it did."
+  echo "Run with L4_GO_REQUIRED=1 to make an absent deposit fatal."
 }
 
 cmd_plan() {
@@ -814,19 +887,33 @@ EOF
   if [[ -f "$RUN/journal.ndjson" ]]; then
     node "$GO_ROOT/etc/go/report/render-report.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
     # The explainer's final render, for the same reason and with the same
-    # status. It may legitimately not exist — a subject with no declared
-    # narrative, or a milestone that does not declare the stage — so a failure
-    # here is silent and leaves no file, rather than inventing one.
-    node "$GO_ROOT/etc/go/report/render-explainer.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+    # status — but DECLARED-STAGES-ONLY. p9-explain renders narrative prose
+    # about a body of law, and a milestone that does not declare the stage
+    # gets no explainer file. The guard is load-bearing, measured 2026-08-09
+    # before it existed: a g2 run wrote the g1 narrative — 127 KB about the
+    # COMMITTED corpus, drift banners included — into the run dir with no
+    # receipt, no journal row, and no gate covering it (the g2 HG1 digest
+    # deliberately excludes the narrative deposit), then announced its path.
+    # That is the relabelling ORCHESTRATOR.md §5.2 exists to prevent. (An
+    # earlier comment here PREDICTED this guard's behaviour while the render
+    # ran unconditionally; the sidecar's declared explainer dir made the
+    # prediction false.) At a declaring milestone the render may still
+    # legitimately leave no file — a subject with no declared narrative — so
+    # a failure stays silent rather than inventing one.
+    if [[ $'\n'"$stages"$'\n' == *$'\n'"p9-explain"$'\n'* ]]; then
+      node "$GO_ROOT/etc/go/report/render-explainer.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+    fi
   fi
 
   echo
   echo "go: VERDICT: $MILESTONE $verdict"
   if [[ "$MILESTONE" == "g2" ]]; then
-    echo "go:   g2's verdict is over its DEPOSIT-VALIDATING stages. It says the deposits"
-    echo "go:   present are well formed and names the ones that are not there. It does not"
-    echo "go:   say a de novo run happened: SPEC.md §6's G2 acceptance is the §8 diff oracle"
-    echo "go:   (node etc/go/lib/denovo-diff.mjs), which no stage calls."
+    echo "go:   g2's verdict is over its declared stages. It says the deposits present are"
+    echo "go:   well formed and names the ones that are not there. It does not, by itself,"
+    echo "go:   say a de novo run happened: a run with every deposit absent is COMPLETE over"
+    echo "go:   SKIPPED receipts. SPEC.md §6's G2 acceptance is the §8 diff oracle"
+    echo "go:   (node etc/go/lib/denovo-diff.mjs), which the p8-diff stage runs when a"
+    echo "go:   surface map is deposited — read its receipt, not the verdict, for that."
   fi
   echo "go: journal  $RUN/journal.ndjson"
   [[ -f "$RUN/report.md" ]] && echo "go: report   $RUN/report.md"
