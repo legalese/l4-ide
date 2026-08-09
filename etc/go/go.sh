@@ -210,7 +210,10 @@ declare -a GO_CORPUS_FILES=("$GO_S_CORPUS")
 # §6.3 claims for a post-gate edit.
 if [[ "$MILESTONE" == "g2" ]]; then
   GO_CORPUS_FILES=()
-  for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}"; do
+  # The surface map is in the set for the same reason the narrative deposit is
+  # in g1's: HG1 covers the pairing declaration too, and a map edited after a
+  # waiver would otherwise ride the old grant into p8-diff.
+  for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
     [[ -n "$_p" ]] && GO_CORPUS_FILES+=("$_p")
   done
   if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
@@ -242,6 +245,26 @@ else
     done
   fi
 fi
+
+# --- the milestone-scoped module set (ONE list per run) ----------------------
+# p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
+# g1 the committed corpus (corpus.main + optional corpus.wizard), at g2 the
+# subject's declared de novo deposit (denovo.modules — possibly empty, which
+# those stages report as SKIPPED under the deposit contract). GO_MODULES_ORIGIN
+# says which, so a stage selects the matching per-origin floor and never reads
+# a corpus floor over a deposit, or a deposit floor over the corpus.
+#
+# Exported EXPLICITLY: the `export "${!GO_S_@}"` glob above covers only the
+# sidecar-derived names, and the `--inputs` answers are produced by subshells
+# the dispatch loop spawns, which inherit only exported env.
+if [[ "$MILESTONE" == "g2" ]]; then
+  GO_MODULES="${GO_S_DENOVO_MODULES:-}"
+  GO_MODULES_ORIGIN="denovo"
+else
+  GO_MODULES="$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  GO_MODULES_ORIGIN="corpus"
+fi
+export GO_MODULES GO_MODULES_ORIGIN
 
 # Assemble the declared stage list and the HG1 set from the sidecar's legs.
 G1_STAGES=(p0-preflight p3-check p6-tests)

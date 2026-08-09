@@ -7,12 +7,23 @@
     "script reads. All paths are repo-root-relative.",
     "",
     "'denovo' declares where this subject's G2 deposits live. Those paths'",
-    "EXISTENCE is optional and none of them is on this branch: producing them is",
-    "agent work (fetch, sweep, encode, fork), and the stages report SKIPPED with",
-    "a named reason until they appear. 'denovo.modules' may not name a corpus",
+    "EXISTENCE is optional: producing them is agent work (fetch, sweep, encode,",
+    "fork), and the stages report SKIPPED with a named reason until they appear.",
+    "As of 2026-08-09 all five declared deposits ARE on disk, committed by the",
+    "de novo runs of 2026-08-05..09. 'denovo.modules' may not name a corpus",
     "module -- SPEC.md section 8's diff oracle compares the de novo encoding",
     "AGAINST the committed one, so a de novo module that IS the corpus makes that",
-    "comparison an identity."
+    "comparison an identity.",
+    "",
+    "'denovo.checks' floors measure the DEPOSIT, never the corpus (per-origin",
+    "floors, 2026-08-09). min_assertions 39 = assertions_total from 'l4 run",
+    "--json' results[] over regcf-denovo.l4, the figure p6-tests compares against",
+    "(the source text carries 40 '#ASSERT' strings; the 40th is prose in a",
+    "comment at regcf-denovo.l4:3590). min_dated_arms 0 = the population under",
+    "p3-check's matcher: the module routes rule-date logic through a helper",
+    "abstraction over YMD constants, which that matcher cannot see -- NOTES.md",
+    "has the census. A 0 floor makes p3-check report the sub-check NOT CHECKED",
+    "rather than vacuously green."
   ],
   "id": "regcf",
   "display_name": "SEC Regulation Crowdfunding",
@@ -33,7 +44,12 @@
     "bundle": "jl4/examples/legal/regcf/denovo/source-bundle.json",
     "register": "jl4/examples/legal/regcf/denovo/external-modifications.json",
     "fork_register": "jl4/examples/legal/regcf/denovo/fork-register.json",
-    "modules": ["jl4/examples/legal/regcf/denovo/regcf-denovo.l4"]
+    "modules": ["jl4/examples/legal/regcf/denovo/regcf-denovo.l4"],
+    "checks": {
+      "min_dated_arms": 0,
+      "min_assertions": 39
+    },
+    "surface_map": "jl4/examples/legal/regcf/denovo/surface-map.json"
   },
   "legs": {
     "p7-dmn": {

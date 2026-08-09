@@ -19,9 +19,11 @@ here in the same change that moved it — a stale idiosyncrasy note misleads the
 
 ## House-rule tolerances
 
-- **Nine `ELSE IF` sites** stand in the pair against P3's BRANCH-over-`ELSE IF` house rule.
-  They are tolerated, not endorsed: `p3-check` reports them as a finding and the leg rides
-  DEGRADED. Do not add more; converting the nine is open corpus work.
+- **Thirteen `ELSE IF` sites** stand in the pair against P3's BRANCH-over-`ELSE IF` house rule
+  (nine until 2026-08-09, when the 501(a)(4) decomposition added four wizard sites;
+  measured with p3-check's own regex: `regcf.l4` ×2, `regcf-wizard.l4` ×11). They are
+  tolerated, not endorsed: `p3-check` reports them as a finding and the leg rides
+  DEGRADED. Do not add more; converting the thirteen is open corpus work.
 - **`checks.min_dated_arms` is 2, and why.** `regcf.l4` has 5 `RULES EFFECTIVE DATE` sites, of
   which exactly 2 are _dated arms_ (compare against a `Date` literal on the same line — the
   COVID-window bounds at lines 475–476); the other 3 are comment prose ×2 and one parameterised
@@ -32,6 +34,24 @@ here in the same change that moved it — a stale idiosyncrasy note misleads the
   near `regcf.l4:472` makes the check report both arms.
 - **`checks.min_assertions` is 20.** The pair carries well over that many `#ASSERT` directives;
   the floor exists because `results[]` satisfies "no failed assertion" vacuously when empty.
+
+## De novo floors (`denovo.checks`, measured 2026-08-09)
+
+- **`denovo.checks.min_assertions` is 39**, and 39 is the `assertions_total` sum out of
+  `l4 run --json` results[] over `regcf-denovo.l4` — the figure `p6-tests` actually compares
+  against. `grep -c '#ASSERT'` says 40, and the discrepancy is one comment
+  (`regcf-denovo.l4:3590`, prose discussing why a DEONTIC value cannot be EQUALS-compared in an
+  `#ASSERT`). Pin floors to the executed count, not the string count.
+- **`denovo.checks.min_dated_arms` is 0, and 0 is the measured population, not a dodge.**
+  `regcf-denovo.l4` has exactly one non-comment `RULES EFFECTIVE DATE` site (line 220), the body
+  of a helper abstraction (`` `the rules in force include` change ``) that compares a
+  _parameter_, so p3-check's matcher — which requires a `Date <digit>` literal on the same
+  physical line — matches zero arms. The module IS temporally parameterised: the DMN exporter's
+  `[D-RULEDATE]` advisory counts 8 decisions reading the rule date, all through the helper over
+  `YMD`-shaped constants (`YMD 2022 9 20`, `YMD 2023 3 1`). Widening the matcher to see the
+  abstraction would change the g1 count too and is not this floor's business. With a 0 floor,
+  p3-check reports the temporal-closure sub-check **NOT CHECKED** for this module set rather
+  than printing a vacuous "all 0 dated arm(s) carry an @ref".
 
 ## Temporal shape
 

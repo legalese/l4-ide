@@ -2441,6 +2441,81 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       r.status === 2 && /denovo: unknown key 'surprise'/.test(r.stderr),
     );
   }
+  // --- 1a. the per-origin floors, the surface map, the per-leg declarations --
+  // (D2/D4/D6, 2026-08-09). Each positive resolution has a refusing sibling,
+  // because the schema's whole value is that it is CLOSED — measured before the
+  // extension landed: every one of these sidecars was refused with
+  // "denovo: unknown key 'checks'".
+  {
+    mkSidecar("dnfloors", {
+      modules: [resolve(DEP, "smoke.l4")],
+      checks: { min_dated_arms: 0, min_assertions: 39 },
+      surface_map: resolve(DEP, "never-written-map.json"),
+      legs: { "p7-dmn": { cases: resolve(DEP, "never-written.cases.json") } },
+    });
+    const r = subjectRun("dnfloors");
+    check(
+      "denovo.checks resolves to per-origin floor env, distinct from the corpus floors",
+      r.status === 0 &&
+        r.stdout.includes("GO_S_DENOVO_MIN_DATED_ARMS='0'") &&
+        r.stdout.includes("GO_S_DENOVO_MIN_ASSERTIONS='39'"),
+    );
+    check(
+      "denovo.surface_map and denovo.legs['p7-dmn'].cases resolve, and their existence is NOT required",
+      r.status === 0 &&
+        r.stdout.includes(
+          `GO_S_DENOVO_SURFACE_MAP='${resolve(DEP, "never-written-map.json")}'`,
+        ) &&
+        r.stdout.includes(
+          `GO_S_DENOVO_DMN_CASES='${resolve(DEP, "never-written.cases.json")}'`,
+        ) &&
+        !ex(resolve(DEP, "never-written-map.json")),
+    );
+  }
+  {
+    mkSidecar("dnbadfloor", {
+      checks: { min_assertions: 39, surprise: 1 },
+    });
+    const r = subjectRun("dnbadfloor");
+    check(
+      "an unknown key inside denovo.checks is refused, naming the two floors",
+      r.status === 2 && /denovo\.checks: unknown key 'surprise'/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("dnbadleg", {
+      legs: { "p7-dmn": { golden: "x.dmn" } },
+    });
+    const r = subjectRun("dnbadleg");
+    check(
+      "denovo.legs does NOT reuse LEG_KEYS: a golden inside denovo.legs['p7-dmn'] is refused",
+      r.status === 2 &&
+        /denovo\.legs\['p7-dmn'\]: unknown key 'golden'/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("dnbadleg2", {
+      legs: { "p7-akn": { cases: "x.json" } },
+    });
+    const r = subjectRun("dnbadleg2");
+    check(
+      "a denovo.legs entry for a leg with no de novo schema refuses every key",
+      r.status === 2 &&
+        /denovo\.legs\['p7-akn'\]: unknown key 'cases'/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("nodenovo2", null);
+    const r = subjectRun("nodenovo2");
+    check(
+      "a subject with no denovo section resolves every new GO_S_DENOVO_* to ''",
+      r.status === 0 &&
+        r.stdout.includes("GO_S_DENOVO_MIN_DATED_ARMS=''") &&
+        r.stdout.includes("GO_S_DENOVO_MIN_ASSERTIONS=''") &&
+        r.stdout.includes("GO_S_DENOVO_SURFACE_MAP=''") &&
+        r.stdout.includes("GO_S_DENOVO_DMN_CASES=''"),
+    );
+  }
   {
     mkSidecar("selfdiff", { modules: ["jl4/examples/legal/regcf/regcf.l4"] });
     const r = subjectRun("selfdiff");
