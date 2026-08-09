@@ -61,8 +61,9 @@
 #   2. Once dispatchable, the ref you select decides which COPY of the file
 #      runs. To make the outcome identical either way, this workflow never
 #      relies on the run's own ref: it checks out `inputs.ref` (default
-#      `unstable`) explicitly, exactly as cache-warmup.yml does for the same
-#      reason. Dispatch it from `main` and it still builds `unstable`.
+#      `unstable`) explicitly — the same pattern the now-retired
+#      cache-warmup.yml used, for the same reason. Dispatch it from `main`
+#      and it still builds `unstable`.
 #
 #   MEASURED 2026-08-09: the constraint has a sharper edge than point 1
 #   suggests. main's history was rewritten after 2026-08-05 — PR #218's merge
@@ -361,8 +362,9 @@ jobs:
       #   * the path must be exactly `cabal-store` — the same single entry
       #     main-tag.yml uses. Adding dist-newstyle to the list would change
       #     the version and silently match nothing.
-      #   * pr-checks.yml's `haskell` job and cache-warmup.yml both run inside
-      #     `container: ubuntu:24.04`, whose apt list installs no `zstd`;
+      #   * pr-checks.yml's `haskell` job (and the now-retired cache-warmup.yml
+      #     before it) runs inside `container: ubuntu:24.04`, whose apt list
+      #     installs no `zstd`;
       #     this workflow runs on bare runners. I have NOT measured whether
       #     those two families are version-compatible, so this deliberately
       #     falls back only to `lsp-*`, which main-tag.yml writes from bare
