@@ -227,9 +227,12 @@ agreement counts — a (pair, fact) leaf the battery perturbed without ever movi
 surface on which agreement is silence rather than evidence.
 
 Design, limits and the verbatim self-tests:
-[`DENOVO-DIFF-ORACLE.md`](../../specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md). **No
-stage calls it** — `p3-encode` checks a de novo module, it does not write one — so it has been run
-only against the committed corpus and against scratch copies of it with one constant moved.
+[`DENOVO-DIFF-ORACLE.md`](../../specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md).
+**`p8-diff` calls it** (a declared g2 stage, 2026-08-09) over the surface map the sidecar declares
+in `denovo.surface_map`, following the deposit contract — no map declared or deposited is a
+`SKIPPED` receipt naming the key; comparator exits 2/4 (harness errors) are `DEGRADED`; exits 0/1
+are a completed measurement, because a divergence is §8's better pass, never a failure. Writing
+the map and the module, and triaging any witness, remain agent/reviewer acts.
 
 `selftest.mjs` proves the status lattice can still say no: that every status is
 producible, that `PASS` is rejected with a null, failing, or _weak_ oracle, that

@@ -15,8 +15,8 @@
 # model and this driver takes neither. They validate what an agent deposited,
 # and report SKIPPED with a named reason when the deposit is not there yet. So
 # `g2 COMPLETE` means every g2 stage is accounted for — NOT that a de novo run
-# happened. SPEC.md §6's G2 acceptance is the §8 diff oracle
-# (etc/go/lib/denovo-diff.mjs), which no stage calls. See
+# happened. SPEC.md §6's G2 acceptance is the §8 diff oracle, which the
+# p8-diff stage runs over the declared surface map (SKIPPED when absent). See
 # `go.sh plan --milestone g2`.
 #
 # This script NEVER runs cabal, never commits, and never pushes.
@@ -83,7 +83,12 @@ P7_LEG_ORDER=(
 # now real stages that validate a deposit, and they are g2's declared members.
 UNIMPLEMENTED_STAGES=(p8-verify p10-publish)
 
-# G2's declared stages, in order. The five de novo stages plus the report.
+# G2's declared stages, in order. The five deposit-validating stages, the §8
+# comparator, and the report.
+#
+# p8-diff (2026-08-09) is the ONE stage licensed to read both the committed
+# corpus and the de novo deposit: SPEC.md §8's acceptance is precisely the
+# comparison of the two, over the declared surface map.
 #
 # WHAT IS DELIBERATELY NOT HERE, and why the omission is the honest choice:
 # p3-check, p6-tests and every p7 leg read the subject's COMMITTED corpus and
@@ -94,7 +99,7 @@ UNIMPLEMENTED_STAGES=(p8-verify p10-publish)
 # unbuilt; until it is, they are named in `plan --milestone g2` as NOT WIRED
 # rather than run. p9-report is included because it reads journal.ndjson and
 # nothing else, so it is correct for any milestone.
-G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p9-report)
+G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-diff p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
@@ -286,10 +291,14 @@ done
 G1_STAGES+=(p9-report p9-explain)
 gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 
-# SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the only stage after
-# P5 is the report, so that is what HG1 gates — and, as at g1, a g2 run stops
-# there with exit 3 until the gate is signed or waived on the record.
-if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p9-report"; fi
+# SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the stages after P5
+# are the §8 comparator and the report, so those are what HG1 gates — and, as
+# at g1, a g2 run stops there with exit 3 until the gate is signed or waived on
+# the record. At g2 the gate binds to the DE NOVO deposit-set digest (see
+# GO_CORPUS_FILES above), so a waiver over the replay corpus covers nothing
+# here, and depositing or editing a deposit — the surface map included —
+# re-opens the gate.
+if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p8-diff p9-report"; fi
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -355,6 +364,13 @@ cmd_plan_g2() {
     [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
     printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "compares against this subject's committed goldens, which are the replay artifacts"
   done
+  local sm="${GO_S_DENOVO_SURFACE_MAP:-}" smwhat
+  if [[ -n "$sm" ]]; then
+    smwhat="SPEC.md §8's diff oracle over $sm"
+  else
+    smwhat="(no denovo.surface_map in subject.json)"
+  fi
+  printf '  %-14s %-9s %-11s %s\n' "p8-diff" "HG1" "$(deposit_state "$sm")" "$smwhat"
   printf '  %-14s %-9s %-11s %s\n' "p9-report" "HG1" "-" "reads journal.ndjson and nothing else"
   echo
   echo "declared by this driver at g2, and therefore run: ${G2_STAGES[*]}"
@@ -365,9 +381,11 @@ cmd_plan_g2() {
   echo "encode or find forks: those need the network or a model, and this driver takes"
   echo "neither (ORCHESTRATOR.md §2.1, §6.4). They VALIDATE what an agent deposited, and"
   echo "report SKIPPED with a named reason when the deposit is not there. So 'g2 COMPLETE'"
-  echo "means every g2 stage is accounted for — it does NOT mean a de novo run happened."
-  echo "SPEC.md §6's G2 acceptance is the §8 diff oracle, etc/go/lib/denovo-diff.mjs,"
-  echo "which no stage calls. Run with L4_GO_REQUIRED=1 to make an absent deposit fatal."
+  echo "means every g2 stage is accounted for — it does NOT mean a de novo run happened:"
+  echo "a run with every deposit absent is COMPLETE over SKIPPED receipts. SPEC.md §6's"
+  echo "G2 acceptance is the §8 diff oracle, etc/go/lib/denovo-diff.mjs, which p8-diff"
+  echo "runs over the declared surface map — its receipt above says whether it did."
+  echo "Run with L4_GO_REQUIRED=1 to make an absent deposit fatal."
 }
 
 cmd_plan() {
@@ -846,10 +864,12 @@ EOF
   echo
   echo "go: VERDICT: $MILESTONE $verdict"
   if [[ "$MILESTONE" == "g2" ]]; then
-    echo "go:   g2's verdict is over its DEPOSIT-VALIDATING stages. It says the deposits"
-    echo "go:   present are well formed and names the ones that are not there. It does not"
-    echo "go:   say a de novo run happened: SPEC.md §6's G2 acceptance is the §8 diff oracle"
-    echo "go:   (node etc/go/lib/denovo-diff.mjs), which no stage calls."
+    echo "go:   g2's verdict is over its declared stages. It says the deposits present are"
+    echo "go:   well formed and names the ones that are not there. It does not, by itself,"
+    echo "go:   say a de novo run happened: a run with every deposit absent is COMPLETE over"
+    echo "go:   SKIPPED receipts. SPEC.md §6's G2 acceptance is the §8 diff oracle"
+    echo "go:   (node etc/go/lib/denovo-diff.mjs), which the p8-diff stage runs when a"
+    echo "go:   surface map is deposited — read its receipt, not the verdict, for that."
   fi
   echo "go: journal  $RUN/journal.ndjson"
   [[ -f "$RUN/report.md" ]] && echo "go: report   $RUN/report.md"

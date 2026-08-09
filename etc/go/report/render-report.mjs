@@ -397,6 +397,7 @@ const NARRATED_ELSEWHERE = new Set([
   "p4-forks",
   "p5-gate",
   "p6-tests",
+  "p8-diff", // narrated whole in triageSection()
 ]);
 function otherStagesSection() {
   const rows = stageEnds.filter(
@@ -426,10 +427,26 @@ function comparisonSection() {
 }
 
 function triageSection() {
-  return absent(
-    "SPEC.md §8's triage table classifies each disagreement between the de novo encoding and the committed corpus as encoding error / genuine ambiguity / improvement over the hand corpus.",
-    "the diff oracle only exists once a de novo run has produced a second encoding to diff against. This milestone produces one encoding, so there is nothing to triage.",
-  );
+  // p8-diff (2026-08-09) is this section's stage: it runs SPEC.md §8's diff
+  // oracle over the declared surface map and emits the triage table with every
+  // row UNTRIAGED — the three dispositions are judgements, owned by the skill
+  // and then HG1, never by a script. Its receipt renders here, whole, and this
+  // is its narrated site (it is in NARRATED_ELSEWHERE below).
+  const r = byStage.get("p8-diff");
+  if (!r)
+    return absent(
+      "SPEC.md §8's triage table classifies each disagreement between the de novo encoding and the committed corpus as encoding error / genuine ambiguity / improvement over the hand corpus.",
+      "`p8-diff` — the stage that runs the diff oracle (`etc/go/lib/denovo-diff.mjs`) over the subject's declared surface map — has no receipt in this run. It is declared at milestone `g2`; a `g1` run replays one encoding and compares nothing.",
+    );
+  const m = r.metrics || {};
+  const head =
+    r.status === "SKIPPED" || r.status === "DEGRADED"
+      ? []
+      : [
+          `The comparator evaluated **${esc(m.evaluations ?? "?")}** (pair, row) cells over ${esc(m.pairs ?? "?")} declared pair(s): ${esc(m.agreed ?? "?")} agreed, **${esc(m.diverged ?? "?")} diverged**, ${esc(m.untriaged ?? "?")} untriaged. Every divergence witness is emitted \`UNTRIAGED\` in the \`denovo-diff.md\` artifact; triaging them (encoding error / genuine ambiguity / improvement) is the reviewer's act, and a run that finds a divergence is §8's *better* pass.`,
+          "",
+        ];
+  return [...head, receiptBlock(r, "`p8-diff`")].join("\n");
 }
 
 // The one place this renderer looks at anything other than the journal, and it
