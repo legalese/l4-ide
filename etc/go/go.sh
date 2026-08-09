@@ -10,14 +10,14 @@
 # through every currently-reachable projection and emits conversion report v0.
 # No de novo encoding.
 #
-# MILESTONE G2 — the de novo run — runs its DEPOSIT-VALIDATING half. P1, P2, P3
-# and P4 do not fetch, search, encode or find forks: those need the network or a
-# model and this driver takes neither. They validate what an agent deposited,
-# and report SKIPPED with a named reason when the deposit is not there yet. So
-# `g2 COMPLETE` means every g2 stage is accounted for — NOT that a de novo run
-# happened. SPEC.md §6's G2 acceptance is the §8 diff oracle, which the
-# p8-diff stage runs over the declared surface map (SKIPPED when absent). See
-# `go.sh plan --milestone g2`.
+# MILESTONE G2 — the de novo run — validates AND measures the agent's deposit.
+# P1-P4 do not fetch, search, encode or find forks (those need the network or a
+# model; this driver takes neither); p3-check, p6-tests, p8-verify and p7-dmn
+# (emit-only) measure the deposited module set, and p8-diff runs SPEC.md §6's
+# G2 acceptance — the §8 diff oracle — over the declared surface map. Every
+# stage reports SKIPPED, on the record, when its deposit is not there; so
+# `g2 COMPLETE` means every stage is accounted for — NOT that a de novo run
+# happened. See `go.sh plan --milestone g2`.
 #
 # This script NEVER runs cabal, never commits, and never pushes.
 #
@@ -84,23 +84,28 @@ P7_LEG_ORDER=(
 # p8-verify left it 2026-08-09 (D3): declared at both milestones below.
 UNIMPLEMENTED_STAGES=(p10-publish)
 
-# G2's declared stages, in order. The five deposit-validating stages, the §8
-# comparator, and the report.
+# G2's declared stages, in order (2026-08-09, D5). The five deposit-validating
+# stages, the measurement stages over the deposit, the §8 comparator, and the
+# report.
 #
-# p8-diff (2026-08-09) is the ONE stage licensed to read both the committed
-# corpus and the de novo deposit: SPEC.md §8's acceptance is precisely the
-# comparison of the two, over the declared surface map.
+# LAYERING, stated where the list is declared because both P3 stages run:
+# p3-encode is deposit ACCEPTANCE — the module exists and `l4 check` accepts
+# it, nothing else — while p3-check holds the P3 HOUSE RULES (BRANCH over
+# ELSE IF, @ref per dated arm, the per-origin floors) against the same
+# deposit. They are one phase's two halves and their receipts say so.
+# p6-tests runs the deposit's own #ASSERT directives; p7-dmn runs EMIT-ONLY
+# (no goldens exist for a deposit — see the leg's g2 branch); p8-verify runs
+# `l4 verify`; p8-diff is the ONE stage licensed to read both the committed
+# corpus and the deposit, because SPEC.md §8's acceptance is precisely the
+# comparison of the two over the declared surface map.
 #
-# WHAT IS DELIBERATELY NOT HERE, and why the omission is the honest choice:
-# p3-check, p6-tests and every p7 leg read the subject's COMMITTED corpus and
-# its committed goldens (GO_S_CORPUS, legs[*].golden). Running them inside a g2
-# run would measure the replay artifacts and file the result under a de novo
-# label — "the encoding typechecks", "its assertions hold" — about a module the
-# de novo run never wrote. Re-pointing them at a `denovo.modules` deposit is
-# unbuilt; until it is, they are named in `plan --milestone g2` as NOT WIRED
-# rather than run. p9-report is included because it reads journal.ndjson and
+# STILL NOT HERE: p0-preflight — so a g2 run carries no CLI-surface pin and no
+# failing-#ASSERT tripwire, while p6-tests' oracle rests on the workaround
+# that tripwire defends (§5.3); a p0 for g2 is future work. The p7 legs other
+# than p7-dmn read committed goldens/entries the deposit does not have; the
+# plan names each one's missing piece. p9-report reads journal.ndjson and
 # nothing else, so it is correct for any milestone.
-G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p7-dmn p8-verify p8-diff p9-report)
+G2_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
@@ -304,7 +309,7 @@ gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 # GO_CORPUS_FILES above), so a waiver over the replay corpus covers nothing
 # here, and depositing or editing a deposit — the surface map included —
 # re-opens the gate.
-if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p7-dmn p8-verify p8-diff p9-report"; fi
+if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p6-tests p7-dmn p8-verify p8-diff p9-report"; fi
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -357,14 +362,14 @@ cmd_plan_g2() {
     for x in "${mm[@]}"; do [[ -f "$x" ]] || mstate=absent; done
   fi
   printf '  %-14s %-9s %-11s %s\n' "p3-encode" "-" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no denovo.modules in subject.json)")"
-  printf '  %-14s %-9s %-11s %s\n' "p3-check" "NOT WIRED" "-" "reads the committed corpus ($GO_S_CORPUS); re-pointing it at a de novo deposit is unbuilt"
+  printf '  %-14s %-9s %-11s %s\n' "p3-check" "-" "$mstate" "the P3 house rules over the SAME deposit: BRANCH over ELSE IF, @ref per dated arm, per-origin floors (denovo.checks)"
   printf '  %-14s %-9s %-11s %s\n' "p4-forks" "-" "$(deposit_state "$f")" "${f:-(no denovo.fork_register in subject.json)}"
 
   local n=0 s
   for s in "$b" "$r" "$f"; do [[ -n "$s" && -f "$s" ]] && n=$((n + 1)); done
   printf '  %-14s %-9s %-11s %s\n' "p5-gate" "-" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
   echo "  ---- HG1 ------- Meng's go on the encoding; blocks P6 onward (SPEC.md §7.3)"
-  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "NOT WIRED" "-" "reads the committed corpus; a de novo run's tests discriminate between FORKS, which is unbuilt"
+  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "HG1" "$mstate" "the deposit's own #ASSERT directives, via l4 run --json results[]; floor = denovo.checks.min_assertions"
   # Every p7 leg the sidecar declares, with a PRECISE reason per leg: a plan
   # that lists only what runs cannot tell a reader what is missing, and a
   # generic reason ("compares against committed goldens") was true of some

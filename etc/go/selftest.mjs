@@ -2840,15 +2840,60 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
           "p3-check",
           "p4-forks",
           "p5-gate",
+          "p6-tests",
+          "p8-verify",
+          "p8-diff",
           "p9-report",
         ].every((s) => r.stdout.includes(s)),
     );
+    // Until 2026-08-09 this asserted p3-check and p6-tests printed NOT WIRED.
+    // The g2 wiring (D1/D5) falsified that — measured: the old assertion went
+    // red against the new plan before this rewrite — and the claim is now the
+    // opposite: the measurement stages are wired rows, p6-tests onward behind
+    // HG1, with the deposit state in the DEPOSIT column. The smoke sidecar
+    // declares a module that is never written, so its state reads `absent`.
     check(
-      "the plan states each deposit's presence, and marks the stages that are NOT wired at g2",
+      "the plan states each deposit's presence, and the re-pointed stages are wired rows, not NOT WIRED",
       /p1-ingest\s+-\s+present/.test(r.stdout) &&
-        /p3-check\s+NOT WIRED/.test(r.stdout) &&
-        /p6-tests\s+NOT WIRED/.test(r.stdout),
+        /p3-check\s+-\s+absent/.test(r.stdout) &&
+        /p6-tests\s+HG1\s+absent/.test(r.stdout) &&
+        /p8-verify\s+HG1\s+absent/.test(r.stdout) &&
+        /p8-diff\s+HG1\s+undeclared/.test(r.stdout) &&
+        !/p3-check\s+NOT WIRED/.test(r.stdout) &&
+        !/p6-tests\s+NOT WIRED/.test(r.stdout),
     );
+    // The legs that remain unwired must still say WHY, per leg — the plan's
+    // whole value is naming what is missing. The smoke sidecar declares no
+    // legs, so this is asked of the repo's real subject via the default
+    // subjects dir (FIXTURE_SUBJECT declares the full leg set).
+    {
+      const rp = spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "plan",
+          "--milestone",
+          "g2",
+          "--subject",
+          FIXTURE_SUBJECT,
+        ],
+        { encoding: "utf8" },
+      );
+      check(
+        "each still-unwired p7 leg carries its own precise reason, and p7-dmn is a wired emit-only row",
+        rp.status === 0 &&
+          /p7-dmn\s+HG1\s+present\s+emit-only/.test(rp.stdout) &&
+          /p7-tnr\s+NOT WIRED\s+-\s+the sidecar declares no denovo\.legs\['p7-tnr'\]\.golden/.test(
+            rp.stdout,
+          ) &&
+          /p7-ladder\s+NOT WIRED\s+-\s+needs a de novo demo entry/.test(
+            rp.stdout,
+          ) &&
+          !/compares against this subject's committed goldens, which are the replay artifacts/.test(
+            rp.stdout,
+          ),
+      );
+    }
     check(
       "and it refuses to let 'g2 COMPLETE' be read as 'a de novo run happened'",
       /does NOT mean a de novo run happened/.test(r.stdout) &&

@@ -362,12 +362,14 @@ unstable now.
   `Interpretation` parameter). **Half built as of 2026-08-03**: `go.sh run --milestone g2` runs
   P1, P2, P3-encode, P4 and P5 as deposit-validating stages, each with an exit code over the
   agent's deposit and a `SKIPPED` naming the deposit it is waiting for; the sidecar's `denovo`
-  section says where those deposits live. What is **not** built is anything that produces a
-  deposit (agent work by design — the driver takes neither the network nor a model), and the
-  wiring that would point `p3-check`, `p6-tests` and the p7 legs at a de novo module rather than
-  at the committed corpus. The acceptance comparator was built 2026-08-02 as
-  `etc/go/lib/denovo-diff.mjs`, designed in [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md);
-  **no stage calls it**, so no `go.sh` verdict can assert G2 in this bullet's sense.
+  section says where those deposits live. **The measurement wiring landed 2026-08-09**: the
+  driver resolves one module set per milestone, so `p3-check`, `p6-tests` and `p8-verify` run
+  over the deposit at g2, `p7-dmn` runs emit-only over it, and the acceptance comparator
+  (`etc/go/lib/denovo-diff.mjs`, designed in
+  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md)) **is called by the `p8-diff` stage** over
+  the sidecar's declared surface map. What remains agent work, by design, is everything that
+  PRODUCES a deposit (the driver takes neither the network nor a model) and the triage of any
+  divergence the comparator reports.
 - **G3 — execution parity.** Every P7 leg executes: BKM emission (DMN spec Phase 5, with
   whatever of Phase 4 it needs — the owning spec sequences them) landed and the corpus DMN
   runs on both engines (**done 2026-08-02** — PRs #188 + #194, measured in ORCHESTRATOR.md
@@ -417,7 +419,8 @@ then diffs its encoding against `jl4/examples/legal/regcf/regcf.l4`:
 - The triage table goes into the conversion report. A de novo run that merely reproduces the
   corpus is a pass; one that finds a defect in it is a better pass.
 
-**Built 2026-08-02, unexercised.** The comparator is `etc/go/lib/denovo-diff.mjs` and its pairing
+**Built 2026-08-02; wired and first exercised in-pipeline 2026-08-09, by the `p8-diff` stage.**
+The comparator is `etc/go/lib/denovo-diff.mjs` and its pairing
 format is `schemas/surface-map.schema.json`; the design, the two self-tests verbatim, and the list
 of what the comparison cannot see are in [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md). It is
 behavioural, not textual — two encodings of one statute share no names, so it pairs decisions by
@@ -494,14 +497,20 @@ rule-version arms_, brought up to run 1's assertion density, and put through run
 suite.** What a fresh run must supply that _neither_ has: the authorising instrument (now required
 by §4 P1) and the background rules of construction, which no run has ever ingested — see §9.
 
-**A fresh run cannot produce this today, and the reason is structural, not prompt quality.**
-`G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p9-report)` (`etc/go/go.sh:97`) — there
-is no assertion stage, no projection leg, and no stage calls §8's diff oracle. `p3-encode` runs
-`l4 check` and nothing else. So every axis this table assigns to run 1 is unreachable at G2 by
-construction, which §6 already names: the missing piece is "the wiring that would point
-`p3-check`, `p6-tests` and the p7 legs at a de novo module rather than at the committed corpus."
-Under R0 ("the execution is the exhibit") the demo's headline artifact is the one G2 cannot
-currently make. That wiring is the first item of work, not the last.
+**The structural half of that gap closed on 2026-08-09.** When this section was written,
+`G2_STAGES` had no assertion stage, no projection leg, and no stage calling §8's diff oracle, so
+every axis this table assigns to run 1 was unreachable at G2 by construction. The wiring named
+as "the first item of work" landed: `G2_STAGES` now declares `p3-check`, `p6-tests`, `p7-dmn`
+(emit-only), `p8-verify` and `p8-diff` over the deposited module set, so a g2 run MEASURES the
+deposit's assertions (39/39 on the committed de novo module, floor `denovo.checks`), verifies it
+(2 `vacuous-guard` findings, on the record), emits its DMN (both engines refuse it — 35 blocking
+fidelity codes; that receipt IS this table's "never been executed through DMN" row as an exit
+code), and runs the §8 comparator (80/80 agreement over the committed surface map's 4 pairs).
+What the wiring does NOT change: the density gap is measured, not closed (p8-diff reports it as
+`left_density`/`right_density` per the decision-count proxy above); the BPMN/ladder/wizard rows
+still have no de novo leg; and producing any deposit remains agent work. Under R0 ("the
+execution is the exhibit") the headline artifact is now the refusal receipts and the comparator
+table a g2 run writes — not a claim that the union exists.
 
 ## 9. Open rulings
 

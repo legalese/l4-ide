@@ -1,10 +1,11 @@
 # The `go` Orchestrator
 
-**Status (2026-08-03): PARTIALLY IMPLEMENTED — milestone G1 runs end to end; milestone G2 runs
-its deposit-validating half; everything downstream of G2 does not.** Written against
-`legalese/l4-ide` branch `mengwong/go-orchestrator`, cut from `origin/unstable` at `162e5070`,
-and verified by running it on this worktree; the G2 half was added on branch
-`mengwong/denovo-harnesses` and verified the same way.
+**Status (2026-08-09): PARTIALLY IMPLEMENTED — milestone G1 runs end to end; milestone G2 runs
+its deposit-validating half AND its measurement half (p3-check, p6-tests, p7-dmn emit-only,
+p8-verify, p8-diff) over the deposit; G3/G4 do not run.** Written against `legalese/l4-ide`
+branch `mengwong/go-orchestrator`, cut from `origin/unstable` at `162e5070`, and verified by
+running it on this worktree; the G2 deposit half was added on branch `mengwong/denovo-harnesses`
+and the G2 measurement half on `mengwong/g2-wiring`, each verified the same way.
 
 What that means precisely, in the present tense:
 
@@ -13,16 +14,19 @@ What that means precisely, in the present tense:
   emits conversion report v0. It refuses at HG1 unless a signature verifies or a waiver is
   recorded. The subject is resolved from a per-subject sidecar (§2.3), so the driver and phase
   scripts carry no Reg CF facts of their own.
-- **`etc/go/go.sh run --milestone g2 --subject <id>` runs its DEPOSIT-VALIDATING half, as of
-  2026-08-03.** `p1-ingest`, `p2-sweep`, `p3-encode`, `p4-forks` and `p5-gate` stopped refusing:
-  each is a real stage that validates a deposit an agent produced, with three outcomes —
-  `SKIPPED` when the deposit is not there (a missing prerequisite, not a defect), `DEGRADED`
-  naming every rule that fired, or `PASS` over an artifact whose sha256 is on the row. They do
-  **not** fetch, search, encode or find forks: those need the network or a model and this driver
-  takes neither, so producing the deposits is agent-side work the skill's G2 section owns. §5.2
-  is the per-stage table. **`g2 COMPLETE` means every g2 stage is accounted for, not that a de
-  novo run happened** — the §8 diff oracle, which is SPEC.md §6's G2 acceptance, is called by no
-  stage.
+- **`etc/go/go.sh run --milestone g2 --subject <id>` runs its DEPOSIT-VALIDATING half (as of
+  2026-08-03) and its MEASUREMENT half (as of 2026-08-09).** `p1-ingest`, `p2-sweep`,
+  `p3-encode`, `p4-forks` and `p5-gate` each validate a deposit an agent produced, with three
+  outcomes — `SKIPPED` when the deposit is not there (a missing prerequisite, not a defect),
+  `DEGRADED` naming every rule that fired, or `PASS` over an artifact whose sha256 is on the
+  row. They do **not** fetch, search, encode or find forks: those need the network or a model
+  and this driver takes neither, so producing the deposits is agent-side work the skill's G2
+  section owns. The measurement stages — `p3-check`, `p6-tests`, `p7-dmn` (emit-only),
+  `p8-verify`, `p8-diff` — run over the deposited module set itself (D1's resolved
+  `GO_MODULES`). §5.2 is the per-stage table. **`g2 COMPLETE` still means every g2 stage is
+  accounted for, not that a de novo run happened** — a run with every deposit absent is
+  COMPLETE over SKIPPED receipts; the §8 diff oracle, which is SPEC.md §6's G2 acceptance, is
+  run by `p8-diff` and its receipt says whether a comparison happened.
 - **One stage is still scaffolded and cannot run**: `p10-publish`. It is an entry point that
   prints what it would do and what is blocking it, then exits 3. With R1 closed in full on
   2026-08-02 (`legalese/canon`, which exists as of 2026-08-03) it waits only on HG2 acts and
@@ -33,10 +37,11 @@ What that means precisely, in the present tense:
   HG1-gated at both — it verifies whichever module set the driver resolved, so at g2 it runs
   over the de novo deposit and its verdict is about the deposit. It left
   `UNIMPLEMENTED_STAGES` in the same change.
-- **Milestone G2's de novo half is not wired.** `p3-check`, `p6-tests` and every p7 leg read the
-  subject's COMMITTED corpus and goldens, so a g2 run does not execute them: measuring the replay
-  artifacts under a de novo label would be a false claim. `go.sh plan --milestone g2` prints
-  SPEC.md §4's full de novo order and marks each of them `NOT WIRED` with that reason.
+- **Milestone G2's measurement half is wired, as of 2026-08-09.** The driver resolves one
+  module set per run (`GO_MODULES`: the committed corpus at g1, `denovo.modules` at g2) and
+  `p3-check`, `p6-tests` and `p8-verify` iterate it; `p7-dmn` runs emit-only over the deposit.
+  The p7 legs other than `p7-dmn` still read committed goldens the deposit does not have;
+  `go.sh plan --milestone g2` marks each `NOT WIRED` with its own precise missing piece.
 - **G2's acceptance comparator exists AND is wired**, as of 2026-08-09: `etc/go/lib/denovo-diff.mjs`
   plus `schemas/surface-map.schema.json`, designed in
   [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md), called by the declared g2 stage `p8-diff`
@@ -549,29 +554,39 @@ milestone's declared stage list, so its absence cannot make a milestone `INCOMPL
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `p10-publish` | R1 ruled in full 2026-08-02 (`legalese/canon` + license + layout + public-with-inspectable-gates) and R2 ruled (probe done, PR #199). The repo **now exists** — public, scaffolded to that shape, zero subjects, as of 2026-08-03 — so what remains is that every act that would put a subject in it is HG2's, plus unbuilt stage tooling |
 
-#### What a `g2` run does NOT cover
+#### What a `g2` run covers since 2026-08-09, and what it still does not
 
-`p3-check`, `p6-tests` and every p7 leg are deliberately **not** in G2's declared stage list. They
-read the subject's committed corpus and its committed goldens; running them inside a g2 run would
-measure the replay artifacts and file the result under a de novo label — "the encoding typechecks",
-"its assertions hold" — about a module the de novo run never wrote. Re-pointing them at a
-`denovo.modules` deposit is unbuilt. `go.sh plan --milestone g2` prints SPEC.md §4's full de novo
-order with each of them marked `NOT WIRED` and the reason attached, because a plan that lists only
-what runs cannot tell a reader what is missing.
+Until 2026-08-09 this subsection was titled "What a `g2` run does NOT cover" and recorded that
+`p3-check`, `p6-tests` and every p7 leg were deliberately absent from G2's declared list, because
+they read the committed corpus and re-pointing them at a deposit was unbuilt. The re-pointing is
+now built (D1): the driver resolves ONE module set per run (`GO_MODULES`, origin-marked), and at
+g2 that set is `denovo.modules` — so `p3-check` (house rules + per-origin floors), `p6-tests`
+(the deposit's own `#ASSERT`s), `p8-verify` (`l4 verify`) and `p7-dmn` (emit-only — no golden
+exists for a deposit, so its g2 oracle is emission + the structural gate + a no-cases engine-load
+probe on both harnesses) all run **over the deposit**, and `p8-diff` runs SPEC.md §8's comparator
+over the declared surface map. Measuring replay artifacts under a de novo label remains the
+falsehood it always was; the fix was re-pointing, not relabelling.
+
+**Still not covered at g2**: `p0-preflight` (no CLI-surface pin, no failing-`#ASSERT` tripwire —
+while `p6-tests`' oracle rests on the workaround that tripwire defends, §5.3); every p7 leg other
+than `p7-dmn`, each named `NOT WIRED` in the plan with its own precise missing piece (a de novo
+demo entry for the ladder, a loopback deployment for MCP, an undeclared de novo `.nlg.golden` for
+TNR, …); and `p9-explain` (no de novo narrative deposit exists).
 
 `p9-report` **is** declared at g2: it reads `journal.ndjson` and nothing else, so it is correct for
-any milestone. HG1 gates it, per SPEC.md §7.3's "blocks P6 onward", and at g2 the gate binds to the
-digest of the **de novo deposit set** rather than the committed corpus — a waiver granted over the
-replay corpus says nothing about an encoding that did not exist when it was granted, and because
-`digestSet` records a missing file as `ABSENT` rather than skipping it, _depositing_ a bundle or a
-module re-opens the gate.
+any milestone. HG1 gates P6 onward (`p6-tests p7-dmn p8-verify p8-diff p9-report`), per SPEC.md
+§7.3, and at g2 the gate binds to the digest of the **de novo deposit set** (surface map included)
+rather than the committed corpus — a waiver granted over the replay corpus says nothing about an
+encoding that did not exist when it was granted, and because `digestSet` records a missing file as
+`ABSENT` rather than skipping it, _depositing_ a bundle, a module or a map re-opens the gate.
 
 The consequence for the milestone verdict, stated plainly so nobody has to infer it: **`g2
-COMPLETE` means every g2 stage is accounted for. It does not mean a de novo run happened.** A run
-with every deposit absent produces five `SKIPPED` receipts, each carrying a reason that appears in
-the report, and `COMPLETE` — which is §3.2's completeness-of-accounting doing exactly its job.
-SPEC.md §6's G2 acceptance is the §8 diff oracle, which no stage calls. The driver prints that
-sentence after every g2 verdict, and `L4_GO_REQUIRED=1` turns each of those skips into exit 5.
+COMPLETE` means every g2 stage is accounted for. It does not, by itself, mean a de novo run
+happened.** A run with every deposit absent produces `SKIPPED` receipts, each carrying a reason
+that appears in the report, and `COMPLETE` — §3.2's completeness-of-accounting doing exactly its
+job. SPEC.md §6's G2 acceptance is the §8 diff oracle, which `p8-diff` runs when a surface map is
+deposited — read its receipt, not the verdict, for whether a comparison happened. The driver
+prints that sentence after every g2 verdict, and `L4_GO_REQUIRED=1` turns each skip into exit 5.
 
 ### 5.3 The `l4 run` workaround, and its expiry
 
