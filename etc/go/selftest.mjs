@@ -1238,6 +1238,16 @@ if (!process.argv.includes("--with-driver")) {
           "denovo",
       ),
     );
+    // The after-verdict explainer render is DECLARED-STAGES-ONLY (2026-08-09).
+    // RED, measured before the guard: a g2 run dir held explainer.md
+    // (126,982 B of g1 narrative about the COMMITTED corpus) and
+    // explainer.html, announced by the driver, with zero p9-explain journal
+    // rows — narrative prose outside the g2 HG1 digest, reported to nobody.
+    check(
+      "a g2 run renders NO explainer — the stage is undeclared at g2 and the render respects the declared list",
+      !existsSync(resolve(rundir2, runId2, "explainer.md")) &&
+        !existsSync(resolve(rundir2, runId2, "explainer.html")),
+    );
   }
 }
 

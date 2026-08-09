@@ -571,7 +571,12 @@ falsehood it always was; the fix was re-pointing, not relabelling.
 while `p6-tests`' oracle rests on the workaround that tripwire defends, §5.3); every p7 leg other
 than `p7-dmn`, each named `NOT WIRED` in the plan with its own precise missing piece (a de novo
 demo entry for the ladder, a loopback deployment for MCP, an undeclared de novo `.nlg.golden` for
-TNR, …); and `p9-explain` (no de novo narrative deposit exists).
+TNR, …); and `p9-explain` (no de novo narrative deposit exists — and, since the 2026-08-09
+repair, the driver's after-verdict explainer render is **declared-stages-only**, so a g2 run
+directory carries no explainer file at all. Before that guard the render ran unconditionally,
+and a g2 run wrote the g1 narrative — 127 KB about the _committed_ corpus, drift banners
+included — into its run dir with no receipt, no journal row and no gate covering it, then
+announced the path; measured 2026-08-09).
 
 `p9-report` **is** declared at g2: it reads `journal.ndjson` and nothing else, so it is correct for
 any milestone. HG1 gates P6 onward (`p6-tests p7-dmn p8-verify p8-diff p9-report`), per SPEC.md

@@ -887,10 +887,22 @@ EOF
   if [[ -f "$RUN/journal.ndjson" ]]; then
     node "$GO_ROOT/etc/go/report/render-report.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
     # The explainer's final render, for the same reason and with the same
-    # status. It may legitimately not exist — a subject with no declared
-    # narrative, or a milestone that does not declare the stage — so a failure
-    # here is silent and leaves no file, rather than inventing one.
-    node "$GO_ROOT/etc/go/report/render-explainer.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+    # status — but DECLARED-STAGES-ONLY. p9-explain renders narrative prose
+    # about a body of law, and a milestone that does not declare the stage
+    # gets no explainer file. The guard is load-bearing, measured 2026-08-09
+    # before it existed: a g2 run wrote the g1 narrative — 127 KB about the
+    # COMMITTED corpus, drift banners included — into the run dir with no
+    # receipt, no journal row, and no gate covering it (the g2 HG1 digest
+    # deliberately excludes the narrative deposit), then announced its path.
+    # That is the relabelling ORCHESTRATOR.md §5.2 exists to prevent. (An
+    # earlier comment here PREDICTED this guard's behaviour while the render
+    # ran unconditionally; the sidecar's declared explainer dir made the
+    # prediction false.) At a declaring milestone the render may still
+    # legitimately leave no file — a subject with no declared narrative — so
+    # a failure stays silent rather than inventing one.
+    if [[ $'\n'"$stages"$'\n' == *$'\n'"p9-explain"$'\n'* ]]; then
+      node "$GO_ROOT/etc/go/report/render-explainer.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+    fi
   fi
 
   echo
