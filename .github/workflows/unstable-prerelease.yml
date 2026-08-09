@@ -13,9 +13,11 @@
 # ---------------------------------------------------------------------------
 # WHY THIS EXISTS
 #
-# `etc/go/go.sh` — the pipeline entry point — never builds; it requires `L4` to
-# point at an already-built binary and refuses otherwise (go.sh:474-488), and
-# `JL4_LSP_CMD` likewise for the ladder leg (etc/go/phases/p7-ladder.sh:31).
+# `etc/go/go.sh` — the pipeline entry point — never builds. When `L4` /
+# `JL4_LSP_CMD` are unset it discovers built binaries under dist-newstyle in
+# its own worktree or a sibling (etc/go/lib/toolchain.sh) and refuses only
+# when discovery also finds nothing — which is exactly the situation on a
+# machine that has never built the repo, the machine this workflow serves.
 # Before this file existed, the only `l4` we shipped was the copy bundled
 # inside the VS Code extension, whose most recent build is from 2026-07-18 —
 # older than `l4 export`. A contributor who wanted to run the pipeline had to

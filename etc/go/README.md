@@ -20,6 +20,7 @@ cannot run. The pipeline it serves is `specs/todo/single-instruction-demo/SPEC.m
 ```
 etc/go/go.sh run     --milestone g1 --subject <id> [--run-id ID] [--through STAGE]
                      [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
+etc/go/go.sh doctor  [--milestone g1|g2] [--subject <id>]
 etc/go/go.sh plan    [--milestone g1|g2] [--subject <id>]
 etc/go/go.sh status  [--run-id ID]
 etc/go/go.sh verify  [--run-id ID] [--gates]
@@ -38,11 +39,19 @@ one sidecar exists, `--subject` may be omitted and defaults to it; with several,
 is mandatory. An unknown subject exits 2 listing the available sidecars and the recipe for
 adding one.
 
-A first run, given a prebuilt `l4`:
+A first run. On a machine where this repo (any worktree) has been built, no
+exports are needed — `run` discovers `l4` and `jl4-lsp` from `dist-newstyle`
+and says so; `doctor` forecasts what the run will and will not produce:
+
+```
+etc/go/go.sh doctor --milestone g1
+etc/go/go.sh run --milestone g1 --subject regcf
+```
+
+On a machine with no build anywhere, point `L4` at a prebuilt binary first:
 
 ```
 export L4=/path/to/dist-newstyle/build/<arch>/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l4
-etc/go/go.sh run --milestone g1 --subject regcf
 ```
 
 That stops at HG1 with exit 3 and tells you how to grant the gate. To proceed
@@ -89,43 +98,55 @@ Extending `etc/check-bpmn-kie.sh`'s 0/1/2/3/4:
 
 ## Environment
 
-| variable             | effect                                                                                                                                                                                                                                                                                                                                               |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `L4`                 | **required.** Path to a prebuilt `l4`. This orchestrator never runs `cabal`; the build lock is a shared resource and concurrent invocations in one worktree corrupt each other. Same escape hatch as `JL4_LSP_CMD=` / `DMNMD=`.                                                                                                                      |
-| `JL4_LIBRARY_PATH`   | defaults to `<repo>/jl4-core/libraries`                                                                                                                                                                                                                                                                                                              |
-| `JL4_LSP_CMD`        | a prebuilt `jl4-lsp`, for the ladder leg. Absent ⇒ that leg is `SKIPPED` with a named reason.                                                                                                                                                                                                                                                        |
-| `JL4_GO_SERVICE_URL` | a **loopback** `jl4-service` for the MCP leg. The URL is parsed, not string-trimmed, and userinfo is refused outright — `http://127.0.0.1:8080@REALHOST/` reads as loopback to a naive parser and as credentials-for-REALHOST to curl. A non-loopback host is refused: an outward-facing deployment is HG2's subject, not an environment variable's. |
-| `L4_GO_RUNDIR`       | where runs live (default `$TMPDIR/l4-go`). Never the tree.                                                                                                                                                                                                                                                                                           |
-| `L4_GO_REQUIRED`     | `1` ⇒ any `SKIPPED` stage is fatal (exit 5), which is what CI wants                                                                                                                                                                                                                                                                                  |
-| `L4_GO_FIXED_NOW`    | pins the clock threaded into every `run`/`check`/`render` (default `2025-01-31T00:00:00Z`)                                                                                                                                                                                                                                                           |
+| variable             | effect                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `L4`                 | path to a prebuilt `l4`. When unset, `run` and `doctor` **discover** one under `dist-newstyle` — this worktree's own first, then the newest among sibling worktrees (`lib/toolchain.sh`); explicit always wins, and the run refuses only when discovery also finds nothing. This orchestrator never runs `cabal`; the build lock is a shared resource and concurrent invocations in one worktree corrupt each other. |
+| `JL4_LIBRARY_PATH`   | defaults to `<repo>/jl4-core/libraries`                                                                                                                                                                                                                                                                                                                                                                              |
+| `JL4_LSP_CMD`        | a prebuilt `jl4-lsp`, for the ladder leg; discovered the same way as `L4` when unset. Absent even after discovery ⇒ that leg is `SKIPPED` with a named reason.                                                                                                                                                                                                                                                       |
+| `JL4_GO_SERVICE_URL` | a **loopback** `jl4-service` for the MCP leg. The URL is parsed, not string-trimmed, and userinfo is refused outright — `http://127.0.0.1:8080@REALHOST/` reads as loopback to a naive parser and as credentials-for-REALHOST to curl. A non-loopback host is refused: an outward-facing deployment is HG2's subject, not an environment variable's.                                                                 |
+| `L4_GO_RUNDIR`       | where runs live (default `$TMPDIR/l4-go`). Never the tree.                                                                                                                                                                                                                                                                                                                                                           |
+| `L4_GO_REQUIRED`     | `1` ⇒ any `SKIPPED` stage is fatal (exit 5), which is what CI wants                                                                                                                                                                                                                                                                                                                                                  |
+| `L4_GO_FIXED_NOW`    | pins the clock threaded into every `run`/`check`/`render` (default `2025-01-31T00:00:00Z`)                                                                                                                                                                                                                                                                                                                           |
 
 ## Requirements
 
-`node` and `bash` for everything. `npx` for the DMN and BPMN interchange gates.
-`npm` plus `JL4_LSP_CMD` for the ladder leg. `graphviz` optionally, to render
-the LTS DOT to SVG. `mvn` + JDK 17/21 for the DMN engine harnesses on the
-`p7-dmn` leg (reachable since PR #194 landed the corpus cases file). Every
-absence produces a `SKIPPED` receipt naming what is missing and what it was
-needed for.
+**Start with `etc/go/go.sh doctor`.** It prints, before any stage spends time,
+which declared stages will run whole and which will `SKIP`, each with its
+remedy — the aggregation of every per-stage probe, at the front door instead of
+one ten-minute run at a time. Exit 0 = whole, 1 = something will not run whole,
+2 = no usable `l4` anywhere.
+
+`node` and `bash` for everything. `npx` for the DMN and BPMN interchange gates
+(it fetches `dmn-moddle`/`bpmn-moddle` into its own cache — network needed the
+first time only). `npm` plus `JL4_LSP_CMD` for the ladder leg. `graphviz`
+optionally, to render the LTS DOT to SVG. `mvn` + JDK 17/21 for the DMN engine
+harnesses on the `p7-dmn` leg (reachable since PR #194 landed the corpus cases
+file). Every absence produces a `SKIPPED` receipt naming what is missing and
+what it was needed for.
 
 ### Getting `l4` and `jl4-lsp` without building them
 
 `L4` and `JL4_LSP_CMD` want prebuilt binaries, and this driver never builds
-them. Building them yourself needs GHC 9.10.x, Cabal and a slow `cabal build`
-— which is fine on a workstation and impossible inside a cloud sandbox whose
-setup script is capped at a few minutes.
+them. On a workstation with worktrees the usual answer is discovery (see
+Environment above): any sibling worktree's `dist-newstyle` counts, so most
+machines that have ever built the repo need no exports at all. The rest of
+this section is for machines with no build anywhere — say, a cloud sandbox
+whose setup script is capped at a few minutes.
 
 The alternative is a prerelease archive from GitHub Releases.
 `.github/workflows/unstable-prerelease.yml` is the workflow that builds and
 attaches them: one archive per platform, built from `unstable`, published under
 tags of the form `unstable-<YYYYMMDD>-<short-sha>`.
 
-**Status 2026-08-05: that workflow has never been run, so no such release
-exists yet.** It is dispatched by hand, and — because GitHub only offers the
-Run-workflow button for files present on the default branch — it becomes
-dispatchable only once it has reached `main`. Until then, building the binaries
-yourself is still the only route. The rest of this section describes what the
-archives look like once one has been cut.
+**Status 2026-08-09: the workflow is proven but the one published release has
+been deleted.** It ran on 2026-08-05 (dry run 31011661044, real publish 31015006781) and published `unstable-20260805-c873bb5`; as of 2026-08-09 that
+release object is gone from the releases page — only the git tag survives —
+so there is currently **no archive to download**. Check before constructing
+URLs: `gh release list --repo legalese/l4-ide | grep unstable-`. Dispatch does
+not need the file on `main`: the web Run-workflow button only appears for
+default-branch workflows, but
+`gh workflow run unstable-prerelease.yml --ref unstable` works and is the
+measured route (run 31302358588, 2026-08-09).
 
 The URL is constructible from the tag and the platform, so no page-scraping:
 
@@ -297,8 +318,10 @@ exits **0** on a failed `#ASSERT`, so neither the exit code nor the envelope's
 
 ## Common errors
 
-**`go.sh: L4 is unset.`** — point it at a prebuilt binary. The orchestrator will
-not build one.
+**`go.sh: L4 is unset, and no built l4 was discovered…`** — no explicit `L4`
+and discovery found nothing under `dist-newstyle` here or in sibling worktrees.
+Point `L4` at a prebuilt binary, or build one in a _different_ worktree. The
+orchestrator will not build one.
 
 **`GATE HG1: REFUSED — no signer is enrolled.`** — the shipped state.
 `specs/todo/single-instruction-demo/gate-allowed-signers` carries no public key,

@@ -62,7 +62,9 @@ What that means precisely, in the present tense:
 
 ```
 etc/go/
-├── go.sh                        the only entry point; dispatch, gates, resumability
+├── go.sh                        the only entry point; dispatch, gates, resumability,
+│                                and `doctor` — the front-door forecast of which
+│                                declared stages will run whole, with remedies
 ├── selftest.mjs                 proof the lattice can still refuse
 ├── check-skill-drift.mjs        the skill's command set vs go.sh's dispatch table
 ├── gate-request.sh              prints the payload a human signs
@@ -76,13 +78,19 @@ etc/go/
 │                                assert-report (+selftest) · fidelity-counts ·
 │                                plan-shape · split-digraphs · known-defects ·
 │                                gate-payload · verify-run · register-validate ·
-│                                denovo-diff · phase-prelude.sh ·
+│                                denovo-diff · narrative ·
+│                                narrative-provenance · dmn-tables ·
+│                                label-order · doctor (the forecast §0a) ·
+│                                phase-prelude.sh · toolchain.sh (L4/LSP
+│                                discovery from dist-newstyle; explicit wins) ·
 │                                deposit-prelude.sh (the G2 deposit contract,
 │                                in one file so the five stages cannot drift)
 ├── phases/                      p0 p3-check p6 p8-verify p7×9 p9  (G1, run) ·
 │                                p1 p2 p3-encode p4 p5 p8-diff  (G2 — validate
 │                                a deposit §5.2, or compare §8) · p10 (refuses)
-└── report/                      render-report.mjs + template.md
+└── report/                      render-report.mjs + template.md ·
+                                 render-explainer.mjs + explainer-template.md ·
+                                 md-lite.mjs
 
 .claude/skills/running-the-l4-pipeline/
 ├── SKILL.md
@@ -107,6 +115,30 @@ CI runs it: `.github/workflows/pr-checks.yml` gains a `go:` paths filter over `e
 `.claude/skills/running-the-l4-pipeline/**` and `specs/todo/single-instruction-demo/**`, and a
 `Go Orchestrator` job. That filter is load-bearing — `.claude/**` matched **no** existing filter,
 so a skill-only PR previously ran zero jobs.
+
+---
+
+## 0a. Provision and the doctor (added 2026-08-09)
+
+Measured the same day, and the reason this section exists: one explainer rendered three
+different ways in one day depending on which env vars the invoking agent happened to export.
+Every skip was honest and named its remedy on its receipt — but a receipt is read after the
+run, and a full g1 has five independently-supplied prerequisites discovered by different
+stages. Two mechanisms close the gap, both in the tree:
+
+- **Provision** (`etc/go/lib/toolchain.sh`): when `L4` or `JL4_LSP_CMD` is unset, `run` and
+  `doctor` discover a built binary under `dist-newstyle` — the worktree's own first (it
+  matches the tree being run), then the newest among sibling worktrees. Explicit env always
+  wins; every use is labelled `[discovered]` or `[explicit]`, because the two are different
+  claims. `JL4_GO_SERVICE_URL` is **never** discovered: a deployment target must be named by
+  a human, not found by a probe. Nothing is ever built — the build lock stands.
+- **The doctor** (`go.sh doctor`, `etc/go/lib/doctor.mjs`): the front-door forecast. For the
+  chosen milestone it names every declared stage that will not run whole, with its remedy,
+  before any stage spends time. Exit 0 whole · 1 not whole · 2 no usable `l4`. `run` prints
+  the same forecast in brief at the door, and under `L4_GO_REQUIRED=1` refuses there (exit 5)
+  instead of minutes in. The forecast **licenses nothing**: receipts remain the only record
+  of what happened, and the doctor's checks are derived from the same probes the stages read
+  (`lib/probe.mjs`), so the two cannot drift apart without the selftest noticing.
 
 ---
 
