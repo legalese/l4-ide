@@ -28,8 +28,8 @@ known heirs may have the securities sold and the proceeds escheat to the state
 treasury; the recipient is a stranger and the transfer is still in connection
 with the death.
 
-The corpus carries that shape now. Until 2026-08-09 exception (4) was a single
-field whose name was the whole sentence, so a holder was asked to self-assess
+The corpus carries that shape now. It did not always: exception (4) used to be a
+single field whose name was the whole sentence, so a holder was asked to self-assess
 all four alternatives at once and, having answered no, could not say which of
 them they had ruled out. It is now six questions under a decision of its own,
 and the ladder figure for that decision in the **Pictures** section shows the

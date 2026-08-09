@@ -25,10 +25,23 @@ what the corpus deliberately does not model (§5). This page is only about what 
 | 4 | Ladder figures (7 decisions × 4 carriers)      | 28    | `npm run demo:regcf` in `ts-shared/ladder-svg`      | `turbo run test` (drift guard)  |
 | 5 | Deployable API / MCP surface                   | 1 `.l4` | `POST /deployments` to `jl4-service`              | `cabal test jl4:jl4-test`       |
 
-Every one of 1–3 reproduces **byte for byte from the command line with no flags** other than
-`--rule` (which selects _which_ process, since a BPMN document holds exactly one). That was not
-true before 2026-07-27: the model name was hand-typed in the golden test, so the corpus's DMN model
-had three different names at once. It now comes from the corpus's own outermost `§` heading.
+Targets **2 and 3** reproduce **byte for byte from the command line with no flags** other than
+`--rule` (which selects _which_ process, since a BPMN document holds exactly one). Measured
+2026-08-09 by exporting each to a scratch path and diffing against the shipped golden: 0 lines
+differ across all six BPMN files and both dmnmd files.
+
+**Target 1 does not, and this line used to say it did.** The DMN goldens are cut by
+`jl4/tests/DmnExport.hs` through an in-memory VFS whose module is named `main.l4`, so every
+annotation that carries a source position says `main.l4:` where the same command run against the
+file on disk says `regcf.l4:` — 23 `<text>` elements in `regcf-corpus.dmn` and 113 located notes in
+`regcf-corpus.fidelity.txt`, measured the same way, and **nothing else on either side differs**.
+Re-derive that pair with `cabal test jl4:jl4-test`, not with the command in the table above, or you
+will commit that one-word drift by hand. (This is not new — the shipped golden carried `main.l4:`
+23 times before this change too — it is newly measured.)
+
+Even the surviving claim is recent. Before 2026-07-27 the model _name_ was hand-typed in the golden
+test as well, so the corpus's DMN model had three different names at once; it now comes from the
+corpus's own outermost `§` heading.
 
 Pin `JL4_LIBRARY_PATH=<repo>/jl4-core/libraries` for every command on this page.
 

@@ -74,10 +74,10 @@ each statutory paragraph label riding beside its operative limb:
 So the reading is a visible choice rather than an accident of punctuation, and
 the statutory label travels with the limb it labels.
 
-Until 2026-08-09 this was also, by some distance, the widest figure the ladder
-generator produced from this corpus, because the fourth exception was a single
-field whose name was the regulation's own 291-character sentence and leaf labels
-do not wrap. That was reported here as "not a defect". It was one, and not the
+Until the decomposition described below, this was also, by some distance, the
+widest figure the ladder generator produced from this corpus, because the fourth
+exception was a single field whose name was the regulation's own sentence,
+verbatim, and leaf labels do not wrap. That was reported here as "not a defect". It was one, and not the
 width: a name is read as a label, not as a proposition, so four statutory
 alternatives sitting inside one name were four alternatives nobody could audit —
 not a reviewer, not the diagram, not the wizard. The limb is now six fields under a decision of its own,
