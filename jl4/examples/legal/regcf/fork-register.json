@@ -1,7 +1,7 @@
 {
   "kind": "fork-register",
   "register_version": 1,
-  "subject": "17 CFR Part 227 — SEC Regulation Crowdfunding",
+  "subject": "regcf",
   "note": "Interpretive forks in the COMMITTED corpus (regcf.l4). Distinct from jl4/examples/legal/regcf/denovo/fork-register.json, which registers 26 forks found by the independent de novo encoding of the same Part and describes a different file — do not merge the two without re-deriving each entry against the file it names. Every entry here was already argued in prose before it was registered: F-501A-ENDPOINT and F-4A6B-MEASURE in README.md §5 and §3, F-501A-LEAPDAY in README.md §5.2 as of 2026-08-05. Registering them changes nothing about the encoding; it moves the disclosure from prose a drafter chose to write into structure the explainer renders whether or not anyone remembers. COMPLETENESS IS UNFALSIFIABLE: no procedure enumerates the ambiguities a statute contains, so three entries here is not a claim that there are three.",
   "entries": [
     {
@@ -11,7 +11,9 @@
       "site": {
         "file": "jl4/examples/legal/regcf/regcf.l4",
         "anchor": "`the first anniversary of the issuance`",
-        "provisions": ["17 CFR 227.501(a)"]
+        "provisions": [
+          "17 CFR 227.501(a)"
+        ]
       },
       "source": {
         "quote": "during the one-year period beginning when the securities were issued",
@@ -55,7 +57,9 @@
       "witnesses": [
         "A transfer of securities issued 2024-02-29 and transferred 2025-02-28 is OUTSIDE the restricted period under `clamp` and INSIDE it under `rollForward`. One day, one holding in roughly four."
       ],
-      "cross_refs": ["F-501A-ENDPOINT"],
+      "cross_refs": [
+        "F-501A-ENDPOINT"
+      ],
       "notes": [
         "This fork became visible only when the encoding stopped carrying an elapsed day count and started carrying dates. While `Transfer` held `days since the securities were issued`, the question could not be asked in the corpus's own vocabulary."
       ]
@@ -67,7 +71,9 @@
       "site": {
         "file": "jl4/examples/legal/regcf/regcf.l4",
         "anchor": "`transfer is within the one-year restricted period`",
-        "provisions": ["17 CFR 227.501(a)"]
+        "provisions": [
+          "17 CFR 227.501(a)"
+        ]
       },
       "source": {
         "quote": "during the one-year period beginning when the securities were issued",
@@ -82,13 +88,23 @@
           "id": "halfOpen",
           "description": "The first anniversary is OUTSIDE the period: a transfer on the anniversary itself is free. The interval is [issuance, first anniversary).",
           "status": "live",
-          "citations": [{ "kind": "provision", "cite": "17 CFR 227.501(a)" }]
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)"
+            }
+          ]
         },
         {
           "id": "closed",
           "description": "The first anniversary is INSIDE the period: a transfer on the anniversary is still restricted, and freedom begins the following day.",
           "status": "live",
-          "citations": [{ "kind": "provision", "cite": "17 CFR 227.501(a)" }]
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)"
+            }
+          ]
         }
       ],
       "taken": {
@@ -101,7 +117,9 @@
       "witnesses": [
         "A transfer exactly on the first anniversary is permitted under `halfOpen` and prohibited under `closed`. Asserted both ways in regcf.l4's leap-case block."
       ],
-      "cross_refs": ["F-501A-LEAPDAY"],
+      "cross_refs": [
+        "F-501A-LEAPDAY"
+      ],
       "notes": [
         "Unlike F-501A-LEAPDAY, this one has no engine-convention tiebreak available: the target systems have nothing to say about which endpoint a statute means."
       ]
@@ -133,7 +151,10 @@
           "description": "The limit is computed on the GREATER of annual income and net worth — the rule as amended in 2021.",
           "status": "live",
           "citations": [
-            { "kind": "instrument", "cite": "86 FR 3496 (Rel. 33-10884)" }
+            {
+              "kind": "instrument",
+              "cite": "86 FR 3496 (Rel. 33-10884)"
+            }
           ]
         },
         {
@@ -141,8 +162,14 @@
           "description": "The limit is computed on the LESSER of the two — the rule as originally adopted, and what the statute's own text at 15 U.S.C. 77d(a)(6)(B) still says.",
           "status": "live",
           "citations": [
-            { "kind": "provision", "cite": "15 U.S.C. 77d(a)(6)(B)" },
-            { "kind": "instrument", "cite": "80 FR 71388 (Rel. 33-9974)" }
+            {
+              "kind": "provision",
+              "cite": "15 U.S.C. 77d(a)(6)(B)"
+            },
+            {
+              "kind": "instrument",
+              "cite": "80 FR 71388 (Rel. 33-9974)"
+            }
           ]
         }
       ],
@@ -159,6 +186,71 @@
       "cross_refs": [],
       "notes": [
         "This is the fork the explainer already discussed in prose before there was a register — 'the statute is ambiguous, the regulator glossed it twice, and the encoding resolves neither'. Registering it is what stops that passage from being the only place it is said."
+      ]
+    },
+    {
+      "id": "F-100A1-CAP-vs-STATUTE",
+      "kind": "statutory-wording",
+      "status": "open",
+      "divergence": "observable",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/regcf.l4",
+        "anchor": "`the aggregate offering limit`",
+        "provisions": [
+          "17 CFR 227.100(a)(1)",
+          "15 U.S.C. 77d(a)(6)(A)",
+          "15 U.S.C. 77z-3"
+        ]
+      },
+      "source": {
+        "quote": "The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000",
+        "citation": "17 CFR 227.100(a)(1), read against 15 U.S.C. 77d(a)(6)(A) (\"is not more than $1,000,000\")"
+      },
+      "readings": [
+        {
+          "id": "regulationCap",
+          "description": "The offering cap is $5,000,000, as 17 CFR 227.100(a)(1) states in terms.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.100(a)(1)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.100"
+            },
+            {
+              "kind": "instrument",
+              "cite": "Release 33-10884 (2020), raising the cap; Part 227 Authority note claims 15 U.S.C. 77z-3"
+            }
+          ]
+        },
+        {
+          "id": "statuteCap",
+          "description": "The offering cap is $1,000,000, the figure Congress wrote into the paragraph the exemption is granted by, and which has never been amended.",
+          "status": "rejected",
+          "rejection_rationale": "No issuer can rely on it and no encoding that took it would describe the law anyone is administered under. It is recorded because the gap between the two texts is real, not because the reading is available to a filer.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "15 U.S.C. 77d(a)(6)(A)",
+              "url": "https://www.law.cornell.edu/uscode/text/15/77d"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "regulationCap",
+        "mechanism": "encoded",
+        "rationale": "Taken because it is the operative law. What the encoding does NOT resolve, and what this entry exists to disclose, is that the two texts differ by a factor of five on their face. 15 U.S.C. 77d(a)(6)(A) caps the exemption at $1,000,000; 17 CFR 227.100(a)(1) sets $5,000,000. Securities Act s 4A(h)(1) (15 U.S.C. 77d-1(h)(1)) requires the Commission to index the crowdfunding dollar amounts to CPI-U at least every five years, but indexation does not account for the gap: CPI-U from 2012 to 2021 takes $1,000,000 to roughly $1.15M, not to $5M. The Commission raised the cap in Release 33-10884 (2020) and the Authority note for the part claims 15 U.S.C. 77z-3. So the live question is not whether the figures differ -- they plainly do -- but whether s 28's general exemptive authority reaches a specific numeric cap Congress placed in the very paragraph being exempted. That is a question for a court, and no encoding settles it. MEASURED 2026-08-09: statutory text fetched and quoted from Cornell LII; uscode.house.gov refused the connection, so this is ONE source, not two, and the quote should be corroborated before it is relied on in print."
+      },
+      "witnesses": [
+        "An issuer raising $3,000,000 in a rolling twelve months is inside the exemption under `regulationCap` and outside it under `statuteCap`. The corpus asserts the $5,000,000 figure; no fixture exercises the statutory arm, because no filer may use it."
+      ],
+      "cross_refs": [
+        "F-4A6B-MEASURE"
+      ],
+      "notes": [
+        "FOUND BY AUDIT, NOT BY EITHER RUN (2026-08-09). Neither the run 1 corpus nor the de novo run registered this, and the de novo run could not have: it ingested 17 CFR Part 227 from the eCFR and never fetched the instrument the part is made under. That gap is the reason P1 now requires a document with role 'instrument' (SPEC.md s 4 P1, added 2026-08-06). This entry is the first fork in either register that exists because the pipeline was made to look UP rather than forward in time."
       ]
     }
   ]
