@@ -439,20 +439,29 @@ MEASURED 2026-08-06 against the two committed encodings:
 | axis                                  |             run 1 — replay `regcf.l4` | run 2 — de novo `regcf-denovo.l4` | union target                   | supplied by         |
 | ------------------------------------- | ------------------------------------: | --------------------------------: | ------------------------------ | ------------------- |
 | Part 227 sections encoded             |                                    12 |                            **23** | 23                             | run 2, outright     |
-| decisions (`GIVETH`/`DECIDE`/`MEANS`) |                                   187 |                           **485** | 485                            | run 2               |
+| decisions (`GIVETH`/`DECIDE`/`MEANS`) |                                   191 |                           **485** | 485                            | run 2               |
 | `@ref` citations                      |                                    70 |                           **245** | 245                            | run 2               |
 | authority reached beyond Part 227     |          statute + 230.501 + 270.3a-9 |                230.501 + 270.3a-9 | + statute + construction rules | neither, fully      |
-| forks registered                      |                                     3 |                            **26** | 28                             | run 2 + run 1's two |
-| forks with a measured witness         |                            **3 of 3** |                          12 of 26 | all                            | run 1's discipline  |
+| forks registered                      |                                     7 |                            **26** | 28                             | run 2 + run 1's two |
+| forks with a measured witness         |                            **6 of 7** |                          12 of 26 | all                            | run 1's discipline  |
 | forks whose divergence is unassessed  |                                 **0** |                                 9 | 0                              | run 1's discipline  |
-| `#ASSERT`                             |                                **74** |                                40 | ≥ 190 at run 1's density       | run 1               |
-| assertions per decision               |                              **0.40** |                              0.08 | 0.40                           | run 1 — a 5× gap    |
+| `#ASSERT`                             |                                **83** |                                40 | ≥ 190 at run 1's density       | run 1               |
+| assertions per decision               |                              **0.43** |                              0.08 | 0.43                           | run 1 — a 5× gap    |
 | source bundle with provenance         |                                  none |                   **6 documents** | 6 + an `instrument`            | run 2               |
 | external-modification sweep           |                                  none |       **11 searches, 14 entries** | that, standing                 | run 2               |
-| DMN                                   | **69 decisions, 12 tables, 21 cases** |                              none | that, standing                 | run 1               |
+| DMN                                   | **70 decisions, 12 tables, 22 cases** |                              none | that, standing                 | run 1               |
 | BPMN                                  |                       **3 processes** |                              none | that, standing                 | run 1               |
-| ladder figures                        |                                 **6** |                              none | that, standing                 | run 1               |
+| ladder figures                        |                                 **7** |                              none | that, standing                 | run 1               |
 | wizard façade                         |                         **8 exports** |                              none | that, standing                 | run 1               |
+
+Run 1's figures moved on 2026-08-09, when Rule 501(a)(4) was decomposed from one
+~300-character boolean into six fields under a decision of their own: 187 → 191 decisions,
+74 → 83 `#ASSERT`s, 69 → 70 DMN decisions over 21 → 22 engine cases, 6 → 7 ladder figures, and
+4 → 7 registered forks. The witness row went from "3 of 3" to "6 of 7" without any loss of
+discipline: the seventh, `F-501A4-DETERMINER`, records `divergence: "none"` — its two readings
+differ in what a field is NAMED and not in what any transfer satisfies — and the register's own
+validator forbids a witness on such an entry, because a witness that separates nothing is a claim
+that a test was run.
 
 **Run 2's corpus covers every Part 227 section run 1 cites, plus ten more** (227.205, .206, .300,
 .304, .305, .401, .402, .403, .502, .504), reaching all 22 sections of the fetched part. The

@@ -62,6 +62,16 @@ not `transfer is within the one-year restricted period` with `a transfer from _ 
 `days until the first anniversary of the issuance` with `a transfer from _ to _` with `YMD` with 2021, 6 and 1 and `YMD` with 2022, 5 and 31
 executing contract `resale restriction` with `a transfer at` with 364 and `TRUE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 100
 executing contract `resale restriction` with `a transfer at` with 100 and `FALSE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 200
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `TRUE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `TRUE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `TRUE`, `FALSE`, `FALSE` and `FALSE`
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `TRUE`, `FALSE` and `FALSE`
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `TRUE` and `FALSE`
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `TRUE`
+not `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+not `transfer is permitted` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`transfer is permitted` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `TRUE`, `FALSE` and `FALSE`
+executing contract `resale restriction` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `TRUE` and `FALSE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 100
 `the base case qualifies`
 not `the delinquent-issuer case qualifies`
 not `the over-limit-investor case qualifies`

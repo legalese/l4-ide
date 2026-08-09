@@ -730,7 +730,35 @@ DECLARE Transfer HAS
     `to the issuer of the securities`                       IS A BOOLEAN
     `to an accredited investor`                             IS A BOOLEAN
     `as part of an offering registered with the Commission` IS A BOOLEAN
-    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS A BOOLEAN
+    -- Limb (4), decomposed. It is NOT four of a kind: the chapeau is "unless
+    -- such securities are transferred:", and limbs (1)-(3) plus the first three
+    -- parts of (4) complete it as a TRANSFEREE ("transferred TO x"), while the
+    -- last part completes it as a CIRCUMSTANCE ("transferred IN CONNECTION WITH
+    -- y"). The fields keep the preposition for that reason: a `Transfer` cannot
+    -- have a field `the death of the purchaser`, because the purchaser's death
+    -- is not a property of the transfer — the transfer's being in connection
+    -- with it is.
+    --
+    -- The determiner in "the death or divorce of the purchaser" attaches to the
+    -- coordinated phrase, not to each conjunct, so splitting would force us
+    -- either to distribute a determiner the source never distributed or to drop
+    -- it. Dropping invents less. Registered as F-501A4-DETERMINER.
+    --
+    -- "or other similar circumstance" is read as similar to DEATH OR DIVORCE
+    -- only, not to the whole of (4) — the broad reading would make (4) swallow
+    -- itself. Registered as F-501A4-SIMILAR.
+    --
+    -- The decomposition STOPS HERE. 17 CFR 227.501(c) defines "member of the
+    -- family of the purchaser or the equivalent" with "includes" — an open list
+    -- of 13 relationships plus adoptive ones. Enumerating them would encode an
+    -- open term as a closed one, which is a worse fidelity loss than the one
+    -- this decomposition repairs.
+    `to a member of the family of the purchaser or the equivalent`                                    IS A BOOLEAN
+    `to a trust controlled by the purchaser`                                                          IS A BOOLEAN
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS A BOOLEAN
+    `in connection with death of the purchaser`                                                       IS A BOOLEAN
+    `in connection with divorce of the purchaser`                                                     IS A BOOLEAN
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS A BOOLEAN
 
 -- The anniversary itself, computed rather than approximated: name the unit the
 -- rule names, and let the calendar decide how many days that is. 366 across a
@@ -777,6 +805,34 @@ GIVETH A BOOLEAN
 `transfer is within the one-year restricted period` transfer MEANS
     transfer's `date of the transfer` LESS THAN `the first anniversary of the issuance` transfer
 
+-- Limb (4) gets its own decision, rather than six rungs spliced into the
+-- Rule 501(a) chain, because it is the one limb with internal structure: three
+-- transferees and one circumstance, coordinated by a single "or". Nesting it
+-- keeps that asymmetry visible in the ladder — two groups, each captioned by
+-- the words that produced it — where a flat six-way disjunction would present
+-- "a trust controlled by the purchaser" and "in connection with divorce" as the
+-- same kind of thing. They are not: the first says who received the securities,
+-- the second says nothing about who received them at all.
+--
+-- (4)(iv) DOES NOT CONSTRAIN THE TRANSFEREE. The circumstance is the whole
+-- test. Witness: a purchaser dies intestate with no known heirs, the securities
+-- are sold and the proceeds escheat to the state treasury. That is squarely "in
+-- connection with the death of the purchaser" and the transferee is a stranger.
+-- Registered as F-501A4-NEXUS.
+@ref 17 CFR 227.501(a)(4)
+GIVEN transfer IS A Transfer
+GIVETH A BOOLEAN
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` transfer MEANS
+        "(4)"
+    ..      "To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent,"
+        ..  transfer's `to a member of the family of the purchaser or the equivalent`
+        ..  transfer's `to a trust controlled by the purchaser`
+        OR  transfer's `to a trust created for the benefit of a member of the family of the purchaser or the equivalent`
+    OR      "or in connection with the death or divorce of the purchaser or other similar circumstance."
+        ..  transfer's `in connection with death of the purchaser`
+        ..  transfer's `in connection with divorce of the purchaser`
+        OR  transfer's `in connection with a circumstance similar to death or divorce of the purchaser`
+
 @ref 17 CFR 227.501(a)(1)-(4)
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
@@ -785,7 +841,7 @@ GIVETH A BOOLEAN
     ..  "(1)" ... transfer's `to the issuer of the securities`
     ..  "(2)" ... transfer's `to an accredited investor`
     ..  "(3)" ... transfer's `as part of an offering registered with the Commission`
-    ..  "(4)" ... transfer's `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
+    OR  "(4)" ... `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` transfer
 
 @ref 17 CFR 227.501(a)
 GIVEN transfer IS A Transfer
@@ -931,7 +987,12 @@ GIVETH A Transfer
     `to the issuer of the securities`                       IS FALSE
     `to an accredited investor`                             IS `to accredited`
     `as part of an offering registered with the Commission` IS FALSE
-    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE
+    `to a member of the family of the purchaser or the equivalent`                                    IS FALSE
+    `to a trust controlled by the purchaser`                                                          IS FALSE
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS FALSE
+    `in connection with death of the purchaser`                                                       IS FALSE
+    `in connection with divorce of the purchaser`                                                     IS FALSE
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS FALSE
 
 §§ `Group 1 — issuer eligibility (Rule 100(b))`
 
@@ -1126,7 +1187,12 @@ GIVETH A Transfer
     `to the issuer of the securities`                       IS FALSE
     `to an accredited investor`                             IS FALSE
     `as part of an offering registered with the Commission` IS FALSE
-    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE
+    `to a member of the family of the purchaser or the equivalent`                                    IS FALSE
+    `to a trust controlled by the purchaser`                                                          IS FALSE
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS FALSE
+    `in connection with death of the purchaser`                                                       IS FALSE
+    `in connection with divorce of the purchaser`                                                     IS FALSE
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS FALSE
 
 -- day 365 of a leap-spanning holding: STILL RESTRICTED (was FREE under the flat count)
 #ASSERT     `transfer is within the one-year restricted period` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 2 29))
@@ -1147,6 +1213,60 @@ GIVETH A Transfer
 -- A restricted transfer leaves a live prohibition that the transfer breaches.
 #TRACE `resale restriction` (`a transfer at` 100 FALSE) AT 0 WITH
     PARTY Purchaser DOES `transfer the securities` AT 200
+
+§§ `Group 8a — limb (4), one leaf at a time`
+
+-- Before 2026-08-09 limb (4) was ONE ~300-character boolean, so none of the
+-- assertions below could be written: there was a single fact to set, and the
+-- party setting it had to self-assess four alternatives without help. Each of
+-- the six now fires on its own, inside the restricted period, where nothing
+-- else could be excusing the transfer.
+GIVEN `days since issue` IS A NUMBER
+      `family`           IS A BOOLEAN
+      `own trust`        IS A BOOLEAN
+      `family trust`     IS A BOOLEAN
+      `death`            IS A BOOLEAN
+      `divorce`          IS A BOOLEAN
+      `similar`          IS A BOOLEAN
+GIVETH A Transfer
+`a transfer under limb (4) at` `days since issue` `family` `own trust` `family trust` `death` `divorce` `similar` MEANS Transfer WITH
+    `date the securities were issued`                       IS `the fixture issuance date`
+    `date of the transfer`                                  IS `days since issue` PLUS `the fixture issuance date`
+    `to the issuer of the securities`                       IS FALSE
+    `to an accredited investor`                             IS FALSE
+    `as part of an offering registered with the Commission` IS FALSE
+    `to a member of the family of the purchaser or the equivalent`                                    IS `family`
+    `to a trust controlled by the purchaser`                                                          IS `own trust`
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS `family trust`
+    `in connection with death of the purchaser`                                                       IS `death`
+    `in connection with divorce of the purchaser`                                                     IS `divorce`
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS `similar`
+
+-- The transferee half: three ways to be the right recipient.
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 TRUE  FALSE FALSE FALSE FALSE FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE TRUE  FALSE FALSE FALSE FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE TRUE  FALSE FALSE FALSE)
+-- The circumstance half: three ways for the occasion to be the right one.
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE TRUE  FALSE FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE TRUE  FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE FALSE TRUE )
+-- None of the six: limb (4) does not fire, and the restriction stands.
+#ASSERT NOT `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE FALSE FALSE)
+#ASSERT NOT `transfer is permitted` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE FALSE FALSE)
+
+-- THE ESCHEAT CASE, and the reason (4)(iv) is not read to constrain the
+-- transferee. A purchaser dies intestate with no known heirs; the securities
+-- are sold and the proceeds escheat to the state treasury. The transferee is a
+-- stranger — not family, not a trust, not the issuer, not accredited — and the
+-- transfer is nonetheless "in connection with the death of the purchaser". A
+-- nexus reading, on which the transferee must be one the circumstance produces,
+-- would deny the exception here. This corpus permits it. See F-501A4-NEXUS.
+#ASSERT `transfer is permitted` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE TRUE FALSE FALSE)
+
+-- Each of the six carries the whole limb on its own, and that reaches the
+-- deontic layer too: a limb-(4) transfer leaves no live prohibition to breach.
+#TRACE `resale restriction` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE TRUE FALSE) AT 0 WITH
+    PARTY Purchaser DOES `transfer the securities` AT 100
 
 §§ `Top level — the whole exemption`
 

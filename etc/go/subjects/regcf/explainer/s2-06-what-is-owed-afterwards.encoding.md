@@ -23,7 +23,7 @@ On this one it could not, and rather than assuming, it wrote down both what it
 failed to prove and what it did instead. The whole finding, not the first half
 of it:
 
-> [`ongoing reporting obligation` could not be certified total (TERMINATES at main.l4:708:1-717:84: self-recursion could not be certified structurally terminating (no parameter position decreases through a FOLLOWED BY pattern on every recursive call)), so it is not un-lifted. Its deontic body is lowered to a verdict decision table (see D-VERDICT), which always answers one row, and no raw-L4 call site of it remains in the artifact; what could not be certified is the L4 source itself — the HENCE self-recursion may not terminate — and the artifact does not carry that recursion](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L336 "verbatim")
+> [`ongoing reporting obligation` could not be certified total (TERMINATES at main.l4:708:1-717:84: self-recursion could not be certified structurally terminating (no parameter position decreases through a FOLLOWED BY pattern on every recursive call)), so it is not un-lifted. Its deontic body is lowered to a verdict decision table (see D-VERDICT), which always answers one row, and no raw-L4 call site of it remains in the artifact; what could not be certified is the L4 source itself — the HENCE self-recursion may not terminate — and the artifact does not carry that recursion](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L342 "verbatim")
 
 Read the second half carefully, because the first half on its own tells a
 flattering and wrong story. The exporter did **not** refuse. It produced a

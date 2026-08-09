@@ -2,7 +2,7 @@
   "kind": "fork-register",
   "register_version": 1,
   "subject": "regcf",
-  "note": "Interpretive forks in the COMMITTED corpus (regcf.l4). Distinct from jl4/examples/legal/regcf/denovo/fork-register.json, which registers 26 forks found by the independent de novo encoding of the same Part and describes a different file — do not merge the two without re-deriving each entry against the file it names. Every entry here was already argued in prose before it was registered: F-501A-ENDPOINT and F-4A6B-MEASURE in README.md §5 and §3, F-501A-LEAPDAY in README.md §5.2 as of 2026-08-05. Registering them changes nothing about the encoding; it moves the disclosure from prose a drafter chose to write into structure the explainer renders whether or not anyone remembers. COMPLETENESS IS UNFALSIFIABLE: no procedure enumerates the ambiguities a statute contains, so three entries here is not a claim that there are three.",
+  "note": "Interpretive forks in the COMMITTED corpus (regcf.l4). Distinct from jl4/examples/legal/regcf/denovo/fork-register.json, which registers 26 forks found by the independent de novo encoding of the same Part and describes a different file — do not merge the two without re-deriving each entry against the file it names. Every entry here was already argued in prose before it was registered: F-501A-ENDPOINT and F-4A6B-MEASURE in README.md §5 and §3, F-501A-LEAPDAY in README.md §5.2 as of 2026-08-05. Registering them changes nothing about the encoding; it moves the disclosure from prose a drafter chose to write into structure the explainer renders whether or not anyone remembers. Three more (F-501A4-NEXUS, F-501A4-DETERMINER, F-501A4-SIMILAR) were added 2026-08-09 when Rule 501(a)(4) stopped being one ~300-character boolean and became six fields; all three were forced by the split and none of them could have been asked while the limb was one self-assessed fact. COMPLETENESS IS UNFALSIFIABLE: no procedure enumerates the ambiguities a statute contains, so seven entries here is not a claim that there are seven.",
   "entries": [
     {
       "id": "F-501A-LEAPDAY",
@@ -268,6 +268,193 @@
       ],
       "notes": [
         "FOUND BY AUDIT, NOT BY EITHER RUN (2026-08-09). Neither the run 1 corpus nor the de novo run registered this, and the de novo run could not have: it ingested 17 CFR Part 227 from the eCFR and never fetched the instrument the part is made under. That gap is the reason P1 now requires a document with role 'instrument' (SPEC.md s 4 P1, added 2026-08-06). This entry is the first fork in either register that exists because the pipeline was made to look UP rather than forward in time."
+      ]
+    },
+    {
+      "id": "F-501A4-NEXUS",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/regcf.l4",
+        "anchor": "`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance`",
+        "provisions": [
+          "17 CFR 227.501(a)(4)"
+        ]
+      },
+      "source": {
+        "quote": "To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.501(a)(4)",
+            "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "circumstanceAlone",
+          "description": "The closing limb asks only about the OCCASION of the transfer. A transfer made in connection with the purchaser's death or divorce, or a similar circumstance, is excepted whoever receives the securities.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)(4)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+            }
+          ]
+        },
+        {
+          "id": "circumstanceWithNexus",
+          "description": "The closing limb also constrains the TRANSFEREE: the recipient must be one the circumstance produces — an heir, the estate, a former spouse — so that a transfer to an unrelated stranger is outside it even if a death or a divorce occasioned it.",
+          "status": "rejected",
+          "rejection_rationale": "Rejected on the escheat case. A purchaser dies intestate with no known possible heirs; the securities are sold and the proceeds escheat to the state treasury. That is squarely a transfer in connection with the death of the purchaser, and the transferee is a stranger. The nexus reading would deny the exception there, and nothing in the text supplies the recipient it would require: the first three parts of (4) name a transferee in terms ('to a ...'), and the fourth conspicuously does not.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)(4)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "circumstanceAlone",
+        "mechanism": "encoded",
+        "rationale": "RULED 2026-08-09. The grammar decides it: the chapeau is 'unless such securities are transferred:', and limbs (1)-(3) plus the first three parts of (4) complete it as a transferee ('transferred TO x') while the last part completes it as a circumstance ('transferred IN CONNECTION WITH y'). Preserving that asymmetry is the point of decomposing the limb; flattening it into six transferee-shaped tests would be the defect the decomposition exists to repair. The encoded fields therefore keep their prepositions, and `in connection with death of the purchaser` carries the whole test on its own."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "The escheat case: a day-100 transfer with only `in connection with death of the purchaser` true, and no family member, no trust, no accredited transferee and not the issuer. `transfer is permitted` is TRUE under circumstanceAlone and FALSE under circumstanceWithNexus. Asserted in regcf.l4's Group 8a and pinned on both DMN engines as the 22nd case of jl4/examples/dmn/regcf-corpus.cases.json."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "Inexpressible before 2026-08-09. While limb (4) was ONE boolean field carrying all four alternatives, no fact pattern in this corpus could separate the readings: the party self-assessed the whole limb and the encoding never saw which part of it they were relying on."
+      ]
+    },
+    {
+      "id": "F-501A4-DETERMINER",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/regcf.l4",
+        "anchor": "`in connection with death of the purchaser`",
+        "provisions": [
+          "17 CFR 227.501(a)(4)"
+        ]
+      },
+      "source": {
+        "quote": "or in connection with the death or divorce of the purchaser or other similar circumstance",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.501(a)(4)",
+            "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "dropDeterminer",
+          "description": "Split the coordinated phrase into determiner-free fragments: `in connection with death of the purchaser`, `in connection with divorce of the purchaser`. The definite article attached to the coordination, not to each conjunct, so neither fragment inherits it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)(4)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+            }
+          ]
+        },
+        {
+          "id": "distributeDeterminer",
+          "description": "Distribute the article across both conjuncts: `in connection with THE death of the purchaser`, `in connection with A divorce of the purchaser` (indefinite on the second, since a purchaser has one death but may have several divorces).",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)(4)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "dropDeterminer",
+        "mechanism": "encoded",
+        "rationale": "RULED 2026-08-09: dropping invents less. Splitting a coordination forces the choice — either distribute a determiner the source never distributed, or drop it — and there is no third option that leaves the words untouched, because the words were never in the split form. Read as a test rather than as a description, the bare fragment is existential and answers the divorce question correctly: any qualifying divorce satisfies it. If a determiner is ever forced (by a renderer that cannot present a bare fragment, say), the recorded fallback is the indefinite 'a'."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "Divergence is 'none' on purpose, and the witnesses field is therefore absent rather than empty: the readings differ in what the field NAME says, not in what any transfer satisfies. Both are the same boolean over the same occasion, so no fact pattern separates them and none could be written.",
+        "Registered because it is a decision, not because it is a risk. The value of the entry is that a later editor who reaches for 'the death' or 'a death' can see that the bare form was chosen and why, instead of re-deciding it silently."
+      ]
+    },
+    {
+      "id": "F-501A4-SIMILAR",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/regcf/regcf.l4",
+        "anchor": "`in connection with a circumstance similar to death or divorce of the purchaser`",
+        "provisions": [
+          "17 CFR 227.501(a)(4)"
+        ]
+      },
+      "source": {
+        "quote": "or other similar circumstance",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.501(a)(4)",
+            "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "similarToDeathOrDivorce",
+          "description": "'Similar' reaches back only to 'the death or divorce of the purchaser' — the nearest coordination, and the only one it is grammatically parallel to. Its extension is circumstances of that kind: incapacity, or a legal separation.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(a)(4)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+            }
+          ]
+        },
+        {
+          "id": "similarToAllOfLimb4",
+          "description": "'Similar' reaches back over the whole of limb (4), so a transfer resembling any of (4)'s transferee cases — to a household member who is not on the Rule 501(c) list, into a trust-like vehicle that is not a trust — is also within it.",
+          "status": "rejected",
+          "rejection_rationale": "Rejected because it makes (4) self-swallowing: the first three parts would become examples rather than requirements, and the Rule 501(c) definition of 'member of the family of the purchaser or the equivalent' — which the Commission wrote a whole paragraph to fix — could be routed around by asserting similarity to it. A catch-all at the end of a list does not ordinarily reopen the list's own defined terms.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "17 CFR 227.501(c)",
+              "url": "https://www.ecfr.gov/current/title-17/section-227.501"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "similarToDeathOrDivorce",
+        "mechanism": "encoded",
+        "rationale": "RULED 2026-08-09. The field name says which reading was taken, in the name itself: `in connection with a circumstance similar to death or divorce of the purchaser`, not `similar circumstance`. That is a deliberate departure from the source's wording — the source says only 'or other similar circumstance' — and it is made because the shorter form would carry the ambiguity into the question a lay holder is asked. What the encoding cannot do is decide the boundary: 'similar' remains vague, and the field asks the party to place their own facts inside or outside it."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "A transfer to a long-term housemate who is not a Rule 501(c) relation, made for no reason connected with a death or a divorce, is outside the limb under similarToDeathOrDivorce and arguably inside it under similarToAllOfLimb4. The corpus refuses it: the six fields have no arm the facts fit."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "The decomposition STOPS at 'member of the family of the purchaser or the equivalent'. 17 CFR 227.501(c) defines that term with 'includes' over thirteen relationships plus adoptive ones, so it is an OPEN list; enumerating it as six or thirteen booleans would encode an open term as a closed one, which is a larger fidelity loss than the one the decomposition repairs. It stays one boolean deliberately, and that is the reason.",
+        "Vagueness, not competing parses: unlike F-501A4-NEXUS there is no second grammar here that a court would have to choose between, only a term whose extension is not fixed. Registered under kind 'vagueness' for that reason."
       ]
     }
   ]

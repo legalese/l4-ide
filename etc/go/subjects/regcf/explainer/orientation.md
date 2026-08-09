@@ -1,7 +1,7 @@
 Selling shares in your company to the public normally means registering the
 offering with the Securities and Exchange Commission. Regulation Crowdfunding is
 the rulebook for one exemption from that requirement: an issuer may
-[offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933](src:jl4/examples/legal/regcf/regcf.l4#L823 "verbatim"),
+[offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933](src:jl4/examples/legal/regcf/regcf.l4#L879 "verbatim"),
 raising money from ordinary people over the internet, if it satisfies the
 conditions this Part sets out.
 

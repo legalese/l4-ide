@@ -1,6 +1,6 @@
 # Reg CF ladder figures
 
-Generated, never hand-drawn. Six decisions from `../regcf.l4`, four carriers each:
+Generated, never hand-drawn. Seven decisions from `../regcf.l4`, four carriers each:
 
 | File         | Carrier                                 | Made by                                      |
 | ------------ | --------------------------------------- | -------------------------------------------- |
@@ -9,15 +9,16 @@ Generated, never hand-drawn. Six decisions from `../regcf.l4`, four carriers eac
 | `.mmd`       | Mermaid `railroad-beta`                 | `@repo/ladder-core` `toMermaidRailroad`      |
 | `.sentences` | **readable prose** — one per way to satisfy | `@repo/ladder-core` `expandSentences`     |
 
-**The four are not interchangeable**, though as of 2026-08-03 this corpus no longer
-demonstrates it. `toMermaidRailroad` still deliberately drops medial inert glue inside
+**The four are not interchangeable**, and since 2026-08-09 this corpus demonstrates it
+again. `toMermaidRailroad` deliberately drops medial inert glue inside
 an `OR` (a railroad `choice` branch is a live path, and prose-as-branch would make the
 disjunction trivially satisfiable — correct, and documented in `mermaid.ts`). Until the
 enumeration-label ruling, `transfer falls within an exception in Rule 501(a)` put each
 caption on its own rung, so `regcf-resale-exceptions.mmd` carried the chapeau and
 **none** of limbs (2)(3)(4). The labels now ride their own nodes via `...`, so each is
-inside a `sequence(terminal("(n)"), nonterminal(…))` branch and all four survive. The
-mechanism is unchanged; nothing in this corpus trips it. Still do not treat one carrier
+inside a `sequence(terminal("(n)"), nonterminal(…))` branch and all four survive — but
+`regcf-resale-limb-4`, added when Rule 501(a)(4) was decomposed, has a caption between
+two live rungs and its `.mmd` drops it (see §4). Do not treat one carrier
 as a stand-in for another — see §3 and §4.
 
 The `.sentences` carrier is a **disjunction** view and degrades on conjunctions:
@@ -65,19 +66,27 @@ absent from a figure still passes, and layout is not checked at all. Run
 
 ## What was generated
 
-| Slug                         | Decision (`regcf.l4`)                                  | Scene       | Longest leaf |
-| ---------------------------- | ------------------------------------------------------- | ----------- | ------------ |
-| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:309)              | 912 × 571   | 78 ch        |
-| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:683)     | 1006 × 505  | 90 ch        |
-| `regcf-transfer-permitted`   | `transfer is permitted` (:743)                          | 846 × 269   | 63 ch        |
-| `regcf-intermediary`         | `intermediary obligations are met` (:580)               | 2054 × 180  | 75 ch        |
-| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:733) | 2751 × 440 | **301 ch**   |
-| `regcf-exemption`            | `the transaction qualifies…` (:771)                     | **3027 × 185** | 61 ch     |
+| Slug                         | Decision (`regcf.l4`)                                       | Scene          | Longest leaf |
+| ---------------------------- | ----------------------------------------------------------- | -------------- | ------------ |
+| `regcf-rule-100b`            | `issuer is excluded by Rule 100(b)` (:320)                  | 912 × 571      | 78 ch        |
+| `regcf-reporting-terminates` | `ongoing reporting obligation may terminate` (:694)         | 1006 × 505     | 90 ch        |
+| `regcf-transfer-permitted`   | `transfer is permitted` (:849)                              | 846 × 269      | 63 ch        |
+| `regcf-intermediary`         | `intermediary obligations are met` (:591)                   | 2054 × 180     | 75 ch        |
+| `regcf-resale-exceptions`    | `transfer falls within an exception in Rule 501(a)` (:839)  | 1074 × 440     | 87 ch        |
+| `regcf-resale-limb-4`        | `(a)(4) — a family or trust transferee…` (:825)             | 1147 × 572     | 108 ch       |
+| `regcf-exemption`            | `the transaction qualifies…` (:878)                         | **3027 × 185** | 61 ch        |
 
 Every scene size in that table is the emitted SVG's `viewBox`, and every line reference
 is the line of the decision's `MEANS`/`DECIDE` head in `regcf.l4` as it stands in this
-commit. Both were checked on 2026-08-03 by reading the SVGs and the corpus, not carried
-over from a previous run.
+commit. Both were re-checked on 2026-08-09 by reading the SVGs and the corpus, not
+carried over from a previous run.
+
+`regcf-resale-limb-4` joined the set on 2026-08-09, when Rule 501(a)(4) stopped being
+one ~300-character boolean and became six fields under a decision of their own. Note
+what happened to the row above it: `regcf-resale-exceptions` went from 2751 × 440 to
+1074 × 440 and from a 301-character leaf to an 87-character one. It is no longer the
+widest thing in the corpus, and the defect recorded in §2 below is no longer this
+figure's.
 
 Nothing regenerates these numbers, and they have now drifted twice, so re-derive them
 whenever you regenerate the figures — and re-derive them **last**, after the corpus has
@@ -88,9 +97,11 @@ branch, replaced them with `297 671 731 568 721 759` — measured correctly but 
 the last twelve lines of corpus edits landed above them, so every one was uniformly
 twelve short. Measuring early is the failure mode here, not measuring wrongly.
 
-The corpus has **34** visualisable decisions in total (every boolean-returning
-`DECIDE`/`MEANS`; the LSP code lens does not require `@export`). These six were
-picked for what they demonstrate, not because the rest fail.
+The corpus has **43** visualisable decisions in total (every boolean-returning
+`DECIDE`/`MEANS`; the LSP code lens does not require `@export`) — the figure
+`demo:regcf` prints on every run, re-read 2026-08-09; the **34** this line carried
+before was measured when the corpus was smaller and nothing regenerated it. These seven
+were picked for what they demonstrate, not because the rest fail.
 
 ## Three of these figures are wrong for a page, and here is why
 
@@ -111,15 +122,22 @@ This is the root/index picture, so it is the one a reader most wants. Today it
 needs `scale` modes or auto-folding (DESIGN §16), or an `orient: "TB"` for
 conjunctions. Neither exists.
 
-### 2. Leaf labels do not wrap (`regcf-resale-exceptions`)
+### 2. Leaf labels do not wrap — MITIGATED AT THE SOURCE 2026-08-09
 
 `layout.ts` sizes a leaf as `caretW + tm.width(label, FONT) + 2*PAD_X`. There is
-no wrap and no ellipsis. Rule 501(a)(4)'s field name is 291 characters in the
-corpus — because it is the CFR's own sentence, which is what isomorphic
-formalisation means — so its leaf is 304 characters printed and roughly 2380 px
-wide on its own. Only **inert** prose wraps, and only to two balanced lines
+no wrap and no ellipsis. Only **inert** prose wraps, and only to two balanced lines
 (`balanceTwoLines`, gated at `STRADDLE_MIN_WIDTH`), and only when it is riding a
-wire; an `OR` heading is a single line however long.
+wire; an `OR` heading is a single line however long. **The layout mechanism is
+unchanged.**
+
+Until 2026-08-09 this section's exhibit was `regcf-resale-exceptions`, whose Rule
+501(a)(4) field name was 291 characters in the corpus — 304 printed, roughly 2380 px
+wide on its own. That leaf is gone: the limb is now six fields under
+`regcf-resale-limb-4`, and the longest leaf anywhere in these figures is 108
+characters. What removed it was not a wrapping feature but a **decomposition** — the
+field carried four statutory alternatives inside one name, which is the Oakhurst defect
+the grouping tutorial warns against, and the width was the symptom rather than the
+disease. A field name that is genuinely one long sentence would still overflow.
 
 ### 3. A leading run of inert prose is merged into ONE heading — REPAIRED AT THE SOURCE 2026-08-03
 
@@ -169,6 +187,17 @@ Once each label rides its node, there is no medial inert glue left to discard: t
 four. **The discard is still there** and will still bite any rule that puts prose
 between two live `..` rungs, so the carriers remain non-interchangeable for
 inert-style sources.
+
+**And it bit again on 2026-08-09, on the new figure.** `regcf-resale-limb-4` has two
+captioned groups — the transferee half and the circumstance half — and the second
+caption sits between two live rungs, which is exactly the shape this discard is about.
+`regcf-resale-limb-4.mmd` therefore carries `(4) To a member of the family …` as its
+leading terminal and **drops** `or in connection with the death or divorce of the
+purchaser or other similar circumstance.` altogether, while the `.svg`, the `.txt` and
+the `.sentences` all carry it — the ASCII puts it on the wire at precisely the boundary
+between the third and fourth rungs, which is where it belongs. This is not a regression
+and not a bug to file: it is the documented trade, observed on a fresh case, and it is
+the reason the four carriers are shipped rather than one.
 
 ## What is right about them
 

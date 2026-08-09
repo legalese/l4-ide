@@ -1,36 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2751" height="440" viewBox="0 0 2751 440">
-<rect width="2751" height="440" fill="#ffffff"/>
-<text x="1167.2" y="115.3" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(1)</text>
-<rect data-fnid="6" data-value="6" class="lad-box lad-clickable" x="1235.0" y="101.6" width="373.0" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
-<text data-fnid="6" x="1421.4" y="126.4" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `to the issuer of the securities`</text>
-<polyline class="lad-wire lad-clickable" data-fold="4" points="1191.0,121.4 1235.0,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
-<polyline class="lad-wire lad-clickable" data-fold="4" points="1143.4,121.4 1191.0,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 230.0,219.8 1023.4,121.4 1143.4,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 1607.9,121.4 C 1727.9,121.4 2521.4,219.8 2641.4,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
-<text x="1190.7" y="180.9" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(2)</text>
-<rect data-fnid="10" data-value="10" class="lad-box lad-clickable" x="1258.5" y="167.2" width="325.9" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
-<text data-fnid="10" x="1421.4" y="192.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `to an accredited investor`</text>
-<polyline class="lad-wire lad-clickable" data-fold="8" points="1214.5,187.0 1258.5,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
-<polyline class="lad-wire lad-clickable" data-fold="8" points="1167.0,187.0 1214.5,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 230.0,219.8 1047.0,187.0 1167.0,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 1584.4,187.0 C 1704.4,187.0 2521.4,219.8 2641.4,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
-<text x="1081.0" y="246.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(3)</text>
-<rect data-fnid="14" data-value="14" class="lad-box lad-clickable" x="1148.7" y="232.8" width="545.4" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
-<text data-fnid="14" x="1421.4" y="257.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `as part of an offering registered with the Commission`</text>
-<polyline class="lad-wire lad-clickable" data-fold="12" points="1104.7,252.6 1148.7,252.6" fill="none" stroke="#777" stroke-width="1.5"/>
-<polyline class="lad-wire lad-clickable" data-fold="12" points="1057.2,252.6 1104.7,252.6" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 230.0,219.8 937.2,252.6 1057.2,252.6" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 1694.2,252.6 C 1814.2,252.6 2521.4,219.8 2641.4,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1074" height="440" viewBox="0 0 1074 440">
+<rect width="1074" height="440" fill="#ffffff"/>
+<text x="328.3" y="115.3" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(1)</text>
+<rect data-fnid="6" data-value="6" class="lad-box lad-clickable" x="396.1" y="101.6" width="373.0" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="6" x="582.6" y="126.4" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `to the issuer of the securities`</text>
+<polyline class="lad-wire lad-clickable" data-fold="4" points="352.1,121.4 396.1,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="4" points="304.6,121.4 352.1,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 230.0,219.8 184.6,121.4 304.6,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 769.0,121.4 C 889.0,121.4 843.6,219.8 963.6,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<text x="351.8" y="180.9" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(2)</text>
+<rect data-fnid="10" data-value="10" class="lad-box lad-clickable" x="419.6" y="167.2" width="325.9" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="10" x="582.6" y="192.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `to an accredited investor`</text>
+<polyline class="lad-wire lad-clickable" data-fold="8" points="375.6,187.0 419.6,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="8" points="328.1,187.0 375.6,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 230.0,219.8 208.1,187.0 328.1,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 745.5,187.0 C 865.5,187.0 843.6,219.8 963.6,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<text x="242.1" y="246.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(3)</text>
+<rect data-fnid="14" data-value="14" class="lad-box lad-clickable" x="309.8" y="232.8" width="545.4" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="14" x="582.6" y="257.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `as part of an offering registered with the Commission`</text>
+<polyline class="lad-wire lad-clickable" data-fold="12" points="265.8,252.6 309.8,252.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="12" points="218.3,252.6 265.8,252.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 191.2,219.8 137.1,252.6 218.3,252.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 855.3,252.6 C 936.5,252.6 882.4,219.8 963.6,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
 <text x="159.8" y="312.1" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">(4)</text>
-<rect data-fnid="18" data-value="18" class="lad-box lad-clickable" x="227.5" y="298.4" width="2387.8" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
-<text data-fnid="18" x="1421.4" y="323.2" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">transfer's `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`</text>
+<rect data-fnid="18" data-value="18" class="lad-box lad-clickable" x="227.5" y="298.4" width="710.1" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="18" x="582.6" y="323.2" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` OF transfer</text>
 <polyline class="lad-wire lad-clickable" data-fold="16" points="183.5,318.2 227.5,318.2" fill="none" stroke="#777" stroke-width="1.5"/>
 <polyline class="lad-wire lad-clickable" data-fold="16" points="136.0,318.2 183.5,318.2" fill="none" stroke="#777" stroke-width="1.5"/>
 <path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,219.8 C 164.1,219.8 81.9,318.2 136.0,318.2" fill="none" stroke="#777" stroke-width="1.5"/>
-<path class="lad-wire lad-clickable" data-fold="2" d="M 2615.4,318.2 C 2669.5,318.2 2587.2,219.8 2641.4,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
-<text data-fnid="2" data-fold="2" class="lad-clickable" x="1375.7" y="87.8" font-family="Georgia, serif" font-size="12.5" text-anchor="middle" fill="#555" font-style="italic">unless such securities are transferred:</text>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 937.6,318.2 C 991.7,318.2 909.5,219.8 963.6,219.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="2" data-fold="2" class="lad-clickable" x="536.8" y="87.8" font-family="Georgia, serif" font-size="12.5" text-anchor="middle" fill="#555" font-style="italic">unless such securities are transferred:</text>
 <polyline class="lad-wire" points="70.0,219.8 110.0,219.8" fill="none" stroke="#222" stroke-width="1.5"/>
 <circle cx="70.0" cy="219.8" r="3.5" fill="#222"/>
-<polyline class="lad-wire" points="2641.4,219.8 2681.4,219.8" fill="none" stroke="#222" stroke-width="1.5"/>
-<circle cx="2681.4" cy="219.8" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="963.6,219.8 1003.6,219.8" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="1003.6" cy="219.8" r="3.5" fill="#222"/>
 </svg>

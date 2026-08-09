@@ -566,7 +566,7 @@ dateProbeCases    = dmnDateProbeDir </> "date-axis.cases.json"
 dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
 
 -- The Reg CF CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
--- the statute corpus, 69 decisions, evaluated end to end. The cases
+-- the statute corpus, 70 decisions, evaluated end to end. The cases
 -- file's own header records how each pin was anchored (L4 + the documented
 -- transform, never the engine's own output).
 corpusGolden, corpusEngineCases :: FilePath
@@ -1676,16 +1676,16 @@ spec bin = do
         out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
         out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
 
-    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 69-decision Reg CF
-    -- corpus builds and answers on both engines, over TWENTY-ONE cases — the
+    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 70-decision Reg CF
+    -- corpus builds and answers on both engines, over TWENTY-TWO cases — the
     -- base world, the 15 dated cases that relocate the rule-date-rebinding
     -- fixtures R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law
     -- under a date; the harness owns the dates"), the 4 seed cases that close
     -- the total-assets and restricted-period leaves the §8 diff oracle reported
-    -- structurally inert, and THE LEAP CASE. 21 x 69 = 1449. All counts below
-    -- are MEASURED (2026-08-05, this machine, both harnesses), not aspirational:
-    -- before R12/R13 KIE refused with 16 build errors and Camunda refused the
-    -- file at parse() on the raw-L4 deontic body.
+    -- structurally inert, THE LEAP CASE, and THE ESCHEAT CASE. 22 x 70 = 1540.
+    -- All counts below are MEASURED (2026-08-09, this machine, both harnesses),
+    -- not aspirational: before R12/R13 KIE refused with 16 build errors and
+    -- Camunda refused the file at parse() on the raw-L4 deontic body.
     --
     -- 67 decisions became 69, and 20 cases became 21, on 2026-08-05, when Rule
     -- 501(a)'s "one year" stopped being the constant 365. The two added
@@ -1695,30 +1695,38 @@ spec bin = do
     -- calendar refuses. It is pinned here rather than only in the L4 #ASSERTs
     -- because R0 says the execution is the exhibit: an engine we do not control
     -- has to be the one that refuses it.
+    --
+    -- 69 became 70, and 21 cases became 22, on 2026-08-09, when Rule 501(a)(4)
+    -- stopped being one ~300-character boolean and became six. The added
+    -- decision is the limb itself; the added case is the ESCHEAT case — a
+    -- transfer in connection with the purchaser's death to a transferee who is
+    -- nobody in particular — which is the fact pattern the decomposition's
+    -- nexus ruling turns on, and which no case could express while the limb was
+    -- a single self-assessed fact.
     it "KIE builds and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("21 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1449/1449 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("1449/1449 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
           -- the SVC leg is a value check since 2026-08-02 (each service fed
           -- its inputDecisions' computed values, each outputDecision compared
           -- against the same expect entry): 7 services, 15 declared outputs,
           -- per case
-          out `shouldSatisfy` ("315/315 service output value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("330/330 service output value(s) as expected" `isInfixOf`)
 
     it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("21 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1449/1449 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("1449/1449 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
 
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,

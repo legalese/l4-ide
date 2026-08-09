@@ -1,0 +1,24 @@
+(4) To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent,
+                                     ┌────────────────────────────────────────────────────────────────────────────┐
+                ┌────────────────────┤ transfer's `to a member of the family of the purchaser or the equivalent`  ├───────────────────┐
+                │                    └────────────────────────────────────────────────────────────────────────────┘                   │
+                │                                                                                                                     │
+                │                               ┌──────────────────────────────────────────────────────┐                              │
+                ├───────────────────────────────┤ transfer's `to a trust controlled by the purchaser`  ├──────────────────────────────┤
+                │                               └──────────────────────────────────────────────────────┘                              │
+                │                                                                                                                     │
+                │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+                ├──┤ transfer's `to a trust created for the benefit of a member of the family of the purchaser or the equivalent`  ├──┤
+                │  └───────────────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
+             ●──┤             or in connection with the death or divorce of the purchaser or other similar circumstance.              ├──●
+                │                             ┌─────────────────────────────────────────────────────────┐                             │
+                ├─────────────────────────────┤ transfer's `in connection with death of the purchaser`  ├─────────────────────────────┤
+                │                             └─────────────────────────────────────────────────────────┘                             │
+                │                                                                                                                     │
+                │                            ┌───────────────────────────────────────────────────────────┐                            │
+                ├────────────────────────────┤ transfer's `in connection with divorce of the purchaser`  ├────────────────────────────┤
+                │                            └───────────────────────────────────────────────────────────┘                            │
+                │                                                                                                                     │
+                │           ┌──────────────────────────────────────────────────────────────────────────────────────────────┐          │
+                └───────────┤ transfer's `in connection with a circumstance similar to death or divorce of the purchaser`  ├──────────┘
+                            └──────────────────────────────────────────────────────────────────────────────────────────────┘

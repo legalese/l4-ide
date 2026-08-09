@@ -11,8 +11,8 @@ An encoding has to do something with that. What this one does is refuse to pick:
 the measure is a **dated function** that selects `greater of` from the amendment
 date and `lesser of` before it, and both readings stay live and testable
 forever. The consequence is asserted at both ends — the same investor is capped
-at [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L972) at time of writing ({{as_of}}) and was capped at
-[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1270) under the earlier rule, a
+at [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1033) at time of writing ({{as_of}}) and was capped at
+[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1390) under the earlier rule, a
 factor of more than three.
 
 **An exhaustiveness claim the prose does not make.** Limb (i) applies "if
@@ -38,7 +38,7 @@ the record `InvestorFacts` declares
 [`an accredited investor` IS A BOOLEAN](src:jl4/examples/legal/regcf/regcf-wizard.l4#L123 "verbatim"),
 and the fixture that had been called the same thing now had to be something
 else. It was resolved by taking Rule 100(a)(2)'s own noun, so the fixture is
-[`an accredited purchaser` MEANS InvestorFacts WITH](src:jl4/examples/legal/regcf/regcf-wizard.l4#L684 "verbatim").
+[`an accredited purchaser` MEANS InvestorFacts WITH](src:jl4/examples/legal/regcf/regcf-wizard.l4#L720 "verbatim").
 That is a real type error and not a style complaint, and it is the smallest
 possible illustration of the difference this whole exercise is about: in prose,
 two things with the same name are a reader's problem, and here they were the

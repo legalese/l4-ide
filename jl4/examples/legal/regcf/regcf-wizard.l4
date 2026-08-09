@@ -135,7 +135,18 @@ DECLARE ResaleFacts HAS
     `selling back to the issuer`            IS A BOOLEAN @desc Are you transferring the securities back to the company that issued them?
     `buyer is an accredited investor`       IS A BOOLEAN @desc Is the person receiving the securities an accredited investor?
     `part of a registered offering`         IS A BOOLEAN @desc Is this transfer part of an offering registered with the SEC?
-    `family transfer death or divorce`      IS A BOOLEAN @desc Is this a transfer to a family member or the equivalent, to a trust you control or one for a family member's benefit, or in connection with death or divorce?
+    -- Rule 501(a)(4), asked as six questions rather than one. The single
+    -- compound question this replaces asked a holder to self-assess four
+    -- alternatives at once, and a holder who answered NO to it could not say
+    -- which of the four they had ruled out. The first three ask WHO is
+    -- receiving the securities; the last three ask WHAT OCCASION the transfer
+    -- is being made on, and do not ask about the recipient at all.
+    `to a family member or the equivalent`  IS A BOOLEAN @desc Is the person receiving the securities a member of your family, or the equivalent? Rule 501(c) counts a child, stepchild, grandchild, parent, stepparent, grandparent, spouse or spousal equivalent, sibling, or in-law, including by adoption — and says "includes", so that list is not closed.
+    `to a trust you control`                IS A BOOLEAN @desc Is the person receiving the securities a trust that you control?
+    `to a trust for your family`            IS A BOOLEAN @desc Is the person receiving the securities a trust created for the benefit of a member of your family, or the equivalent?
+    `in connection with a death`            IS A BOOLEAN @desc Is this transfer being made in connection with the death of the person who bought the securities? Answer yes even if the recipient is a stranger — for example, a sale by the estate of a purchaser who died intestate.
+    `in connection with a divorce`          IS A BOOLEAN @desc Is this transfer being made in connection with a divorce of the person who bought the securities?
+    `in connection with the like`           IS A BOOLEAN @desc Is this transfer being made in connection with some other circumstance similar to a death or a divorce — incapacity, or a legal separation, for instance? "Similar" here means similar to a death or a divorce, not similar to the family and trust transfers above.
 
 DECLARE ReportingFacts HAS
     `now files Exchange Act reports`         IS A BOOLEAN @desc Does your company now file reports under section 13(a) or section 15(d) of the Securities Exchange Act of 1934?
@@ -226,7 +237,12 @@ GIVETH A Transfer
         `to the issuer of the securities`                       IS holding's `selling back to the issuer`
         `to an accredited investor`                             IS holding's `buyer is an accredited investor`
         `as part of an offering registered with the Commission` IS holding's `part of a registered offering`
-        `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS holding's `family transfer death or divorce`
+        `to a member of the family of the purchaser or the equivalent`                                    IS holding's `to a family member or the equivalent`
+        `to a trust controlled by the purchaser`                                                          IS holding's `to a trust you control`
+        `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS holding's `to a trust for your family`
+        `in connection with death of the purchaser`                                                       IS holding's `in connection with a death`
+        `in connection with divorce of the purchaser`                                                     IS holding's `in connection with a divorce`
+        `in connection with a circumstance similar to death or divorce of the purchaser`                  IS holding's `in connection with the like`
 
 GIVEN filer IS A ReportingFacts
 GIVETH A ReportingStatus
@@ -467,6 +483,26 @@ GIVETH A NUMBER
              ((`the first anniversary of the issuance` (`transfer from` holding))
               MINUS (holding's `date of the transfer`))
 
+-- Rule 501(a)(4) has six ways in, so it has six reasons out. Before the limb
+-- was decomposed the wizard could only say "family, trust, death or divorce" —
+-- the whole limb read back at the holder, which is not an explanation. Only
+-- reached when one of the six is true, so the final ELSE is the sixth arm and
+-- not a fallback.
+GIVEN holding IS A ResaleFacts
+GIVETH A STRING
+`which part of Rule 501(a)(4) applies to` holding MEANS
+    IF   holding's `to a family member or the equivalent`
+    THEN "The transferee is a member of your family or the equivalent, which Rule 501(a)(4) excepts from the restriction. Rule 501(c) defines the term, and defines it with 'includes', so its list of thirteen relationships is not closed."
+    ELSE IF   holding's `to a trust you control`
+         THEN "The transferee is a trust you control, which Rule 501(a)(4) excepts from the restriction."
+         ELSE IF   holding's `to a trust for your family`
+              THEN "The transferee is a trust created for the benefit of a member of your family or the equivalent, which Rule 501(a)(4) excepts from the restriction."
+              ELSE IF   holding's `in connection with a death`
+                   THEN "The transfer is in connection with the death of the purchaser, which Rule 501(a)(4) excepts from the restriction. That limb is about the occasion, not the recipient: it does not require the transferee to be anyone in particular."
+                   ELSE IF   holding's `in connection with a divorce`
+                        THEN "The transfer is in connection with a divorce of the purchaser, which Rule 501(a)(4) excepts from the restriction. That limb is about the occasion, not the recipient."
+                        ELSE "The transfer is in connection with a circumstance similar to a death or a divorce, which Rule 501(a)(4)'s closing words except from the restriction. Read as similar to a death or a divorce specifically — incapacity or a legal separation, for instance — and not as a general licence."
+
 GIVEN holding IS A ResaleFacts
 GIVETH A STRING
 `why the transfer stands or falls for` holding MEANS
@@ -476,8 +512,8 @@ GIVETH A STRING
          THEN "The transferee is an accredited investor, which Rule 501(a)(2) excepts from the restriction."
          ELSE IF   holding's `part of a registered offering`
               THEN "The transfer is part of an offering registered with the Commission, which Rule 501(a)(3) excepts from the restriction."
-              ELSE IF   holding's `family transfer death or divorce`
-                   THEN "The transfer is to a family member or the equivalent, to a trust you control or one created for a family member's benefit, or in connection with death or divorce, which Rule 501(a)(4) excepts from the restriction."
+              ELSE IF   `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`transfer from` holding)
+                   THEN `which part of Rule 501(a)(4) applies to` holding
                    ELSE IF   NOT (`transfer is within the one-year restricted period` (`transfer from` holding))
                         THEN CONCAT "The one-year restricted period has run: the securities were issued ",
                                     (((`transfer from` holding)'s `days since the securities were issued`) AS STRING),
@@ -693,7 +729,12 @@ DECIDE `can this company raise` IS
     `selling back to the issuer`            IS FALSE
     `buyer is an accredited investor`       IS FALSE
     `part of a registered offering`         IS FALSE
-    `family transfer death or divorce`      IS FALSE
+    `to a family member or the equivalent`  IS FALSE
+    `to a trust you control`                IS FALSE
+    `to a trust for your family`            IS FALSE
+    `in connection with a death`            IS FALSE
+    `in connection with a divorce`          IS FALSE
+    `in connection with the like`           IS FALSE
 
 `a holding sold to an accredited buyer` MEANS ResaleFacts WITH
     `date the securities were issued to you` IS YMD 2021 6 1
@@ -701,7 +742,29 @@ DECIDE `can this company raise` IS
     `selling back to the issuer`            IS FALSE
     `buyer is an accredited investor`       IS TRUE
     `part of a registered offering`         IS FALSE
-    `family transfer death or divorce`      IS FALSE
+    `to a family member or the equivalent`  IS FALSE
+    `to a trust you control`                IS FALSE
+    `to a trust for your family`            IS FALSE
+    `in connection with a death`            IS FALSE
+    `in connection with a divorce`          IS FALSE
+    `in connection with the like`           IS FALSE
+
+-- The escheat case, at the façade. A purchaser died intestate with no known
+-- heirs; the securities are sold and the proceeds escheat to the state. The
+-- recipient is a stranger, and the transfer is still excepted, because
+-- Rule 501(a)(4)'s last limb asks about the occasion and not the recipient.
+`a holding sold after the purchaser died` MEANS ResaleFacts WITH
+    `date the securities were issued to you` IS YMD 2021 6 1
+    `date of the transfer`                  IS YMD 2021 9 9
+    `selling back to the issuer`            IS FALSE
+    `buyer is an accredited investor`       IS FALSE
+    `part of a registered offering`         IS FALSE
+    `to a family member or the equivalent`  IS FALSE
+    `to a trust you control`                IS FALSE
+    `to a trust for your family`            IS FALSE
+    `in connection with a death`            IS TRUE
+    `in connection with a divorce`          IS FALSE
+    `in connection with the like`           IS FALSE
 
 `a filer who may stop` MEANS ReportingFacts WITH
     `now files Exchange Act reports`       IS FALSE
@@ -764,6 +827,10 @@ DECIDE `can this company raise` IS
 #ASSERT (`days still to wait for` `a restricted holding`) EQUALS 265
 #ASSERT     `transfer is permitted` (`transfer from` `a holding sold to an accredited buyer`)
 #ASSERT (`days still to wait for` `a holding sold to an accredited buyer`) EQUALS 0
+-- The escheat case: a stranger as transferee, excepted anyway, because the
+-- last limb of Rule 501(a)(4) asks about the occasion and not the recipient.
+#ASSERT     `transfer is permitted` (`transfer from` `a holding sold after the purchaser died`)
+#ASSERT (`days still to wait for` `a holding sold after the purchaser died`) EQUALS 0
 
 -- Reporting: 299 holders and one annual report is a way out; 5,000 is not.
 #ASSERT     `ongoing reporting obligation may terminate` (`reporting status from` `a filer who may stop`)
@@ -781,5 +848,6 @@ DECIDE `can this company raise` IS
 #EVAL `investment limit check` `an accredited purchaser`
 #EVAL `resale check` `a restricted holding`
 #EVAL `resale check` `a holding sold to an accredited buyer`
+#EVAL `resale check` `a holding sold after the purchaser died`
 #EVAL `reporting exit check` `a filer who may stop`
 #EVAL `reporting exit check` `a filer who must keep going`

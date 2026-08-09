@@ -1085,14 +1085,21 @@ where it already lives, not re-decided in the explainer.
    card** in dark mode, not to strip the rect. Stripping it is editing the artifact, and the
    artifact is the evidence.
 2. **They are self-contained.** No `xlink:href`, no `<image>`, no `@import`, no `url(` in any of the
-   six **[M:** counted, zero in each **]**. They inline with no CSP or dependency concern at all.
-3. **Three of the six are unusable as page assets, and the explainer must not fix that.** The root
+   seven **[M:** counted, zero in each; re-counted 2026-08-09 over the seventh, `regcf-resale-limb-4`
+   **]**. They inline with no CSP or dependency concern at all.
+3. **One of the seven is unusable as a page asset, and the explainer must not fix that.** The root
    exemption figure is 3027 × 185 — a strip sixteen times wider than tall — because an `AND` is a
-   series circuit whose scene width is the sum of its children's, and leaf labels never wrap; Rule
-   501(a)(4)'s leaf prints at 301 characters because it **is** the CFR's sentence **[G]**. The
-   ruling: render those three in a horizontally scrolling container at full fidelity, with a caption
-   that states the width and says why, and a link to the file. **Trimming is transcription** — the
-   figures' own README says so — and a trimmed ladder is a different rule.
+   series circuit whose scene width is the sum of its children's **[G]**. The ruling: render it in a
+   horizontally scrolling container at full fidelity, with a caption that states the width and says
+   why, and a link to the file. **Trimming is transcription** — the figures' own README says so —
+   and a trimmed ladder is a different rule.
+
+   This bullet read "three of the six" until 2026-08-09, and the other two were wide for a different
+   reason: leaf labels never wrap, and Rule 501(a)(4)'s leaf printed at 301 characters because it
+   **was** the CFR's whole sentence in one field name. That field is now six, under a decision of
+   its own, and the longest leaf in any regcf figure is 108 characters. The wrapping limitation is
+   unchanged; what changed is that nothing here trips it. Note which repair worked: decomposing a
+   name that hid four statutory alternatives, not a layout feature.
 
 The drift guard on these figures (`ts-shared/ladder-svg/test/regcf-figures.test.ts`) is
 **one-directional**: a leaf added to the L4 and absent from a figure still passes **[G]**. §S8 says

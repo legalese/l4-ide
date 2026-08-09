@@ -62,7 +62,7 @@ and
 [transmit funds to the issuer](src:jl4/examples/legal/regcf/regcf.l4#L101 "verbatim").
 There is also one period that only the citizen-facing wizard's prose reads; the
 decision-table exporter flags it as an inert decision —
-[advisory — decision_business_days_to_file_a_progress_update](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L293 "verbatim")
+[advisory — decision_business_days_to_file_a_progress_update](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L299 "verbatim")
 — which is how it was found. A projection noticing something dead in the source
 is not what a projection is for, and it is the second-best argument in this
 document for building them.

@@ -19,7 +19,7 @@ are **not** conjuncts of it. They are regulative rules — obligations and
 prohibitions with parties, deadlines and lifecycles — and they live outside the
 decision entirely. Rule 100(a)(4)'s proviso is therefore encoded as _structure_
 rather than as a comment: a reporting default cannot make
-[`the transaction qualifies for the section 4(a)(6) exemption`](src:jl4/examples/legal/regcf/regcf.l4#L822 "verbatim")
+[`the transaction qualifies for the section 4(a)(6) exemption`](src:jl4/examples/legal/regcf/regcf.l4#L878 "verbatim")
 false, because it is not one of the things that decision reads.
 
 **What the encoding did not manage to say.** The other half of that proviso —

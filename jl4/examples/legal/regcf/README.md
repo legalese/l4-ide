@@ -464,7 +464,7 @@ projection *cannot* say. What follows is the summary.
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
-| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1449/1449 over 21 cases on both engines** — see below |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1540/1540 over 22 cases on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 
 Every BPMN golden, and the DMN **markdown** golden, reproduces byte for byte from a bare
@@ -474,35 +474,42 @@ from the CLI's bytes in exactly its 23 source-range annotation labels (`main.l4:
 2026-08-02, see `../../dmn/README.md` "From the CLI"). The `<definitions>` name comes
 from this file's own outermost `§` heading.
 
-### 6.1 DMN: 69 decisions, 12 tables, and a model both engines evaluate
+### 6.1 DMN: 70 decisions, 12 tables, and a model both engines evaluate
 
-**Measured 2026-08-05 on the shipped goldens (R12 + R13,
+**Measured 2026-08-09 on the shipped goldens (R12 + R13,
 `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** `l4 export --to=dmn` on
 this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
 since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
 reporting spine to a verdict decision table — **both engines evaluate it end to end**,
-over the 21 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 22 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec
-§15.12.1 — 4 seed cases added 2026-08-03, and the leap case added 2026-08-05):
-KIE 8.44.0.Final answers 1449/1449 decisions with 1449/1449 values as expected (plus
-315/315 decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and
-answers 1449/1449. An earlier revision of this section — "102 decisions, 11 tables, and a model no
+§15.12.1 — 4 seed cases added 2026-08-03, the leap case added 2026-08-05, and the
+escheat case added 2026-08-09):
+KIE 8.44.0.Final answers 1540/1540 decisions with 1540/1540 values as expected (plus
+330/330 decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and
+answers 1540/1540. An earlier revision of this section — "102 decisions, 11 tables, and a model no
 engine can bind" — described the pre-BKM, pre-R12/R13 artifact; that model no longer
 ships.
 
-- **67 `<decision>`** elements — 9 decision tables, 57 boxed literal expressions, 1
+- **70 `<decision>`** elements — 9 decision tables, 60 boxed literal expressions, 1
   boxed context — plus **10 `businessKnowledgeModel`s** (Phase 5's tier-2 λ-lifts,
   3 of which carry the other 3 of the artifact's 12 `<decisionTable>`s) and **7
   `decisionService`s**. Of the 12 tables, 10 are `hitPolicy="UNIQUE"` rule-date
   interval tables and 2 are `FIRST` — one of them the R13 verdict table over the
   reporting spine. The boxed literals are FEEL an engine evaluates:
-  `D-LITERALEXPR` is now **advisory**, ×64 (57 decisions + 7 BKM bodies).
+  `D-LITERALEXPR` is now **advisory**, ×67 (60 decisions + 7 BKM bodies). The three
+  bullet figures above read 67/57/×64 until 2026-08-09 and were stale by two
+  before this edit: the calendar-anniversary change of 2026-08-05 added two decisions
+  and nothing regenerated this list. Re-derived here by counting the shipped XML and
+  the shipped fidelity report, not by adding to the old numbers.
 - **15 `<inputData>`** elements, one of which is the rule-date input
   `RULES_EFFECTIVE_DATE` (`typeRef="date"`). The flat-namespace collision story shrank
   with them: hydration and the BKM lowering absorbed most of the old scalar inputs, so
   `D-RENAME` and `D-SCOPE` fire once each (the two `status` terms) and `D-FEELNAME` is
   zero.
-- **0 blocking, 21 lossy, 125 advisory** notes in total. The lossy set is the honest
+- **0 blocking, 21 lossy, 133 advisory** notes in total (re-counted from the shipped
+  `regcf-corpus.fidelity.txt` on 2026-08-09; this line read 125 and drifted the same
+  way the bullet above it did). The lossy set is the honest
   remainder: 15 `D-RULEDATE-UNBOUND` (the `EVAL UNDER RULES EFFECTIVE AT` scenarios
   are **not emitted** — a DRG has one global rule-date input and no scoped rebinding),
   2 `D-REGULATIVE`, 1 `D-VERDICT` (the obligation lifecycle is the BPMN projection's
@@ -596,9 +603,15 @@ Three reasons, each measured rather than assumed.
 
 1. **Field names.** `jl4-service` sanitises schema property names — every non-alphanumeric
    becomes `-`, runs collapse — and then **truncates to 60 characters**
-   (`jl4-service/src/Shared.hs`). **23 of the corpus's 41 record fields exceed that**, because
-   they are the CFR's own sentences; the longest is 291 characters. Deployed and read back off
-   the live MCP endpoint:
+   (`jl4-service/src/Shared.hs`). **24 of the corpus's 48 record fields exceed that**, because
+   they are the CFR's own sentences. Counted 2026-08-09 by reading every `` `field` IS … `` line
+   of every `DECLARE` in `regcf.l4`; the same count over the file at the previous commit gives
+   23 of 43, so the "23 of 41" this line used to carry was measured by some other method and is
+   not reproduced here. The longest field was Rule 501(a)(4)'s limb, at 288 characters — this
+   line said 291, which was its length before the clitic rename dropped a leading `is `. That
+   field was decomposed into six on 2026-08-09, so the longest is now Rule 100(b)(5)'s
+   184-character limb: three times the cut, and still severed at the same place. Deployed and
+   read back off the live MCP endpoint:
 
    ```
    60  is-subject-to-a-disqualification-as-specified-in-section-227

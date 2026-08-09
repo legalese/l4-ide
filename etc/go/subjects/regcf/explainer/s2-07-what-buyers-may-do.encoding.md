@@ -8,7 +8,7 @@ The corpus does not paper over the gap; it records it, picks a reading, says
 which, and tests the boundary from both sides. The note at the site is worth
 quoting in full because it is the honest shape of an interpretive choice:
 
-> [A drafter who cared could remove the question with four words; a reader who cares must litigate it.](src:jl4/examples/legal/regcf/regcf.l4#L760-L762 "verbatim")
+> [A drafter who cared could remove the question with four words; a reader who cares must litigate it.](src:jl4/examples/legal/regcf/regcf.l4#L788-L790 "verbatim")
 
 The reading taken is a half-open interval: the day before the anniversary is
 restricted, the anniversary itself is free. Both sides are asserted, so anyone
@@ -20,9 +20,9 @@ elapsed days against a constant. That is wrong across a leap year, by exactly on
 day. Unlike the endpoint question it was a defect and not a hole, and it has been
 fixed: the record now carries the issuance date and the transfer date, and the
 period ends at a computed anniversary —
-[`add years` (transfer's `date the securities were issued`)](src:jl4/examples/legal/regcf/regcf.l4#L753-L754 "verbatim"),
+[`add years` (transfer's `date the securities were issued`)](src:jl4/examples/legal/regcf/regcf.l4#L781-L782 "verbatim"),
 which the corpus notes is
-[366 across a 29 February, 365 otherwise](src:jl4/examples/legal/regcf/regcf.l4#L736-L737 "verbatim").
+[366 across a 29 February, 365 otherwise](src:jl4/examples/legal/regcf/regcf.l4#L764-L765 "verbatim").
 
 **How it was found is the part worth keeping, and it is not the flattering
 version.** The defect was never hidden. It was
@@ -51,7 +51,7 @@ differ, on a case both sides evaluate.
 **And repairing it did not remove a question. It exposed one.** A calendar
 anniversary has to decide what one year after a leap day is, and the encoding
 takes the reading its target systems already implement:
-[`add years` CLAMPS: the first anniversary of a 29 February issuance is 28 February](src:jl4/examples/legal/regcf/regcf.l4#L739-L740 "verbatim").
+[`add years` CLAMPS: the first anniversary of a 29 February issuance is 28 February](src:jl4/examples/legal/regcf/regcf.l4#L767-L768 "verbatim").
 That was measured on the two decision engines this corpus exports to, and it is
 also what a spreadsheet's month-arithmetic does. The alternative — that the
 period runs a full year and lands on the next day that exists, one day later — is
@@ -61,7 +61,7 @@ you rebuild the components by hand. What it is not is what either target engine
 does, so an encoding that took it here would answer differently from its own
 export. So this rule now discloses two interpretive forks where it used to
 disclose one, and the corpus says which is which:
-[This is a genuine fork; the UNIT question below was not](src:jl4/examples/legal/regcf/regcf.l4#L762-L763 "verbatim").
+[This is a genuine fork; the UNIT question below was not](src:jl4/examples/legal/regcf/regcf.l4#L790-L791 "verbatim").
 Both are registered under **Where the law is unsettled**.
 
 **The inert-style showcase.** This decision's four exceptions are written with
@@ -72,8 +72,21 @@ each statutory paragraph label riding beside its operative limb:
 ```
 
 So the reading is a visible choice rather than an accident of punctuation, and
-the statutory label travels with the limb it labels. It is also, by some
-distance, the widest figure the ladder generator produces from this corpus, for
-a reason that is not a defect: the fourth exception's field name is the
-regulation's own sentence, and leaf labels do not wrap. Trimming it would be
-transcription, and a trimmed ladder is a different rule.
+the statutory label travels with the limb it labels.
+
+Until 2026-08-09 this was also, by some distance, the widest figure the ladder
+generator produced from this corpus, because the fourth exception was a single
+field whose name was the regulation's own 291-character sentence and leaf labels
+do not wrap. That was reported here as "not a defect". It was one, and not the
+width: a name is read as a label, not as a proposition, so four statutory
+alternatives sitting inside one name were four alternatives nobody could audit —
+not a reviewer, not the diagram, not the wizard. The limb is now six fields under a decision of its own,
+[a family or trust transferee, or a death-or-divorce circumstance](src:jl4/examples/legal/regcf/regcf.l4#L825 "verbatim"),
+grouped so that the three that name a **recipient** and the three that name an
+**occasion** are visibly different things, and the figure is a third of its
+former width as a side effect. What was not decomposed is the defined term
+"member of the family of the purchaser or the equivalent": Rule 501(c) defines it
+with "includes", so it is an open list, and enumerating it would encode an open
+term as a closed one. Trimming a label would still be transcription, and a
+trimmed ladder is still a different rule; splitting a name that hid a disjunction
+is neither.
