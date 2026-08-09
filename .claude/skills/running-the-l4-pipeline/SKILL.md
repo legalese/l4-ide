@@ -287,11 +287,11 @@ Two of the five checks are discharged in `p3-check` (house style, temporal closu
 
 ### §8 — the acceptance diff
 
-Write a surface map (`schemas/surface-map.schema.json`) declaring the pairing between the de novo encoding and the committed corpus, then run the oracle as in step 10 above. Exit `1` means it found a divergence, which is the **better** outcome. Triage each witness yourself; the script never will.
+Write a surface map (`schemas/surface-map.schema.json`) declaring the pairing between the de novo encoding and the committed corpus, then run the oracle as in step 10 above — or read the receipt of `p8-diff`, the declared g2 stage that has run the same oracle over `denovo.surface_map` since 2026-08-09. Exit `1` means it found a divergence, which is the **better** outcome. Triage each witness yourself; neither the script nor the stage ever will.
 
 ### Reading a g2 verdict
 
-`g2 COMPLETE` means every g2 stage is accounted for. It does **not** mean a de novo run happened: `plan --milestone g2` names the stages that are not wired at g2, and SPEC.md §6's G2 acceptance is the §8 diff oracle, which no stage calls. A g2 run with every deposit absent reports five `SKIPPED` receipts and `COMPLETE`, which is completeness of accounting doing exactly its job — and `L4_GO_REQUIRED=1` turns each of those skips into exit 5, which is what CI should want.
+`g2 COMPLETE` means every g2 stage is accounted for. It does **not** mean a de novo run happened: a run with every deposit absent reports ten `SKIPPED` receipts — the five deposit validators plus `p3-check`, `p6-tests`, `p7-dmn`, `p8-verify` and `p8-diff`, which all follow the deposit contract since 2026-08-09 — and `COMPLETE`, which is completeness of accounting doing exactly its job. `L4_GO_REQUIRED=1` turns each of those skips into exit 5, which is what CI should want. SPEC.md §6's G2 acceptance is the §8 diff oracle, and the declared stage `p8-diff` calls it over `denovo.surface_map`: read that receipt, including its `perturbation_enabled` metric, before repeating its agreement number. The p7 legs other than DMN are the rows `plan --milestone g2` still names `NOT WIRED`, each with its own reason.
 
 ---
 
