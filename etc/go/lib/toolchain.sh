@@ -44,9 +44,17 @@ go_discover_tool() {
     # shellcheck disable=SC2231  # $pkg must glob
     for c in "$r"/dist-newstyle/build/*/ghc-*/$pkg/x/"$exe"/build/"$exe"/"$exe"; do
       [[ -x "$c" ]] || continue
-      # stat -f is macOS, -c is GNU; a stat that fails ranks the candidate last
-      # rather than losing it.
-      m="$(stat -f %m "$c" 2>/dev/null || stat -c %Y "$c" 2>/dev/null || echo 0)"
+      # GNU form FIRST. The BSD-first order was a Linux-fatal bug the
+      # adversarial review reproduced: GNU `stat -f %m FILE` reads -f as
+      # --file-system, prints a multi-line filesystem report for FILE to
+      # STDOUT (which the substitution captures — only stderr is redirected)
+      # and exits 1, so the fallback APPENDED the real mtime to garbage and
+      # the arithmetic below died with `File: unbound variable` under set -u.
+      # BSD stat rejects `-c` with exit 1 and EMPTY stdout, so GNU-first is
+      # clean on both. The numeric guard makes any residual surprise rank
+      # the candidate last instead of killing the run.
+      m="$(stat -c %Y "$c" 2>/dev/null || stat -f %m "$c" 2>/dev/null || echo 0)"
+      [[ "$m" =~ ^[0-9]+$ ]] || m=0
       if [[ "$r" == "$root" ]]; then
         if ((m > own_m)); then
           own_m=$m

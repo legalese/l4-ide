@@ -136,9 +136,13 @@ stages. Two mechanisms close the gap, both in the tree:
   chosen milestone it names every declared stage that will not run whole, with its remedy,
   before any stage spends time. Exit 0 whole · 1 not whole · 2 no usable `l4`. `run` prints
   the same forecast in brief at the door, and under `L4_GO_REQUIRED=1` refuses there (exit 5)
-  instead of minutes in. The forecast **licenses nothing**: receipts remain the only record
-  of what happened, and the doctor's checks are derived from the same probes the stages read
-  (`lib/probe.mjs`), so the two cannot drift apart without the selftest noticing.
+  instead of minutes in. The forecast **licenses nothing**: receipts remain the only record of
+  what happened. The doctor's checks are derived from the same probe module the stages read
+  (`lib/probe.mjs`) and its service-URL fence mirrors `p7-mcp.sh`'s, but forecast↔stage
+  equivalence is a review obligation, not a mechanical guarantee — the selftest pins the exit
+  contract and a handful of forecasts, not every condition. Its own record so far: the first
+  live run caught it crying wolf (moddle gates), and the first adversarial review caught it
+  green-lighting a URL the stage refuses. Expect the gap to be nonzero; read receipts.
 
 ---
 

@@ -71,6 +71,30 @@ const resolvable = (pkg, dirs) => {
   return false;
 };
 
+const onPath = (cmd) =>
+  spawnSync("command", ["-v", cmd], { shell: true }).status === 0;
+
+// The SAME fence p7-mcp.sh applies, so a URL the stage would refuse is
+// forecast as the gate-abort it causes. Returns null for loopback-OK, else
+// the reason the stage will refuse. Kept semantically identical to the
+// stage's parse (userinfo refused outright; http/https only; the five
+// loopback spellings) — if you change one, change both.
+const serviceUrlRefusal = (raw) => {
+  let u;
+  try {
+    u = new URL(raw);
+  } catch {
+    return "is not a parseable URL";
+  }
+  if (u.username || u.password) return "carries userinfo (refused outright)";
+  if (u.protocol !== "http:" && u.protocol !== "https:")
+    return `uses scheme '${u.protocol}', not http or https`;
+  const host = u.hostname.toLowerCase();
+  if (["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"].includes(host))
+    return null;
+  return `points at host '${host}', which is not loopback`;
+};
+
 const probes = probeAll();
 const findings = []; // {stage, what, remedy} — these drive exit 1
 const notes = []; // informational; never change the exit code
@@ -104,6 +128,15 @@ if (declared("p7-ladder")) {
       remedy:
         "build jl4-lsp in another worktree, or export JL4_LSP_CMD=<dist-newstyle …/jl4-lsp>",
     });
+  } else if (!executable(env.JL4_LSP_CMD)) {
+    // A set-but-stale path deserves the same scrutiny L4 gets: the stage
+    // would launch the generator, fail to spawn the LSP, and land DEGRADED
+    // ten minutes from now.
+    findings.push({
+      stage: "p7-ladder",
+      what: `will not run whole — JL4_LSP_CMD=${env.JL4_LSP_CMD} is not executable and not on PATH`,
+      remedy: "fix the path, or unset it and let discovery find a built one",
+    });
   } else if (
     !resolvable("tsx", [env.GO_S_LADDER_NPM_DIR, env.GO_ROOT || process.cwd()])
   ) {
@@ -115,13 +148,41 @@ if (declared("p7-ladder")) {
   }
 }
 
-if (declared("p7-mcp") && !env.JL4_GO_SERVICE_URL) {
-  findings.push({
-    stage: "p7-mcp",
-    what: "deploy half will SKIP — JL4_GO_SERVICE_URL is unset (the deployable zip is still built and hashed)",
-    remedy:
-      "bring up a LOOPBACK jl4-service (./dev-start.sh) and export JL4_GO_SERVICE_URL=http://127.0.0.1:8080 — never auto-set; a deployment target must be named by a human",
-  });
+if (declared("p7-mcp")) {
+  if (!onPath("zip")) {
+    findings.push({
+      stage: "p7-mcp",
+      what: "will SKIP entirely — zip is not on PATH, and the stage skips before building the deployable surface",
+      remedy: "install zip",
+    });
+  } else if (!env.JL4_GO_SERVICE_URL) {
+    findings.push({
+      stage: "p7-mcp",
+      what: "deploy half will SKIP — JL4_GO_SERVICE_URL is unset (the deployable zip is still built and hashed)",
+      remedy:
+        "bring up a LOOPBACK jl4-service (./dev-start.sh) and export JL4_GO_SERVICE_URL=http://127.0.0.1:8080 — never auto-set; a deployment target must be named by a human",
+    });
+  } else {
+    const refusal = serviceUrlRefusal(env.JL4_GO_SERVICE_URL);
+    if (refusal) {
+      // Worse than a skip: the stage exits 3 and the driver escalates to
+      // VERDICT: GATE, so every stage after p7-mcp never dispatches. The
+      // doctor's first live gap — a forecast that said "whole" over a URL
+      // the stage was always going to refuse (review finding, 2026-08-10).
+      findings.push({
+        stage: "p7-mcp",
+        what: `will REFUSE and the run stops there with VERDICT: GATE — JL4_GO_SERVICE_URL ${refusal}; every later declared stage never dispatches`,
+        remedy:
+          "use a loopback URL (localhost, 127.0.0.1, ::1, [::1], 0.0.0.0), or unset it; a non-loopback deployment is HG2's subject and needs a signature, not an env var",
+      });
+    } else if (!onPath("curl")) {
+      findings.push({
+        stage: "p7-mcp",
+        what: "deploy half will SKIP — curl is not on PATH (the zip is still built and hashed)",
+        remedy: "install curl",
+      });
+    }
+  }
 }
 
 // The moddle gates need only npx: the stages run
@@ -148,6 +209,12 @@ for (const [stage, pkg] of moddleLegs) {
 if (declared("p7-lts") && !probes.dot?.present) {
   notes.push(
     "p7-lts: graphviz absent — DOT still emitted and checked, SVG rendering skipped (named on the receipt; not a stage skip)",
+  );
+}
+
+if (declared("p7-dmn") && !probes.mvn?.present) {
+  notes.push(
+    "p7-dmn: mvn absent — the engine-load harnesses skip loudly and the leg's strongest available oracle weakens; not a stage skip",
   );
 }
 
@@ -193,8 +260,12 @@ if (!BRIEF) {
 }
 
 if (findings.length === 0) {
+  // "Environmental wants" and nothing more: gates, deposit presence (g2) and
+  // the oracles' own verdicts are the stages' account, not this forecast's —
+  // an earlier wording promised "a whole deliverable" here, which at g2
+  // overclaimed straight past every deposit the doctor cannot see.
   process.stdout.write(
-    "doctor: every declared stage is fully provisioned; the run should produce a whole deliverable\n",
+    "doctor: every declared stage's environmental wants are met; gates, deposits and oracle verdicts remain the stages' own account\n",
   );
   process.exit(0);
 }

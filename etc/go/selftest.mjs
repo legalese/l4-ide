@@ -3607,9 +3607,16 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
   );
   check(
     "discovery prints nothing when no candidate exists anywhere",
-    bashDiscover(
-      resolve(mkdtempSync(resolve(tmpdir(), "l4-go-empty-")), "."),
-    ) === "",
+    (() => {
+      // The root is NESTED inside its own fresh parent, so the sibling scan
+      // sees only that parent's (empty) contents. Rooting the check directly
+      // in the shared $TMPDIR made it flaky: any concurrent process leaving
+      // a dist-newstyle one level down would satisfy "empty" discovery.
+      const parent = mkdtempSync(resolve(tmpdir(), "l4-go-empty-"));
+      const root = resolve(parent, "wt");
+      mkdirSync(root);
+      return bashDiscover(root) === "";
+    })(),
   );
   check(
     "explicit L4 is never overridden by discovery",
@@ -3680,6 +3687,36 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
     (() => {
       const r = doctor(CLEAN, "p0-preflight p7-mcp");
       return r.status === 1 && /zip is still built/.test(r.stdout);
+    })(),
+  );
+  check(
+    "doctor forecasts the GATE abort for a non-loopback service URL",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, JL4_GO_SERVICE_URL: "http://192.168.1.10:8080" },
+        "p0-preflight p7-mcp",
+      );
+      return r.status === 1 && /VERDICT: GATE/.test(r.stdout);
+    })(),
+  );
+  check(
+    "a loopback service URL is not a finding",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, JL4_GO_SERVICE_URL: "http://127.0.0.1:8080" },
+        "p0-preflight p7-mcp",
+      );
+      return r.status === 0;
+    })(),
+  );
+  check(
+    "a set-but-stale JL4_LSP_CMD is a finding, same scrutiny as L4",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, JL4_LSP_CMD: "/nonexistent/jl4-lsp" },
+        "p0-preflight p7-ladder",
+      );
+      return r.status === 1 && /not executable/.test(r.stdout);
     })(),
   );
 }

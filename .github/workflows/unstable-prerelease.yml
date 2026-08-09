@@ -24,7 +24,10 @@
 # install GHC and Cabal and do a full Haskell build to obtain a binary. On a
 # Claude Code cloud sandbox, whose setup script is capped at five minutes, that
 # is impossible; downloading a tarball is not. This workflow produces the
-# tarball, and as of 2026-08-05 there is one on the Releases page.
+# tarball. One was published 2026-08-05 (unstable-20260805-c873bb5) and the
+# release object has since been DELETED from the Releases page — only the git
+# tag survives (verified 2026-08-09). Check before constructing URLs:
+#   gh release list --repo legalese/l4-ide | grep unstable-
 #
 # ---------------------------------------------------------------------------
 # HOW THIS STAYS DISJOINT FROM main's RELEASE TRACK (main-tag.yml)

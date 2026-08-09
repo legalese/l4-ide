@@ -31,7 +31,7 @@
 #     doctor  [--milestone g1|g2] [--subject ID]
 #             the front-door forecast: which declared stages will run whole,
 #             which will SKIP and why, each with its remedy. Runs no stage.
-#             Exit: 0 whole · 1 something will not run whole · 2 no usable l4.
+#             Exit: 0 wants met · 1 will not run whole · 2 no usable l4.
 #     plan    [--milestone g1|g2]
 #     status  [--run-id ID]
 #     verify  [--run-id ID] [--gates]
@@ -613,7 +613,10 @@ EOF
   # to reach.
   local door_stages="$stages"
   if [[ -n "$ONLY" ]]; then
-    door_stages="$ONLY"
+    # Intersected with the declared set: --only over an undeclared stage
+    # dispatches nothing, and a forecast must not refuse a run that was
+    # going to run nothing.
+    door_stages="$(printf '%s\n' "$stages" | awk -v o="$ONLY" '$0 == o')"
   elif [[ -n "$THROUGH" ]]; then
     # awk, not sed's '1,/re/p': that range cannot close on line 1, so
     # --through <first-stage> would have forecast every stage.

@@ -110,10 +110,14 @@ Extending `etc/check-bpmn-kie.sh`'s 0/1/2/3/4:
 
 ## Requirements
 
-**Start with `etc/go/go.sh doctor`.** It prints, before any stage spends time,
-which declared stages will run whole and which will `SKIP`, each with its
-remedy — the aggregation of every per-stage probe, at the front door instead of
-one ten-minute run at a time. Exit 0 = whole, 1 = something will not run whole,
+**Start with `etc/go/go.sh doctor`.** It forecasts, before any stage spends
+time, which declared stages will run whole and which will not, each with its
+remedy — at the front door instead of one ten-minute run at a time. What it
+checks: the `l4` and `jl4-lsp` binaries (with discovery), `npm`/`npx`/`tsx`,
+`zip`/`curl`, and the service URL against the same loopback fence the MCP
+stage applies; `mvn`/graphviz absences print as notes. It does **not** see
+gates, deposit presence (g2) or oracle verdicts — those stay the stages' own
+account. Exit 0 = environmental wants met, 1 = something will not run whole,
 2 = no usable `l4` anywhere.
 
 `node` and `bash` for everything. `npx` for the DMN and BPMN interchange gates

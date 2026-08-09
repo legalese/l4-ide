@@ -51,7 +51,7 @@ It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative
 etc/go/go.sh doctor --milestone g1
 ```
 
-This is the front-door forecast: it says which declared stages will run whole and which will `SKIP`, each with its remedy, before any stage spends time. Exit 0 = every declared stage fully provisioned; 1 = something will not run whole; 2 = no usable `l4` anywhere. It runs no stage and writes no run directory.
+This is the front-door forecast: it says which declared stages will run whole and which will not, each with its remedy, before any stage spends time. Exit 0 = every declared stage's environmental wants are met; 1 = something will not run whole; 2 = no usable `l4` anywhere. It runs no stage, writes no run directory, and sees only the environment — gates, deposit presence and oracle verdicts stay the stages' own account.
 
 The orchestrator **never runs `cabal`.** The build lock is a shared resource, and concurrent invocations inside one worktree corrupt each other with errors that look like code defects and are not. When `L4` or `JL4_LSP_CMD` is unset, `run` and `doctor` **discover** a built binary under `dist-newstyle` — this worktree's own first, then the newest among sibling worktrees — and say so with a `[discovered]` marker. An explicit export always wins:
 
