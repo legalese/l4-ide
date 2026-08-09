@@ -1,12 +1,14 @@
 # Unstable prerelease: standalone `l4` + `jl4-lsp` binaries.
 #
-# STATUS 2026-08-06: RUN, AND PUBLISHING. It went green on its first execution
+# STATUS 2026-08-09: RUN, AND PUBLISHING. It went green on its first execution
 # as a dry run (31011661044) and then published for real (31015006781), both
-# from ref `unstable`, on 2026-08-05. Claims below about this workflow's
-# behaviour are therefore measurements, with the exceptions enumerated in
-# §"What is measured, and what is not" at the foot of this file — which
-# includes one measured DEFECT. `dry_run: true` remains the default, and
-# remains the right way to exercise a change to this file.
+# building ref `unstable`, on 2026-08-05. A third run, 31302358588 (2026-08-09,
+# dry), re-measured the cache borrow after main-tag.yml ran on 2026-08-07 and
+# retired the measured DEFECT below to a measured CONDITION. Claims below about
+# this workflow's behaviour are therefore measurements, with the exceptions
+# enumerated in §"What is measured, and what is not" at the foot of this file.
+# `dry_run: true` remains the default, and remains the right way to exercise a
+# change to this file.
 #
 # ---------------------------------------------------------------------------
 # WHY THIS EXISTS
@@ -61,6 +63,19 @@
 #      relies on the run's own ref: it checks out `inputs.ref` (default
 #      `unstable`) explicitly, exactly as cache-warmup.yml does for the same
 #      reason. Dispatch it from `main` and it still builds `unstable`.
+#
+#   MEASURED 2026-08-09: the constraint has a sharper edge than point 1
+#   suggests. main's history was rewritten after 2026-08-05 — PR #218's merge
+#   commit a60cae2a, which put this file on main, is no longer an ancestor —
+#   so main currently does not carry this file at all. In that state,
+#   dispatching with `--ref main` fails ("Workflow does not have
+#   'workflow_dispatch' trigger": the trigger is validated against the
+#   dispatched ref's copy), while
+#       gh workflow run unstable-prerelease.yml --ref unstable
+#   works, because unstable's copy has the trigger and the workflow is
+#   already registered. Run 31302358588 went out exactly that way. Whether
+#   FIRST registration required the file to have been on main once is not
+#   measured — do not delete point 1 on this evidence.
 #
 # No `schedule:` trigger. A scheduled run would execute against main's latest
 # commit, and — more to the point — publishing is an outward-facing act, so a
@@ -322,6 +337,22 @@ jobs:
       #      are kept because they are correct and cost nothing when they miss;
       #      the reasoning that justified relying on them is not. See the foot
       #      of this file.
+      #
+      #      RE-MEASURED 2026-08-09, and the note above needed its own
+      #      correction three days after it was written: main-tag.yml ran
+      #      twice on 2026-08-07 (31181497918, 31187420749), and run
+      #      31302358588 — dispatched inside the resulting 7-day shadow — hit
+      #      the FIRST RESTORE-KEY on all three platforms (prefix match, not
+      #      the primary key: unstable's plan.json differs from main's) and
+      #      built in 379-398s against the 1279-1428s cold baseline. So
+      #      reason 2 is neither true nor false; it is CONDITIONAL: the
+      #      borrowing works iff main-tag.yml has run within the last 7 days.
+      #
+      #      RULING 2026-08-09: stay restore-only. Warm when main is releasing
+      #      anyway, cold otherwise; a ~22-minute cold build on a
+      #      hand-dispatched release track is not worth a cache-budget fight
+      #      to remove. If you want a warm run, dispatch within a week of a
+      #      main-tag run.
       #
       # The single `path:` and the bare-runner execution are both load-bearing.
       # actions/cache derives an internal cache VERSION from the path list and
@@ -662,17 +693,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 # ---------------------------------------------------------------------------
-# WHAT IS MEASURED, AND WHAT IS NOT (2026-08-06)
+# WHAT IS MEASURED, AND WHAT IS NOT (2026-08-06, re-measured 2026-08-09)
 #
-# Two runs, both from ref `unstable`, both on 2026-08-05:
+# Three runs, all building ref `unstable`:
 #
-#   * 31011661044, `dry_run: true` — four jobs green, and verified afterwards
-#     to have created NOTHING: no `unstable-*` tag, no release, `Latest` still
-#     `l4-ide-build-88`. The dry-run guard works.
-#   * 31015006781, `dry_run: false` — five jobs green. Tag
+#   * 31011661044, `dry_run: true`, 2026-08-05 — four jobs green, and verified
+#     afterwards to have created NOTHING: no `unstable-*` tag, no release,
+#     `Latest` still `l4-ide-build-88`. The dry-run guard works.
+#   * 31015006781, `dry_run: false`, 2026-08-05 — five jobs green. Tag
 #     `unstable-20260805-c873bb5`, annotated, dereferencing to c873bb5, which
 #     was `unstable`'s head. Release `prerelease: true`, `draft: false`, three
 #     archives plus SHA256SUMS, and `Latest` still `l4-ide-build-88`.
+#   * 31302358588, `dry_run: true`, 2026-08-09 — five jobs green, dispatched
+#     `--ref unstable` (main no longer carries this file; see the header).
+#     Verified afterwards: still no `unstable-*` tag beyond 20260805. Its
+#     purpose was the cache re-measurement below.
 #
 # Settled by those runs — each of these was an open question here:
 #
@@ -682,7 +717,9 @@ jobs:
 #     platforms — each smoke step reported 12 subcommands, including `export`;
 #   * the release body's rendering, read back from the API;
 #   * the dispatch itself: the file reached `main` via PR #218, the
-#     Run-workflow button appeared, and it fired twice.
+#     Run-workflow button appeared, and it fired twice. (Overtaken 2026-08-09:
+#     main's rewrite has since dropped the file, and dispatch now goes by
+#     `--ref unstable` — see the header's default-branch note.)
 #
 # Settled the other way. This is a MEASURED DEFECT, and reason 2 above is the
 # thing that is wrong:
@@ -708,8 +745,22 @@ jobs:
 #     above deliberately rejects, and that trade-off deserves re-argument now
 #     that the borrowing has been shown not to work — or to accept cold builds
 #     and delete reason 2, which is currently load-bearing and false.
-#   * `cabal configure --disable-tests` versus plan.json is consequently moot,
-#     and stays untestable until some cache exists to restore from.
+#
+#     RESOLVED 2026-08-09, and the answer is neither option. main-tag.yml ran
+#     twice on 2026-08-07 (31181497918, 31187420749), writing all four `lsp-*`
+#     families; run 31302358588 two days later hit the first restore-key on
+#     all three platforms — a PREFIX match on `<platform>-ghc-9.10.2-cabal-
+#     3.16.1.0-`, not the primary key, because unstable's plan.json hashes
+#     differently from main's — and the build step took 396s (linux), 379s
+#     (darwin), 398s (win32) against the cold 1428/1399/1279s above. So the
+#     defect was a CONDITION: the borrowing works iff main-tag.yml ran within
+#     the last 7 days. The ruling is to stay restore-only and let warmth be
+#     opportunistic; the operational recipe is in the cache note at the
+#     restore step.
+#   * `cabal configure --disable-tests` versus plan.json: measured 2026-08-09
+#     by 31302358588 — the restored store is usable under these configure
+#     flags (the 379-398s builds above), while the primary plan-hash key
+#     missed, as branch drift alone already guarantees.
 #
 # Still unverified, and cheap to leave that way:
 #
