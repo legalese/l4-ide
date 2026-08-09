@@ -100,7 +100,7 @@ UNIMPLEMENTED_STAGES=(p10-publish)
 # unbuilt; until it is, they are named in `plan --milestone g2` as NOT WIRED
 # rather than run. p9-report is included because it reads journal.ndjson and
 # nothing else, so it is correct for any milestone.
-G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p8-diff p9-report)
+G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p7-dmn p8-verify p8-diff p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which at G1 means the MCP deployment leg and P10.
@@ -304,7 +304,7 @@ gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 # GO_CORPUS_FILES above), so a waiver over the replay corpus covers nothing
 # here, and depositing or editing a deposit — the surface map included —
 # re-opens the gate.
-if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p8-verify p8-diff p9-report"; fi
+if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p7-dmn p8-verify p8-diff p9-report"; fi
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -365,10 +365,30 @@ cmd_plan_g2() {
   printf '  %-14s %-9s %-11s %s\n' "p5-gate" "-" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
   echo "  ---- HG1 ------- Meng's go on the encoding; blocks P6 onward (SPEC.md §7.3)"
   printf '  %-14s %-9s %-11s %s\n' "p6-tests" "NOT WIRED" "-" "reads the committed corpus; a de novo run's tests discriminate between FORKS, which is unbuilt"
-  local leg
+  # Every p7 leg the sidecar declares, with a PRECISE reason per leg: a plan
+  # that lists only what runs cannot tell a reader what is missing, and a
+  # generic reason ("compares against committed goldens") was true of some
+  # legs and false of others. p7-dmn is wired (emit-only, D6); the rest are
+  # not, each for its own named lack.
+  local leg legwhy
   for leg in "${P7_LEG_ORDER[@]}"; do
     [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
-    printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "compares against this subject's committed goldens, which are the replay artifacts"
+    if [[ "$leg" == "p7-dmn" ]]; then
+      printf '  %-14s %-9s %-11s %s\n' "p7-dmn" "HG1" "$mstate" "emit-only over the deposit: l4 export + dmn-moddle gate + engine-load probes; no golden exists, so no diff. Cases via denovo.legs['p7-dmn'].cases when declared"
+      continue
+    fi
+    case "$leg" in
+      p7-dmn-md) legwhy="golden-differential only, and no de novo dmn-md golden exists; re-pointing it emit-only is unbuilt" ;;
+      p7-bpmn) legwhy="needs an expected_dir + rules map for the deposit; the sidecar declares neither, and the leg's soundness gate reads committed goldens" ;;
+      p7-ladder) legwhy="needs a de novo demo entry + figures dir (no denovo demo/*.ts exists); the committed ones render the replay corpus" ;;
+      p7-lts) legwhy="its oracle cross-checks digraph count against the BPMN discovery call over the committed corpus; re-pointing both halves is unbuilt" ;;
+      p7-mcp) legwhy="needs a loopback JL4_GO_SERVICE_URL deployment of the DEPOSIT (it carries @exports); the leg today zips the committed corpus pair" ;;
+      p7-tnr) legwhy="the sidecar declares no denovo.legs['p7-tnr'].golden — a de novo .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
+      p7-wizard) legwhy="its well-formedness checks read the committed wizard module; the deposit declares no wizard split" ;;
+      p7-akn) legwhy="re-pointing its shallow well-formedness pass at the deposit is unbuilt" ;;
+      *) legwhy="re-pointing this leg at the deposit is unbuilt" ;;
+    esac
+    printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "$legwhy"
   done
   printf '  %-14s %-9s %-11s %s\n' "p8-verify" "HG1" "$mstate" "l4 verify over the de novo module set; five control fixtures license the oracle"
   local sm="${GO_S_DENOVO_SURFACE_MAP:-}" smwhat
