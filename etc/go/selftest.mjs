@@ -2201,7 +2201,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   //    are judgements; if one of them ever appears as a value this file writes,
   //    the skill/script boundary (ORCHESTRATOR.md §2.1) has been crossed.
   {
-    const mk = (pair, id, kind, mutation, l, r) => ({
+    const mk = (pair, id, kind, mutation, l) => ({
       job: {
         pair,
         rule_date: null,
