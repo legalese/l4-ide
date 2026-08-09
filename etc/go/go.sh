@@ -607,9 +607,21 @@ EOF
   # stage that will not run whole BEFORE ten minutes are spent learning it one
   # receipt at a time. Under L4_GO_REQUIRED=1 a forecast skip refuses HERE —
   # the same stages would exit 5 mid-run, after the earlier stages' work.
+  #
+  # The forecast covers the stages THIS invocation will dispatch: an --only or
+  # --through run must not be refused over a doomed stage it was never going
+  # to reach.
+  local door_stages="$stages"
+  if [[ -n "$ONLY" ]]; then
+    door_stages="$ONLY"
+  elif [[ -n "$THROUGH" ]]; then
+    # awk, not sed's '1,/re/p': that range cannot close on line 1, so
+    # --through <first-stage> would have forecast every stage.
+    door_stages="$(printf '%s\n' "$stages" | awk -v t="$THROUGH" '{ print } $0 == t { exit }')"
+  fi
   local doctor_rc=0
   set +e
-  node "$LIB/doctor.mjs" --milestone "$MILESTONE" --stages "$(echo "$stages" | tr '\n' ' ')" --brief
+  node "$LIB/doctor.mjs" --milestone "$MILESTONE" --stages "$(echo "$door_stages" | tr '\n' ' ')" --brief
   doctor_rc=$?
   set -e
   if [[ "${L4_GO_REQUIRED:-0}" == "1" && $doctor_rc -ge 1 ]]; then
