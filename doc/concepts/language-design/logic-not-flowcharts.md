@@ -685,6 +685,231 @@ other would have been impossible.
 
 ---
 
+## The strongest version of the tree: Rulemapping (2026)
+
+Everything above has been an argument against the flowchart, and an argument
+against a diagram being the source. Those are two different claims, and the
+flowchart examples let us get away with running them together — Lexipedia's BPMN
+is both the wrong picture _and_ the substrate, so a single section convicts it
+twice.
+
+The honest test is a notation that gets the **picture** right and keeps it as the
+**source**. One exists, it is in commercial deployment, and as of April 2026 it
+has an experiment attached to it.
+
+**Rulemapping** ([von Cossel 2026](https://arxiv.org/abs/2605.16280)) represents
+a statute as a rooted tree of logical nodes in parent–child relationships, each
+parent computing `AND`, `OR` or `XOR` over its children, optionally negated.
+Evaluation runs **bottom-up, leaves to root**. It was built for practitioner
+accessibility — lawyers author the tree in a visual builder, not in code — and
+has, per the paper, "seen sustained commercial deployment for more than two
+decades across German courts, law firms, and administrative agencies."
+
+Its § 130(1) no. 1 StGB (incitement to hatred) map, in the paper's own
+transcription:
+
+```
+§ 130(1) no. 1 := Attacking action ∧ Suited to disturb the public peace ∧ Protected target
+Attacking action := Incitement to Hatred ∨ Call for violent or arbitrary measures
+Protected target := Protected Group ∨ Section of population ∨ Individual
+```
+
+Note first what it is **not**. The paper's §3.1 sets Rulemapping against "classic expert
+trees or flowchart logics such as [26]" — reference 26 being McLachlan, Kyrimi,
+Dube, Fenton & Webley, _"Lawmaps: Enabling Legal AI Development through
+Visualisation of the Implicit Structure of Legislation and Lawyerly Process"_,
+Artificial Intelligence and Law 31(1), 2022. That is a flowchart approach, in the
+field's flagship journal, named and declined in favour of a Boolean tree. This
+page reached the same verdict from first principles; Rulemapping reached it from
+twenty years of deployment pressure. **We should say plainly that this is the
+strongest independent support the thesis has, and that it is not ours.**
+
+### The measurement we do not have
+
+The 2026 paper is a neuro-symbolic evaluation: the tree is retained as a
+deterministic scaffold, and each open-textured **leaf** is delegated to an LLM
+under curated, leaf-specific context (commentary, landmark decisions), which must
+return a Boolean. Composition stays symbolic. In Kautz's taxonomy this is
+`Symbolic[Neuro]` — the same pattern as AlphaGo, where the neural net scores
+positions and the tree search owns the reasoning.
+
+Benchmarked on 868 German social-media posts against the same statute, the same
+element definitions, and the same logical relationships supplied as _prose
+instruction_ instead:
+
+|               | Rulemapping   | Long-context CoT | Zero-context |
+| ------------- | ------------- | ---------------- | ------------ |
+| **Precision** | **0.80–0.86** | 0.34–0.49        | 0.28–0.37    |
+| **Recall**    | 0.82–0.89     | 0.69–1.00        | 0.89–1.00    |
+
+The failure the structure prevents has a name: **scope drift**. Models trained on
+toxicity corpora conflate moral offensiveness with criminal liability — in the
+DeTox dataset, general toxicity labels outnumber illegality labels roughly 9:1
+for the same posts. The sharpest instance in their data: baselines flagged
+Holocaust-denial posts _on mere mention_, importing § 130(3) when the task was
+explicitly confined to § 130(1). Prose describing the decomposition did not stop
+it; **computing** the decomposition did.
+
+The claim that logical structure is what makes a model's legal judgment
+trustworthy is one this project has asserted and not measured. Someone has now
+measured it, on a notation close enough to the ladder to make the result our
+evidence too.
+
+### What the tree still cannot do
+
+And then the objection reverses, because Rulemapping keeps the diagram as the
+source, and the bill for that arrives in the paper's own §7.
+
+**A tree does not share.** Parent–child, root to leaves, no DAG. This is the
+`permitted`-four-times defect from the flowchart section — and it becomes the
+update anomaly this page found on Lexipedia's own page — one fact, stored twice,
+amended in only one of them — the moment a second Rulemap needs `Protected Group`,
+or the same map needs it twice. Their §3.2 offers what looks like a remedy: when precedent
+shifts, "experts update that specific leaf's context material directly … these
+local updates propagate predictably." Read it carefully — that is DRY for the
+**context corpus**, not for the **logic**. There is still no binding form, no
+place to write a definition once and refer to it twice, and therefore no way for
+two occurrences to be _the same_ occurrence rather than two that happen to agree.
+
+**It cannot compute.** The connectives are `∧ ∨ ⊻ ¬` over Boolean leaves and
+nothing else. This is the DMN objection — propositional logic where law is
+quantified — but sharper, because DMN at least puts a FEEL expression in a cell
+and a Business Knowledge Model behind a name. A Rulemap has no cell that computes
+at all. The paper concedes the point and files it as future work.
+
+**There is no `IMPLIES`, so there is no N/A.** The root is a conjunction of three
+elements. There is no antecedent–consequent seam, so "the statute never reached
+this conduct" and "the statute reached it and it was not made out" are the same
+`⊥`. That is the vacuity problem this page corrected in its own ladder renderer —
+and here it lands in **criminal** law, where the difference between _out of
+scope_ and _assessed and cleared_ is not a nicety of notation.
+
+**And there is no state.** § 130(1) is a pure classification predicate, so the
+paper never needs an obligation, a deadline or a reparation. Its own transfer
+claim is to "mass administrative proceedings" — which is exactly where
+`PARTY/MUST/WITHIN/HENCE/LEST` starts and a Boolean tree stops.
+
+**And it welds each fact to its source.** This is the subtlest of the five, and
+the one with the least to do with logic. Their §3.2:
+
+> "During construction, the expert author determines for each leaf whether it
+> requires LLM interpretation of open-textured content or whether it can be
+> computed symbolically from structured records and deterministic algorithms
+> (e.g., limitation periods from dates)."
+
+That is the right _distinction_ — some facts are read out of prose by a model,
+others are computed from dates, looked up in a system of record that knows ages
+and balances, or simply answered by the user in front of the form. But note where
+the distinction is **recorded**: in the map, at authoring time, node by node.
+
+It does not belong there. A rule is a pure function of its parameters, and the
+whole point of that is that it cannot tell where an argument came from and does
+not get a vote. Provenance is a property of the **caller** — of whatever
+dispatches values into the logic — not of the rule and not of the picture. Put it
+in the map and you have written the plumbing into the statute: a leaf that today
+needs an oracle because the fact arrives as prose, and next quarter arrives as a
+structured field from a platform's moderation record, is a **change to the tree**.
+Same statute, same logic, edited scaffold. Downstream, every consumer of that map
+must be re-checked for a change that was never legal at all.
+
+In L4 that migration edits nothing. The `MEANS` is untouched; a different
+hydrator fills the parameter. The same rule is served by a wizard, an oracle and a
+database without knowing which.
+
+Where L4 already puts provenance, it puts it in the right place — on the _event_
+that supplies a fact
+([`L4.Evaluate.Ledger`](../../../jl4-core/src/L4/Evaluate/Ledger.hs) records
+party, source and both timestamps at the point of a write), not inside the values
+the logic combines. But be exact about the scope of that, because it is narrower
+than this argument needs: those are **ledger** events, and they exist only on the
+stateful, deontic path. A pure decision predicate — which is what § 130(1) is, and
+what most of this page is about — writes nothing and therefore carries no
+provenance at all today. The architecture is right and the coverage is partial.
+
+There is a jibe here and it is too well set up to decline. Their artefact is
+called a Rulemap, and a map that must be redrawn because the survey switched from
+theodolite to GPS is not a map of the territory. It is a map of the surveying.
+
+### The limitation that is an argument for the language
+
+Their §7 names the structural cost of strict Boolean composition:
+
+> "a single false negative in a mandatory leaf node defeats the entire
+> classification. Unlike neural systems that absorb partial mistakes via soft
+> weighting, this deterministic scaffold offers no recovery from leaf-level
+> failures."
+
+Their proposed remedy is calibrated probabilistic leaves. Three better ones fall
+straight out of having a language underneath.
+
+**Bottom-up evaluation spends an LLM call on every leaf, unconditionally.** Once
+a mandatory conjunct is false the remaining calls cannot change the verdict, and
+in a rare-positive domain that is most of them. Short-circuit evaluation plus the
+information-gain ordering of the [question-ordering
+wizard](../../../specs/todo/QUESTION-ORDERING-SPEC.md) turns their limitation
+into a measurable win: same decomposition, fewer oracle calls, and the BDD
+choosing which leaf is worth paying for next. Order-of-asking is the one order
+that _is_ real, and it is the one a fixed tree cannot optimise.
+
+**And when a leaf is wrong, the picture should show where.** A ladder under a
+valuation reports the contact that stopped the current, not merely the verdict —
+which is what makes a leaf-level failure a reviewable finding rather than an
+unexplained `⊥`.
+
+**And a failure should be attributable, not merely weighted.** This is what the
+previous section's argument buys. If the controller that dispatches parameters
+also records where it got each one, then a wrong verdict does not just have a
+location, it has a **suspect**: not only "it stopped at _suited to disturb the
+public peace_" but "it stopped there, and that value came from an oracle reading
+prose, while the two conjuncts that passed came from a system of record."
+
+Compare the remedies. Soft weighting spreads doubt uniformly, over every leaf,
+including the ones that were computed from a date and are not in doubt at all — it
+buys graded confidence at the cost of knowing which grades were earned. Provenance
+recorded at dispatch instead **partitions** the leaves: those sourced
+deterministically are not review candidates, and those sourced from a model are.
+That is a targeted review queue rather than a smeared score, and it is the half of
+the audit story a reasoning trace alone cannot tell — the trace says how the
+conclusion followed, and only provenance says how much to trust what it followed
+from.
+
+Note this one is unbuilt, and unbuilt exactly where it is needed. Provenance
+exists on ledger writes, which is the deontic path; the pure decision logic that a
+classification task like § 130(1) consists of has none. Making the controller
+carry provenance per dispatched parameter — for predicates that write nothing —
+and surfacing it beside the ladder is work, not a feature we can point at. It is
+listed here because it is the one item on this page's charge sheet where the fix
+is ours to build and theirs to be structurally unable to.
+
+### Right about the picture, wrong about the source
+
+None of this is a knock on the method, which is the best-evidenced thing in this
+document's vicinity. It is the same inversion, one more time, in its most
+sympathetic form: a notation that correctly refuses the flowchart, correctly puts
+the lawyer in the authoring seat, correctly confines the LLM to the leaves — and
+then stops at whatever the tree can draw, because the tree is where the rule
+lives. Every gap in the list above is a gap in a _diagram format_, and each one
+would be a non-question in a language that emitted the diagram.
+
+There is one more reason to take the paper seriously, and it is the objection
+this page has to keep answering. §2.1 names its foil precisely: sentence-based
+approaches such as **PROLEG** "require legal knowledge to be authored in a
+programming formalism, reintroducing the knowledge-acquisition bottleneck" that
+visualisation was meant to remove. That is the real charge against L4, better put
+than any strawman we would have written for ourselves, and it is not answered by
+having better semantics. It is answered by [linguistic
+syntax](linguistic-syntax.md) — by a language a lawyer can read — and by the
+derived views being good enough that nobody needs to author the picture to get
+one.
+
+_(von Cossel, "Beyond Imperfect Alternatives with Rulemapping: A Neuro-Symbolic
+Case Study on Online Hate Speech", arXiv:2605.16280 [cs.CY], 10 April 2026;
+Kautz, "The Third AI Summer", AI Magazine 43(1), 2022; McLachlan et al., AI & Law
+31(1), 2022; Zufall, Hamacher, Kloppenborg & Zesch, "A Legal Approach to Hate
+Speech", NLLP 2022, for the dataset.)_
+
+---
+
 ## But some law really _is_ process
 
 Not everything in law is a static predicate. Obligations with deadlines,
