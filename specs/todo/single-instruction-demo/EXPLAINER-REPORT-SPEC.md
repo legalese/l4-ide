@@ -443,17 +443,46 @@ the duplication and keep the equality test as a regression.
 
 ### 3.7 Why not declared at g2
 
-At g2 the pipeline validates _deposits_ — a source bundle, a modification register, a fork
-register, a de novo module. No subject has any of those on a branch today
-(`subject.json`'s own `_comment` says so **[M]**), so a g2 explainer would have a de novo encoding
-to describe and no de novo encoding to describe it from.
+**Re-ruled 2026-08-09 — same conclusion, on narrower grounds.** The original premise and the
+original trigger are both gone, so the paragraph that carried them is kept below as history and
+must not be cited as evidence.
 
-**The case against, honestly:** the g2 story — "a machine re-derived this statute from source and
-here is where it disagreed with the humans" — is the single most compelling thing this pipeline
-will ever have to explain, and it is a shame to leave the explainer out of it. **What would change
-this ruling:** the first subject with a deposited de novo module and a populated fork register. At
-that point the stage joins `G2_STAGES`, gains a row in the hand-written `cmd_plan_g2` table, gains
-a name in `selftest.mjs:1993-2005`, and joins the g2 `gated_by_HG1` override at `go.sh:240`.
+- **The premise was retracted.** This section argued from "No subject has any of those on a
+  branch today (`subject.json`'s own `_comment` says so **[M]**)". The g2-wiring change of
+  2026-08-09 rewrote exactly that `_comment`: all five declared deposits — bundle, register,
+  fork register, de novo module, surface map — ARE on disk for regcf, committed by the de novo
+  runs of 2026-08-05..09.
+- **The stated trigger fired.** "The first subject with a deposited de novo module and a
+  populated fork register" exists: `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` and a fork
+  register measuring `forks=26` on the p4-forks receipt.
+- **The ruling stands anyway, because the trigger was mis-stated.** What a g2 explainer needs is
+  not a de novo _module_ but a de novo _narrative deposit_ — a manifest, parts and provenance
+  drafted **from the deposit** — and none exists. The subject's `explainer/` directory is g1
+  narrative about the _committed_ corpus; rendering it under a g2 label is precisely the
+  relabelling ORCHESTRATOR.md §5.2 exists to prevent, and it is not hypothetical: measured
+  2026-08-09, the driver's after-verdict render wrote that g1 narrative into a g2 run dir
+  ungated and unreceipted, and the same-day repair made the final render declared-stages-only.
+  The corrected trigger: **the first de novo narrative deposit** (its own manifest + provenance,
+  drafted from the deposit, with the fork register as its natural spine).
+- **The wiring sites named below moved.** The g2-wiring branch edited every one of them
+  (`selftest.mjs`, `cmd_plan_g2`, the g2 `gated_by_HG1` override, `go.sh`'s stage lists), so
+  the line numbers in the historical paragraph are stale; a future declaration re-derives them
+  from the tree rather than from this file.
+
+The paragraph as originally written (2026-08-03), kept as history:
+
+> At g2 the pipeline validates _deposits_ — a source bundle, a modification register, a fork
+> register, a de novo module. No subject has any of those on a branch today
+> (`subject.json`'s own `_comment` says so **[M]**), so a g2 explainer would have a de novo
+> encoding to describe and no de novo encoding to describe it from.
+>
+> **The case against, honestly:** the g2 story — "a machine re-derived this statute from source
+> and here is where it disagreed with the humans" — is the single most compelling thing this
+> pipeline will ever have to explain, and it is a shame to leave the explainer out of it. **What
+> would change this ruling:** the first subject with a deposited de novo module and a populated
+> fork register. At that point the stage joins `G2_STAGES`, gains a row in the hand-written
+> `cmd_plan_g2` table, gains a name in `selftest.mjs:1993-2005`, and joins the g2 `gated_by_HG1`
+> override at `go.sh:240`.
 
 ---
 
