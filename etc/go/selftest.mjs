@@ -1149,6 +1149,96 @@ if (!process.argv.includes("--with-driver")) {
       r.status === 2 && /--waive HG2 is REFUSED/.test(r.stderr),
     );
   }
+
+  // --- g2 replay correctness (D9, 2026-08-09) -------------------------------
+  // The same idempotence properties as the g1 block above, over the de novo
+  // declared set — the re-pointed stages answer --inputs with the RESOLVED
+  // module set, so a byte-identical deposit replays and an edited one re-runs.
+  // Also asserted: the measurement stages ran at denovo origin, i.e. what a g2
+  // run measured is the deposit and not the corpus.
+  {
+    const rundir2 = mkdtempSync(resolve(tmpdir(), "l4-go-idem-g2-"));
+    const env2 = { ...process.env, L4_GO_RUNDIR: rundir2 };
+    const go2 = (args) => {
+      try {
+        return execFileSync("bash", [resolve(HERE, "go.sh"), ...args], {
+          env: env2,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+      } catch (e) {
+        return (e.stdout ?? "") + (e.stderr ?? "");
+      }
+    };
+    go2([
+      "run",
+      "--milestone",
+      "g2",
+      "--subject",
+      FIXTURE_SUBJECT,
+      "--waive",
+      "HG1=selftest g2 replay-correctness",
+    ]);
+    const runId2 = execFileSync("ls", ["-1", rundir2], { encoding: "utf8" })
+      .trim()
+      .split("\n")[0];
+    const j2 = resolve(rundir2, runId2, "journal.ndjson");
+    const first2 = read(j2).filter((r) => r.kind === "stage_end");
+    const verdictA = read(j2)
+      .filter((r) => r.kind === "run_end")
+      .pop()?.verdict;
+    go2([
+      "run",
+      "--milestone",
+      "g2",
+      "--subject",
+      FIXTURE_SUBJECT,
+      "--run-id",
+      runId2,
+    ]);
+    const all2 = read(j2).filter((r) => r.kind === "stage_end");
+    const second2 = all2.slice(first2.length);
+    const verdictB = read(j2)
+      .filter((r) => r.kind === "run_end")
+      .pop()?.verdict;
+    const executed2 = second2
+      .filter((r) => !r.replayed_from)
+      .map((r) => r.stage)
+      .sort();
+    const sameSet2 = (a, b) =>
+      a.length === b.length && a.every((x, i) => x === b[i]);
+    check(
+      "a second g2 run re-executes nothing but the never-replaying stages",
+      sameSet2(
+        executed2,
+        NEVER_REPLAY.filter((s) => second2.some((r) => r.stage === s)).sort(),
+      ),
+    );
+    check(
+      "the g2 milestone verdict is unchanged by replay",
+      verdictA === verdictB && !!verdictA,
+    );
+    check(
+      "replayed g2 receipts keep their original verdict",
+      second2
+        .filter((r) => r.replayed_from)
+        .every(
+          (r) => first2.find((f) => f.stage === r.stage)?.status === r.status,
+        ),
+    );
+    check(
+      "the g2 journal still verifies after a replay",
+      verify(j2).ok === true,
+    );
+    check(
+      "the g2 measurement stages ran at denovo origin — the deposit, not the corpus",
+      ["p3-check", "p6-tests", "p8-verify"].every(
+        (s) =>
+          first2.find((r) => r.stage === s)?.metrics?.module_origin ===
+          "denovo",
+      ),
+    );
+  }
 }
 
 // ------------------------------------------------------------- 5. the report
@@ -2809,6 +2899,167 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         t.exit === 1 &&
           t.row?.status === "DEGRADED" &&
           Number(t.row.metrics.typecheck_failures) === 1,
+      );
+    }
+  }
+
+  // --- 7a. the re-pointed measurement stages (D1/D2/D4, 2026-08-09) ---------
+  //
+  // p3-check, p6-tests, p8-verify and p8-diff run over the module set the
+  // driver resolved (GO_MODULES + GO_MODULES_ORIGIN), with the deposit
+  // contract and PER-ORIGIN floors. Three properties are load-bearing and each
+  // is checked with its red sibling: (1) an undeclared/absent module set is
+  // SKIPPED naming the key, and fatal under L4_GO_REQUIRED=1; (2) at denovo
+  // origin the stages read the denovo floors and NEVER the corpus floors —
+  // proven by poisoning the corpus floors to absurd values and watching the
+  // stage stay green, then breaking the denovo floor and watching it go red;
+  // (3) a zero dated-arm floor over a zero matched count reports NOT CHECKED
+  // rather than the vacuous green it used to print.
+  {
+    const skp = stage("p3-check", {
+      GO_MODULES: "",
+      GO_MODULES_ORIGIN: "denovo",
+    });
+    check(
+      "p3-check with no de novo module set is SKIPPED naming denovo.modules",
+      skp.exit === 0 &&
+        skp.row?.status === "SKIPPED" &&
+        /denovo\.modules/.test(skp.row.reason),
+    );
+    const abs = stage("p3-check", {
+      GO_MODULES: resolve(DEP, "never-written.l4"),
+      GO_MODULES_ORIGIN: "denovo",
+      L4_GO_REQUIRED: "1",
+    });
+    check(
+      "p3-check with a declared-but-undeposited module is SKIPPED, and exit 5 under L4_GO_REQUIRED=1",
+      abs.exit === 5 &&
+        abs.row?.status === "SKIPPED" &&
+        abs.row.reason.includes("never-written.l4"),
+    );
+    const p6u = stage("p6-tests", {
+      GO_MODULES: "",
+      GO_MODULES_ORIGIN: "denovo",
+    });
+    check(
+      "p6-tests with no de novo module set is SKIPPED naming denovo.modules",
+      p6u.exit === 0 &&
+        p6u.row?.status === "SKIPPED" &&
+        /denovo\.modules/.test(p6u.row.reason),
+    );
+    const p8u = stage("p8-verify", {
+      GO_MODULES: "",
+      GO_MODULES_ORIGIN: "denovo",
+    });
+    check(
+      "p8-verify with no de novo module set is SKIPPED naming denovo.modules",
+      p8u.exit === 0 &&
+        p8u.row?.status === "SKIPPED" &&
+        /denovo\.modules/.test(p8u.row.reason),
+    );
+  }
+  {
+    // p8-diff's deposit contract is over the MAP, not the module set.
+    const und = stage("p8-diff", { GO_S_DENOVO_SURFACE_MAP: "" });
+    check(
+      "p8-diff with no declared surface map is SKIPPED naming denovo.surface_map",
+      und.exit === 0 &&
+        und.row?.status === "SKIPPED" &&
+        /denovo\.surface_map/.test(und.row.reason),
+    );
+    const abs = stage("p8-diff", {
+      GO_S_DENOVO_SURFACE_MAP: resolve(DEP, "never-written-map.json"),
+      L4_GO_REQUIRED: "1",
+    });
+    check(
+      "p8-diff with a declared-but-undeposited map is SKIPPED, and exit 5 under L4_GO_REQUIRED=1",
+      abs.exit === 5 && abs.row?.status === "SKIPPED",
+    );
+    // A harness error is DEGRADED (D4's recorded deviation from go_broken),
+    // carrying the comparator exit as a metric and the deviation as a note —
+    // and it must NOT be a vacuous pass: an unparseable map exercises the
+    // comparator's exit-2 class, which also covers unresolvable pair rules
+    // and short battery rows.
+    const badMap = resolve(DEP, "bad-map.json");
+    wr(badMap, "{ this is not a surface map\n");
+    const deg = stage("p8-diff", { GO_S_DENOVO_SURFACE_MAP: badMap });
+    check(
+      "p8-diff over an unparseable map is DEGRADED naming the harness error, never PASS and never BROKEN",
+      deg.exit === 1 &&
+        deg.row?.status === "DEGRADED" &&
+        deg.row?.metrics?.comparator_exit === "2" &&
+        (deg.row.notes ?? []).some((n) => /deviation/.test(n.text)),
+    );
+  }
+  {
+    const l4 = process.env.L4;
+    if (!l4 || !ex(l4)) {
+      skip(
+        "per-origin floor selection over a deposited module",
+        "$L4 is unset or missing (CI's Go Orchestrator job builds no binary)",
+      );
+    } else {
+      const tiny = resolve(DEP, "tiny.l4");
+      wr(
+        tiny,
+        "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\nDECIDE `is positive` x IF x GREATER THAN 0\n\n#ASSERT `is positive` 1\n",
+      );
+      const FLOORS = {
+        GO_MODULES: tiny,
+        GO_MODULES_ORIGIN: "denovo",
+        // the poison: if a stage reads a corpus floor at denovo origin, these
+        // make it red, so a green run PROVES per-origin selection
+        GO_S_MIN_DATED_ARMS: "999",
+        GO_S_MIN_ASSERTIONS: "99999",
+      };
+      const p3 = stage("p3-check", {
+        ...FLOORS,
+        GO_S_DENOVO_MIN_DATED_ARMS: "0",
+      });
+      check(
+        "p3-check at denovo origin reads the denovo floor, not the poisoned corpus floor",
+        p3.exit === 0 &&
+          p3.row?.status === "PASS" &&
+          p3.row?.metrics?.min_dated_arms === "0" &&
+          p3.row?.metrics?.module_origin === "denovo",
+      );
+      check(
+        "…and a zero floor over zero matched arms is NOT CHECKED on the receipt, not a vacuous green",
+        (p3.row?.notes ?? []).some((n) =>
+          /temporal closure NOT CHECKED/.test(n.text),
+        ) && /NOT CHECKED/.test(p3.row?.oracle?.cmd ?? ""),
+      );
+      const p6 = stage("p6-tests", {
+        ...FLOORS,
+        GO_S_DENOVO_MIN_ASSERTIONS: "1",
+      });
+      check(
+        "p6-tests at denovo origin reads the denovo assertion floor, not the poisoned corpus floor",
+        p6.exit === 0 &&
+          p6.row?.status === "PASS" &&
+          p6.row?.metrics?.assertions_total === "1",
+      );
+      const p6red = stage("p6-tests", {
+        ...FLOORS,
+        GO_S_DENOVO_MIN_ASSERTIONS: "2",
+      });
+      check(
+        "…and the denovo floor is capable of red: floor 2 over 1 assertion is DEGRADED",
+        p6red.exit === 1 &&
+          p6red.row?.status === "DEGRADED" &&
+          /floor is 2/.test(p6red.row.reason),
+      );
+      const p6undecl = stage("p6-tests", {
+        GO_MODULES: tiny,
+        GO_MODULES_ORIGIN: "denovo",
+      });
+      check(
+        "an UNDECLARED denovo assertion floor defaults to 0 with a toothless-guard note on the receipt",
+        p6undecl.exit === 0 &&
+          p6undecl.row?.status === "PASS" &&
+          (p6undecl.row.notes ?? []).some((n) =>
+            /declares no denovo\.checks\.min_assertions/.test(n.text),
+          ),
       );
     }
   }
