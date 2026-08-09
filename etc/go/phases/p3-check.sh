@@ -22,7 +22,19 @@ if [[ -z "${GO_MODULES+x}" ]]; then
 fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}"
+  # The dated-arm floor is a VERDICT INPUT this stage reads (sidecar-derived,
+  # via GO_S_* env), so it is a digest contributor — `text:` entries are
+  # literal contributors, per digestSet in lib/ledger.mjs. Without it a floor
+  # edit escaped the digest and a resumed run replayed the old verdict
+  # (measured 2026-08-09 on p6-tests' twin floor; this stage had the same
+  # hole). The undeclared case is a distinct contributor because it changes
+  # the receipt (the inapplicable-floor note below).
+  if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
+    _floor="${GO_S_DENOVO_MIN_DATED_ARMS:-undeclared}"
+  else
+    _floor="${GO_S_MIN_DATED_ARMS:-undeclared}"
+  fi
+  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" "text:min_dated_arms=$_floor"
   exit 0
 fi
 

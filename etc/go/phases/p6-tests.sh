@@ -22,7 +22,20 @@ if [[ -z "${GO_MODULES+x}" ]]; then
 fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/assert-report.mjs"
+  # The assertion floor is a VERDICT INPUT this stage reads (sidecar-derived,
+  # via GO_S_* env), so it is a digest contributor — `text:` entries are
+  # literal contributors, per digestSet in lib/ledger.mjs. Without this line,
+  # editing the floor and resuming a run REPLAYED the old verdict: measured
+  # 2026-08-09, denovo.checks.min_assertions 39 → 1000 then --run-id resume
+  # printed "p6-tests: PASS (replayed)" — a PASS the edited configuration
+  # would refuse. The undeclared case is a distinct contributor because it
+  # changes the receipt (the toothless-guard note below).
+  if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
+    _floor="${GO_S_DENOVO_MIN_ASSERTIONS:-undeclared}"
+  else
+    _floor="${GO_S_MIN_ASSERTIONS:-undeclared}"
+  fi
+  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/assert-report.mjs" "text:min_assertions=$_floor"
   exit 0
 fi
 

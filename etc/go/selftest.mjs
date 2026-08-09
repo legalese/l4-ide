@@ -3064,6 +3064,50 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     }
   }
 
+  // --- 7b. the floors are DIGEST CONTRIBUTORS (2026-08-09) -------------------
+  // A floor is a verdict input the stage reads out of the sidecar (via GO_S_*
+  // env), so an edit to it must re-run the oracle, never replay the old
+  // verdict. RED, measured before the fix: both stages' --inputs listed only
+  // modules + script (+ assert-report.mjs), so denovo.checks.min_assertions
+  // 39 → 1000 followed by a --run-id resume printed "p6-tests: PASS
+  // (replayed)" — a verdict the edited configuration would refuse. No $L4
+  // needed: --inputs executes nothing.
+  {
+    const inputsOf = (name, over = {}) =>
+      spawnSync("bash", [resolve(HERE, `phases/${name}.sh`), "--inputs"], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GO_ROOT: REPO,
+          GO_MODULES: "probe.l4",
+          GO_MODULES_ORIGIN: "denovo",
+          GO_S_DENOVO_MIN_ASSERTIONS: "",
+          GO_S_DENOVO_MIN_DATED_ARMS: "",
+          ...over,
+        },
+      }).stdout;
+    const a6 = inputsOf("p6-tests", { GO_S_DENOVO_MIN_ASSERTIONS: "1" });
+    const b6 = inputsOf("p6-tests", { GO_S_DENOVO_MIN_ASSERTIONS: "2" });
+    check(
+      "p6-tests' --inputs carries the resolved assertion floor, so a floor edit moves the digest",
+      a6.includes("text:min_assertions=1") &&
+        b6.includes("text:min_assertions=2") &&
+        a6 !== b6,
+    );
+    check(
+      "…and an undeclared assertion floor is its own contributor (it changes the receipt too)",
+      inputsOf("p6-tests").includes("text:min_assertions=undeclared"),
+    );
+    const a3 = inputsOf("p3-check", { GO_S_DENOVO_MIN_DATED_ARMS: "0" });
+    const b3 = inputsOf("p3-check", { GO_S_DENOVO_MIN_DATED_ARMS: "2" });
+    check(
+      "p3-check's --inputs carries the resolved dated-arm floor, so a floor edit moves the digest",
+      a3.includes("text:min_dated_arms=0") &&
+        b3.includes("text:min_dated_arms=2") &&
+        a3 !== b3,
+    );
+  }
+
   // --- 8. the plan stops refusing -------------------------------------------
   {
     const r = spawnSync(
