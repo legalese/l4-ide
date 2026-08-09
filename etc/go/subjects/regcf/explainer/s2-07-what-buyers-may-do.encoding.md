@@ -74,14 +74,17 @@ each statutory paragraph label riding beside its operative limb:
 So the reading is a visible choice rather than an accident of punctuation, and
 the statutory label travels with the limb it labels.
 
-Until the decomposition described below, this was the second-widest figure the
-ladder generator produced from this corpus — behind `regcf-exemption` at 3027 —
-at 2751 × 440; it is now 1074 × 440 and fourth, because the fourth
-exception was a single field whose name was the regulation's own sentence,
-verbatim, and leaf labels do not wrap. That was reported here as "not a defect". It was one, and not the
-width: a name is read as a label, not as a proposition, so four statutory
-alternatives sitting inside one name were four alternatives nobody could audit —
-not a reviewer, not the diagram, not the wizard. The limb is now six fields under a decision of its own,
+Until the decomposition described below, this figure
+[went from 2751 × 440 to 1074 × 440 and from a 301-character leaf to an 87-character one](src:jl4/examples/legal/regcf/figures/README.md#L86-L87 "verbatim"),
+which moved it from second-widest to fourth. It was never the widest:
+[`regcf-exemption` was and is, at 3027](src:jl4/examples/legal/regcf/figures/README.md#L88 "verbatim").
+The width came of the fourth exception being a single field whose name was the
+regulation's own sentence, verbatim, and leaf labels do not wrap.
+
+That was reported here as "not a defect", which was wrong — but so is treating
+the width as the defect. A name is read as a label, not as a proposition, so
+four statutory alternatives sitting inside one name were four alternatives
+nobody could audit: not a reviewer, not the diagram, not the wizard. The limb is now six fields under a decision of its own,
 [a family or trust transferee, or a death-or-divorce circumstance](src:jl4/examples/legal/regcf/regcf.l4#L827 "verbatim"),
 grouped so that the three that name a **recipient** and the three that name an
 **occasion** are visibly different things, and the figure is a third of its

@@ -1339,6 +1339,34 @@ process.stdout.write("\n-- the explainer --\n");
       "every citation in the shipped narrative resolves against its source",
       summary.citations_total > 0 && summary.citations_unresolved === 0,
     );
+    // The renderer's summary counts UNRESOLVED citations; it does not count
+    // narrative LINT, and an uncited figure is a lint, not an unresolved
+    // citation. pr-checks.yml's "Every citation in the shipped narrative
+    // resolves" step fails on either, and swept every subject where the render
+    // above reads one. MEASURED 2026-08-09: two N-DIGIT lints (raw ladder
+    // widths written into s2-07) passed this file and failed that job, so the
+    // only way to see them was to push. A check CI runs that the selftest does
+    // not is a check you discover after pushing, which is the wrong end.
+    check(
+      "no shipped narrative, in any subject, carries an uncited figure",
+      (() => {
+        const SUBJECTS = resolve(HERE, "subjects");
+        const bad = [];
+        for (const sub of readdirSync(SUBJECTS)) {
+          const dir = resolve(SUBJECTS, sub, "explainer");
+          if (!existsSync(dir)) continue;
+          for (const f of readdirSync(dir).filter((n) => n.endsWith(".md")))
+            for (const p of lintNarrative(
+              readFileSync(resolve(dir, f), "utf8"),
+            ))
+              bad.push(`${sub}/${f}:${p.line} [${p.code}]`);
+        }
+        return (
+          bad.length === 0 ||
+          (process.stdout.write(`     ${bad.join("\n     ")}\n`), false)
+        );
+      })(),
+    );
     // The gate is the fact that most changes what a verdict means, and the
     // explainer printed the verdict without it: MEASURED on run
     // 2026-08-03-3f45e62b-004, `run verdict COMPLETE` over a journal whose
