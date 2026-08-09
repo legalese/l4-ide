@@ -750,7 +750,7 @@ DECLARE Transfer HAS
     --
     -- The decomposition STOPS HERE. 17 CFR 227.501(c) defines "member of the
     -- family of the purchaser or the equivalent" with "includes" — an open list
-    -- of 13 relationships plus adoptive ones. Enumerating them would encode an
+    -- of 14 relationships plus adoptive ones. Enumerating them would encode an
     -- open term as a closed one, which is a worse fidelity loss than the one
     -- this decomposition repairs.
     `to a member of the family of the purchaser or the equivalent`                                    IS A BOOLEAN
@@ -817,7 +817,9 @@ GIVETH A BOOLEAN
 -- (4)(iv) DOES NOT CONSTRAIN THE TRANSFEREE. The circumstance is the whole
 -- test. Witness: a purchaser dies intestate with no known heirs, the securities
 -- are sold and the proceeds escheat to the state treasury. That is squarely "in
--- connection with the death of the purchaser" and the transferee is a stranger.
+-- connection with the death or divorce of the purchaser" — the death half of
+-- the statutory phrase, which the CFR states only in the disjunction — and the
+-- transferee is a stranger.
 -- Registered as F-501A4-NEXUS.
 @ref 17 CFR 227.501(a)(4)
 GIVEN transfer IS A Transfer
@@ -1258,9 +1260,11 @@ GIVETH A Transfer
 -- transferee. A purchaser dies intestate with no known heirs; the securities
 -- are sold and the proceeds escheat to the state treasury. The transferee is a
 -- stranger — not family, not a trust, not the issuer, not accredited — and the
--- transfer is nonetheless "in connection with the death of the purchaser". A
--- nexus reading, on which the transferee must be one the circumstance produces,
--- would deny the exception here. This corpus permits it. See F-501A4-NEXUS.
+-- transfer is nonetheless in connection with the death of the purchaser, which
+-- the CFR states only in the disjunction: "in connection with the death or
+-- divorce of the purchaser". A nexus reading, on which the transferee must be
+-- one the circumstance produces, would deny the exception here. This corpus
+-- permits it. See F-501A4-NEXUS.
 #ASSERT `transfer is permitted` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE TRUE FALSE FALSE)
 
 -- Each of the six carries the whole limb on its own, and that reaches the

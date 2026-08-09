@@ -31,9 +31,9 @@ proper subset is not a partial improvement; it is a defect, because the
 half-dated function answers **confidently and wrongly inside its own answerable
 window**. The corpus pins that with a dedicated regression: an investor above
 the second limb's cap, where
-[the answer IS the cap — which also moved on 2022-09-20, in the same release, by the same instruction](src:jl4/examples/legal/regcf/regcf.l4#L1374-L1375 "verbatim").
+[the answer IS the cap — which also moved on 2022-09-20, in the same release, by the same instruction](src:jl4/examples/legal/regcf/regcf.l4#L1378-L1379 "verbatim").
 Under a partially dated module the assertion at
-[$107,000](src:jl4/examples/legal/regcf/regcf.l4#L1382) silently returns the
+[$107,000](src:jl4/examples/legal/regcf/regcf.l4#L1386) silently returns the
 current figure instead — the right shape of answer, from the wrong regime, with
 nothing to notice it.
 

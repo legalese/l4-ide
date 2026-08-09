@@ -1280,6 +1280,64 @@ function main(argv) {
     };
   }
 
+  // EVERY DECLARED FIELD IS SUPPLIED, ON BOTH SIDES, BY EVERY ROW.
+  //
+  // A row states one canonical payload per slot and each side's `rename` maps
+  // it onto that side's field names, so a record can be renamed or decomposed
+  // in its own module and leave the map silently stale. That is not a
+  // hypothetical: the corpus grew `date the securities were issued` in
+  // 4fec076e and decomposed Rule 501(a)(4) into six booleans in 3f06cdc6, and
+  // on 2026-08-09 both `transfer`-slot pairs were erroring on the left for all
+  // twenty rows.
+  //
+  // It is invisible without this check for two compounding reasons. A missing
+  // field raises `UserError "Missing required field"` at evaluation
+  // (jl4-core/src/L4/EvaluateLazy/Machine.hs), and the probe's
+  // `WHEN LEFT e THEN NOTHING` arm catches only *parse* failures — so the
+  // answer becomes an ERROR string that `compare` reports as a divergence.
+  // Twenty rows of broken harness therefore read as total corpus divergence:
+  // the louder the breakage, the more it looks like a finding.
+  //
+  // Extra keys are legitimate and deliberately not flagged — a row states the
+  // union of both sides' names ("one key, two names"), and JSONDECODE ignores
+  // what the record does not declare. Only ABSENCE is an error.
+  {
+    const missing = [];
+    for (const [slotName, slot] of Object.entries(map.slots)) {
+      for (const which of ["left", "right"]) {
+        const declared = surface[which].types[slot[which].type];
+        if (!Array.isArray(declared)) continue; // enum, or a type we cannot see
+        for (const [i, row] of (map.battery?.rows || []).entries()) {
+          const payload = row.slots?.[slotName];
+          if (!payload) continue;
+          const supplied = new Set(
+            Object.keys(applyRename(payload, slot[which].rename)),
+          );
+          const absent = declared.filter((f) => !supplied.has(f));
+          if (absent.length)
+            missing.push(
+              `  battery.rows[${i}] (${row.name ?? "unnamed"}) -> slots.${slotName}.${which} ` +
+                `(${slot[which].type}): ${absent.map((f) => `'${f}'`).join(", ")}`,
+            );
+        }
+      }
+    }
+    if (missing.length) {
+      const shown = missing.slice(0, 12);
+      throw new Usage(
+        `${missing.length} (row, slot, side) combination(s) do not supply every field the record declares. ` +
+          `Each one evaluates to \`Missing required field\`, which the probe reports as a DIVERGENCE, ` +
+          `not as a broken harness — so this reads as the two encodings disagreeing.\n` +
+          shown.join("\n") +
+          (missing.length > shown.length
+            ? `\n  … and ${missing.length - shown.length} more`
+            : "") +
+          `\nFix by adding the field to the rows, or by mapping an existing row key onto it ` +
+          `with slots.<name>.<side>.rename.`,
+      );
+    }
+  }
+
   if (cmd === "validate") {
     process.stdout.write(
       `denovo-diff: ${opt("map")} is valid — ${map.pairs.length} pair(s), ` +

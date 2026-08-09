@@ -35,12 +35,12 @@ is the sentence in every plain-English summary of Reg CF that is right today and
 silently wrong about any transaction before that date.
 
 A worked example the corpus asserts and re-checks on every run: an investor with
-income of [$60,000](src:jl4/examples/legal/regcf/regcf.l4#L1033) and net worth of
-[$200,000](src:jl4/examples/legal/regcf/regcf.l4#L1033) falls in the first limb —
+income of [$60,000](src:jl4/examples/legal/regcf/regcf.l4#L1035) and net worth of
+[$200,000](src:jl4/examples/legal/regcf/regcf.l4#L1035) falls in the first limb —
 income is below the cut point — so the cap is five per cent of the _greater_
-figure: [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1033).
+figure: [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1035).
 
 The word "greater" in that last sentence is not a detail. Until the amendment
 described under **Time**, below, both limbs read _lesser_ of income and net
 worth, and the same investor's cap was
-[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1390).
+[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1394).

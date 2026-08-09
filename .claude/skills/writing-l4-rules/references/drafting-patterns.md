@@ -622,7 +622,14 @@ string that restates the node. It is silent on what to do when **the source numb
 sub-number what is inside it** — and the silence was filled the worst possible way.
 
 17 CFR 227.501(a)(4) is one numbered exception containing four disjuncts, comma-separated, that the CFR
-does not label. The corpus encoded it as **one BOOLEAN whose name is the whole ~300-character sentence**:
+does not label. The corpus **used to encode** it as one BOOLEAN whose name was the whole 288-character
+sentence. **Repaired 2026-08-09** — the exhibit below is history, not the present state of the tree.
+What it looks like now: six fields under a decision of their own
+(`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance`), the ladder figure down
+from `viewBox="0 0 2751 440"` to `0 0 1074 440` with a new `regcf-resale-limb-4` beside it, and six
+answerable wizard questions in place of the one nobody could answer. Read what follows for the
+_defect and its argument_, which are unchanged and are the reason the repair happened; do not read it
+as a description of `regcf.l4`.
 
 ```l4
 -- WRONG. The device, used backwards.

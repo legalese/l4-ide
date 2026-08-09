@@ -463,7 +463,7 @@ projection *cannot* say. What follows is the summary.
 
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
+| **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 7 decisions × 4 carriers                  | works; 1 of 7 too wide for a page untrimmed — see `figures/README.md` |
 | **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1540/1540 over 22 cases on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 

@@ -2249,6 +2249,53 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
     }
   }
+
+  // 11. THE SHIPPED MAP, not just the fixture.
+  //
+  //     Every leg above runs `fixtures/regcf-identity.surface-map.json`, so the
+  //     map this repo actually ships was gated by nothing. It went stale twice
+  //     without anyone noticing — once when the corpus grew a second DATE
+  //     (4fec076e) and again when Rule 501(a)(4) became six booleans
+  //     (3f06cdc6) — and by 2026-08-09 both `transfer`-slot pairs were raising
+  //     `Missing required field` on the left for all twenty rows.
+  //
+  //     `validate` is the right depth for a selftest: it reads both modules'
+  //     record declarations through `l4 render` and checks that every row
+  //     supplies every declared field on both sides, which is the invariant
+  //     that broke, without paying for eighty evaluations. A full `run` belongs
+  //     in the pipeline, not here.
+  {
+    const l4 = process.env.L4;
+    const shipped = resolve(
+      HERE,
+      "../../jl4/examples/legal/regcf/denovo/surface-map.json",
+    );
+    if (!l4 || !existsSync(l4)) {
+      skip(
+        "the shipped Reg CF surface map validates",
+        "$L4 is unset or missing",
+      );
+    } else if (!existsSync(shipped)) {
+      skip(
+        "the shipped Reg CF surface map validates",
+        "the Reg CF de novo map is not in this tree",
+      );
+    } else {
+      const r = spawnSync(
+        "node",
+        [resolve(HERE, "lib/denovo-diff.mjs"), "validate", "--map", shipped],
+        { encoding: "utf8" },
+      );
+      if (r.status !== 0)
+        process.stdout.write(
+          `     ${((r.stdout || "") + (r.stderr || "")).split("\n").slice(0, 4).join("\n     ")}\n`,
+        );
+      check(
+        "the shipped Reg CF surface map validates — every row supplies every declared field, both sides",
+        r.status === 0 && /is valid/.test(r.stdout || ""),
+      );
+    }
+  }
 }
 // ===== END denovo-diff-oracle checks ========================================
 

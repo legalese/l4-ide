@@ -84,9 +84,10 @@ carried over from a previous run.
 `regcf-resale-limb-4` joined the set on 2026-08-09, when Rule 501(a)(4) stopped being
 one ~300-character boolean and became six fields under a decision of their own. Note
 what happened to the row above it: `regcf-resale-exceptions` went from 2751 × 440 to
-1074 × 440 and from a 301-character leaf to an 87-character one. It is no longer the
-widest thing in the corpus, and the defect recorded in §2 below is no longer this
-figure's.
+1074 × 440 and from a 301-character leaf to an 87-character one. It was never the
+widest thing in the corpus — `regcf-exemption` was and is, at 3027; at 2751 it was
+the second-widest, and at 1074 it is now the fourth. The defect recorded in §2 below
+is no longer this figure's.
 
 Nothing regenerates these numbers, and they have now drifted twice, so re-derive them
 whenever you regenerate the figures — and re-derive them **last**, after the corpus has
@@ -131,7 +132,7 @@ wire; an `OR` heading is a single line however long. **The layout mechanism is
 unchanged.**
 
 Until 2026-08-09 this section's exhibit was `regcf-resale-exceptions`, whose Rule
-501(a)(4) field name was 291 characters in the corpus — 304 printed, roughly 2380 px
+501(a)(4) field name was 288 characters in the corpus — 301 printed, roughly 2380 px
 wide on its own. That leaf is gone: the limb is now six fields under
 `regcf-resale-limb-4`, and the longest leaf anywhere in these figures is 108
 characters. What removed it was not a wrapping feature but a **decomposition** — the
@@ -193,9 +194,11 @@ captioned groups — the transferee half and the circumstance half — and the s
 caption sits between two live rungs, which is exactly the shape this discard is about.
 `regcf-resale-limb-4.mmd` therefore carries `(4) To a member of the family …` as its
 leading terminal and **drops** `or in connection with the death or divorce of the
-purchaser or other similar circumstance.` altogether, while the `.svg`, the `.txt` and
-the `.sentences` all carry it — the ASCII puts it on the wire at precisely the boundary
-between the third and fourth rungs, which is where it belongs. This is not a regression
+purchaser or other similar circumstance.` altogether, while the `.svg` and the `.txt`
+carry it — the ASCII puts it on the wire at precisely the boundary
+between the third and fourth rungs, which is where it belongs. The `.sentences` carrier
+drops sequence-level captions on **both** groups — it keeps only labels that ride inside
+a branch, which is why `regcf-resale-exceptions.sentences` retains its `(1)`–`(4)`. This is not a regression
 and not a bug to file: it is the documented trade, observed on a fresh case, and it is
 the reason the four carriers are shipped rather than one.
 

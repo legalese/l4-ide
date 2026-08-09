@@ -38,7 +38,10 @@
  * each label inside its own branch and the .mmd now carries all four. It bites
  * `regcf-resale-limb-4.mmd` instead, whose second group caption ("or in
  * connection with the death or divorce …") sits between two live rungs and is
- * dropped, while the SVG, the ASCII and the sentences all carry it.
+ * dropped, while the SVG and the ASCII carry it. The `.sentences` carrier drops
+ * sequence-level captions on both groups — it keeps only labels that ride
+ * inside a branch, which is why `regcf-resale-exceptions.sentences` retains its
+ * (1)-(4).
  *
  * Run (from ts-shared/ladder-svg):  npx tsx demo/regcf.ts
  * Env: JL4_LSP_PORT (default 5019). Writes jl4/examples/legal/regcf/figures/.
@@ -93,13 +96,13 @@ const SUBJECTS: { decision: string; slug: string; why: string }[] = [
   {
     decision: "transfer falls within an exception in Rule 501(a)",
     slug: "regcf-resale-exceptions",
-    why: "the inert-style showcase: four statutory captions interleaved with their operative limbs. Was the widest thing in the corpus until 2026-08-09, when limb (4) stopped being a 291-character field name — see the size line this script prints",
+    why: "the inert-style showcase: four statutory captions interleaved with their operative limbs. Never the widest figure in the corpus — regcf-exemption is, at 3027 — but the second-widest at 2751 × 440 until 2026-08-09, when limb (4) stopped being a 288-character field name and it fell to 1074 × 440 and fourth — see the size line this script prints",
   },
   {
     decision:
       "(a)(4) — a family or trust transferee, or a death-or-divorce circumstance",
     slug: "regcf-resale-limb-4",
-    why: "limb (4) is not four of a kind: three transferees and one circumstance, and the two groups are what the nesting exists to show. Until 2026-08-09 this whole limb was ONE leaf carrying a 291-character field name, and there was no figure to draw",
+    why: "limb (4) is not four of a kind: three transferees and one circumstance, and the two groups are what the nesting exists to show. Until 2026-08-09 this whole limb was ONE leaf carrying a 288-character field name, and there was no figure to draw",
   },
   {
     decision: "transfer is permitted",

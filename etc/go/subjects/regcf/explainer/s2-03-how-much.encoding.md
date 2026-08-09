@@ -11,8 +11,8 @@ An encoding has to do something with that. What this one does is refuse to pick:
 the measure is a **dated function** that selects `greater of` from the amendment
 date and `lesser of` before it, and both readings stay live and testable
 forever. The consequence is asserted at both ends — the same investor is capped
-at [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1033) at time of writing ({{as_of}}) and was capped at
-[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1390) under the earlier rule, a
+at [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1035) at time of writing ({{as_of}}) and was capped at
+[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1394) under the earlier rule, a
 factor of more than three.
 
 **An exhaustiveness claim the prose does not make.** Limb (i) applies "if

@@ -104,7 +104,14 @@ jobs:
             # the driver are one unit and are gated as one.
             go:
               - 'etc/go/**'
-              - '.claude/skills/running-the-l4-pipeline/**'
+              # ALL skills, not just the pipeline one. Narrowed to
+              # running-the-l4-pipeline, this filter left every other skill
+              # ungated: on 2026-08-09 writing-l4-rules was still exhibiting a
+              # corpus defect repaired that same day as the live present state,
+              # and nothing would have run on a PR that touched only it.
+              # Verified before widening that `.claude/skills/**/*.md` is
+              # prettier-clean, so this adds coverage without turning CI red.
+              - '.claude/skills/**'
               - 'specs/todo/single-instruction-demo/**'
             mlir:
               - 'jl4-mlir/**'

@@ -74,14 +74,15 @@ each statutory paragraph label riding beside its operative limb:
 So the reading is a visible choice rather than an accident of punctuation, and
 the statutory label travels with the limb it labels.
 
-Until the decomposition described below, this was also, by some distance, the
-widest figure the ladder generator produced from this corpus, because the fourth
+Until the decomposition described below, this was the second-widest figure the
+ladder generator produced from this corpus — behind `regcf-exemption` at 3027 —
+at 2751 × 440; it is now 1074 × 440 and fourth, because the fourth
 exception was a single field whose name was the regulation's own sentence,
 verbatim, and leaf labels do not wrap. That was reported here as "not a defect". It was one, and not the
 width: a name is read as a label, not as a proposition, so four statutory
 alternatives sitting inside one name were four alternatives nobody could audit —
 not a reviewer, not the diagram, not the wizard. The limb is now six fields under a decision of its own,
-[a family or trust transferee, or a death-or-divorce circumstance](src:jl4/examples/legal/regcf/regcf.l4#L825 "verbatim"),
+[a family or trust transferee, or a death-or-divorce circumstance](src:jl4/examples/legal/regcf/regcf.l4#L827 "verbatim"),
 grouped so that the three that name a **recipient** and the three that name an
 **occasion** are visibly different things, and the figure is a third of its
 former width as a side effect. What was not decomposed is the defined term
