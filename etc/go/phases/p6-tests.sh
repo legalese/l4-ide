@@ -113,6 +113,25 @@ if [[ "$TOTAL" -lt "$MIN_ASSERTIONS" ]]; then
   exit "$GO_EXIT_FINDING"
 fi
 
+# THE ZERO-ASSERTION CASE IS NOT A GREEN (2026-08-09). With the floor at 0 —
+# the schema default when denovo.checks is undeclared, the natural state of a
+# new subject — a module set carrying no #ASSERT at all fell through the floor
+# check and earned PASS with oracle-class `execution`, whose ORCHESTRATOR.md
+# §3.1 promise is "ran on its target engine, on cases, and agreed". Nothing
+# ran and nothing agreed; measured RED before this branch existed. Unlike
+# p3-check — where temporal closure is one sub-check among several and a
+# 0-over-0 case demotes to NOT CHECKED without moving the status — the
+# assertions ARE this stage's whole oracle, so an empty set demotes the
+# status itself.
+if [[ "$TOTAL" -eq 0 ]]; then
+  go_receipt --status DEGRADED \
+    --reason "0 assertions ran across the module set (floor: $MIN_ASSERTIONS). 'No failed assertion' over an empty results[] is vacuous, and this stage's PASS claims oracle-class execution — something ran and agreed — which nothing did. A module set with no #ASSERT directives is a finding about the test carrier; a 0 floor is honest only when 0 is the measured population, and even then the absence of tests is reportable, not green." \
+    --artifact "$REPORT" "${ENV_ARTS[@]}" \
+    --metric "assertions_total=0" \
+    --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
+  exit "$GO_EXIT_FINDING"
+fi
+
 if [[ $ORACLE_EXIT -ne 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "assert-report found failing assertions or error results in results[]; see $REPORT. Note that 'l4 run' itself exited 0 for every module — the exit code is not the oracle." \

@@ -3061,6 +3061,28 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
             /declares no denovo\.checks\.min_assertions/.test(n.text),
           ),
       );
+      // The vacuous-pass hole under that default (RED, measured 2026-08-09):
+      // a module with NO #ASSERT at all, floor defaulted 0, earned
+      // PASS/execution over assertions_total=0 — "ran on cases and agreed"
+      // with nothing run. Now DEGRADED: the assertions are this stage's whole
+      // oracle, so an empty set demotes the status (unlike p3-check's
+      // NOT CHECKED, which demotes one sub-check among several).
+      const empty = resolve(DEP, "zeroassert.l4");
+      wr(
+        empty,
+        "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\nDECIDE `is positive` x IF x GREATER THAN 0\n",
+      );
+      const p6zero = stage("p6-tests", {
+        GO_MODULES: empty,
+        GO_MODULES_ORIGIN: "denovo",
+      });
+      check(
+        "a zero-assertion module set is DEGRADED, never a vacuous PASS/execution",
+        p6zero.exit === 1 &&
+          p6zero.row?.status === "DEGRADED" &&
+          /0 assertions ran/.test(p6zero.row?.reason ?? "") &&
+          p6zero.row?.metrics?.assertions_total === "0",
+      );
     }
   }
 
