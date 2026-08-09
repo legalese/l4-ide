@@ -417,7 +417,7 @@
       "readings": [
         {
           "id": "similarToDeathOrDivorce",
-          "description": "'Similar' reaches back only to 'the death or divorce of the purchaser' — the nearest coordination, and the only one it is grammatically parallel to. Its extension is circumstances of that kind: incapacity, or a legal separation.",
+          "description": "'Similar' reaches back only to 'the death or divorce of the purchaser' — the nearest coordination, and the only one it is grammatically parallel to. Its extension is circumstances of that kind: incapacity, or separation. (Those two examples are the ruling's own, recorded unnarrowed: 'separation', not 'legal separation' — the reading is not confined to a decree.)",
           "status": "live",
           "citations": [
             {
@@ -449,11 +449,11 @@
       "status": "resolved",
       "divergence": "observable",
       "witnesses": [
-        "A transfer to a long-term housemate who is not a Rule 501(c) relation, made for no reason connected with a death or a divorce, is outside the limb under similarToDeathOrDivorce and arguably inside it under similarToAllOfLimb4. The corpus refuses it: the six fields have no arm the facts fit."
+        "A transfer to a long-term housemate who is not a Rule 501(c) relation — a cohabitant, but not one 'occupying a relationship generally equivalent to that of a spouse', which is where 501(c)'s spousal-equivalent limb stops — made for no reason connected with a death or a divorce, is outside the limb under similarToDeathOrDivorce and arguably inside it under similarToAllOfLimb4. The corpus refuses it: the six fields have no arm the facts fit."
       ],
       "cross_refs": [],
       "notes": [
-        "The decomposition STOPS at 'member of the family of the purchaser or the equivalent'. 17 CFR 227.501(c) defines that term with 'includes' over thirteen relationships plus adoptive ones, so it is an OPEN list; enumerating it as six or thirteen booleans would encode an open term as a closed one, which is a larger fidelity loss than the one the decomposition repairs. It stays one boolean deliberately, and that is the reason.",
+        "The decomposition STOPS at 'member of the family of the purchaser or the equivalent'. 17 CFR 227.501(c) defines that term with 'includes' over FOURTEEN enumerated relationships, and 'shall include adoptive relationships' on top, so it is an OPEN list; enumerating it as fourteen booleans would encode an open term as a closed one, which is a larger fidelity loss than the one the decomposition repairs. It stays one boolean deliberately, and that is the reason. COUNTING METHOD, because the number was wrong once already: fourteen comma-separated slots in the definition — child, stepchild, grandchild, parent, stepparent, grandparent, 'spouse or spousal equivalent' (one slot, not two), sibling, and the six in-laws (mother-, father-, son-, daughter-, brother-, sister-). Splitting spouse from spousal equivalent gives fifteen; no counting gives thirteen, which is what this note and three sibling texts said until 2026-08-09.",
         "Vagueness, not competing parses: unlike F-501A4-NEXUS there is no second grammar here that a court would have to choose between, only a term whose extension is not fixed. Registered under kind 'vagueness' for that reason."
       ]
     }
