@@ -48,10 +48,15 @@
         },
         "description": { "type": "string", "minLength": 1 },
         "status": {
-          "enum": ["live", "rejected", "demoted"],
-          "description": "'rejected' = the encoder argued it away; 'demoted' = an authority struck it (R4 §1: a court striking a reading demotes, never deletes)."
+          "enum": ["live", "arguable", "rejected", "demoted"],
+          "description": "'rejected' = the encoder argued it away; 'demoted' = an authority struck it (R4 §1: a court striking a reading demotes, never deletes). 'arguable' = NEITHER: not taken, and not refuted — a reading the operative text forecloses, which a court could yet adopt. It exists because 'rejected' was carrying two different facts under one name, and only one of them is 'do not cite this'. A reader sizing exposure wants exactly the arguable list: readings live as law but not live in the encoding. ADDED 2026-08-09 ON ONE MEASURED INSTANCE, disclosed here rather than implied: F-100A1-CAP-vs-STATUTE's `statuteCap`, where Congress wrote $1,000,000 into 15 U.S.C. 77d(a)(6)(A) — the very paragraph the exemption is granted by, never since amended — and the Commission set $5,000,000 by rule. Nobody argued the statute away; the entry's own rationale says whether § 28's general exemptive authority reaches a specific numeric cap Congress placed in that paragraph 'is a question for a court, and no encoding settles it'. The other six entries in that register have genuinely refuted alternatives, so one instance is what this value rests on. If a second does not appear in the BNA's twelve dispositions or the charities corpus, reconsider it rather than let it become the bin every awkward reading is filed in."
         },
         "rejection_rationale": { "type": "string", "minLength": 1 },
+        "foreclosure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "For an 'arguable' reading only: what makes it non-operative, given that no one refuted it. Kept apart from `rejection_rationale` because the field names must not lie — nothing was rejected."
+        },
         "citations": {
           "type": "array",
           "items": { "$ref": "#/$defs/citation" }
@@ -237,11 +242,15 @@
     },
     {
       "id": "non-live-readings-explain",
-      "description": "A rejected or demoted reading carries a rejection_rationale. Every BNA row already wrote one; the schema makes it non-optional."
+      "description": "A rejected or demoted reading carries a rejection_rationale. Every BNA row already wrote one; the schema makes it non-optional. 'arguable' is exempt and carries `foreclosure` instead — see the next rule."
     },
     {
       "id": "live-readings-cite-their-licence",
       "description": "A live reading carries at least one citation — R4 §1: each per-reading implementation carries @ref citations to the text that licenses its reading."
+    },
+    {
+      "id": "arguable-readings-cite-and-foreclose",
+      "description": "An 'arguable' reading is held to a HIGHER bar than a rejected one, not a lower one: it must cite the text that makes it arguable (it is, after all, law someone could win on) AND state in `foreclosure` what makes it non-operative, and it must NOT carry a rejection_rationale, because nothing rejected it. `foreclosure` is forbidden on every other status. The strictness is deliberate: the failure mode of a new enum value is that it becomes the bin for anything awkward, and a value that costs two fields to use does not attract lazy filing."
     },
     {
       "id": "settled-or-demoted-requires-authority",

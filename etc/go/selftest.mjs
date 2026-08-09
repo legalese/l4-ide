@@ -654,6 +654,7 @@ process.stdout.write("\n-- the register schemas --\n");
       "interpretation-fields-unique",
       "non-live-readings-explain",
       "live-readings-cite-their-licence",
+      "arguable-readings-cite-and-foreclose",
       "settled-or-demoted-requires-authority",
       "demoted-requires-a-demoted-reading",
       "quote-or-absent-reason",

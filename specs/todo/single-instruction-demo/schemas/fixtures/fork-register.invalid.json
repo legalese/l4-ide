@@ -2,7 +2,7 @@
   "kind": "fork-register",
   "register_version": 1,
   "subject": "bna",
-  "note": "INVALID FIXTURE. Structurally well-formed on purpose, so the x-rules actually run rather than being short-circuited by a shape error. Every entry below trips a named rule, and etc/go/selftest.mjs asserts the rule names. Rules expected to fire: entry-ids-unique, taken-names-a-live-reading, at-least-one-live-reading, materialisation-implies-field, materialisation-implies-mechanism, interpretation-fields-unique, non-live-readings-explain, live-readings-cite-their-licence, settled-or-demoted-requires-authority, demoted-requires-a-demoted-reading, quote-or-absent-reason, materialised-forks-declare-divergence, observable-divergence-requires-witnesses, witnesses-only-when-observable, and cross-refs-resolve when the external-modifications peer is given.",
+  "note": "INVALID FIXTURE. Structurally well-formed on purpose, so the x-rules actually run rather than being short-circuited by a shape error. Every entry below trips a named rule, and etc/go/selftest.mjs asserts the rule names. Rules expected to fire: entry-ids-unique, taken-names-a-live-reading, at-least-one-live-reading, materialisation-implies-field, materialisation-implies-mechanism, interpretation-fields-unique, non-live-readings-explain, live-readings-cite-their-licence, arguable-readings-cite-and-foreclose, settled-or-demoted-requires-authority, demoted-requires-a-demoted-reading, quote-or-absent-reason, materialised-forks-declare-divergence, observable-divergence-requires-witnesses, witnesses-only-when-observable, and cross-refs-resolve when the external-modifications peer is given.",
   "entries": [
     {
       "id": "X1",
@@ -35,6 +35,13 @@
           "id": "beta",
           "description": "a rejected reading with no rationale",
           "status": "rejected",
+          "citations": []
+        },
+        {
+          "id": "iota",
+          "description": "an arguable reading that does all three things arguable forbids: no citation of what makes it arguable, no foreclosure, and a rejection_rationale it is not entitled to",
+          "status": "arguable",
+          "rejection_rationale": "nothing rejected it, so this field is the wrong one",
           "citations": []
         }
       ],
@@ -114,13 +121,23 @@
           "id": "epsilon",
           "description": "live and cited",
           "status": "live",
-          "citations": [{ "kind": "provision", "cite": "s 3" }]
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "s 3"
+            }
+          ]
         },
         {
           "id": "zeta",
           "description": "live and cited",
           "status": "live",
-          "citations": [{ "kind": "provision", "cite": "s 3" }]
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "s 3"
+            }
+          ]
         }
       ],
       "taken": {
@@ -154,7 +171,12 @@
           "id": "eta",
           "description": "live and cited",
           "status": "live",
-          "citations": [{ "kind": "provision", "cite": "s 4" }]
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "s 4"
+            }
+          ]
         },
         {
           "id": "theta",
