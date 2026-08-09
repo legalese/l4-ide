@@ -23,6 +23,37 @@ it, which they arguably should since they are then an explicit choice; and wheth
 `AndOrDepth.hs` or beside it, since the existing check is about columns and this one is about their
 absence. Occasioned by [Grouping and Precedence](../../doc/tutorials/getting-started/grouping-and-precedence.md).
 
+**Warn on the derived antonym** (Meng, 2026-08-09). A field defined as `NOT` its apparent opposite
+asserts that the pair _partitions_ the domain — exhaustive **and mutually exclusive**. The second
+half is usually false of natural-language antonyms, and nothing in the language makes the assertion
+visible as a choice.
+
+MEASURED 2026-08-09. `paper/case-studies/gco-jersey-covid/*.l4` derived
+`takes place outdoors MEANS NOT takes place indoors` in all three point-in-time versions. A gathering
+can be both — vows on the lawn, reception in the restaurant — and because Article 3's outdoor
+(>20) and indoor (>10) caps read the **same** head count, exactly one of them could ever fire: a
+15-person mixed gathering breached or cleared according to which box the responsible person ticked.
+The Order's own drafting contradicted the model, since the sibling record counts persons in the
+indoor _areas_ (plural) of one premises. Repaired by making the two independent.
+
+Two grep-able tells, both mechanically detectable:
+
+1. `X MEANS NOT Y` where `X` and `Y` are fields of the **same** record.
+2. A two-constructor `DECLARE T IS ONE OF A / B` with a field computed `IF p THEN A ELSE B` — worse,
+   because it puts the exclusivity in the _type_, where no fact can dislodge it. GCO carried one of
+   these too (`VenueKind`), dead and unread, which is why it never bit.
+
+It must be advisory, not an error: some pairs genuinely partition. The tree-wide sweep found the
+pattern in only one other place — the adult/minor pair at
+`jl4/examples/ok/computed-fields.l4:26`, the **teaching example**, where 18-or-over does partition.
+That is the likely aetiology: a sound instance generalised into an unsound one. So the right output is "this asserts an exclusivity your
+source may not — confirm it or register a fork", pointing at the fork register rather than refusing
+the code.
+
+This is also a **third shape of hidden fork** for `specs/todo/single-instruction-demo/SPEC.md` §8.1,
+whose taxonomy lists two (resolved-in-a-comment; hidden-in-a-bare-typed-field). This one is
+hidden-in-a-**derived**-field: the derivation reads as a definition but is a reading.
+
 Three carets together will mean "repeat everything above to the end of the line".
 
 Syntax and semantics for regulative rules. — ✅ DONE (Syntax.hs:228 `Regulative`/`Deonton`; EvaluateLazy/Machine.hs:500 + ContractFrame.hs:50)

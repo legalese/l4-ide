@@ -11,10 +11,6 @@
 
 §§ `1 Interpretation - domain model`
 
-DECLARE VenueKind IS ONE OF
-    Indoor
-    Outdoor
-
 DECLARE CeremonyOfficersRole IS ONE OF
     `persons constituting the marriage`
     `persons constituting the civil partnership`
@@ -23,11 +19,13 @@ DECLARE CeremonyOfficersRole IS ONE OF
 
 DECLARE Gathering HAS
     `number of persons taking part`                                            IS A NUMBER
+    -- TWO INDEPENDENT PREDICATES, NOT A PARTITION -- see GCO-as-repealed.l4's
+    -- note at the same field. A gathering can be both, these were once written
+    -- as a complement, and the first enacted text's flat 10-person cap made the
+    -- exclusivity harmless here; it starts to bite once R&O.189/2020 splits the
+    -- cap by venue kind, which is why the same repair lands in all three files.
     `takes place indoors`                                                      IS A BOOLEAN
     `takes place outdoors`                                                     IS A BOOLEAN
-        MEANS NOT `takes place indoors`
-    `venue kind`                                                               IS A VenueKind
-        MEANS IF `takes place indoors` THEN Indoor ELSE Outdoor
     `is a school group of pupils and staff at school premises`                 IS A BOOLEAN
     `is a wedding, civil partnership ceremony or funeral`                      IS A BOOLEAN
     `ceremony officers role`                                                   IS A CeremonyOfficersRole
@@ -191,6 +189,7 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `ordinary indoor of 11` MEANS Gathering WITH
     `number of persons taking part`                            IS 11
     `takes place indoors`                                      IS TRUE
+    `takes place outdoors`                                     IS FALSE
     `is a school group of pupils and staff at school premises` IS FALSE
     `is a wedding, civil partnership ceremony or funeral`      IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
@@ -201,6 +200,7 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `ordinary outdoor of 11` MEANS Gathering WITH
     `number of persons taking part`                            IS 11
     `takes place indoors`                                      IS FALSE
+    `takes place outdoors`                                     IS TRUE
     `is a school group of pupils and staff at school premises` IS FALSE
     `is a wedding, civil partnership ceremony or funeral`      IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
@@ -211,6 +211,7 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `school of 30` MEANS Gathering WITH
     `number of persons taking part`                            IS 30
     `takes place indoors`                                      IS TRUE
+    `takes place outdoors`                                     IS FALSE
     `is a school group of pupils and staff at school premises` IS TRUE
     `is a wedding, civil partnership ceremony or funeral`      IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
@@ -221,6 +222,7 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `wedding of 2 officers and 18 guests` MEANS Gathering WITH
     `number of persons taking part`                            IS 20
     `takes place indoors`                                      IS TRUE
+    `takes place outdoors`                                     IS FALSE
     `is a school group of pupils and staff at school premises` IS FALSE
     `is a wedding, civil partnership ceremony or funeral`      IS TRUE
     `ceremony officers role`                                   IS `persons constituting the marriage`
@@ -231,6 +233,7 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `wedding of 2 officers and 19 guests over cap` MEANS Gathering WITH
     `number of persons taking part`                            IS 21
     `takes place indoors`                                      IS TRUE
+    `takes place outdoors`                                     IS FALSE
     `is a school group of pupils and staff at school premises` IS FALSE
     `is a wedding, civil partnership ceremony or funeral`      IS TRUE
     `ceremony officers role`                                   IS `persons constituting the marriage`
@@ -241,6 +244,7 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `worksite of 25` MEANS Gathering WITH
     `number of persons taking part`                            IS 25
     `takes place indoors`                                      IS TRUE
+    `takes place outdoors`                                     IS FALSE
     `is a school group of pupils and staff at school premises` IS FALSE
     `is a wedding, civil partnership ceremony or funeral`      IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
