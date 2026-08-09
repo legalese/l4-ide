@@ -23,7 +23,16 @@
       },
       "source": {
         "quote": "Instruction 1 to paragraph (a)(2). To determine the investment limit for a natural person, the person's annual income and net worth shall be calculated as those values are calculated for purposes of determining accredited investor status in accordance with § 230.501 of this chapter.",
-        "citation": "17 CFR 227.100(a)(2) and Instruction 1 thereto; the operative words of (a)(2)(i)-(ii) are \"the greater of the investor's annual income or net worth\""
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(2) and Instruction 1 thereto"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(2)(i)-(ii), whose operative words are \"the greater of the investor's annual income or net worth\""
+          }
+        ]
       },
       "readings": [
         {
@@ -86,7 +95,12 @@
       },
       "source": {
         "quote": "The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;",
-        "citation": "17 CFR 227.100(a)(1)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(1)"
+          }
+        ]
       },
       "readings": [
         {
@@ -158,7 +172,20 @@
       },
       "source": {
         "quote": "The greater of $2,500, or 5 percent of the greater of the investor's annual income or net worth, if either the investor's annual income or net worth is less than $124,000; or",
-        "citation": "17 CFR 227.100(a)(2)(i); the word \"annual\" is undefined in part 227, and Instruction 1 sends the calculation to § 230.501, which speaks of income \"in each of the two most recent years\" without defining the year"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(2)(i) — the word \"annual\" is undefined in part 227"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(2) Instruction 1, which sends the calculation to § 230.501"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 230.501, which speaks of income \"in each of the two most recent years\" without defining the year"
+          }
+        ]
       },
       "readings": [
         {
@@ -220,7 +247,12 @@
       },
       "source": {
         "quote": "Is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Securities Exchange Act of 1934 (the “Exchange Act”) (15 U.S.C. 78m or 78o(d));",
-        "citation": "17 CFR 227.100(b)(2)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(b)(2)"
+          }
+        ]
       },
       "readings": [
         {
@@ -284,7 +316,16 @@
       },
       "source": {
         "quote": "The issuer has filed, since its most recent sale of securities pursuant to this part, at least one annual report pursuant to this section and has fewer than 300 holders of record;",
-        "citation": "17 CFR 227.202(b)(2), read against 17 CFR 227.100(d) (\"A crowdfunding vehicle (as defined in § 270.3a-9 of this chapter) is not considered an investor for the purposes of this part.\")"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.202(b)(2)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(d), which it is read against (\"A crowdfunding vehicle (as defined in § 270.3a-9 of this chapter) is not considered an investor for the purposes of this part.\")"
+          }
+        ]
       },
       "readings": [
         {
@@ -347,7 +388,12 @@
       },
       "source": {
         "quote": "Instruction to paragraph (a)(3). An issuer shall not conduct an offering or concurrent offerings in reliance on section 4(a)(6) of the Securities Act of 1933 (15 U.S.C. 77d(a)(6)) using more than one intermediary.",
-        "citation": "17 CFR 227.100(a)(3) and the Instruction thereto"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(3) and the Instruction thereto"
+          }
+        ]
       },
       "readings": [
         {
@@ -410,7 +456,20 @@
       },
       "source": {
         "quote": "Indebtedness that is secured by the person's primary residence, up to the estimated fair market value of the primary residence at the time of the sale of securities, shall not be included as a liability (except that if the amount of such indebtedness outstanding at the time of sale of securities exceeds the amount outstanding 60 days before such time, other than as a result of the acquisition of the primary residence, the amount of such excess shall be included as a liability); and",
-        "citation": "17 CFR 230.501(a)(5)(i)(B), read with (C), reached from 17 CFR 227.100(a)(2) Instruction 1"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 230.501(a)(5)(i)(B)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 230.501(a)(5)(i)(C), with which (B) is read"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(2) Instruction 1, from which § 230.501 is reached"
+          }
+        ]
       },
       "readings": [
         {
@@ -466,7 +525,16 @@
       },
       "source": {
         "quote": "Has been convicted, within 10 years before the filing of the offering statement or such sale (or five years, in the case of issuers, their predecessors and affiliated issuers), of any felony or misdemeanor:",
-        "citation": "17 CFR 227.503(a)(1), against the phrase \"within five years before the filing of the information required by section 4A(b) of the Securities Act\" used in (a)(2), (a)(3)(ii), (a)(5), (a)(7) and (a)(8)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.503(a)(1)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.503(a)(2), (a)(3)(ii), (a)(5), (a)(7) and (a)(8) — the paragraph is set against the phrase \"within five years before the filing of the information required by section 4A(b) of the Securities Act\" used in each of them"
+          }
+        ]
       },
       "readings": [
         {
@@ -515,7 +583,16 @@
       },
       "source": {
         "quote": "Instruction to paragraph (a): With respect to any beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power, the issuer is required to determine whether a disqualifying event has occurred only as of the time of filing of the offering statement and not from the time of such sale.",
-        "citation": "17 CFR 227.503(a) Instruction, against the chapeau's \"any promoter connected with the issuer in any capacity at the time of filing, any offer after filing, or such sale\""
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.503(a) Instruction"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.503(a) chapeau, which it is set against — \"any promoter connected with the issuer in any capacity at the time of filing, any offer after filing, or such sale\""
+          }
+        ]
       },
       "readings": [
         {
@@ -567,7 +644,12 @@
       },
       "source": {
         "quote": "may not be transferred by any purchaser of such securities during the one-year period beginning when the securities were issued in a transaction exempt from registration pursuant to section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), unless such securities are transferred:",
-        "citation": "17 CFR 227.501(a)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.501(a)"
+          }
+        ]
       },
       "readings": [
         {
@@ -619,7 +701,12 @@
       },
       "source": {
         "quote": "The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;",
-        "citation": "17 CFR 227.100(a)(1)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(1)"
+          }
+        ]
       },
       "readings": [
         {
@@ -668,7 +755,12 @@
       },
       "source": {
         "quote": "including the securities offered in such transaction",
-        "citation": "17 CFR 227.100(a)(1)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(1)"
+          }
+        ]
       },
       "readings": [
         {
@@ -719,7 +811,12 @@
       },
       "source": {
         "quote": "Instruction 2 to paragraph (a)(2). A person's annual income and net worth may be calculated jointly with that person's spouse; however, when such a joint calculation is used, the aggregate investment of the investor spouses may not exceed the limit that would apply to an individual investor at that income or net worth level.",
-        "citation": "17 CFR 227.100(a)(2) Instruction 2"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(a)(2) Instruction 2"
+          }
+        ]
       },
       "readings": [
         {
@@ -771,7 +868,12 @@
       },
       "source": {
         "quote": "must file with the Commission and provide to investors and the relevant intermediary the following information:",
-        "citation": "17 CFR 227.201 chapeau"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.201 chapeau"
+          }
+        ]
       },
       "readings": [
         {
@@ -820,7 +922,12 @@
       },
       "source": {
         "quote": "provided, however, that for issuers that have not previously sold securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), offerings that have a target offering amount of more than $618,000, but not more than $1,235,000, financial statements of the issuer reviewed by a public accountant that is independent of the issuer.",
-        "citation": "17 CFR 227.201(t)(3) proviso"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.201(t)(3) proviso"
+          }
+        ]
       },
       "readings": [
         {
@@ -872,7 +979,16 @@
       },
       "source": {
         "quote": "An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:",
-        "citation": "17 CFR 227.202(b) chapeau, against 17 CFR 227.203(b)(3) (\"within five business days from the date on which the issuer becomes eligible to terminate its reporting obligation\")"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.202(b) chapeau"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.203(b)(3), which it is set against (\"within five business days from the date on which the issuer becomes eligible to terminate its reporting obligation\")"
+          }
+        ]
       },
       "readings": [
         {
@@ -924,7 +1040,12 @@
       },
       "source": {
         "quote": "An issuer must file with the Commission an amendment to the annual report filed on Form C: Annual Report (Form C-AR) (§ 239.900 of this chapter) to make a material change to the previously filed annual report as soon as practicable after discovery of the need for the material change.",
-        "citation": "17 CFR 227.203(b)(2)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.203(b)(2)"
+          }
+        ]
       },
       "readings": [
         {
@@ -977,7 +1098,16 @@
       },
       "source": {
         "quote": "During the 48 hours prior to such deadline, an investment commitment may not be cancelled except as provided in paragraph (c) of this section.",
-        "citation": "17 CFR 227.304(a), against 17 CFR 227.304(b)(2)(iii) (notice of \"whether the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline\")"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.304(a)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.304(b)(2)(iii), which it is set against — notice of \"whether the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline\""
+          }
+        ]
       },
       "readings": [
         {
@@ -1032,7 +1162,16 @@
       },
       "source": {
         "quote": "An investor may cancel an investment commitment for any reason until 48 hours prior to the deadline identified in the issuer's offering materials.",
-        "citation": "17 CFR 227.304(a), against 17 CFR 227.303(d)(4) (\"The date and time by which the investor may cancel the investment commitment.\")"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.304(a)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.303(d)(4), which it is set against (\"The date and time by which the investor may cancel the investment commitment.\")"
+          }
+        ]
       },
       "readings": [
         {
@@ -1086,7 +1225,20 @@
       },
       "source": {
         "quote": "This information must be made publicly available on the intermediary's platform for a minimum of 21 days before any securities are sold in the offering, during which time the intermediary may accept investment commitments;",
-        "citation": "17 CFR 227.303(a)(2), against 17 CFR 227.303(e)(3)(i) (\"earlier than 21 days after the date on which the intermediary makes publicly available on its platform the information required to be provided by the issuer under §§ 227.201 and 227.203(a)\") and 17 CFR 227.304(b)(1) (\"The offering remains open for a minimum of 21 days pursuant to § 227.303(a)\")"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.303(a)(2)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.303(e)(3)(i), which it is set against (\"earlier than 21 days after the date on which the intermediary makes publicly available on its platform the information required to be provided by the issuer under §§ 227.201 and 227.203(a)\")"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.304(b)(1) (\"The offering remains open for a minimum of 21 days pursuant to § 227.303(a)\")"
+          }
+        ]
       },
       "readings": [
         {
@@ -1136,7 +1288,16 @@
       },
       "source": {
         "quote": "Has a reasonable basis for believing that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection.",
-        "citation": "17 CFR 227.301(c)(2); \"promptly\" in the same paragraph and in 17 CFR 227.303(d)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.301(c)(2), and \"promptly\" in the same paragraph"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.303(d), where \"promptly\" also appears"
+          }
+        ]
       },
       "readings": [
         {
@@ -1189,7 +1350,12 @@
       },
       "source": {
         "quote": "The issuer did not know of such failure where the failure to comply with a term, condition or requirement of this part was the result of the failure of the intermediary to comply with the requirements of section 4A(a) of the Securities Act (15 U.S.C. 77d-1(a)) and the related rules, or such failure by the intermediary occurred solely in offerings other than the issuer's offering.",
-        "citation": "17 CFR 227.502(a)(3)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.502(a)(3)"
+          }
+        ]
       },
       "readings": [
         {
@@ -1245,7 +1411,12 @@
       },
       "source": {
         "quote": "The failure to comply was insignificant with respect to the offering as a whole;",
-        "citation": "17 CFR 227.502(a)(1)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.502(a)(1)"
+          }
+        ]
       },
       "readings": [
         {
@@ -1293,7 +1464,12 @@
       },
       "source": {
         "quote_absent_reason": "There is nothing to quote: 17 CFR part 227 fixes no timezone anywhere, and the ambiguity is the absence. Quoting a provision that does not mention time zones would misrepresent what the source says.",
-        "citation": "17 CFR part 227; the EDGAR/SEC Eastern-time filing convention is not in the P1 bundle and is world knowledge"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR part 227; the EDGAR/SEC Eastern-time filing convention is not in the P1 bundle and is world knowledge"
+          }
+        ]
       },
       "readings": [
         {
@@ -1351,7 +1527,12 @@
       },
       "source": {
         "quote": "If the 120th day falls on a Saturday, Sunday, or holiday, the next business day shall be considered the 120th day for purposes of determining the age of the financial statements.",
-        "citation": "17 CFR 227.201(t) Instruction 4 — the only mention of a holiday in the part, which uses \"business day\" twelve times and never defines it"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.201(t) Instruction 4 — the only mention of a holiday in the part, which uses \"business day\" twelve times and never defines it"
+          }
+        ]
       },
       "readings": [
         {
@@ -1405,7 +1586,16 @@
       },
       "source": {
         "quote": "(7) [Reserved]",
-        "citation": "17 CFR 227.100(b)(7); the same shape at 17 CFR 227.201(aa)"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.100(b)(7)"
+          },
+          {
+            "kind": "provision",
+            "cite": "17 CFR 227.201(aa), the same shape"
+          }
+        ]
       },
       "readings": [
         {

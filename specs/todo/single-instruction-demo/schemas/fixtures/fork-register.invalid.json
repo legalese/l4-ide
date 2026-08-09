@@ -17,7 +17,12 @@
       "source": {
         "quote": "both a quote",
         "quote_absent_reason": "and an absent reason",
-        "citation": "s 1"
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "s 1"
+          }
+        ]
       },
       "readings": [
         {
@@ -53,7 +58,14 @@
         "anchor": "y",
         "provisions": ["s 2"]
       },
-      "source": { "citation": "s 2" },
+      "source": {
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "s 2"
+          }
+        ]
+      },
       "readings": [
         {
           "id": "gamma",
@@ -88,7 +100,15 @@
         "anchor": "z",
         "provisions": ["s 3"]
       },
-      "source": { "quote": "words", "citation": "s 3" },
+      "source": {
+        "quote": "words",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "s 3"
+          }
+        ]
+      },
       "readings": [
         {
           "id": "epsilon",
@@ -120,7 +140,15 @@
         "anchor": "w",
         "provisions": ["s 4"]
       },
-      "source": { "quote": "words", "citation": "s 4" },
+      "source": {
+        "quote": "words",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "s 4"
+          }
+        ]
+      },
       "readings": [
         {
           "id": "eta",

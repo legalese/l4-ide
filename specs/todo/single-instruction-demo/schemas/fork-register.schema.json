@@ -124,7 +124,7 @@
         "source": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["citation"],
+          "required": ["citations"],
           "properties": {
             "quote": {
               "type": "string",
@@ -136,7 +136,12 @@
               "minLength": 1,
               "description": "Required when there is no quote. BNA A12 needs this: the restriction it is about sits in s 41A, whose text the ingest never fetched verbatim, so quoting it would have been invention."
             },
-            "citation": { "type": "string", "minLength": 1 }
+            "citations": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/citation" },
+              "description": "The same citation objects `readings[].citations` carries — an array, not a string, and not a string-or-array union. Two things measured 2026-08-09 forced it. (1) Three of the four entries in jl4/examples/legal/regcf/fork-register.json already held a citation OBJECT where this field declared `string`, so that register failed its own schema and nobody knew, because nothing had ever run the validator over it. (2) Twelve of the twenty-six entries in jl4/examples/legal/regcf/denovo/fork-register.json packed two or more distinct texts into one string, joined by 'read against', 'against' or a semicolon — which buries the very thing the entry exists to record: F-100A1-CAP-vs-STATUTE's source read '17 CFR 227.100(a)(1), read against 15 U.S.C. 77d(a)(6)(A)', a regulation set against the statute it is made under, and no query could see the second half or its `instrument` kind. One shape only, and no string alternative: `oneOf` is outside the keyword set etc/go/lib/register-validate.mjs implements, and a keyword parsed but not enforced is a constraint that silently does not exist."
+            }
           }
         },
         "readings": {
