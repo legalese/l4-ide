@@ -90,13 +90,26 @@ if [[ $DIFF_RC -ne 0 && $DIFF_RC -ne 1 ]]; then
 fi
 
 # The metrics come from the report JSON, never from stdout (the CLI's battery
-# line has a known cosmetic defect; the JSON coerces it).
-read -r ROWS PAIRS EVALS AGREED DIVERGED WITNESSES UNTRIAGED LEFT_MOD RIGHT_MOD < <(node -e '
+# line has a known cosmetic defect; the JSON coerces it). The perturbation
+# figures ride along (2026-08-09): the headline agreement count was published
+# with the comparator's anti-vacuity instrument switched off — the committed
+# map declares battery.perturbation.enabled=false — and neither the receipt
+# nor the documents quoting the number said so. A receipt reader must be able
+# to see whether the Sensitivity axis measured anything.
+read -r ROWS PAIRS EVALS AGREED DIVERGED WITNESSES UNTRIAGED PERTURBATIONS LEAVES_PERTURBED LEAVES_INERT PERTURB_ENABLED LEFT_MOD RIGHT_MOD < <(node -e '
   const j = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
   const { resolve } = require("node:path");
   const untriaged = (j.witnesses ?? []).filter(
     (w) => (w.disposition ?? "UNTRIAGED") === "UNTRIAGED",
   ).length;
+  let enabled = "undeclared";
+  try {
+    const m = JSON.parse(require("node:fs").readFileSync(process.argv[3], "utf8"));
+    if (typeof m.battery?.perturbation?.enabled === "boolean")
+      enabled = String(m.battery.perturbation.enabled);
+  } catch {
+    /* the comparator already accepted the map; an unreadable one here stays "undeclared" */
+  }
   process.stdout.write(
     [
       j.battery?.rows ?? 0,
@@ -106,11 +119,15 @@ read -r ROWS PAIRS EVALS AGREED DIVERGED WITNESSES UNTRIAGED LEFT_MOD RIGHT_MOD 
       j.totals?.diverged ?? 0,
       j.totals?.witnesses ?? 0,
       untriaged,
+      j.battery?.perturbations ?? 0,
+      j.totals?.leaves_perturbed ?? 0,
+      j.totals?.leaves_inert ?? 0,
+      enabled,
       resolve(process.argv[2], j.sides.left.module),
       resolve(process.argv[2], j.sides.right.module),
     ].join(" ") + "\n",
   );
-' "$REPORT_JSON" "$GO_ROOT")
+' "$REPORT_JSON" "$GO_ROOT" "$MAP")
 
 # §8.1's density axis, as numbers on a receipt. The method is NAMED because no
 # tool reports it: numerator = executable #ASSERT directive lines
@@ -144,6 +161,9 @@ METRICS=(
   --metric "agreed=$AGREED" --metric "diverged=$DIVERGED"
   --metric "witnesses=$WITNESSES" --metric "untriaged=$UNTRIAGED"
   --metric "comparator_exit=$DIFF_RC"
+  --metric "perturbations=$PERTURBATIONS"
+  --metric "leaves_perturbed=$LEAVES_PERTURBED" --metric "leaves_inert=$LEAVES_INERT"
+  --metric "perturbation_enabled=$PERTURB_ENABLED"
   --metric "left_assertions=$L_ASSERTS" --metric "left_decisions=$L_DECISIONS" --metric "left_density=$L_DENSITY"
   --metric "right_assertions=$R_ASSERTS" --metric "right_decisions=$R_DECISIONS" --metric "right_density=$R_DENSITY"
   --metric "density_delta=$DENSITY_DELTA"
@@ -151,7 +171,15 @@ METRICS=(
 )
 
 DIVERGE_NOTE="divergences do not demote this status: SPEC.md §8 rules that a run finding a defect is a BETTER pass, and each witness's disposition is a reading of the law — the report artifact carries every one as UNTRIAGED for the skill and HG1 to triage, never this script"
-SENSITIVITY_NOTE="read the report's Sensitivity table beside the agreement count: a (pair, fact) leaf the battery perturbed without ever moving an answer is a surface on which agreement is silence, not evidence. The battery covers $PAIRS declared pair(s) over $ROWS row(s); decisions outside the map are not compared at all, and a divergence confined to the deontic layer would not appear here (DENOVO-DIFF-ORACLE.md carries the full blind-spot list)"
+# The sensitivity note must not point at an empty table as if it were
+# reassurance. When nothing was perturbed, say that nothing was measured on
+# that axis; the old note said "read the Sensitivity table beside the
+# agreement count" while the table was empty by construction.
+if [[ "$LEAVES_PERTURBED" == "0" ]]; then
+  SENSITIVITY_NOTE="the battery's perturbation instrument produced NO perturbed leaves on this run (perturbation_enabled=$PERTURB_ENABLED — the committed map declares it off by construction), so the report's Sensitivity table is empty and the agreement count is UNWEIGHTED by inertness: no (pair, fact) leaf was shown to move an answer, and none was shown inert either — that axis measured nothing. The battery covers $PAIRS declared pair(s) over $ROWS row(s); decisions outside the map are not compared at all, and a divergence confined to the deontic layer would not appear here (DENOVO-DIFF-ORACLE.md carries the full blind-spot list)"
+else
+  SENSITIVITY_NOTE="read the report's Sensitivity table beside the agreement count: a (pair, fact) leaf the battery perturbed ($LEAVES_PERTURBED perturbed, $LEAVES_INERT inert) without ever moving an answer is a surface on which agreement is silence, not evidence. The battery covers $PAIRS declared pair(s) over $ROWS row(s); decisions outside the map are not compared at all, and a divergence confined to the deontic layer would not appear here (DENOVO-DIFF-ORACLE.md carries the full blind-spot list)"
+fi
 
 # The oracle's acceptance condition is exactly "the comparator ran to
 # completion": its exit contract defines BOTH 0 (agreement) and 1 (divergence)

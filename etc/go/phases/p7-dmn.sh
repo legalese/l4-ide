@@ -97,8 +97,19 @@ if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
       # At g1 an export failure is go_broken (a harness defect against a module
       # the repo defends). Over a DEPOSIT it is a finding about the exporter's
       # coverage of this encoding's constructs — D6 rules it DEGRADED, named.
+      #
+      # "Typechecks" is p3-encode's claim, not this stage's, and under the
+      # documented --only p7-dmn route p3-encode never ran — a receipt must
+      # not assert a certification its own run's journal does not hold
+      # (measured 2026-08-09 on an --only probe: the unconditional
+      # parenthetical shipped with no p3-encode row in the journal). So the
+      # clause is conditioned on the row existing.
+      CERT="a deposited module (typecheck acceptance NOT certified this run: no passing p3-encode receipt is in this run's journal — the full g2 list carries the acceptance half)"
+      if [[ -f "$GO_RUN/journal.ndjson" ]] && /usr/bin/grep -q '"stage":"p3-encode","status":"PASS"' "$GO_RUN/journal.ndjson"; then
+        CERT="a deposited module that typechecks (p3-encode certified it this run)"
+      fi
       go_receipt --status DEGRADED \
-        --reason "l4 export --to dmn exited $EXPORT_RC on $STEM.l4, a deposited module that typechecks (p3-encode certified it this run). That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
+        --reason "l4 export --to dmn exited $EXPORT_RC on $STEM.l4, $CERT. That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
         --artifact "$GO_OUT/$STEM.dmn.emit.stderr" \
         --metric "module_origin=denovo" --metric "export_exit=$EXPORT_RC"
       exit "$GO_EXIT_FINDING"

@@ -47,7 +47,8 @@ What that means precisely, in the present tense:
   [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md), called by the declared g2 stage `p8-diff`
   over the sidecar's `denovo.surface_map`. It has now seen a second encoding: the committed
   regcf de novo module, via the committed surface map — first in-pipeline run measured 80/80
-  agreement over 4 pairs × 20 rows. (An earlier version of this bullet said the §8 diff oracle
+  agreement over 4 pairs × 20 rows, with the map's perturbation half off by construction
+  (`leaves_perturbed=0` on the receipt: agreement is unweighted by leaf sensitivity). (An earlier version of this bullet said the §8 diff oracle
   "does not exist either"; a later one said it existed but "no stage calls it". Each was true
   when written. Its first genuine two-encodings run arrived out-of-band — the charities
   cleanroom comparison, PR #201, executed from this branch's worktree.)

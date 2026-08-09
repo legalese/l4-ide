@@ -505,7 +505,9 @@ as "the first item of work" landed: `G2_STAGES` now declares `p3-check`, `p6-tes
 deposit's assertions (39/39 on the committed de novo module, floor `denovo.checks`), verifies it
 (2 `vacuous-guard` findings, on the record), emits its DMN (both engines refuse it — 35 blocking
 fidelity codes; that receipt IS this table's "never been executed through DMN" row as an exit
-code), and runs the §8 comparator (80/80 agreement over the committed surface map's 4 pairs).
+code), and runs the §8 comparator (80/80 agreement over the committed surface map's 4 pairs —
+with the map's perturbation half off by construction, so the agreement is unweighted by leaf
+sensitivity; the receipt carries `leaves_perturbed=0` and `perturbation_enabled=false`).
 What the wiring does NOT change: the density gap is measured, not closed (p8-diff reports it as
 `left_density`/`right_density` per the decision-count proxy above); the BPMN/ladder/wizard rows
 still have no de novo leg; and producing any deposit remains agent work. Under R0 ("the

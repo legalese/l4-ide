@@ -6,7 +6,11 @@ g2 stage.** `etc/go/lib/denovo-diff.mjs` runs today and both of its self-tests a
 committed, the committed surface map (`jl4/examples/legal/regcf/denovo/surface-map.json`) pairs
 the corpus against it, and the first two-encodings run over that pair measured 80/80 agreement
 across 4 pairs × 20 battery rows (2026-08-09; an out-of-band two-encodings run had already
-happened via the charities cleanroom, PR #201). The stage follows the deposit contract — no
+happened via the charities cleanroom, PR #201). Read that 80/80 with its qualifier: the
+committed map declares `battery.perturbation.enabled=false` ("off by construction"), so 0
+leaves were perturbed, the Sensitivity table is empty, and the agreement count is unweighted
+by leaf inertness — the receipt says so (`leaves_perturbed=0`, `perturbation_enabled=false`,
+added 2026-08-09 after the first run published the number unqualified). The stage follows the deposit contract — no
 declared `denovo.surface_map`, or a map not yet on disk, is `SKIPPED` with the key named — and
 maps the comparator's exit contract onto the lattice: 0 and 1 (divergence is a finding, not a
 failure) are a completed measurement, 2 and 4 are a `DEGRADED` receipt naming the harness error.
