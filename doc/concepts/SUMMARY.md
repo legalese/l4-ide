@@ -19,3 +19,7 @@
 
 - [Algebraic Types](type-system/algebraic-types.md)
 - [Exhaustiveness](type-system/exhaustiveness.md)
+
+## Reviewing
+
+- [Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)

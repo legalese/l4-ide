@@ -89,13 +89,21 @@ proximity exactly like a `NormalName` one.** That is §2.4d, and it is load-bear
 | **stored** record selector                  | `addQualifiedAliases` @ `:1056`                                                                                                                      | **no**                                                        | **no**                                                                                                                   |
 | infer-phase requalification of a `DECLARE`  | `addQualifiedAliases` @ `:2724`                                                                                                                      | no (deliberate no-op; `:2790` already recorded it)            | —                                                                                                                        |
 | `WHERE`/`LET` local `DECIDE`                | `withQualified` @ `:3651` via `scanFunSigLocalDecl` `:3630`                                                                                          | yes, but **inert** — `localBindings` short-circuits proximity | n/a                                                                                                                      |
-| `GIVEN` param, pattern var, type var        | plain `makeKnown`, `Local` / `KnownTypeVariable`                                                                                                     | no                                                            | n/a — locals win absolutely                                                                                              |
+| `GIVEN` param, pattern var, type var        | plain `makeKnown`, `Local` / `KnownTypeVariable`                                                                                                     | no                                                            | n/a — locals win absolutely, except at a projection LABEL (see below)                                                    |
 | imported binding                            | **none** — `combineOne` keeps `accState.sectionPaths` and drops `r.sectionPaths` (`Import/Resolution.hs:383`, and `:359` folds only the accumulator) | **no**                                                        | no — and moot: `isImport` (`Types.hs:816`) exempts them from ranking _and_ from elimination before any path is consulted |
 
 The imports row was stated backwards in the first draft ("yes"). It is worth getting right because
 it means importers see a genuinely flat namespace: this is the same residual
 `SECTION-LEXICAL-SCOPING-SPEC.md` §12 records, and it is why I3 holds for a reason stronger than
 `isImport` alone.
+
+**Amendment (2026-08-03, `SECTION-LEXICAL-SCOPING-SPEC.md` §12 FIX A′,
+[smucclaw/l4-ide#930](https://github.com/smucclaw/l4-ide/issues/930)).** "Locals win absolutely"
+now has exactly one exception: at the LABEL of a projection `base's l`, the locals-only
+restriction in `resolveTermFiltered` additionally keeps record selectors and data constructors,
+so a `GIVEN` parameter named after a field no longer shadows that field's selector at the one
+position where it cannot be meant. Bare occurrences are unchanged. This does not give
+selectors a section path and does not make them rank — the question this spec asks is still open.
 
 ### 2.3 What a user can rely on today
 

@@ -110,10 +110,7 @@ regcf.l4:1148:1-136:
 regcf.l4:1150:1-136:
   assertion satisfied
 regcf.l4:1154:1-1155:62:
-  PARTY Issuer
-  MUST `file a Form C-AR annual report`
-  WITHIN `days to file the annual report after fiscal year end`
-  HENCE `ongoing reporting obligation` OF status, (`annual cycles` MINUS 1)
+  PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end` HENCE (`ongoing reporting obligation` OF status, (`annual cycles` MINUS 1))
 regcf.l4:1159:1-1160:71:
   FULFILLED
 regcf.l4:1163:1-1164:72:

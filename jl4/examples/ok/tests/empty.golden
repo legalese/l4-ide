@@ -20,6 +20,5 @@ empty.l4:16:10-19:26:
   I found a problem while checking the definition of `xx`:
     The following CONSIDER branch is redundant: 
     
-      WHEN faz qux
-          qux THEN 2
+      WHEN faz qux qux THEN 2
     

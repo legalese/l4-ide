@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -704,16 +704,19 @@ spec = describe "integration" do
         resp <- httpLbs req mgr
         statusCode' resp `shouldBe` 404
 
-    it "KNOWN GAP: ladder atomIds are not in the query-plan's atomId namespace" do
-      -- Characterisation test, NOT an endorsement. L4.Viz.Ladder.generateAtomId
-      -- hashes each input ref as its numeric rootUnique over the atom's direct
-      -- ref set; L4.Decision.QueryPlan.atomIdByUnique hashes it as the ref's
-      -- label over the transitive closure. So the ids disagree for every atom
-      -- with a non-empty ref set, and a client cannot join `ladder` leaves to
-      -- `impactByAtomId`. jl4-lsp reconciles them with
-      -- LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds; jl4-service does not.
-      -- WHEN THAT IS WIRED IN, this expectation should be inverted to assert
-      -- the two sets are equal.
+    it "ladder atomIds ARE the query-plan's atomIds (smucclaw/l4-ide#935)" do
+      -- Was a characterisation test pinning the disagreement, with a note to
+      -- invert it when the two surfaces were reconciled. This is that inversion.
+      --
+      -- The gap: L4.Viz.Ladder.generateAtomId hashes each input ref as its
+      -- numeric rootUnique over the atom's DIRECT ref set, while
+      -- L4.Decision.QueryPlan.atomIdByUnique hashes it as the ref's LABEL over
+      -- the TRANSITIVE closure. The ids therefore disagreed for every atom with
+      -- a non-empty ref set — which is every ordinary leaf — so a client could
+      -- not join `ladder` leaves to `impactByAtomId`, and a binding keyed by a
+      -- ladder atomId was accepted with a 200 and quietly did nothing.
+      -- jl4-lsp had always reconciled the two with annotateLadderWithAtomIds;
+      -- jl4-service now does the same, in buildDecisionQueryCacheFromCompiled.
       withServiceFromSources "ladder-atomids" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         qpResp <- queryPlan' baseUrl mgr "ladder-atomids" "compute_qualifies"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
@@ -727,10 +730,61 @@ spec = describe "integration" do
                 Just (Aeson.Object fd) -> ladderAtomIds fd
                 _ -> []
               _ -> []
-        -- Both sides are non-empty, so the disjointness below is meaningful.
+        -- Both sides are non-empty, so the equality below is meaningful.
         planIds `shouldSatisfy` (not . null)
         ladderIds `shouldSatisfy` (not . null)
-        filter (`elem` planIds) ladderIds `shouldBe` []
+        List.sort (List.nub planIds) `shouldBe` List.sort (List.nub ladderIds)
+
+    it "the GET /ladder atomIds match the POST /query-plan atomIds" do
+      -- #935 was measured across the two ROUTES, not within one response, so
+      -- pin it that way too: a client that fetches the diagram once and then
+      -- posts answers is joining two HTTP responses.
+      withServiceFromSources "ladder-atomids-2routes" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        ladResp <- getLadder baseUrl mgr "ladder-atomids-2routes" "compute_qualifies"
+        statusCode' ladResp `shouldBe` 200
+        let getIds = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
+              Just (Aeson.Object fd) -> ladderAtomIds fd
+              _ -> []
+        qpResp <- queryPlan' baseUrl mgr "ladder-atomids-2routes" "compute_qualifies"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        let planIds = case lookupKey "impactByAtomId" (decodeObject (responseBody qpResp)) of
+              Just (Aeson.Object m) -> map Aeson.Key.toText (Aeson.KeyMap.keys m)
+              _ -> []
+        getIds `shouldSatisfy` (not . null)
+        List.sort (List.nub getIds) `shouldBe` List.sort (List.nub planIds)
+
+    it "a binding keyed by a ladder atomId MOVES the decision, and reaches every twin" do
+      -- The end-to-end claim of #935, stated as a value rather than a type: read
+      -- the atomId off GET /ladder, post it as a binding, and watch `determined`
+      -- change. Before the fix this route returned 200 with `determined` still
+      -- null — the silent no-op the issue reports.
+      --
+      -- The fixture's atom appears TWICE (see 'twinLeavesJL4'), and only binding
+      -- BOTH occurrences settles the decision, so this also pins that the
+      -- atomId -> unique inversion in L4.Decision.QueryPlan is one-to-many
+      -- rather than last-wins.
+      withServiceFromSources "ladder-atomid-binds" [("twins.l4", twinLeavesJL4)] \baseUrl mgr -> do
+        ladResp <- getLadder baseUrl mgr "ladder-atomid-binds" "twins"
+        statusCode' ladResp `shouldBe` 200
+        let ids = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
+              Just (Aeson.Object fd) -> ladderAtomIds fd
+              _ -> []
+            twins = [a | (a : _ : _) <- List.group (List.sort ids)]
+        -- Guard: without a genuine twin the binding assertion would pass for the
+        -- wrong reason.
+        twinId <- case twins of
+          [] -> fail "the ladder carries no duplicated atomId"
+          (t : _) -> pure t
+        unbound <- queryPlan' baseUrl mgr "ladder-atomid-binds" "twins"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        lookupKey "determined" (decodeObject (responseBody unbound)) `shouldBe` Just Aeson.Null
+        bound <- queryPlan' baseUrl mgr "ladder-atomid-binds" "twins"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ Aeson.Key.fromText twinId Aeson..= False ]
+            ])
+        statusCode' bound `shouldBe` 200
+        lookupKey "determined" (decodeObject (responseBody bound)) `shouldBe` Just (Aeson.Bool False)
 
   describe "evaluation with trace" do
     it "includes reasoning when trace=full" do

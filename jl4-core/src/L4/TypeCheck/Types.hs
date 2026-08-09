@@ -1038,6 +1038,50 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
 resolveTerm' p n = resolveTermFiltered False p (const True) n pure
 
+-- | Does an in-scope lexical local take absolute priority over a same-named
+-- record selector \/ data constructor at this occurrence?
+--
+-- See the @candidates0@ filter in 'resolveTermFiltered' and the rationale on
+-- 'resolveProjectionLabel'.
+data LocalShadowing
+  = LocalsShadowAll
+    -- ^ ordinary occurrence: a local shadows every same-named binding.
+  | LocalsSpareSelectors
+    -- ^ projection-label occurrence (@base's l@): a local shadows same-named
+    -- VALUE bindings, but selectors and constructors stay in the running.
+  deriving stock (Eq, Show)
+
+-- | Resolve the LABEL of a record projection @base's l@ (smucclaw\/l4-ide#930).
+--
+-- Identical to 'resolveTerm' except for 'LocalsSpareSelectors'. The label
+-- position is the one place where an in-scope local of that name is definitely
+-- not what the author meant: @'s@ desugars to an application of the label to
+-- the base, so the label is always a function, and a local that happens to
+-- share a field's name (the corpus house style threads a record as one @GIVEN@
+-- parameter, and the clitic idiom names the parameter after the field) is not.
+--
+-- Why this is scoped to the label position rather than fixed once in
+-- 'resolveTermFiltered' for every occurrence: sparing selectors\/constructors
+-- everywhere makes a BARE occurrence of such a name ambiguous rather than
+-- local, and that is a real regression — measured on this tree, it breaks
+-- @jl4\/examples\/ok\/pattern-matching-wildcard-shadow.l4@ (a @WHEN active@
+-- pattern binder against the same-typed @active@ constructor — same
+-- 'typeKey', so type-direction cannot discriminate), @jl4\/experiments\/dogs.l4@
+-- and @jl4\/experiments\/environmental-quality-review-act-7.l4@ (locals named
+-- after computed selectors). Locals must keep winning absolutely at bare
+-- occurrences; only the label position changes.
+--
+-- The price, stated because the corpus does not pay it and so no measurement
+-- will surface it: a local that IS a function of the selector's exact type at
+-- a label was previously resolved (to the local) and is now AMBIGUOUS —
+-- @GIVEN amount IS A FUNCTION FROM Money TO NUMBER@ over a @Money@ with an
+-- @amount@ field, at @m's amount@, has two candidates in one 'typeKey' group.
+-- Accepted: that source is genuinely ambiguous. Recorded in
+-- @specs\/done\/SECTION-LEXICAL-SCOPING-SPEC.md@ §12 FIX A′.
+resolveProjectionLabel :: Name -> Check (Resolved, Type' Resolved)
+resolveProjectionLabel n =
+  resolveTermFilteredIn LocalsSpareSelectors False (const True) (const True) n pure
+
 -- | Continuation-passing overload resolution with a candidate pre-filter
 -- (smucclaw\/l4-ide#929).
 --
@@ -1080,7 +1124,19 @@ resolveTermFiltered
   -> Name
   -> ((Resolved, Type' Resolved) -> Check r)
   -> Check r
-resolveTermFiltered preambleErr p viab n kont = do
+resolveTermFiltered = resolveTermFilteredIn LocalsShadowAll
+
+-- | 'resolveTermFiltered' with the local-shadowing policy made explicit; see
+-- 'LocalShadowing' and 'resolveProjectionLabel'.
+resolveTermFilteredIn
+  :: LocalShadowing
+  -> Bool
+  -> (TermKind -> Bool)
+  -> (Type' Resolved -> Bool)
+  -> Name
+  -> ((Resolved, Type' Resolved) -> Check r)
+  -> Check r
+resolveTermFilteredIn shadowing preambleErr p viab n kont = do
   options <- lookupRawNameInEnvironment (rawName n)
   -- Lexical scoping: among the viable candidates, prefer those defined in the
   -- nearest enclosing section (see 'selectByProximity'). Only fall through to
@@ -1096,8 +1152,22 @@ resolveTermFiltered preambleErr p viab n kont = do
   -- silently shadowed by an enclosing section binding (section proximity 0 wins
   -- over a local, which carries no section path). If any candidate is a local,
   -- restrict resolution to the locals before section-proximity ranking.
+  --
+  -- EXCEPT at a projection-label occurrence ('LocalsSpareSelectors',
+  -- smucclaw\/l4-ide#930), where the restriction additionally keeps record
+  -- selectors and data constructors: at the @l@ of @base's l@ a local can never
+  -- be what the author meant, and dropping the selector there is what made
+  -- @amount's amount@ resolve the label to the @GIVEN amount IS A Money@
+  -- parameter and report \"trying to apply amount ... of type Money to 1
+  -- argument\". See 'resolveProjectionLabel' for why this is NOT done at
+  -- ordinary occurrences.
   let localCandidates = [ c | c@(_, _, u, _) <- viable, u `Set.member` locals ]
-      candidates0 = if null localCandidates then viable else localCandidates
+      isKept (_, isVal, u, _) = u `Set.member` locals || case shadowing of
+        LocalsShadowAll      -> False
+        LocalsSpareSelectors -> not isVal
+      candidates0
+        | null localCandidates = viable
+        | otherwise            = filter isKept viable
       -- FIX B (spec §5.3: proximity dominates type-direction). A same-module
       -- value binding whose type is still an unresolved 'InfVar' is a forward
       -- reference to a not-yet-inferred un-annotated DECIDE. Because it lands in

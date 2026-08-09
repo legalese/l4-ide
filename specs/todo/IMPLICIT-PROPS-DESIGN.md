@@ -210,3 +210,186 @@ Minimize the surface of the breaking change: existing explicit `GIVEN` threading
 ## 9. One-paragraph summary for a hurried reader
 
 L4 should give every function an implicit, statically-typed `props` environment — a principled, scoped replacement for the untyped context dictionaries developers otherwise hand-roll, and for the unmaintainable manual threading of dozens of parameters through thousands of rules. The `§` section hierarchy defines `props` scope; structural subtyping lets `props` start small at the entry point and grow richer deeper in the call stack; the compiler infers each function's `props` requirements from usage (no annotations), discovers which subtrees are "very pure" because they never touch the environment, and surfaces the inferred dependencies through a `TAKING` clause that the IDE displays and the decision trace records. The Reader monad's `local` supplies hypothetical "what-if" evaluation without leaving the pure world. The guiding principle is _mechanism, not policy_: give developers visible, auditable rope rather than forcing them to hack together something opaque — preserving the referential transparency and explainability that are L4's whole reason for being.
+
+---
+
+## 10. `ASSUME`: the unprincipled prior implementation of `props` (measured snapshot, 2026-08-04)
+
+**Status of this section:** an observation appended after the design above was written, recording a
+conversation between Meng and a Claude session working in `smucclaw/dmnmd`. Nothing here is a
+ruling; it is a measurement of the tree plus the migration question the design above implies but
+does not currently pose. Sections 0–9 do not mention `ASSUME` at all, and it is not among the nine
+open questions in §8 — that omission is the reason this section exists.
+
+All counts below are over `origin/unstable` at `c873bb5d`, measured with
+`git grep -c '^\s*ASSUME' origin/unstable -- '*.l4'`. Multi-line `ASSUME` declarations would be
+undercounted by that line-based grep; none of the conclusions turn on exact totals.
+
+### 10.1 What `ASSUME` is
+
+An `ASSUME`d name is visible to every function in the module without threading, has no definition,
+and evaluates to `ValAssumed` ("I needed this value and it is an assumed term"). It has **no**
+axiom or SMT role — nothing in a verify path consumes it — and in DMN export, `Lower.hs` feeds
+both `ASSUME`s and `DECIDE`/`GIVEN` parameters into the same `freeTermTypes` map, where both
+become `inputData`. Per Meng, it is historically an early construct whose job was to declare
+unimplemented types and terms so the typechecker would accept a partial example; as the language
+matured, function definitions became more concrete and the construct stayed behind.
+
+There are two categories, not more (an earlier three-way split into types / predicates / scalars
+turned out to be arity dressed up as semantics — `ASSUME x IS A BOOLEAN` and
+`ASSUME f IS A FUNCTION FROM Order TO BOOLEAN` are the same construct, an uninterpreted symbol):
+
+| category                               | count |
+| -------------------------------------- | ----- |
+| uninterpreted **type** (`… IS A TYPE`) | 101   |
+| uninterpreted **term**, any arity      | ~547  |
+
+### 10.2 `ASSUME` already is an implicit environment — with every property §4 asks for missing
+
+| §4 wants                                | `ASSUME` gives                                      |
+| --------------------------------------- | --------------------------------------------------- |
+| a value you can supply                  | none — an assumed name cannot be bound from outside |
+| `§`-scoped visibility                   | module-wide, flat                                   |
+| provenance in the trace                 | nothing to trace                                    |
+| `local` for hypothetical rebinding      | no rebinding; already bound, cannot be shadowed     |
+| inferred structural requirements (§5.2) | untyped ambient reachability                        |
+
+The "cannot be bound from outside" row has a measured cost: the dmnmd↔L4 differential harness
+(`etc/dmn-differential/`, PR #216) has to **generate one driver file per test case**, rewriting
+`ASSUME` declarations in place, purely because there is no way to pass a value in. Under `props`
+the fact set is a first-class value. That is the difference between a model you can evaluate under
+varying worlds and one you have to edit.
+
+### 10.3 Where the uses live: scaffolding, mostly — but not entirely
+
+697 `ASSUME` lines total:
+
+| where                | lines | note                                           |
+| -------------------- | ----- | ---------------------------------------------- |
+| `jl4/experiments`    | 418   | 60% — but see the caveat below                 |
+| `jl4/examples` (all) | 204   | of which `examples/ok` 97, `examples/legal` 53 |
+| `doc/reference`      | 71    | documentation                                  |
+| everything else      | 4     | `tests-cli` 2, `jl4-core/libraries` 2          |
+
+Of the 101 type declarations, 88 are in `jl4/experiments`; 6 are in the legal corpus.
+
+The **legal corpus** uses `ASSUME` in six files, 53 lines: `anti-social.l4` (14),
+`british-citizen-act.l4` (7), `imaginary-alcohol-act.l4` (14, plus a `tests/` copy),
+`promissory-note.l4` (2), `regcf/regcf.l4` (2). (An earlier statement of this measurement said
+"two files, 16 lines"; that was wrong, and this table is the correction.)
+
+**Caveat on "experiments = scaffolding":** the directory name tells you maturity, not intent.
+`jl4/experiments/macma3.l4` is a genuine draft formalisation of the Mutual Assistance in Criminal
+Matters Act — `ASSUME`-heavy early-stage _real_ modelling that would face the same migration
+question if promoted. Some fraction of the 418 is that, not operator demos.
+
+### 10.4 What this adds to the spec's open questions
+
+1. **The migration story for ~547 term uses is unwritten**, and it is probably the largest single
+   piece of work this design implies. For the _authored_ corpus it is small (53 lines, six files);
+   for experiments and fixtures it is large and arguably shouldn't be paid at all (next item).
+2. **Fixtures and experiments are a real constituency, and `props` is worse for them.** A
+   two-line example demonstrating one operator should not need an environment to exist. Either
+   `ASSUME` survives as an explicitly test-and-experiment construct (possibly under a name that
+   says so), or the teaching story (§8 Q7) has to cover "how do I write a minimal example".
+3. **Uninterpreted _types_ need their own spelling.** `props` carries terms; `ASSUME x IS A TYPE`
+   introduces an uninterpreted sort. That is an opaque/abstract type declaration and wants its own
+   keyword. Six uses in the legal corpus; small and separable.
+4. **Failure-time semantics change.** Today an under-specified model runs and fails at the point
+   of demand, naming the missing fact; under total `props` with inference (§5.2) the same defect
+   is a compile-time error. Better — but "run it and see what it asks for" is a workflow drafters
+   plausibly rely on, and the change deserves an explicit ruling rather than arriving as a side
+   effect.
+5. **§4.4 `local` and DMN lowering must be read against each other before either freezes.**
+   `local` generalises `EVAL UNDER RULES EFFECTIVE AT` — rebind one environment component for a
+   subtree, evaluate, unwind. That is precisely the construct the DMN exporter cannot lower: a DMN
+   decision is a 0-ary variable holding one value per evaluation, so a DRG has no scoped
+   rebinding. Today that costs 15 dropped decisions (the `D-RULEDATE-UNBOUND` class in
+   `specs/todo/DMN-DIFFERENTIAL-CI-SPEC.md`); if `local` becomes a general feature, **every use
+   of it is unlowerable by the same argument**, and the unlowerable surface grows in proportion to
+   how much authors reach for hypothetical evaluation. Not an argument against `props` — an
+   argument that this spec and `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` should cite each other, which
+   as of this snapshot neither does.
+
+### 10.5 Correction: a partial deprecation ruling already exists, and it couples to DMN export
+
+An earlier draft of this section said no spec for deprecating `ASSUME` exists. That is wrong in
+one important particular: **`specs/todo/lexipedia-superset/CORPUS-TRACK.md` §1.3** already
+declares house style — "GIVEN/record throughout — no `ASSUME`" — and elsewhere calls the
+module-parameter style "deprecated" by name (its regcf annotations distinguish a deliberate
+`ASSUME` bottom from "the deprecated module-parameter ASSUME style"). What does not exist is a
+_language-level_ deprecation plan; §1.3 is house style for one corpus, enforced by convention.
+
+The same section records the fact that makes this spec's fate and the DMN exporter's fate one
+question. The `dmn-exporter-assume-shaped` finding: **the exporter models a module as global
+scalars plus decisions — the `ASSUME` shape — and it is the GIVEN/record house style it handles
+worst** (duplicate-named `inputData`, unevaluable `f(x)` invocations, no BKM, records erased to
+`Any`). `regcf.l4`, the flagship corpus and the canonical GIVEN/record module, cannot be demoed
+through DMN export without exporter work. So today the codebase is pulled two ways: house style
+deprecates the one module shape the DMN exporter can lower.
+
+`props` resolves that tension, and this is the concrete thing it buys for DMN lowering: **a
+`props` environment is isomorphic to a DMN input namespace.** DMN's evaluation model is a flat
+set of typed `inputData` plus decisions over them — a Reader, not a lambda calculus. A module
+written against typed `props` lowers naturally: props fields → `inputData`, functions over props
+→ decisions, the inferred per-function props requirement (§5.2) → exactly the DRG's information
+requirements. The exporter stops reverse-engineering an environment out of parameter threading
+and reads it off the type. (What `props` does **not** buy: §4.4 `local` remains unlowerable —
+see 10.4 item 5.)
+
+### 10.6 The 53 legal-corpus uses, case by case (measured 2026-08-04)
+
+The 53 lines reduce to 39 unique declarations — `tests/imaginary-alcohol-act.l4` is a
+byte-identical copy of `imaginary-alcohol-act.l4` (verified with `git diff`, exit 0). They fall
+into four dispositions, none of which is "keep as-is forever":
+
+**(a) Module-parameter scalars — 14 unique declarations (28 lines), `imaginary-alcohol-act.l4`
+×2.** Fourteen 0-ary `IS BOOLEAN` facts (`the person is a body corporate`, …) consumed by 0-ary
+`DECIDE`s. This is precisely the style CORPUS-TRACK §1.3 deprecates, and precisely the shape
+that is DMN-ready today: each fact is an `inputData` column, each `DECIDE` a one-row decision
+table. **Disposition: the flagship `props` migration candidate** — the file reads naturally as
+"functions over an implicit fact environment", which is what it already is, untyped.
+
+**(b) Uninterpreted sorts + predicates over them — 21 lines, `anti-social.l4` (14) and
+`british-citizen-act.l4` (7).** `ASSUME Person IS A TYPE` plus `is authorised : Person →
+BOOLEAN`, `mother of : Person → Person`, etc. The pain is already written into the source:
+`anti-social.l4` carries a comment explaining its main function is deliberately **not**
+`@export` because calling it hits assumed-term errors on every invocation — a model that cannot
+be run. **Disposition: `DECLARE` records** — `Person`/`Receiver`/`Conduct`/`Effect` become
+records whose Boolean fields replace the predicates, making the modules evaluable _and_
+exportable; the instance data then arrives via `props` or `GIVEN`. `british-citizen-act.l4` is
+half-migrated already: the same file's "Improved Readability Version" uses `DECLARE Place`.
+(`mother of`/`father of` want optional self-referential fields — the one genuinely non-trivial
+case in the corpus.)
+
+**(c) Sentinel values — 2 lines, `promissory-note.l4`.** `ASSUME NaN IS A NUMBER` (the comment
+says "JS coders rejoice :D") and `ASSUME NO_COLLATERAL IS A STRING`. Not environment, not
+modelling — absent-value hacks. **Disposition: defined constants or an optional/`MAYBE` type.**
+Trivial; nothing to do with `props`.
+
+**(d) Deliberate typed bottoms (curated refusals) — 2 lines, `regcf.l4`.** Both carry
+paragraph-length comments: an arm that reaches them stops evaluation with "…is an assumed
+term", _naming the refusal_ — "no Regulation Crowdfunding figure exists before commencement",
+"the COVID-19 temporary rules … are not modelled here". This is a **fifth role** for `ASSUME`
+that neither the term/type taxonomy in 10.1 nor `props` covers: refusal-with-provenance. One of
+the two already names its designed replacement (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3's
+generated "not in force" arm) and says "delete this when it lands". **Disposition: keep until a
+first-class refusal construct exists** — a `REFUSE "…"`-style typed bottom would let `ASSUME`
+drop this job too, and is worth a line in any props-era deprecation plan.
+
+**Reading of the whole:** the corpus does not argue for keeping `ASSUME`; it argues for building
+`props`. Categories (a) and (b) — 49 of 53 lines — are authors reaching for an implicit typed
+environment that does not exist yet, and paying for it with modules that either cannot be
+evaluated (b) or cannot be supplied values without editing source (a). Category (c) is unrelated
+debt. Category (d) is the only principled survivor, and it wants its own construct, not
+`ASSUME`.
+
+### 10.7 Bottom line as of 2026-08-04
+
+Deprecation from **authored models** is feasible, desirable, and already half-ruled (CORPUS-TRACK
+§1.3 as house style). `props` subsumes the term role with strictly better properties, at a
+corpus migration cost of ~49 lines across five files — and, per 10.5, it is also the missing
+piece that lets the DMN exporter handle idiomatic L4 at all. What blocks a clean "remove the
+keyword": the fixture/experiment constituency (10.4 item 2), the uninterpreted-type role (10.4
+item 3), and the curated-refusal role (10.6 d) — all three separable, the third wanting a
+dedicated `REFUSE` construct.

@@ -4,6 +4,7 @@ module LSP.L4.Viz.QueryPlan (
   buildQueryPlanCache,
   buildParamsByUnique,
   annotateLadderWithAtomIds,
+  annotateLadderWithAtomIdsUsing,
   queryPlanFromLadder,
   vizExprToBoolExpr,
 ) where
@@ -14,7 +15,6 @@ import Data.IntSet (IntSet)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import qualified L4.Decision.QueryPlan as QP
@@ -30,25 +30,49 @@ buildParamsByUnique ladderInfo =
     | p <- ladderInfo.funDecl.params
     ]
 
+-- | Rewrite every leaf's @atomId@ into the query plan's namespace, deriving that
+-- namespace from the ladder itself.
+--
+-- Convenience wrapper over 'annotateLadderWithAtomIdsUsing' for callers that do
+-- not already hold a compiled cache; it pays for a fresh BDD compile. A caller
+-- that has one — jl4-service does — should call the @Using@ form and hand over
+-- the function name it will later run the plan under, since the name is the
+-- first component of every atomId and taking it from the diagram instead is an
+-- assumption, not a fact.
 annotateLadderWithAtomIds ::
   VizExpr.RenderAsLadderInfo ->
   LadderViz.VizState ->
   VizExpr.RenderAsLadderInfo
 annotateLadderWithAtomIds ladderInfo vizState =
+  annotateLadderWithAtomIdsUsing
+    (QP.atomIdByUnique ladderInfo.funDecl.fnName.label (buildParamsByUnique ladderInfo) cache)
+    ladderInfo
+ where
+  cache = buildQueryPlanCache ladderInfo vizState
+
+-- | Rewrite every leaf's @atomId@ using a precomputed @unique -> atomId@ map.
+--
+-- WHY THIS EXISTS AT ALL. The ladder and the query plan both mint atomIds as a
+-- UUID5 over @"fn|label|refs=…"@, but they disagree on how a ref renders:
+-- 'L4.Viz.Ladder.generateAtomId' writes each ref as its numeric @rootUnique@
+-- over the atom's DIRECT refs, while 'QP.atomIdByUnique' writes it as the ref's
+-- LABEL over the TRANSITIVE closure. They therefore differ for every atom with a
+-- non-empty ref set — which is every ordinary leaf.
+--
+-- The query plan's rendering is the one to keep, and not merely because it came
+-- second: a @unique@ is a compilation artefact that moves when an unrelated
+-- declaration is added to the file, so a numeric-ref atomId is not stable across
+-- recompiles, and an id whose whole job is to survive a redeploy must be.
+--
+-- Reconciling here rather than in 'generateAtomId' is deliberate: the visualiser
+-- runs before the dependency closure exists, so it cannot compute this id, only
+-- be corrected with it.
+annotateLadderWithAtomIdsUsing ::
+  Map Int Text ->
+  VizExpr.RenderAsLadderInfo ->
+  VizExpr.RenderAsLadderInfo
+annotateLadderWithAtomIdsUsing atomIds ladderInfo =
   let
-    funName :: Text
-    funName = ladderInfo.funDecl.fnName.label
-
-    paramsByUnique :: Map Int Text
-    paramsByUnique =
-      Map.fromList
-        [ (p.unique, p.label)
-        | p <- ladderInfo.funDecl.params
-        ]
-
-    cache = buildQueryPlanCache ladderInfo vizState
-    atomIds = QP.atomIdByUnique funName paramsByUnique cache
-
     annotateExpr :: VizExpr.IRExpr -> VizExpr.IRExpr
     annotateExpr = \case
       VizExpr.And uid xs ->
@@ -63,12 +87,27 @@ annotateLadderWithAtomIds ladderInfo vizState =
         VizExpr.TrueE uid nm
       VizExpr.FalseE uid nm ->
         VizExpr.FalseE uid nm
-      VizExpr.UBoolVar uid nm val canInline _oldAtomId typically ->
-        VizExpr.UBoolVar uid nm val canInline (Map.findWithDefault (Text.pack (show nm.unique)) nm.unique atomIds) typically
-      VizExpr.App uid nm args _oldAtomId ->
-        VizExpr.App uid nm (map annotateExpr args) (Map.findWithDefault (Text.pack (show nm.unique)) nm.unique atomIds)
+      VizExpr.UBoolVar uid nm val canInline oldAtomId typically ->
+        VizExpr.UBoolVar uid nm val canInline (reAtom nm.unique oldAtomId) typically
+      VizExpr.App uid nm args oldAtomId ->
+        VizExpr.App uid nm (map annotateExpr args) (reAtom nm.unique oldAtomId)
       VizExpr.InertE uid txt ctx ->
         VizExpr.InertE uid txt ctx  -- Inert elements pass through unchanged
+
+    -- | Not every ladder leaf is a BDD variable, so not every leaf has an entry
+    -- here. The children of an @App@ are the standing case: 'vizExprToBoolExpr'
+    -- turns the whole application into ONE variable and does not descend, so its
+    -- arguments never reach @varLabelByUnique@ and never get a plan-side id.
+    --
+    -- Such a leaf keeps the id the visualiser gave it. This used to fall back to
+    -- @show unique@, which was wrong twice over: it threw away a perfectly good
+    -- UUID for a decimal that is not stable across recompiles, and it made the
+    -- leaf's @atomId@ collide with the OTHER thing @query-plan@ accepts as a
+    -- binding key — a @unique@ written as a decimal string. So the leaves a
+    -- reader is most likely to click were the ones whose id could silently mean
+    -- someone else's atom.
+    reAtom :: Int -> Text -> Text
+    reAtom u old = Map.findWithDefault old u atomIds
    in
     ladderInfo
       { VizExpr.funDecl =

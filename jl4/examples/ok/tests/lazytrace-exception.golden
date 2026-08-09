@@ -28,27 +28,31 @@ lazytrace-exception.l4:10:1-66:
   │└ LIST TRUE, TRUE, TRUE, something, ...
   │┌ and
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN TRUE,
-  │                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  ├ x AND and OF xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN TRUE
+  │   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ├ x AND (and OF xs)
   │┌ and OF xs
   ││┌ and
   ││└ <function>
-  │├ CONSIDER list WHEN EMPTY THEN TRUE,
-  ││                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  │├ x AND and OF xs
+  │├ CONSIDER list
+  ││   WHEN EMPTY THEN TRUE
+  ││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  │├ x AND (and OF xs)
   ││┌ and OF xs
   │││┌ and
   │││└ <function>
-  ││├ CONSIDER list WHEN EMPTY THEN TRUE,
-  │││                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  ││├ x AND and OF xs
+  ││├ CONSIDER list
+  │││   WHEN EMPTY THEN TRUE
+  │││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ││├ x AND (and OF xs)
   │││┌ and OF xs
   ││││┌ and
   ││││└ <function>
-  │││├ CONSIDER list WHEN EMPTY THEN TRUE,
-  ││││                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  │││├ x AND and OF xs
+  │││├ CONSIDER list
+  ││││   WHEN EMPTY THEN TRUE
+  ││││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  │││├ x AND (and OF xs)
   │││├ IF a THEN b ELSE FALSE
   ││││┌ a
   ││││└ something
@@ -103,57 +107,65 @@ lazytrace-exception.l4:19:1-52:
   │   GIVEN acc
   │         list
   │   DECIDE go acc list IS
-  │     CONSIDER list WHEN EMPTY THEN acc,
-  │                     WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  │     CONSIDER list
+  │       WHEN EMPTY THEN acc
+  │       WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF 0, l
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF (acc PLUS x), xs
   │┌ acc PLUS x
   │└ 1
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF (acc PLUS x), xs
   │┌ acc PLUS x
   │└ 3
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF (acc PLUS x), xs
   │┌ acc PLUS x
   │└ 6
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF (acc PLUS x), xs
   │┌ acc PLUS x
   ││• ↯ division by zero
   │└ ↯ division by zero
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF (acc PLUS x), xs
   │┌ acc PLUS x
   ││• ↯ division by zero
   │└ ↯ division by zero
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ go OF (acc PLUS x), xs
   │┌ acc PLUS x
   ││• ↯ division by zero
   │└ ↯ division by zero
   │┌ go
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN acc,
-  │                 WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN acc
+  │   WHEN x FOLLOWED BY xs THEN go OF (acc PLUS x), xs
   ├ acc
   └ ↯ division by zero

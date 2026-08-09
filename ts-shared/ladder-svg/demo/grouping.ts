@@ -65,7 +65,10 @@ import { sceneToSvg } from "../src/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../../..");
-const CORPUS = resolve(REPO, "doc/tutorials/getting-started/grouping-and-precedence.l4");
+const CORPUS = resolve(
+  REPO,
+  "doc/tutorials/getting-started/grouping-and-precedence.l4",
+);
 const OUT = resolve(REPO, "doc/tutorials/getting-started/figures");
 const LSP_PORT = Number(process.env.JL4_LSP_PORT || 5019);
 

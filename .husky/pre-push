@@ -1,0 +1,94 @@
+# Pre-push hook: refuse a push that CI's `format:check` would reject.
+#
+# WHY THIS IS pre-push, AND NOT ANOTHER pre-commit HOOK.
+#
+# A pre-commit hook already exists and already runs prettier — see
+# .husky/pre-commit, which calls lint-staged, which is configured in
+# package.json as `"*": "prettier --write --ignore-unknown"`. It has not been
+# preventing format:check failures, and adding more of it would not help.
+#
+# The reason is that lint-staged re-stages EVERY modified file it formats. That
+# makes `git add <paths>` unable to scope a commit: you stage three files, the
+# hook sweeps in everything else you had dirty in the worktree, and the commit
+# is bigger than the one you wrote a message for. The house habit that grew out
+# of that is `git commit --no-verify`, which skips pre-commit entirely — so the
+# formatter that was supposed to be automatic is, in practice, off.
+#
+# `--no-verify` on `git commit` does NOT skip pre-push. This hook is therefore
+# the first gate that actually runs on the normal path, and it sits exactly
+# where a formatting mistake starts to cost something: one CI round trip.
+#
+# IT CHECKS AND REFUSES. IT NEVER WRITES AND NEVER STAGES.
+# That is deliberate, and it is the difference between this hook and the one
+# above it. A hook that edits your tree while you are pushing is how you push
+# something you have not read. This one tells you the command and gets out of
+# the way.
+#
+# Escape hatch, for when you mean it: `git push --no-verify`.
+
+# The repo-local binary, so the version is the one package.json pins. A bare
+# `npx prettier` resolves to whatever is current and reformats markdown tables
+# differently, which fails format:check on files you did not touch.
+PRETTIER="$(git rev-parse --show-toplevel)/node_modules/.bin/prettier"
+
+if [ ! -x "$PRETTIER" ]; then
+  echo "pre-push: node_modules/.bin/prettier not found — skipping the format check." >&2
+  echo "pre-push: run \`npm ci\` if you want this gate. CI still enforces it." >&2
+  exit 0
+fi
+
+# stdin gives one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+ZERO=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
+status=0
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  # deletion of a remote branch pushes the zero sha as the local one
+  [ "$local_sha" = "$ZERO" ] && continue
+
+  if [ "$remote_sha" = "$ZERO" ]; then
+    # New branch: the remote has no counterpart to diff against, so compare
+    # with wherever this branch left the integration line. `unstable` first,
+    # because that is what feature branches are cut from and PR back into.
+    base=""
+    for candidate in origin/unstable origin/main; do
+      if git rev-parse --verify --quiet "$candidate" >/dev/null; then
+        base=$(git merge-base "$candidate" "$local_sha" 2>/dev/null) && [ -n "$base" ] && break
+      fi
+    done
+    # No integration branch fetched yet — check only this commit rather than
+    # silently checking nothing.
+    [ -n "$base" ] || base="$local_sha^"
+  else
+    base="$remote_sha"
+  fi
+
+  # Only files that still exist: a push that deletes a file must not be blocked
+  # by a check on the file it deleted.
+  files=$(git diff --name-only --diff-filter=d "$base" "$local_sha" 2>/dev/null)
+  [ -n "$files" ] || continue
+
+  # --ignore-unknown so binaries, .l4 files and anything without a prettier
+  # parser are skipped rather than reported as failures. .prettierignore is
+  # honoured by prettier itself.
+  if ! printf '%s\n' "$files" | xargs "$PRETTIER" --check --ignore-unknown 2>&1; then
+    status=1
+  fi
+done
+
+if [ "$status" -ne 0 ]; then
+  cat >&2 <<'MSG'
+
+pre-push: prettier would fail CI's format:check on the files listed above.
+
+  Fix:    npx prettier@3.4.2 --write <the files above>
+  Then:   git add -- <the files above> && git commit --amend --no-edit
+  Or:     git push --no-verify     (if you mean it)
+
+Formatting-only pushes are cheap. A format:check failure costs a CI round trip
+and, on a queued PR, a re-queue.
+MSG
+  exit 1
+fi
+
+exit 0

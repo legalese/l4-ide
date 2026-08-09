@@ -90,19 +90,7 @@ regcf-denovo.l4:3587:1-49:
 regcf-denovo.l4:3633:1-3635:77:
   FULFILLED
 regcf-denovo.l4:3640:1-3641:97:
-  PARTY `the investor`
-  MUST `reconfirm the investment commitment` PROVIDED commitment's `reconfirmed within five business days of receipt of the notice`
-  WITHIN `five business days`
-  HENCE FULFILLED
-  LEST PARTY `the intermediary`
-  MUST `give or send the investor notice of the cancellation and the refund amount`
-  WITHIN `five business days`
-  HENCE PARTY `the intermediary`
-  MUST `direct the refund of investor funds`
-  WITHIN `five business days`
-  HENCE FULFILLED
-  LEST BREACH BY `the intermediary` BECAUSE "§ 227.304(c)(1)(ii): the refund of investor funds was not directed within five business days of the failure to reconfirm"
-  LEST BREACH BY `the intermediary` BECAUSE "§ 227.304(c)(1)(i): the investor was not notified of the cancellation, its reason and the refund amount within five business days of the failure to reconfirm"
+  PARTY `the investor` MUST `reconfirm the investment commitment` PROVIDED (commitment's `reconfirmed within five business days of receipt of the notice`) WITHIN `five business days` HENCE FULFILLED LEST (PARTY `the intermediary` MUST `give or send the investor notice of the cancellation and the refund amount` WITHIN `five business days` HENCE (PARTY `the intermediary` MUST `direct the refund of investor funds` WITHIN `five business days` HENCE FULFILLED LEST (BREACH BY `the intermediary` BECAUSE "§ 227.304(c)(1)(ii): the refund of investor funds was not directed within five business days of the failure to reconfirm")) LEST (BREACH BY `the intermediary` BECAUSE "§ 227.304(c)(1)(i): the investor was not notified of the cancellation, its reason and the refund amount within five business days of the failure to reconfirm"))
 regcf-denovo.l4:3643:1-76:
   TRUE
 regcf-denovo.l4:3644:1-103:

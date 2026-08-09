@@ -1,0 +1,6 @@
+`is significant` with `Money` with 2000 and SGD
+`is significant` with `Money` with 10 and SGD
+`exceeds floor` with 1 and `Money` with 2 and SGD
+`exceeds default floor` with `Money` with 2 and SGD
+`is sgd` with `Money` with 1 and SGD
+`shadowed` with `Money` with 1 and USD

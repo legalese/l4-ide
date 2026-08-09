@@ -41,7 +41,7 @@ import qualified Data.UUID.V5 as UUIDV5
 
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.VizExpr as VizExpr
-import LSP.L4.Viz.QueryPlan (vizExprToBoolExpr)
+import LSP.L4.Viz.QueryPlan (annotateLadderWithAtomIdsUsing, vizExprToBoolExpr)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import Backend.Api (FnArguments (..), FnLiteral (..))
@@ -222,21 +222,45 @@ buildDecisionQueryCacheFromCompiled nodeBudget funName compiled sourceText = do
       deps = LadderViz.getAtomDeps vizState
       inputRefs = LadderViz.getAtomInputRefs vizState
 
+      core =
+        QP.CachedDecisionQuery
+          { varLabelByUnique = labels
+          , varDepsByUnique = deps
+          , varInputRefsByUnique =
+              fmap
+                (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
+                inputRefs
+          , compiled = bddCompiled
+          , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+          }
+
+      -- Put the ladder's leaves into the SAME atomId namespace the query plan
+      -- will answer in (upstream smucclaw/l4-ide#935).
+      --
+      -- Before this, the two surfaces minted different ids for the same atom, so
+      -- a client that fetched the diagram and then posted answers keyed by its
+      -- atomIds — the natural thing for a ladder-embedded wizard, and what the
+      -- Reg CF wizard does — got a 200 and a silent no-op: no 4xx, no warning,
+      -- verdict unchanged. jl4-lsp had reconciled them since the beginning by
+      -- calling annotateLadderWithAtomIds before serving the ladder; the service
+      -- never had, so the IDE and the deployed service disagreed about what a
+      -- question was called.
+      --
+      -- The atomId map is derived from @funName@ — the name this deployment
+      -- serves the function under, and the same one 'queryPlan' will be handed —
+      -- rather than from the diagram's own @fnName@ label, so the two cannot
+      -- drift apart if a function is ever registered under something other than
+      -- its DECIDE name. @paramsByUnique@ is read off the ladder's params, which
+      -- the annotation does not touch, so it stays valid afterwards.
+      paramsByUnique = Map.fromList [(p.unique, p.label) | p <- ladderInfo.funDecl.params]
+      joinableLadder =
+        annotateLadderWithAtomIdsUsing (QP.atomIdByUnique funName paramsByUnique core) ladderInfo
+
   pure
     CachedDecisionQuery
       { cacheKey = decisionQueryCacheKey funName sourceText
-      , ladderInfo
-      , core =
-          QP.CachedDecisionQuery
-            { varLabelByUnique = labels
-            , varDepsByUnique = deps
-            , varInputRefsByUnique =
-                fmap
-                  (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
-                  inputRefs
-            , compiled = bddCompiled
-            , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
-            }
+      , ladderInfo = joinableLadder
+      , core
       , paramSchema = parametersFromDecideWithErrors resolvedModule decide []
       }
 

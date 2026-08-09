@@ -86,7 +86,7 @@ the string anywhere is `-Wno-name-shadowing` in `jl4-wasm`.
 Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-lsp-test`,
 `jl4-service-test`, `jl4-mlir-test`, `jl4-websessions-test`.
 
-### 3.1 Two traps that produce fake failures
+### 3.1 Three traps that produce fake failures
 
 **Pin `JL4_LIBRARY_PATH` when running goldens locally.** CI sets it
 (`.github/workflows/pr-checks.yml`); without it you get unrelated failures that look like
@@ -97,6 +97,88 @@ machine-independence.
 **Use the pinned prettier.** A bare `npx prettier` resolves to whatever is current, which reformats
 markdown tables differently from `3.4.2` and fails `format:check` on files you did not mean to
 touch. Run `npx prettier@3.4.2` or the repo-local binary.
+
+**A new corpus ships its goldens in the same commit as its `.l4`.** `jl4-test` writes four goldens
+per file (`<dir>/tests/<stem>.{golden,ep.golden,nlg.golden,schema.golden}`) and `failFirstTime` is
+`True`, so a `.l4` with no `tests/` directory turns the whole suite red. You will not see it: no
+paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not run on your PR, and
+the failure surfaces on the next person's branch instead. Generate them by running `cabal test
+jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the
+`.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
+looked at is how a wrong answer becomes the expected answer.
+
+> **Why.** This went off twice in one day. The BNA corpus landed without goldens in PR #195 and was
+> repaired by #202; eleven hours later the Jersey charities cleanroom did the same in #201 and was
+> repaired by #212 — after it had already knocked another PR out of the merge queue. `etc/check-corpus-goldens.mjs`
+> now runs in CI on every event with no filter and no build, and names the missing files. If you are
+> reading this because that check failed, it has done its job.
+
+### 3.2 There are TWO printers, and they are guarded differently
+
+| printer                 | what it prints                       | its guard                                                  |
+| ----------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `Rules.ExactPrint`      | the concrete tokens, byte-for-byte   | `exactprint identity`, plus the per-file `*.ep.golden`     |
+| `L4.Print.prettyLayout` | the AST, re-rendered as fresh source | `prettyLayout round-trip (filter -> print -> parse; #932)` |
+
+`prettyLayout` is what **`l4 batch` and the REPL** re-emit a module through (`filterIdeDirectives`
+then print then re-run the front end), and what the DMN exporter falls back to for an expression it
+cannot lower. It used to have no test of its own at all, which is how it accumulated a printer that
+could not render its own corpus back into parseable source (smucclaw/l4-ide#932).
+
+The round-trip block in `jl4/tests/Main.hs` runs over **every file the golden suite type-checks** —
+`ok/**`, `legal/**` and `jl4-core/libraries/*.l4`, 300 files — and asserts three things per file:
+no inference-variable gensym reaches the output, the printed text re-parses, and the printed text
+re-type-checks. **There are no exclusions and no known-failure list**; if you need one, that is the
+signal to fix the printer instead.
+
+Debugging it: the output is thousands of columns wide, so set `JL4_PRETTY_DUMP_DIR=<dir>` and the
+whole emitted module is written to `<dir>/<name>.l4.pl.l4` — a plain `.l4` file you can run
+`l4 check` on.
+
+#### 3.2.1 Re-parsing is not re-meaning — run the evaluation differential
+
+Parse + type-check is a **weaker** property than it looks, and the gap is where the expensive bugs
+live: a printer that drops a bracket emits source that parses fine, checks fine, and **evaluates to
+a different answer**. That is not hypothetical — it was the state of this tree. `prettyConj`
+rendered `(TRUE OR FALSE) AND FALSE` and `TRUE OR (FALSE AND FALSE)` as the _same_ string, so
+`ok/logic.l4` went from `LIST TRUE, TRUE, FALSE, FALSE` to `LIST TRUE, TRUE, TRUE, TRUE`, an
+assertion in `legal/regcf/regcf.l4` went from satisfied to failed, and the Tesla CEO award's
+`PROVIDED` guard re-associated — all through `l4 batch`, silently, with the round-trip property
+green throughout.
+
+So when you touch `L4.Print`, run this too:
+
+```bash
+find jl4 jl4-core -name '*.evaldiff.l4' -delete            # always start clean
+JL4_EVALDIFF=1 jl4_datadir=$PWD/jl4 jl4_core_datadir=$PWD/jl4-core \
+  JL4_LIBRARY_PATH=$PWD/jl4-core/libraries <jl4-test binary> -m "prettyLayout round-trip"
+# then, per file, compare `l4 run <f>` against `l4 run <f>.evaldiff.l4`,
+# keeping only the `Result:` blocks
+find jl4 jl4-core -name '*.evaldiff.l4' -delete            # MUST clean up: these are inside the
+                                                           # corpus globs and would be goldened
+```
+
+Measured on this tree: **288 of 291 comparable files identical**. The three that differ are
+clock-dependent, not printer defects — `ok/excel-date/serials.l4` and the bitemporal ledger files
+stamp wall-clock transaction time (`at=2026-08-02T22:14:22Z` vs `…23Z`), and the original disagrees
+with _itself_ across two runs. Eight more files exit non-zero on both sides by design.
+
+It is deliberately **not** a test: it is slow, and the clock-dependent files would need exactly the
+known-failure list §3.2 forbids. It is a tool you run by hand.
+
+#### 3.2.2 The one thing `prettyLayout` still cannot render
+
+Two mixfix operators that share a **head keyword, an arity and an argument type vector** print to
+the same text, because a call site is resolved to the canonical pattern (`_ tax on _ …`) and the
+printer can only re-emit the head keyword — no definition can be spelled any other way. The witness
+is `ok/mixfix-garden-path.l4`, whose own comment predicted it: `tax on _ item costing _ as GST in _`
+beside `… as VAT in _`. It fails **loudly** ("multiple definitions for the identifier"), and only
+via the unfiltered print — `l4 batch` strips `#EVAL`, which is where both call sites live.
+
+Re-emitting the surface form instead (`` `tax on` c `item costing` p ``) was built and measured and
+**does not work**: definitions print from their restructured AppForm (`DECIDE andop a b c IS …`), so
+the printed module has no later keywords to match, and `fixity-nary-guard.l4`'s `1 andop 2 hadop 3`
+stopped resolving. A real fix has to thread `L4.Mixfix.MixfixRegistry` into the printer.
 
 ---
 

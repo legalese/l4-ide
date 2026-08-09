@@ -49,12 +49,28 @@ jobs:
         id: filter
         with:
           filters: |
+            # `.github/workflows/pr-checks.yml` appears in five filters below,
+            # for the reason the mlir one has always given: this file IS the
+            # definition of those jobs, so a change to it must re-run them or it
+            # merges unmeasured. That was not academic — the merge-queue cache
+            # fix for smucclaw/l4-ide#911 edits the cache steps of the haskell,
+            # typescript, dmn-engines and bpmn jobs, and on the filters as they
+            # stood NONE of those four jobs would have run on the PR that made
+            # the edit. `prettier --check .` lives in the typescript job, so the
+            # workflow file's own formatting gate was unreachable from a
+            # workflow-only PR too.
+            #
+            # The price is that a workflow-only PR now costs a full Haskell
+            # build + WASM build. That is the same trade the `.mjs`, `etc/**`
+            # and `.claude/**` entries below already bought, each after a PR
+            # that ran zero jobs.
             haskell:
               - '**/*.hs'
               - '**/*.cabal'
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
+              - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
               - '**/*.tsx'
@@ -72,6 +88,9 @@ jobs:
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+              # Hosts `prettier --check .`, which is the only gate on this
+              # file's own formatting. See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
             # The BPMN interchange checkers and their fixtures. Kept as its own
             # filter so the (zero-dependency, node-only) soundness gate runs
             # when a fixture changes, which no other filter would catch:
@@ -90,6 +109,8 @@ jobs:
               # BPMN file at all, and without these lines nothing would notice.
               - 'jl4/examples/dmn/expected/**'
               - 'jl4-core/src/L4/Dmn/**'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
             # specs/** must trigger doc checks too: a spec-only PR that skips
             # both this filter and 'haskell' never runs test-docs.sh or
             # prettier, so a broken link or unformatted file merges silently.
@@ -146,6 +167,8 @@ jobs:
               - 'jl4-core/libraries/daydate.l4'
               # The engine-intersection triple: likewise hand-written.
               - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
 
   # ============================================
   # BPMN interchange: soundness gate over the emitted fixtures
@@ -164,6 +187,23 @@ jobs:
   # resolve "whatever is newest today"). That pinning is what makes the cache
   # key stable.
   #
+  # No `needs`, no `if`, no paths filter — deliberately. This check exists BECAUSE
+  # the filters cannot see the failure it catches: a `.l4` added under
+  # jl4/examples/ matches no filter, so the Haskell job does not run, so the PR
+  # that ships a corpus without its goldens is green and the golden suite goes red
+  # on somebody else's branch instead. That happened twice in one day (PR #202,
+  # the BNA; PR #212, the Jersey charities cleanroom). Node-only, ~1 s, no build.
+  corpus-goldens:
+    name: Corpus Goldens Present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      - name: Every corpus .l4 ships its four goldens
+        run: node etc/check-corpus-goldens.mjs
+
   # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
   # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
   # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
@@ -176,9 +216,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       # Proves the status lattice can still say no: every status producible, PASS
       # rejected with a null, failing, or WEAK oracle, a BROKEN receipt unable to
@@ -368,9 +412,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       # Proves the gate can still FAIL, by asserting every fixture in
       # jl4/examples/bpmn/unsound/ is caught on the specific property it exists
@@ -443,8 +491,29 @@ jobs:
 
       # Keyed on every pom under etc/, so the DMN engine harnesses share this
       # cache the moment they land rather than needing their own entry.
-      - name: Cache the pinned engine jars
-        uses: actions/cache@v4
+      #
+      # ---- why merge_group never SAVES a cache in this workflow --------------
+      # GitHub scopes cache reads to {the run's own ref, the default branch},
+      # plus the base branch for pull_request only. A merge_group run's own ref
+      # is `gh-readonly-queue/unstable/pr-N-<sha>`, which GitHub deletes when the
+      # queue entry finishes — so anything a queue run writes is unreadable by
+      # every other run, including the push that lands the very same commit.
+      # Measured 2026-08-02 over the repo's 73 live cache entries: 53 of them,
+      # 5.58 GB, sat in gh-readonly-queue refs, and 44 had last_accessed ==
+      # created — written once, never read. Against a 10 GB cap the store was at
+      # 10.65 GB and LRU-evicting continuously, which is the same mechanism the
+      # prune step in the Haskell job below exists to fight (it once cost the
+      # repo 40-minute PRs). The warm caches that smucclaw/l4-ide#911's fix
+      # depends on live in that same 10 GB.
+      #
+      # So: restore on every event, save on every event EXCEPT merge_group.
+      # pull_request keeps saving — refs/pull/N/merge IS readable by later runs
+      # of the same PR — and push keeps refreshing the shared base cache.
+      # Nothing is skipped and no job does less work; the only thing removed is
+      # a write with no reader.
+      - name: Restore the pinned engine jars
+        uses: actions/cache/restore@v4
+        id: l4-engines-m2
         with:
           path: ~/.cache/l4-engines/repo
           key: l4-engines-m2-${{ runner.os }}-${{ hashFiles('etc/**/pom.xml') }}
@@ -527,6 +596,16 @@ jobs:
 
           node etc/check-bpmn-kie-baseline.mjs kie-expected.log
 
+      # `!cancelled()` reproduces `actions/cache`'s post-step behaviour exactly,
+      # including its save-on-failure: the ONLY thing this change removes is the
+      # write no run can read.
+      - name: Save the pinned engine jars
+        uses: actions/cache/save@v4
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.l4-engines-m2.outputs.cache-hit != 'true' }}
+        with:
+          path: ~/.cache/l4-engines/repo
+          key: ${{ steps.l4-engines-m2.outputs.cache-primary-key }}
+
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
   # ============================================
@@ -550,12 +629,35 @@ jobs:
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5
 
+      # `cache:` is set to npm on every event EXCEPT merge_group — see "why
+      # merge_group never SAVES a cache in this workflow" in the BPMN job above.
+      # setup-node has no save-only switch, so the input itself is conditional;
+      # an empty `cache:` disables its caching entirely, which is exactly what a
+      # merge_group run wants. It loses nothing: no `node-cache-*` entry exists
+      # in main's scope, so a queue run's npm restore has never hit — measured
+      # `npm cache is not found` on merge_group run 30760823299 — after which it
+      # wrote 111 MB into its own doomed ref. 28 such entries were live on
+      # 2026-08-02, 1.89 GB, 20 of them never read once.
+      #
+      # BOTH inputs have to be turned off, and this is the only setup-node in
+      # the file that needs both. setup-node@v5's restore is:
+      #
+      #   if (cache && isCacheFeatureAvailable()) { restoreCache(cache, …) }
+      #   else if (resolvedPackageManager && packagemanagercache) { restoreCache(…) }
+      #
+      # `cache: npm` alone reaches the first branch; leaving `cache` empty falls
+      # through to the second, where `package-manager-cache` defaults to TRUE and
+      # auto-detects npm anyway. Disabling only one of the two does nothing —
+      # which is what the first cut of this change did, caught by the resolved
+      # inputs GitHub echoes into the log (`package-manager-cache: true`) rather
+      # than by reading the action.
       - name: Use Node.js
         uses: actions/setup-node@v5
         with:
           cache-dependency-path: package-lock.json
           node-version: "24.x"
-          cache: npm
+          cache: ${{ github.event_name != 'merge_group' && 'npm' || '' }}
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       - run: npm ci
       - run: npm run build
@@ -620,6 +722,31 @@ jobs:
 
       # Restore caches BEFORE configure so cabal can plan incrementally
       # on top of existing build state rather than starting fresh.
+      #
+      # The `mq-warmup-` line applies to dist-newstyle the same trick the
+      # dependency step below documents at length. A merge_group run cannot read
+      # the unstable-scoped `pr-checks-*-dist-*` entry, so until now BOTH its
+      # restore keys missed and it recompiled every first-party package from
+      # nothing. Measured on 2026-08-02, all three events within 31 minutes of
+      # each other and all asking for the identical key
+      # `pr-checks-Linux-ghc-9.10.2-dist-14bfce8b…`:
+      #
+      #   merge_group  (pr-197)  `Cache not found for input keys: …`   build 514.9 s
+      #   pull_request (#206)    `Cache restored from key: …`          build  16.1 s
+      #   push         (unstable) `Cache restored from key: …`         build  19.1 s
+      #
+      # …i.e. ~8 min per queued PR spent rebuilding what was sitting in a cache
+      # the run was not allowed to read. cache-warmup.yml now also saves
+      # unstable's dist-newstyle in MAIN's cache scope, under `mq-warmup-*-dist-*`,
+      # which is a scope merge_group CAN read. merge_group only, so PRs into main
+      # never match it and keep restoring the `pr-checks-` namespace alone.
+      #
+      # This does not weaken the gate: the restore step already ran on
+      # merge_group and was already *meant* to hit — it simply always missed.
+      # A merge_group build now starts from the same kind of prefix-matched dist
+      # a pull_request build has always started from, and cabal's recompilation
+      # check governs reuse exactly as it does there. No step is skipped; the
+      # build and the full `cabal test all` run unchanged.
       - name: Restore cached build artifacts
         uses: actions/cache/restore@v5
         id: build-cache
@@ -628,6 +755,7 @@ jobs:
           key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-${{ hashFiles('**/*.hs', '**/*.cabal') }}
           restore-keys: |
             pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
+            ${{ github.event_name == 'merge_group' && format('mq-warmup-{0}-ghc-{1}-dist-', runner.os, steps.setup.outputs.ghc-version) || '' }}
 
       # merge_group runs canNOT read the unstable-scoped cache: GitHub scopes
       # cache reads to {own ref, default branch}, plus the base branch for
@@ -651,6 +779,47 @@ jobs:
           restore-keys: |
             ${{ env.key }}-
             ${{ github.event_name == 'merge_group' && format('mq-warmup-{0}-ghc-{1}-cabal-', runner.os, steps.setup.outputs.ghc-version) || '' }}
+
+      # Both warm caches above are written by cache-warmup.yml, and a scheduled
+      # workflow can only fire from the DEFAULT branch. That file was deleted
+      # from main on 2026-07-13 by #112 — a blanket "revert direct-to-main
+      # changes pending review", not a decision about caching — and the cron has
+      # not run since. Nothing said so. merge_group kept restoring a 24-day-old
+      # store that happened to still satisfy the plan (`Up to date`, 0.4 s, on
+      # 10/10 queue runs), and the first dependency bump would have reinstated
+      # the ~22 min cold install of smucclaw/l4-ide#911 with no signal at all.
+      #
+      # This step is that signal. It warns, it does not fail: a stale cache is a
+      # maintenance problem, and blocking the merge queue over one would be a
+      # worse outcome than the slow build it is warning about.
+      - name: The merge-queue warm cache must be fresh
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prefix = `mq-warmup-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-`;
+            const caches = await github.paginate(
+              github.rest.actions.getActionsCacheList,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 },
+            );
+            const warm = caches.filter((c) => c.key.startsWith(prefix));
+            if (warm.length === 0) {
+              core.warning(`No ${prefix}* cache exists. Every merge_group run will cold-build the cabal store AND all of dist-newstyle. Fix: land .github/workflows/cache-warmup.yml on the DEFAULT branch (main) so its cron can fire, then dispatch it once.`);
+              return;
+            }
+            const newest = warm.reduce((a, b) => (a.created_at > b.created_at ? a : b));
+            const ageDays = (Date.now() - Date.parse(newest.created_at)) / 86400000;
+            const families = new Set(warm.map((c) => c.key.slice(prefix.length).split('-')[0]));
+            core.info(`Warm caches: ${warm.length} entr(ies), families [${[...families].join(', ')}], newest ${newest.key} created ${newest.created_at} (${ageDays.toFixed(1)} d ago).`);
+            for (const want of ['cabal', 'dist']) {
+              if (!families.has(want)) {
+                core.warning(`No ${prefix}${want}-* cache. merge_group runs will cold-build that half. Check that cache-warmup.yml is on main (default branch) and that its last run succeeded.`);
+              }
+            }
+            if (ageDays > 14) {
+              core.warning(`The merge-queue warm cache is ${ageDays.toFixed(0)} days old (${newest.key}). cache-warmup.yml runs on a 6h cron FROM THE DEFAULT BRANCH; if it is stale this long the workflow is not on main, is disabled, or is failing. Check: gh run list -R legalese/l4-ide --workflow cache-warmup.yml`);
+            }
 
       - name: Configure the build
         run: |
@@ -811,8 +980,17 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Cache the Maven repository
-        uses: actions/cache@v5
+      # Restore/save split, not `actions/cache`, so the save can be skipped on
+      # merge_group. See "why merge_group never saves" at the l4-engines-m2 step
+      # in the BPMN job above: a queue run writes into its own ephemeral
+      # gh-readonly-queue/... ref, which is deleted with the queue entry, so the
+      # entry is unreadable the moment it exists. Measured on merge_group run
+      # 30760823299: `Cache not found for input keys: dmn-engines-m2-…` at
+      # 18:18:57 followed by `Cache saved with key: dmn-engines-m2-…` at
+      # 18:20:14 — 51 MB written into a scope with no reader.
+      - name: Restore the Maven repository
+        uses: actions/cache/restore@v5
+        id: dmn-m2
         with:
           path: ~/.m2/repository
           key: dmn-engines-m2-${{ hashFiles('etc/kie-dmn-check/pom.xml', 'etc/camunda-dmn-check/pom.xml') }}
@@ -1223,6 +1401,16 @@ jobs:
       - name: dmn-moddle (DMN 1.3 metamodel)
         run: npx --yes --package=dmn-moddle node etc/validate-dmn.mjs
 
+      # `!cancelled()` reproduces `actions/cache`'s post-step behaviour exactly,
+      # including its save-on-failure: the ONLY thing this change removes is the
+      # write no run can read.
+      - name: Save the Maven repository
+        uses: actions/cache/save@v5
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.dmn-m2.outputs.cache-hit != 'true' }}
+        with:
+          path: ~/.m2/repository
+          key: ${{ steps.dmn-m2.outputs.cache-primary-key }}
+
   # ============================================
   # WASM Build & Test (only when Haskell changes)
   # ============================================
@@ -1264,8 +1452,18 @@ jobs:
           wasm32-wasi-ghc --version
           wasm32-wasi-cabal --version
 
-      - name: Cache WASM dependencies
-        uses: actions/cache@v5
+      # Restore/save split so the save can skip merge_group — see "why
+      # merge_group never SAVES a cache in this workflow" in the BPMN job above.
+      # This family was by far the worst offender: 9 gh-readonly-queue entries,
+      # 3.05 GB, 9 of 9 never read once.
+      #
+      # The `~/.ghc-wasm` toolchain cache above is deliberately left as
+      # `actions/cache`: its key is version-only, so a merge_group run restores
+      # the main-scoped entry EXACTLY, and an exact hit makes the post-save a
+      # no-op already. There is nothing to gate.
+      - name: Restore WASM dependencies
+        uses: actions/cache/restore@v5
+        id: wasm-deps
         with:
           path: |
             ~/.ghc-wasm/.cabal/store
@@ -1340,6 +1538,18 @@ jobs:
           echo "- **Binary Size:** ${WASM_SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** All tests passed" >> $GITHUB_STEP_SUMMARY
 
+      # `!cancelled()` reproduces `actions/cache`'s post-step behaviour exactly,
+      # including its save-on-failure: the ONLY thing this change removes is the
+      # write no run can read.
+      - name: Save WASM dependencies
+        uses: actions/cache/save@v5
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.wasm-deps.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.ghc-wasm/.cabal/store
+            dist-newstyle
+          key: ${{ steps.wasm-deps.outputs.cache-primary-key }}
+
   # ============================================
   # TIER 1 — cheap, ALWAYS-ON pure parity-gate unit test (REQUIRED)
   # No LLVM, no GHC, no service, no npm. Guards gate semantics every PR.
@@ -1351,9 +1561,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
       - name: Pure parity-gate classify + verdict semantics
         run: node jl4-mlir/scripts/parity-gate.test.mjs
       - name: Other jl4-mlir pure node tests (untested in CI today)
@@ -1479,6 +1693,28 @@ jobs:
           cabal-update: true
       - name: Update git submodules
         run: git submodule update --init
+      # KNOWN DEAD, ON EVERY EVENT — measured, left alone deliberately, do not
+      # "fix" it by pattern-matching the Haskell job. Two independent faults:
+      #
+      #  1. `actions/cache` derives a cache VERSION from the paths AND the
+      #     compression method, and matches key+version. The Haskell job runs in
+      #     `container: ubuntu:24.04`, which has no zstd, so it writes
+      #     `cache.tgz`; this job runs on the bare host, which has zstd, so it
+      #     asks for `cache.tzst`. Same key, different version, never a hit. In
+      #     pull_request run 30750827575 the Haskell job restored
+      #     `pr-checks-Linux-ghc-9.10.2-cabal-3.16.1.0-plan-5cc1953c…` at
+      #     13:54:37 while this job, seven seconds earlier, logged `Cache not
+      #     found for input keys: …-cabal-88349c09…, …-cabal-`.
+      #  2. The primary key below omits the `-${cabal-version}-plan-` segment the
+      #     Haskell job saves under, so it could not be an exact hit even at the
+      #     same version.
+      #
+      # Cost: `Build native jl4-mlir + jl4-service` cold-builds every run — 1583 s
+      # on pull_request, 1688 s on merge_group. Installing zstd in the Haskell
+      # container would unify (1) in one line, but it also re-versions EVERY
+      # `pr-checks-*` and `mq-warmup-*` entry at once, and the warm caches
+      # merge_group depends on would be unreadable until the next cron. Do that
+      # only once cache-warmup.yml is confirmed alive on main — not before.
       - name: Restore cabal store cache
         uses: actions/cache/restore@v5
         with:
@@ -1495,9 +1731,13 @@ jobs:
         run: |
           cabal update
           cabal build jl4-mlir jl4-service
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
       # --- run the harness with EXPLICIT in-repo corpus (default list is broken) ---
       - name: Run differential parity harness
         run: |
