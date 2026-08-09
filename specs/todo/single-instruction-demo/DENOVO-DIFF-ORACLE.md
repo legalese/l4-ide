@@ -518,6 +518,10 @@ file, not by remembering the edit):
 - **`ORCHESTRATOR.md` §8** ("Deliberately not built") listed "the de novo path and the §8 diff
   oracle" as unbuilt. The oracle is no longer in that table's row: the row now says the comparator
   is built, self-tested and unexercised, and that the de novo path it serves is still unbuilt.
+  (Moved again 2026-08-09: "unexercised" left that row when `p8-diff` wired the comparator as a
+  declared g2 stage — the row now reads built, self-tested and wired. The g2-wiring change
+  initially retensed the status header above and §5.1a/§5.2 but not §8; the repair pass caught
+  the row, which is this cross-reference doing its job.)
 - **`ORCHESTRATOR.md` §1** said "Milestone G2 is unbuilt … The §8 diff oracle does not exist
   either". The second clause was repaired in place, and the bullet says in so many words that the
   earlier version was true when written and is not now.
