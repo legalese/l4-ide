@@ -61,6 +61,7 @@ A subject sidecar is four files in `etc/go/subjects/<id>/`:
 | `pins.json`          | the CLI surface the stage table reads, measured against that subject's corpus                                                                                                                                                                                                                                                                                                                                                                                   |
 | `known-defects.json` | measured defects used as negative controls; empty groups say why they are empty                                                                                                                                                                                                                                                                                                                                                                                 |
 | `NOTES.md`           | free-prose idiosyncrasies of the corpus, for humans and the skill. **No script reads it.**                                                                                                                                                                                                                                                                                                                                                                      |
+| `explainer/`         | optional. The subject's checked-in explainer narrative — `manifest.json` (the document's spine), `provenance.json` (per file: its digest, who drafted it, the sources it was drafted from with their digests, and its review state) and one markdown file per part. Declared explicitly in `subject.json`'s `explainer.dir`, never discovered, so a mistyped directory is an error rather than a silently empty document.                                       |
 
 `etc/go/lib/subject.mjs` resolves and validates a sidecar (unknown keys refused; a leg entry
 naming a missing golden is a hard error naming the path) and exports it to the driver as
@@ -104,6 +105,69 @@ the LTS DOT to SVG. `mvn` + JDK 17/21 for the DMN engine harnesses on the
 `p7-dmn` leg (reachable since PR #194 landed the corpus cases file). Every
 absence produces a `SKIPPED` receipt naming what is missing and what it was
 needed for.
+
+### Getting `l4` and `jl4-lsp` without building them
+
+`L4` and `JL4_LSP_CMD` want prebuilt binaries, and this driver never builds
+them. Building them yourself needs GHC 9.10.x, Cabal and a slow `cabal build`
+— which is fine on a workstation and impossible inside a cloud sandbox whose
+setup script is capped at a few minutes.
+
+The alternative is a prerelease archive from GitHub Releases.
+`.github/workflows/unstable-prerelease.yml` is the workflow that builds and
+attaches them: one archive per platform, built from `unstable`, published under
+tags of the form `unstable-<YYYYMMDD>-<short-sha>`.
+
+**Status 2026-08-05: that workflow has never been run, so no such release
+exists yet.** It is dispatched by hand, and — because GitHub only offers the
+Run-workflow button for files present on the default branch — it becomes
+dispatchable only once it has reached `main`. Until then, building the binaries
+yourself is still the only route. The rest of this section describes what the
+archives look like once one has been cut.
+
+The URL is constructible from the tag and the platform, so no page-scraping:
+
+```
+https://github.com/legalese/l4-ide/releases/download/<tag>/l4-<tag>-<platform>.tar.gz
+```
+
+with `<platform>` one of `linux-x64`, `darwin-arm64`, `win32-x64`. Each archive
+extracts to a directory of its own name holding `l4`, `jl4-lsp`, a `libraries/`
+copy of the standard library, and a `BUILD-INFO.txt` naming the commit it came
+from. A `SHA256SUMS` file covering all three archives is attached to the same
+release.
+
+```bash
+TAG=<pick one from the releases page>
+PLATFORM=linux-x64   # or darwin-arm64, win32-x64
+BASE=https://github.com/legalese/l4-ide/releases/download/$TAG
+
+curl -fsSLO "$BASE/l4-$TAG-$PLATFORM.tar.gz"
+curl -fsSLO "$BASE/SHA256SUMS"
+sha256sum --ignore-missing -c SHA256SUMS   # macOS without coreutils: shasum -a 256 --ignore-missing -c SHA256SUMS
+tar -xzf "l4-$TAG-$PLATFORM.tar.gz"
+
+export L4="$PWD/l4-$TAG-$PLATFORM/l4"
+export JL4_LSP_CMD="$PWD/l4-$TAG-$PLATFORM/jl4-lsp"
+```
+
+Three things worth knowing:
+
+- **These are prereleases, and they say so.** They are built from `unstable`,
+  the integration branch, and are flagged `prerelease` so they never appear as
+  the repository's "Latest release". `/releases/latest` will not find them —
+  read the releases list, or use the tag you were given.
+- **Leave `JL4_LIBRARY_PATH` alone.** The standard library is compiled into the
+  binary; the `libraries/` directory in the archive is there for standalone use
+  outside a checkout. Inside the repo the driver already points it at
+  `<repo>/jl4-core/libraries`.
+- **macOS may quarantine the download.** Clear it with
+  `xattr -dr com.apple.quarantine "l4-$TAG-darwin-arm64"`.
+
+Do not use the binary bundled inside the published VS Code extension for this.
+As of 2026-08-05 the most recent extension build is the one `main-tag.yml`
+produced on 2026-07-18, which predates the `l4 export` subcommand, so it cannot
+drive the DMN or BPMN legs.
 
 ## Selftests
 
@@ -175,8 +239,45 @@ subject resolver refuses an unknown subject (listing the available sidecars), a
 descriptor naming a nonexistent golden, and a descriptor carrying an unknown
 key. `--with-driver` also
 drives the whole G1 pipeline twice and asserts that the second run re-executes
-nothing but the report — the only mechanical check that `replayed` means
-anything.
+nothing but the two stages that declare no inputs (`p9-report`, `p9-explain`) —
+the only mechanical check that `replayed` means anything. It also asserts that
+every declared g1 stage sequenced at or after `p6-tests` is gated by HG1, which
+is the one invariant whose violation is silent in every other direction.
+
+## The two documents a run produces
+
+| file             | what it is                                                                                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `report.md`      | the AUDIT account, rendered by `p9-report` from `journal.ndjson` and nothing else. Its template may not contain a two-digit number; every figure is a placeholder resolved from a journal row.     |
+| `explainer.html` | the READER-facing sibling, rendered by `p9-explain`. It explains the body of law and, interleaved with that, what happened when somebody made it executable. `explainer.md` carries the same text. |
+
+Both are written into the run directory and never into the tree; copying either
+anywhere a third party can see it is publication, which is P10, which is HG2's.
+
+The explainer's discipline is the report's, adapted to a document that must
+carry prose and figures. Run facts are placeholders resolved from the journal.
+Every OTHER number lives in a narrative file under
+`etc/go/subjects/<id>/explainer/`, where it must be a placeholder or a citation
+— `[$5,000,000](src:path#L151)` — whose source line the renderer re-opens and
+matches before printing it. A citation that does not resolve prints the figure
+followed by a visible complaint and degrades the stage. Narrative that has not
+been reviewed renders behind a draft banner; no signer is enrolled today, so all
+of it does, and `p9-explain` rides `DEGRADED` for that reason. Design and
+rulings: [`EXPLAINER-REPORT-SPEC.md`](../../specs/todo/single-instruction-demo/EXPLAINER-REPORT-SPEC.md).
+
+Provenance is maintained with:
+
+```
+node etc/go/lib/narrative-provenance.mjs <subject> [--check | --bless]
+```
+
+`--check` (the default) reports every narrative file whose text or whose cited
+sources have moved since the record was written, and exits 1 if any has.
+`--bless` rewrites those digests **and clears the affected records' review
+state**, because a review signed over one text and one set of sources says
+nothing about a different text or different sources. It will not invent a
+`drafted_from` for a file that has no record: what a paragraph was drafted from
+is a fact about how it was written, and no tool can observe it afterwards.
 
 `assert-report.selftest.mjs` mutates a real captured `l4 run --json` envelope
 ten ways to prove the assertion checker can be red. It exists because `l4 run`

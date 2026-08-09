@@ -125,7 +125,14 @@ jobs:
             # the driver are one unit and are gated as one.
             go:
               - 'etc/go/**'
-              - '.claude/skills/running-the-l4-pipeline/**'
+              # ALL skills, not just the pipeline one. Narrowed to
+              # running-the-l4-pipeline, this filter left every other skill
+              # ungated: on 2026-08-09 writing-l4-rules was still exhibiting a
+              # corpus defect repaired that same day as the live present state,
+              # and nothing would have run on a PR that touched only it.
+              # Verified before widening that `.claude/skills/**/*.md` is
+              # prettier-clean, so this adds coverage without turning CI red.
+              - '.claude/skills/**'
               - 'specs/todo/single-instruction-demo/**'
             mlir:
               - 'jl4-mlir/**'
@@ -153,6 +160,11 @@ jobs:
               # them.
               - 'jl4/tests-cli/fixtures/dmn-xsd-order/**'
               - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
+              # The date-arithmetic clamp pair: likewise hand-written, and the
+              # thing it gates is an equivalence between daydate and FEEL, so a
+              # change to EITHER side should run it.
+              - 'jl4/tests-cli/fixtures/dmn-date-arith/**'
+              - 'jl4-core/libraries/daydate.l4'
               # The engine-intersection triple: likewise hand-written.
               - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
               # See the note on the haskell filter.
@@ -253,6 +265,7 @@ jobs:
           etc/go/go.sh plan --milestone g1 | tee /tmp/plan.txt
           grep -q 'p0-preflight' /tmp/plan.txt
           grep -q 'entry points that exist and refuse' /tmp/plan.txt
+          grep -q 'p9-explain' /tmp/plan.txt
           etc/go/go.sh plan --milestone g2 | tee /tmp/plan-g2.txt
           grep -q 'p1-ingest' /tmp/plan-g2.txt
           grep -q 'NOT WIRED' /tmp/plan-g2.txt
@@ -320,6 +333,77 @@ jobs:
             exit 1
           }
           echo "ok the template contains no literal measurement, and the renderer refuses a runless journal"
+
+      # The SAME check for the explainer's template, and it needs its own step:
+      # the leg above names render-report.mjs by path, so a sibling template
+      # gets no coverage from it. Same two assertions, for the same reason —
+      # the second proves the digit check was actually reached.
+      - name: The explainer template carries no transcribed measurement
+        run: |
+          mkdir -p /tmp/empty-run
+          printf '' > /tmp/empty-run/journal.ndjson
+          out=$(node etc/go/report/render-explainer.mjs /tmp/empty-run 2>&1) || true
+          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
+          echo "$out" | grep -q 'no run_begin' || {
+            echo "::error::expected the explainer renderer to get past the template check and refuse the empty journal; it said: $out"
+            exit 1
+          }
+          echo "ok the explainer template contains no literal measurement, and the renderer refuses a runless journal"
+
+      # Every figure in the shipped narrative must still resolve against the
+      # source line it cites. This is the check that stops the explainer from
+      # becoming a second place where numbers are typed: it re-reads every cited
+      # line, and it goes red when the corpus moves underneath the prose.
+      - name: Every citation in the shipped narrative resolves
+        run: |
+          node - <<'EOF'
+          import("./etc/go/lib/narrative.mjs").then(async (n) => {
+            const { readFileSync, readdirSync, existsSync } = await import("node:fs");
+            const { resolve } = await import("node:path");
+            let total = 0, unresolved = 0, lint = 0;
+            for (const sub of readdirSync("etc/go/subjects")) {
+              const dir = resolve("etc/go/subjects", sub, "explainer");
+              if (!existsSync(dir)) continue;
+              for (const f of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
+                const text = readFileSync(resolve(dir, f), "utf8");
+                for (const p of n.lintNarrative(text)) {
+                  lint++;
+                  console.log(`::error file=${dir}/${f},line=${p.line}::[${p.code}] ${p.message}`);
+                }
+                const r = n.resolveCitations(text, {
+                  resolveSrc: (p) => (existsSync(resolve(p)) ? resolve(p) : null),
+                  resolveArt: () => null,
+                });
+                total += r.total;
+                for (const c of r.findings) {
+                  // An `art:` citation names a RUN artifact and cannot resolve
+                  // outside a run; everything else must.
+                  if (c.code === "C-ARTIFACT-UNKNOWN") continue;
+                  unresolved++;
+                  console.log(`::error file=${dir}/${f}::[${c.code}] ${c.target} — ${c.detail}`);
+                }
+              }
+            }
+            console.log(`narrative: ${total} citation(s) checked, ${unresolved} unresolved, ${lint} lint finding(s)`);
+            process.exit(unresolved + lint === 0 ? 0 : 1);
+          });
+          EOF
+
+      # Provenance drift is a PROMPT TO RE-READ, not a defect, so this warns and
+      # does not block. The blocking check is the one above: a source that moved
+      # far enough to break a citation fails the build. A source that moved
+      # without breaking one means somebody should re-read the paragraph, and
+      # making that fatal would block every unrelated corpus PR and teach people
+      # to re-bless without reading — which is the one thing the provenance
+      # record exists to prevent.
+      - name: Narrative provenance is in step with its sources
+        run: |
+          for s in $(node etc/go/lib/subject.mjs --list); do
+            out=$(node etc/go/lib/narrative-provenance.mjs "$s" --check 2>&1) || true
+            echo "$out"
+            echo "$out" | grep -qE 'drifted, 0 narrative' && continue
+            echo "::warning::narrative provenance for '$s' has drifted; re-read the affected sections, then: node etc/go/lib/narrative-provenance.mjs $s --bless"
+          done
 
   bpmn:
     name: BPMN Soundness
@@ -946,26 +1030,38 @@ jobs:
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected' camunda.log
 
       # The CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
-      # the whole 67-decision Reg CF corpus, built and value-checked on both
+      # the whole 70-decision Reg CF corpus, built and value-checked on both
       # engines. This is deliverable R0's gate — "the execution is the exhibit"
       # — and its counts are pinned to the LOCALLY MEASURED verdict lines
-      # (2026-08-03), not to round numbers. 20 cases x 67 decisions = 1340:
+      # (2026-08-09), not to round numbers. 22 cases x 70 decisions = 1540:
       # the base world, the 15 dated cases relocating the rule-date-rebinding
-      # fixtures R12 dropped from the artifact (spec §15.12.1), and the 4 seed
+      # fixtures R12 dropped from the artifact (spec §15.12.1), the 4 seed
       # cases that close the total-assets and restricted-period leaves the §8
-      # diff oracle reported inert. Earlier pins on this same artifact read
+      # diff oracle reported inert, THE LEAP CASE, and THE ESCHEAT CASE.
+      # Earlier pins on this same artifact read
+      # '21 case(s) ... 1449/1449 ... 315/315' (2026-08-05, while Rule
+      # 501(a)(4) was one ~300-character boolean),
+      # '20 case(s) ... 1340/1340 ... 280/280' (2026-08-03,
+      # while Rule 501(a)'s "one year" was the constant 365),
       # '16 case(s) ... 1072/1072 ... 224/224' (2026-08-02, before the seeds)
       # and '1 case(s) ... 67/67' (81ece880); before R12/R13 the file was
       # VALID 16 error(s) on KIE and PARSE INVALID on Camunda.
       #
-      # The KIE pin includes the service clause on purpose: 280/280 is the
+      # 67 -> 69 and 20 -> 21 on 2026-08-05, when the resale restriction became
+      # a calendar anniversary instead of a flat 365 days. The two decisions are
+      # the anniversary and the deadline computed from it; the case is the one
+      # the constant got WRONG — day 365 of a holding spanning 29 Feb 2024,
+      # which the flat count permitted and the calendar refuses. It is gated
+      # HERE, on engines we do not control, because that is what R0 means.
+      #
+      # The KIE pin includes the service clause on purpose: 315/315 is the
       # decision-service sweep VALUE-checking every declared outputDecision
-      # (fed its inputDecisions' computed values; 7 services, 14 outputs, per
+      # (fed its inputDecisions' computed values; 7 services, 15 outputs, per
       # case), and "0 warning(s)" counts runtime WARNs too since 81ece880 —
       # both were blind spots before.
       #
       # regcf-corpus.cases.json's expect block is SYMMETRIC with the model's
-      # decision population (67/67 both ways, in every case), so a decision
+      # decision population (70/70 both ways, in every case), so a decision
       # added to the corpus without a pin, or a pin left behind by a dropped
       # decision, fails here rather than passing silently.
       - name: The Reg CF corpus -- both engines, end to end (R12/R13)
@@ -979,12 +1075,12 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/regcf-corpus.dmn \
             --cases jl4/examples/dmn/regcf-corpus.cases.json | tee kie-corpus.log
-          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 20 case(s), 0 error(s), 0 warning(s), 1340/1340 decision(s) SUCCEEDED, 1340/1340 value(s) as expected, 280/280 service output value(s) as expected' kie-corpus.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s), 0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected, 330/330 service output value(s) as expected' kie-corpus.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/regcf-corpus.dmn \
             --cases jl4/examples/dmn/regcf-corpus.cases.json | tee camunda-corpus.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 20 case(s), 1 parsed, 0 error(s), 1340/1340 decision(s) evaluated, 1340/1340 value(s) as expected' camunda-corpus.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated, 1540/1540 value(s) as expected' camunda-corpus.log
 
       # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
       #
@@ -1124,6 +1220,71 @@ jobs:
           fi
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-date-negative.log
           grep -q 'PARSE  INVALID' camunda-date-negative.log
+
+      # The DATE ARITHMETIC pair (added 2026-08-05). The step above settled date
+      # LITERALS and date COMPARISONS; this one settles date ARITHMETIC, which is
+      # what an anniversary needs and what Reg CF's Rule 501(a) now uses.
+      #
+      # WHAT IS ACTUALLY BEING GATED is an EQUIVALENCE, not a feature: daydate's
+      # `add months`/`add years` CLAMP the day to the target month's last day,
+      # the exporter lowers them to FEEL's `date + duration(...)`, and that is
+      # sound only if FEEL clamps the same way. DMN 1.3's own formula does NOT
+      # clamp -- it preserves the day component, which for 29 February plus one
+      # year names a date that does not exist -- so the spec text and the engines
+      # had to be treated as disagreeing until measured. They clamp, on months
+      # and years alike, and agree with L4 on all six cases. If this goes red the
+      # two lowering arms in jl4-core/src/L4/Dmn/Lower.hs are unsound and the
+      # corpus's exported resale restriction has drifted from its own #ASSERTs.
+      #
+      # THE NEGATIVE IS NOT DECORATION. It is the reason the corpus writes
+      # `add years` rather than rebuilding the date from its components:
+      # `date(2025, 2, 29)` is not a date, and neither engine clamps or rolls it.
+      # Three implementations, three answers -- L4's lenient `Date` rolls to
+      # 1 March, FEEL's `date(y+1,m,d)` is null, FEEL's duration clamps to
+      # 28 February -- which is why the idiom is fixed in the library instead of
+      # left to whoever writes the next anniversary.
+      - name: Date arithmetic -- the clamp equivalence, and its negative (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          arith=jl4/tests-cli/fixtures/dmn-date-arith
+
+          ./etc/kie-dmn-check/run.sh \
+            "$arith/clamp.dmn" --cases "$arith/clamp.cases.json" | tee kie-date-arith.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected' kie-date-arith.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$arith/clamp.dmn" --cases "$arith/clamp.cases.json" | tee camunda-date-arith.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected' camunda-date-arith.log
+
+          # The NEGATIVE control, same `&& rc=0 || rc=$?` device as above.
+          ./etc/kie-dmn-check/run.sh \
+            "$arith/reconstruct-refused.dmn" \
+            --cases "$arith/reconstruct-refused.cases.json" > kie-arith-negative.log 2>&1 && rc=0 || rc=$?
+          cat kie-arith-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::KIE produced a clamped anniversary from date(y + 1, m, d); the reconstruction refusal no longer holds"
+            exit 1
+          fi
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-arith-negative.log
+          # The CONTROL in the same file must still pass, so the red isolates to
+          # the reconstruction rather than to anything about the fixture.
+          grep -q 'anniv_duration .*SUCCEEDED .*2025-02-28' kie-arith-negative.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$arith/reconstruct-refused.dmn" \
+            --cases "$arith/reconstruct-refused.cases.json" > camunda-arith-negative.log 2>&1 && rc=0 || rc=$?
+          cat camunda-arith-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Camunda produced a clamped anniversary from date(y + 1, m, d); the reconstruction refusal no longer holds"
+            exit 1
+          fi
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-arith-negative.log
+          grep -q 'anniv_duration .*2025-02-28' camunda-arith-negative.log
 
       # The negative control for the placement rule (DMN-EXPORT-PROGRAM-MODEL-SPEC.md
       # §4.3, §9). Every other step above asserts that a gate stays GREEN, which

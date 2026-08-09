@@ -96,6 +96,8 @@ p7-dmn:       PASS
 p7-bpmn:      DEGRADED
 p7-tnr:       PASS
 p7-akn:       UNVERIFIED
+p9-report:    PASS
+p9-explain:   DEGRADED
 go: VERDICT: g1 COMPLETE
 ```
 
@@ -135,12 +137,12 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 etc/go/go.sh run --milestone g1 --subject regcf --run-id <run-id>
 ```
 
-Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact. A second run back to back re-executes nothing but the report.
+Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact. A second run back to back re-executes only the two stages that declare no inputs.
 
 **Key idioms:**
 
 - **Resume into the same run id.** A new run id is a new run, and it will redo everything.
-- **`p9-report` never replays**, by design: the journal grows while it runs, and a stale report claiming to be current is the worst possible artifact.
+- **`p9-report` and `p9-explain` never replay**, by design: each is a function of the journal, the journal grows while it runs, and a stale document claiming to be current is the worst possible artifact. They are the only two stages that declare an empty `--inputs` set, and `etc/go/selftest.mjs` asserts that as a named set rather than as a count.
 - **If a stage re-runs when you expected a replay, an input moved.** That is the digest doing its job. Find out what changed before assuming the driver is wrong.
 
 ### 7. Read the report
@@ -152,6 +154,23 @@ $TMPDIR/l4-go/<run-id>/report.md
 It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 requires but this milestone cannot fill render as **ABSENT** with the reason and the stage that would have supplied them — never omitted. Notes you asked a phase script to record render in a block labelled _claimed, not verified_, with the author.
 
 Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most recent few **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected.
+
+### 7b. Read the explainer, which is a different document for a different reader
+
+```
+$TMPDIR/l4-go/<run-id>/explainer.html   (and explainer.md)
+```
+
+`report.md` accounts for the run. `explainer.html` explains **the body of law**, and — interleaved with that — **what happened when somebody made it executable**. It is rendered by `p9-explain` from the journal, from the subject's checked-in narrative under `etc/go/subjects/<id>/explainer/`, and from the artifacts this run's receipts attest.
+
+**Key idioms:**
+
+- **Prose lives in the subject, not in the template.** A narrative file carries its own provenance record naming the sources it was drafted from, with their digests, so a later run detects drift in the narrative, in a source, or in a review that no longer covers the text it signed.
+- **Every number in it is checked at render time.** A figure is either a placeholder resolved from the journal or a citation — `[$5,000,000](src:path#L151)` — whose source line the renderer re-opens and matches before printing it. A citation that does not resolve prints the figure followed by a visible complaint and degrades the stage.
+- **Unreviewed narrative renders as draft, three times over.** No signer is enrolled today, so every section does, and `p9-explain` rides `DEGRADED` for that reason. That is the correct state, not a near miss.
+- **The explainer never links back from the report.** It can legitimately not exist for a run; a report linking to a document that was never produced would be a claim the journal does not support. `go.sh` prints its path at the end of a run instead.
+- **Edited the corpus? Re-read the narrative, then re-bless it.** `node etc/go/lib/narrative-provenance.mjs <subject> --check` names every section whose text or cited sources have moved; `--bless` updates the digests and **clears the affected review states**, because a review signed over one text says nothing about another. Do not bless without reading.
+- Design and rulings: `specs/todo/single-instruction-demo/EXPLAINER-REPORT-SPEC.md`.
 
 ### 8. Hand it to somebody who should not have to trust you
 
@@ -215,7 +234,17 @@ etc/go/go.sh run --milestone g2 --subject <id> --only p1-ingest
 
 ### P1 — fetch with provenance
 
-Fetch the subject's source from its `source_url` and write a `source-bundle`. What the schema makes non-optional is what the BNA smoke run learned the hard way:
+Fetch the subject's source from its `source_url` and write a `source-bundle`.
+
+**Fetch the instrument it is made under, too.** A regulation is promulgated under a statute, a statutory instrument under a parent Act, a by-law under an ordinance. Fetch that with the same provenance and record it as a document with `role: "instrument"` — the specific empowering provision where the source names one, the enabling Act where it does not.
+
+This is not bookkeeping, and it is not the same job as P2. **You cannot tell whether a word in the subject is compelled or chosen without reading the text above it**, and no other stage looks there: P2 sweeps _forward_ in time for what has happened to a provision since it was printed, never _up_ to its source of authority.
+
+Reg CF is the worked instance. 17 CFR 227.100(a)(2) computes the investment limit from "the greater of" the investor's annual income or net worth. Read alone, that is simply what the law says. Read against 15 U.S.C. 77d(a)(6)(B) it is something else: the statute says only "a given percentage of the annual income or net worth of such investor, as applicable" — **it specifies neither** — and the Commission picked "lesser of" in 2015, held it five years, then reversed to "greater of" in 2021, noting that "[t]he statutory language does not expressly provide that the investor use the lesser of" (86 FR 3496, n.460). So the operative word is a reversible policy choice with a live prior arm, not a statutory command. The corpus built the slow way carries both arms on the rule-version axis (`regcf.l4:405-407`). The de novo run captured three regulations and three corroborations, never reached up, and encoded "greater of" as though the statute had said so.
+
+That is the general shape, and it is why the fetch is not optional: **a regulation's word looks compelled until you read the instrument that did not compel it.**
+
+What the schema makes non-optional is what the BNA smoke run learned the hard way:
 
 - **Archive fallback.** legislation.gov.uk answered an AWS WAF challenge, and the run completed through Wayback captures. Record that as `retrieval_method: "archive"` with the `archive_url` — the schema requires the URL when the method is `archive`, and forbids it otherwise.
 - **The in-force banner**, in `in_force` — the "up to date with all changes known to be in force on or before ⟨date⟩" line, or a stated reason there is none. The Jersey charities fetch recorded "Showing the law from 16 October 2025 to Current" instead, which is the same field for a different jurisdiction's phrasing.
@@ -246,7 +275,9 @@ Open a fork wherever two readings of the source survive, and record it. R4 is ru
 
 `materialisation` is a discriminator, not an assumption. The two inventories anyone has actually produced — the BNA smoke's twelve and the Jersey charities cleanroom's twelve — resolved **every** ambiguity at encode time or delegated it to a fact-supplier, and materialised none. "Twelve forks, none materialised" is a real and interesting result, and the stage records the counts per class so the report can say it.
 
-Cross-reference P2: a fork an authority has already settled carries `settled_by` rather than presenting as open, and the `cross-refs-resolve` join checks that the id it cites is real. Deposit the register; run the stage; the receipt is the fact.
+Cross-reference P2: a fork an authority has already settled carries `settled_by` rather than presenting as open, and the `cross-refs-resolve` join checks that the id it cites is real.
+
+**Cross-reference P1's `instrument` document too, and read the two texts against each other.** Where the subject says something its authorising instrument does not, that is a fork of a distinct kind — not an ambiguity in one text but a disagreement between two, and the reading with the weaker claim may be the one the subject itself states. Record both readings and say which instrument licenses each. If the bundle has no `instrument` document, this check cannot run, and P4 should say so rather than leave a reader to infer the texts agreed. Deposit the register; run the stage; the receipt is the fact.
 
 ### P5 — the adversarial gate
 

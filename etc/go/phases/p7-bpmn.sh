@@ -5,11 +5,23 @@
 # acceptance + soundness + DMN wiring. Engine execution of the process is a
 # declared NON-GOAL: the process runs on the parties, and jBPM is corroboration.
 #
-# THIS LEG REPORTS `DEGRADED` EVEN WHEN EVERY CHECKER IS GREEN, because the
-# third element of its own bar — a businessRuleTask in the emitted BPMN wired to
-# the emitted DMN — is NOT BUILT and has no checker (PROCESS-TRACK §8.3 says so
-# in those words, and gates it on DMN Phase 5). A leg with an unbuilt mandatory
-# half may not print PASS.
+# THE THIRD ELEMENT OF THAT BAR — a businessRuleTask in the emitted BPMN wired
+# to the emitted DMN — IS BUILT, AND THIS LEG CHECKS IT.
+#
+# This header and this leg's receipt both used to say the wiring was "NOT BUILT
+# and has no checker", citing PROCESS-TRACK.md §8.3. That section now opens
+# "mandated 2026-08-01, BUILT 2026-08-02" and reads "Status: BUILT"; each of the
+# three committed goldens carries two `businessRuleTask` occurrences; and
+# `etc/check-bpmn-dmn-refs.mjs` is the checker CI already runs
+# (.github/workflows/pr-checks.yml:404). MEASURED 2026-08-03: that checker over
+# the three goldens and the committed DMN exits 0, "all resolve". The leg was
+# publishing a stale absence as a live finding — and the explainer republished
+# it verbatim to a lay reader, beside a table row showing the wiring present.
+#
+# The references resolve against the COMMITTED DMN golden rather than this run's
+# emitted one: a stage may not depend on another stage's output without
+# declaring it as an input, and `p7-dmn` separately establishes that the emitted
+# DMN is that golden byte for byte, or reports that it is not.
 #
 # The rule names are DISCOVERED, not transcribed: `l4 export FILE --to bpmn`
 # with no --rule exits 1 and enumerates them. The rule -> output-filename map
@@ -29,7 +41,8 @@
 
 if [[ "${1:-}" == "--inputs" ]]; then
   printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
-    "$GO_ROOT/etc/check-bpmn-soundness.mjs" "$GO_ROOT/etc/validate-bpmn.mjs"
+    "$GO_ROOT/etc/check-bpmn-soundness.mjs" "$GO_ROOT/etc/validate-bpmn.mjs" \
+    "$GO_ROOT/etc/check-bpmn-dmn-refs.mjs" ${GO_S_DMN_GOLDEN:+"$GO_S_DMN_GOLDEN"}
   while IFS=$'\t' read -r _rule stem; do
     [[ -n "$stem" ]] && printf '%s\n' "$GO_S_BPMN_EXPECTED_DIR/$stem.bpmn"
   done < <(node "$(dirname "${BASH_SOURCE[0]}")/../lib/subject.mjs" "$GO_SUBJECT" bpmn-rules)
@@ -106,10 +119,53 @@ VALID_RC=$?
 set -e
 echo "validate-bpmn → exit $VALID_RC" | tee -a "$LOG"
 
+# --- 5. the DMN wiring (PROCESS-TRACK.md §8.3) -------------------------------
+# Every businessRuleTask names a (namespace, model, decision) triple, which is
+# the whole of an engine's lookup key. A dangling one is the single defect this
+# linkage can have that a reader cannot see: the diagram still draws, the file
+# still parses, and the delegation silently does nothing.
+WIRE_RC=0
+WIRE_SAYS=""
+if [[ -n "${GO_S_DMN_GOLDEN:-}" && -f "$GO_S_DMN_GOLDEN" ]]; then
+  set +e
+  node "$GO_ROOT/etc/check-bpmn-dmn-refs.mjs" "${FILES[@]}" "$GO_S_DMN_GOLDEN" >>"$LOG" 2>&1
+  WIRE_RC=$?
+  set -e
+  echo "check-bpmn-dmn-refs → exit $WIRE_RC" | tee -a "$LOG"
+  WIRE_SAYS="every businessRuleTask in the emitted processes names a (namespace, model, decision) triple that resolves in the committed DMN — which is the artifact p7-dmn compares this run's emitted DMN against, byte for byte"
+else
+  WIRE_RC=-1
+  echo "check-bpmn-dmn-refs → NOT RUN (the subject declares no DMN golden)" | tee -a "$LOG"
+  WIRE_SAYS="the subject declares no DMN golden, so the businessRuleTask references were resolved against nothing"
+fi
+
+# --- 6. the picture ----------------------------------------------------------
+# `pictures.md` promises "a process diagram shows the same duty as a workflow",
+# and until now the section printed the fidelity table and no diagram. The DI
+# in each emitted file carries every coordinate, so this is a transform, not a
+# layout engine — see the header of etc/bpmn-to-svg.mjs for why it is not
+# bpmn-js. A render failure is a FINDING, not a warning: the renderer throws on
+# any element outside the exporter's closed vocabulary, and that throw is how a
+# newly-added node kind announces itself instead of silently vanishing from a
+# legal diagram.
+SVG_RC=0
+declare -a SVGS=()
+for f in "${FILES[@]}"; do
+  svg="${f%.bpmn}.svg"
+  if node "$GO_ROOT/etc/bpmn-to-svg.mjs" "$f" "$svg" >>"$LOG" 2>&1; then
+    SVGS+=("$svg")
+  else
+    SVG_RC=1
+    echo "bpmn-to-svg → FAILED on $(basename "$f")" | tee -a "$LOG"
+  fi
+done
+echo "bpmn-to-svg → ${#SVGS[@]}/${#FILES[@]} rendered, exit $SVG_RC" | tee -a "$LOG"
+
 ARTS=()
 for f in "${FILES[@]}"; do
   ARTS+=(--artifact "$f")
   [[ -f "${f%.bpmn}.fidelity.txt" ]] && ARTS+=(--artifact "${f%.bpmn}.fidelity.txt")
+  [[ -f "${f%.bpmn}.svg" ]] && ARTS+=(--artifact "${f%.bpmn}.svg")
 done
 ARTS+=(--artifact "$LOG")
 
@@ -118,6 +174,16 @@ RULE_METRIC="$(
   echo "${RULES[*]}"
 )"
 
+# Ordered after RULE_METRIC deliberately: every receipt below cites it, and an
+# unset metric would be reported as an empty rule list rather than as an error.
+if [[ $SVG_RC -ne 0 ]]; then
+  go_receipt --status DEGRADED \
+    --reason "$((${#FILES[@]} - ${#SVGS[@]})) of ${#FILES[@]} emitted processes could not be rendered to SVG. etc/bpmn-to-svg.mjs covers exactly the closed vocabulary L4.Bpmn.IR emits and throws on anything else, so this is how a new node kind reports itself rather than disappearing from a legal diagram. See $LOG for the element it refused." \
+    "${ARTS[@]}" --metric "processes=${#FILES[@]}" --metric "rules=$RULE_METRIC" \
+    --metric "svg_exit=$SVG_RC"
+  exit "$GO_EXIT_FINDING"
+fi
+
 if [[ $DIFFS -gt 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "$DIFFS emitted BPMN artifact(s) differ from their committed goldens; see $LOG. Do NOT regenerate the goldens to make this green — jl4-test and the CI bpmn job both defend them." \
@@ -125,21 +191,40 @@ if [[ $DIFFS -gt 0 ]]; then
   exit "$GO_EXIT_FINDING"
 fi
 
-if [[ $SOUND_RC -ne 0 || $VALID_RC -ne 0 ]]; then
+if [[ $SOUND_RC -ne 0 || $VALID_RC -ne 0 || $WIRE_RC -gt 0 ]]; then
   go_receipt --status DEGRADED \
-    --reason "a BPMN checker objected: soundness exit $SOUND_RC, interchange exit $VALID_RC. See $LOG." \
+    --reason "a BPMN checker objected: soundness exit $SOUND_RC, interchange exit $VALID_RC, DMN-wiring exit $WIRE_RC. See $LOG." \
     "${ARTS[@]}" --metric "processes=${#FILES[@]}" --metric "rules=$RULE_METRIC" \
-    --metric "soundness_exit=$SOUND_RC" --metric "interchange_exit=$VALID_RC"
+    --metric "soundness_exit=$SOUND_RC" --metric "interchange_exit=$VALID_RC" \
+    --metric "dmn_wiring_exit=$WIRE_RC"
   exit "$GO_EXIT_FINDING"
 fi
 
-# Green on every checker that exists — and still DEGRADED, because the leg's own
-# acceptance bar has a third element with no implementation.
-go_receipt --status DEGRADED \
-  --reason "all ${#FILES[@]} emitted processes reproduce their committed goldens byte for byte, pass soundness (S1 option-to-complete, S2 deadlock-free, S3 no dead node, S4 1-bounded), and pass the bpmn-moddle interchange gate. Because the output IS the committed goldens, CI's jBPM baseline verdict over those goldens applies to it. The leg is nonetheless DEGRADED because the THIRD element of its own acceptance bar — a businessRuleTask wiring the emitted BPMN to the emitted DMN — is NOT BUILT and has no checker; PROCESS-TRACK.md §8.3 declares it mandated and unbuilt, gated on DMN Phase 5 BKM emission. A leg with an unbuilt mandatory half may not print PASS." \
+# The wiring check could not run at all. That is a coverage gap, not a green:
+# with nothing to resolve against, every reference would pass vacuously.
+if [[ $WIRE_RC -lt 0 ]]; then
+  go_receipt --status DEGRADED \
+    --reason "all ${#FILES[@]} emitted processes reproduce their committed goldens byte for byte, pass soundness (S1 option-to-complete, S2 deadlock-free, S3 no dead node, S4 1-bounded) and pass the bpmn-moddle interchange gate — but the third element of this leg's acceptance bar was not checked at all: $WIRE_SAYS. A dangling businessRuleTask reference is the one defect this linkage can have that a reader cannot see." \
+    "${ARTS[@]}" --metric "processes=${#FILES[@]}" --metric "rules=$RULE_METRIC" \
+    --metric "soundness_exit=$SOUND_RC" --metric "interchange_exit=$VALID_RC" \
+    --metric "dmn_wiring_exit=$WIRE_RC"
+  exit "$GO_EXIT_FINDING"
+fi
+
+# Every element of this leg's own acceptance bar now has a checker, and every
+# checker is green. PROCESS-TRACK.md §8's bar is acceptance + soundness + DMN
+# wiring; engine execution of the process is a declared non-goal (R0).
+go_receipt --status PASS \
+  --oracle-cmd "l4 export --to bpmn, one per discovered rule, then cmp against each committed golden; check-bpmn-soundness.mjs; bpmn-moddle validate-bpmn.mjs; check-bpmn-dmn-refs.mjs against the committed DMN" \
+  --oracle-exit 0 \
+  --oracle-class differential \
+  --oracle-because "all ${#FILES[@]} emitted processes reproduce their committed goldens byte for byte, pass soundness (S1 option-to-complete, S2 deadlock-free, S3 no dead node, S4 1-bounded), pass the bpmn-moddle interchange gate, and $WIRE_SAYS. Because the output IS the committed goldens, CI's jBPM baseline verdict over those goldens applies to it" \
   "${ARTS[@]}" \
   --metric "processes=${#FILES[@]}" \
   --metric "soundness_exit=$SOUND_RC" --metric "interchange_exit=$VALID_RC" \
+  --metric "dmn_wiring_exit=$WIRE_RC" \
   --metric "rules=$RULE_METRIC" \
+  --metric "svg_exit=$SVG_RC" \
+  --note "each process is also rendered to a standalone SVG from its own diagram interchange, so the explainer's process subsection can show the duty rather than only describe it. The renderer is a coordinate transform, not a layout engine, and it throws on any element outside the exporter's vocabulary" \
   --note "engine execution of the process is a declared non-goal (R0): the process runs on the parties" \
   --note "the jBPM baseline comparator (etc/check-bpmn-kie-baseline.mjs) is NOT this leg's oracle: its baseline covers the whole committed BPMN corpus, so a three-file run reports the other three as NOT CHECKED and exits 1. Measured 2026-08-02."

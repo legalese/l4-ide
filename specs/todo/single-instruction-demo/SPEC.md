@@ -22,8 +22,8 @@ ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo, and P8's ru
 §5 is the verified inventory and §6 is the gap register.
 This document owns the pipeline decisions; per-projection rulings stay in their own specs
 (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, `lexipedia-superset/SPEC.md`,
-`ladder-diagrams-2026/DESIGN.md`, `QUESTION-ORDERING-SPEC.md`), which this spec cites but does
-not override.
+`ladder-diagrams-2026/DESIGN.md`, `QUESTION-ORDERING-SPEC.md`,
+`EXPLAINER-REPORT-SPEC.md`), which this spec cites but does not override.
 
 ---
 
@@ -80,8 +80,37 @@ only what an earlier stage committed.
 
 Pull the current and historical rule text (the 2016 adoption, the 2017 and 2022 inflation
 adjustments, the 2021 amendments, the COVID-19 temporary rules) with Federal Register citations
-attached. Deliverable: a source bundle with provenance (URL, retrieval date, FR cites) that P3
-encodes from and P9 cites. Machine-readable format:
+attached.
+
+**And pull the instrument the subject is made under** (added 2026-08-06): the enabling statute for
+a regulation, the parent Act for a statutory instrument — recorded as a document with
+`role: "instrument"`, a value the schema has always carried and nothing had ever asked for. The
+reason is that **a word in the subject looks compelled until you read the instrument that did not
+compel it**, and no other stage looks in that direction: P2 sweeps forward in time for what has
+happened to a provision since it was printed, never up to the provision's own source of authority.
+
+MEASURED 2026-08-06: the Reg CF de novo bundle holds three `current` documents (17 CFR 227,
+230.501, 270.3a-9) and three `corroboration` documents, and **no statute**. So it encoded
+§ 227.100(a)(2)'s "greater of the investor's annual income or net worth" as simply what the law
+says. Against 15 U.S.C. 77d(a)(6)(B) it is not: the statute says only "a given percentage of the
+annual income or net worth of such investor, as applicable" — **specifying neither measure** — and
+the Commission chose "lesser of" in 2015, held it five years, then reversed in 2021, noting that
+"[t]he statutory language does not expressly provide that the investor use the lesser of" (86 FR
+3496, n.460). The committed corpus reaches the statute, records this as `F-4A6B-MEASURE`, and
+carries both arms live on the rule-version axis (`regcf.l4:405-407`). P4 reads the two texts
+against each other and opens a fork wherever the subject decides something its authority left open.
+
+**Corrected 2026-08-06, same day, before this text had been relied on.** The first version of this
+paragraph asserted that 15 U.S.C. 77d(a)(6)(B) "says 'the lesser of'". It does not; the phrase
+appears nowhere in § 77d. The claim was copied from `F-4A6B-MEASURE`'s own rationale in
+`jl4/examples/legal/regcf/fork-register.json` and sharpened in the copying, without checking either
+the statute or `regcf.l4:394-403`, which had it right ten lines from the encoding. That register
+entry still carries the false form and is corrected in the same change. This is the failure mode
+the user-level `CLAUDE.md` rule 2 names — re-verify a borrowed claim where you copy it, and never
+sharpen it — reproduced by the change that was fixing a different instance of it.
+
+Deliverable: a source bundle with provenance (URL, retrieval date, FR cites) that P3 encodes from
+and P9 cites. Machine-readable format:
 [`schemas/source-bundle.schema.json`](./schemas/source-bundle.schema.json) — defined and
 validated 2026-08-02; no stage writes one yet.
 
@@ -236,6 +265,56 @@ externally-settled resolution), what each projection preserved and lost (the fid
 are the raw material), test results, and — where an alternative system has published its own
 representation of the same rule — a factual note of where we disagree with it.
 
+#### P9.1 — The explainer report (a sibling, not a rewrite)
+
+**Status (2026-08-03): BUILT at v0, with one named gap.** The stage is `p9-explain`, declared in
+`G1_STAGES` and gated by HG1; the renderer is `etc/go/report/render-explainer.mjs` over
+`etc/go/report/explainer-template.md`; the Reg CF narrative is checked in at
+`etc/go/subjects/regcf/explainer/`. **The gap is E17's signature verification**: the provenance
+model carries a per-section review state and derives `stale` when the text or a source moves, but
+nothing verifies a signature yet, so a hand-written `"state": "reviewed"` would be believed. Since
+no section claims review today, every section renders as draft and the stage rides `DEGRADED` —
+which is the correct v0 state and not a near miss. The design is
+[EXPLAINER-REPORT-SPEC.md](./EXPLAINER-REPORT-SPEC.md), which owns every decision about it; its
+ruling series is the **E-series**, cited elsewhere as `EXP-En`.
+
+The conversion report above is an **audit** document, and its central rule — no digit-run may be
+typed into `etc/go/report/template.md`, enforced by `render-report.mjs` before it opens a journal
+and again in CI — makes it structurally incapable of explaining a regulation to anybody. The
+explainer is its reader-facing sibling. It does a **dual** job that interleaves rather than
+splitting: it explains **the law** to a lay reader, and alongside each substantive part it explains
+**the L4 treatment of the formalization** — where the prose was vague and the code could not be,
+what the type system refused, where an ambiguity had to fork, what each projection makes visible
+that the others hide, and what the encoding honestly failed to capture. That second thread is what
+makes the document an argument for the method rather than a summary of the rule, and it is held to
+the same discipline: a claim about the encoding is licensed by the encoding, cited to a line.
+
+Three rulings by Meng, 2026-08-03, recorded here and expanded in the owning spec:
+
+- **D1 — narrative provenance.** The lay narrative is **agent-drafted, checked in, and
+  HG1-reviewed**. It lives in the subject directory (`etc/go/subjects/<id>/explainer/`) with a
+  provenance record naming the source it was drafted from, so a later run detects drift when the
+  source text changes. Unreviewed narrative renders visibly marked as draft / "claimed, not
+  verified". See EXPLAINER-REPORT-SPEC.md §5 for the file layout, the record's fields, the three
+  drift classes, and the three-level draft marking.
+- **D2 — a separate sibling artifact.** `explainer.md` + `explainer.html`, beside the existing
+  `report.md` / `report.html`, from a separate stage. **P9's "no typed numbers in the template"
+  invariant survives completely untouched** — `render-report.mjs` and `template.md` are not opened
+  by that build. The two documents cross-link; per `EXP-E16` the link is one-way (explainer →
+  report), because the explainer may legitimately not exist for a run and the report may not assert
+  it does. See §2.
+- **D3 — Reg CF first; the design is not Reg CF-shaped.** The BNA is the planned second subject and
+  is **not in scope** for the v0 build. The spine is fixed by the spec; the body sections are
+  declared per subject in that subject's `explainer/manifest.json`. See §4.1.
+
+Constraints the design records rather than solves, because recording them is the point:
+**there is no in-repo DOT→SVG path** (graphviz is a machine dependency, DOT carries no coordinates,
+so a renderer would be a layout engine — `EXP-E12`); **BPMN/DMN are the opposite case**, since both
+exporters already emit diagram interchange with computed coordinates, so a picture needs a
+serializer and not a layout engine, deferred to v1 with the measurement attached (`EXP-E14`); and
+**no live-deployment claim is available from this repo**, so the call to action is
+stand-it-up-yourself (`EXP-E15`).
+
 ### P10 — Publish
 
 GitHub first: a corpus-of-law repository **separate from l4-ide** (`jl4/examples/` and
@@ -347,10 +426,88 @@ are judgements: the script emits the table with every row `UNTRIAGED` and never 
 Its largest blind spot is stated there and repeated in every report it writes: the battery
 exercises decisions, so a divergence confined to the deontic layer would not appear.
 
+### 8.1 The union target — what best-of-both-worlds contains (added 2026-08-06)
+
+§8 above treats the committed corpus as the reference and the de novo run as the challenger. Two
+Reg CF runs now exist, and that framing does not survive contact with them: **each found things the
+other could not**, so neither is the reference and "the diff" is not the goal. The goal is the
+union, and a fresh run doing the right thing is one that produces it without either run's history
+to lean on.
+
+MEASURED 2026-08-06 against the two committed encodings:
+
+| axis                                  |             run 1 — replay `regcf.l4` | run 2 — de novo `regcf-denovo.l4` | union target                   | supplied by         |
+| ------------------------------------- | ------------------------------------: | --------------------------------: | ------------------------------ | ------------------- |
+| Part 227 sections encoded             |                                    12 |                            **23** | 23                             | run 2, outright     |
+| decisions (`GIVETH`/`DECIDE`/`MEANS`) |                                   191 |                           **485** | 485                            | run 2               |
+| `@ref` citations                      |                                    70 |                           **245** | 245                            | run 2               |
+| authority reached beyond Part 227     |          statute + 230.501 + 270.3a-9 |                230.501 + 270.3a-9 | + statute + construction rules | neither, fully      |
+| forks registered                      |                                     7 |                            **26** | 28                             | run 2 + run 1's two |
+| forks with a measured witness         |                            **6 of 7** |                          12 of 26 | all                            | run 1's discipline  |
+| forks whose divergence is unassessed  |                                 **0** |                                 9 | 0                              | run 1's discipline  |
+| `#ASSERT`                             |                                **83** |                                40 | ≥ 190 at run 1's density       | run 1               |
+| assertions per decision               |                              **0.43** |                              0.08 | 0.43                           | run 1 — a 5× gap    |
+| source bundle with provenance         |                                  none |                   **6 documents** | 6 + an `instrument`            | run 2               |
+| external-modification sweep           |                                  none |       **11 searches, 14 entries** | that, standing                 | run 2               |
+| DMN                                   | **70 decisions, 12 tables, 22 cases** |                              none | that, standing                 | run 1               |
+| BPMN                                  |                       **3 processes** |                              none | that, standing                 | run 1               |
+| ladder figures                        |                                 **7** |                              none | that, standing                 | run 1               |
+| wizard façade                         |                         **8 exports** |                              none | that, standing                 | run 1               |
+
+Run 1's figures moved on 2026-08-09, when Rule 501(a)(4) was decomposed from one
+~300-character boolean into six fields under a decision of their own: 187 → 191 decisions,
+74 → 83 `#ASSERT`s, 69 → 70 DMN decisions over 21 → 22 engine cases, 6 → 7 ladder figures, and
+4 → 7 registered forks. The witness row went from "3 of 3" to "6 of 7" without any loss of
+discipline: the seventh, `F-501A4-DETERMINER`, records `divergence: "none"` — its two readings
+differ in what a field is NAMED and not in what any transfer satisfies — and the register's own
+validator forbids a witness on such an entry, because a witness that separates nothing is a claim
+that a test was run.
+
+**Run 2's corpus covers every Part 227 section run 1 cites, plus ten more** (227.205, .206, .300,
+.304, .305, .401, .402, .403, .502, .504), reaching all 22 sections of the fetched part. The
+breadth expectation holds on the coverage axis. It does **not** hold on the temporal axis, and that
+exception is load-bearing: run 1 binds four regime dates and carries the pre-2021 `lesserOf` arm
+live (`regcf.l4:405-407`), where run 2 gives each of its seven constants a single arm over
+`ASSUME 'no encoding of Part 227 exists for rule dates before 2022-09-20'`
+(`regcf-denovo.l4:211`). Taking run 2's corpus outright would therefore discard `F-4A6B-MEASURE`'s
+prior arm — the very fork this section says the union must carry.
+
+**Corrected 2026-08-06, same day.** Two measurement slips in the table above, both caught by the
+cold-run audit rather than by me. The section counts came from a `227\.[0-9]+` regex over each
+corpus, which (a) counted `regcf-denovo.l4:3552`'s typo'd comment header `§ 227.230.501(a)(5)` — a
+mangled § 230.501 — as a section 227.230, inflating run 2 to 23, and (b) counts _cited_ sections,
+not encoded ones, so run 1's 12 includes 227.400/.404, which appear only in comments, and 227.503,
+which is an input boolean. Read the row as citation reach, not encoding depth. The original text
+also called run 2 "a strict superset", which the temporal axis refutes.
+
+**So the answer to "how much can we get from the de novo run" is: the law, and its provenance,
+essentially in full — and almost none of the evidence that any of it works.** Run 2 encodes 2.6×
+the decisions on 2.8× the lines and commits _fewer_ assertions than run 1 in absolute terms (40 vs
+74), a five-fold drop in density. Nine of its 26 forks record `divergence: unassessed` — nobody
+ever measured whether the two readings differ — and four more have witnesses whose committed
+fixtures hardcode the very field that distinguishes the readings, so the corpus holds forks its own
+test data cannot exhibit. It has never been executed through DMN, BPMN, a ladder or the wizard.
+Under Knot 1 ("the execution is the exhibit") that last row is not a nice-to-have.
+
+The union therefore is: **run 2's corpus and deposits, carrying run 1's two missing forks _and its
+rule-version arms_, brought up to run 1's assertion density, and put through run 1's projection
+suite.** What a fresh run must supply that _neither_ has: the authorising instrument (now required
+by §4 P1) and the background rules of construction, which no run has ever ingested — see §9.
+
+**A fresh run cannot produce this today, and the reason is structural, not prompt quality.**
+`G2_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p9-report)` (`etc/go/go.sh:97`) — there
+is no assertion stage, no projection leg, and no stage calls §8's diff oracle. `p3-encode` runs
+`l4 check` and nothing else. So every axis this table assigns to run 1 is unreachable at G2 by
+construction, which §6 already names: the missing piece is "the wiring that would point
+`p3-check`, `p6-tests` and the p7 legs at a de novo module rather than at the committed corpus."
+Under R0 ("the execution is the exhibit") the demo's headline artifact is the one G2 cannot
+currently make. That wiring is the first item of work, not the last.
+
 ## 9. Open rulings
 
 R-numbers are scoped to this document (house precedent: the DMN spec has its own R-series, the
-lexipedia-superset spec its K-series). Cross-references from elsewhere should say "SI-Rn".
+lexipedia-superset spec its K-series, the explainer spec its E-series). Cross-references from
+elsewhere should say "SI-Rn".
 
 - **R0 — ANSWERED 2026-07-31**: the execution is the exhibit (§2).
 - **R1 — corpus-of-law repository**: name, org, license, layout. Owner: Meng. **ANSWERED IN
@@ -375,7 +532,9 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   ShareAlike ever reaching the encodings. The open-core → freemium-enrichment pathway stays
   open by construction. Nothing in R1 remains open; **creating** `legalese/canon` is a
   distinct outward-facing act and is HG2's, per §7.3 — the ruling names the repo, it does not
-  create it.
+  create it. **Update 2026-08-03: it has since been created** — public, holding
+  `subjects/README.md` and zero subjects. Creating it was the HG2 act; **depositing** a subject
+  is a further one, and remains blocked. See R8 for how a contributor's work reaches it.
 - **R2 — lexipedia compatibility**: **ANSWERED 2026-08-02 (Meng), as a three-step pathway:**
   **probe now** (read-only: their DokuWiki format, contribution route, licensing — measured
   2026-08-02: the site is CC BY-SA 4.0, so a comparison note must be written in our own words
@@ -423,6 +582,120 @@ lexipedia-superset spec its K-series). Cross-references from elsewhere should sa
   verification pass caught it. Nothing blocks G2 on this axis.
 - **R7 — report versioning**: one report per run, versioned by run date + source retrieval
   date, or a living document? Proposal: per-run, immutable, latest linked.
+- **R8 — how contributors get work INTO `legalese/canon`**: **ANSWERED 2026-08-03 (Meng),
+  PROVISIONALLY — and the provisionality is the ruling's most important clause.** Contributors
+  work in a **fork** and open a **pull request**; canon's own branches are not per-contributor.
+  Meng first proposed a per-user branch (`legalese/<github-username>`, e.g. an `aswathy`
+  branch) and then observed that a fork already does that job. It does, and it does it better
+  on the dimension that matters here: a per-user branch requires granting **write access to
+  canon** to everyone who wants to contribute, whereas a fork requires granting nothing at all.
+  For a corpus whose whole proposition is that outward-facing writes are gated, handing out
+  write bits to obtain per-user isolation would trade away the property the gate exists to
+  protect.
+
+  **The cost is named rather than wished away: somebody has to merge the PRs, and that is
+  unenviable work.** It is a real, recurring, human cost, and it scales with adoption — which
+  is to say it gets worse precisely when things go well. This ruling accepts it as the price of
+  the simplest thing that works today.
+
+  **Standing instruction: this yields.** Thomas has a better model in mind. When it arrives it
+  supersedes this ruling without further argument, and R8 should be rewritten rather than
+  defended. Nothing downstream may assume fork-and-PR is permanent; in particular, do not build
+  tooling that hard-codes it where a seam would do.
+
+  **One consequence that falls out of the gate design and must not be discovered during a
+  merge.** An HG1 signature is a detached signature **over a digest of the reviewed content**.
+  So a maintainer who edits a contributor's encoding while merging — a rebase that touches
+  content, a conflict resolved by hand, a lint fix, a reformat — **invalidates that
+  contributor's signature**, and the subject arrives in canon signed by nobody. The merge
+  workflow must therefore be **content-preserving**, or the signature must be re-obtained from
+  the contributor after the edit. This is not a policy we chose; it is what "binds to content,
+  not to a moment" means when the content moves. Whatever supersedes R8 inherits this
+  constraint.
+
+  **Scope narrowed 2026-08-05 by R9's ruling: R8 is now the VENDORED lane's mechanism, not the
+  only lane.** The two coexist. A contributor who would rather keep their encoding in their own
+  repository takes the pointer lane instead, and for them the merge-invalidates-the-signature
+  problem above **does not arise at all** — nobody merges content, the encoding never moves, and
+  the signature keeps verifying where it was made. R8's provisionality clause is unaffected and
+  still stands: it yields to Thomas's model when that arrives. Two facts about the merge problem
+  survive R9 and are worth keeping in view: it still binds the vendored lane in full, and the
+  reorganisation-only case is separately safe because gate payloads bind **basenames plus
+  sha256** and embed no canon path (verified in `etc/go/phases/p0-preflight.sh:91`), so moving a
+  subject between directories does not invalidate anything.
+
+- **R9 — canon as an INDEX rather than a monorepo**: **ANSWERED 2026-08-05 (Meng), in the
+  coexistence form** — canon holds vendored encodings _and_ indexes external ones through one row
+  grammar. The concrete on-disk shape is `docs/directory-conventions.md` §4 in `legalese/canon`,
+  ruled via that document's §10; this bullet records the ruling, that document owns the mechanism.
+  Adopt the model Claude Code uses for plugins and skills: a **marketplace** that is a
+  thin index layer over GitHub. Encodings live in their authors' own repositories; canon
+  maintains an index of known L4 encodings — name, jurisdiction, citation, source repo, version,
+  licence — and resolves them on demand. The mechanism is not speculative: this repository
+  already ships `.claude-plugin/marketplace.json` in exactly that shape (`name`, `owner`,
+  `metadata`, `plugins[]`, each carrying a `source` of `{source: github, repo, path}`), so the
+  pattern is one we already operate rather than one we would be inventing.
+
+  **This does not mitigate R8's worst consequence; it dissolves it.** R8 must make merges
+  content-preserving, because a maintainer's edit invalidates the contributor's HG1 signature.
+  Under an index **nobody merges content at all** — the maintainer accepts or rejects an index
+  entry, the encoding never moves, and the signature keeps verifying indefinitely. The
+  unenviable job shrinks from reviewing an encoding to reviewing a row.
+
+  **Two further fits, the second substantive.** (a) It matches the **cottage industry** in
+  _Deep Dive: The Supply Side_ (l4-pitch): a firm keeps its encodings in its own repository
+  under its own name — better for the firm than donating them into somebody else's monorepo —
+  and the index points at them. (b) It makes **competing encodings of the same statute
+  first-class**. Two firms may index two readings of the same section, each signed by its own
+  author. That is not a collision to disambiguate away; it is the **fork register at repository
+  scale**, and this project already holds that under-determination is a property of law rather
+  than a defect in an encoding.
+
+  **The costs, which are why this said PROPOSED for two days — each is answered, partially
+  answered or structurally preserved by the sub-rulings below, and none is wished away:**
+
+  1. **Availability.** A monorepo holds content; an index holds a pointer. Indexed repos get
+     renamed, force-pushed, made private, deleted. Mitigation: pin each entry by **commit SHA
+     plus content digest**; whether canon also mirrors is a separate decision.
+  2. **Verification moves to fetch time.** A consumer must retrieve before checking anything, so
+     each entry must carry the digest of what was indexed — otherwise "indexed" says nothing
+     about what you actually got.
+  3. **Indexed is not reviewed is not signed.** Three distinct claims; the index must keep them
+     structurally distinct or listing becomes implied endorsement.
+  4. **Namespace.** Who holds `uk/housing-act-1988`? If competing encodings are first-class then
+     names cannot be exclusive, and entries need author-qualified identity.
+  5. **Supply chain.** The pipeline runs exporters over indexed L4. Fetching and processing a
+     stranger's encoding is a trust decision a monorepo made implicitly and an index makes
+     explicit.
+
+  **The three sub-rulings, 2026-08-05, and what each does to the costs above:**
+
+  1. **Pins are mandatory.** Every pointer row carries a commit `sha` **and** a `tree_sha`
+     integrity digest of the indexed subtree; `ref` is advisory and `sha` wins. This is cost 2
+     answered in full — verification happens at fetch time against a digest recorded at index
+     time.
+  2. **No mirroring.** Canon does not copy an indexed repository, because mirroring is itself
+     redistribution and carries licence consequences. So **cost 1 is only PARTIALLY answered, and
+     the residual is accepted deliberately**: pins make rot _detectable_, nothing makes it
+     _survivable_. A deleted upstream means that encoding is gone from canon, leaving a tombstone
+     row. The one durability path is vendoring through the R8 lane **at the encoder's own choice**
+     — never canon copying unilaterally.
+  3. **No curated primary.** Every encoding of a subject is an **equal row**; canon takes no
+     editorial position on which to use. This resolves cost 4 by subject-owned paths carrying
+     encoder-qualified rows, and it retires the first draft's curated-primary-plus-`alt/` shape
+     entirely — with no first-class rows there are no second-class ones, so the name went with the
+     concept. Cost 3 survives structurally: `status`, `status_checked` and the encoding-level
+     descriptor keep _indexed_, _reviewed_ and _signed_ distinct, and a registry that refuses to
+     choose must instead make choosing cheap, which is what the derived index's columns are for.
+
+  Note the interaction of (2) and (3), recorded as a consequence rather than an objection: with no
+  curated copy standing behind a pointer and no mirror either, **an externally-hosted encoding has
+  exactly one copy in the world.**
+
+  **Ruled for Meng (2026-08-05):** R9 and R8 **coexist** rather than R9 superseding — R8 stands as
+  the **vendored lane's** mechanism, and its standing yield-to-Thomas instruction is inherited
+  untouched. Entries **do** pin by SHA (mandatory, per sub-ruling 1). Canon does **not** mirror
+  against link rot (sub-ruling 2).
 
 ---
 

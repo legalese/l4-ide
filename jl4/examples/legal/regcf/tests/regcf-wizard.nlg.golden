@@ -18,6 +18,13 @@ not `transfer is permitted` with `transfer from` with `a restricted holding`
 `days still to wait for` with `a restricted holding` is equal to 265
 `transfer is permitted` with `transfer from` with `a holding sold to an accredited buyer`
 `days still to wait for` with `a holding sold to an accredited buyer` is equal to 0
+`transfer is permitted` with `transfer from` with `a holding sold after the purchaser died`
+`days still to wait for` with `a holding sold after the purchaser died` is equal to 0
+`transfer is permitted` with `transfer from` with `a holding transferred to a family member`
+`transfer is permitted` with `transfer from` with `a holding transferred to a trust you control`
+`transfer is permitted` with `transfer from` with `a holding transferred to a family trust`
+`transfer is permitted` with `transfer from` with `a holding transferred in a divorce`
+`transfer is permitted` with `transfer from` with `a holding transferred on a like occasion`
 `ongoing reporting obligation may terminate` with `reporting status from` with `a filer who may stop`
 not `ongoing reporting obligation may terminate` with `reporting status from` with `a filer who must keep going`
 `count` with `termination conditions met by` with `a filer who may stop` is equal to 1
@@ -30,5 +37,11 @@ not `ongoing reporting obligation may terminate` with `reporting status from` wi
 `investment limit check` with `an accredited purchaser`
 `resale check` with `a restricted holding`
 `resale check` with `a holding sold to an accredited buyer`
+`resale check` with `a holding sold after the purchaser died`
+`resale check` with `a holding transferred to a family member`
+`resale check` with `a holding transferred to a trust you control`
+`resale check` with `a holding transferred to a family trust`
+`resale check` with `a holding transferred in a divorce`
+`resale check` with `a holding transferred on a like occasion`
 `reporting exit check` with `a filer who may stop`
 `reporting exit check` with `a filer who must keep going`

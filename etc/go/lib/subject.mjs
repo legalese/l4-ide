@@ -173,6 +173,7 @@ export function loadSubject(id) {
     "checks",
     "legs",
     "denovo",
+    "explainer",
   ]);
   for (const k of ["id", "display_name", "citation", "source_url"]) {
     if (typeof desc[k] !== "string" || !desc[k])
@@ -326,6 +327,28 @@ export function loadSubject(id) {
     }
   }
 
+  // --- the explainer narrative (P9's reader-facing sibling) -----------------
+  //
+  // EXPLAINER-REPORT-SPEC.md E1-a: EXPLICIT DECLARATION, not directory
+  // discovery. Convention over configuration would work here and would need no
+  // schema change; it is refused because a mistyped directory name would then
+  // yield a fully-ABSENT explainer with no error anywhere — absence experienced
+  // as breakage. A subject that declares no `explainer` key gets a clean SKIP
+  // with a named reason, which is a different and honest outcome.
+  let explainerDir = "";
+  if (desc.explainer !== undefined) {
+    if (
+      typeof desc.explainer !== "object" ||
+      desc.explainer === null ||
+      Array.isArray(desc.explainer)
+    )
+      die(`subject.json: 'explainer' must be an object`);
+    checkKeys("explainer", desc.explainer, ["dir"]);
+    if (typeof desc.explainer.dir !== "string" || !desc.explainer.dir)
+      die(`explainer.dir must be a non-empty string`);
+    explainerDir = mustBeDir("explainer.dir", desc.explainer.dir);
+  }
+
   const pins = resolve(dir, "pins.json");
   const defects = resolve(dir, "known-defects.json");
   if (!existsSync(pins)) die(`${dir}/pins.json is required and missing`);
@@ -346,6 +369,7 @@ export function loadSubject(id) {
       GO_S_KNOWN_DEFECTS: defects,
       GO_S_MIN_DATED_ARMS: String(desc.checks.min_dated_arms),
       GO_S_MIN_ASSERTIONS: String(desc.checks.min_assertions),
+      GO_S_EXPLAINER_DIR: explainerDir,
       GO_S_LEGS: legs.join(" "),
       ...denovo,
       ...env,

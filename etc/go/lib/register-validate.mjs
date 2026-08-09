@@ -409,12 +409,50 @@ const RULES = {
     "non-live-readings-explain": (ctx) =>
       ctx.entries((e, p) =>
         (e.readings ?? []).forEach((r, i) => {
-          if (r.status !== "live" && !has(r, "rejection_rationale"))
+          // 'arguable' is deliberately exempt: nothing rejected it, so it owes
+          // `foreclosure` instead — enforced by the next rule.
+          if (
+            r.status !== "live" &&
+            r.status !== "arguable" &&
+            !has(r, "rejection_rationale")
+          )
             ctx.f(
               `${p}.readings[${i}].rejection_rationale`,
               `status '${r.status}' requires it`,
               "non-live-readings-explain",
             );
+        }),
+      ),
+    "arguable-readings-cite-and-foreclose": (ctx) =>
+      ctx.entries((e, p) =>
+        (e.readings ?? []).forEach((r, i) => {
+          const at = `${p}.readings[${i}]`;
+          if (r.status === "arguable") {
+            if ((r.citations ?? []).length === 0)
+              ctx.f(
+                `${at}.citations`,
+                "an arguable reading must cite the text that makes it arguable",
+                "arguable-readings-cite-and-foreclose",
+              );
+            if (!has(r, "foreclosure"))
+              ctx.f(
+                `${at}.foreclosure`,
+                "an arguable reading must say what makes it non-operative",
+                "arguable-readings-cite-and-foreclose",
+              );
+            if (has(r, "rejection_rationale"))
+              ctx.f(
+                `${at}.rejection_rationale`,
+                "an arguable reading was not rejected; use foreclosure",
+                "arguable-readings-cite-and-foreclose",
+              );
+          } else if (has(r, "foreclosure")) {
+            ctx.f(
+              `${at}.foreclosure`,
+              `foreclosure is for status 'arguable', not '${r.status}'`,
+              "arguable-readings-cite-and-foreclose",
+            );
+          }
         }),
       ),
     "live-readings-cite-their-licence": (ctx) =>

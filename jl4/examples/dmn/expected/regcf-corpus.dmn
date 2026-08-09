@@ -141,19 +141,37 @@
     </itemComponent>
   </itemDefinition>
   <itemDefinition id="itemdef_transfer" name="Transfer">
-    <itemComponent id="itemdef_transfer_c1" name="days_since_the_securities_were_issued" label="days since the securities were issued">
-      <typeRef>number</typeRef>
+    <itemComponent id="itemdef_transfer_c1" name="date_the_securities_were_issued" label="date the securities were issued">
+      <typeRef>date</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c2" name="to_the_issuer_of_the_securities" label="to the issuer of the securities">
+    <itemComponent id="itemdef_transfer_c2" name="date_of_the_transfer" label="date of the transfer">
+      <typeRef>date</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_transfer_c3" name="to_the_issuer_of_the_securities" label="to the issuer of the securities">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c3" name="to_an_accredited_investor" label="to an accredited investor">
+    <itemComponent id="itemdef_transfer_c4" name="to_an_accredited_investor" label="to an accredited investor">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c4" name="as_part_of_an_offering_registered_with_the_Commission" label="as part of an offering registered with the Commission">
+    <itemComponent id="itemdef_transfer_c5" name="as_part_of_an_offering_registered_with_the_Commission" label="as part of an offering registered with the Commission">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c5" name="to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance" label="to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance">
+    <itemComponent id="itemdef_transfer_c6" name="to_a_member_of_the_family_of_the_purchaser_or_the_equivalent" label="to a member of the family of the purchaser or the equivalent">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_transfer_c7" name="to_a_trust_controlled_by_the_purchaser" label="to a trust controlled by the purchaser">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_transfer_c8" name="to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent" label="to a trust created for the benefit of a member of the family of the purchaser or the equivalent">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_transfer_c9" name="in_connection_with_death_of_the_purchaser" label="in connection with death of the purchaser">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_transfer_c10" name="in_connection_with_divorce_of_the_purchaser" label="in connection with divorce of the purchaser">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_transfer_c11" name="in_connection_with_a_circumstance_similar_to_death_or_divorce_of_the_purchaser" label="in connection with a circumstance similar to death or divorce of the purchaser">
       <typeRef>boolean</typeRef>
     </itemComponent>
   </itemDefinition>
@@ -747,10 +765,10 @@
       <text>5</text>
     </literalExpression>
   </decision>
-  <decision id="decision_days_in_the_resale_restricted_period" name="days_in_the_resale_restricted_period" label="days in the resale restricted period">
-    <variable id="decision_days_in_the_resale_restricted_period_var" name="days_in_the_resale_restricted_period" label="days in the resale restricted period" typeRef="number"/>
-    <literalExpression id="decision_days_in_the_resale_restricted_period_literal">
-      <text>365</text>
+  <decision id="decision_the_resale_restriction_in_years" name="the_resale_restriction_in_years" label="the resale restriction in years">
+    <variable id="decision_the_resale_restriction_in_years_var" name="the_resale_restriction_in_years" label="the resale restriction in years" typeRef="number"/>
+    <literalExpression id="decision_the_resale_restriction_in_years_literal">
+      <text>1</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_1_not_organized_under_state_or_territorial_law" name="b_1_not_organized_under_State_or_territorial_law" label="(b)(1) — not organized under State or territorial law">
@@ -1214,25 +1232,61 @@
       </rule>
     </decisionTable>
   </decision>
+  <decision id="decision_the_first_anniversary_of_the_issuance" name="the_first_anniversary_of_the_issuance" label="the first anniversary of the issuance">
+    <variable id="decision_the_first_anniversary_of_the_issuance_var" name="the_first_anniversary_of_the_issuance" label="the first anniversary of the issuance" typeRef="date"/>
+    <informationRequirement id="decision_the_first_anniversary_of_the_issuance_ir1">
+      <requiredDecision href="#decision_the_resale_restriction_in_years"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_first_anniversary_of_the_issuance_ir2">
+      <requiredInput href="#input_transfer"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_first_anniversary_of_the_issuance_literal">
+      <text>transfer.date_the_securities_were_issued + floor(the_resale_restriction_in_years) * duration("P1Y")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_days_until_the_first_anniversary_of_the_issuance" name="days_until_the_first_anniversary_of_the_issuance" label="days until the first anniversary of the issuance">
+    <variable id="decision_days_until_the_first_anniversary_of_the_issuance_var" name="days_until_the_first_anniversary_of_the_issuance" label="days until the first anniversary of the issuance" typeRef="number"/>
+    <informationRequirement id="decision_days_until_the_first_anniversary_of_the_issuance_ir1">
+      <requiredDecision href="#decision_the_first_anniversary_of_the_issuance"/>
+    </informationRequirement>
+    <informationRequirement id="decision_days_until_the_first_anniversary_of_the_issuance_ir2">
+      <requiredInput href="#input_transfer"/>
+    </informationRequirement>
+    <literalExpression id="decision_days_until_the_first_anniversary_of_the_issuance_literal">
+      <text>(the_first_anniversary_of_the_issuance - transfer.date_the_securities_were_issued).days</text>
+    </literalExpression>
+  </decision>
   <decision id="decision_transfer_is_within_the_one_year_restricted_period" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period">
     <variable id="decision_transfer_is_within_the_one_year_restricted_period_var" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period" typeRef="boolean"/>
     <informationRequirement id="decision_transfer_is_within_the_one_year_restricted_period_ir1">
-      <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
+      <requiredDecision href="#decision_the_first_anniversary_of_the_issuance"/>
     </informationRequirement>
     <informationRequirement id="decision_transfer_is_within_the_one_year_restricted_period_ir2">
       <requiredInput href="#input_transfer"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_is_within_the_one_year_restricted_period_literal">
-      <text>transfer.days_since_the_securities_were_issued &lt; days_in_the_resale_restricted_period</text>
+      <text>transfer.date_of_the_transfer &lt; the_first_anniversary_of_the_issuance</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance" name="a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance" label="(a)(4) — a family or trust transferee, or a death-or-divorce circumstance">
+    <variable id="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance_var" name="a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance" label="(a)(4) — a family or trust transferee, or a death-or-divorce circumstance" typeRef="boolean"/>
+    <informationRequirement id="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance_ir1">
+      <requiredInput href="#input_transfer"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance_literal">
+      <text>false or (false or (transfer.to_a_member_of_the_family_of_the_purchaser_or_the_equivalent or (transfer.to_a_trust_controlled_by_the_purchaser or transfer.to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent)) or (false or (transfer.in_connection_with_death_of_the_purchaser or (transfer.in_connection_with_divorce_of_the_purchaser or transfer.in_connection_with_a_circumstance_similar_to_death_or_divorce_of_the_purchaser))))</text>
     </literalExpression>
   </decision>
   <decision id="decision_transfer_falls_within_an_exception_in_rule_501_a" name="transfer_falls_within_an_exception_in_Rule_501_a" label="transfer falls within an exception in Rule 501(a)">
     <variable id="decision_transfer_falls_within_an_exception_in_rule_501_a_var" name="transfer_falls_within_an_exception_in_Rule_501_a" label="transfer falls within an exception in Rule 501(a)" typeRef="boolean"/>
     <informationRequirement id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
+      <requiredDecision href="#decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance"/>
+    </informationRequirement>
+    <informationRequirement id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir2">
       <requiredInput href="#input_transfer"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_falls_within_an_exception_in_rule_501_a_literal">
-      <text>false or (true and transfer.to_the_issuer_of_the_securities or (true and transfer.to_an_accredited_investor or (true and transfer.as_part_of_an_offering_registered_with_the_Commission or true and transfer.to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance)))</text>
+      <text>false or (true and transfer.to_the_issuer_of_the_securities or (true and transfer.to_an_accredited_investor or (true and transfer.as_part_of_an_offering_registered_with_the_Commission or true and a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance)))</text>
     </literalExpression>
   </decision>
   <decision id="decision_transfer_is_permitted" name="transfer_is_permitted" label="transfer is permitted">
@@ -2102,11 +2156,14 @@
     <inputData href="#input_annual_cycles"/>
   </decisionService>
   <decisionService id="service__8_resale_restrictions_rule_501" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501">
-    <variable id="service__8_resale_restrictions_rule_501_var" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501" typeRef="boolean"/>
+    <variable id="service__8_resale_restrictions_rule_501_var" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501" typeRef="Any"/>
+    <outputDecision href="#decision_days_until_the_first_anniversary_of_the_issuance"/>
     <outputDecision href="#decision_transfer_is_permitted"/>
+    <encapsulatedDecision href="#decision_the_first_anniversary_of_the_issuance"/>
     <encapsulatedDecision href="#decision_transfer_is_within_the_one_year_restricted_period"/>
+    <encapsulatedDecision href="#decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance"/>
     <encapsulatedDecision href="#decision_transfer_falls_within_an_exception_in_rule_501_a"/>
-    <inputDecision href="#decision_days_in_the_resale_restricted_period"/>
+    <inputDecision href="#decision_the_resale_restriction_in_years"/>
     <inputData href="#input_transfer"/>
   </decisionService>
   <decisionService id="service_top_level_the_whole_exemption" name="Top_level_the_whole_exemption" label="Top level — the whole exemption">
@@ -2230,7 +2287,7 @@
       <dmndi:DMNShape id="decision_business_days_to_file_a_progress_update_shape" dmnElementRef="decision_business_days_to_file_a_progress_update">
         <dc:Bounds x="3580" y="700" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_days_in_the_resale_restricted_period_shape" dmnElementRef="decision_days_in_the_resale_restricted_period">
+      <dmndi:DMNShape id="decision_the_resale_restriction_in_years_shape" dmnElementRef="decision_the_resale_restriction_in_years">
         <dc:Bounds x="3800" y="700" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_b_1_not_organized_under_state_or_territorial_law_shape" dmnElementRef="decision_b_1_not_organized_under_state_or_territorial_law">
@@ -2281,7 +2338,7 @@
       <dmndi:DMNShape id="decision_b_5_liquidated_or_dissolved_shape" dmnElementRef="decision_b_5_liquidated_or_dissolved">
         <dc:Bounds x="7320" y="700" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_transfer_falls_within_an_exception_in_rule_501_a_shape" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a">
+      <dmndi:DMNShape id="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance_shape" dmnElementRef="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance">
         <dc:Bounds x="7540" y="700" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_a_clean_issuer_shape" dmnElementRef="decision_a_clean_issuer">
@@ -2341,11 +2398,14 @@
       <dmndi:DMNShape id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_shape" dmnElementRef="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000">
         <dc:Bounds x="1600" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_transfer_is_within_the_one_year_restricted_period_shape" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period">
+      <dmndi:DMNShape id="decision_the_first_anniversary_of_the_issuance_shape" dmnElementRef="decision_the_first_anniversary_of_the_issuance">
         <dc:Bounds x="1820" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_conforming_filing_shape" dmnElementRef="decision_a_conforming_filing">
+      <dmndi:DMNShape id="decision_transfer_falls_within_an_exception_in_rule_501_a_shape" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a">
         <dc:Bounds x="2040" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_conforming_filing_shape" dmnElementRef="decision_a_conforming_filing">
+        <dc:Bounds x="2260" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_issuer_is_eligible_shape" dmnElementRef="decision_issuer_is_eligible">
         <dc:Bounds x="60" y="380" width="180" height="80"/>
@@ -2359,26 +2419,32 @@
       <dmndi:DMNShape id="decision_ongoing_reporting_obligation_may_terminate_shape" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate">
         <dc:Bounds x="720" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_transfer_is_permitted_shape" dmnElementRef="decision_transfer_is_permitted">
+      <dmndi:DMNShape id="decision_days_until_the_first_anniversary_of_the_issuance_shape" dmnElementRef="decision_days_until_the_first_anniversary_of_the_issuance">
         <dc:Bounds x="940" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_transfer_is_within_the_one_year_restricted_period_shape" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period">
+        <dc:Bounds x="1160" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_ongoing_reporting_obligation_shape" dmnElementRef="decision_ongoing_reporting_obligation">
         <dc:Bounds x="60" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_base_case_qualifies_shape" dmnElementRef="decision_the_base_case_qualifies">
+      <dmndi:DMNShape id="decision_transfer_is_permitted_shape" dmnElementRef="decision_transfer_is_permitted">
         <dc:Bounds x="280" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_delinquent_issuer_case_qualifies_shape" dmnElementRef="decision_the_delinquent_issuer_case_qualifies">
+      <dmndi:DMNShape id="decision_the_base_case_qualifies_shape" dmnElementRef="decision_the_base_case_qualifies">
         <dc:Bounds x="500" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_over_limit_investor_case_qualifies_shape" dmnElementRef="decision_the_over_limit_investor_case_qualifies">
+      <dmndi:DMNShape id="decision_the_delinquent_issuer_case_qualifies_shape" dmnElementRef="decision_the_delinquent_issuer_case_qualifies">
         <dc:Bounds x="720" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_short_availability_case_qualifies_shape" dmnElementRef="decision_the_short_availability_case_qualifies">
+      <dmndi:DMNShape id="decision_the_over_limit_investor_case_qualifies_shape" dmnElementRef="decision_the_over_limit_investor_case_qualifies">
         <dc:Bounds x="940" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_under_assured_financials_case_qualifies_shape" dmnElementRef="decision_the_under_assured_financials_case_qualifies">
+      <dmndi:DMNShape id="decision_the_short_availability_case_qualifies_shape" dmnElementRef="decision_the_short_availability_case_qualifies">
         <dc:Bounds x="1160" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_under_assured_financials_case_qualifies_shape" dmnElementRef="decision_the_under_assured_financials_case_qualifies">
+        <dc:Bounds x="1380" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="bkm_the_rules_in_force_include_shape" dmnElementRef="bkm_the_rules_in_force_include">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
@@ -2426,10 +2492,10 @@
         <dc:Bounds x="40" y="200" width="7480" height="600"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="service__8_resale_restrictions_rule_501_shape" dmnElementRef="service__8_resale_restrictions_rule_501">
-        <dc:Bounds x="920" y="360" width="6820" height="440"/>
+        <dc:Bounds x="260" y="200" width="7480" height="600"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="service_top_level_the_whole_exemption_shape" dmnElementRef="service_top_level_the_whole_exemption">
-        <dc:Bounds x="260" y="200" width="1980" height="440"/>
+        <dc:Bounds x="480" y="200" width="1980" height="440"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_offering_maximum_in_a_12_month_period_ir1_edge" dmnElementRef="decision_offering_maximum_in_a_12_month_period_ir1">
         <di:waypoint x="150" y="860"/>
@@ -2735,293 +2801,317 @@
         <di:waypoint x="2790" y="860"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir1_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir1">
+      <dmndi:DMNEdge id="decision_the_first_anniversary_of_the_issuance_ir1_edge" dmnElementRef="decision_the_first_anniversary_of_the_issuance_ir1">
         <di:waypoint x="3890" y="700"/>
         <di:waypoint x="1910" y="620"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir2_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir2">
+      <dmndi:DMNEdge id="decision_the_first_anniversary_of_the_issuance_ir2_edge" dmnElementRef="decision_the_first_anniversary_of_the_issuance_ir2">
         <di:waypoint x="3010" y="860"/>
         <di:waypoint x="1910" y="620"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1_edge" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
-        <di:waypoint x="3010" y="860"/>
-        <di:waypoint x="7630" y="780"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir1_edge" dmnElementRef="decision_transfer_is_permitted_ir1">
-        <di:waypoint x="7630" y="700"/>
-        <di:waypoint x="1030" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir2_edge" dmnElementRef="decision_transfer_is_permitted_ir2">
+      <dmndi:DMNEdge id="decision_days_until_the_first_anniversary_of_the_issuance_ir1_edge" dmnElementRef="decision_days_until_the_first_anniversary_of_the_issuance_ir1">
         <di:waypoint x="1910" y="540"/>
         <di:waypoint x="1030" y="460"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir3_edge" dmnElementRef="decision_transfer_is_permitted_ir3">
+      <dmndi:DMNEdge id="decision_days_until_the_first_anniversary_of_the_issuance_ir2_edge" dmnElementRef="decision_days_until_the_first_anniversary_of_the_issuance_ir2">
         <di:waypoint x="3010" y="860"/>
         <di:waypoint x="1030" y="460"/>
       </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir1_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir1">
+        <di:waypoint x="1910" y="540"/>
+        <di:waypoint x="1250" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir2_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir2">
+        <di:waypoint x="3010" y="860"/>
+        <di:waypoint x="1250" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance_ir1_edge" dmnElementRef="decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance_ir1">
+        <di:waypoint x="3010" y="860"/>
+        <di:waypoint x="7630" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1_edge" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
+        <di:waypoint x="7630" y="700"/>
+        <di:waypoint x="2130" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir2_edge" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a_ir2">
+        <di:waypoint x="3010" y="860"/>
+        <di:waypoint x="2130" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir1_edge" dmnElementRef="decision_transfer_is_permitted_ir1">
+        <di:waypoint x="2130" y="540"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir2_edge" dmnElementRef="decision_transfer_is_permitted_ir2">
+        <di:waypoint x="1250" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir3_edge" dmnElementRef="decision_transfer_is_permitted_ir3">
+        <di:waypoint x="3010" y="860"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_conforming_filing_ir1_edge" dmnElementRef="decision_a_conforming_filing_ir1">
         <di:waypoint x="8510" y="700"/>
-        <di:waypoint x="2130" y="620"/>
+        <di:waypoint x="2350" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir1_edge" dmnElementRef="decision_the_base_case_qualifies_ir1">
         <di:waypoint x="7850" y="700"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir2_edge" dmnElementRef="decision_the_base_case_qualifies_ir2">
-        <di:waypoint x="2130" y="540"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="2350" y="540"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir3_edge" dmnElementRef="decision_the_base_case_qualifies_ir3">
         <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir4_edge" dmnElementRef="decision_the_base_case_qualifies_ir4">
         <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir5_edge" dmnElementRef="decision_the_base_case_qualifies_ir5">
         <di:waypoint x="370" y="380"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir6_edge" dmnElementRef="decision_the_base_case_qualifies_ir6">
         <di:waypoint x="590" y="540"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir7_edge" dmnElementRef="decision_the_base_case_qualifies_ir7">
         <di:waypoint x="590" y="380"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir8_edge" dmnElementRef="decision_the_base_case_qualifies_ir8">
         <di:waypoint x="150" y="380"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir9_edge" dmnElementRef="decision_the_base_case_qualifies_ir9">
         <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir10_edge" dmnElementRef="decision_the_base_case_qualifies_ir10">
         <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir11_edge" dmnElementRef="decision_the_base_case_qualifies_ir11">
         <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir12_edge" dmnElementRef="decision_the_base_case_qualifies_ir12">
         <di:waypoint x="810" y="540"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir13_edge" dmnElementRef="decision_the_base_case_qualifies_ir13">
         <di:waypoint x="370" y="540"/>
-        <di:waypoint x="370" y="300"/>
+        <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir1_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir1">
-        <di:waypoint x="2130" y="540"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="2350" y="540"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir2_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir2">
         <di:waypoint x="8070" y="700"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir3_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir3">
         <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir4_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir4">
         <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir5_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir5">
         <di:waypoint x="370" y="380"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir6_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir6">
         <di:waypoint x="590" y="540"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir7_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir7">
         <di:waypoint x="590" y="380"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir8_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir8">
         <di:waypoint x="150" y="380"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir9_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir9">
         <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir10_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir10">
         <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir11_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir11">
         <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir12_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir12">
         <di:waypoint x="810" y="540"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir13_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir13">
         <di:waypoint x="370" y="540"/>
-        <di:waypoint x="590" y="300"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir1_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir1">
         <di:waypoint x="7850" y="700"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir2_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir2">
-        <di:waypoint x="2130" y="540"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="2350" y="540"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir3_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir3">
         <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir4_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir4">
         <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir5_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir5">
         <di:waypoint x="370" y="380"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir6_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir6">
         <di:waypoint x="590" y="540"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir7_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir7">
         <di:waypoint x="590" y="380"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir8_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir8">
         <di:waypoint x="150" y="380"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir9_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir9">
         <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir10_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir10">
         <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir11_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir11">
         <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir12_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir12">
         <di:waypoint x="810" y="540"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir13_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir13">
         <di:waypoint x="370" y="540"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="1030" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir1_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir1">
         <di:waypoint x="7850" y="700"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir2_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir2">
-        <di:waypoint x="2130" y="540"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="2350" y="540"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir3_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir3">
         <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir4_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir4">
         <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir5_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir5">
         <di:waypoint x="370" y="380"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir6_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir6">
         <di:waypoint x="590" y="540"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir7_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir7">
         <di:waypoint x="590" y="380"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir8_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir8">
         <di:waypoint x="150" y="380"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir9_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir9">
         <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir10_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir10">
         <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir11_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir11">
         <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir12_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir12">
         <di:waypoint x="810" y="540"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir13_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir13">
         <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1030" y="300"/>
+        <di:waypoint x="1250" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir1_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir1">
         <di:waypoint x="7850" y="700"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir2_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir2">
-        <di:waypoint x="2130" y="540"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="2350" y="540"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir3_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir3">
         <di:waypoint x="5650" y="700"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir4_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir4">
         <di:waypoint x="5430" y="700"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir5_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir5">
         <di:waypoint x="370" y="380"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir6_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir6">
         <di:waypoint x="590" y="540"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir7_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir7">
         <di:waypoint x="590" y="380"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir8_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir8">
         <di:waypoint x="150" y="380"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir9_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir9">
         <di:waypoint x="1690" y="700"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir10_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir10">
         <di:waypoint x="1470" y="700"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir11_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir11">
         <di:waypoint x="1030" y="700"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir12_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir12">
         <di:waypoint x="810" y="540"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir13_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir13">
         <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1250" y="300"/>
+        <di:waypoint x="1470" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="hydration_investor_ir1_edge" dmnElementRef="hydration_investor_ir1">
         <di:waypoint x="810" y="860"/>
@@ -3041,83 +3131,83 @@
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr1_edge" dmnElementRef="decision_the_base_case_qualifies_kr1">
         <di:waypoint x="2130" y="140"/>
-        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="590" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr2_edge" dmnElementRef="decision_the_base_case_qualifies_kr2">
         <di:waypoint x="1910" y="140"/>
-        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="590" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr3_edge" dmnElementRef="decision_the_base_case_qualifies_kr3">
         <di:waypoint x="1690" y="140"/>
-        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="590" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_kr4_edge" dmnElementRef="decision_the_base_case_qualifies_kr4">
         <di:waypoint x="1470" y="140"/>
-        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="590" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr1_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr1">
         <di:waypoint x="2130" y="140"/>
-        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="810" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr2_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr2">
         <di:waypoint x="1910" y="140"/>
-        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="810" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr3_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr3">
         <di:waypoint x="1690" y="140"/>
-        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="810" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_kr4_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_kr4">
         <di:waypoint x="1470" y="140"/>
-        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="810" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr1_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr1">
         <di:waypoint x="2130" y="140"/>
-        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="1030" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr2_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr2">
         <di:waypoint x="1910" y="140"/>
-        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="1030" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr3_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr3">
         <di:waypoint x="1690" y="140"/>
-        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="1030" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_kr4_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_kr4">
         <di:waypoint x="1470" y="140"/>
-        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="1030" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr1_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr1">
         <di:waypoint x="2130" y="140"/>
-        <di:waypoint x="1030" y="220"/>
+        <di:waypoint x="1250" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr2_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr2">
         <di:waypoint x="1910" y="140"/>
-        <di:waypoint x="1030" y="220"/>
+        <di:waypoint x="1250" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr3_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr3">
         <di:waypoint x="1690" y="140"/>
-        <di:waypoint x="1030" y="220"/>
+        <di:waypoint x="1250" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_kr4_edge" dmnElementRef="decision_the_short_availability_case_qualifies_kr4">
         <di:waypoint x="1470" y="140"/>
-        <di:waypoint x="1030" y="220"/>
+        <di:waypoint x="1250" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr1_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr1">
         <di:waypoint x="2130" y="140"/>
-        <di:waypoint x="1250" y="220"/>
+        <di:waypoint x="1470" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr2_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr2">
         <di:waypoint x="1910" y="140"/>
-        <di:waypoint x="1250" y="220"/>
+        <di:waypoint x="1470" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr3_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr3">
         <di:waypoint x="1690" y="140"/>
-        <di:waypoint x="1250" y="220"/>
+        <di:waypoint x="1470" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_kr4_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_kr4">
         <di:waypoint x="1470" y="140"/>
-        <di:waypoint x="1250" y="220"/>
+        <di:waypoint x="1470" y="220"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_w_offering_kr1_edge" dmnElementRef="decision_w_offering_kr1">
         <di:waypoint x="1690" y="140"/>

@@ -566,7 +566,7 @@ dateProbeCases    = dmnDateProbeDir </> "date-axis.cases.json"
 dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
 
 -- The Reg CF CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
--- the 1,236-line statute corpus, 67 decisions, evaluated end to end. The cases
+-- the statute corpus, 70 decisions, evaluated end to end. The cases
 -- file's own header records how each pin was anchored (L4 + the documented
 -- transform, never the engine's own output).
 corpusGolden, corpusEngineCases :: FilePath
@@ -575,6 +575,32 @@ corpusEngineCases = "examples/dmn/regcf-corpus.cases.json"
 
 dmnDateProbeDir :: FilePath
 dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
+
+-- The DATE ARITHMETIC axis, added 2026-08-05. `dmn-date-probe` above settled
+-- date LITERALS and date COMPARISONS; this pair settles date ARITHMETIC, which
+-- is what an anniversary needs and what the corpus's Rule 501(a) now uses.
+--
+-- Hand-written and never regenerated, same rule as its sibling. The load-bearing
+-- claim is an EQUIVALENCE the emitter cannot state about itself: `daydate`'s
+-- `add months`\/`add years` CLAMP to the target month's last day, the exporter
+-- lowers them to FEEL's @date + duration(...)@, and that is sound only if FEEL
+-- clamps identically. DMN 1.3's own formula does NOT clamp -- it preserves the
+-- day component -- so the spec and the engines had to be assumed to disagree
+-- until measured. They clamp. All six cases agree with L4.
+--
+-- `dateArithNegative` is the NEGATIVE CONTROL and is driven 'HarnessMustFail':
+-- the same anniversary written by reconstructing components, @date(y + 1, m,
+-- d)@, which is null on both engines for a 29 February issuance. Without it the
+-- positive would show only that one idiom works, not that the other cannot --
+-- and "cannot" is the whole reason `add years` exists.
+dateArithModel, dateArithCases, dateArithNegative, dateArithNegativeCases :: FilePath
+dateArithModel         = dmnDateArithDir </> "clamp.dmn"
+dateArithCases         = dmnDateArithDir </> "clamp.cases.json"
+dateArithNegative      = dmnDateArithDir </> "reconstruct-refused.dmn"
+dateArithNegativeCases = dmnDateArithDir </> "reconstruct-refused.cases.json"
+
+dmnDateArithDir :: FilePath
+dmnDateArithDir = fixtureDir </> "dmn-date-arith"
 
 -- The ENGINE-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
 -- measured note of 2026-07-30). One statute-shaped predicate — "either spouse
@@ -1650,40 +1676,57 @@ spec bin = do
         out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
         out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
 
-    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 67-decision Reg CF
-    -- corpus builds and answers on both engines, over TWENTY cases — the base
-    -- world, the 15 dated cases that relocate the rule-date-rebinding fixtures
-    -- R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law under a
-    -- date; the harness owns the dates"), and the 4 seed cases that close the
-    -- total-assets and restricted-period leaves the §8 diff oracle reported
-    -- structurally inert. 20 x 67 = 1340. All counts below are MEASURED
-    -- (2026-08-03, this machine, both harnesses), not aspirational: before
-    -- R12/R13 KIE refused with 16 build errors and Camunda refused the file at
-    -- parse() on the raw-L4 deontic body.
+    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 70-decision Reg CF
+    -- corpus builds and answers on both engines, over TWENTY-TWO cases — the
+    -- base world, the 15 dated cases that relocate the rule-date-rebinding
+    -- fixtures R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law
+    -- under a date; the harness owns the dates"), the 4 seed cases that close
+    -- the total-assets and restricted-period leaves the §8 diff oracle reported
+    -- structurally inert, THE LEAP CASE, and THE ESCHEAT CASE. 22 x 70 = 1540.
+    -- All counts below are MEASURED (2026-08-09, this machine, both harnesses),
+    -- not aspirational: before R12/R13 KIE refused with 16 build errors and
+    -- Camunda refused the file at parse() on the raw-L4 deontic body.
+    --
+    -- 67 decisions became 69, and 20 cases became 21, on 2026-08-05, when Rule
+    -- 501(a)'s "one year" stopped being the constant 365. The two added
+    -- decisions are the anniversary and the deadline computed from it; the added
+    -- case is the one that constant got WRONG — a transfer on day 365 of a
+    -- holding spanning 29 February 2024, which the flat count PERMITTED and the
+    -- calendar refuses. It is pinned here rather than only in the L4 #ASSERTs
+    -- because R0 says the execution is the exhibit: an engine we do not control
+    -- has to be the one that refuses it.
+    --
+    -- 69 became 70, and 21 cases became 22, on 2026-08-09, when Rule 501(a)(4)
+    -- stopped being one ~300-character boolean and became six. The added
+    -- decision is the limb itself; the added case is the ESCHEAT case — a
+    -- transfer in connection with the purchaser's death to a transferee who is
+    -- nobody in particular — which is the fact pattern the decomposition's
+    -- nexus ruling turns on, and which no case could express while the limb was
+    -- a single self-assessed fact.
     it "KIE builds and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("20 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1340/1340 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("1340/1340 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
           -- the SVC leg is a value check since 2026-08-02 (each service fed
           -- its inputDecisions' computed values, each outputDecision compared
-          -- against the same expect entry): 7 services, 14 declared outputs,
+          -- against the same expect entry): 7 services, 15 declared outputs,
           -- per case
-          out `shouldSatisfy` ("280/280 service output value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("330/330 service output value(s) as expected" `isInfixOf`)
 
     it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("20 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1340/1340 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("1340/1340 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
 
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
@@ -1722,6 +1765,42 @@ spec bin = do
     -- a fixture can ask whether Xerces objects to one -- and only the NEGATIVE
     -- half can show that it does. Same rationale, and the same construction, as
     -- the dmn-xsd-order pair.
+    -- The DATE ARITHMETIC pair. What this asserts that nothing else does: the
+    -- CLAMP that `daydate`'s `add months`/`add years` perform is the same clamp
+    -- FEEL performs, so an L4 module that computes an anniversary and the DMN it
+    -- exports to cannot answer differently. That equivalence is the licence for
+    -- the two lowering arms in "L4.Dmn.Lower"; if this goes red they are unsound
+    -- and the Reg CF corpus's exported resale restriction has silently drifted
+    -- from its own #ASSERTs.
+    it "both engines CLAMP date arithmetic, agreeing with daydate on all six" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dateArithModel [dateArithModel, "--cases", dateArithCases] \out -> do
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    it "both engines CLAMP date arithmetic, agreeing with daydate on all six (Camunda)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dateArithModel [dateArithModel, "--cases", dateArithCases] \out -> do
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    -- The negative half, and it is not decoration: it is the reason the corpus
+    -- writes `add years` instead of rebuilding the date from its components.
+    -- `date(2025, 2, 29)` is not a date, and neither engine clamps or rolls it.
+    it "reconstructing an anniversary from components is REFUSED for 29 February" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dateArithNegative [dateArithNegative, "--cases", dateArithNegativeCases] \out -> do
+          -- the control in the same file DOES clamp, so the failure isolates to
+          -- the reconstruction rather than to anything about the fixture
+          out `shouldSatisfy` ("anniv_duration" `isInfixOf`)
+          out `shouldSatisfy` ("anniv_reconstruct" `isInfixOf`)
+
+    it "reconstructing an anniversary from components is REFUSED for 29 February (Camunda)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dateArithNegative [dateArithNegative, "--cases", dateArithNegativeCases] \out -> do
+          out `shouldSatisfy` ("anniv_duration" `isInfixOf`)
+          out `shouldSatisfy` ("anniv_reconstruct" `isInfixOf`)
+
     it "the date-axis probe pair differs ONLY in the @id on the annotationEntry" $ do
       pos <- readUtf8 dateProbeModel
       neg <- readUtf8 dateProbeNegative

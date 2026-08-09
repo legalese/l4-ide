@@ -22,13 +22,26 @@ what the corpus deliberately does not model (§5). This page is only about what 
 | 1 | DMN 1.3 decision model                         | 2     | `l4 export … --to dmn`                              | `cabal test jl4:jl4-test`       |
 | 2 | dmnmd markdown                                 | 2     | `l4 export … --to dmn-md`                           | `cabal test jl4:jl4-test`       |
 | 3 | BPMN 2.0 processes (3 rules)                   | 6     | `l4 export … --to bpmn --rule …`                    | `cabal test jl4:jl4-test`       |
-| 4 | Ladder figures (6 decisions × 4 carriers)      | 24    | `npm run demo:regcf` in `ts-shared/ladder-svg`      | `turbo run test` (drift guard)  |
+| 4 | Ladder figures (7 decisions × 4 carriers)      | 28    | `npm run demo:regcf` in `ts-shared/ladder-svg`      | `turbo run test` (drift guard)  |
 | 5 | Deployable API / MCP surface                   | 1 `.l4` | `POST /deployments` to `jl4-service`              | `cabal test jl4:jl4-test`       |
 
-Every one of 1–3 reproduces **byte for byte from the command line with no flags** other than
-`--rule` (which selects _which_ process, since a BPMN document holds exactly one). That was not
-true before 2026-07-27: the model name was hand-typed in the golden test, so the corpus's DMN model
-had three different names at once. It now comes from the corpus's own outermost `§` heading.
+Targets **2 and 3** reproduce **byte for byte from the command line with no flags** other than
+`--rule` (which selects _which_ process, since a BPMN document holds exactly one). Measured
+2026-08-09 by exporting each to a scratch path and diffing against the shipped golden: 0 lines
+differ across all six BPMN files and both dmnmd files.
+
+**Target 1 does not, and this line used to say it did.** The DMN goldens are cut by
+`jl4/tests/DmnExport.hs` through an in-memory VFS whose module is named `main.l4`, so every
+annotation that carries a source position says `main.l4:` where the same command run against the
+file on disk says `regcf.l4:` — 23 `<text>` elements in `regcf-corpus.dmn` and 113 located notes in
+`regcf-corpus.fidelity.txt`, measured the same way, and **nothing else on either side differs**.
+Re-derive that pair with `cabal test jl4:jl4-test`, not with the command in the table above, or you
+will commit that one-word drift by hand. (This is not new — the shipped golden carried `main.l4:`
+23 times before this change too — it is newly measured.)
+
+Even the surviving claim is recent. Before 2026-07-27 the model _name_ was hand-typed in the golden
+test as well, so the corpus's DMN model had three different names at once; it now comes from the
+corpus's own outermost `§` heading.
 
 Pin `JL4_LIBRARY_PATH=<repo>/jl4-core/libraries` for every command on this page.
 
@@ -41,16 +54,19 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn --fidelity-report
 ```
 
-**Measured 2026-08-02 on the shipped goldens (R12 + R13,
-`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** 67 `<decision>` elements — 9 decision
-tables, 57 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
-tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 149 `<informationRequirement>`
+**Measured 2026-08-09 on the shipped goldens (R12 + R13,
+`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16; recounted when Rule 501(a)'s "one year"
+became a calendar anniversary, and again when Rule 501(a)(4) was decomposed).** 70 `<decision>`
+elements — 9 decision
+tables, 60 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
+tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 155 `<informationRequirement>`
 edges, 31 `<knowledgeRequirement>`s, one diagram. Loads clean in `dmn-moddle` — and **evaluates**,
-over the 20 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 22 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec §15.12.1 —
-and 4 seed cases added 2026-08-03): KIE 8.44.0.Final answers 1340/1340 decisions, 1340/1340
-values as expected (280/280 decision-service output values); Camunda 8.7.6 (zeebe-dmn) parses and
-answers 1340/1340. The
+4 seed cases added 2026-08-03, the leap case added 2026-08-05, and the escheat case added
+2026-08-09): KIE 8.44.0.Final answers
+1540/1540 decisions, 1540/1540 values as expected (330/330 decision-service output values);
+Camunda 8.7.6 (zeebe-dmn) parses and answers 1540/1540. The
 verbatim verdict lines live in
 `jl4/examples/dmn/README.md` and are CI-gated (`.github/workflows/pr-checks.yml`, dmn-engines).
 
@@ -103,7 +119,7 @@ refused: the 15 law-time-rebinding scenarios (dropped, Lossy-noted) and the raw-
 - **It executes — this bullet used to say "nearly inert", and stopped being true on 2026-08-02.**
   Phase 5's BKM emission retired the unevaluable `f(x)` family (tier-1 calls read shared inputs
   after un-lifting; tier-2 calls invoke `businessKnowledgeModel`s), and R12/R13 removed the last
-  two refusing families. Both engines now answer all 67 decisions with every value as expected.
+  two refusing families. Both engines now answer all 70 decisions with every value as expected.
   What is still true: a DMN decision is a 0-ary variable, and the price of making the corpus fit
   that program model is itemised in the fidelity table above (the un-lift's shared globals, the
   dropped scenarios, the verdict split).
@@ -282,43 +298,54 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
 cd ts-shared/ladder-svg && npm run demo:regcf     # needs jl4-lsp; set JL4_LSP_CMD
 ```
 
-Six decisions, four carriers each, all projected through the LSP from the corpus. See
-`figures/README.md` for the subject list and why each was chosen.
+Seven decisions, four carriers each, all projected through the LSP from the corpus. See
+`figures/README.md` for the subject list and why each was chosen. Re-measured 2026-08-09.
 
 |                                | dims        | leaves | sentences |
 | ------------------------------ | ----------- | ------ | --------- |
 | `regcf-exemption` (the root)   | 3027 × 185  | 61 ch  | 1         |
 | `regcf-rule-100b`              | 912 × 571   | 78 ch  | 6         |
 | `regcf-reporting-terminates`   | 1006 × 505  | 90 ch  | 5         |
-| `regcf-resale-exceptions`      | 2683 × 444  | 304 ch | 4         |
+| `regcf-resale-exceptions`      | 1074 × 440  | 87 ch  | 4         |
+| `regcf-resale-limb-4`          | 1147 × 572  | 108 ch | 6         |
 | `regcf-transfer-permitted`     | 846 × 269   | 63 ch  | 2         |
 | `regcf-intermediary`           | 2054 × 180  | 75 ch  | 1         |
 
 ### What this projection cannot say
 
-- **Three of the six are not usable as page assets, untrimmed.** These are measured, not estimated,
+- **One of the seven is not usable as a page asset, untrimmed** — the root, for the ribbon reason
+  below. Until 2026-08-09 it was three of six, because two of them were wide for the leaf-label
+  reason, which the decomposition of Rule 501(a)(4) removed. These are measured, not estimated,
   and unlike `demo/charities-a3.ts` — whose header admits its labels are "trimmed for the page" —
   nothing here is trimmed, because trimming is transcription.
 - **AND is a ribbon.** In ladder logic a conjunction is a series circuit, so it lays out
   left-to-right with no wrap. The root decision — Rule 100(a)'s five conditions, plus a 118-char
   chapeau riding the wire — is a strip **16× wider than tall**. That is the picture a reader most
   wants and the one the notation handles worst.
-- **Leaf labels never wrap.** Rule 501(a)(4)'s field name is 288 characters _because it is the
-  CFR's own sentence_; it prints at 301 and occupies 2387.8 px in a single box. (291/304 before the
-  clitic ruling dropped its leading `is `; the box figure read "≈2380 px" and was measured at 2411.4
-  when re-derived on 2026-08-03, so it is now the number the SVG actually carries.)
-- **A leading run of inert prose merges into one heading.** The mechanism is unchanged, but this
-  corpus stopped tripping it on 2026-08-03: under the enumeration-label ruling each caption is
-  truncated to its label and rides its own node (`.. "(1)" ... transfer's \`to the issuer …\``), so in
-  `regcf-resale-exceptions` the heading is now the chapeau alone and all four labels sit on the wires
-  into their rungs. Before the ruling the chapeau and caption **(1)** were one text element and a
-  reader took "(1) To the issuer of the securities" for preamble.
-- **The four carriers are not interchangeable.** `toMermaidRailroad` deliberately drops medial inert
-  glue inside an `OR` (a railroad `choice` branch is a live path, and prose-as-branch would make the
-  disjunction trivially satisfiable — correct, and documented in `mermaid.ts`). That discard is still
-  there and still bites any rule that puts prose between two live `..` rungs; it no longer bites this
-  one, because the labels are now inside their branches and the `.mmd` carries all four. **Do not
-  treat one carrier as a stand-in for another.**
+- **Leaf labels never wrap — but nothing here is now long enough for it to matter.** The mechanism
+  is unchanged; the exhibit is gone. Rule 501(a)(4)'s field name used to be 288 characters _because
+  it was the CFR's own sentence_, printing at 301 and occupying 2387.8 px in a single box. On
+  2026-08-09 that one field became six, and the widest leaf in any of these figures is 108
+  characters. What removed it was decomposition, not a wrapping feature: the name had four statutory
+  alternatives inside it, and the width was the symptom. A field name that is genuinely one long
+  sentence would still overflow.
+- **A leading run of inert prose merges into one heading.** The mechanism is unchanged, but
+  `regcf-resale-exceptions` stopped tripping it on 2026-08-03: under the enumeration-label ruling
+  each caption is truncated to its label and rides its own node
+  (`.. "(1)" ... transfer's \`to the issuer …\``), so its heading is the chapeau alone and all four
+  labels sit on the wires into their rungs. Before the ruling the chapeau and caption **(1)** were
+  one text element and a reader took "(1) To the issuer of the securities" for preamble. The 2026-08-09
+  figure `regcf-resale-limb-4` trips it deliberately: its `"(4)"` and its transferee caption are both
+  in the leading run, so they merge into `(4) To a member of the family …`, which is the statute's
+  own line and is what a reader wants at the top of that figure.
+- **The four carriers are not interchangeable, and the newest figure proves it again.**
+  `toMermaidRailroad` deliberately drops medial inert glue inside an `OR` (a railroad `choice` branch
+  is a live path, and prose-as-branch would make the disjunction trivially satisfiable — correct, and
+  documented in `mermaid.ts`). It does not bite `regcf-resale-exceptions`, whose labels are inside
+  their branches, so its `.mmd` carries all four. It **does** bite `regcf-resale-limb-4`: the caption
+  `or in connection with the death or divorce of the purchaser or other similar circumstance.` sits
+  between two live rungs and is absent from the `.mmd`, while the `.svg`, `.txt` and `.sentences`
+  all carry it. **Do not treat one carrier as a stand-in for another.**
 
 ### The prose carrier, and its own limit
 
@@ -349,7 +376,7 @@ figure still passes. Run `demo:regcf` for the real thing.
 
 The corpus carries **zero** `@export` annotations by design, and
 `tests/regcf.schema.golden` still reads `No @export annotations found in file`. A façade
-(`regcf-wizard.l4`, `IMPORT regcf`) carries the deployment surface: five `@export`s, plain-English
+(`regcf-wizard.l4`, `IMPORT regcf`) carries the deployment surface: six `@export`s, plain-English
 field names, and prose fields that splice their figures out of corpus constants rather than
 restating them. §7 of `README.md` covers it in full.
 
@@ -387,6 +414,12 @@ curl -X POST http://HOST/deployments -F id=regcf -F sources=@/tmp/regcf.zip
   `/.well-known/{mcp,mcp/manifest,webmcp}` and `/.webmcp/embed.js` are all 200.
 
 ### Measured live (own service, own store, port 21877, torn down)
+
+**This block predates the sixth `@export`.** `investment-limit-under-the-rules-effective-on` — the
+law-time control — is absent from it, so the counts below are nine and five where a service run
+against the current façade reports ten and six. Re-measured 2026-08-03 by `etc/go/phases/p7-mcp.sh`,
+which records the count and the tool names on its receipt. The dated measurement is left as it was
+taken rather than rewritten.
 
 ```
 tools/list on /regcf/.mcp  → 9 tools

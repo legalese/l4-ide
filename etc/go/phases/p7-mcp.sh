@@ -213,6 +213,12 @@ if [[ "$DEPLOY_STATE" != "ready" ]]; then
   exit "$GO_EXIT_FINDING"
 fi
 
+# The names, not only the counts, ride on the receipt as `tool_names`. Without
+# them a document downstream can print "6 tools" and nothing else, and the only
+# way to say WHICH six is to type them by hand — which the explainer's call to
+# action did, and got wrong, enumerating five descriptions against six exports.
+# A count is not a list.
+#
 # --- 5. the tool list ---------------------------------------------------------
 # JSON-RPC over POST. GET /deployments/{id}/.mcp is 405 by design: Application.hs
 # :82 declares `Post … :<|> Get …` and :376 wires the Get to `throwError err405`.
@@ -262,7 +268,8 @@ if [[ "$FUNCTIONS" -lt 1 || "$CORPUS_TOOLS" -ne "$FUNCTIONS" ]]; then
     --reason "the deployment is ready and .mcp answered, but the module's tools are not all there: the deployment reports $FUNCTIONS compiled function(s) while tools/list enumerates $TOOLS tool(s), of which $CORPUS_TOOLS are not jl4-service's own generic file-browsing tools ($SERVICE_OWN_TOOLS). Corpus tools found: $TOOL_NAMES. Zero here usually means the module carrying the subject's @export surface did not deploy — see the subject's NOTES.md for which module that is. A non-zero mismatch means the service's generic tool set has moved and the pin in this script is stale." \
     --artifact "$ZIP" --artifact "$LOG" --artifact "$MCP" $([[ -f "$STATUS" ]] && echo --artifact "$STATUS") \
     --metric "deployment_id=$DEPLOY_ID" --metric "functions=$FUNCTIONS" \
-    --metric "tools=$TOOLS" --metric "corpus_tools=$CORPUS_TOOLS"
+    --metric "tools=$TOOLS" --metric "corpus_tools=$CORPUS_TOOLS" \
+    --metric "tool_names=$TOOL_NAMES"
   exit "$GO_EXIT_FINDING"
 fi
 
@@ -275,4 +282,5 @@ go_receipt --status PASS \
   --metric "deployment_id=$DEPLOY_ID" --metric "tools=$TOOLS" \
   --metric "corpus_tools=$CORPUS_TOOLS" --metric "functions=$FUNCTIONS" \
   --metric "http=$CODE" --metric "ready_after_s=$WAITED" \
+  --metric "tool_names=$TOOL_NAMES" \
   --note "loopback only; a non-loopback deployment is refused as HG2's subject"

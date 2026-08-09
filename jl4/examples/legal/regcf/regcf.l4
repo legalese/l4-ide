@@ -243,11 +243,22 @@ GIVETH A NUMBER
 `business days to file a progress update` MEANS 5
 
 -- Rule 501(a) states the restriction as a "one-year period beginning when the
--- securities were issued". Rendered in days for the deontic deadline; see the
--- endpoint note at `transfer is within the one-year restricted period`.
+-- securities were issued" — a UNIT, not a count. The number 365 appears nowhere
+-- in Part 227, and the Part uses both idioms apart: days where it means days
+-- (§ 227.201(c) "120 days", § 227.303(a)(2) "21 days", § 227.400 "30 days") and
+-- years where it means years (§ 227.503(a)(1) "within 10 years", § 227.404(a)
+-- "five years"). A flat 365 also fails to generalise inside its own Part: if a
+-- year is 365 days then § 227.503(a)(1)'s "within 10 years" is 3,650 days, and a
+-- conviction on the actual tenth anniversary escapes disqualification.
+--
+-- This was 365 until 2026-08-05. That constant existed because a deontic
+-- deadline needs a number, and it was then reused as the DECLARATIVE
+-- predicate's threshold — where it is wrong for any holding spanning a
+-- 29 February, by exactly one day. WITHIN accepts an arbitrary expression
+-- (measured), so the deadline no longer needs a constant either.
 @ref 17 CFR 227.501(a) — resale restricted period
 GIVETH A NUMBER
-`days in the resale restricted period` MEANS 365
+`the resale restriction in years` MEANS 1
 
 § `1. Issuer eligibility — Rule 100(b)`
 
@@ -619,8 +630,8 @@ GIVETH A BOOLEAN
 -- Deliberately UNDEADLINED. §227.204 contains no temporal limit at all — its
 -- only temporal word is "period", inside the phrase "the closing date of the
 -- offering period" in the 204(e) definition, which bounds nothing. An earlier
--- draft wrote `WITHIN `days in the resale restricted period``, borrowing the
--- 365 days from Rule 501(a); that is a different rule about a different party
+-- draft wrote `WITHIN` the resale restricted period, borrowing the one-year
+-- period from Rule 501(a); that is a different rule about a different party
 -- (resale by a Purchaser, not advertising by the Issuer). It was not merely
 -- decorative: `SHANT ... WITHIN n` SUNSETS at n, so the borrowed deadline made
 -- the prohibition expire after a year and an issuer advertising on day 400
@@ -709,23 +720,120 @@ GIVETH A DEONTIC Actor Action
 
 @ref 17 CFR 227.501(a)
 DECLARE Transfer HAS
+    `date the securities were issued`                       IS A DATE
+    `date of the transfer`                                  IS A DATE
+    -- Derived, so the dates remain the single source of truth. Retained because
+    -- the wizard asks for elapsed days and readers downstream expect the field.
     `days since the securities were issued`                 IS A NUMBER
+        MEANS `Date to days` `date of the transfer`
+        MINUS `Date to days` `date the securities were issued`
     `to the issuer of the securities`                       IS A BOOLEAN
     `to an accredited investor`                             IS A BOOLEAN
     `as part of an offering registered with the Commission` IS A BOOLEAN
-    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS A BOOLEAN
+    -- Limb (4), decomposed. It is NOT four of a kind: the chapeau is "unless
+    -- such securities are transferred:", and limbs (1)-(3) plus the first three
+    -- parts of (4) complete it as a TRANSFEREE ("transferred TO x"), while the
+    -- last part completes it as a CIRCUMSTANCE ("transferred IN CONNECTION WITH
+    -- y"). The fields keep the preposition for that reason: a `Transfer` cannot
+    -- have a field `the death of the purchaser`, because the purchaser's death
+    -- is not a property of the transfer — the transfer's being in connection
+    -- with it is.
+    --
+    -- The determiner in "the death or divorce of the purchaser" attaches to the
+    -- coordinated phrase, not to each conjunct, so splitting would force us
+    -- either to distribute a determiner the source never distributed or to drop
+    -- it. Dropping invents less. Registered as F-501A4-DETERMINER.
+    --
+    -- "or other similar circumstance" is read as similar to DEATH OR DIVORCE
+    -- only, not to the whole of (4) — the broad reading would make (4) swallow
+    -- itself. Registered as F-501A4-SIMILAR.
+    --
+    -- The decomposition STOPS HERE. 17 CFR 227.501(c) defines "member of the
+    -- family of the purchaser or the equivalent" with "includes" — an open list
+    -- of 14 relationships plus adoptive ones. Enumerating them would encode an
+    -- open term as a closed one, which is a worse fidelity loss than the one
+    -- this decomposition repairs.
+    `to a member of the family of the purchaser or the equivalent`                                    IS A BOOLEAN
+    `to a trust controlled by the purchaser`                                                          IS A BOOLEAN
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS A BOOLEAN
+    `in connection with death of the purchaser`                                                       IS A BOOLEAN
+    `in connection with divorce of the purchaser`                                                     IS A BOOLEAN
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS A BOOLEAN
+
+-- The anniversary itself, computed rather than approximated: name the unit the
+-- rule names, and let the calendar decide how many days that is. 366 across a
+-- 29 February, 365 otherwise.
+--
+-- `add years` CLAMPS: the first anniversary of a 29 February issuance is
+-- 28 February. That is Excel's EDATE convention, and -- measured 2026-08-05 --
+-- also what FEEL's `date + duration("P1Y")` returns on both Drools/KIE 8.44.0
+-- and Camunda 8.7.6, so the L4 answer and the exported-DMN answer cannot drift
+-- apart. See the leap-day fork registered in README.md: the clamp is a READING
+-- of "one year", not a fact about it, and 1 March is the disclosed alternative.
+--
+-- Do NOT rewrite this by reconstructing components as `Date d m (y PLUS 1)`.
+-- That form is wrong twice over: L4's `Date` is lenient and rolls 29 February
+-- forward to 1 March, while FEEL's `date(2025, 2, 29)` is null on both engines,
+-- so the two would disagree with each other AND with the clamp.
+@ref 17 CFR 227.501(a) — "the one-year period beginning when the securities were issued"
+GIVEN transfer IS A Transfer
+GIVETH A DATE
+`the first anniversary of the issuance` transfer MEANS
+    `add years` (transfer's `date the securities were issued`) `the resale restriction in years`
 
 -- ENDPOINT NOTE. Rule 501(a) restricts transfer "during the one-year period
 -- beginning when the securities were issued". The rule does not say whether the
 -- first anniversary itself falls inside or outside that period. Read here as a
--- half-open interval [issuance, issuance + 365): day 364 is restricted, day 365
--- is free. A drafter who cared could remove the question with four words; a
--- reader who cares must litigate it. Flagged in README.md.
+-- half-open interval [issuance, first anniversary): the day before the
+-- anniversary is restricted, the anniversary itself is free. A drafter who
+-- cared could remove the question with four words; a reader who cares must
+-- litigate it. Flagged in README.md. This is a genuine fork; the UNIT question
+-- below was not.
+-- The deontic deadline, in days, computed from the same two dates rather than
+-- from a constant. `WITHIN` accepts an arbitrary expression; the constant that
+-- used to sit here is what leaked the wrong unit into the predicate above.
+@ref 17 CFR 227.501(a)
+GIVEN transfer IS A Transfer
+GIVETH A NUMBER
+`days until the first anniversary of the issuance` transfer MEANS
+    `Date to days` (`the first anniversary of the issuance` transfer)
+    MINUS `Date to days` (transfer's `date the securities were issued`)
+
 @ref 17 CFR 227.501(a)
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
 `transfer is within the one-year restricted period` transfer MEANS
-    transfer's `days since the securities were issued` LESS THAN `days in the resale restricted period`
+    transfer's `date of the transfer` LESS THAN `the first anniversary of the issuance` transfer
+
+-- Limb (4) gets its own decision, rather than six rungs spliced into the
+-- Rule 501(a) chain, because it is the one limb with internal structure: three
+-- transferees and one circumstance, coordinated by a single "or". Nesting it
+-- keeps that asymmetry visible in the ladder — two groups, each captioned by
+-- the words that produced it — where a flat six-way disjunction would present
+-- "a trust controlled by the purchaser" and "in connection with divorce" as the
+-- same kind of thing. They are not: the first says who received the securities,
+-- the second says nothing about who received them at all.
+--
+-- (4)(iv) DOES NOT CONSTRAIN THE TRANSFEREE. The circumstance is the whole
+-- test. Witness: a purchaser dies intestate with no known heirs, the securities
+-- are sold and the proceeds escheat to the state treasury. That is squarely "in
+-- connection with the death or divorce of the purchaser" — the death half of
+-- the statutory phrase, which the CFR states only in the disjunction — and the
+-- transferee is a stranger.
+-- Registered as F-501A4-NEXUS.
+@ref 17 CFR 227.501(a)(4)
+GIVEN transfer IS A Transfer
+GIVETH A BOOLEAN
+`(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` transfer MEANS
+        "(4)"
+    ..      "To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent,"
+        ..  transfer's `to a member of the family of the purchaser or the equivalent`
+        ..  transfer's `to a trust controlled by the purchaser`
+        OR  transfer's `to a trust created for the benefit of a member of the family of the purchaser or the equivalent`
+    OR      "or in connection with the death or divorce of the purchaser or other similar circumstance."
+        ..  transfer's `in connection with death of the purchaser`
+        ..  transfer's `in connection with divorce of the purchaser`
+        OR  transfer's `in connection with a circumstance similar to death or divorce of the purchaser`
 
 @ref 17 CFR 227.501(a)(1)-(4)
 GIVEN transfer IS A Transfer
@@ -735,7 +843,7 @@ GIVETH A BOOLEAN
     ..  "(1)" ... transfer's `to the issuer of the securities`
     ..  "(2)" ... transfer's `to an accredited investor`
     ..  "(3)" ... transfer's `as part of an offering registered with the Commission`
-    ..  "(4)" ... transfer's `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
+    OR  "(4)" ... `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` transfer
 
 @ref 17 CFR 227.501(a)
 GIVEN transfer IS A Transfer
@@ -750,7 +858,8 @@ GIVETH A DEONTIC Actor Action
 `resale restriction` transfer MEANS
     IF   `transfer falls within an exception in Rule 501(a)` transfer
     THEN FULFILLED
-    ELSE PARTY Purchaser SHANT `transfer the securities` WITHIN `days in the resale restricted period`
+    ELSE PARTY Purchaser SHANT `transfer the securities`
+         WITHIN `days until the first anniversary of the issuance` transfer
 
 § `Top-level — does the transaction qualify for the section 4(a)(6) exemption?`
 
@@ -863,15 +972,29 @@ GIVETH A ReportingStatus
     `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS FALSE
     `the issuer has liquidated or dissolved its business in accordance with state law`                 IS FALSE
 
+-- A fixture constructor. It fixes an issuance date whose first anniversary is
+-- exactly 365 days away (2021-06-01 -> 2022-06-01 spans a 28-day February), so
+-- every assertion written against a day count keeps saying precisely what it
+-- said before the dates arrived. The leap-spanning cases are asserted directly
+-- from dates below, because they CANNOT be expressed through this constructor —
+-- which is why the flat-count encoding could never have tested them.
+`the fixture issuance date` MEANS YMD 2021 6 1
+
 GIVEN `days since issue` IS A NUMBER
       `to accredited`    IS A BOOLEAN
 GIVETH A Transfer
 `a transfer at` `days since issue` `to accredited` MEANS Transfer WITH
-    `days since the securities were issued`                 IS `days since issue`
+    `date the securities were issued`                       IS `the fixture issuance date`
+    `date of the transfer`                                  IS `days since issue` PLUS `the fixture issuance date`
     `to the issuer of the securities`                       IS FALSE
     `to an accredited investor`                             IS `to accredited`
     `as part of an offering registered with the Commission` IS FALSE
-    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE
+    `to a member of the family of the purchaser or the equivalent`                                    IS FALSE
+    `to a trust controlled by the purchaser`                                                          IS FALSE
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS FALSE
+    `in connection with death of the purchaser`                                                       IS FALSE
+    `in connection with divorce of the purchaser`                                                     IS FALSE
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS FALSE
 
 §§ `Group 1 — issuer eligibility (Rule 100(b))`
 
@@ -1051,6 +1174,39 @@ GIVETH A FinancialStatementRequirement
 #ASSERT     `transfer is within the one-year restricted period` (`a transfer at` 364 FALSE)
 #ASSERT NOT `transfer is within the one-year restricted period` (`a transfer at` 365 FALSE)
 
+-- THE LEAP CASE. Inexpressible before 2026-08-05, because the record carried an
+-- elapsed day count and no dates — which is exactly why neither this corpus's
+-- own tests nor a de novo encoding's could reach it, and only a differential
+-- comparison between the two did. Issued 2023-03-01, the first anniversary is
+-- 2024-03-01, which is 366 days away because February 2024 has 29. Day 365 is
+-- therefore 2024-02-29, and is still inside the period.
+GIVEN `issued` IS A DATE
+      `transferred` IS A DATE
+GIVETH A Transfer
+`a transfer from` `issued` `to` `transferred` MEANS Transfer WITH
+    `date the securities were issued`                       IS `issued`
+    `date of the transfer`                                  IS `transferred`
+    `to the issuer of the securities`                       IS FALSE
+    `to an accredited investor`                             IS FALSE
+    `as part of an offering registered with the Commission` IS FALSE
+    `to a member of the family of the purchaser or the equivalent`                                    IS FALSE
+    `to a trust controlled by the purchaser`                                                          IS FALSE
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS FALSE
+    `in connection with death of the purchaser`                                                       IS FALSE
+    `in connection with divorce of the purchaser`                                                     IS FALSE
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS FALSE
+
+-- day 365 of a leap-spanning holding: STILL RESTRICTED (was FREE under the flat count)
+#ASSERT     `transfer is within the one-year restricted period` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 2 29))
+-- day 366, the anniversary itself: free, on the half-open reading above
+#ASSERT NOT `transfer is within the one-year restricted period` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 3 1))
+-- an ordinary year is unaffected: day 364 restricted, day 365 free
+#ASSERT     `transfer is within the one-year restricted period` (`a transfer from` (YMD 2021 6 1) `to` (YMD 2022 5 31))
+#ASSERT NOT `transfer is within the one-year restricted period` (`a transfer from` (YMD 2021 6 1) `to` (YMD 2022 6 1))
+-- and the deadline the deontic rule now computes, rather than assumes
+#EVAL `days until the first anniversary of the issuance` (`a transfer from` (YMD 2023 3 1) `to` (YMD 2024 2 29))
+#EVAL `days until the first anniversary of the issuance` (`a transfer from` (YMD 2021 6 1) `to` (YMD 2022 5 31))
+
 -- The prohibition, exercised: an excepted transfer leaves no prohibition
 -- standing, so making it is not a breach.
 #TRACE `resale restriction` (`a transfer at` 364 TRUE) AT 0 WITH
@@ -1059,6 +1215,62 @@ GIVETH A FinancialStatementRequirement
 -- A restricted transfer leaves a live prohibition that the transfer breaches.
 #TRACE `resale restriction` (`a transfer at` 100 FALSE) AT 0 WITH
     PARTY Purchaser DOES `transfer the securities` AT 200
+
+§§ `Group 8a — limb (4), one leaf at a time`
+
+-- Before 2026-08-09 limb (4) was ONE ~300-character boolean, so none of the
+-- assertions below could be written: there was a single fact to set, and the
+-- party setting it had to self-assess four alternatives without help. Each of
+-- the six now fires on its own, inside the restricted period, where nothing
+-- else could be excusing the transfer.
+GIVEN `days since issue` IS A NUMBER
+      `family`           IS A BOOLEAN
+      `own trust`        IS A BOOLEAN
+      `family trust`     IS A BOOLEAN
+      `death`            IS A BOOLEAN
+      `divorce`          IS A BOOLEAN
+      `similar`          IS A BOOLEAN
+GIVETH A Transfer
+`a transfer under limb (4) at` `days since issue` `family` `own trust` `family trust` `death` `divorce` `similar` MEANS Transfer WITH
+    `date the securities were issued`                       IS `the fixture issuance date`
+    `date of the transfer`                                  IS `days since issue` PLUS `the fixture issuance date`
+    `to the issuer of the securities`                       IS FALSE
+    `to an accredited investor`                             IS FALSE
+    `as part of an offering registered with the Commission` IS FALSE
+    `to a member of the family of the purchaser or the equivalent`                                    IS `family`
+    `to a trust controlled by the purchaser`                                                          IS `own trust`
+    `to a trust created for the benefit of a member of the family of the purchaser or the equivalent` IS `family trust`
+    `in connection with death of the purchaser`                                                       IS `death`
+    `in connection with divorce of the purchaser`                                                     IS `divorce`
+    `in connection with a circumstance similar to death or divorce of the purchaser`                  IS `similar`
+
+-- The transferee half: three ways to be the right recipient.
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 TRUE  FALSE FALSE FALSE FALSE FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE TRUE  FALSE FALSE FALSE FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE TRUE  FALSE FALSE FALSE)
+-- The circumstance half: three ways for the occasion to be the right one.
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE TRUE  FALSE FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE TRUE  FALSE)
+#ASSERT     `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE FALSE TRUE )
+-- None of the six: limb (4) does not fire, and the restriction stands.
+#ASSERT NOT `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE FALSE FALSE)
+#ASSERT NOT `transfer is permitted` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE FALSE FALSE)
+
+-- THE ESCHEAT CASE, and the reason (4)(iv) is not read to constrain the
+-- transferee. A purchaser dies intestate with no known heirs; the securities
+-- are sold and the proceeds escheat to the state treasury. The transferee is a
+-- stranger — not family, not a trust, not the issuer, not accredited — and the
+-- transfer is nonetheless in connection with the death of the purchaser, which
+-- the CFR states only in the disjunction: "in connection with the death or
+-- divorce of the purchaser". A nexus reading, on which the transferee must be
+-- one the circumstance produces, would deny the exception here. This corpus
+-- permits it. See F-501A4-NEXUS.
+#ASSERT `transfer is permitted` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE TRUE FALSE FALSE)
+
+-- Each of the six carries the whole limb on its own, and that reaches the
+-- deontic layer too: a limb-(4) transfer leaves no live prohibition to breach.
+#TRACE `resale restriction` (`a transfer under limb (4) at` 100 FALSE FALSE FALSE FALSE TRUE FALSE) AT 0 WITH
+    PARTY Purchaser DOES `transfer the securities` AT 100
 
 §§ `Top level — the whole exemption`
 

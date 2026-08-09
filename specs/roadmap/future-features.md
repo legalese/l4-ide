@@ -1,10 +1,58 @@
 > **Status (audited 2026-07-03):** roadmap reviewed — 1 of 7 items now implemented (plus 1 partial); see per-item annotations.
 >
-> Since this list was written, **regulative rules** (syntax + semantics) shipped: `Regulative`/`Deonton`/`DMust`/`DMustNot` in `jl4-core/src/L4/Syntax.hs` and evaluation in `jl4-core/src/L4/EvaluateLazy/Machine.hs` + `ContractFrame.hs`. **Ellipsis linting** is partially scaffolded (`jl4-core/src/L4/Lint/AndOrDepth.hs`) but is not ellipsis-specific and not yet wired into diagnostics. Remaining items (three-caret repeat, bounded deontics + reasoner backends, web-app generation, set UNION/INTERSECT, WHEN-free CONSIDER branches) are still open. Note: some referenced spec paths use a stale `dev/specs/todo/` prefix — the asyndetic spec is now in `specs/done/`.
+> Since this list was written, **regulative rules** (syntax + semantics) shipped: `Regulative`/`Deonton`/`DMust`/`DMustNot` in `jl4-core/src/L4/Syntax.hs` and evaluation in `jl4-core/src/L4/EvaluateLazy/Machine.hs` + `ContractFrame.hs`. **Ellipsis linting** is partially scaffolded (`jl4-core/src/L4/Lint/AndOrDepth.hs`) and is not ellipsis-specific. It **is** wired into diagnostics, contrary to what this line said until 2026-08-06: a mixed `AND`/`OR` at one indentation emits `DiagnosticSeverity_Warning` — "AND and OR operators appear at the same indentation level (column N)" — and it sees through the `...`/`..` sugar (MEASURED). What remains open is its coverage; see the single-line item below. Remaining items (three-caret repeat, bounded deontics + reasoner backends, web-app generation, set UNION/INTERSECT, WHEN-free CONSIDER branches) are still open. Note: some referenced spec paths use a stale `dev/specs/todo/` prefix — the asyndetic spec is now in `specs/done/`.
 
 # Future Features
 
 **Ellipsis linting**: LSP diagnostics to warn when ellipsis forms appear adjacent to mismatched operators (e.g., `...` near OR, `..` near AND). See [spec](../done/ASYNDETIC-DISJUNCTION-SPEC.md).
+
+**Warn on single-line unparenthesized mixed `AND`/`OR`** (Meng, 2026-08-06). `AndOrDepth.hs` warns
+when the two operators tie at one _indentation column_, but says nothing when the whole formula sits
+on **one line** with no parentheses — where there is no layout signal at all and the grouping falls
+to the precedence table. MEASURED 2026-08-06: `DECIDE \`one line\` IF \`a\` OR \`b\` AND \`c\``compiles with **no diagnostic** and evaluates as`a OR (b AND c)` (`TRUE FALSE FALSE`→ TRUE, versus
+FALSE for the parenthesized`(a OR b) AND c`).
+
+The coverage is inverted with respect to risk. The one-line form is the one that most resembles the
+statute it came from — a single flowing clause, no visual structure — and it is decided by a table a
+legal reviewer has never read. The warning fires where the author was being _more_ explicit and stays
+silent where they were being _least_.
+
+Open questions before building it: whether to warn always or only in some statutory/strict mode (a
+bare warning on every one-liner would be noise in ordinary code); whether parentheses should silence
+it, which they arguably should since they are then an explicit choice; and whether this belongs in
+`AndOrDepth.hs` or beside it, since the existing check is about columns and this one is about their
+absence. Occasioned by [Grouping and Precedence](../../doc/tutorials/getting-started/grouping-and-precedence.md).
+
+**Warn on the derived antonym** (Meng, 2026-08-09). A field defined as `NOT` its apparent opposite
+asserts that the pair _partitions_ the domain — exhaustive **and mutually exclusive**. The second
+half is usually false of natural-language antonyms, and nothing in the language makes the assertion
+visible as a choice.
+
+MEASURED 2026-08-09. `paper/case-studies/gco-jersey-covid/*.l4` derived
+`takes place outdoors MEANS NOT takes place indoors` in all three point-in-time versions. A gathering
+can be both — vows on the lawn, reception in the restaurant — and because Article 3's outdoor
+(>20) and indoor (>10) caps read the **same** head count, exactly one of them could ever fire: a
+15-person mixed gathering breached or cleared according to which box the responsible person ticked.
+The Order's own drafting contradicted the model, since the sibling record counts persons in the
+indoor _areas_ (plural) of one premises. Repaired by making the two independent.
+
+Two grep-able tells, both mechanically detectable:
+
+1. `X MEANS NOT Y` where `X` and `Y` are fields of the **same** record.
+2. A two-constructor `DECLARE T IS ONE OF A / B` with a field computed `IF p THEN A ELSE B` — worse,
+   because it puts the exclusivity in the _type_, where no fact can dislodge it. GCO carried one of
+   these too (`VenueKind`), dead and unread, which is why it never bit.
+
+It must be advisory, not an error: some pairs genuinely partition. The tree-wide sweep found the
+pattern in only one other place — the adult/minor pair at
+`jl4/examples/ok/computed-fields.l4:26`, the **teaching example**, where 18-or-over does partition.
+That is the likely aetiology: a sound instance generalised into an unsound one. So the right output is "this asserts an exclusivity your
+source may not — confirm it or register a fork", pointing at the fork register rather than refusing
+the code.
+
+This is also a **third shape of hidden fork** for `specs/todo/single-instruction-demo/SPEC.md` §8.1,
+whose taxonomy lists two (resolved-in-a-comment; hidden-in-a-bare-typed-field). This one is
+hidden-in-a-**derived**-field: the derivation reads as a definition but is a reading.
 
 Three carets together will mean "repeat everything above to the end of the line".
 

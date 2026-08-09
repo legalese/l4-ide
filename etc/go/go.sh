@@ -220,6 +220,27 @@ if [[ "$MILESTONE" == "g2" ]]; then
   # A subject with no `denovo` section at all still needs a digest to bind a
   # gate to; `text:` entries are literal digest contributors (digestSet).
   [[ ${#GO_CORPUS_FILES[@]} -eq 0 ]] && GO_CORPUS_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
+else
+  # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
+  #
+  # `p9-explain` is HG1-gated because it publishes narrative prose about a body
+  # of law. But the gate binds to this digest, and this digest used to cover the
+  # L4 modules alone — MEASURED: editing `explainer/orientation.md`, re-running
+  # `--only p9-explain` with no new grant, and watching the gate stay open while
+  # the replaced prose went straight into the rendered document. The drift
+  # detector fired (an inline `UNRECORDED EDIT` banner, a `narrative-drift`
+  # finding), and `--bless` cleared all of it in one command with nothing left
+  # to compare. A gate that does not re-open over the thing it gates is not a
+  # gate over that thing.
+  #
+  # Folding the deposit in here also closes the `--bless` hole for free:
+  # blessing rewrites `provenance.json`, which is in this set, so the digest
+  # moves and HG1 shuts.
+  if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]]; then
+    for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
+      [[ -e "$_f" ]] && GO_CORPUS_FILES+=("$_f")
+    done
+  fi
 fi
 
 # Assemble the declared stage list and the HG1 set from the sidecar's legs.
@@ -231,8 +252,16 @@ for s in "${P7_LEG_ORDER[@]}"; do
     gated_by_HG1="$gated_by_HG1 $s"
   fi
 done
-G1_STAGES+=(p9-report)
-gated_by_HG1="$gated_by_HG1 p9-report"
+# p9-explain follows p9-report: both read the journal, and the explainer also
+# reads the report's own presence. Declared, so that a run which produced no
+# explainer says so in its milestone verdict rather than staying silent; and
+# HG1-gated on the SAME LINE as it is declared, so the two cannot drift apart.
+# An ungated stage here would publish HG1-unreviewed narrative and every
+# downstream honesty check would report clean — the gate test below defaults to
+# UNGATED, and verify-run.mjs reads the gated set out of run_begin, so it would
+# agree with the omission. selftest.mjs asserts the invariant directly.
+G1_STAGES+=(p9-report p9-explain)
+gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 
 # SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the only stage after
 # P5 is the report, so that is what HG1 gates — and, as at g1, a g2 run stops
@@ -335,6 +364,15 @@ cmd_plan() {
     [[ " $gated_by_HG2 " == *" $s "* ]] && gate="HG2"
     printf '  %-14s gate=%-4s %s\n' "$s" "$gate" "$PHASES/$s.sh"
   done <<<"$stages"
+  echo
+  # WHAT A GATE WOULD BIND TO, printed rather than left to be inferred. A gate
+  # grant covers one digest and nothing else, so "which files are in it" is the
+  # question a reader of a waiver actually has — and it is the question that was
+  # answered wrongly for the explainer's narrative deposit, which the gate was
+  # supposed to cover and did not.
+  echo "the digest a gate on this run would bind to, over ${#GO_CORPUS_FILES[@]} file(s):"
+  echo "  $(node "$LIB/digest.mjs" "${GO_CORPUS_FILES[@]}")"
+  for s in "${GO_CORPUS_FILES[@]}"; do printf '  %s\n' "${s#"$GO_ROOT"/}"; done
   echo
   echo "entry points that exist and refuse, each with a named blocker:"
   for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
@@ -565,7 +603,7 @@ EOF
     if [[ "$MILESTONE" == "g2" ]]; then
       echo "go:   the waiver covers the de novo deposit set $corpus_digest and nothing else; deposit or edit one and $gname re-opens."
     else
-      echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file and $gname re-opens."
+      echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file, or any file of the subject's explainer narrative deposit, and $gname re-opens."
     fi
   done
 
@@ -775,6 +813,11 @@ EOF
   # hashed, preliminary render p9-report produced lives in artifacts/.
   if [[ -f "$RUN/journal.ndjson" ]]; then
     node "$GO_ROOT/etc/go/report/render-report.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+    # The explainer's final render, for the same reason and with the same
+    # status. It may legitimately not exist — a subject with no declared
+    # narrative, or a milestone that does not declare the stage — so a failure
+    # here is silent and leaves no file, rather than inventing one.
+    node "$GO_ROOT/etc/go/report/render-explainer.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
   fi
 
   echo
@@ -787,6 +830,11 @@ EOF
   fi
   echo "go: journal  $RUN/journal.ndjson"
   [[ -f "$RUN/report.md" ]] && echo "go: report   $RUN/report.md"
+  # The explainer is announced here and NOWHERE ELSE. report.md deliberately
+  # does not link to it: the explainer can legitimately not exist for a run, and
+  # a report linking to a document that was never produced would be making a
+  # claim about the run that the journal does not support.
+  [[ -f "$RUN/explainer.html" ]] && echo "go: explainer $RUN/explainer.html  (and explainer.md)"
   exit "$vexit"
 }
 

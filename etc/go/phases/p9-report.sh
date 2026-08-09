@@ -71,6 +71,7 @@ node -e '
     "## What the encoding decided",
     "## What each projection preserved and lost",
     "## Test results",
+    "## Every other stage that reported",
     "## Where another system published its own representation of the same rule",
     "## Triage",
     "## Every artifact this run put on disk",

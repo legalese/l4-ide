@@ -330,13 +330,63 @@ Honest list. Nothing below is hidden behind a `TRUE`.
    weekend or holiday intervenes. Expressing it properly needs a business-day calendar over
    `daydate`, which the deadline arithmetic does not currently consult.
 
-2. **The 1-year resale period is rendered as 365 days, and its endpoint is a guess.**
+2. **The 1-year resale period: the unit is now right; its endpoint is still a guess, and its
+   leap-day anniversary is a disclosed fork.**
    Rule 501(a) restricts transfer "during the one-year period beginning when the securities
-   were issued" and does not say whether the first anniversary is inside or outside. Modelled
-   as the half-open interval `[issuance, issuance + 365)`. Two separate infidelities: the
-   leap-year one (a real anniversary is 365 or 366 days out — `daydate` could fix this, at
-   the cost of carrying an issuance *date* rather than an elapsed count), and the endpoint
-   one, which **no encoding can fix because the rule does not decide it**. Flagged inline.
+   were issued". This entry used to record three infidelities. One is **fixed**, two remain,
+   and the two that remain are of a different kind — they are places the rule does not decide,
+   not places the encoding gave up.
+
+   - **FIXED 2026-08-05 — the unit.** The period was encoded as the constant `365`, which is
+     wrong by one day for any holding spanning a 29 February, i.e. roughly one in four. It is
+     now a calendar anniversary (`add years`, in `daydate`'s Calendar Arithmetic), and the
+     `Transfer` record carries two dates instead of an elapsed count — exactly the trade this
+     entry predicted.
+
+     **Say the provenance accurately, because an earlier draft of this bullet did not.** The
+     defect was never hidden: it was disclosed in this list from the corpus's first commit
+     (`4c6a385d`, 2026-07-25), which named the cause, the remedy and its price. What it was
+     not, for eleven days, was *fixed*. Being written down and being repaired are different
+     states, and this entry is the evidence that a disclosed defect can outlive several
+     readings of the disclosure.
+
+     What moved it was the §8 differential comparison, and the reason neither side could get
+     there alone is **not** the same on both sides:
+
+     - **This corpus could not state the case.** While `Transfer` held only "days since
+       issue", a leap-spanning holding was inexpressible in its own vocabulary.
+     - **The de novo encoding could state it, and still would not have found this.** Its
+       `Transfer` carries two dates and it computes its own anniversary
+       (`regcf-denovo.l4:1245`) — by reconstructing the components, so it *rolls forward*
+       where this corpus now clamps. Its assertions exercise the de novo. A test cannot fail
+       on a defect in a file it does not import.
+
+     So the comparison did not supply the knowledge; it supplied the **witness** — a concrete
+     pair of answers that differ, on a case both sides evaluate. The battery it runs over has
+     perturbation **off by construction**: twenty hand-built rows that are already one fact
+     apart, not generated inputs. The case is now pinned in `regcf.l4` and, per R0, executed
+     on both DMN engines from `regcf-corpus.cases.json`.
+
+     And the two encodings still disagree: this one clamps, the de novo rolls forward. That
+     divergence is not a bug in either — it is the fork below, live in the tree, with one
+     reading committed on each side.
+   - **OPEN — the endpoint.** The rule does not say whether the first anniversary is inside
+     or outside the period. Modelled as the half-open interval `[issuance, first anniversary)`:
+     the day before the anniversary is restricted, the anniversary itself is free. **No
+     encoding can fix this, because the rule does not decide it.** Flagged inline.
+   - **OPEN — the leap-day anniversary.** What is "one year after 29 February 2024"? There is
+     no single right answer, and we have three measured candidates:
+
+     | reading | answer | where it comes from |
+     | --- | --- | --- |
+     | clamp to the month end | 2025-02-28 | Excel `EDATE`; FEEL `date + duration("P1Y")` on both DMN engines |
+     | roll forward | 2025-03-01 | L4's lenient `Date d m y` constructor |
+     | no such date | *null* | FEEL `date(2025, 2, 29)` on both engines |
+
+     The corpus takes **the clamp** as its primary reading, because it is what both engines do
+     natively and what the anniversary convention generally implies — so the L4 answer and the
+     exported-DMN answer cannot drift apart. **1 March is the disclosed alternative**, and a
+     drafter who cared could remove the question in four words.
 
 3. **Reasonable-belief standards are inputs, not derivations.** Rules 301(a)–(c) and
    303(b)(1) turn on whether an intermediary "has a reasonable basis for believing" something.
@@ -413,8 +463,8 @@ projection *cannot* say. What follows is the summary.
 
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
-| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1340/1340 over 20 cases on both engines** — see below |
+| **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 7 decisions × 4 carriers                  | works; 1 of 7 too wide for a page untrimmed — see `figures/README.md` |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1540/1540 over 22 cases on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 
 Every BPMN golden, and the DMN **markdown** golden, reproduces byte for byte from a bare
@@ -424,34 +474,42 @@ from the CLI's bytes in exactly its 23 source-range annotation labels (`main.l4:
 2026-08-02, see `../../dmn/README.md` "From the CLI"). The `<definitions>` name comes
 from this file's own outermost `§` heading.
 
-### 6.1 DMN: 67 decisions, 12 tables, and a model both engines evaluate
+### 6.1 DMN: 70 decisions, 12 tables, and a model both engines evaluate
 
-**Measured 2026-08-02 on the shipped goldens (R12 + R13,
+**Measured 2026-08-09 on the shipped goldens (R12 + R13,
 `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** `l4 export --to=dmn` on
 this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
 since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
 reporting spine to a verdict decision table — **both engines evaluate it end to end**,
-over the 20 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 22 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec
-§15.12.1 — and 4 seed cases added 2026-08-03): KIE 8.44.0.Final answers 1340/1340
-decisions with 1340/1340 values as expected (plus 280/280 decision-service output
-values), and Camunda 8.7.6 (zeebe-dmn) parses it and answers 1340/1340. An earlier revision of this section — "102 decisions, 11 tables, and a model no
+§15.12.1 — 4 seed cases added 2026-08-03, the leap case added 2026-08-05, and the
+escheat case added 2026-08-09):
+KIE 8.44.0.Final answers 1540/1540 decisions with 1540/1540 values as expected (plus
+330/330 decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and
+answers 1540/1540. An earlier revision of this section — "102 decisions, 11 tables, and a model no
 engine can bind" — described the pre-BKM, pre-R12/R13 artifact; that model no longer
 ships.
 
-- **67 `<decision>`** elements — 9 decision tables, 57 boxed literal expressions, 1
+- **70 `<decision>`** elements — 9 decision tables, 60 boxed literal expressions, 1
   boxed context — plus **10 `businessKnowledgeModel`s** (Phase 5's tier-2 λ-lifts,
   3 of which carry the other 3 of the artifact's 12 `<decisionTable>`s) and **7
   `decisionService`s**. Of the 12 tables, 10 are `hitPolicy="UNIQUE"` rule-date
   interval tables and 2 are `FIRST` — one of them the R13 verdict table over the
   reporting spine. The boxed literals are FEEL an engine evaluates:
-  `D-LITERALEXPR` is now **advisory**, ×64 (57 decisions + 7 BKM bodies).
+  `D-LITERALEXPR` is now **advisory**, ×67 (60 decisions + 7 BKM bodies). The three
+  bullet figures above read 67/57/×64 until 2026-08-09 and were stale by two
+  before this edit: the calendar-anniversary change of 2026-08-05 added two decisions
+  and nothing regenerated this list. Re-derived here by counting the shipped XML and
+  the shipped fidelity report, not by adding to the old numbers.
 - **15 `<inputData>`** elements, one of which is the rule-date input
   `RULES_EFFECTIVE_DATE` (`typeRef="date"`). The flat-namespace collision story shrank
   with them: hydration and the BKM lowering absorbed most of the old scalar inputs, so
   `D-RENAME` and `D-SCOPE` fire once each (the two `status` terms) and `D-FEELNAME` is
   zero.
-- **0 blocking, 21 lossy, 125 advisory** notes in total. The lossy set is the honest
+- **0 blocking, 21 lossy, 133 advisory** notes in total (re-counted from the shipped
+  `regcf-corpus.fidelity.txt` on 2026-08-09; this line read 125 and drifted the same
+  way the bullet above it did). The lossy set is the honest
   remainder: 15 `D-RULEDATE-UNBOUND` (the `EVAL UNDER RULES EFFECTIVE AT` scenarios
   are **not emitted** — a DRG has one global rule-date input and no scoped rebinding),
   2 `D-REGULATIVE`, 1 `D-VERDICT` (the obligation lifecycle is the BPMN projection's
@@ -545,9 +603,15 @@ Three reasons, each measured rather than assumed.
 
 1. **Field names.** `jl4-service` sanitises schema property names — every non-alphanumeric
    becomes `-`, runs collapse — and then **truncates to 60 characters**
-   (`jl4-service/src/Shared.hs`). **23 of the corpus's 41 record fields exceed that**, because
-   they are the CFR's own sentences; the longest is 291 characters. Deployed and read back off
-   the live MCP endpoint:
+   (`jl4-service/src/Shared.hs`). **24 of the corpus's 48 record fields exceed that**, because
+   they are the CFR's own sentences. Counted 2026-08-09 by reading every `` `field` IS … `` line
+   of every `DECLARE` in `regcf.l4`; the same count over the file at the previous commit gives
+   23 of 43, so the "23 of 41" this line used to carry was measured by some other method and is
+   not reproduced here. The longest field was Rule 501(a)(4)'s limb, at 288 characters — this
+   line said 291, which was its length before the clitic rename dropped a leading `is `. That
+   field was decomposed into six on 2026-08-09, so the longest is now Rule 100(b)(5)'s
+   184-character limb: three times the cut, and still severed at the same place. Deployed and
+   read back off the live MCP endpoint:
 
    ```
    60  is-subject-to-a-disqualification-as-specified-in-section-227

@@ -376,6 +376,53 @@ GIVETH A NUMBER
 
 
 
+§§ `Calendar Arithmetic`
+
+
+-- Add a whole number of months or years to a date, CLAMPING the day to the last
+-- day of the target month when the original day does not exist there. 31 January
+-- plus one month is 29 February in a leap year and 28 February otherwise; the
+-- first anniversary of 29 February 2024 is 28 February 2025.
+--
+-- The clamp is not one convention picked from several. It is what Excel's EDATE
+-- does, what `actus-schedule` already did for schedule generation, and -- MEASURED
+-- on 2026-08-05 against Drools/KIE 8.44.0.Final and Camunda 8.7.6 (zeebe-dmn) --
+-- what FEEL's `date + duration("P1Y")` does on both DMN engines, over months and
+-- years alike, in all six probed cases. Agreeing with all three is the point: it
+-- is what lets an L4 module that computes an anniversary export to DMN and get
+-- the same answer back from an engine we do not control.
+--
+-- Contrast `Date d m y`, which is LENIENT and ROLLS FORWARD: `Date 29 2 2025` is
+-- 1 March 2025, not 28 February. Rolling is right for component arithmetic of the
+-- `Date 1 (month PLUS 6) year` kind and wrong for an anniversary, and the two
+-- differ by exactly one day on precisely the dates anybody litigates. Note that
+-- FEEL has no rolling form at all: `date(2025, 2, 29)` evaluates to null on both
+-- engines, so an anniversary written by reconstructing components cannot be
+-- exported at all, whereas one written here can.
+
+GIVEN date   IS A DATE
+      months IS A NUMBER
+GIVETH A DATE
+`add months` MEANS
+    DATE_FROM_DMY clampedDay newMonth newYear
+    WHERE
+        totalMonths MEANS DATE_MONTH date PLUS FLOOR months
+        newYear     MEANS DATE_YEAR date
+                              PLUS FLOOR ((totalMonths MINUS 1) DIVIDED BY `Months in a year`)
+        newMonth    MEANS ((totalMonths MINUS 1) MODULO `Months in a year`) PLUS 1
+        lastDay     MEANS `Days in month` newMonth newYear
+        clampedDay  MEANS IF   DATE_DAY date GREATER THAN lastDay
+                          THEN lastDay
+                          ELSE DATE_DAY date
+
+GIVEN date  IS A DATE
+      years IS A NUMBER
+GIVETH A DATE
+`add years` MEANS
+    `add months` date (FLOOR years TIMES `Months in a year`)
+
+
+
 §§ `Weekday Functions`
 
 

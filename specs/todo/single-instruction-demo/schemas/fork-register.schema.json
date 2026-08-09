@@ -48,10 +48,15 @@
         },
         "description": { "type": "string", "minLength": 1 },
         "status": {
-          "enum": ["live", "rejected", "demoted"],
-          "description": "'rejected' = the encoder argued it away; 'demoted' = an authority struck it (R4 §1: a court striking a reading demotes, never deletes)."
+          "enum": ["live", "arguable", "rejected", "demoted"],
+          "description": "'rejected' = the encoder argued it away; 'demoted' = an authority struck it (R4 §1: a court striking a reading demotes, never deletes). 'arguable' = NEITHER: not taken, and not refuted — a reading the operative text forecloses, which a court could yet adopt. It exists because 'rejected' was carrying two different facts under one name, and only one of them is 'do not cite this'. A reader sizing exposure wants exactly the arguable list: readings live as law but not live in the encoding. ADDED 2026-08-09 ON ONE MEASURED INSTANCE, disclosed here rather than implied: F-100A1-CAP-vs-STATUTE's `statuteCap`, where Congress wrote $1,000,000 into 15 U.S.C. 77d(a)(6)(A) — the very paragraph the exemption is granted by, never since amended — and the Commission set $5,000,000 by rule. Nobody argued the statute away; the entry's own rationale says whether § 28's general exemptive authority reaches a specific numeric cap Congress placed in that paragraph 'is a question for a court, and no encoding settles it'. The other six entries in that register have genuinely refuted alternatives, so one instance is what this value rests on. If a second does not appear in the BNA's twelve dispositions or the charities corpus, reconsider it rather than let it become the bin every awkward reading is filed in."
         },
         "rejection_rationale": { "type": "string", "minLength": 1 },
+        "foreclosure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "For an 'arguable' reading only: what makes it non-operative, given that no one refuted it. Kept apart from `rejection_rationale` because the field names must not lie — nothing was rejected."
+        },
         "citations": {
           "type": "array",
           "items": { "$ref": "#/$defs/citation" }
@@ -124,7 +129,7 @@
         "source": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["citation"],
+          "required": ["citations"],
           "properties": {
             "quote": {
               "type": "string",
@@ -136,7 +141,12 @@
               "minLength": 1,
               "description": "Required when there is no quote. BNA A12 needs this: the restriction it is about sits in s 41A, whose text the ingest never fetched verbatim, so quoting it would have been invention."
             },
-            "citation": { "type": "string", "minLength": 1 }
+            "citations": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/citation" },
+              "description": "The same citation objects `readings[].citations` carries — an array, not a string, and not a string-or-array union. Two things measured 2026-08-09 forced it. (1) Three of the four entries in jl4/examples/legal/regcf/fork-register.json already held a citation OBJECT where this field declared `string`, so that register failed its own schema and nobody knew, because nothing had ever run the validator over it. (2) Twelve of the twenty-six entries in jl4/examples/legal/regcf/denovo/fork-register.json packed two or more distinct texts into one string, joined by 'read against', 'against' or a semicolon — which buries the very thing the entry exists to record: F-100A1-CAP-vs-STATUTE's source read '17 CFR 227.100(a)(1), read against 15 U.S.C. 77d(a)(6)(A)', a regulation set against the statute it is made under, and no query could see the second half or its `instrument` kind. One shape only, and no string alternative: `oneOf` is outside the keyword set etc/go/lib/register-validate.mjs implements, and a keyword parsed but not enforced is a constraint that silently does not exist."
+            }
           }
         },
         "readings": {
@@ -160,7 +170,7 @@
         },
         "status": {
           "enum": ["open", "resolved", "settled", "demoted"],
-          "description": "'open': more than one reading is live and no authority has spoken. 'resolved': the encoder took one reading on its own argument — the BNA's twelve are all this, and a three-value open/settled/demoted vocabulary had nowhere to put them without either overclaiming an authority or leaving twelve entries permanently 'open'. 'settled': an authority settled it. 'demoted': an authority struck a reading."
+          "description": "STATUS IS ABOUT WHAT THE ENCODER DID, NOT ABOUT HOW MANY READINGS SURVIVE. 'open': the encoder took no reading — there is no `taken`, and the fork is disclosed unresolved. 'resolved': the encoder took one reading on its own argument — the BNA's twelve are all this, and a three-value open/settled/demoted vocabulary had nowhere to put them without either overclaiming an authority or leaving twelve entries permanently 'open'. 'settled': an authority settled it. 'demoted': an authority struck a reading. RULED 2026-08-09, because the earlier gloss defined 'open' by a live-reading count ('more than one reading is live and no authority has spoken') while defining 'resolved' by the encoder's act, and the two tests disagree: F-501A4-DETERMINER is 'resolved' with two readings still live, and F-100A1-CAP-vs-STATUTE was 'open' with one. Live-reading count is NOT the test — a reading may stay live because no authority has struck it while the encoder has nonetheless taken another. Crucially 'resolved' does not assert the underlying legal question is settled; that is exactly what 'settled' is for, and an entry may be 'resolved' while its `taken.rationale` records that a court could hold otherwise."
         },
         "settled_by": {
           "type": "object",
@@ -232,11 +242,15 @@
     },
     {
       "id": "non-live-readings-explain",
-      "description": "A rejected or demoted reading carries a rejection_rationale. Every BNA row already wrote one; the schema makes it non-optional."
+      "description": "A rejected or demoted reading carries a rejection_rationale. Every BNA row already wrote one; the schema makes it non-optional. 'arguable' is exempt and carries `foreclosure` instead — see the next rule."
     },
     {
       "id": "live-readings-cite-their-licence",
       "description": "A live reading carries at least one citation — R4 §1: each per-reading implementation carries @ref citations to the text that licenses its reading."
+    },
+    {
+      "id": "arguable-readings-cite-and-foreclose",
+      "description": "An 'arguable' reading is held to a HIGHER bar than a rejected one, not a lower one: it must cite the text that makes it arguable (it is, after all, law someone could win on) AND state in `foreclosure` what makes it non-operative, and it must NOT carry a rejection_rationale, because nothing rejected it. `foreclosure` is forbidden on every other status. The strictness is deliberate: the failure mode of a new enum value is that it becomes the bin for anything awkward, and a value that costs two fields to use does not attract lazy filing."
     },
     {
       "id": "settled-or-demoted-requires-authority",

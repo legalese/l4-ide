@@ -1882,6 +1882,27 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- fields folding to one path step is valid FEEL computing a wrong number.
     Proj _ x n             -> unary e SFeel (\t -> t <> "." <> feelFieldIn names n) x
     Plus      _ a b -> binary e 6 SFeel "+"  a b
+    -- `Day d2 MINUS Day d1` is L4's way of asking how many days lie between two
+    -- dates, via daydate's days-since-epoch serial. FEEL has no serial, but it
+    -- does have the difference directly: subtracting two dates yields a days and
+    -- time duration, whose @.days@ property is that whole number.
+    --
+    -- Matched as a PEEPHOLE on the whole subtraction rather than by giving @Day@
+    -- a rendering of its own, which is what keeps this cheap. A lone @Day d@ has
+    -- no FEEL image -- there is no serial to render it to -- so lowering it in
+    -- isolation would mean introducing a duration DmnType and threading it
+    -- through 'DmnType', 'dmnTypeAttr', "L4.Dmn.Emit" and "L4.Dmn.Markdown"'s
+    -- four-type grammar. Here the duration is born and consumed inside one
+    -- fragment and never reaches the type layer at all, so nothing downstream
+    -- needs to know it existed. A @Day@ that appears anywhere else still falls
+    -- to verbatim, which is the honest answer for it.
+    --
+    -- The oracle guard is load-bearing: daydate overloads @Day@ on NUMBER as
+    -- well as DATE, and the NUMBER arm is not a date difference.
+    Minus _ a b
+      | Just da <- serialOf a
+      , Just db <- serialOf b
+      -> pair e FullFeel (\ta tb -> "(" <> ta <> " - " <> tb <> ").days") da db
     Minus     _ a b -> binary e 6 SFeel "-"  a b
     Times     _ a b -> binary e 7 SFeel "*"  a b
     DividedBy _ a b -> binary e 7 SFeel "/"  a b
@@ -2112,6 +2133,51 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                         <> ")"
                     , FullFeel
                     )
+    -- daydate's Calendar Arithmetic (`add months`, `add years`) IS FEEL's
+    -- `date + duration(...)`. Not approximately: the two agree on the clamp,
+    -- which is the only place a calendar addition can differ. MEASURED
+    -- 2026-08-05 on Drools/KIE 8.44.0.Final and Camunda 8.7.6 across six cases
+    -- including 31 Jan +1M, 31 Mar +1M, 29 Feb +1Y and 29 Feb +4Y; L4 answers
+    -- the same six. See jl4/tests-cli/fixtures/dmn-date-arith.
+    --
+    -- This is why the corpus is written with `add years` rather than by
+    -- reconstructing components: `date(y + 1, m, d)` is null on both engines for
+    -- a 29 February issuance, so the reconstruction has no correct lowering to
+    -- give it, while this one is a one-line rendering that executes.
+    --
+    -- TWO renderings, because the count is usually a NAMED CONSTANT rather than
+    -- a literal, and 'tcDateConstants' records the standing rule that an
+    -- EXPRESSION may not inline one: there the constant is a DMN decision
+    -- variable and inlining would erase the reference. So:
+    --
+    --   * a whole non-negative literal becomes @duration("P1Y")@ directly, which
+    --     is the legible form and the only one a decision-table endpoint could
+    --     ever hold;
+    --   * anything else becomes @floor(n) * duration("P1Y")@, which keeps the
+    --     reference intact. @floor@ is not defensive padding -- `add years`
+    --     FLOORs its argument, so without it a fractional count would scale the
+    --     duration where L4 truncates it, and the two would answer differently.
+    --
+    -- MEASURED on both engines rather than chosen from the spec, because the
+    -- obvious third form does not work: @duration(concatenate("P", string(n),
+    -- "Y"))@ fails on KIE (no such overload) and answers null on Camunda, so
+    -- building the designator at runtime is not portable. Multiplying a
+    -- years-and-months duration by a number is, on both, and it survives the
+    -- clamp: @floor(1.9) * duration("P1Y")@ added to 29 Feb 2024 is 28 Feb 2025.
+    App _ r [dE, nE]
+      | Just unit <- calendarUnit r
+      , oracleType oracle e == DmnDate
+      -> let (pd, td, fd) = go dE
+             (_,  tn, fn) = go nE
+             designator k = "duration(\"P" <> k <> unit <> "\")"
+             addend = case intLitOf nE of
+               Just n | n >= 0             -> Just (designator (Text.pack (show n)))
+               _      | fn /= L4Verbatim   -> Just ("floor(" <> tn <> ") * " <> designator "1")
+               _                           -> Nothing
+         in case addend of
+              Just a | fd /= L4Verbatim ->
+                (6, parenIf (pd < 6) td <> " + " <> a, maximum [FullFeel, fd, fn])
+              _ -> verbatim e
     App _ _ (_ : _) -> verbatim e
     -- R8-d′. A CONSIDER over a MAYBE is an ABSENCE TEST, and FEEL spells one
     -- with a comparison against null. Two arms, in either source order, one
@@ -2203,6 +2269,24 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
       InertCtxAnd  -> "true"
       InertCtxOr   -> "false"
       InertCtxNone -> "true"
+
+    -- The two daydate calendar-arithmetic heads, and the FEEL duration
+    -- designator each maps onto. Matched BY NAME, not by 'Unique', because
+    -- these are ordinary library @DECIDE@s rather than builtins -- the same
+    -- reason 'foldDateLiteral' matches @Date@ and @YMD@ by name.
+    calendarUnit r
+      | nameOf r == "add years"  = Just "Y"
+      | nameOf r == "add months" = Just "M"
+      | otherwise                = Nothing
+
+    -- @Day d@ / @Date to days d@ applied to something the oracle agrees is a
+    -- DATE. Returns the date, so the caller can render the difference of two of
+    -- them; see the 'Minus' peephole.
+    serialOf = \case
+      App _ r [x]
+        | nameOf r `elem` ["Day", "Date to days"]
+        , oracleType oracle x == DmnDate -> Just x
+      _ -> Nothing
 
     unary whole frag build x =
       let (p, t, f) = go x

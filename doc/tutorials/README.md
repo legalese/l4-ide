@@ -13,6 +13,7 @@ New to L4? Start here:
 - **[Version Control for Rules](getting-started/version-control-for-rules.md)** - Manage L4 files with git
 - **[Encoding Legislation](getting-started/encoding-legislation.md)** - Turn legal text into L4
 - **[Wedding Vows](getting-started/wedding-vows.md)** - Fun intro to regulative rules
+- **[Grouping and Precedence](getting-started/grouping-and-precedence.md)** - What binds to what, why L4 groups by indentation, and three cases where a comma was the whole dispute
 
 See also: [Common Patterns](../reference/patterns/common-patterns.md) - a quick reference of frequently used L4 patterns.
 
