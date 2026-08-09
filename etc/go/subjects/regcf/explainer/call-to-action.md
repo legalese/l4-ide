@@ -92,7 +92,7 @@ browser page, so a model driving a browser can use them:
 <script src="http://localhost:8080/.webmcp/embed.js" data-scope="regcf"></script>
 ```
 
-The [`data-scope`](src:jl4-service/README.md#L375 "verbatim") attribute filters
+The [`data-scope`](src:jl4-service/README.md#L400 "verbatim") attribute filters
 by deployment and by function. This run exercised the JSON-RPC endpoint and not
 the browser embed, so treat this block as documented rather than as measured
 here.
