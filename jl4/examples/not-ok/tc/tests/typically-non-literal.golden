@@ -1,0 +1,12 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-non-literal.l4
+  Hidden: no
+  Range: 4:9-4:14
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY value for `x` must be a literal:
+    a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.

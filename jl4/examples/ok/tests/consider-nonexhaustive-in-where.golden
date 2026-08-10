@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+consider-nonexhaustive-in-where.l4:19:13-21:35:
+  I found a problem while checking the definition of `result`:
+    I found a problem while checking the definition of `tax rate`:
+      The following branches still need to be considered:
+      
+        WHEN rural THEN
+      

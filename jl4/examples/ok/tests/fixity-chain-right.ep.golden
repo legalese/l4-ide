@@ -1,0 +1,21 @@
+-- @infixr declares a right-associative operator: a chain groups from the
+-- right, like Haskell's (:) or (^).
+
+@infixr 5
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p CONSR q MEANS p + 10 * q
+
+-- 1 CONSR (2 CONSR 3) = 1 + 10 * (2 + 30) = 321
+#EVAL 1 CONSR 2 CONSR 3
+
+-- parenthesized control for the right grouping
+#EVAL 1 CONSR (2 CONSR 3)
+
+-- the left grouping is a different value, reachable only with parentheses
+#EVAL (1 CONSR 2) CONSR 3
+
+-- four operands, still grouping from the right:
+-- 1 CONSR (2 CONSR (3 CONSR 4)) = 1 + 10 * (2 + 10 * (3 + 40)) = 4321
+#EVAL 1 CONSR 2 CONSR 3 CONSR 4

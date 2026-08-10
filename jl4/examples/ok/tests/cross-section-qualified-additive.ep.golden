@@ -1,0 +1,63 @@
+-- Test: section qualification is ADDITIVE.
+--
+-- `cross-section-qualified.l4` checks that `Section`.Type, `Section`.constructor
+-- and `Section`.selector can be WRITTEN (issue #921). This file checks the other
+-- half of that claim: giving them a qualified spelling must not change how the
+-- BARE name resolves.
+--
+-- The distinction is not academic. Unqualified references are ranked by section
+-- proximity, using a map from each definition's Unique to the section path it
+-- was registered at. Constructors and selectors have never had a path recorded,
+-- so they behave as top-level: an ancestor of every section. Registering one as
+-- part of adding the qualified spelling would silently re-rank every
+-- unqualified reference to it — turning working programs ambiguous and
+-- ambiguous programs into ones with a binding picked for the user. Whether
+-- constructors and selectors SHOULD be section-ranked is a separate question
+-- with its own spec; #921 is not the place to answer it.
+--
+-- Both collisions below are same-typed on purpose: same-typed candidates land
+-- in the same proximity group, which is precisely where re-ranking would show.
+
+§ Alpha
+DECLARE V IS ONE OF yes, no
+DECLARE R HAS w IS A NUMBER
+
+§ Beta
+
+-- a VALUE named like Alpha's constructor, of that very type
+GIVETH A V
+yes MEANS no
+
+-- a VALUE named like Alpha's selector, of that very selector's type
+GIVEN r IS A R
+GIVETH A NUMBER
+w MEANS 99
+
+§ Gamma
+
+-- Bare `yes`, referenced from a section that is neither Alpha nor Beta, still
+-- resolves to Alpha's CONSTRUCTOR (which carries no section path) rather than
+-- becoming ambiguous against Beta's same-typed value.
+GIVETH A V
+useCon MEANS yes
+
+-- Same for the bare selector `w`.
+GIVEN r IS A R
+GIVETH A NUMBER
+useSel MEANS w OF r
+
+-- And Beta's values are still reachable, by qualifying them.
+GIVETH A V
+qBetaValue MEANS `Beta`.yes
+
+-- ... as are Alpha's constructor and selector, which is what #921 added.
+GIVETH A V
+qAlphaCon MEANS `Alpha`.yes
+
+qAlphaSel MEANS `Alpha`.w OF (R WITH w IS 7)
+
+#EVAL useCon
+#EVAL useSel OF (R WITH w IS 5)
+#EVAL qBetaValue
+#EVAL qAlphaCon
+#EVAL qAlphaSel

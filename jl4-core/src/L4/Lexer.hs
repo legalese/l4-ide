@@ -79,8 +79,27 @@ data TAnnotations
   | TNlgPrefix    -- ^ "@nlg"
   | TDesc         !Text -- ^ "@desc"
   | TExport       !Text -- ^ "@export"
+  | TFixity       !FixityDirection !Text -- ^ "@infixl" / "@infixr" / "@infix"
+  | TNonexhaustive      !Text -- ^ "@nonexhaustive"
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
+
+-- | Associativity direction of a fixity annotation ('@infixl' / '@infixr' /
+-- '@infix'). Declared here (rather than in the parser or syntax tree) because
+-- the lexer token carries it.
+data FixityDirection
+  = FixityLeft   -- ^ "@infixl"
+  | FixityRight  -- ^ "@infixr"
+  | FixityNone   -- ^ "@infix" (non-associative)
+  deriving stock (Eq, Generic, Ord, Show)
+  deriving anyclass (ToExpr, NFData)
+
+-- | Render the herald that produced a 'FixityDirection'.
+fixityHerald :: FixityDirection -> Text
+fixityHerald = \ case
+  FixityLeft  -> "@infixl"
+  FixityRight -> "@infixr"
+  FixityNone  -> "@infix"
 
 data TIdentifiers
   = TIdentifier !Text
@@ -95,6 +114,7 @@ data TSymbols
   | TNlgOpen
   | TNlgClose
   | TParagraph
+  | TBullet      -- • offside bullet-list marker
   | TPOpen
   | TPClose
   | TCOpen
@@ -123,6 +143,7 @@ symbols = Map.fromList
   , ("[" , TNlgOpen)
   , ("]" , TNlgClose)
   , ("§" , TParagraph)
+  , ("•" , TBullet)
   , ("," , TComma)
   , (";" , TSemicolon)
   , ("." , TDot)
@@ -205,6 +226,11 @@ data TKeywords
   | TKFetch
   | TKPost
   | TKEnv
+  | TKRecord
+  | TKCommit
+  | TKAttest
+  | TKRecall
+  | TKOfficial
   | TKConcat
   | TKAs
   | TKLet
@@ -212,6 +238,7 @@ data TKeywords
   | TKBe
   | TKMean
   | TKUnless
+  | TKTypically
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -289,6 +316,11 @@ keywords = Map.fromList
   , ("FETCH"      , TKFetch      )
   , ("POST"       , TKPost       )
   , ("ENV"        , TKEnv        )
+  , ("RECORD"     , TKRecord     )
+  , ("COMMIT"     , TKCommit     )
+  , ("ATTEST"     , TKAttest     )
+  , ("RECALL"     , TKRecall     )
+  , ("OFFICIAL"   , TKOfficial   )
   , ("CONCAT"     , TKConcat     )
   , ("AS"         , TKAs         )
   , ("LET"        , TKLet        )
@@ -296,6 +328,7 @@ keywords = Map.fromList
   , ("BE"         , TKBe         )
   , ("MEAN"       , TKMean       )
   , ("UNLESS"     , TKUnless     )
+  , ("TYPICALLY"  , TKTypically  )
   ]
 
 data TOperators
@@ -345,7 +378,12 @@ data TSpaces
 data TLiterals
   = TIntLit       !Text !Integer
   | TRationalLit  !Text !Rational
-  | TStringLit    !Text
+  | TStringLit    !Text !Text
+  -- ^ @TStringLit raw decoded@. The first field is the verbatim source slice
+  -- (including quotes and any escapes as written); the second is the decoded
+  -- value. Keeping the raw slice — mirroring 'TIntLit'/'TRationalLit' — lets
+  -- exactprint reproduce the source byte-for-byte instead of re-escaping
+  -- non-ASCII characters through 'showLitString'.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -395,6 +433,17 @@ descAnnotation = fst <$> lineAnno "@desc"
 exportAnnotation :: Lexer Text
 exportAnnotation = fst <$> lineAnno "@export"
 
+-- | Fixity annotations: "@infixl", "@infixr", "@infix".
+-- NOTE: "@infix" is a prefix of the other two heralds, so it must be tried last.
+fixityAnnotation :: Lexer (FixityDirection, Text)
+fixityAnnotation =
+      ((FixityLeft,)  . fst <$> lineAnno "@infixl")
+  <|> ((FixityRight,) . fst <$> lineAnno "@infixr")
+  <|> ((FixityNone,)  . fst <$> lineAnno "@infix")
+
+nonexhaustiveAnnotation :: Lexer Text
+nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
+
 nlgString :: Lexer Text
 nlgString =
   takeWhile1P (Just "character") (\c -> c `notElem` nlgSpecialChars && not (isSpace c))
@@ -437,9 +486,12 @@ blockComment =
   where
     inner = blockComment <|> Text.singleton <$> anySingle
 
-stringLiteral :: Lexer Text
+-- | Lex a string literal, returning @(raw, decoded)@: the verbatim source
+-- slice (quotes included) and the escape-decoded value. 'Megaparsec.match'
+-- captures the raw slice so exactprint can reproduce it exactly.
+stringLiteral :: Lexer (Text, Text)
 stringLiteral =
-  char '"' *> (Text.pack <$> manyTill Lexer.charLiteral (char '"'))
+  Megaparsec.match (char '"' *> (Text.pack <$> manyTill Lexer.charLiteral (char '"')))
 
 -- | A quoted identifier between backticks.
 quoted :: Lexer Text
@@ -524,7 +576,7 @@ literalPayload :: Lexer TLiterals
 literalPayload = asum
   [ uncurry TRationalLit <$> try rationalLiteral
   , uncurry TIntLit      <$> try integerLiteral
-  , TStringLit           <$> stringLiteral
+  , uncurry TStringLit   <$> stringLiteral
   ]
 
 identifiersPayload :: Lexer TIdentifiers
@@ -539,6 +591,8 @@ annotationsPayload = asum
   , TRefMap       <$> refMapAnnotation
   , TDesc         <$> descAnnotation
   , TExport       <$> exportAnnotation
+  , uncurry TFixity <$> fixityAnnotation
+  , TNonexhaustive      <$> nonexhaustiveAnnotation
   , uncurry TNlg  <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
@@ -900,7 +954,14 @@ errorBundleToErrorMessages ParseErrorBundle{..} =
     let
       (msline, pst') = calculateOffset pst
       epos = pstateSourcePos pst'
-      eposNext = pstateSourcePos $ reachOffsetNoLine 1 pst'
+      -- Give the error span real width: advance one stream unit (one character
+      -- for the lexer's Text stream, one token for the parser's TokenStream)
+      -- past the error offset. `pst'` is already positioned at `errorOffset e`
+      -- (via `calculateOffset` below), and `reachOffset` never moves backwards,
+      -- so the old literal `1` collapsed to a zero-width span for every error at
+      -- offset >= 1. Residual: an end-of-input error sits at an empty stream,
+      -- where `reachOffset` cannot advance, so those spans stay zero-width.
+      eposNext = pstateSourcePos $ reachOffsetNoLine (errorOffset e + 1) pst'
       errMsg = parseErrorTextPretty e
       parseErrCtx = offendingLine msline epos
     put pst'
@@ -999,7 +1060,7 @@ displayPosToken (MkPosToken _r tt) =
 -- be a good target for potential future optimizations
 inverseCompleteLookup :: (Eq a, Show a) => a -> Map c a -> c
 inverseCompleteLookup k
-  = fromMaybe (error $ "inverse complete lookup for " <> show k <> "was actually not cmoplete")
+  = fromMaybe (error $ "inverseCompleteLookup: no inverse image for " <> show k)
   . lookup k
   . map (\(a, b) -> (b, a))
   . Map.toList
@@ -1014,7 +1075,7 @@ displayTokenType = \case
   TLiterals lit -> case lit of
     TIntLit t _i      -> t
     TRationalLit t _i -> t
-    TStringLit s      -> showStringLit s
+    TStringLit raw _  -> raw
   TAnnotations ann -> case ann of
     TNlg t ty         -> toNlgAnno t ty
     TRef t ty         -> toRefAnno t ty
@@ -1024,6 +1085,8 @@ displayTokenType = \case
     TNlgPrefix        -> "@nlg"
     TDesc t           -> "@desc" <> t
     TExport t         -> "@export" <> t
+    TFixity dir t     -> fixityHerald dir <> t
+    TNonexhaustive t        -> "@nonexhaustive" <> t
   TIdentifiers i -> case i of
     TGenitive         -> "'s"
     TIdentifier t     -> t
@@ -1035,6 +1098,14 @@ displayTokenType = \case
   -- NOTE: we cannot look up TCopy (Just _) in the map - instead we just act as if it was
   -- TCopy Nothing, which is fine
   RealTCopy _ -> displayTokenType (TSymbols (TCopy Nothing))
+  -- `TOtherSymbolic` carries the verbatim source run of an unrecognized
+  -- operator; render it as-is rather than looking it up (it is not a key in
+  -- `symbols`, so the lookup below would otherwise hit a partial-function
+  -- `error`). This branch is currently unreachable — the producer at the
+  -- `TOtherSymbolic` lexer rule is shadowed by `operatorsPayload`'s
+  -- consumed-failure — but keeping `displayTokenType` total removes the
+  -- landmine if that ever changes.
+  TSymbols (TOtherSymbolic t) -> t
   TSymbols sym -> inverseCompleteLookup sym symbols
   TOperators op -> inverseCompleteLookup op operators
 

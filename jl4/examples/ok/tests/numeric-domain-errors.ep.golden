@@ -1,0 +1,10 @@
+-- Regression fixture for T8(a): SQRT and TO THE POWER OF (EXPONENT) must raise
+-- a caught domain error rather than silently producing a garbage/NaN Rational
+-- (Double NaN/Infinity fed through toRational). The last two directives pin the
+-- valid cases so the guard cannot over-reject.
+
+#EVAL SQRT (-1)          -- caught: SQRT expects input >= 0
+#EVAL EXPONENT 0 (-1)    -- caught: non-finite (0 to a negative power)
+#EVAL EXPONENT (-1) 0.5  -- caught: non-finite (negative base, fractional exp)
+#EVAL SQRT 4             -- 2
+#EVAL EXPONENT 2 10      -- 1024

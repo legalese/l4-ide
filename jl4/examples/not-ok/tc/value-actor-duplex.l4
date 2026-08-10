@@ -1,0 +1,16 @@
+-- The duplex canon has teeth: `aliceToBob` is performed by Alice (the first
+-- actor, by the SVO subject-first canon), so Bob may not bear it. Constructing
+-- the message the other way round (Bob first) is how Bob would become the
+-- performer — see ok/regulative-actor-duplex.l4.
+
+DECLARE Actor IS ONE OF Alice, Bob
+
+DECLARE SendMessage HAS
+  from IS AN Actor
+  to   IS AN Actor
+  body IS A STRING
+
+aliceToBob MEANS SendMessage OF Alice, Bob, "hi"
+
+GIVETH DEONTIC Actor SendMessage
+wrong MEANS PARTY Bob MUST aliceToBob WITHIN 10   -- performed by Alice, not by Bob

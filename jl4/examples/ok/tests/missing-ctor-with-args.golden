@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+missing-ctor-with-args.l4:12:3-13:31:
+  I found a problem while checking the definition of `area`:
+    The following branches still need to be considered:
+    
+      WHEN square `_` THEN
+    
