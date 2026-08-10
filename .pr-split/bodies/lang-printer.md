@@ -285,6 +285,33 @@ because `-Wall -Werror` fails on an unused import, so neither could simply carry
 Whichever of the two lands second will hit a one-line conflict on that import. Resolve it by
 keeping the union form, `import System.Environment (lookupEnv, setEnv)`.
 
+
+## Must merge as a batch with four sibling PRs (constructor-level, verified)
+
+`unstable` removes the `Expr` constructor **`Exponent`** from `jl4-core/src/L4/Syntax.hs`
+(upstream PR #83, *"remove dead Exponent AST constructor"*). On `main` that constructor is
+pattern-matched by modules spread across five themes, so the split cannot separate them:
+
+| module | theme |
+| --- | --- |
+| `L4/Syntax.hs`, `L4/Desugar.hs`, `L4/TypeCheck.hs`, `L4/TypeCheck/Annotation.hs`, `L4/Parser/ResolveAnnotation.hs` | **lang-syntax-typecheck** |
+| `L4/EvaluateLazy/Machine.hs` | **lang-eval-ledger** |
+| `L4/Nlg.hs`, `L4/Export/Document.hs` | **service-cli** |
+| `L4/Print.hs` | **lang-printer** |
+| `jl4-mlir/src/L4/MLIR/{Lower,Schema}.hs` | **mlir** |
+
+The dependency runs **both ways**. `lang-syntax-typecheck` alone leaves four themes' modules
+naming a constructor that is gone; any of the other four alone drops its `Exponent` arm while the
+constructor still exists, so an exhaustive `case` over `Expr` goes incomplete — and `-Werror`
+makes that fatal too. The same is symmetrically true of the two constructors `unstable` adds
+(`Record`, `ReadCell`).
+
+**So these five PRs should go into the merge queue as one batch**, or land in immediate
+succession with the understanding that `main` does not build in between. This was found by an
+audit pass and verified against both trees; it is *not* visible to the import-level dependency
+check, which is why it is called out here rather than left to CI.
+
+
 ## Provenance
 
 Unstable PRs folded into this one:

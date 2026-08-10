@@ -81,9 +81,10 @@ No performance, coverage or agreement numbers were claimed, because none apply t
 Not standalone. This PR deletes a directory that three files outside its manifest still point at,
 and those three files belong to sibling themes:
 
-- **`cabal.project`** still lists `./jl4-actus-analyzer` under `packages:`. That file is owned by
-  the **proleg** theme (which adds `./jl4-proleg` to the same list). If this PR lands without that
-  line being removed, `cabal build all` fails immediately with *"package location does not exist"*.
+- **`cabal.project`** — resolved: **this PR carries its own one-line deletion** of
+  `./jl4-actus-analyzer`. The file is not owned by any single theme; the proleg PR separately adds
+  its own `./jl4-proleg` line. Neither PR can leave `cabal build all` pointing at a directory that
+  is not there.
   This is not speculation: it is exactly what happened on `unstable`. PR #63 merged with its
   `cabal.project` edit left uncommitted, and commit `f2f646fc` (`fix(#63): remove dangling
   jl4-actus-analyzer refs from cabal.project/README/AGENTS`) had to repair it the next day.

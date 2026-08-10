@@ -120,3 +120,30 @@ Folded from these `unstable` PRs, taking only the CLI and service parts of the o
 | #214 | fix(print): make prettyLayout round-trip, and stop it silently changing the answer | `l4 batch` — the reported `#932` failure was in the filter→print→parse path `batchCmd` drives |
 
 Not attributable to any PR in the list above: several of the older `l4 batch` and JSON Schema commits predate this numbering and reached `unstable` through earlier merges — `582b956c` (batch output formats, `--output`, `--continue-on-error`, CSV type inference), `291cd005` (unbuffered ndjson, exponent CSV cells, MAYBE param validation), `3a8d77e7` (shell injection in `l4 trace`, backslash corruption in `l4 batch`), `4be7553d` (fail `l4 check`/`run` on cyclic imports), `87c8b2e4` (valid JSON Schema for builtin types, T3), `04d5c5b5` (leftover tmp staging dir on redeploy, `smucclaw/l4-ide#850`), and `d7aa1631` (a crashed `#EVAL` fails `l4 run`).
+
+
+## Must merge as a batch with four sibling PRs (constructor-level, verified)
+
+`unstable` removes the `Expr` constructor **`Exponent`** from `jl4-core/src/L4/Syntax.hs`
+(upstream PR #83, *"remove dead Exponent AST constructor"*). On `main` that constructor is
+pattern-matched by modules spread across five themes, so the split cannot separate them:
+
+| module | theme |
+| --- | --- |
+| `L4/Syntax.hs`, `L4/Desugar.hs`, `L4/TypeCheck.hs`, `L4/TypeCheck/Annotation.hs`, `L4/Parser/ResolveAnnotation.hs` | **lang-syntax-typecheck** |
+| `L4/EvaluateLazy/Machine.hs` | **lang-eval-ledger** |
+| `L4/Nlg.hs`, `L4/Export/Document.hs` | **service-cli** |
+| `L4/Print.hs` | **lang-printer** |
+| `jl4-mlir/src/L4/MLIR/{Lower,Schema}.hs` | **mlir** |
+
+The dependency runs **both ways**. `lang-syntax-typecheck` alone leaves four themes' modules
+naming a constructor that is gone; any of the other four alone drops its `Exponent` arm while the
+constructor still exists, so an exhaustive `case` over `Expr` goes incomplete — and `-Werror`
+makes that fatal too. The same is symmetrically true of the two constructors `unstable` adds
+(`Record`, `ReadCell`).
+
+**So these five PRs should go into the merge queue as one batch**, or land in immediate
+succession with the understanding that `main` does not build in between. This was found by an
+audit pass and verified against both trees; it is *not* visible to the import-level dependency
+check, which is why it is called out here rather than left to CI.
+
