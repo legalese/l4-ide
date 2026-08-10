@@ -2,7 +2,7 @@
 // Assign every file in `git diff --name-only main...unstable` to exactly one theme.
 // First matching rule wins. Goldens inherit the theme of their source .l4.
 import { execFileSync } from 'node:child_process'
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 1 << 28 })
 const files = git('diff', '--name-only', 'origin/main...origin/unstable').trim().split('\n')
@@ -77,7 +77,7 @@ const RULES = [
     ),
   ],
   [
-    'lang-temporal-ledger',
+    'lang-eval-ledger',
     re(
       /^jl4-core\/src\/L4\/(EvaluateLazy|TemporalContext)|^jl4-core\/src\/L4\/Evaluate\/|^jl4-core\/test\/(Bitemporal|Ledger|RecordLedger|M4PartyLedger|M45Read|M5Deontic|TemporalContext|Trace)\w*Spec\.hs$/,
     ),
@@ -103,11 +103,22 @@ const RULES = [
   ['corpus-legal-other', re(/^jl4\/examples\/legal\//)],
   ['corpus-notok', re(/^jl4\/examples\/not-ok\//)],
   ['tests-cli', re(/^jl4\/tests-cli\//)],
+
+  // ---- stragglers ------------------------------------------------------------
+  ['experiments', re(/^jl4\/examples\/experiments\//)],
+  ['lsp', re(/^jl4\/examples\/lsp\//)],
+  ['docs', re(/^jl4\/GRAMMAR\.md$/)],
+  ['ci-build', re(/^nix\/|^etc\/check-corpus-goldens\.mjs$/)],
+  ['service-cli', re(/^jl4-repl\/|^jl4-wasm\//)],
 ]
+
+// Files that many themes need a piece of. Sliced hunk-by-hunk, not owned outright.
+const SPINE =
+  /^(jl4-core\/jl4-core\.cabal|jl4\/jl4\.cabal|jl4-lsp\/jl4-lsp\.cabal|jl4-service\/jl4-service\.cabal|jl4\/tests\/Main\.hs)$/
 
 // ok/ corpus keyword buckets -> theme (checked against the .l4 stem)
 const OK_BUCKETS = [
-  [/^(temporal|ledger|bitemporal|record-|recall|attest|deontic-seq|state-ledger|party-ledger|trace)/, 'lang-temporal-ledger'],
+  [/^(temporal|ledger|bitemporal|record-|recall|attest|deontic-seq|state-ledger|party-ledger|trace)/, 'lang-eval-ledger'],
   [/^(set-operators|setof|union|intersect)/, 'lang-sets'],
   [/^(fixity|infix|mixfix|bullet|pattern-match|clitic)/, 'lang-typecheck'],
   [/^(section-scoping|section-lexical|typo-binder|unify|overload|ambigu|shadow|resolution)/, 'lang-typecheck'],
@@ -118,6 +129,14 @@ const OK_BUCKETS = [
   [/^(bpmn)/, 'bpmn-export'],
   [/^(openfisca)/, 'openfisca-export'],
   [/^(nlg)/, 'lang-nlg'],
+  // exhaustiveness / pattern matching / scoping diagnostics
+  [
+    /^(consider-|catchall-|pattern-|missing-|list-|enum-named|event-|nonexhaustive|cross-section|assume|desc|empty|loop|numeric-domain)/,
+    'lang-typecheck',
+  ],
+  [/^(variadic-construction)/, 'lang-sets'],
+  [/^(ref-annotation)/, 'lang-printer'],
+  [/^(regulative-|deontic-)/, 'lang-eval-ledger'],
 ]
 
 // --------------------------------------------------------------- assignment
@@ -130,7 +149,12 @@ function themeForOkStem(stem) {
 }
 
 const unmatched = []
+const spine = []
 for (const f of files) {
+  if (SPINE.test(f)) {
+    spine.push(f)
+    continue
+  }
   // goldens & sidecars: defer, resolved in pass 2
   let m = f.match(/^(.*)\/tests\/([^/]+?)\.(golden|ep\.golden|nlg\.golden|schema\.golden)$/)
   if (m) continue
@@ -165,6 +189,58 @@ for (const f of files) {
   else orphanGoldens.push(f)
 }
 
+// pass 3: whatever is left is behaviour drift on a file whose source did not
+// change in this window. Attribute it to the theme of the PR that last touched
+// it — a PR's theme being the majority theme of the files pass 1 could place.
+const prRows = readFileSync('.pr-split/analysis/file-pr-map.txt', 'utf8').trim().split('\n')
+const prFiles = new Map() // pr -> [file]
+const fileLastPr = new Map() // file -> pr (numerically highest = latest)
+for (const row of prRows) {
+  const [pr, , file] = row.split('\t')
+  if (!prFiles.has(pr)) prFiles.set(pr, [])
+  prFiles.get(pr).push(file)
+  const prev = fileLastPr.get(file)
+  if (prev === undefined || Number(pr) > Number(prev)) fileLastPr.set(file, pr)
+}
+const prTheme = new Map()
+for (const [pr, fs] of prFiles) {
+  const tally = {}
+  for (const f of fs) {
+    const t = assign.get(f)
+    if (t) tally[t] = (tally[t] || 0) + 1
+  }
+  const best = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]
+  if (best) prTheme.set(pr, best[0])
+}
+// pass 4: last-resort rules for goldens whose source predates the window and
+// whose drift came in on a direct commit rather than through a PR.
+const FALLBACK = [
+  [/not-ok\/tc\/tests\/parse-error/, 'lang-syntax-typecheck'],
+  [/not-ok\/tests\/export-(after|before|between)/, 'lang-syntax-typecheck'],
+  [/ok\/tests\/(assume-as-given|float)\./, 'lang-syntax-typecheck'],
+  [/ok\/tests\/mixfix-(cross-module-postfix|garden-path)/, 'lang-printer'],
+  [/legal\/tests\//, 'corpus-legal-new'],
+  [/ok\/tests\/(postfix-with-variables|time-tests)/, 'lang-printer'],
+]
+const stillOrphan = []
+for (const f of [...orphanGoldens, ...unmatched]) {
+  const pr = fileLastPr.get(f)
+  let t = pr && prTheme.get(pr)
+  if (!t) for (const [rx, th] of FALLBACK) if (rx.test(f)) { t = th; break }
+  if (t) assign.set(f, t)
+  else stillOrphan.push(f)
+}
+
+// Consolidate themes too small to be worth their own review.
+const MERGE = {
+  'lang-nlg': 'service-cli',
+  'corpus-legal-other': 'corpus-legal-new',
+  'corpus-bna-charities': 'corpus-legal-new',
+  'corpus-notok': 'lang-syntax-typecheck',
+  'lang-typecheck': 'lang-syntax-typecheck',
+}
+for (const [f, t] of assign) if (MERGE[t]) assign.set(f, MERGE[t])
+
 // ------------------------------------------------------------------ report
 const counts = {}
 for (const t of assign.values()) counts[t] = (counts[t] || 0) + 1
@@ -173,14 +249,16 @@ writeFileSync(
   '.pr-split/analysis/assignment.tsv',
   [...assign].map(([f, t]) => `${t}\t${f}`).join('\n') + '\n',
 )
-writeFileSync('.pr-split/analysis/unmatched.txt', unmatched.join('\n') + '\n')
+writeFileSync('.pr-split/analysis/unresolved.txt', stillOrphan.join('\n') + '\n')
+writeFileSync('.pr-split/analysis/spine.txt', spine.join('\n') + '\n')
+writeFileSync('.pr-split/analysis/pr-theme.tsv', [...prTheme].map(([p, t]) => p + '\t' + t).join('\n') + '\n')
 writeFileSync('.pr-split/analysis/orphan-goldens.txt', orphanGoldens.join('\n') + '\n')
 
 console.log('total changed files:', files.length)
-console.log('assigned:', assign.size, ' unmatched:', unmatched.length, ' orphan goldens:', orphanGoldens.length)
+console.log('assigned:', assign.size, ' spine:', spine.length, ' unresolved:', stillOrphan.length)
 console.log('\n--- per theme ---')
 for (const [t, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) console.log(String(n).padStart(5), t)
-console.log('\n--- unmatched sample (first 60) ---')
-console.log(unmatched.slice(0, 60).join('\n'))
-console.log('\n--- orphan goldens sample (first 25) ---')
-console.log(orphanGoldens.slice(0, 25).join('\n'))
+console.log('\n--- unresolved (all) ---')
+console.log(stillOrphan.join('\n'))
+console.log('\n--- spine (hunk-sliced) ---')
+console.log(spine.join('\n'))

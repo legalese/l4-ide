@@ -1,0 +1,14 @@
+139	legalese/mengwong/regcf-corpus
+162	legalese/feat/regcf-projections
+172	legalese/mengwong/regcf-rule-version
+178	legalese/mengwong/dmn-ruledate
+180	legalese/mengwong/dmn-hydration-null
+193	legalese/mengwong/go-orchestrator
+194	legalese/mengwong/dmn-r0-executable
+203	legalese/fix/assert-count-drift
+205	legalese/mengwong/clitic-corpus-fix
+206	legalese/mengwong/exporter-fixes
+208	legalese/mengwong/inert-label-truncation
+210	legalese/mengwong/ladder-atomid-embed
+214	legalese/mengwong/printer-batch-and-gensym
+224	legalese/mengwong/go-explainer

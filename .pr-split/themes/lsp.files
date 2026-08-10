@@ -1,0 +1,10 @@
+jl4-lsp/app/LSP/L4/Handlers.hs
+jl4-lsp/src/LSP/Core/Shake.hs
+jl4-lsp/src/LSP/L4/Actions.hs
+jl4-lsp/src/LSP/L4/Inspector.hs
+jl4-lsp/src/LSP/L4/Oneshot.hs
+jl4-lsp/src/LSP/L4/Rules.hs
+jl4-lsp/src/LSP/L4/SemanticTokens.hs
+jl4-lsp/test/HoverDisplaySpec.hs
+jl4-lsp/test/LibraryResolutionSpec.hs
+jl4-lsp/test/Spec.hs

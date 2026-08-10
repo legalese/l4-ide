@@ -1,0 +1,9 @@
+89	legalese/mengwong/temporal-rule-version
+111	legalese/mengwong/bitemporal-ledger
+125	legalese/mengwong/fix-event-exactprint
+130	legalese/mengwong/format-fidelity
+172	legalese/mengwong/regcf-rule-version
+174	legalese/mengwong/ymd-constructor
+189	legalese/merge/main-into-unstable
+211	legalese/mengwong/eval-pin-and-shadowing
+214	legalese/mengwong/printer-batch-and-gensym

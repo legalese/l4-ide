@@ -1,0 +1,10 @@
+.github/workflows/pr-checks.yml
+.github/workflows/unstable-prerelease.yml
+.husky/pre-commit
+.husky/pre-push
+etc/check-corpus-goldens.mjs
+nix/configuration.nix
+nix/default.nix
+package-lock.json
+package.json
+turbo.json

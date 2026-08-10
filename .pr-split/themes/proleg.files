@@ -1,0 +1,13 @@
+cabal.project
+jl4-proleg/docs/burden-of-proof.md
+jl4-proleg/docs/proleg-concrete-syntax.md
+jl4-proleg/examples/lease.pl
+jl4-proleg/examples/minor-duress.pl
+jl4-proleg/jl4-proleg.cabal
+jl4-proleg/l4/burden.l4
+jl4-proleg/src/L4/Proleg/Burden.hs
+jl4-proleg/src/L4/Proleg/Parser.hs
+jl4-proleg/src/L4/Proleg/Print.hs
+jl4-proleg/src/L4/Proleg/Syntax.hs
+jl4-proleg/test/Burden.hs
+jl4-proleg/test/Roundtrip.hs
