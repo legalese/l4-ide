@@ -150,9 +150,10 @@ Honest, and it differs sharply between the two apps.
   owned by **service-cli**. Nothing in this PR fails to compile without them, but the app has
   nothing to talk to, and `api/validate.ts` plus the two `__fixtures__/live-*.json` files encode
   those wire shapes verbatim, so they are the files to re-measure if either sibling changes shape.
-- **The nix module here is inert on its own, and the two lines that arm it are elsewhere.** The
-  import line in `nix/configuration.nix` and the `bundles` `default`→`config` move in
-  `nix/jl4-service/configuration.nix` both belong to the **ci-build** theme. That second one
+- **The nix module here is inert on its own, and the lines that reach it are elsewhere.** The
+  import in `nix/configuration.nix`, the `regcf-wizard = pkgs.callPackage ./regcf-wizard/package.nix`
+  entry in `nix/default.nix`, and the `bundles` `default`→`config` move in
+  `nix/jl4-service/configuration.nix` all belong to the **ci-build** theme. That last one
   matters: on `main`, `services.jl4-service.bundles` still carries `{classic,
   thailand-cosmetics}` as its `default`, and an `attrsOf` option discards its default the moment
   anything defines the option — so if someone imported this module *and* enabled it before
@@ -165,9 +166,11 @@ Honest, and it differs sharply between the two apps.
   against `main`'s pin has not been measured either way.
 - The one shared-file edit, `turbo.json`'s added `BASE_PATH`, is additive to an `env` array and
   conflicts with nothing.
-- Two façade/spec files these apps read are *not* in this PR:
-  `jl4/experiments/housing-act-wizard.l4` (and its Ground 8/10/11/common imports) belongs to
-  **experiments**, and `specs/todo/housing-act-citizen-wizard-demo.md` to **specs**.
+- **The Housing Act façade is not in this PR either.** `jl4/experiments/housing-act-wizard.l4`
+  and its Ground 8 / 10 / 11 / common imports — the 5-file bundle the wizard is deployed
+  against — belong to the **experiments** theme, and
+  `specs/todo/housing-act-citizen-wizard-demo.md` to **specs**. Same shape of dependency as above:
+  the app compiles and its unit tests pass without them; it just has no deployment to ask.
 
 Known and pre-existing, from the source PR, not introduced here: `turbo.json`'s `test` task
 depends on `^check` only, so a single combined `turbo build test …` graph can run a SvelteKit
@@ -180,9 +183,11 @@ deliberately — fixing it changes task ordering for every package.
 The repo keeps its language, its engine, its service and its diagrams, and loses the only two
 things anyone outside the project can actually *use* — there would again be no demonstration that
 an L4 encoding yields a public tool, which is the whole downstream pitch to Lawmaker and the whole
-of Track C item C2b. Nothing else breaks: no sibling imports these packages, and dropping this PR
-leaves `ci-build`'s nix import line pointing at an absent `nix/regcf-wizard/configuration.nix`,
-which is a one-line deletion there.
+of Track C item C2b. Nothing else breaks at the TypeScript level — no sibling package imports
+either app — but two lines in **ci-build** would then point at files that do not exist:
+`nix/configuration.nix`'s `./regcf-wizard/configuration.nix` import and `nix/default.nix`'s
+`regcf-wizard = pkgs.callPackage ./regcf-wizard/package.nix { }`. Both are one-line deletions
+there, and both must be deleted, or `nix` evaluation of the flake fails.
 
 **Provenance**
 
