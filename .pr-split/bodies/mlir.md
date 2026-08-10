@@ -106,7 +106,9 @@ and `test/Main.hs` at 572 → 1593), 5 `.mjs` (2 of them new), 7 markdown, 1 cab
 13-entry status ledger in three states — FIXED (the backend computes the correct answer),
 FAIL-LOUD (silent-wrong eliminated, the backend refuses and routes to fallback, capability
 gap still open), and OPEN (still silently wrong, or untested) — with the "what was tried and
-rejected" for each. The ledger closes with **"There are no remaining OPENs."**
+rejected" for each. The ledger closes with **"There are no remaining OPENs"** — and says so
+with its own caveat attached: the claim is bounded by the corpus and the curated cases, and
+the log is explicit that "no known reds" and "no reds" are different statements.
 `coverage-report/PARITY-COVERAGE.md` (new, 271 lines) carries the matrices.
 `MLIR-REVIEW.md` (new, 99 lines) is the adversarial review. `README.md`,
 `FEATURE-PARITY-PLAN.md` and `SOLIDITY-BACKEND-PLAN.md` are reconciled with the backend as
