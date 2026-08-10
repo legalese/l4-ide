@@ -1,0 +1,23 @@
+-- A dated-formula BRANCH whose arms are ASCENDING by date. L4 BRANCH is
+-- first-match; OpenFisca picks the latest formula by date — they disagree, so
+-- the bridge must REJECT non-descending arms.
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+GIVEN `the period` IS A Period
+      y IS A NUMBER
+      m IS A NUMBER
+GIVETH A BOOLEAN
+`period reaches` MEANS
+    (`the period`'s year GREATER THAN y)
+    OR (`the period`'s year EQUALS y AND `the period`'s month AT LEAST m)
+
+@export A mis-ordered dated amount
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`thing` p period MEANS
+    BRANCH
+        IF `period reaches` OF period, 2015, 1 THEN 10
+        IF `period reaches` OF period, 2017, 1 THEN 20
+        OTHERWISE 0
