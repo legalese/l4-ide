@@ -39,6 +39,7 @@ import qualified Data.CharSet as CharSet
 import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
+import qualified BpmnExport
 import qualified Hover
 import qualified SemanticTokens
 
@@ -67,6 +68,7 @@ main = do
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
+    describe "bpmn export" BpmnExport.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do
