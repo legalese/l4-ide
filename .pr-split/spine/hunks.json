@@ -1,0 +1,351 @@
+{
+  "jl4-core/jl4-core.cabal": [
+    {
+      "hunk": 1,
+      "theme": "lang-imports-stdlib",
+      "why": "Moves `data-files: libraries/*.l4` above the first section (with the KEEP-THIS-ABOVE comment explaining that Cabal drops package-level fields after the first section, so the sdist shipped no .l4 and an installed `l4` answered 'Module not found: prelude'). This is what makes the embedded stdlib exist for import resolution; lang-imports-stdlib owns jl4-core/libraries/*.l4 and L4.Import.Resolution. Introduced by 473e2acb 'fix(build): restore the embedded stdlib, and make its absence a build error'."
+    },
+    {
+      "hunk": 2,
+      "theme": "lang-imports-stdlib",
+      "why": "The other half of the same move: deletes the old `data-files: libraries/*.l4` from below the flag stanzas. Cannot be separated from hunk 1 without leaving the field duplicated."
+    },
+    {
+      "hunk": 3,
+      "theme": "lang-printer",
+      "why": "Raises the bound to `megaparsec >=9.7` with the comment about the ditto (^) column metric being display width. Text.Megaparsec.Unicode.isWideChar has exactly one importer in the tree, jl4-core/src/L4/Print/Columnar.hs, which lang-printer owns. Introduced by 7bb6879c 'fix(columnar): defer column width to megaparsec isWideChar; pin megaparsec >=9.7'."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "bpmn-export",
+      "lines": [
+        "+    L4.Bpmn.IR",
+        "+    L4.Bpmn.Lower",
+        "+    L4.Bpmn.Emit",
+        "+    L4.Bpmn.Wiring"
+      ],
+      "why": "exposed-modules for the BPMN exporter; jl4-core/src/L4/Bpmn/*.hs are in bpmn-export.files."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "dmn-export",
+      "lines": [
+        "+    L4.Dmn.Analysis",
+        "+    L4.Dmn.IR",
+        "+    L4.Dmn.Lower",
+        "+    L4.Dmn.Emit",
+        "+    L4.Dmn.Markdown"
+      ],
+      "why": "exposed-modules for the DMN exporter; jl4-core/src/L4/Dmn/*.hs are in dmn-export.files."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "lang-eval-ledger",
+      "lines": [
+        "+    L4.Evaluate.ValueLazyJSON",
+        "+    L4.Evaluate.Ledger"
+      ],
+      "why": "exposed-modules for the event-sourced ledger substrate; jl4-core/src/L4/Evaluate/{ValueLazyJSON,Ledger}.hs are in lang-eval-ledger.files."
+    },
+    {
+      "hunk": 5,
+      "theme": "openfisca-export",
+      "why": "exposed-modules L4.OpenFisca.{IR,Lower,Emit}; jl4-core/src/L4/OpenFisca/*.hs are in openfisca-export.files. Single-theme hunk."
+    },
+    {
+      "hunk": 6,
+      "theme": "lang-printer",
+      "why": "exposed-module L4.Print.Columnar; jl4-core/src/L4/Print/Columnar.hs is in lang-printer.files. Pairs with hunk 3's megaparsec bound."
+    },
+    {
+      "hunk": 7,
+      "split": true,
+      "theme": "ladder-viz",
+      "lines": [
+        "+    L4.Viz.GuardedRows"
+      ],
+      "why": "jl4-core/src/L4/Viz/GuardedRows.hs is in ladder-viz.files (the guarded-chains-are-ladder-structure work, 73cf9b26)."
+    },
+    {
+      "hunk": 7,
+      "split": true,
+      "theme": "dmn-export",
+      "lines": [
+        "+    L4.Interchange.Fidelity"
+      ],
+      "why": "jl4-core/src/L4/Interchange/Fidelity.hs is in dmn-export.files (the fidelity report emitted alongside a DMN export)."
+    },
+    {
+      "hunk": 8,
+      "split": true,
+      "theme": "lang-syntax-typecheck",
+      "lines": [
+        "+    UnifySpec",
+        "+    PatternMatchParserSpec",
+        "+    EdgeCrashSpec"
+      ],
+      "why": "jl4-core/test/{UnifySpec,PatternMatchParserSpec,EdgeCrashSpec}.hs are in lang-syntax-typecheck.files."
+    },
+    {
+      "hunk": 8,
+      "split": true,
+      "theme": "lang-printer",
+      "lines": [
+        "+    EventExactPrintSpec",
+        "+    FormatFidelitySpec",
+        "+    BulletParserSpec",
+        "+    DirectiveAmbiguitySpec",
+        "+    RefAnnotationSpec",
+        "+    PrintRoundtripSpec"
+      ],
+      "why": "jl4-core/test/{EventExactPrintSpec,FormatFidelitySpec,BulletParserSpec,DirectiveAmbiguitySpec,RefAnnotationSpec,PrintRoundtripSpec}.hs are all in lang-printer.files (exactprint/prettyLayout fidelity)."
+    },
+    {
+      "hunk": 8,
+      "split": true,
+      "theme": "lang-imports-stdlib",
+      "lines": [
+        "+    ResolutionCascadeSpec"
+      ],
+      "why": "jl4-core/test/ResolutionCascadeSpec.hs is in lang-imports-stdlib.files (the JL4_LIBRARY_PATH -> root -> importer-relative -> embedded -> XDG -> bundle cascade)."
+    },
+    {
+      "hunk": 8,
+      "split": true,
+      "theme": "lang-eval-ledger",
+      "lines": [
+        "+    TracePostprocessSpec",
+        "+    LedgerSubstrateSpec",
+        "+    LedgerThunkCacheSpec",
+        "+    RecordLedgerSpec",
+        "+    LedgerRenderingSpec",
+        "+    M4PartyLedgerSpec",
+        "+    M45ReadSpec",
+        "+    M5DeonticSequencingSpec",
+        "+    BitemporalSubstrateSpec",
+        "+    BitemporalRecallSpec",
+        "+    TraceOrderingSpec",
+        "+    deepseq,"
+      ],
+      "why": "All eleven Spec files are in lang-eval-ledger.files (M0-M5 event-sourced ledger + trace ordering). The `deepseq` build-depend belongs here too: jl4-core/test/TracePostprocessSpec.hs is the only test module in the suite that imports Control.DeepSeq."
+    },
+    {
+      "hunk": 8,
+      "split": true,
+      "theme": "ladder-viz",
+      "lines": [
+        "+    StateGraphSpec"
+      ],
+      "why": "jl4-core/test/StateGraphSpec.hs is in ladder-viz.files."
+    }
+  ],
+  "jl4/jl4.cabal": [
+    {
+      "hunk": 1,
+      "theme": "service-cli",
+      "why": "Adds `jl4-query-plan`, `containers` and `optics` to the `l4` executable's build-depends. All three were introduced by b2cfe22e 'feat(cli): l4 verify and l4 nlg — the two footings P8 and P7-TNR were missing'; jl4-query-plan/ and jl4/app/L4/Cli/{Verify,Nlg}.hs are in service-cli.files. Single-theme hunk."
+    },
+    {
+      "hunk": 2,
+      "split": true,
+      "theme": "service-cli",
+      "lines": [
+        "+    L4.Cli.Export",
+        "+    L4.Cli.Nlg",
+        "+    L4.Cli.Verify"
+      ],
+      "why": "jl4/app/L4/Cli/{Export,Nlg,Verify}.hs are in service-cli.files (2ac090f4 `l4 export`, b2cfe22e `l4 verify`/`l4 nlg`)."
+    },
+    {
+      "hunk": 2,
+      "split": true,
+      "theme": "openfisca-export",
+      "lines": [
+        "+    L4.Cli.OpenFisca"
+      ],
+      "why": "jl4/app/L4/Cli/OpenFisca.hs is in openfisca-export.files (50376f65)."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "bpmn-export",
+      "lines": [
+        "+    BpmnExport"
+      ],
+      "why": "jl4/tests/BpmnExport.hs is in bpmn-export.files; registers the BPMN golden module in jl4-test's other-modules."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "ladder-viz",
+      "lines": [
+        "+    VizAutoRefresh",
+        "+    VizImplies",
+        "+    VizGuardedRows"
+      ],
+      "why": "jl4/tests/Viz{AutoRefresh,Implies,GuardedRows}.hs are in ladder-viz.files (45354115, ea727ec6, 73cf9b26)."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "dmn-export",
+      "lines": [
+        "+    DmnExport"
+      ],
+      "why": "jl4/tests/DmnExport.hs is in dmn-export.files (20992358)."
+    },
+    {
+      "hunk": 4,
+      "theme": "dmn-export",
+      "why": "Adds `time` to jl4-test's build-depends. Introduced by 5d22ec9f 'feat(dmn): law time on a date axis'; jl4/tests/DmnExport.hs is the only test module importing Data.Time (Data.Time.Calendar.fromGregorian). Single-theme hunk."
+    }
+  ],
+  "jl4-lsp/jl4-lsp.cabal": [
+    {
+      "hunk": 1,
+      "theme": "lsp",
+      "why": "Adds the whole `test-suite jl4-lsp-test` stanza. Both other-modules it names, jl4-lsp/test/HoverDisplaySpec.hs and jl4-lsp/test/LibraryResolutionSpec.hs, plus jl4-lsp/test/Spec.hs, are in lsp.files. Introduced by f35c6b17 'fix(lsp): normalise inference variables in hover types (#313)'. Single-theme hunk."
+    }
+  ],
+  "jl4-service/jl4-service.cabal": [
+    {
+      "hunk": 1,
+      "theme": "service-cli",
+      "why": "Adds `servant-server >=0.20.2 && <0.21` to jl4-service-test's build-depends. Introduced by d2dd71f9 'feat(service): GET /functions/:name/ladder, and the two bugs it uncovered', which is the commit that grew jl4-service/test/IntegrationSpec.hs; every jl4-service/test/*.hs is in service-cli.files. Single-theme hunk."
+    }
+  ],
+  "jl4/tests/Main.hs": [
+    {
+      "hunk": 1,
+      "theme": "lang-printer",
+      "why": "`import Data.Char (isAlphaNum)` — used only by `leakedInfVars`, the gensym-leak tokeniser inside the prettyLayout round-trip added in hunk 6."
+    },
+    {
+      "hunk": 2,
+      "theme": "lang-printer",
+      "why": "Imports L4.DirectiveFilter (filterIdeDirectives), L4.Parser (execProgramParserWithHintPass) and L4.Print (prettyLayout) — exactly the three pieces the prettyLayout round-trip property needs (07a95495, smucclaw/l4-ide#932). Single-theme hunk."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "lang-imports-stdlib",
+      "lines": [
+        "+import System.Environment (lookupEnv, setEnv)",
+        "+  -- Make the golden suite self-sufficient under a bare `cabal test` (comment block)",
+        "+  mLibEnv <- lookupEnv \"JL4_LIBRARY_PATH\"",
+        "+  case mLibEnv of",
+        "+    Just _  -> pure ()",
+        "+    Nothing -> setEnv \"JL4_LIBRARY_PATH\" (dataDirCore </> \"libraries\")"
+      ],
+      "why": "Defaults JL4_LIBRARY_PATH to the bundled core libraries so a bare `cabal test` resolves IMPORTs the same way CI does (ee67baa7). This is library resolution, which lang-imports-stdlib owns (L4.Import.Resolution, jl4-core/libraries/). The System.Environment import lands here because this is what introduced it (ee67baa7); the later JL4_PRETTY_DUMP_DIR / JL4_EVALDIFF lookups in hunk 6 reuse it."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "lang-printer",
+      "lines": [
+        "+import Text.Read (readMaybe)"
+      ],
+      "why": "readMaybe is used only by `errorRows` in jl4PrettyLayoutRoundTrip (hunk 6), which pulls line numbers out of a rendered parse error to print the offending lines."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "bpmn-export",
+      "lines": [
+        "+import qualified BpmnExport"
+      ],
+      "why": "Test-module import for jl4/tests/BpmnExport.hs (bpmn-export.files)."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "ladder-viz",
+      "lines": [
+        "+import qualified VizAutoRefresh",
+        "+import qualified VizImplies",
+        "+import qualified VizGuardedRows"
+      ],
+      "why": "Test-module imports for jl4/tests/Viz{AutoRefresh,Implies,GuardedRows}.hs (ladder-viz.files)."
+    },
+    {
+      "hunk": 3,
+      "split": true,
+      "theme": "dmn-export",
+      "lines": [
+        "+import qualified DmnExport"
+      ],
+      "why": "Test-module import for jl4/tests/DmnExport.hs (dmn-export.files)."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "lang-syntax-typecheck",
+      "lines": [
+        "+  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs (comment block)",
+        "+  exportPlacementFiles <- sort <$> globDir1 (compile \"not-ok/export-*.l4\") examplesRoot",
+        "+    describe \"corpus sanity (every glob matched something)\" $ do ... corpusNonEmpty \"export-placement\" exportPlacementFiles",
+        "+    describe \"export placement (typechecks; no default export)\" $",
+        "+      tests evalConfig (True, True) exportPlacementFiles examplesRoot"
+      ],
+      "why": "Wires the three orphaned not-ok/export-*.l4 fixtures into the suite (ee67baa7). Their twelve goldens, jl4/examples/not-ok/tests/export-{after-giveth,before-decide,between-given-giveth}.*, are in lang-syntax-typecheck.files, and the fixtures assert that an @export in an unsupported position yields no default export. The corpus-sanity block is bundled here because it was introduced in the same commit and its last assertion names exportPlacementFiles, so it cannot compile without the glob — see plan.md."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "lang-printer",
+      "lines": [
+        "+    describe \"exactprint identity (source round-trips l4 format)\" $ ... jl4ExactPrintIdentity",
+        "+    describe \"prettyLayout round-trip (filter -> print -> parse; #932)\" $ ... jl4PrettyLayoutRoundTrip"
+      ],
+      "why": "The two printer invariants named in CLAUDE.md §3.2: `exactprint identity` guards Rules.ExactPrint (1b3eb1e0) and `prettyLayout round-trip` guards L4.Print.prettyLayout (07a95495). lang-printer owns L4/Print.hs, L4/Print/Columnar.hs and L4/Parser/Anno.hs. Registers the bodies added in hunk 6."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "ladder-viz",
+      "lines": [
+        "+    describe \"viz\" VizAutoRefresh.spec",
+        "+    describe \"viz implies\" VizImplies.spec",
+        "+    describe \"viz guarded rows\" VizGuardedRows.spec"
+      ],
+      "why": "Registers the three ladder-visualiser test groups (ladder-viz.files owns the modules)."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "dmn-export",
+      "lines": [
+        "+    DmnExport.spec examplesRoot"
+      ],
+      "why": "Registers the DMN exporter test group."
+    },
+    {
+      "hunk": 4,
+      "split": true,
+      "theme": "bpmn-export",
+      "lines": [
+        "+    describe \"bpmn export\" BpmnExport.spec"
+      ],
+      "why": "Registers the BPMN exporter test group."
+    },
+    {
+      "hunk": 5,
+      "theme": "lang-imports-stdlib",
+      "why": "Adds mkLibraryPathScrubber and routes l4Golden's output and readFromFile through it, replacing the absolute JL4_LIBRARY_PATH prefix with a stable token. The only goldens affected are pure [Import Resolution] logs ('Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4'), emitted by L4.Import.Resolution, which lang-imports-stdlib owns. Pairs with hunk 3's setEnv (which guarantees the variable is always set). Single-theme hunk; see plan.md for the ordering constraint against lang-syntax-typecheck."
+    },
+    {
+      "hunk": 6,
+      "theme": "lang-printer",
+      "why": "The bodies of jl4ExactPrintIdentity, jl4PrettyLayoutRoundTrip and leakedInfVars, plus the JL4_PRETTY_DUMP_DIR and JL4_EVALDIFF debugging affordances documented in CLAUDE.md §3.2/§3.2.1. Both printers, both owned by lang-printer. Single-theme hunk."
+    },
+    {
+      "hunk": 7,
+      "theme": "lang-eval-ledger",
+      "why": "`MkEvalDirectiveResult r _ _` becomes `MkEvalDirectiveResult r _ _ _` — the constructor grew a fourth field when the event-sourced ledger substrate landed (9e081dba, 'jl4-core: M0-M5 event-sourced ledger substrate'). Mechanical follow-on of an L4.EvaluateLazy change owned by lang-eval-ledger. Single-theme hunk."
+    }
+  ]
+}
