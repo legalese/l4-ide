@@ -1,0 +1,24 @@
+cross-theme Haskell import edges: 5
+
+## bpmn-export -> dmn-export   (6)
+   jl4-core/src/L4/Bpmn/IR.hs imports L4.Interchange.Fidelity
+   jl4-core/src/L4/Bpmn/Lower.hs imports L4.Interchange.Fidelity
+   jl4-core/src/L4/Bpmn/Wiring.hs imports L4.Dmn.IR
+   jl4/tests/BpmnExport.hs imports L4.Dmn.IR
+   jl4/tests/BpmnExport.hs imports L4.Interchange.Fidelity
+   jl4/tests/BpmnExport.hs imports DmnExport
+## dmn-export -> ladder-viz   (1)
+   jl4-core/src/L4/Dmn/Lower.hs imports L4.Viz.GuardedRows
+## service-cli -> bpmn-export   (4)
+   jl4/app/L4/Cli/Export.hs imports L4.Bpmn.Emit
+   jl4/app/L4/Cli/Export.hs imports L4.Bpmn.IR
+   jl4/app/L4/Cli/Export.hs imports L4.Bpmn.Lower
+   jl4/app/L4/Cli/Export.hs imports L4.Bpmn.Wiring
+## service-cli -> dmn-export   (5)
+   jl4/app/L4/Cli/Export.hs imports L4.Dmn.Emit
+   jl4/app/L4/Cli/Export.hs imports L4.Dmn.IR
+   jl4/app/L4/Cli/Export.hs imports L4.Dmn.Lower
+   jl4/app/L4/Cli/Export.hs imports L4.Dmn.Markdown
+   jl4/app/L4/Cli/Export.hs imports L4.Interchange.Fidelity
+## service-cli -> openfisca-export   (1)
+   jl4/app/Main.hs imports L4.Cli.OpenFisca
