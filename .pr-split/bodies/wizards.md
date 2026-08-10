@@ -26,7 +26,7 @@ upstream issue number is named in the source commits for either app.
 
 **What's in it**
 
-91 files, 7,140 insertions, 1 deletion (the one-character `turbo.json` line).
+91 files, 7,140 insertions, 1 deletion — the deletion is the `turbo.json` line that gets replaced.
 
 *`ts-apps/housing-wizard` — 36 files, 2,432 insertions*
 
@@ -61,10 +61,18 @@ upstream issue number is named in the source commits for either app.
   inside the step-by-step surface, driven by the framework-free `LadderController`.
 - **Validation of every record shape** (`api/validate.ts`) plus the scalar carve-out: a NUMBER
   return is not wrapped under its return-type name, a record is.
+- **A content-security policy emitted as a `<meta>` tag**, with `style-src 'self'` — which is only
+  affordable because the ladder emitter bakes no inline `style=` attributes, a property
+  `ladder-embed.test.ts` pins for `sceneToSvg`. The README says plainly which half of that the
+  test does *not* cover (the app renders through `LadderController`, not `sceneToSvg`).
 - **`nix/regcf-wizard/{package.nix,configuration.nix}`** — everything the deploy needs and nothing
   that performs it. The module defaults to **off**, serves at `/regcf/` (the IDE already owns
-  `/`), bakes `BASE_PATH` and `VITE_JL4_BASE_URL` in at build time, and contributes the `regcf`
-  corpus bundle *inside its own `mkIf`*.
+  `/`), bakes `BASE_PATH` and `VITE_JL4_BASE_URL` in at build time (SvelteKit's `paths.base` and
+  the app's `connect-src` are both build-time), derives the service URL from the same domain so
+  `connect-src 'self'` covers it, and contributes the `regcf` corpus bundle *inside its own
+  `mkIf`*. `package.nix` builds the SPA the way `nix/jl4-web` builds the IDE, over the narrower
+  workspace chain the wizard needs: viz-expr → boolean-analysis → ladder-core → ladder-svg, and
+  viz-expr → jl4-client-rpc.
 - `turbo.json` gains `BASE_PATH` to its build task's `env` list — the one-line change the nix build
   needs to bake the SPA's base path.
 
@@ -135,12 +143,13 @@ Honest, and it differs sharply between the two apps.
   `@repo/ladder-svg` and `@repo/ladder-core`, and neither package exists on `main` — both are new
   in the **ladder-viz** theme, which is also where the `LadderController` that
   `components/Ladder.svelte` mounts lives. This PR must land after ladder-viz.
-- **`regcf-wizard` needs a corpus and a service to answer anything.** The five surfaces it calls
-  are the exports of `jl4/examples/legal/regcf/regcf-wizard.l4`, owned by the **corpus-regcf**
-  theme; the `/query-plan` endpoint and its `verdict`/`stillNeeded` payload are owned by
-  **service-cli**. Nothing in this PR fails to compile without them, but the app has nothing to
-  talk to, and `api/validate.ts` plus the two `__fixtures__/live-*.json` files encode those wire
-  shapes verbatim.
+- **`regcf-wizard` needs a corpus and a service to answer anything.** Its five surfaces are drawn
+  from the six exports of `jl4/examples/legal/regcf/regcf-wizard.l4` — five decision surfaces plus
+  the law-time export that the investment-limit surface pairs with — and that file is owned by the
+  **corpus-regcf** theme; the `/query-plan` endpoint and its `verdict`/`stillNeeded` payload are
+  owned by **service-cli**. Nothing in this PR fails to compile without them, but the app has
+  nothing to talk to, and `api/validate.ts` plus the two `__fixtures__/live-*.json` files encode
+  those wire shapes verbatim, so they are the files to re-measure if either sibling changes shape.
 - **The nix module here is inert on its own, and the two lines that arm it are elsewhere.** The
   import line in `nix/configuration.nix` and the `bundles` `default`→`config` move in
   `nix/jl4-service/configuration.nix` both belong to the **ci-build** theme. That second one
