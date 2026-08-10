@@ -121,6 +121,15 @@ the `executable` stanza, where cabal rejects it as an unknown field and silently
 source across incremental builds. It is now declared at package level, where cabal actually
 monitors it.
 
+**One gap deliberately left open.** The enum-with-data hazard is refused here at the *return*
+boundary (`dataEnums` + `givethTypeName`, extended to unmarshallable returns at the
+enriched-type altitude). A sibling branch refused it at the *construction* arm instead —
+`lowerExpr`'s `lookupEnumTag` branch, which emits the bare tag and discards constructor
+arguments. Whether the return-boundary refusal is sufficient, or whether the construction-arm
+refusal adds coverage for an enum-with-data value that is built and passed around *without*
+being the export's return type, was raised as an explicit open question in the source PR and
+deliberately not decided there. Nothing in this PR depends on the answer.
+
 ## Evidence
 
 Quoted from the source PR (#190) and from `PARITY-HUNT-LOG.md`.
@@ -168,7 +177,7 @@ sitting green.
 
 **Two asymmetries are deliberate and documented so nobody "cleans them up."** Within one
 deontic `OBLIGATION` the reference spells the party plain and the action backticked —
-`{"party":"the seller","action":"`deliver the goods`"}` — because the party is an evaluated
+``{"party":"the seller","action":"`deliver the goods`"}`` — because the party is an evaluated
 constructor value (`constructorText`) and the action an unevaluated `Name` (`prettyLayout`).
 Harmonising them in *either* direction re-breaks half the cells. And a literal party is
 backticked when **unobserved** and plain when **observed**; the sweep only revealed this by
