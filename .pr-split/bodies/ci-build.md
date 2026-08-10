@@ -16,7 +16,7 @@ macOS and Windows and publishes them as a GitHub prerelease, so a contributor ca
 
 **Why**
 
-Three separate problems drove this, each measured rather than assumed.
+Four separate problems drove this, each measured rather than assumed.
 
 *The merge queue was paying a cache tax nothing could see.* GitHub scopes cache **reads** to the
 run's own ref plus the default branch (plus the base branch, for `pull_request` only). Our queue
@@ -33,6 +33,13 @@ whose victim is never its author will keep going off.
 (upstream **smucclaw/l4-ide#165**), because `cabal build` and `cabal install` build from different
 sources and only the latter goes through the sdist. Nothing in CI built along that axis, so nothing
 could catch it.
+
+*There was no way to obtain an `l4` binary without building one.* `etc/go/go.sh` never builds — it
+requires `L4` to point at an already-built binary and refuses otherwise — and the only `l4` the repo
+shipped was the copy bundled inside the VS Code extension, whose most recent build predated
+`l4 export`. A contributor wanting to run the pipeline had to install GHC and Cabal and do a full
+Haskell build; on a sandbox whose setup script is capped at five minutes that is impossible, while
+downloading a tarball is not.
 
 ---
 
@@ -73,9 +80,14 @@ stale store over a fresh warm start risks a mixed `package.db`. Every producer a
 `continue-on-error`: a warming failure costs one cold entry, never a red check.
 
 **Cache hygiene.** Saves are gated to `push`; a `Prune superseded Haskell caches` step (needing
-`actions: write`) deletes stale entries to stay under GitHub's 10 GB cap; `setup-node`'s implicit
-`package-manager-cache` is switched off on `merge_group` in every job that uses it, since it never
-hit there and only consumed budget.
+`actions: write` on the job) deletes stale entries before saving the fresh base cache, to stay under
+GitHub's 10 GB cap; `setup-node`'s implicit `package-manager-cache` is switched off on `merge_group`
+in every job that uses it, since it never hit there and only consumed budget. In the TypeScript job
+*both* switches have to be turned off — `cache:` and `package-manager-cache:` — because leaving
+`cache` empty falls through to a second code path in `setup-node@v5` where `package-manager-cache`
+defaults to true and auto-detects npm. The first cut of that change disabled only one; the comment in
+the file records that this was caught by the resolved inputs GitHub echoes into the log
+(`package-manager-cache: true`), not by reading the action.
 
 **The sdist stdlib guard.** A step in the Haskell job runs `cabal check` in `jl4-core`, fails on a
 `parser-warning`, then greps `cabal sdist --list-only` for `libraries/prelude.l4`. This is the check
@@ -148,7 +160,12 @@ cache the run was not allowed to read.** The same PR measured the cache store at
 that `jl4-mlir Full Parity Harness` never hits either Haskell cache on any event — 1583 s cold on
 `pull_request`, 1688 s on `merge_group` — because `actions/cache` versions an entry by paths *and
 compression method*, and the Haskell job's `ubuntu:24.04` container has no zstd while the bare host
-does.
+does. That one is documented in place and deliberately **not** fixed, because installing zstd
+re-versions every `pr-checks-*` entry at once.
+
+**The npm cache on `merge_group` (#209).** Measured `npm cache is not found` on merge_group run
+30760823299, after which the run wrote 111 MB into its own doomed ref. 28 such `node-cache-*` entries
+were live on 2026-08-02, totalling 1.89 GB, **20 of them never read once**.
 
 **#209 and #227 are explicit about what is measured and what is predicted.** The merge_group half of
 each fix could only be observed after landing, since a queue entry requires a human to queue the PR;
@@ -212,7 +229,15 @@ harness grows a baseline — which a later commit on this branch (`572972f4`) su
 **This PR is not standalone, and it should not be reviewed as though it were.** It is the gate layer;
 most of what it gates lives elsewhere.
 
-*Hard dependency — this PR turns CI red without it.* The Haskell job's
+*Hard dependency 1 — `npm ci` fails without it.* `package-lock.json` here is the regenerated
+whole-workspace lock. It contains entries resolving to `ts-apps/housing-wizard`,
+`ts-apps/regcf-wizard`, `ts-shared/ladder-core` and `ts-shared/ladder-svg`. The root `workspaces`
+glob is `ts-apps/*` + `ts-shared/*`, so a lockfile naming workspace directories that are not on disk
+will not install. Those four directories belong to **wizards** (the two apps) and **ladder-viz** (the
+two shared packages). Either they land with or before this PR, or the lockfile has to be regenerated
+against the reduced tree.
+
+*Hard dependency 2 — this PR turns CI red without it.* The Haskell job's
 `The sdist must carry the standard library` step fails on `main` as it stands: `main`'s
 `jl4-core/jl4-core.cabal` still has `data-files: libraries/*.l4` at line 17, **after** the `safe-mode`
 and `serialise-support` flag stanzas, which is exactly the defect the step detects. The reordering,
@@ -239,7 +264,8 @@ runs — no red check, just no coverage:
 
 *Genuinely self-contained within this PR.* `unstable-prerelease.yml` (it builds `l4` and `jl4-lsp`
 from whatever the tree contains), the two husky hooks, `turbo.json`'s `BASE_PATH` entry, and the
-`lint-staged` / `vite` changes to `package.json` + `package-lock.json`.
+`lint-staged` / `vite` changes to `package.json`. Note that `turbo.json`'s `BASE_PATH` exists to serve
+the wizard builds in **wizards**; it is inert but harmless without them.
 
 *Nothing here is required by a sibling in order to compile or test locally.* Dropping this PR does not
 break anyone's build; it removes the machinery that would have caught them breaking it.
@@ -267,10 +293,18 @@ Unstable PRs folded into this one (the CI/build portion of each; several span ot
   **#193**, **#194**, **#196**, **#198**, **#204**, **#206**, **#207**, **#224** — incidental
   workflow, filter and lockfile edits carried alongside each feature branch.
 - **#160** `fix(dmn): two engine flavors (R7)` — the `dmn-engines` job and its skip contract.
-- **#163** `ci(bpmn): run the jBPM second opinion, cached, and gate the toolchain`.
+- **#163** `ci(bpmn): run the jBPM second opinion, cached, and gate the toolchain`. A follow-up
+  commit on the same file, `572972f4 ci(bpmn): give the jBPM check a baseline, so a new finding
+  cannot land green`, closes the gap #163 named.
 - **#167** `fix(build): restore the embedded stdlib, and make its absence a build error` — the sdist
   CI step (its cabal/TH half is in **service-cli**).
 - **#200** `wizard-deploy-ready` — the `nix/` registration lines.
+- **#224** `The explainer stage, a BPMN renderer, the grouping tutorial, and the de novo Reg CF run`
+  — a 151-file omnibus; what this PR takes from it is the `go` job's later steps and the arrival of
+  `unstable-prerelease.yml` on `unstable`'s first-parent line (commits `a8b4eef4` and `4e6a439a`).
+  Per #225's body, the same file reached `main` separately as PR **#218**, whose merge commit
+  `a60cae2a` is no longer an ancestor of `main` after a history rewrite — so `main` does not
+  currently carry it and this PR is the route by which it returns.
 - **#209** `ci: let merge_group read dist-newstyle, and stop it writing caches nothing can read`.
 - **#213** `ci: fail the PR that ships a corpus without goldens, not the next one`.
 - **#221** `ci: pre-push hook that refuses what format:check would reject`.
