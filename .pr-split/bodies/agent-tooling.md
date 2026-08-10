@@ -209,7 +209,7 @@ patterns, and every part of `CLAUDE.md` other than §3.1's third trap and §3.2 
 standalone prose that describes code already on `main`, or describes no code at all.
 
 None of these forward references can fail a check. They read as stale documentation until the
-sibling lands, which is the ordinary cost of splitting one branch into twenty-five PRs, not a
+sibling lands, which is the ordinary cost of splitting one branch into twenty-six PRs, not a
 breakage.
 
 ## Risk if rejected
@@ -222,6 +222,14 @@ knowledge, and `README.md`/`AGENTS.md` go on advertising a package the tree no l
 The concrete cost is that the incidents recorded in each **Why** block — five issues left open, a
 worktree of phantom compile errors, a corpus landing twice in one day without goldens — have nothing
 stopping them from happening again.
+
+## A note on where these files live
+
+On `unstable` the skill lives at `.claude/skills/writing-l4-rules/`. On `main` that path is a
+**symlink** to `skills/writing-l4-rules/`, introduced by the Agent Plugins 1.0 work that landed on
+`main` while this branch was diverging. This PR therefore writes the skill edits to
+`skills/writing-l4-rules/` — main's canonical location — rather than fighting the symlink. Content
+is unchanged; only the destination differs from `unstable`.
 
 ## Provenance
 

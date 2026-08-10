@@ -1,5 +1,8 @@
 # ci: the gate layer — six new PR jobs, an artifact-based merge-queue warm start, and a prerelease binary track
 
+> **Merge this one last.** It is the gate layer: most of what it gates arrives in its sibling PRs,
+> and two of its steps fail against `main` as it stands today. See **Independence** below.
+
 **What this adds**
 
 This is the continuous-integration and build-plumbing layer that the rest of the August 2026 work
@@ -45,8 +48,8 @@ downloading a tarball is not.
 
 ## What's in it
 
-Ten files: two GitHub Actions workflows, two git hooks, one new Node checker, two Nix files, and the
-npm root manifest/lockfile/turbo config.
+Eleven files: two GitHub Actions workflows, two git hooks, one new Node checker, two Nix files, and
+the npm root manifest and lockfile.
 
 ### `.github/workflows/pr-checks.yml` — 316 lines on `main`, 1852 on `unstable`
 
@@ -130,7 +133,6 @@ every check it makes.
 - `package.json`: adds `lint-staged` and its `"*": "prettier --write --ignore-unknown"` config; the
   `vite` override moves from `^6.0.7` to a pinned `6.4.2`. `package-lock.json` is regenerated to
   match.
-- `turbo.json`: `BASE_PATH` added to the `build` task's `env` list.
 - `nix/default.nix` and `nix/configuration.nix`: register the `regcf-wizard` package and import its
   module. **Imported but not enabled** — the module defaults to off, so importing it changes nothing
   that is served.
@@ -233,18 +235,23 @@ most of what it gates lives elsewhere.
 whole-workspace lock. It contains entries resolving to `ts-apps/housing-wizard`,
 `ts-apps/regcf-wizard`, `ts-shared/ladder-core` and `ts-shared/ladder-svg`. The root `workspaces`
 glob is `ts-apps/*` + `ts-shared/*`, so a lockfile naming workspace directories that are not on disk
-will not install. Those four directories belong to **wizards** (the two apps) and **ladder-viz** (the
-two shared packages). Either they land with or before this PR, or the lockfile has to be regenerated
+will not install. Those four directories belong to **wizard-housing**, **wizard-regcf** and
+**ladder-viz** (the two shared packages). Either they land with or before this PR, or the lockfile has to be regenerated
 against the reduced tree.
 
-*Hard dependency 2 — this PR turns CI red without it.* The Haskell job's
-`The sdist must carry the standard library` step fails on `main` as it stands: `main`'s
-`jl4-core/jl4-core.cabal` still has `data-files: libraries/*.l4` at line 17, **after** the `safe-mode`
-and `serialise-support` flag stanzas, which is exactly the defect the step detects. The reordering,
-together with the TH `fail` and the diagnostic change, is #167's other half and travels with
-`jl4-core/src/L4/API/EmbeddedLibraries.hs` in the **service-cli** theme. Worth flagging to whoever is
-assembling the split: `jl4-core/jl4-core.cabal` appears in *no* theme's `.files` manifest, so it may
-need to be added to service-cli explicitly.
+*Hard dependency 2 — the sdist step is red against `main` as it stands.* The Haskell job's
+`The sdist must carry the standard library` step fails today: `main`'s `jl4-core/jl4-core.cabal`
+still has `data-files: libraries/*.l4` **after** the `safe-mode` and `serialise-support` flag
+stanzas, which is exactly the defect the step detects. That reordering is #167's other half, and in
+this split it travels with the **lang-imports-stdlib** PR (verified: that branch's `jl4-core.cabal`
+slice is precisely the `data-files` move). **This PR must merge after lang-imports-stdlib.**
+
+*Hard dependency 3 — the corpus-goldens job is red against `main` as it stands.* Run against plain
+`origin/main`, `etc/check-corpus-goldens.mjs` exits 1: three fixtures —
+`jl4/examples/not-ok/export-{after-giveth,before-decide,between-given-giveth}.l4` — have no goldens
+at all. This is a **pre-existing** gap on `main`, not one this split introduces. The twelve goldens
+that close it are in the **lang-syntax-typecheck** PR. **This PR must merge after that one**, or it
+turns `main` red for a defect that predates all of these PRs.
 
 *Jobs that skip harmlessly, but do nothing useful, without their sibling.* Each of these is gated
 behind a paths filter, so if the sibling's files are absent the filter never fires and the job never
@@ -256,16 +263,20 @@ runs — no red check, just no coverage:
 - `BPMN Soundness` needs `etc/check-bpmn-*`, `etc/kie/**`, `jl4/examples/bpmn/**` — **bpmn-export**.
 - `DMN Engine Checks` needs `etc/kie-dmn-check/**`, `etc/camunda-dmn-check/**`,
   `jl4/examples/dmn/**` — **dmn-export**.
+- The corpus-goldens job's 352-file count only holds once the new corpora land —
+  **corpus-legal-new**, **corpus-regcf**.
 - The two `jl4-mlir` jobs need `jl4-mlir/scripts/parity-gate*.mjs` — **mlir**.
 - `nix/default.nix` and `nix/configuration.nix` reference `./regcf-wizard/package.nix` and
-  `./regcf-wizard/configuration.nix`, which are in **wizards**. `Nix Flake Check` will fail if those
+  `./regcf-wizard/configuration.nix`, which are in **wizard-regcf**. `Nix Flake Check` will fail if those
   two files are not present, so this pairing is a hard one in the other direction — either both land
   or neither of the two nix lines does.
 
 *Genuinely self-contained within this PR.* `unstable-prerelease.yml` (it builds `l4` and `jl4-lsp`
-from whatever the tree contains), the two husky hooks, `turbo.json`'s `BASE_PATH` entry, and the
-`lint-staged` / `vite` changes to `package.json`. Note that `turbo.json`'s `BASE_PATH` exists to serve
-the wizard builds in **wizards**; it is inert but harmless without them.
+from whatever the tree contains), the two husky hooks, and the `lint-staged` / `vite` changes to
+`package.json`.
+
+(`turbo.json`'s `BASE_PATH` entry, which the sources carried alongside these, travels instead with
+the **wizard-regcf** PR, since `ts-apps/regcf-wizard/svelte.config.js` is its only consumer.)
 
 *Nothing here is required by a sibling in order to compile or test locally.* Dropping this PR does not
 break anyone's build; it removes the machinery that would have caught them breaking it.
@@ -276,7 +287,7 @@ break anyone's build; it removes the machinery that would have caught them break
 
 The merge queue goes back to recompiling the whole Haskell tree on every entry — the ~98 min of
 runner time #209 measured over two days — and upstream smucclaw/l4-ide#911 stays open with no route
-to closing it. More seriously, every gate the other twenty-four PRs rely on disappears: the corpus
+to closing it. More seriously, every gate the other twenty-five PRs rely on disappears: the corpus
 that ships without goldens goes green again and reddens somebody else's branch, the DMN and BPMN
 exporters land unchecked by any engine, the `go` orchestrator's skill is free to drift from its
 driver, and `cabal install` quietly returns to producing an `l4` with no standard library.
@@ -297,7 +308,7 @@ Unstable PRs folded into this one (the CI/build portion of each; several span ot
   commit on the same file, `572972f4 ci(bpmn): give the jBPM check a baseline, so a new finding
   cannot land green`, closes the gap #163 named.
 - **#167** `fix(build): restore the embedded stdlib, and make its absence a build error` — the sdist
-  CI step (its cabal/TH half is in **service-cli**).
+  CI step (its cabal/TH half is in **lang-imports-stdlib**).
 - **#200** `wizard-deploy-ready` — the `nix/` registration lines.
 - **#224** `The explainer stage, a BPMN renderer, the grouping tutorial, and the de novo Reg CF run`
   — a 151-file omnibus; what this PR takes from it is the `go` job's later steps and the arrival of

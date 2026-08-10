@@ -33,9 +33,7 @@ be measured against.
 
 ## What's in it
 
-62 files, 22,687 insertions and 8 deletions against `main`: 59 under
-`jl4/examples/legal/regcf/`, plus three goldens elsewhere that belong to sibling themes — see
-Independence.
+59 files, all under `jl4/examples/legal/regcf/`.
 
 ### The mirror corpus
 
@@ -270,6 +268,13 @@ nothing to regenerate from and a large fraction of the branch's measured claims 
 unreproducible. Nothing in the compiler or the language breaks — this is data and prose — but the
 Lexipedia-superset programme loses the exhibit its entire argument rests on, and the two-encoding
 diff that caught the 501(a) leap-day defect goes with it.
+
+**A routing correction made during the split.** Three goldens that the Reg CF work happened to
+force — `jl4/examples/lsp/hover/tests/desc-hover.hover.golden` (the `@desc` leading-space trim in
+`L4.Syntax.getDesc`) and `jl4/examples/ok/tests/export-{explicit,no-explicit}-default.schema.golden`
+(that trim plus a JSON-Schema inlining change) — were initially routed here and have been moved to
+the **lsp** and **service-cli** PRs, which carry the code that produces them. This PR is Reg CF
+files only.
 
 ## Provenance
 

@@ -227,9 +227,11 @@ Hard code dependencies:
   the repo's "a decision is recorded in its owning document in the same PR" rule, those rulings live
   there, not here; the code comments cite section numbers into that file.
 
-Not owned by any theme manifest: **`jl4-core/jl4-core.cabal`** must list the four new `L4.Bpmn.*`
-modules and **`jl4/jl4.cabal`** must list `BpmnExport` in `jl4-test`'s `other-modules`. Whoever
-assembles the stack needs to carry those two edits with this PR or it will not build.
+**The `.cabal` registrations are included.** `jl4-core/jl4-core.cabal` gains the four `L4.Bpmn.*`
+modules and `jl4/jl4.cabal` gains `BpmnExport` in `jl4-test`'s `other-modules` — those files were
+sliced line by line across the split so each PR carries exactly its own module lines, and this
+branch carries the BPMN ones. `jl4/tests/Main.hs` likewise carries only the BPMN import and the
+`describe "bpmn export"` registration.
 
 Genuinely self-contained within this PR: the four `etc/` checkers and the SVG renderer are Node-only
 with zero runtime dependencies and no network, and their self-tests run without a Haskell build at
