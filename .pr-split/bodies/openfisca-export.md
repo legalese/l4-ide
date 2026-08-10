@@ -33,13 +33,13 @@ No upstream issue number is named in the commits or in PR #40.
 
 Four silent-wrong or invalid-output cases are now diagnosed rather than emitted: keyword-unsafe identifiers (`class`, `return`) that produced invalid Python; two distinct L4 names that sanitise to the same OpenFisca variable (previously silently conflated, or a decision's formula dropped in favour of a like-named input) — now rejected with a diagnostic naming both; a time-varying scale whose `OTHERWISE` was bound and never used, so pre-first-date periods returned 0; and `BRANCH` arm ordering, where L4 is first-match but OpenFisca resolves dated formulas and parameters by latest date — non-strictly-descending arms are now rejected. Shrinking scales (a bracket that vanishes in a later year, which OpenFisca cannot represent because it carries values forward) are rejected too.
 
-*Corpus and docs (11 examples, 10 committed goldens, 2 negative fixtures)*
+*Corpus and docs (10 examples, 10 committed goldens, 2 negative fixtures)*
 
 - `jl4/examples/openfisca/*.l4` — `flat-tax`, `benefit`, `household`, `roles`, `housing`, `dated`, `agecheck`, `incometax`, `scale`, `basic-income`.
 - `jl4/examples/openfisca/expected/*.py` — 10 committed golden Python modules.
 - `jl4/examples/openfisca/not-ok/{branch-misordered,name-collision}.l4` — negative fixtures pinning the two rejections.
 - `roundtrip_check.py` — runs a generated module in real OpenFisca and asserts the results equal the L4 `#EVAL` values.
-- `L4-OPENFISCA.md` — correspondence table, toolchain, the state-of-the-art argument, and a "Caveats — and what the tests prove" section covering the float32 numeric model, the enum-default / `members of` / BRANCH-order conventions, and the verification tiers.
+- `L4-OPENFISCA.md` — correspondence table, toolchain, the state-of-the-art argument, and a §6 "Caveats — and what the tests actually prove" section covering the float32 numeric model, the enum-default / `members of` / BRANCH-order conventions, and the verification tiers.
 - `README.md` — the quick tour and the regeneration commands.
 - `site/build_site.py` plus vendored Highlight.js core and an L4 grammar (`site/vendor/`) — a self-contained demo-site generator showing L4 source ↔ generated OpenFisca ↔ live test numbers per example, with highlighting scoped so the ASCII diagram and output panels stay plain.
 
@@ -53,7 +53,9 @@ Quoted from the source commits and PR #40:
 - **Upstream oracle.** `basic-income.l4` "reproduc[es] the six upstream golden vectors" of the real country-template `basic_income`, and the phase-2 contract "now binds to the BRIDGE output (not the hand-written reference) and passes on openfisca-core AND policyengine-core — closing the 'phase 2 is a paper proof' gap the review flagged."
 - **Repaired-bug measurement.** The dropped-`OTHERWISE` fix is recorded as "verified: was 0, now 500 == L4".
 
-`L4-OPENFISCA.md` is explicit about how much each tier proves: golden tests are regression-only, round-trips prove L4 == OpenFisca (consistency), and only the upstream-oracle variables are validated against the real country-template law. That distinction should survive review intact.
+`L4-OPENFISCA.md` §6 is explicit about how much each tier proves: golden tests are regression-only, round-trips prove L4 == OpenFisca (consistency), and only the upstream-oracle variables are validated against the real country-template law. That distinction should survive review intact.
+
+One limit a reviewer should read rather than discover: OpenFisca stores `value_type = float` as **numpy float32** while L4 `NUMBER` is an exact rational, so results diverge past roughly 7 significant digits or ~16.7 million (the doc's worked example is `16777217 → 16777216.0`), and decimal round-off can exceed the round-trip's `1e-6` tolerance (`10000.001 → 10000.0009765625`). This is a property of the target engine, not a defect in the lowering, and §6 says so plainly — for money in cents or large aggregates, the OpenFisca output is float32-approximate, not exact.
 
 **Independence**
 
@@ -65,7 +67,9 @@ This PR is close to standalone but **not fully self-contained as manifested** �
 
 Beyond that it is genuinely independent: the backend reads a typechecked `Module Resolved` through the existing `getExportedFunctions` entry point and touches no shared evaluator, printer or type-checker code. It does not depend on **dmn-export** or **bpmn-export** despite being a sibling exporter — the three share no code. It does not touch the parallel `jl4/experiments/openfisca/` corpus (the **experiments** theme). One caveat inherited from the language side: the examples use current L4 surface syntax, so if **lang-syntax-typecheck** changes how `DECLARE … IS ONE OF`, `CONSIDER`, `BRANCH` or `@desc` parse, these `.l4` files and their goldens move with it.
 
-The two vendored files under `site/vendor/` (Highlight.js core, an L4 grammar, a theme CSS) are third-party minified assets, checked in so the demo site is self-contained and needs no network. Worth a reviewer's eye on licensing even though nothing in the build depends on them.
+The three files under `site/vendor/` are vendored third-party assets, checked in so the demo site is self-contained and needs no network: Highlight.js v11.11.1 (BSD-3-Clause, licence header intact in the minified file), its GitHub Dark theme CSS, and an L4 grammar compiled for the same Highlight.js version. Nothing in the Haskell build depends on them; they are read only by `build_site.py`.
+
+One design boundary PR #40 calls out and a reviewer may want to push on: a decision referenced across entities must itself be `@export`'d, so that it compiles to a variable. That is a deliberate choice to avoid a transitive-reachability pass, not an oversight.
 
 **Risk if rejected**
 
