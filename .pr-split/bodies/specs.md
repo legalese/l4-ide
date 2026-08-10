@@ -180,11 +180,12 @@ this one.
 ## Risk if rejected
 
 The rulings that governed the DMN exporter, the fidelity report, the ladder rewrite and the Reg CF
-demo would exist only in PR descriptions and commit messages, so every sibling PR would arrive with
-no design document to check the code against and `main`'s `specs/` would keep giving stale answers to
-questions it has already settled. It would also break the `go` pipeline outright: `register-validate.mjs`,
-`selftest.mjs`, `denovo-diff.mjs` and `gate-verify.sh` all resolve paths inside
-`specs/todo/single-instruction-demo/`, so the `go-pipeline` theme cannot run without this one.
+demo would exist only in PR descriptions and commit messages, so every sibling PR would arrive with no
+design document to check the code against and `main`'s `specs/` would keep giving stale answers to
+questions it has already settled. Two siblings break outright rather than merely losing context:
+`go-pipeline` cannot run, because `register-validate.mjs`, `selftest.mjs`, `denovo-diff.mjs` and
+`gate-verify.sh` all resolve paths inside `specs/todo/single-instruction-demo/`; and `docs` goes red,
+because `doc/test-docs.sh` fails on the four `doc/` links whose targets are added here.
 
 ## Provenance
 
