@@ -4,14 +4,13 @@
 
 This PR lands the whole academic-writing side of L4 in one place: a new top-level `paper/`
 directory holding seven paper facets, two worked case studies of real Jersey legislation, and one
-fully reproducible exhibit. Before this, the repository carried source code and specifications but
-no home for the papers that explain what the system is for — the ICAIL introduction paper existed
-only as loose files at the top of `paper/`, and everything else (the "Deontics as Domination"
-draft, the formal-methods ladder, the Jersey encodings) lived outside the repo entirely. After
-this, a reader can go from `paper/README.md` to any facet, read its draft or design note, and in
-one case (`the-letter-and-the-spirit/`) run a single script that re-derives the paper's central
-claim from Z3, Espresso and an L4 model. Nothing here is code: no Haskell, no TypeScript, no build
-wiring changes.
+fully reproducible exhibit. `main` has no `paper/` directory at all today — the repository carries
+source code and specifications but no home for the writing that explains what the system is *for*,
+so the drafts have been living on personal branches and in a separate `legalese/sandbox` repo.
+After this, a reader can go from `paper/README.md` to any facet, read its draft or design note, and
+in one case (`the-letter-and-the-spirit/`) run a single script that re-derives the paper's central
+claim from Z3, Espresso and an L4 model. The diff is purely additive — 67 files, no deletions — and
+none of it is code: no Haskell, no TypeScript, no build wiring changes.
 
 **Why**
 
@@ -121,10 +120,11 @@ deletes the dead literal, cross-checked against Quine–McCluskey), a relay-ladd
   complement is replaced by a stated field in 24 fixtures, the dead `VenueKind` type is removed,
   a `mixed-venue party of 15` record is added, and what is *not* fixed (one head count still
   cannot apply two caps to two phases of one gathering) is stated at the declaration.
-- **Charities (Jersey) Law 2014** — a part-by-part whole-statute encoding: eleven `.l4` files
-  covering interpretation, the Commissioner, the charity test, the register and applications,
-  effects and deregistration, governors, use of terms, information, appeals, final provisions and
-  the schedules; an 824-line README and two PDFs.
+- **Charities (Jersey) Law 2014** — a part-by-part whole-statute encoding: twelve `.l4` files
+  (a shared `charities-common.l4` plus one per Part) covering interpretation, the Commissioner,
+  the charity test, the register and applications, effects and deregistration, governors, use of
+  terms, information, appeals, final provisions and the schedules; an 824-line README and two
+  PDFs. The two largest parts are ~2.1k and ~1.8k lines of L4 apiece.
 
 ## Evidence
 
