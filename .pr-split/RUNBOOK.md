@@ -39,3 +39,16 @@ Partition test: `cat .pr-split/themes/*.files | sort | uniq -d` must be empty, a
 ## Progress
 
 See `.pr-split/STATUS.tsv` — one row per theme: pushed?, PR number.
+
+## Final QA pass (do this once every PR is open)
+
+A PR-opening agent reported reading a body file one line shorter than it was on disk — the
+drafting agent was very likely still writing it. The readiness gate (`## Provenance` present)
+narrows that window but does not close it.
+
+So, once all 26 PRs exist, verify each PR's body equals `bodies/<theme>.md` (minus the title line)
+plus `FOOTER.md`, and update any that differ. Do it in a workflow, one agent per PR, so the bodies
+never enter the orchestrator's context:
+
+  read the PR body -> compare with the file bytes (use `sed -n '3,$p'`, not a summarising read)
+  -> if different, call mcp__github__update_pull_request with the corrected body.
