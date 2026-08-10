@@ -137,25 +137,27 @@ machines that have ever built the repo need no exports at all. The rest of
 this section is for machines with no build anywhere — say, a cloud sandbox
 whose setup script is capped at a few minutes.
 
-The alternative is a prerelease archive from GitHub Releases.
-`.github/workflows/unstable-prerelease.yml` is the workflow that builds and
-attaches them: one archive per platform, built from `unstable`, published under
-tags of the form `unstable-<YYYYMMDD>-<short-sha>`.
+The alternative is a prerelease archive from the **release shelf,
+[`legalese/prereleases`](https://github.com/legalese/prereleases/releases)** —
+a dedicated repo whose workflow checks out this repo's `unstable`, builds, and
+publishes there: one archive per platform, under tags of the form
+`unstable-<YYYYMMDD>-<short-sha>` where the SHA names this repo's commit.
 
-**Status 2026-08-09: the workflow is proven but the one published release has
-been deleted.** It ran on 2026-08-05 (dry run 31011661044, real publish 31015006781) and published `unstable-20260805-c873bb5`; as of 2026-08-09 that
-release object is gone from the releases page — only the git tag survives —
-so there is currently **no archive to download**. Check before constructing
-URLs: `gh release list --repo legalese/l4-ide | grep unstable-`. Dispatch does
-not need the file on `main`: the web Run-workflow button only appears for
-default-branch workflows, but
-`gh workflow run unstable-prerelease.yml --ref unstable` works and is the
-measured route (run 31302358588, 2026-08-09).
+The shelf exists because releases and tags are repo-scoped, not
+branch-scoped: prereleases published HERE landed beside the stable
+`l4-ide-build-<n>` extension releases on a page this repo's maintainers keep
+for the stable track (the one published here, 2026-08-05, was deleted within
+days). This repo used to carry the workflow as
+`.github/workflows/unstable-prerelease.yml`; it was retired 2026-08-11 in
+favour of the shelf's copy, which is proven end to end (dry run 31352348001,
+real publish 31353772360, release `unstable-20260810-2e183e5` — all shelf-side
+run ids). To cut a new build: `gh workflow run prerelease.yml --repo
+legalese/prereleases` (dry_run defaults true; uncheck to publish).
 
 The URL is constructible from the tag and the platform, so no page-scraping:
 
 ```
-https://github.com/legalese/l4-ide/releases/download/<tag>/l4-<tag>-<platform>.tar.gz
+https://github.com/legalese/prereleases/releases/download/<tag>/l4-<tag>-<platform>.tar.gz
 ```
 
 with `<platform>` one of `linux-x64`, `darwin-arm64`, `win32-x64`. Each archive
@@ -165,9 +167,9 @@ from. A `SHA256SUMS` file covering all three archives is attached to the same
 release.
 
 ```bash
-TAG=<pick one from the releases page>
+TAG=<pick one from https://github.com/legalese/prereleases/releases>
 PLATFORM=linux-x64   # or darwin-arm64, win32-x64
-BASE=https://github.com/legalese/l4-ide/releases/download/$TAG
+BASE=https://github.com/legalese/prereleases/releases/download/$TAG
 
 curl -fsSLO "$BASE/l4-$TAG-$PLATFORM.tar.gz"
 curl -fsSLO "$BASE/SHA256SUMS"
@@ -181,9 +183,9 @@ export JL4_LSP_CMD="$PWD/l4-$TAG-$PLATFORM/jl4-lsp"
 Three things worth knowing:
 
 - **These are prereleases, and they say so.** They are built from `unstable`,
-  the integration branch, and are flagged `prerelease` so they never appear as
-  the repository's "Latest release". `/releases/latest` will not find them —
-  read the releases list, or use the tag you were given.
+  the integration branch, and are flagged `prerelease`. The shelf hosts
+  nothing else, but `/releases/latest` still will not find them — read the
+  releases list, or use the tag you were given.
 - **Leave `JL4_LIBRARY_PATH` alone.** The standard library is compiled into the
   binary; the `libraries/` directory in the archive is there for standalone use
   outside a checkout. Inside the repo the driver already points it at
@@ -191,10 +193,11 @@ Three things worth knowing:
 - **macOS may quarantine the download.** Clear it with
   `xattr -dr com.apple.quarantine "l4-$TAG-darwin-arm64"`.
 
-Do not use the binary bundled inside the published VS Code extension for this.
-As of 2026-08-05 the most recent extension build is the one `main-tag.yml`
-produced on 2026-07-18, which predates the `l4 export` subcommand, so it cannot
-drive the DMN or BPMN legs.
+Be wary of the binary bundled inside the published VS Code extension: it is
+built from `main`, which trails `unstable`, and the 2026-07-18 build predated
+the `l4 export` subcommand entirely. Before relying on one, run `l4 --help`
+and check the subcommand list includes `export` — the same vintage check the
+shelf's smoke test applies to every archive it publishes.
 
 ## Selftests
 
