@@ -143,9 +143,10 @@ Quoted faithfully from the source PRs:
 - **PR #132** on the Hohfeld restructure — `fitch1967` and `dongroy2021` verified (Fitch's
   "capacitative modalities"; Dong & Roy free preprint arXiv:2110.04454 added), all citations
   preserved across the de-duplication.
-- No test-suite numbers are claimed, because this PR runs no tests. The GCO repair commit and the
-  citation-formatting commits rode inside PRs (#224, #172) whose measurements belong to the
-  `corpus-regcf`, `go-pipeline` and `bpmn-export` themes and are not repeated here.
+- No test-suite numbers are claimed here, because nothing in this PR is executed by CI. The GCO
+  repair and the two prettier-format commits rode inside larger PRs (#224, #172, #134) whose
+  measurements are about their code, not about `paper/`, and are left with the themes that own
+  that code.
 
 ## Independence
 
