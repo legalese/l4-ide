@@ -56,8 +56,14 @@ _Tests (2 test-suites)_
 _Fixtures (2 `.pl` files)_
 
 `examples/lease.pl` (65 lines) is the JURISIN 2010 Appendix A rulebase + factbase — Japanese Civil
-Code Art. 612 plus the Supreme Court rule of 1966.1.27 — in the propositional dialect.
-`examples/minor-duress.pl` (56 lines) is the second fixture.
+Code Art. 612 plus the Supreme Court rule of 1966.1.27 — in the propositional (0-arity) dialect;
+its header names it the phase-2 anchor, the file a PROLEG→L4 translation must agree with on `#EVAL`.
+`examples/minor-duress.pl` (56 lines) is the first-order dialect: rescission by a minor buyer,
+defeated by duress, from Satoh's alice/bob real-estate demonstration, with predicates carrying
+positional untyped arguments — the phase-3 anchor for type reconstruction. Its header records that
+the original slides contain identifier typos (`minifestation_by_duress`, `Maniester`, `Mnifestee`)
+which untyped Prolog tolerates silently and which are corrected in the fixture, noting that this is
+exactly the class of latent bug a name-and-type-checked target is meant to surface.
 
 _The construct in L4 (`l4/burden.l4`, 185 lines)_
 
