@@ -58,3 +58,17 @@ turn `main` red for a defect that predates all of these PRs.
 `package-lock.json` is touched by both **ci-build** (which adds `lint-staged`) and
 **wizard-housing** (which adds a workspace). Whichever lands second needs a plain `npm install`
 to reconcile. That is ordinary lockfile traffic, not a design problem.
+
+## ci-build's own preconditions (both found by running the checks against plain `main`)
+
+- The Haskell job's *"The sdist must carry the standard library"* step fails against `main` today:
+  `data-files: libraries/*.l4` still sits **after** the flag stanzas, which is the exact defect the
+  step detects. The reordering travels with **lang-imports-stdlib** (verified — that branch's
+  `jl4-core.cabal` slice is precisely the `data-files` move).
+- The corpus-goldens job fails against `main` today for the three `not-ok/export-*.l4` fixtures.
+  Their goldens travel with **lang-syntax-typecheck**.
+- `package-lock.json` names four workspace directories that only exist once **ladder-viz**,
+  **wizard-housing** and **wizard-regcf** land.
+
+So `ci-build` merges **after** lang-imports-stdlib, lang-syntax-typecheck, ladder-viz and both
+wizards — which is the same conclusion as "merge it last", now with reasons.

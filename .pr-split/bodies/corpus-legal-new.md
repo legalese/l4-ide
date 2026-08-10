@@ -94,10 +94,11 @@ KIE 8.44.0.Final VERDICT: 1 file(s), 25 case(s), 0 error(s), 0 warning(s), 1075/
 Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 25 case(s), 1 parsed, 0 error(s), 1075/1075 decision(s) evaluated, 1075/1075 value(s) as expected
 ```
 
-The committed `bna.dmn` in *this* PR is the re-cut one: #206 reports `bna.fidelity.txt` going
-"3 blocking → 0" (78 advisory) once the exporter learned the `YMD` lowering, with the same
-1075/1075 on both engines, and `l4 export` reproducing both `bna.dmn` and `bna.fidelity.txt`
-byte-for-byte.
+The committed `bna.dmn` in *this* PR is the re-cut one. #206 §4 describes it as "regenerated on the
+post-#196 exporter", with the only artifact change being three bodies (`YMD OF 1983, 1, 1` →
+`date("1983-01-01")`), `bna.fidelity.txt` going "**3 blocking → 0** (78 advisory)", `bna.dmn.md`
+byte-identical, and — re-verified under the final exporter — `l4 export` reproducing both `bna.dmn`
+and `bna.fidelity.txt` "byte-for-byte", at the same 1075/1075 on both engines.
 
 **Charities, L4 leg (#201):** `l4 check` "EXIT 0 :: Check succeeded."; `l4 run` "EXIT 0 · #ASSERT in
 source 102 | Evaluation blocks 102 | assertion satisfied 102 | assertion failed 0 · diagnostics
