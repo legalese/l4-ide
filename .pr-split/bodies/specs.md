@@ -1,7 +1,7 @@
 # docs(specs): land the aug2026 specification record — rulings, programme specs, and the de novo deposit schemas
 
-**What this adds.** This is the `specs/` tree as it stands on `unstable`: 93 changed paths, ~36k
-added lines, almost all of it prose. It brings across the design documents and numbered rulings that
+**What this adds.** This is the `specs/` tree as it stands on `unstable`: 93 changed paths, 36,386
+added lines against 57 deleted, almost all of it prose. It brings across the design documents and numbered rulings that
 the last two months of work were decided by — the DMN export program model (R1–R13), the fidelity
 severity axis, the Lexipedia superset programme, the 2026 ladder-diagram design, the
 single-instruction demo pipeline — plus a new `specs/research/` tier for investigation records, three
@@ -189,9 +189,32 @@ because `doc/test-docs.sh` fails on the four `doc/` links whose targets are adde
 
 ## Provenance
 
-Folded in from these `unstable` PRs (only the `specs/` portion of each; most also carry code that
-belongs to other themes):
+Folded in from 50 `unstable` PRs. Only the `specs/` portion of each is taken here; most of them also
+carry code that belongs to other themes.
 
-85, 89, 99, 116, 119, 134, 135, 136, 142, 155, 158, 159, 160, 161, 166, 168, 170, 172, 173, 175, 176,
-177, 178, 179, 180, 181, 182, 183, 185, 186, 187, 188, 190, 191, 193, 194, 196, 197, 198, 199, 200,
-204, 206, 207, 208, 211, 217, 224, 226, 227
+**Spec-primary** — these PRs are substantially or entirely this theme:
+
+- **#85** — `chore(specs): promote 6 drifted specs to done/ (state-as-ledger, pattern-matching, batch,
+  deontic-party-action, negation-as-failure, ref-annotation)`
+- **#99** — `docs(specs): question-ordering policy spec + tier-1 WIP tracker`
+- **#119** — `docs(specs): salvage status updates stranded in the main checkout`
+- **#135** — `docs: condensed Adoption Thesis (PRODUCT-STRATEGY) + Lexipedia Reg CF case study`
+- **#136** — `docs(specs): the Lexipedia superset programme + GuardedRows normaliser`
+- **#142** — `docs(tracker): park the ASSUME → GIVEN migration project`
+- **#155** — `docs(spec): section ranking for constructors and selectors — decide B⁺`
+- **#158** — `docs(fidelity): rule on the Blocking-is-two-facts axis (#928)`
+- **#161** — `docs(dmn): rule R3–R6, resolve the cross-ruling interactions, and unblock #923`
+- **#166** — `docs(dmn): a gap analysis of gap analysis — and a retraction`
+- **#170** — `docs(sets): §16.3 condition met — #169 shifts un-un-overloading to semantic grounds`
+- **#173** — `docs(specs): inline dmnmd tables in .l4 — the DX case, speculatively`
+- **#179** — `docs(specs): the single-instruction demo pipeline — "SEC regulation crowdfunding: go"`
+- **#181** — `DMN Phase 5 groundwork: BKM engine probes + build plan`
+- **#187** — `R4 design note: the Interpretation record parameter for ambiguity forks`
+- **#199** — `docs(lexipedia): R2 read-only probe — CC BY-SA 4.0 confirmed, coverage diff vs regcf corpus`
+- **#217** — `specs(props): ASSUME snapshot — the migration the props design implies but does not pose`
+
+**Spec-carrying** — these landed code elsewhere and updated the spec that owns the decision, per
+CLAUDE.md §4:
+
+89, 116, 134, 159, 160, 168, 172, 175, 176, 177, 178, 180, 182, 183, 185, 186, 188, 190, 191, 193,
+194, 196, 197, 198, 200, 204, 206, 207, 208, 211, 224, 226, 227
