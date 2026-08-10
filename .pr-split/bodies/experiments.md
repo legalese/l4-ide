@@ -1,4 +1,4 @@
-# corpus(experiments): Housing Act 1988 Schedule 2 end-to-end, ledger and NAF demos, dmnmd→L4 worked example
+# corpus(experiments): Housing Act 1988 Schedule 2 end-to-end, plus ledger, NAF and dmnmd worked examples
 
 **What this adds**
 
@@ -20,7 +20,7 @@ Schedule 2 was picked because it is real, messy and *recently amended*: a whole 
 
 **Ledger and negation-as-failure demos — 7 files**
 
-`state-ledger.l4` (writes return the value recorded; per-directive isolation; presumption by `fromMaybe`), `state-ledger-m45.l4` (cross-party and `OFFICIAL` reads inside a deontic chain), `recall-all.l4` and `recall-all-usages.l4` (the collect-all read: `RECALL ALL`, `RECALL ALL <party>'s`, `RECALL ALL OFFICIAL's`, and the deliberate contrast that an unwritten cell reads back as `[]` rather than `NOTHING`), `record-hence-block.l4` (proving the layout-block sugar for `RECORD` continuations residuates identically to the explicit flat `HENCE` chain), `notify-v1.l4` (a content-bearing, court-queryable notice as a recipient-qualified `RECORD`, with its v1 caveats written down rather than solved), and `negation-as-failure-examples.l4` (the three epistemic states, `holds` / `naf` / `presumed`, and the `decided` axis NAF throws away).
+`state-ledger.l4` (writes return the value recorded; per-directive isolation; presumption by `fromMaybe`), `state-ledger-m45.l4` (cross-party and `OFFICIAL` reads inside a deontic chain), `recall-all.l4` and `recall-all-usages.l4` (the collect-all read: `RECALL ALL`, `RECALL ALL <party>'s`, `RECALL ALL OFFICIAL's`, the deliberate contrast that an unwritten cell reads back as `[]` rather than `NOTHING`, and a deontic `#TRACE` whose Court duty is guarded by "at least three red-or-yellow notices" — a `count`/`filter` over the accumulated history that last-write-wins `RECALL` simply cannot express), `record-hence-block.l4` (the un-goldened companion to the accept/reject matrix in `jl4/examples/ok/ledger/`: it residuates the layout-block and explicit flat `HENCE` forms with `#TRACE` and observes identical results), `notify-v1.l4` (a content-bearing, court-queryable notice as a recipient-qualified `RECORD`, with its v1 caveats written down rather than solved), and `negation-as-failure-examples.l4` (the three epistemic states, `holds` / `naf` / `presumed`, and the `decided` axis NAF throws away).
 
 **dmnmd→L4 worked example — 4 files**
 
@@ -30,7 +30,7 @@ Schedule 2 was picked because it is real, messy and *recently amended*: a whole 
 
 `britishcitizen5.cases.json` (and its `classic/` twin, byte-identical) and `query-planner-tests/04-alcohol-purchase.cases.json`: curated argument sets that deliberately separate branches instead of taking the harness's synthesised defaults.
 
-**One-line-per-site prelude fix — 1 file**
+**Vendored prelude fix — 1 file**
 
 `jl4/experiments/thailand-cosmetics/prelude.l4` is a 1045-line vendored copy of the standard prelude, created when a symlink was replaced by a real file so a nix store derivation would include the content. It carried the same defect as the original: the `MAYBE NUMBER` overload of `maximum` delegated to `minimum1`, and `maximum1` folded with `min`. Two identifiers corrected here (lines 330 and 339).
 
@@ -56,8 +56,8 @@ No golden files are added or changed by this PR, and no suite counts are claimed
 **What it needs from siblings.**
 
 - **lang-eval-ledger** — required by 9 files. The six ledger demos (`state-ledger*.l4`, `recall-all*.l4`, `record-hence-block.l4`, `notify-v1.l4`) plus three Housing Act files that use the ledger (`housing-act-ground-1-full.l4`, `housing-act-ground-1-traced.l4`, `housing-act-schedule2-aspect.l4`). `RECORD` / `COMMIT` / `ATTEST` / `RECALL` do not exist on `main` at all — `jl4-core/src/L4/Evaluate/Ledger.hs` is absent there — so these files will not even lex without that theme.
-- **lang-syntax-typecheck** — `record-hence-block.l4` exists to demonstrate the layout-block sugar for `RECORD` continuations (`implicitSeq`); without the parser change it is a file about a feature that is not there.
-- **lang-imports-stdlib** — `negation-as-failure-examples.l4` opens with `IMPORT \`negation-as-failure\``, and `jl4-core/libraries/negation-as-failure.l4` is new on `unstable` and belongs to that theme.
+- **lang-syntax-typecheck** — `record-hence-block.l4` exists to demonstrate the layout-block sugar for `RECORD` / `COMMIT` / `ATTEST` continuations (`implicitSeq`, `jl4-core/src/L4/Parser.hs`); without the parser change it is a file about a feature that is not there. It landed in the same commit as the parser change and as the golden-pinned `jl4/examples/ok/ledger/record-block*.l4` fixtures, which belong to **lang-eval-ledger**.
+- **lang-imports-stdlib** — `negation-as-failure-examples.l4` opens by importing the `negation-as-failure` library, and `jl4-core/libraries/negation-as-failure.l4` is new on `unstable` and belongs to that theme.
 - **mlir** — the three `.cases.json` are inert data by themselves. They only do work when `jl4-mlir/scripts/parity-harness.mjs` reads them.
 
 **What it does not need.** The other 46 Housing Act modules import only `prelude` and `daydate`, both already on `main`, and depend on nothing in the other 24 themes. The miles-card example is four self-contained files (two markdown tables, one generated `.l4`, one README) — the dmnmd generator that produced the `.l4` lives in a different repository and is explicitly **not** a build dependency of this one. The `thailand-cosmetics/prelude.l4` fix is a two-line edit to a leaf file with no importers in this corpus.
