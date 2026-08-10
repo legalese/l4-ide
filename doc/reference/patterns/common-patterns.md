@@ -241,6 +241,15 @@ DECIDE amount IS
 
 ## Regulative Rule Patterns
 
+> **The performer rule.** When `PARTY p MUST a` appears in a regulative rule,
+> L4 checks that `p` is the _performer_ of action `a`. For the flat-union style
+> (`DECLARE Action IS ONE OF ...`) used in the examples below, actions carry no
+> actor field and the check is skipped — any party may be obligated to any
+> action. If you use the value-actor encoding (actions that carry their own
+> actor) the compiler enforces the match automatically and reports a clear error
+> if a wrong party is assigned. See
+> [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md).
+
 ### Simple Obligation
 
 ```l4
@@ -318,10 +327,9 @@ GIVETH A DEONTIC Party Action
 ```l4
 GIVETH A DEONTIC Party Action
 `delivery options` MEANS
-    (PARTY Seller MUST `ship goods` WITHIN 14 HENCE FULFILLED)
+    (PARTY Seller MUST `ship goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
     ROR
-    (PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED)
-    LEST BREACH
+    (PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED LEST BREACH)
 ```
 
 ---
@@ -370,8 +378,15 @@ See also the [currency library](../libraries/currency.md) for ISO 4217 currency 
 ```l4
 IMPORT daydate
 
--- Create a date (day, month, year)
-expiryDate MEANS Date 31 12 2025
+-- Create a date. YMD takes year, month, day (ISO 8601 order) and is the
+-- recommended constructor for new code.
+expiryDate MEANS YMD 2025 12 31
+
+-- `Date` takes day, month, year — so `Date 2025 12 31` is NOT 2025-12-31.
+-- Day 2025 of month 12 of year 31 silently overflows to 0037-06-16, with no
+-- error. That is exactly the transposition footgun `YMD` avoids twice over
+-- (harder to write, and refused if written anyway);
+-- written correctly in day-month-year order it is `Date 31 12 2025`.
 
 -- Compare dates
 GIVEN d1 IS A DATE

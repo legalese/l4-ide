@@ -88,6 +88,10 @@ If the buyer exercises the warranty claim, the seller becomes obliged to act:
 - **Confusing MAY with DO.** `DO` expresses bare optionality and has no default HENCE/LEST branches; MAY defaults both to `FULFILLED`.
 - **Forgetting the deadline.** A MAY without WITHIN never expires within the trace, which can keep a contract from reaching a terminal state.
 
+## Performer Rule
+
+When using the **value-actor encoding**, `PARTY p MAY a` requires that `p` is the **performer** of action `a`, just as with MUST. The check fires at compile time. See **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** for the full rules.
+
 ## Related Keywords
 
 - **[PARTY](PARTY.md)** - Identifies who has the permission

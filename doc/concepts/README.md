@@ -22,9 +22,10 @@ Unlike reference docs (which tell you **what** things are) or tutorials (which s
 The philosophy and principles behind L4's design
 
 - **[Principles](language-design/principles.md)** - Core design principles of L4
+- **[Flowcharts, Decision Tables, and Real Logic](language-design/logic-not-flowcharts.md)** - Why L4 is a language with derived diagrams, not a flowchart or decision-table builder
 - **[Linguistic Syntax](language-design/linguistic-syntax.md)** - How L4 borrows from natural language linguistics
 
-**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers
+**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers, diagrams as views not substrate
 
 _More topics planned: Layout Sensitivity, Scope_
 
@@ -54,6 +55,16 @@ How L4's type system works
 **Key Ideas:** Type safety, algebraic data types, functional programming influence
 
 _More topics planned: Maybe and Nothing, Type Inference_
+
+---
+
+### 🖋️ Reviewing
+
+Who checks an encoding against the law, and what their sign-off means
+
+- **[Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)** - The `⟨law⟩: go` pipeline end to end, and the HG1 seat: the one judgement no machine is permitted to make
+
+**Key Ideas:** Human gates, detached signatures bound to content, inert style as the review artifact, fidelity reports, interpretation forks
 
 ---
 

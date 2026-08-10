@@ -27,6 +27,57 @@ Some patterns appear repeatedly across legal rules:
 
 Rather than copy-paste these patterns, we create reusable abstractions.
 
+### The Performer Rule in Cross-Cutting Patterns
+
+Whenever an action carries an actor field, L4 enforces that the `PARTY` in an
+obligation matches the action's _performer_ (the first actor-typed field in
+positional order). This is especially relevant to **notice-and-cure** and
+**duplex notification** patterns where two actors alternate obligations.
+
+**Duplex notification** — one action type, two directions, performer = first slot:
+
+```l4
+DECLARE Actor IS ONE OF
+    RegulatorActor
+    SubjectActor
+
+DECLARE NotifyAction HAS
+    sender   IS AN Actor    -- first actor field = performer
+    receiver IS AN Actor
+    message  IS A STRING
+
+-- Pinned in each direction
+`regulator notifies subject` MEANS NotifyAction OF RegulatorActor, SubjectActor, "notice issued"
+`subject notifies regulator` MEANS NotifyAction OF SubjectActor, RegulatorActor, "cure completed"
+
+-- ✅ ping-pong: each actor obligated to its own pinned action
+GIVETH A DEONTIC Actor NotifyAction
+`notification exchange` MEANS
+    PARTY RegulatorActor
+    MUST `regulator notifies subject`
+    WITHIN 7
+    HENCE
+        PARTY SubjectActor
+        MUST `subject notifies regulator`
+        WITHIN 14
+        HENCE FULFILLED
+        LEST BREACH BY SubjectActor BECAUSE "failed to acknowledge notice"
+    LEST BREACH BY RegulatorActor BECAUSE "failed to issue notice"
+```
+
+The `sender` field is first, so `RegulatorActor` is the performer of
+`regulator notifies subject` and `SubjectActor` is the performer of
+`subject notifies regulator`. Swapping the parties would produce:
+
+```
+An actor may only perform its own actions.
+  `regulator notifies subject` is performed by `RegulatorActor`, not by `SubjectActor`.
+```
+
+For the full performer-rule reference including parameterised (`EXACTLY`-applied)
+actions and procurement chains, see
+[Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md).
+
 ---
 
 ## Timing Patterns
@@ -35,8 +86,8 @@ Rather than copy-paste these patterns, we create reusable abstractions.
 
 ```l4
 -- Simple deadline: fixed number of days
-GIVEN party IS A Actor
-      action IS A Action
+GIVEN party IS AN Actor
+      action IS AN Action
       deadline IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `obligation within days` MEANS
@@ -53,8 +104,8 @@ Deadlines relative to events:
 
 ```l4
 -- "Within 30 days of receiving notice"
-GIVEN party IS A Actor
-      action IS A Action
+GIVEN party IS AN Actor
+      action IS AN Action
       `the trigger date` IS A NUMBER  -- Day number when trigger occurred
       `the day limit` IS A NUMBER
 GIVETH A DEONTIC Actor Action
@@ -115,11 +166,11 @@ Many regulations follow a notice-and-cure pattern:
 ### Generic Notice-and-Cure
 
 ```l4
-GIVEN regulator IS A Actor
-      regulated IS A Actor
+GIVEN regulator IS AN Actor
+      regulated IS AN Actor
       violation IS A STRING
       `the cure period` IS A NUMBER
-      `the consequence` IS A Action
+      `the consequence` IS AN Action
 GIVETH A DEONTIC Actor Action
 `notice and cure` MEANS
     PARTY regulator
@@ -193,7 +244,7 @@ DECLARE `Appeal Outcome` IS ONE OF
     `appeal dismissed`
     `appeal partially allowed` HAS `the modifications` IS A STRING
 
-GIVEN appellant IS A Actor
+GIVEN appellant IS AN Actor
       `the appeal deadline` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `right to appeal` MEANS
@@ -214,7 +265,7 @@ GIVETH A DEONTIC Actor Action
 ```l4
 -- Appeal suspends the original decision
 GIVEN decision IS A Decision
-      appellant IS A Actor
+      appellant IS AN Actor
       `the appeal deadline` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `suspensive appeal` MEANS
@@ -267,7 +318,7 @@ Many enforcement regimes have graduated responses:
 ```l4
 -- Escalation: Warning → Fine → Suspension → Removal
 
-GIVEN subject IS A Actor
+GIVEN subject IS AN Actor
 GIVETH A DEONTIC Actor Action
 `escalation chain` MEANS
     -- Level 1: Warning
@@ -309,7 +360,7 @@ Sometimes serious violations skip early steps:
 
 ```l4
 GIVEN violation IS A Violation
-      subject IS A Actor
+      subject IS AN Actor
 GIVETH A DEONTIC Actor Action
 `enforcement response` MEANS
     IF violation's `the severity` EQUALS Critical
@@ -343,7 +394,7 @@ Grace periods delay consequences:
 
 ```l4
 -- Payment with grace period before late fee applies
-GIVEN debtor IS A Actor
+GIVEN debtor IS AN Actor
       amount IS A NUMBER
       `the due date` IS A NUMBER
       `the grace period` IS A NUMBER

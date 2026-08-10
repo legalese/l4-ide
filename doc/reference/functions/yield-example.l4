@@ -9,8 +9,10 @@ IMPORT prelude
 -- Simple single-parameter lambda
 DECIDE `add one` IS GIVEN x YIELD x + 1
 
--- Multiple parameters (comma-separated)
-DECIDE `add together` IS GIVEN x, y YIELD x + y
+-- Multiple parameters (comma-separated). The NUMBER annotations pick the
+-- arithmetic + over the set-union + (prelude's SET overload of __PLUS__);
+-- with both parameters untyped, `x + y` would be an ambiguity error.
+DECIDE `add together` IS GIVEN x IS A NUMBER, y IS A NUMBER YIELD x + y
 
 -- Multiple parameters (layout-based)
 DECIDE `multiply values` IS

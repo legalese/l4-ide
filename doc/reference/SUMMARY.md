@@ -52,10 +52,16 @@
 - [Patterns](patterns/README.md)
   - [Common Patterns](patterns/common-patterns.md)
 
+## Query Planning
+
+- [Query Planning](query-planning/README.md)
+- [Binary Decision Diagrams (ROBDD)](query-planning/robdd.md)
+
 ## Libraries
 
 - [Libraries Overview](libraries/README.md)
   - [IMPORT](libraries/IMPORT.md)
+  - [Library Resolution (dev vs prod)](libraries/resolution.md)
   - [prelude](libraries/prelude.md)
   - [daydate](libraries/daydate.md)
   - [time](libraries/time.md)

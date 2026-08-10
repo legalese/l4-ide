@@ -29,6 +29,8 @@ In most programming languages, the equivalent would be dot notation: `person.age
 
 The Saxon genitive, by contrast, is immediately legible to anyone who reads English. A lawyer reviewing L4 code sees "the contract's buyer's name" and understands it without explanation. This is not a cosmetic choice -- it directly serves the goal of making L4 code reviewable by domain experts who are not programmers.
 
+**The clitic supplies the verb, so the field name should not.** `'s` reads as both "is" and "has": `` transfer's `to the issuer` `` already means _the transfer **is** to the issuer_, and `` person's `age` `` already means _the person **has** an age_. A field named `` `is to the issuer` `` says it twice. Start the name at the complement. This matters beyond neatness, because the field name is what a ladder diagram prints beside its node and what a generated wizard asks the user -- and because statutes do the same thing, letting a chapeau supply the verb for every limb beneath it.
+
 **Technical detail:** The `'s` operator chains naturally, just as it does in English. `company's ceo's name` accesses the `name` field of the `ceo` field of the `company` record. When used as an argument to a function, wrap in parentheses: `f (record's field)`.
 
 For the full syntax specification, see the [Genitive reference](../../reference/syntax/README.md).
@@ -96,6 +98,8 @@ The nested structure of conjunctions and disjunctions is implicit in the legal t
 
 The choice of three dots for AND and two dots for OR is a convention: the more common operation (conjunction) gets the longer symbol.
 
+**House style: spell the last connective.** Every rung of a chain but the last takes the sugar; the last takes the keyword — `..` … `..` … `OR`, and `...` … `...` … `AND`. This mirrors English, which coordinates asyndetically and then spells the conjunction before the final item ("(1) X; (2) Y; **or** (3) Z"), and it means a reader learns whether they are looking at a conjunction or a disjunction from a word rather than by counting dots. It also makes a truncated chain visible: one that ends in sugar looks unfinished, and sometimes is.
+
 ---
 
 ## Inert Elements: Bare Strings as Scaffolding
@@ -117,6 +121,35 @@ This is a precise semantic choice, not a hack. The identity value is the unique 
 The practical effect is significant: L4 code can include the connecting tissue of legal language -- the prepositions, the relative clauses, the explanatory phrases -- so that reading the code feels like reading the statute. The visualization and explanation tools can then present these phrases to end users, producing output that reads naturally rather than as a bare logical formula.
 
 Inert elements are distinguished from active boolean conditions by their quoting style. Backtick identifiers like `` `deliver` `` are resolved to boolean variables. Double-quoted strings like `"of any property to any person"` are treated as inert scaffolding.
+
+### Scaffolding is structure, not decoration
+
+It is tempting to read inert strings as comments that happen to live inside the expression. They are not: they are **nodes in the tree**, and where they sit changes what the rule says even when it cannot change what the rule computes.
+
+The clearest case is a disjunction. `OR` is associative, so every bracketing of `a OR b OR c` has the same truth value on the same facts — from which it is easy to conclude, wrongly, that indentation cannot express a choice between readings. But an inert string participating in the surrounding `AND` **scopes** whichever disjuncts fall inside its group. Consider a rule about transfers made "in connection with the death or divorce of the purchaser or other similar circumstance":
+
+```l4
+-- The catch-all is a PEER of the group: "of the purchaser" does NOT scope it.
+    ..  "in connection with" ...    "the" ... `death`
+                                          OR `divorce`
+                                      ... "of the purchaser"
+                            OR  `other similar circumstance`
+
+-- The catch-all is INSIDE the group: "of the purchaser" DOES scope it.
+    ..  "in connection with" ...    "the" ... `death`
+                                          OR `divorce`
+                                          OR `other similar circumstance`
+                                      ... "of the purchaser"
+```
+
+These evaluate identically. They are different law: one asks whether _some_ similar circumstance occurred, the other whether one occurred _to the purchaser_. In the source text the difference is carried by a comma that isn't there — the drafter wrote four `or`s and left their precedence to the reader. Here the choice is mandatory and visible, which is the same lesson as _Chew v The Queen_ elsewhere in this document: **punctuation is a false friend; layout is not.**
+
+Two consequences worth naming:
+
+- **Indentation resolves anaphora.** "other _similar_ circumstance" — similar to what? Placing the leaf as a peer of a group makes that group its referent. No punctuation can express that, and the source does not.
+- **The path is the qualifier.** A leaf named `` `death` `` reads out, along the inert strings from the root, as "in connection with / the / death / of the purchaser" — the isomorphic sentence, _assembled_ from the structure rather than stored in the identifier. So leaf names stay short and the scaffolding qualifies them.
+
+The corollary is a drafting rule: never put a sentence in a field name. A name is read as a label, not as a proposition, so disjuncts hidden inside one are readings nobody audits. Lift them out and let the scaffolding carry the words.
 
 ---
 

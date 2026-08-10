@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="689" height="251" viewBox="0 0 689 251">
+<rect width="689" height="251" fill="#ffffff"/>
+<text x="191.1" y="86.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">packing for</text>
+<text x="191.1" y="106.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">shipment</text>
+<rect data-fnid="5" data-value="5" class="lad-box lad-clickable" x="290.2" y="72.8" width="263.2" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="5" x="421.8" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`packs the goods for shipment`</text>
+<polyline class="lad-wire lad-clickable" data-fold="3" points="246.2,92.6 290.2,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="3" points="136.0,92.6 246.2,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,125.4 C 140.0,125.4 106.0,92.6 136.0,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 553.4,92.6 C 583.4,92.6 549.4,125.4 579.4,125.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<text x="218.6" y="154.9" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">or distribution</text>
+<rect data-fnid="8" data-value="8" class="lad-box lad-clickable" x="333.4" y="141.2" width="208.3" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="8" x="437.5" y="166.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`distributes the goods`</text>
+<polyline class="lad-wire lad-clickable" data-fold="6" points="289.4,161.0 333.4,161.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="6" points="147.8,161.0 289.4,161.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,125.4 C 140.0,125.4 117.8,161.0 147.8,161.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 541.7,161.0 C 571.7,161.0 549.4,125.4 579.4,125.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,125.4 110.0,125.4" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="125.4" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="579.4,125.4 619.4,125.4" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="619.4" cy="125.4" r="3.5" fill="#222"/>
+</svg>

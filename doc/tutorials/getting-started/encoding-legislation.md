@@ -300,7 +300,63 @@ ASSUME `the person is a body corporate` IS BOOLEAN
 ASSUME isCompany IS BOOLEAN
 ```
 
-### 2. Handle "And/Or" Carefully
+### 2. Carry Inert Text — Recitals, Preambles, Purpose Clauses
+
+Not every part of a legal document is a rule. Recitals, preambles, "WHEREAS"
+clauses, purpose statements, statements of principle — the throat-clearing at
+the start of a chapter — gate no decision and compute nothing. But an
+_isomorphic_ encoding (one that mirrors the source, so a lawyer can check it
+line-by-line) still has to carry them, verbatim and correctly numbered.
+
+Reach for the `hierarchy` library. An outline is a tree of **strings**
+(`item "…"`), authored as a bullet list and rendered with automatic numbering.
+Each item is just text — never evaluated — so it may say anything, including
+wording that would never be valid L4 logic:
+
+```l4
+IMPORT hierarchy
+
+`recital scheme` MEANS LIST UpperAlpha, Decimal, LowerRoman
+
+`recitals` MEANS
+  item "RECITALS"
+    • item "the Company is engaged in the business of software development;"
+    • item "the Consultant has expertise in legal engineering; and"
+    • item "the parties wish to record the terms of their engagement, namely"
+      • item "the scope of services;"
+      • item "the fees payable; and"
+      • item "the term and termination."
+
+#EVAL `render outline` `recital scheme` `recitals`
+```
+
+The heading is carried verbatim; the rest is numbered by depth — you pick the
+_style_ per level (`recital scheme` is upper-alpha, then decimal, then
+lower-roman) and the renderer assigns the actual markers:
+
+```
+RECITALS
+A      the Company is engaged in the business of software development;
+B      the Consultant has expertise in legal engineering; and
+C      the parties wish to record the terms of their engagement, namely
+C.1    the scope of services;
+C.2    the fees payable; and
+C.3    the term and termination.
+```
+
+**The rule of thumb.** Ask of each passage: _does it gate any decision, or
+compute any value?_ If no — it's inert. Don't force it into a `DECIDE` or an
+`ASSUME` (there's no proposition to decide, no fact to assume); don't drop it
+either (you'd lose fidelity). Capture it as a `hierarchy` outline instead. The
+`•` bullet nests children under a parent to any depth with no `LIST` literal
+and no parentheses; when drafting needs an irregular sequence — an inserted
+"2A", a restart — `labeled`, `numbered`, and `restartAt` pin or reset a marker
+without disturbing its neighbours. See
+[Optimising Natural-Language Generation](../natural-language-functions/optimising-natural-language-generation.md#literal-recitals--carrying-prose-that-isnt-computed)
+for the contrast with `@nlg` (which renders prose _from_ logic; recitals are
+prose that simply _is_).
+
+### 3. Handle "And/Or" Carefully
 
 Legal "or" is often inclusive (any one or more):
 
@@ -309,7 +365,7 @@ Legal "or" is often inclusive (any one or more):
 condition1 OR condition2 OR condition3
 ```
 
-### 3. Watch for Implicit Negation
+### 4. Watch for Implicit Negation
 
 "not a public house or hotel" can be ambiguous:
 
@@ -320,7 +376,7 @@ NOT (`is public house` OR `is hotel`)
 -- Or: (NOT public house) OR (NOT hotel)  -- usually not intended
 ```
 
-### 4. Test Edge Cases
+### 5. Test Edge Cases
 
 - All conditions true
 - All conditions false
@@ -334,6 +390,7 @@ NOT (`is public house` OR `is hotel`)
 - How to analyze legal text structure
 - How to use ASSUME for external facts
 - How to encode AND/OR conditions
+- How to carry inert recital/preamble text as a `hierarchy` outline
 - How to refactor for readability
 - How to test legislative rules
 

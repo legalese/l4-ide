@@ -293,6 +293,10 @@ sanitized — spaces become hyphens — so the rule `is eligible` is addressed a
 AI agents can call the same deployed rules through the built-in MCP server at
 `https://mcp.legalese.cloud/{orgSlug}/{deploymentId}`.
 
+> **Self-hosting note:** a self-hosted `jl4-service` serves the same
+> data-plane API from your own host, e.g.
+> `http://localhost:PORT/deployments/{deploymentId}/functions/...`.
+
 For the complete walkthrough, see
 [Exporting Rules for Deployment](../../tutorials/deploying-rules/exporting-rules-for-deployment.md).
 
@@ -309,9 +313,45 @@ DECLARE Application
         `the purposes` IS A LIST OF Purpose  -- Multi-select
 ```
 
-> **Self-hosting note:** a self-hosted `jl4-service` serves the same
-> data-plane API from your own host, e.g.
-> `http://localhost:PORT/deployments/{deploymentId}/functions/...`.
+The generated interface is not a static form. For a Boolean-valued decision, L4
+drives it with the [query planner](../../reference/query-planning/README.md):
+it asks the most decisive question first, skips questions that can no longer
+change the answer, and stops as soon as the outcome is determined — turning a
+flat form into a guided interview. The planner is built on a
+[Reduced Ordered Binary Decision Diagram](../../reference/query-planning/robdd.md).
+
+#### Default values with TYPICALLY
+
+Many facts have a usual answer. Rather than make the user confirm every one, mark
+it with [`TYPICALLY`](../../reference/types/TYPICALLY.md) — a _rebuttable
+presumption_ attached to a field or parameter:
+
+```l4
+DECLARE Party
+    HAS name IS A STRING
+        `has capacity`   IS A BOOLEAN TYPICALLY TRUE
+        `under duress`   IS A BOOLEAN TYPICALLY FALSE
+        jurisdiction     IS A STRING  TYPICALLY "Singapore"
+```
+
+```l4
+GIVEN
+  age     IS A NUMBER  TYPICALLY 18
+  married IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+DECIDE `may purchase alcohol` IF age >= 18
+```
+
+The default is **metadata only** — it does not change how the rule evaluates.
+Downstream consumers decide what to do with it: the generator prefills the field,
+and the exported JSON schema surfaces it as the `default` keyword. Because a
+strongly presumed fact is unlikely to swing the outcome, it is also the natural
+per-atom prior the planner can use to push "usually true" questions to the bottom
+of the ask-order — see
+[question ordering](../../reference/query-planning/README.md#question-ordering).
+
+For the full rules on where `TYPICALLY` may appear and how the default is
+type-checked, see the [TYPICALLY reference](../../reference/types/TYPICALLY.md).
 
 ---
 
