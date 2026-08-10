@@ -1,4 +1,4 @@
-# feat(openfisca): L4 → OpenFisca bridge — `l4 openfisca` compiles decision rules to a runnable Python module
+# feat(openfisca): L4 → OpenFisca bridge — compile decision rules to a runnable Python module
 
 **What this adds**
 
@@ -112,5 +112,12 @@ The nine feature commits behind the theme's 35 files, all from that branch:
 | `acffce81` | feat(openfisca): scalar legislation-parameter store |
 | `f514f032` | fix(openfisca): adversarial-review CRITICALs — name collisions, scale OTHERWISE, BRANCH order |
 | `ac626d80` | docs+feat(openfisca): caveats from the review; country-template basic_income example |
+
+Two later commits from *other* themes also touched `jl4-core/src/L4/OpenFisca/Lower.hs` after the merge, and the file as it stands on `unstable` includes both. They are not part of this feature and are listed only because they explain the state of the file (see Independence):
+
+| commit | subject | effect here |
+| --- | --- | --- |
+| `91a43d79` | refactor(jl4-core): remove dead Exponent AST constructor and its arms | −1 line; harmless either way (catch-all arm) |
+| `c55761d8` | rebase(typically): thread the TYPICALLY field through unstable's new code | 3 pattern sites; **required** if TYPICALLY is absent, see Independence |
 
 The theme's `.prs` manifest is empty; the PR number above was recovered from the merge commit `b3715710 Merge pull request #40 from legalese/mengwong/openfisca-backend`.
