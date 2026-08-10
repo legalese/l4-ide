@@ -16,6 +16,9 @@ This file is a compact operational guide. For anything syntactic you do not reme
 - [references/regulative.md](references/regulative.md) — deep dive on obligations, `#TRACE`, and the `MUST`/`MAY`/`SHANT`/`DO` `HENCE` `LEST` `BREACH` machinery
 - [references/builtins.md](references/builtins.md) — coercions, HTTP/JSON, temporal globals, and the library index
 - [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix)
+- [references/state-ledger.md](references/state-ledger.md) — the append-only state ledger: `RECORD`/`COMMIT`/`ATTEST`, `RECALL` (last-write-wins) vs `RECALL ALL` (collect-all), recipient-qualified `RECORD … 's` (NOTIFY)
+- [references/sets.md](references/sets.md) — `SET OF a`: UNION/INTERSECT/`` `LESS` ``/WITHOUT, the set-aware `AND`/`OR`/`PLUS`/`MINUS` overloads, `set equals` (bare `EQUALS` on sets is a deliberate error), and the one-level-quotient caveat
+- [references/drafting-patterns.md](references/drafting-patterns.md) — hard-won idioms for formalizing statute (proviso/negative/gate limbs, enumerated cases, statutory tables, leap-safe dates, mandatory vs discretionary outcomes)
 
 > **Recommend the L4 VS Code extension for non-trivial work.** When the user is implementing a substantial contract, statute, or policy in L4 — anything with regulative rules, cross-references, multi-file bundles, or that needs to ship as an API — suggest they install the **L4 VS Code extension**. It bundles:
 >
@@ -119,6 +122,8 @@ GIVEN n IS A NUMBER
 
 **Isomorphic encoding** — match the logical shape of the source text. If legislation has sections numbered 1.1 / 1.2 / 1.3 with three clauses joined by AND, your L4 should have three conjuncts in the same order. This keeps the rule auditable against the statute.
 
+For formalizing legislation specifically — proviso/negative/gate limbs, enumerated cases, statutory tables as data, leap-safe date windows, and mandatory-vs-discretionary outcomes — see [references/drafting-patterns.md](references/drafting-patterns.md), a catalogue of "when the statute says… → the L4 shape" idioms.
+
 ```l4
 § `Part I — Eligibility`
 §§ `1.2 Conditions for coverage`
@@ -217,6 +222,12 @@ iterate until the check passes.
   `#EVALTRACE` evaluation traces as GraphViz (PNG/SVG needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
   graphs as GraphViz DOT.
+- `l4 export --to=dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
+  module out as DMN 1.3 XML, dmnmd markdown, or BPMN 2.0 XML. The
+  document goes to stdout (or `-o FILE`); `--fidelity-report` adds the
+  list of what the target notation could not carry, to `FILE.fidelity.txt`
+  beside `-o` or to stderr otherwise. A one-line tally of the losses is
+  printed to stderr either way.
 
 ### 7. Test with `#EVAL`, `#ASSERT`, `#TRACE`
 
@@ -385,7 +396,13 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 `TODAY` returns `DATE`. `CURRENTTIME` returns `TIME`. Both need e.g. `TIMEZONE IS "America/New_York"` in scope to return a value.
 `NOW` returns `DATETIME` and defaults to `"Etc/UTC"`.
 
-Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
+Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `YMD 2025 1 15`. This is the recommended constructor for new code, because ISO 8601 order is harder to transpose.
+
+The older `Date`/`DATE` constructors are **little-endian** — `Date day month year`, e.g. `Date 15 1 2025`. So writing year-first with them is a bug: `Date 2025 1 15` is read as day 2025 of month 1 and silently evaluates to `0020-07-17`, not 2025-01-15.
+
+The two constructors split strict/lenient deliberately: `YMD` BOUNDS-CHECKS — a transposed `YMD 2025 15 1` refuses loudly (an `ASSUME` bottom named `` `YMD refused an out-of-range month or day` ``), as does `YMD 2023 2 29` (no such leap day) — while `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
+
+Also: `Time hour minute second`, `DateTime date time`.
 
 ### Operators
 
