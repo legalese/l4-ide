@@ -21,7 +21,7 @@ Three distinct pressures. First, statutory transcription: verbatim legislative t
   - The `RECORD` / `COMMIT` / `ATTEST` / `RECALL` / `OFFICIAL` AST constructors and their parsers (`Record`, `ReadCell`, `RecallMode`) — the syntax half of the ledger work whose evaluator lives in the **lang-eval-ledger** theme.
 - **Annotation attachment** (`Parser/ResolveAnnotation.hs`, +672): a `HasFixity` rail that claims fixity annotations in document order and bounds them to adjacency (a stranded `@infixl` used to leak to a distant later definition, silently giving an operator a fixity nobody wrote), reporting every misplaced one as a parser warning; and the `HasRef` rail that attaches `@ref` annotations to the AST nodes that follow them, with its own misattachment warnings.
 - **Typechecker** (`TypeCheck.hs` +2,822, `TypeCheck/{Types,Unify,Environment,Annotation}.hs`)
-  - *Overload resolution*: `resolveTermFiltered` restructures resolution into continuation-passing form with the ambiguity fallback appended lazily; `appCandidateFilter` / `candidateViableForArgs` / `approxArgHeads` approximate each argument's type head without recursion and drop candidates that definitely cannot apply. Every uncertainty degrades to keep-the-candidate; singletons are never filtered; ambiguity messages are still built from the unfiltered list.
+  - *Overload resolution*: `resolveTermFiltered` / `resolveTermFilteredIn` (in `TypeCheck/Types.hs`) restructure resolution into continuation-passing form with the ambiguity fallback appended lazily — `resolveTerm'` is byte-neutral by construction, defined as `resolveTermFiltered False p (const True) n pure`; `appCandidateFilter` / `candidateViableForArgs` / `approxArgHeads` approximate each argument's type head without recursion and drop candidates that definitely cannot apply. Every uncertainty degrades to keep-the-candidate; singletons are never filtered; ambiguity messages are still built from the unfiltered list.
   - *Fixity re-association*: `tryReassociateFixityChain`, a shunting-yard pre-pass at the `inferExpr` App site that rewrites a flat n-ary chain into the same nested binary tree parenthesized source produces. `normalizeChain` handles both parse shapes — operator-head (literal first operand) and operand-head (bare identifier first operand) — and an n-ary theft guard dry-runs the real mixfix matcher and declines whenever any registered pattern engages the shape.
   - *Variadic construction (route α)*: a record constructor with exactly one `LIST`-typed field applied to ≥2 arguments collects them into a synthesized `List` — `SET OF 1, 2, 3`. It is a per-call-site biased fallback that participates only when the entire nondeterministic resolution has zero successes, with `orElseKeepAll` added to `TypeCheck/Types.hs` to keep the curated ambiguity candidates alive.
   - *Exhaustiveness*: `constructorsInScopeFromEntityInfo` (the oracle — totality claims outside same-file top-level enums were vacuous without it), nabla-based missing-pattern expansion (`addConstraint`, `expandToPattern`, `maxUncoveredNablas`, `maxMissingSuggestions`), the `@nonexhaustive` decorator, `checkClauseMatrix` for multi-clause groups, and `hintSuspiciousBinders` / `exactlyOneEditApart` — the typo-binder hint that catches `WHEN nothing THEN …` silently binding everything.
@@ -33,7 +33,7 @@ Three distinct pressures. First, statutory transcription: verbatim legislative t
 
 **Unit tests — 4 `jl4-core` specs** (+506): `UnifySpec` (new, 321 lines), `PatternMatchParserSpec` (new, 105), `EdgeCrashSpec` (new, 22), and `MixfixParserSpec` extended by 58 lines with `exactprint . parse ≡ id` round-trips for the issue-918 repro, chains, and trailing comments.
 
-**Corpus — 87 fixtures** (57 under `jl4/examples/ok/`, 29 under `jl4/examples/not-ok/`, 2 `.cases.json`) **and 382 goldens** (93 `.golden`, 101 `.ep.golden`, 95 `.nlg.golden`, 95 `.schema.golden`). Grouped by what they pin:
+**Corpus — 88 fixtures** (57 under `jl4/examples/ok/`, 29 under `jl4/examples/not-ok/`, 2 `.cases.json`; 87 of them carry changes) **and 382 goldens** (93 `.golden`, 101 `.ep.golden`, 95 `.nlg.golden`, 95 `.schema.golden`). Grouped by what they pin:
 
 | group | fixtures |
 | --- | --- |
@@ -119,7 +119,7 @@ Unstable PRs folded into this one:
 - #131 — `mengwong/fixity-operand-head-fix` (operand-head chain re-association)
 - #133 — `mengwong/set-operators-phase3d` (prelude fixity for set operators)
 - #134 — `docs/library-resolution-shadow` (resolution-order goldens)
-- #162 — `feat/regcf-projections`
+- #162 — `feat/regcf-projections` (`a9caf2f6`; section-qualification of types, constructors and selectors rode with it)
 - #168 — `mengwong/set-andor-unoverload` (`not-ok/tc/set-and-unoverloaded.l4`)
 - #169 — `mengwong/tc-overload-memo` (overload pre-filter + lazy ambiguity fallback, #929)
 - #172 — `mengwong/regcf-rule-version`
@@ -127,7 +127,7 @@ Unstable PRs folded into this one:
 - #183 — `mengwong/bkm-phase4-unlift` (DMN Phase 4; checker-side hooks)
 - #184 — `mengwong/maybe-minmax-nothing` (`set-equals-ambiguous` line-number golden)
 - #185 — `mengwong/open6-clause-matrix` (clause-matrix exhaustiveness, OPEN-6)
-- #188 — `mengwong/dmn-phase5-bkm`
+- #188 — `mengwong/dmn-phase5-bkm` (its own PR body records the `TypeCheck.hs` touch as "a comment only")
 - #189 — `merge/main-into-unstable` (revert protection for the oracle)
 - #190 — `mengwong/mlir-parity-land`
 - #211 — `mengwong/eval-pin-and-shadowing` (FIX A′ projection-label shadowing, #930)
