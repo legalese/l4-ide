@@ -84,6 +84,22 @@ Counts I measured directly against this tree while assembling the PR: `hierarchy
 
 Drop this and the stdlib itself is missing while everything built on it lands: `lang-sets`' examples have no `SET` type, `dmn-export`'s FEEL date-literal fold has no `YMD` to fold, the BNA and Reg CF corpora do not resolve, and `regcf.l4`'s anniversary arithmetic has no `add years`. The two compiler-side fixes are also lost — diamond imports quietly resume type-checking their second sibling against an empty environment (smucclaw/l4-ide#904, a silent wrong answer, not a crash), and the #920 diagnostic cascade resumes telling users to file a compiler bug when they have merely misspelled a name.
 
+
+## One-line interaction with `lang-printer`
+
+`jl4/tests/Main.hs` needs `import System.Environment (lookupEnv, setEnv)` here. The
+**lang-printer** PR adds the same import in the same place, but as `(lookupEnv)` alone — it reads
+`JL4_PRETTY_DUMP_DIR` and `JL4_EVALDIFF` and never sets anything. Each PR imports exactly what it
+uses, because `-Wall -Werror` fails on an unused import.
+
+Whichever lands second hits a one-line conflict on that import; keep the union form,
+`import System.Environment (lookupEnv, setEnv)`.
+
+Related ordering note, from the spine attribution: the `mkLibraryPathScrubber` change in this PR
+scrubs `$JL4_LIBRARY_PATH` out of golden output, and three goldens carrying that token
+(`not-ok/tc/tests/{section-scoping-import-collision,set-and-unoverloaded,set-equals-ambiguous}.golden`)
+are owned by **lang-syntax-typecheck**. Land this PR first, or that one re-blesses them.
+
 ## Provenance
 
 Unstable PRs folded into this one:

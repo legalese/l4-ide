@@ -273,6 +273,18 @@ arrangement that blessed the mangled event output in the first place — and `co
 `promissory-note.golden`, which records the one-line residual obligation this printer produces, goes
 red the moment that theme lands.
 
+
+## One-line interaction with `lang-imports-stdlib`
+
+`jl4/tests/Main.hs` needs `import System.Environment (lookupEnv)` here, because the
+`JL4_PRETTY_DUMP_DIR` and `JL4_EVALDIFF` switches read the environment. The
+**lang-imports-stdlib** PR adds the same import in the same place, but as
+`(lookupEnv, setEnv)` — it also defaults `JL4_LIBRARY_PATH`. Each PR imports exactly what it uses,
+because `-Wall -Werror` fails on an unused import, so neither could simply carry the union.
+
+Whichever of the two lands second will hit a one-line conflict on that import. Resolve it by
+keeping the union form, `import System.Environment (lookupEnv, setEnv)`.
+
 ## Provenance
 
 Unstable PRs folded into this one:

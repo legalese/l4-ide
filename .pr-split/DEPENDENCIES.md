@@ -72,3 +72,28 @@ to reconcile. That is ordinary lockfile traffic, not a design problem.
 
 So `ci-build` merges **after** lang-imports-stdlib, lang-syntax-typecheck, ladder-viz and both
 wizards — which is the same conclusion as "merge it last", now with reasons.
+
+## A build break caught by the spine attribution, and fixed
+
+The spine agent flagged a line-level hazard the file-level partition could not see:
+`jl4/tests/Main.hs` gained `import System.Environment (lookupEnv, setEnv)` on `unstable`, but
+**two themes need it for different reasons** — `lang-imports-stdlib` calls `setEnv` to default
+`JL4_LIBRARY_PATH`, and `lang-printer` calls `lookupEnv` for `JL4_PRETTY_DUMP_DIR` and
+`JL4_EVALDIFF`. The import line was attributed to `lang-imports-stdlib`, which left
+**`lang-printer`'s branch calling `lookupEnv` with no import at all** — a hard compile failure
+under `-Wall -Werror`.
+
+Verified on the pushed branch (`lookupEnv` used twice, `System.Environment` imported zero times,
+and `main` does not import it either) and repaired: `lang-printer` now carries
+`import System.Environment (lookupEnv)`. Neither PR can carry the union, because an unused import
+is also fatal under `-Werror`. Whichever lands second resolves a one-line conflict by keeping
+`(lookupEnv, setEnv)`.
+
+Two softer ordering notes from the same attribution pass:
+
+- `lang-imports-stdlib`'s `mkLibraryPathScrubber` scrubs `$JL4_LIBRARY_PATH` from golden output;
+  three goldens carrying that token belong to `lang-syntax-typecheck`. Land the stdlib PR first.
+- The `megaparsec >=9.7` bound sits in `lang-printer` — its in-file comment says "the lexer's
+  ditto (^) column metric", which reads like a front-end concern, but
+  `Text.Megaparsec.Unicode.isWideChar` has exactly one importer in the tree,
+  `jl4-core/src/L4/Print/Columnar.hs`. The comment is worth rewording.
