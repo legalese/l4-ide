@@ -1,4 +1,5 @@
 import type { IRExpr, IRId, Unique } from '@repo/viz-expr'
+import { typicallyBridge } from '@repo/viz-expr'
 import { match } from 'ts-pattern'
 import type { Assignment } from './assignment.js'
 import type { EvalResult } from './eval.js'
@@ -72,6 +73,13 @@ function collectVarOrder(expr: IRExpr): Unique[] {
         }
       })
       .with({ $type: 'Not' }, (n) => go(n.negand))
+      // Scope before requirement: the source's own order (and the sane ask-order —
+      // settle whether the rule bites you before asking what it demands). Dropping
+      // this arm would let `.otherwise` silently swallow EVERY atom under the seam.
+      .with({ $type: 'Implies' }, (i) => {
+        go(i.scope)
+        go(i.requirement)
+      })
       .with({ $type: 'And' }, (a) => a.args.forEach(go))
       .with({ $type: 'Or' }, (o) => o.args.forEach(go))
       .with({ $type: 'App' }, (app) => app.args.forEach(go))
@@ -90,6 +98,10 @@ function containsApp(expr: IRExpr): boolean {
         found = true
       })
       .with({ $type: 'Not' }, (n) => go(n.negand))
+      .with({ $type: 'Implies' }, (i) => {
+        go(i.scope)
+        go(i.requirement)
+      })
       .with({ $type: 'And' }, (a) => a.args.forEach(go))
       .with({ $type: 'Or' }, (o) => o.args.forEach(go))
       .with({ $type: 'UBoolVar' }, () => {})
@@ -144,6 +156,22 @@ function restrictExpr(expr: IRExpr, assignment: Assignment): IRExpr {
       if (filtered.length === 1) return filtered[0]
       return { ...o, args: filtered }
     })
+    .with({ $type: 'Implies' }, (i): IRExpr => {
+      // The seam (ladder DESIGN §25), restricted classically — this function computes a
+      // VALUE, and `¬scope ∨ requirement` is the value. Note the first branch: a FALSE
+      // scope collapses the rule to TRUE. That is sound, and it is also precisely the
+      // collapse that loses "the rule never bit you" — see `expandImplies`.
+      const scope = restrictExpr(i.scope, assignment)
+      const requirement = restrictExpr(i.requirement, assignment)
+      if (scope.$type === 'FalseE')
+        return { $type: 'TrueE', id: i.id } as IRExpr
+      if (requirement.$type === 'TrueE')
+        return { $type: 'TrueE', id: i.id } as IRExpr
+      // scope is settled TRUE, so the rule reduces to exactly its requirement
+      // (including the FALSE case: a settled breach).
+      if (scope.$type === 'TrueE') return requirement
+      return { ...i, scope, requirement }
+    })
     .with({ $type: 'App' }, (app): IRExpr => {
       const args = app.args.map((x) => restrictExpr(x, assignment))
       return { ...app, args }
@@ -161,6 +189,11 @@ function exprToText(expr: IRExpr): string {
       .with({ $type: 'Not' }, (n) => `¬(${go(n.negand)})`)
       .with({ $type: 'And' }, (a) => `(${a.args.map(go).join(' ∧ ')})`)
       .with({ $type: 'Or' }, (o) => `(${o.args.map(go).join(' ∨ ')})`)
+      // Print the seam, don't expand it — the drafter's own connective, as written.
+      .with(
+        { $type: 'Implies' },
+        (i) => `(${go(i.scope)} ${i.seam} ${go(i.requirement)})`
+      )
       .with({ $type: 'App' }, (app) => {
         const args = app.args.map(go).join(', ')
         return `${app.fnName.label}(${args})`
@@ -180,6 +213,9 @@ function collectSubtreeVars(expr: IRExpr): Map<IRId, Set<Unique>> {
     const vars = match(e)
       .with({ $type: 'UBoolVar' }, (v) => new Set<Unique>([v.name.unique]))
       .with({ $type: 'Not' }, (n) => new Set(go(n.negand)))
+      .with({ $type: 'Implies' }, (i) =>
+        unionUniqueSets([go(i.scope), go(i.requirement)])
+      )
       .with({ $type: 'And' }, (a) => unionUniqueSets(a.args.map(go)))
       .with({ $type: 'Or' }, (o) => unionUniqueSets(o.args.map(go)))
       .with({ $type: 'App' }, (app) => unionUniqueSets(app.args.map(go)))
@@ -202,6 +238,7 @@ function collectSubtreeIds(expr: IRExpr): Map<IRId, Set<IRId>> {
 
     const children = match(e)
       .with({ $type: 'Not' }, (n) => [n.negand])
+      .with({ $type: 'Implies' }, (i) => [i.scope, i.requirement])
       .with({ $type: 'And' }, (a) => a.args)
       .with({ $type: 'Or' }, (o) => o.args)
       .with({ $type: 'App' }, (app) => app.args)
@@ -227,6 +264,7 @@ function collectParentMap(expr: IRExpr): Map<IRId, IRId | null> {
 
     const children = match(e)
       .with({ $type: 'Not' }, (n) => [n.negand])
+      .with({ $type: 'Implies' }, (i) => [i.scope, i.requirement])
       .with({ $type: 'And' }, (a) => a.args)
       .with({ $type: 'Or' }, (o) => o.args)
       .with({ $type: 'App' }, (app) => app.args)
@@ -275,7 +313,11 @@ export class PartialEvalAnalyzer {
       return
     }
 
-    this.#compiled = compileDecisionQuery(expr, varOrder)
+    // v2 question ordering: read per-atom priors from boolean TYPICALLY defaults
+    // (the shared extraction; §8) and hand them to the info-gain ranker. Absent
+    // priors default to 0.5, so this is a no-op for modules without TYPICALLY.
+    const { weights } = typicallyBridge(expr)
+    this.#compiled = compileDecisionQuery(expr, varOrder, weights)
     this.#usedBdd = true
   }
 

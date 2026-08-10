@@ -41,6 +41,9 @@ import LSP.L4.Rules
 
 import qualified Hover
 import qualified SemanticTokens
+import qualified VizAutoRefresh
+import qualified VizImplies
+import qualified VizGuardedRows
 
 main :: IO ()
 main = do
@@ -65,8 +68,12 @@ main = do
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+      tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
+    describe "viz" VizAutoRefresh.spec
+    describe "viz implies" VizImplies.spec
+    describe "viz guarded rows" VizGuardedRows.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

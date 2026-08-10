@@ -120,7 +120,16 @@ export interface FunDecl extends IRNode {
 }
 
 /** The Ladder graph visualizer focuses on boolean formulas. */
-export type IRExpr = And | Or | Not | UBoolVar | TrueE | FalseE | App | InertE
+export type IRExpr =
+  | And
+  | Or
+  | Not
+  | Implies
+  | UBoolVar
+  | TrueE
+  | FalseE
+  | App
+  | InertE
 
 /* Thanks to Andres for pointing out that an n-ary representation would be better for the arguments for And / Or.
 It's one of those things that seems obvious in retrospect; to quote
@@ -153,6 +162,32 @@ export interface Not extends IRNode {
   readonly negand: IRExpr
 }
 
+/**
+ * Material implication — the SEAM between a rule's scope and its requirement
+ * (ladder DESIGN §25).
+ *
+ * Emphatically NOT sugar for `Not scope Or requirement`. That expansion is
+ * truth-functionally perfect and shape-destroying: it discards the scope /
+ * requirement split — the first two questions anyone asks of a rule ("does this
+ * bite me?", then "so what must be true?") — and, worse, it cannot tell apart the
+ * two cases a reader most needs told apart. A window the rule never reached (N/A)
+ * and a window that complies BOTH satisfy `NOT P OR Q`. Same value; different ink.
+ *
+ * Consumers that want only the Boolean FUNCTION (BDD compilation, question
+ * ordering) may read it classically and are correct to. Consumers that draw a
+ * PICTURE may not; use `expandImplies` if you have no seam of your own.
+ */
+export interface Implies extends IRNode {
+  readonly $type: 'Implies'
+  readonly scope: IRExpr
+  readonly requirement: IRExpr
+  /** The connective AS THE DRAFTER WROTE IT: `'IMPLIES'` or `'=>'`. §17's argument
+   *  for inert prose, applied to the operator — the picture does not get to invent
+   *  a register the source did not use. (Never `'MUST'`: there is no constitutive
+   *  MUST in L4. MUST is regulative, and the ladder does not draw those.) */
+  readonly seam: string
+}
+
 export interface App extends IRNode {
   readonly $type: 'App'
   readonly fnName: Name
@@ -179,6 +214,7 @@ export const IRExpr = Schema.Union(
   Schema.suspend((): Schema.Schema<And> => And),
   Schema.suspend((): Schema.Schema<Or> => Or),
   Schema.suspend((): Schema.Schema<Not> => Not),
+  Schema.suspend((): Schema.Schema<Implies> => Implies),
   Schema.suspend((): Schema.Schema<UBoolVar> => UBoolVar),
   Schema.suspend((): Schema.Schema<TrueE> => TrueE),
   Schema.suspend((): Schema.Schema<FalseE> => FalseE),
@@ -236,6 +272,14 @@ export const Not = Schema.Struct({
   id: IRId,
 }).annotations({ identifier: 'Not' })
 
+export const Implies = Schema.Struct({
+  $type: Schema.tag('Implies'),
+  id: IRId,
+  scope: IRExpr,
+  requirement: IRExpr,
+  seam: Schema.String,
+}).annotations({ identifier: 'Implies' })
+
 export const BoolValue = Schema.Union(
   Schema.Literal('FalseV'),
   Schema.Literal('TrueV')
@@ -250,6 +294,15 @@ export const UBoolVar = Schema.Struct({
   canInline: Schema.Boolean,
   /** Stable UUIDv5 derived from function name, atom label, and input refs. */
   atomId: Schema.String,
+  /**
+   * The atom's BOOLEAN `TYPICALLY` default, if it refers to a boolean binder
+   * that declared one (`TRUE`/`FALSE`); otherwise `null`/absent. Populated by
+   * the Haskell ladder builder. A rebuttable presumption (§22): drives both the
+   * tentative rendering and the question-ordering prior. Only boolean binders
+   * contribute — a numeric/string `TYPICALLY` is never a probability over a
+   * derived comparison, so it never appears here. See `typicallyBridge`.
+   */
+  typically: Schema.optional(Schema.NullOr(Schema.Boolean)),
 }).annotations({ identifier: 'UBoolVar' })
 
 /** We have an IRId even for bool lits b/c it's useful to be able to associate IRExprs with the Lir nodes that they get translated to */
@@ -309,6 +362,158 @@ export const RenderAsLadderInfo = Schema.Struct({
 
 export function makeVizInfoDecoder() {
   return Schema.decodeUnknownEither(RenderAsLadderInfo)
+}
+
+/***********************************
+      Implication, classically
+************************************/
+
+/** Largest node id anywhere in the tree — so a rewrite can mint ids that cannot collide. */
+function maxNodeId(e: IRExpr): number {
+  switch (e.$type) {
+    case 'And':
+    case 'Or':
+      return e.args.reduce((m, a) => Math.max(m, maxNodeId(a)), e.id.id)
+    case 'Not':
+      return Math.max(e.id.id, maxNodeId(e.negand))
+    case 'Implies':
+      return Math.max(e.id.id, maxNodeId(e.scope), maxNodeId(e.requirement))
+    case 'App':
+      return e.args.reduce((m, a) => Math.max(m, maxNodeId(a)), e.id.id)
+    default:
+      return e.id.id
+  }
+}
+
+/**
+ * Rewrite every `Implies` to its classical equivalent, `NOT scope OR requirement`.
+ *
+ * This is a LOSSY rewrite, and deliberately so — it is the escape hatch for
+ * consumers that have no seam of their own and must render or compile something
+ * anyway (chiefly the original ladder visualizer, whose LIR predates `Implies`).
+ * What it loses is precisely what DESIGN §25 is about: after this runs, a rule that
+ * never reached the case and a rule the case satisfies are the same TRUE, and no
+ * downstream picture can tell them apart. If you are drawing, prefer the seam.
+ *
+ * Node ids are preserved where they can be (the `Or` inherits the `Implies`' id,
+ * which is now free); the one synthesized `Not` per implication gets a fresh id
+ * minted past the tree's maximum, so nothing collides with a positional key.
+ */
+export function expandImplies(expr: IRExpr): IRExpr {
+  let next = maxNodeId(expr) + 1
+  const fresh = (): IRId => ({ id: next++ })
+  const go = (e: IRExpr): IRExpr => {
+    switch (e.$type) {
+      case 'Implies': {
+        const not: Not = {
+          $type: 'Not',
+          id: fresh(),
+          negand: go(e.scope),
+        }
+        const or: Or = {
+          $type: 'Or',
+          id: e.id,
+          args: [not, go(e.requirement)],
+        }
+        return or
+      }
+      case 'And':
+        return { ...e, args: e.args.map(go) }
+      case 'Or':
+        return { ...e, args: e.args.map(go) }
+      case 'Not':
+        return { ...e, negand: go(e.negand) }
+      case 'App':
+        return { ...e, args: e.args.map(go) }
+      default:
+        return e
+    }
+  }
+  return go(expr)
+}
+
+/***********************************
+        TYPICALLY bridge
+************************************/
+
+/**
+ * Soft prior weights for a boolean atom's `TYPICALLY` presumption (question-
+ * ordering spec §4 / §6.1): soft (0.9 / 0.1), not hard (1 / 0), so a presumed
+ * atom sinks to the end of the ask-order yet is still asked if it would flip the
+ * outcome — safer for high-stakes rules.
+ */
+export const TYPICALLY_TRUE_WEIGHT = 0.9
+export const TYPICALLY_FALSE_WEIGHT = 0.1
+
+/** Structural mirror of ladder-core's `Provenance` (kept local so `@repo/viz-expr`
+ *  needs no dependency on `@repo/ladder-core`). */
+export type TypicallyProvenance = 'given' | 'default'
+
+export interface TypicallyMaps {
+  /**
+   * Per-atom prior P(atom = TRUE), keyed by `name.unique`. Only atoms whose
+   * binder declared a boolean `TYPICALLY` appear; an absent entry means
+   * prior-free (0.5 downstream). Feed straight into `compileDecisionQuery`'s
+   * `weights` parameter.
+   */
+  readonly weights: ReadonlyMap<Unique, number>
+  /**
+   * Per-node provenance keyed by `id.id` (the positional NodeId). Only nodes
+   * riding a `TYPICALLY` presumption are recorded, as `default` (render
+   * tentative); everything else is implicitly `given` (absent ⇒ given, matching
+   * `ViewSpec.provenance`). Feed into the ladder ViewSpec's `provenance` map.
+   */
+  readonly provenance: ReadonlyMap<number, TypicallyProvenance>
+}
+
+/**
+ * The single shared extraction (question-ordering spec §8, "build once, two
+ * consumers"): ONE walk over the wire IR reads each `UBoolVar.typically` and
+ * produces BOTH the question-ordering weights and the tentative-render
+ * provenance. Do not re-derive either map elsewhere — that is the duplication
+ * the spec forbids.
+ *
+ * Only boolean binders contribute a weight (a numeric/string `TYPICALLY` is not
+ * a probability over a derived comparison, so the Haskell side never sets
+ * `typically` for those — this walk simply trusts that field).
+ */
+export function typicallyBridge(expr: IRExpr): TypicallyMaps {
+  const weights = new Map<Unique, number>()
+  const provenance = new Map<number, TypicallyProvenance>()
+  const go = (e: IRExpr): void => {
+    switch (e.$type) {
+      case 'UBoolVar': {
+        const t = e.typically
+        if (t === true || t === false) {
+          weights.set(
+            e.name.unique,
+            t ? TYPICALLY_TRUE_WEIGHT : TYPICALLY_FALSE_WEIGHT
+          )
+          provenance.set(e.id.id, 'default')
+        }
+        return
+      }
+      case 'Not':
+        go(e.negand)
+        return
+      // The seam is not a barrier: an atom's prior is a fact about the atom, and a
+      // rule's atoms live on BOTH sides of the implication.
+      case 'Implies':
+        go(e.scope)
+        go(e.requirement)
+        return
+      case 'And':
+      case 'Or':
+        e.args.forEach(go)
+        return
+      // App / TrueE / FalseE / InertE carry no atom prior; App is an opaque
+      // leaf atom (its args are not decision-query variables).
+      default:
+        return
+    }
+  }
+  go(expr)
+  return { weights, provenance }
 }
 
 /***********************************
