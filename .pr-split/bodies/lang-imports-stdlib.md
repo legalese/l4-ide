@@ -4,7 +4,7 @@
 
 The L4 standard library grows two new modules and three new capabilities, and the import resolver stops silently degrading one shape of import graph. `hierarchy.l4` gives nested legal text — recitals, outlines, `1.A.i.a` paragraph trees — a rose-tree datatype with a renderer that derives numbering markers from depth and sibling position, so an isomorphic encoding can carry inert structure without pretending it is a `DECIDE`. `negation-as-failure.l4` names the closed-world/open-world defaulting combinators (`holds`, `naf`, `presumed`) over `MAYBE BOOLEAN`. `daydate.l4` gains `YMD year month day` — an ISO-ordered, bounds-checking date constructor that *refuses* out-of-range components where `Date d m y` silently rolls them — plus a `Calendar Arithmetic` section (`add months`, `add years`) with day-clamping, relocated out of `actus-schedule.l4`. The prelude gains a `SET OF a` type with the set-theoretic drafting vocabulary. On the Haskell side, `L4.Import.Resolution` now hands a cached module's *resolved record* to later siblings instead of just its name, so both arms of a diamond import see the shared dependency's environment.
 
-**Why.**
+## Why
 
 - **Inert nested text had no home.** Encoding legislation isomorphically routinely turns up prose that gates no decision but must be carried for line-by-line fidelity. `hierarchy.l4` is where that lives (PR #109).
 - **The date footgun was measured, not theorised.** `Date 7 28 2026` — a day/month transposition — silently rolls month 28 forward to `2028-04-07` with no error. `YMD` puts the arguments in the order ISO 8601 writes them *and* round-trips the components back out of the candidate date, refusing anything that did not survive (PR #174, tightened in the bounds-check follow-up).
