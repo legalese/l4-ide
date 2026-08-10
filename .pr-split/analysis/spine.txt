@@ -1,3 +1,4 @@
+cabal.project
 jl4-core/jl4-core.cabal
 jl4-lsp/jl4-lsp.cabal
 jl4-service/jl4-service.cabal
