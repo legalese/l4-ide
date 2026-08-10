@@ -45,9 +45,15 @@ It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative
 
 ## Core workflow
 
-### 1. Point `L4` at a prebuilt binary
+### 1. Run the doctor first
 
-The orchestrator **never runs `cabal`.** The build lock is a shared resource, and concurrent invocations inside one worktree corrupt each other with errors that look like code defects and are not.
+```bash
+etc/go/go.sh doctor --milestone g1
+```
+
+This is the front-door forecast: it says which declared stages will run whole and which will not, each with its remedy, before any stage spends time. Exit 0 = every declared stage's environmental wants are met; 1 = something will not run whole; 2 = no usable `l4` anywhere. It runs no stage, writes no run directory, and sees only the environment — gates, deposit presence and oracle verdicts stay the stages' own account.
+
+The orchestrator **never runs `cabal`.** The build lock is a shared resource, and concurrent invocations inside one worktree corrupt each other with errors that look like code defects and are not. When `L4` or `JL4_LSP_CMD` is unset, `run` and `doctor` **discover** a built binary under `dist-newstyle` — this worktree's own first, then the newest among sibling worktrees — and say so with a `[discovered]` marker. An explicit export always wins:
 
 ```bash
 export L4=/path/to/dist-newstyle/build/<arch>/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l4
@@ -55,9 +61,8 @@ export L4=/path/to/dist-newstyle/build/<arch>/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l
 
 **Key idioms:**
 
-- **A sibling worktree usually has one.** `find ~/src/legalese/l4wt -name l4 -type f -path '*x/l4/build*'` will find a binary you can borrow without taking the lock.
-- **`JL4_LSP_CMD`** does the same job for the ladder leg, which drives a live `jl4-lsp`. Without it that leg reports `SKIPPED` with a named reason, which is a correct outcome, not a failure.
-- **Do not build one to fix a `SKIPPED`.** A skipped leg with a named reason is more honest than a leg that ran under a binary nobody else can reproduce.
+- **`JL4_GO_SERVICE_URL` is never discovered.** A deployment target must be named by a human; the MCP deploy half reports `SKIPPED` until one is.
+- **Do not build a binary to fix a `SKIPPED`.** A skipped leg with a named reason is more honest than a leg that ran under a binary nobody else can reproduce.
 
 ### 2. Read the plan before running it
 
@@ -392,7 +397,7 @@ The first sentence can be checked by someone who disagrees with it. The second c
 
 ## Troubleshooting
 
-- **`go.sh: L4 is unset`** — point `L4` at a prebuilt binary. The orchestrator will not build one, and adding a `cabal` call to make this go away will corrupt somebody else's build.
+- **`go.sh: L4 is unset, and no built l4 was discovered…`** — discovery found nothing under `dist-newstyle` in this worktree or its siblings. Point `L4` at a prebuilt binary, or build one in a _different_ worktree. The orchestrator will not build one, and adding a `cabal` call to make this go away will corrupt somebody else's build.
 - **`GATE HG1: REFUSED — no signer is enrolled`** — the shipped state. `specs/todo/single-instruction-demo/gate-allowed-signers` carries no public key. Enrol one, or waive with a reason.
 - **`the CLI surface the stage table depends on has moved`** (exit 4) — a discovery call returned a set that differs from the subject's pins (`etc/go/subjects/<subject>/pins.json`), and the message names the exact strings. Re-verify the phase scripts against the new surface, then update the pin. Do not update the pin first.
 - **`X NO LONGER REPRODUCES`** (exit 4) — a measured defect used as a negative control has been fixed. Delete the entry from the subject's `known-defects.json`. A stale negative control turns a genuine improvement into a permanent red.

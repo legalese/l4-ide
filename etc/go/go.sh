@@ -28,6 +28,10 @@
 #
 #             HG1 is the only waivable gate. HG2 guards anything outward-facing
 #             and opens on a signature or not at all; --waive HG2 exits 2.
+#     doctor  [--milestone g1|g2] [--subject ID]
+#             the front-door forecast: which declared stages will run whole,
+#             which will SKIP and why, each with its remedy. Runs no stage.
+#             Exit: 0 wants met · 1 will not run whole · 2 no usable l4.
 #     plan    [--milestone g1|g2]
 #     status  [--run-id ID]
 #     verify  [--run-id ID] [--gates]
@@ -38,13 +42,21 @@
 #     0 clean   1 finding   2 usage   3 gate   4 broken   5 skipped-while-required
 #
 #   Environment:
-#     L4                   path to a prebuilt `l4`. REQUIRED — this script does
-#                          not build. Same escape hatch as JL4_LSP_CMD=/DMNMD=.
-#     JL4_LSP_CMD          prebuilt jl4-lsp, for the ladder leg
+#     L4                   path to a prebuilt `l4`. When unset, `run` and
+#                          `doctor` DISCOVER one under dist-newstyle — own
+#                          worktree first, then newest sibling (lib/
+#                          toolchain.sh). Explicit always wins; with none
+#                          found the run refuses. This script NEVER builds.
+#     JL4_LSP_CMD          prebuilt jl4-lsp for the ladder leg; discovered the
+#                          same way when unset
 #     JL4_GO_SERVICE_URL   a LOOPBACK jl4-service for the MCP leg; non-loopback
-#                          is refused (an outward-facing write is HG2's)
+#                          is refused (an outward-facing write is HG2's). Never
+#                          auto-discovered: a deployment target must be named
+#                          by a human, not found by a probe.
 #     L4_GO_RUNDIR         where runs live (default $TMPDIR/l4-go)
-#     L4_GO_REQUIRED       1 ⇒ any SKIPPED stage is fatal (exit 5), as CI wants
+#     L4_GO_REQUIRED       1 ⇒ any SKIPPED stage is fatal (exit 5), as CI
+#                          wants; `run` refuses at the door when the doctor
+#                          forecasts one, rather than minutes in
 #     L4_GO_FIXED_NOW      pin the clock (default 2025-01-31T00:00:00Z)
 
 set -euo pipefail
@@ -52,6 +64,11 @@ set -euo pipefail
 GO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PHASES="$GO_ROOT/etc/go/phases"
 LIB="$GO_ROOT/etc/go/lib"
+
+# Toolchain discovery (go_provision_toolchain): fills L4/JL4_LSP_CMD from
+# dist-newstyle when unset. Sourced here, invoked only by `run` and `doctor` —
+# `plan` and `help` must keep working with no binary anywhere (CI asserts it).
+source "$LIB/toolchain.sh"
 
 # --- the stage table --------------------------------------------------------
 # G1's declared stages, in order. p0-preflight, p3-check, p6-tests and
@@ -115,7 +132,7 @@ gated_by_HG1=""
 gated_by_HG2="p10-publish"
 
 usage() {
-  sed -n '2,48p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,60p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 die_usage() {
@@ -538,19 +555,38 @@ cmd_gc() {
   echo "gc: kept ${#keep_ids[@]} run dir(s) (latest $KEEP, plus every run holding a granted gate); removed $removed"
 }
 
+# The front-door forecast, runnable on its own. Discovery first (so the
+# forecast is about the environment a run would actually get), then the
+# doctor's per-stage verdict. Runs no stage, writes no run dir.
+cmd_doctor() {
+  local stages rc=0
+  stages=$(stages_for "$MILESTONE") || rc=$?
+  [[ $rc -eq 0 ]] || exit $rc
+  go_provision_toolchain "$GO_ROOT"
+  export GO_ROOT
+  export JL4_LIBRARY_PATH="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  node "$LIB/doctor.mjs" --milestone "$MILESTONE" --stages "$(echo "$stages" | tr '\n' ' ')"
+}
+
 cmd_run() {
   local stages rc=0
   stages=$(stages_for "$MILESTONE") || rc=$?
   [[ $rc -eq 0 ]] || exit $rc
 
-  # --- the one hard prerequisite: a prebuilt l4 ------------------------------
+  # --- provision, then the one hard prerequisite: a prebuilt l4 --------------
+  # Discovery fills L4/JL4_LSP_CMD from dist-newstyle when unset; explicit env
+  # always wins, and each line below says which happened, because "discovered"
+  # and "explicit" are different claims and the report may need to cite one.
+  go_provision_toolchain "$GO_ROOT"
   if [[ -z "${L4:-}" ]]; then
     cat >&2 <<EOF
-go.sh: L4 is unset.
+go.sh: L4 is unset, and no built l4 was discovered under dist-newstyle in this
+worktree or its siblings.
 
 This orchestrator never runs cabal — the build lock is a shared resource and
 concurrent invocations in one worktree corrupt each other (CLAUDE.md §2.1).
-Point L4 at a prebuilt binary, the same escape hatch as JL4_LSP_CMD= and DMNMD=:
+Build one in a DIFFERENT worktree, or point L4 at a prebuilt binary, the same
+escape hatch as JL4_LSP_CMD= and DMNMD=:
 
   export L4=/path/to/dist-newstyle/build/<arch>/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l4
 EOF
@@ -560,8 +596,41 @@ EOF
     echo "go.sh: L4=$L4 is not executable and not on PATH" >&2
     exit 2
   fi
+  echo "go: l4      $L4  [${GO_L4_PROVENANCE:-explicit}]"
+  [[ -n "${JL4_LSP_CMD:-}" ]] && echo "go: jl4-lsp $JL4_LSP_CMD  [${GO_LSP_PROVENANCE:-explicit}]"
 
   export JL4_LIBRARY_PATH="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  export GO_ROOT
+
+  # --- the door forecast -----------------------------------------------------
+  # The same doctor `go.sh doctor` runs, in brief form: name every declared
+  # stage that will not run whole BEFORE ten minutes are spent learning it one
+  # receipt at a time. Under L4_GO_REQUIRED=1 a forecast skip refuses HERE —
+  # the same stages would exit 5 mid-run, after the earlier stages' work.
+  #
+  # The forecast covers the stages THIS invocation will dispatch: an --only or
+  # --through run must not be refused over a doomed stage it was never going
+  # to reach.
+  local door_stages="$stages"
+  if [[ -n "$ONLY" ]]; then
+    # Intersected with the declared set: --only over an undeclared stage
+    # dispatches nothing, and a forecast must not refuse a run that was
+    # going to run nothing.
+    door_stages="$(printf '%s\n' "$stages" | awk -v o="$ONLY" '$0 == o')"
+  elif [[ -n "$THROUGH" ]]; then
+    # awk, not sed's '1,/re/p': that range cannot close on line 1, so
+    # --through <first-stage> would have forecast every stage.
+    door_stages="$(printf '%s\n' "$stages" | awk -v t="$THROUGH" '{ print } $0 == t { exit }')"
+  fi
+  local doctor_rc=0
+  set +e
+  node "$LIB/doctor.mjs" --milestone "$MILESTONE" --stages "$(echo "$door_stages" | tr '\n' ' ')" --brief
+  doctor_rc=$?
+  set -e
+  if [[ "${L4_GO_REQUIRED:-0}" == "1" && $doctor_rc -ge 1 ]]; then
+    echo "go: L4_GO_REQUIRED=1 and the forecast above names stages that cannot run whole; refusing at the door." >&2
+    exit 5
+  fi
 
   # --- run id + run dir ------------------------------------------------------
   # The corpus this run is about, as one digest. It names the run, and the gate
@@ -927,6 +996,7 @@ EOF
 
 case "$CMD" in
   run) cmd_run ;;
+  doctor) cmd_doctor ;;
   plan) cmd_plan ;;
   status) cmd_status ;;
   verify) cmd_verify ;;

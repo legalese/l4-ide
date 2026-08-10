@@ -22,6 +22,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -3562,6 +3563,164 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
   );
 }
 // ===== END label-order checks ===============================================
+
+// ===== toolchain discovery + the doctor =====================================
+// lib/toolchain.sh fills L4/JL4_LSP_CMD from dist-newstyle; lib/doctor.mjs
+// turns the probes into a front-door forecast. The properties that must hold:
+// explicit env is never overridden, the own worktree beats a newer sibling,
+// discovery falls back to the newest sibling, and the doctor's three exit
+// codes each fire when they should. Every case controls its environment
+// explicitly — none depends on what this machine happens to have built.
+{
+  const tc = resolve(HERE, "lib/toolchain.sh");
+  const bashDiscover = (root) =>
+    spawnSync(
+      "bash",
+      ["-c", `source '${tc}'; go_discover_tool '${root}' 'jl4-*' l4`],
+      { encoding: "utf8" },
+    ).stdout.trim();
+
+  const froot = mkdtempSync(resolve(tmpdir(), "l4-go-toolchain-"));
+  const mkBin = (wt, mtimeSec) => {
+    const d = resolve(
+      froot,
+      wt,
+      "dist-newstyle/build/aarch64-osx/ghc-9.10.3/jl4-0.1/x/l4/build/l4",
+    );
+    mkdirSync(d, { recursive: true });
+    const p = resolve(d, "l4");
+    writeFileSync(p, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    utimesSync(p, mtimeSec, mtimeSec);
+    return p;
+  };
+  const older = mkBin("wt-own", 1_000_000);
+  const newer = mkBin("wt-sib", 2_000_000);
+  mkdirSync(resolve(froot, "wt-bare"), { recursive: true });
+
+  check(
+    "discovery prefers the worktree's OWN binary over a newer sibling",
+    bashDiscover(resolve(froot, "wt-own")) === older,
+  );
+  check(
+    "a worktree with no dist-newstyle borrows the newest sibling",
+    bashDiscover(resolve(froot, "wt-bare")) === newer,
+  );
+  check(
+    "discovery prints nothing when no candidate exists anywhere",
+    (() => {
+      // The root is NESTED inside its own fresh parent, so the sibling scan
+      // sees only that parent's (empty) contents. Rooting the check directly
+      // in the shared $TMPDIR made it flaky: any concurrent process leaving
+      // a dist-newstyle one level down would satisfy "empty" discovery.
+      const parent = mkdtempSync(resolve(tmpdir(), "l4-go-empty-"));
+      const root = resolve(parent, "wt");
+      mkdirSync(root);
+      return bashDiscover(root) === "";
+    })(),
+  );
+  check(
+    "explicit L4 is never overridden by discovery",
+    (() => {
+      const r = spawnSync(
+        "bash",
+        [
+          "-c",
+          `source '${tc}'; go_provision_toolchain '${resolve(froot, "wt-bare")}'; printf '%s|%s' "$L4" "$GO_L4_PROVENANCE"`,
+        ],
+        { encoding: "utf8", env: { ...process.env, L4: "/bin/echo" } },
+      );
+      return r.stdout === "/bin/echo|explicit";
+    })(),
+  );
+
+  const doctor = (extraEnv, stages) => {
+    const env = { ...process.env, ...extraEnv };
+    // A test must not inherit this shell's provisioning: unset means ABSENT.
+    for (const [k, v] of Object.entries(extraEnv))
+      if (v === null) delete env[k];
+    return spawnSync(
+      "node",
+      [
+        resolve(HERE, "lib/doctor.mjs"),
+        "--milestone",
+        "g1",
+        "--stages",
+        stages,
+      ],
+      { encoding: "utf8", env },
+    );
+  };
+  const CLEAN = {
+    L4: "/bin/ls",
+    JL4_LSP_CMD: null,
+    JL4_GO_SERVICE_URL: null,
+    GO_L4_PROVENANCE: null,
+    GO_LSP_PROVENANCE: null,
+  };
+  check(
+    "doctor exits 2, naming discovery, when no l4 is usable",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, L4: null, GO_L4_PROVENANCE: "none" },
+        "p0-preflight p3-check",
+      );
+      return r.status === 2 && /CANNOT RUN/.test(r.stdout);
+    })(),
+  );
+  check(
+    "doctor exits 1 and names p7-ladder + the remedy when the LSP is missing",
+    (() => {
+      const r = doctor(CLEAN, "p0-preflight p7-ladder");
+      return (
+        r.status === 1 &&
+        /p7-ladder will SKIP/.test(r.stdout) &&
+        /JL4_LSP_CMD/.test(r.stdout)
+      );
+    })(),
+  );
+  check(
+    "doctor exits 0 over stages with no environmental wants",
+    doctor(CLEAN, "p0-preflight p3-check p6-tests p9-report").status === 0,
+  );
+  check(
+    "doctor counts the MCP deploy half as not-whole (exit 1), zip half stated",
+    (() => {
+      const r = doctor(CLEAN, "p0-preflight p7-mcp");
+      return r.status === 1 && /zip is still built/.test(r.stdout);
+    })(),
+  );
+  check(
+    "doctor forecasts the GATE abort for a non-loopback service URL",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, JL4_GO_SERVICE_URL: "http://192.168.1.10:8080" },
+        "p0-preflight p7-mcp",
+      );
+      return r.status === 1 && /VERDICT: GATE/.test(r.stdout);
+    })(),
+  );
+  check(
+    "a loopback service URL is not a finding",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, JL4_GO_SERVICE_URL: "http://127.0.0.1:8080" },
+        "p0-preflight p7-mcp",
+      );
+      return r.status === 0;
+    })(),
+  );
+  check(
+    "a set-but-stale JL4_LSP_CMD is a finding, same scrutiny as L4",
+    (() => {
+      const r = doctor(
+        { ...CLEAN, JL4_LSP_CMD: "/nonexistent/jl4-lsp" },
+        "p0-preflight p7-ladder",
+      );
+      return r.status === 1 && /not executable/.test(r.stdout);
+    })(),
+  );
+}
+// ===== END toolchain discovery + the doctor =================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,

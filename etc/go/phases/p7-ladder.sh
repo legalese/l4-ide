@@ -29,7 +29,7 @@ DIFFOUT="$GO_OUT/p7-ladder.figure-diff.txt"
 command -v npm >/dev/null 2>&1 || go_skip "npm is not on PATH; the ladder generator is an npm script ($GO_S_LADDER_NPM_DIR: npm run $GO_S_LADDER_NPM_SCRIPT), not an l4 subcommand"
 
 if [[ -z "${JL4_LSP_CMD:-}" ]]; then
-  go_skip "JL4_LSP_CMD is unset. The ladder generator drives a live jl4-lsp and this orchestrator never runs cabal (CLAUDE.md §2.1, the build lock). Point JL4_LSP_CMD at a prebuilt jl4-lsp — sibling worktrees carry one at dist-newstyle/build/<arch>/ghc-9.10.3/jl4-lsp-0.1/x/jl4-lsp/build/jl4-lsp/jl4-lsp."
+  go_skip "JL4_LSP_CMD is unset and discovery found no built jl4-lsp under dist-newstyle in this worktree or its siblings (lib/toolchain.sh). The ladder generator drives a live jl4-lsp and this orchestrator never runs cabal (CLAUDE.md §2.1, the build lock). Build one in a different worktree, or point JL4_LSP_CMD at a prebuilt dist-newstyle/build/<arch>/ghc-9.10.3/jl4-lsp-0.1/x/jl4-lsp/build/jl4-lsp/jl4-lsp."
 fi
 
 # The tree must be clean over figures/ BEFORE we start, or the drift oracle is

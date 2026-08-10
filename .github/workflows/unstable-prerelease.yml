@@ -13,16 +13,21 @@
 # ---------------------------------------------------------------------------
 # WHY THIS EXISTS
 #
-# `etc/go/go.sh` — the pipeline entry point — never builds; it requires `L4` to
-# point at an already-built binary and refuses otherwise (go.sh:474-488), and
-# `JL4_LSP_CMD` likewise for the ladder leg (etc/go/phases/p7-ladder.sh:31).
+# `etc/go/go.sh` — the pipeline entry point — never builds. When `L4` /
+# `JL4_LSP_CMD` are unset it discovers built binaries under dist-newstyle in
+# its own worktree or a sibling (etc/go/lib/toolchain.sh) and refuses only
+# when discovery also finds nothing — which is exactly the situation on a
+# machine that has never built the repo, the machine this workflow serves.
 # Before this file existed, the only `l4` we shipped was the copy bundled
 # inside the VS Code extension, whose most recent build is from 2026-07-18 —
 # older than `l4 export`. A contributor who wanted to run the pipeline had to
 # install GHC and Cabal and do a full Haskell build to obtain a binary. On a
 # Claude Code cloud sandbox, whose setup script is capped at five minutes, that
 # is impossible; downloading a tarball is not. This workflow produces the
-# tarball, and as of 2026-08-05 there is one on the Releases page.
+# tarball. One was published 2026-08-05 (unstable-20260805-c873bb5) and the
+# release object has since been DELETED from the Releases page — only the git
+# tag survives (verified 2026-08-09). Check before constructing URLs:
+#   gh release list --repo legalese/l4-ide | grep unstable-
 #
 # ---------------------------------------------------------------------------
 # HOW THIS STAYS DISJOINT FROM main's RELEASE TRACK (main-tag.yml)
