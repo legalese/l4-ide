@@ -103,10 +103,12 @@ and `test/Main.hs` at 572 → 1593), 5 `.mjs` (2 of them new), 7 markdown, 1 cab
 `coverage-report/`, and one `.cases.json` for an existing `jl4/examples` file.
 
 **Documentation.** `PARITY-HUNT-LOG.md` (new, 558 lines) is the reviewer's guide: a
-13-entry status ledger in three states — ✅ fixed, 🟡 fail-loud (silent-wrong gone, the
-backend refuses and routes to fallback, capability gap still open), 🔴 open — with the
-"what was tried and rejected" for each. `coverage-report/PARITY-COVERAGE.md` (new) carries
-the matrices. `MLIR-REVIEW.md` (new) is the adversarial review. `README.md`,
+13-entry status ledger in three states — FIXED (the backend computes the correct answer),
+FAIL-LOUD (silent-wrong eliminated, the backend refuses and routes to fallback, capability
+gap still open), and OPEN (still silently wrong, or untested) — with the "what was tried and
+rejected" for each. The ledger closes with **"There are no remaining OPENs."**
+`coverage-report/PARITY-COVERAGE.md` (new, 271 lines) carries the matrices.
+`MLIR-REVIEW.md` (new, 99 lines) is the adversarial review. `README.md`,
 `FEATURE-PARITY-PLAN.md` and `SOLIDITY-BACKEND-PLAN.md` are reconciled with the backend as
 it actually is.
 
