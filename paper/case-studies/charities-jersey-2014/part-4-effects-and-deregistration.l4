@@ -1,0 +1,1833 @@
+IMPORT prelude
+IMPORT `charities-common`
+IMPORT `part-1-interpretation`
+IMPORT `part-3-charity-test`
+
+§ `Charities (Jersey) Law 2014 — Part 4 — Effects of Registration and Deregistration (Articles 13-17)`
+
+-- ===========================================================================
+-- PART 4 (second half) — Articles 13 to 17. What registration DOES to an entity,
+-- what the court may do about a registered charity that goes wrong, how a charity
+-- leaves the register, and what survives its leaving.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated Version,
+-- showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF EACH PROVISION
+--
+--   Art 13(1)   A GATE over 13(2)-(4): they "apply while an entity is registered as
+--               a charity, and only cease to apply if the entity is deregistered."
+--   Art 13(2)   A NULLITY rule: a constitutional power to amend the purposes so as to
+--               include a NON-charitable purpose "is of no effect". Not a duty — a
+--               disabling. Subject to the Art 13(13) carve-out.
+--   Art 13(3)   A PROVISO: a constitutional power to amend the purposes so as to add
+--               or substitute a DIFFERENT CHARITABLE purpose survives, but "is to be
+--               read as being subject to" (a) evidence AND (b) prior approval — a
+--               CONJUNCTION. Also subject to the Art 13(13) carve-out.
+--   Art 13(4)   A DUTY on the entity: (a) provide public benefit per the registered
+--               public benefit statement; AND (b) a conditional limb — IF it requests
+--               approval of an amendment to that statement, THEN provide evidence.
+--               (b) is a material implication, vacuous when no request is made.
+--   Art 13(5)   A DUTY, gated on being in the restricted section, whose content is a
+--               DISJUNCTION: (a) the original Art 9(2) condition, OR (b) a substituted
+--               condition (itself a conjunction: prior permission AND meeting it).
+--   Art 13(6)   A DUTY to report PROMPTLY, triggered by an EIGHT-limb DISJUNCTION (a)-(h).
+--   Art 13(7)   A DUTY to send an annual return.
+--   Art 13(8)   Order-making power (format/timing/lateness of the return) — INERT STUB.
+--   Art 13(9)   Order-making power (governor-payment details and statements) — INERT STUB.
+--   Art 13(10)  Order-making power (relief for small charities) — INERT STUB.
+--   Art 13(11)  OPERATIVE, and the live half of the governor-payment regime:
+--               (a) a PROHIBITION (SHANT) on payments inconsistent with the Art 13(9)(b)
+--               statement; (b) a PERMISSION (MAY) to apply to amend that statement.
+--   Art 13(12)  Regulation-making power (conflicts arising post-registration) — INERT STUB.
+--   Art 13(13)  A CARVE-OUT: for a court-approved fideicommis or an incorporated 1862
+--               association, paras (2) and (3) "do not apply ... to the extent that they
+--               are inconsistent with any order made ... by the court under the Loi of 1862".
+--
+--   Art 14(1)   TWO ALTERNATIVE GATES on the court's power, both riding on a standing
+--               requirement of an application by the Commissioner or the Attorney General:
+--                 (a) misconduct in the administration of the charity;  OR
+--                 (b) necessary or desirable to protect the property / secure its proper
+--                     application.
+--               Limb (a) is decided by Part 1's `is misconduct` over a MisconductAllegation.
+--   Art 14(2)   The GENERAL power: "any order that the court sees fit".  MAY, not MUST.
+--   Art 14(3)   A NON-EXHAUSTIVE list (a)-(i), "without prejudice to the generality of
+--               paragraph (2)". Modelled as CHECKBOX flags on an order + a disjunction —
+--               and an order OUTSIDE the list is still available under 14(2). That is the
+--               whole point of "without prejudice to the generality".
+--   Art 14(4)   A further MAY: amend or revoke, on the application of a listed person.
+--   Art 14(5)/(6) SAVINGS: the powers are additional (not in derogation), operate
+--               "despite anything in the constitution of the charity", and are without
+--               prejudice to the Commissioner's own powers. 14(5)(b) is made OPERATIVE
+--               below by carrying a constitutional-exclusion flag that is deliberately
+--               NOT a conjunct of the power — so the model shows that it does not bite.
+--
+--   Art 15(1)   A PERMISSION on the entity: it MAY apply to deregister.
+--   Art 15(2)   A DUTY on the applicant entity: provide the requested information.
+--   Art 15(3)   A MUST on the Commissioner, with a FORCED CHOICE: "the Commissioner
+--               MUST — (a) deregister the entity; or (b) refuse ... on grounds relating
+--               to the proposals." Not a discretion to sit on the file.
+--
+--   Art 16(1)   A DISCRETION (MAY). THREE things must all hold before the discretion
+--               even arises:
+--                 (i)   the PROCEDURAL PRECONDITION — "after giving the entity written
+--                       notice specifying reasons and inviting objections within a
+--                       reasonable time specified in the notice";
+--                 (ii)  the PROPORTIONALITY requirement — "satisfied ... that it is
+--                       proportionate to do so"; and
+--                 (iii) a DISJUNCTION of FOUR grounds (a)-(d).
+--               All three feed a MAY. Benign omission is FULFILLED, not BREACH: that is
+--               what makes it a power rather than a duty.
+--   Art 16(2)   A DUTY (MUST): where the Commissioner is satisfied that the entity no
+--               longer exists, the Commissioner MUST deregister. No notice-and-objection
+--               precondition (there is nobody left to object), no proportionality gate,
+--               no discretion. The contrast with 16(1) is the point.
+--
+--   Art 17(1)   TWO duties on the Commissioner: MUST retain for 10 years; MUST NOT
+--               reassign the registered number.
+--   Art 17(2)   A FOUR-LIMB CONJUNCTION (a) AND (b) AND (c) AND (d), which switches on—
+--   Art 17(3)   RETROSPECTIVE effect "from the past date ... for all purposes, including
+--               the purposes of any enactment relating to taxation, but subject to (4)".
+--   Art 17(4)   THE CRIMINAL CARVE-OUT — the safety property of this Part: "An act, that
+--               occurred before the date of the giving of the notice ... is NOT rendered
+--               an offence MERELY BY VIRTUE of the operation of paragraph (3)." The word
+--               "merely" is load-bearing: an act that was ALREADY an offence on some
+--               independent ground remains one. Both halves are modelled and asserted.
+--   Art 17(5)   A GATE over (6)-(11): "if and so long as there remains any property ...
+--               acquired before it was deregistered (the 'remaining property')".
+--   Art 17(6)   A DUTY: apply the remaining property for the PRESERVED charitable purposes
+--               and in accordance with the PRESERVED public benefit statement.
+--   Art 17(7)   A DISABILITY, "despite any provision of the entity's constitution": no
+--               power to amend the preserved purposes or statement.
+--   Art 17(8)   A PERMISSION to apply to the court, and the court's own MAY.
+--   Art 17(9)   The court's CONTINUING Art 14 powers over the deregistered entity, "as if
+--               it were still registered" — two alternative gates again, on the
+--               application of the Attorney General or a governor.
+--   Art 17(10)  A CONDITION PRECEDENT on a governor's application: notice to the AG first.
+--   Art 17(11)  The Attorney General's TAKEOVER: a MAY, then a further election between
+--               withdrawing and proceeding.
+--
+-- ENCODING STYLE — INERT: verbatim statute inline as bare strings (identity of their
+-- context), `...` = AND-sugar, `..` = OR-sugar, layout IS the bracketing.
+--
+-- ===========================================================================
+-- INTERPRETATION CALLS — every place we had to decide something the text leaves open.
+--
+-- >>> Art 13(6) "promptly". The statute fixes no period. We use `WITHIN 14` as a
+--     REVIEWABLE PLACEHOLDER for the open-textured standard. What is "prompt" is a
+--     question of fact; the model must pick a number to be executable, and we say so
+--     rather than smuggling in precision the statute does not have.
+--
+-- >>> Art 13(7) the annual return. "Annual" — WITHIN 365, again a placeholder; the
+--     actual timing is left to an Order under 13(8), which is a stub below.
+--
+-- >>> Art 16(1) "a reasonable time specified in the notice". Placeholder WITHIN 28 for
+--     the entity's window to object. Same caveat.
+--
+-- >>> Art 13(13) carve-out. The statute disapplies (2) and (3) "TO THE EXTENT THAT they
+--     are inconsistent with" a Loi of 1862 order. "To the extent that" is a partial,
+--     provision-by-provision disapplication. We model it as a single boolean
+--     ("paragraphs (2) and (3) are inconsistent with an order made by the court under
+--     the Loi of 1862") because a degree-of-inconsistency calculus is not something the
+--     Law supplies. A finer model would index the carve-out by the specific words carved out.
+--
+-- >>> Art 15(3). Read as a FORCED CHOICE between (a) and (b), but with limb (b)
+--     AVAILABLE ONLY where there are "grounds relating to the proposals mentioned in
+--     paragraph (2)". So where the entity has complied and there are no such grounds,
+--     the only lawful outcome is deregistration: the ROR collapses to a single MUST.
+--     That is a reading; the contrary reading (an unconstrained choice, with the
+--     "grounds" words merely descriptive) is available but would make (b) a licence to
+--     refuse for no reason, which cannot be right.
+--
+-- >>> Art 14(1) chapeau. "on an application by the Commissioner or the Attorney General"
+--     is treated as a STANDING requirement that CONJOINS with the (a)/(b) disjunction —
+--     i.e. `standing AND (a OR b)`, not `standing OR a OR b`. The court cannot act of
+--     its own motion under this Article.
+--
+-- >>> Art 14(3)(i) "making such ancillary provision as the court thinks desirable" is
+--     carried as its own checkbox rather than as a modifier on the others, since it can
+--     be made alongside any of (a)-(h) or alone.
+--
+-- >>> Art 17(3) "for all purposes, including the purposes of any enactment relating to
+--     taxation". We expose the tax consequence as a separate named predicate, because it
+--     is the consequence the statute singles out and the one a user will want to query.
+--
+-- >>> Art 17(4). The carve-out is stated as a SAFETY PROPERTY (see the closing section):
+--     for any act occurring before the notice date whose only source of criminality is
+--     the retrospective operation of para (3), that act is NOT an offence. The property
+--     is asserted, not merely asserted-of-an-example.
+--
+-- >>> Art 17(9) "as if it were still registered". We do not re-derive the whole of Art 14
+--     over a deregistered entity; we gate the same Art 14 ACTION (`make an order in
+--     respect of the charity`) on the Art 17(9) conditions. The identity of the power is
+--     the identity of the action.
+-- ===========================================================================
+
+§§ `Actions regulated by Articles 13 to 17 but not already in charities-common`
+
+-- charities-common's Action enum already carries the acts shared across Parts
+-- (`deregister the entity`, `refuse to deregister the entity`, `make an order in respect
+-- of the charity`, `report the matter to the Commissioner`, `send an annual return`,
+-- `provide public benefit in accordance with the registered public benefit statement`).
+-- These are the acts peculiar to Articles 13 to 17. They are declared LOCALLY, with a
+-- Part-unique type name, rather than pushed into the shared enum.
+--
+-- CONSEQUENCE, stated honestly: a DEONTIC over Part4bAction and a DEONTIC over Action are
+-- different types and cannot be RANDed or chained together. So where a statutory chain
+-- crosses the boundary (Art 15: the entity's application -> the Commissioner's decision;
+-- Art 16: the Commissioner's notice -> the Commissioner's deregistration), the chain is
+-- broken at the type boundary and rejoined CONSTITUTIVELY: the earlier step is lifted to
+-- a boolean precondition on the later deontic. This is exactly how Art 16(1) works anyway
+-- ("if satisfied, AFTER giving ... notice"), so no fidelity is lost there.
+DECLARE Part4bAction IS ONE OF
+  `provide evidence of a reason justifying the proposed amendment`                   -- 13(3)(a), 13(4)(b)
+  `obtain the Commissioner's prior approval of the proposed amendment`               -- 13(3)(b)
+  `make a payment that is inconsistent with a statement provided under Article 13(9)(b)`  -- 13(11)(a)
+  `apply to the Commissioner, with reasons, for permission to amend that statement`  -- 13(11)(b)
+  `amend or revoke an order made under Article 14`                                   -- 14(4)
+  `apply to the Commissioner to terminate the registration of the entity`            -- 15(1)
+  `provide the information or document requested in relation to the proposals`       -- 15(2)
+  `give the entity written notice specifying reasons and inviting objections`        -- 16(1)
+  `object to the proposed deregistration`                                            -- 16(1)
+  `retain the information registered in respect of the entity for 10 years`          -- 17(1)(a)
+  `assign the registered number of that entity to another registered charity`        -- 17(1)(b)
+  `apply the remaining property for the preserved charitable purposes`               -- 17(6)
+  `amend the preserved charitable purposes or preserved public benefit statement`    -- 17(7)
+  `apply to the court for an order amending the preserved charitable purposes or preserved public benefit statement`  -- 17(8)
+  `make such amending order, and any ancillary order, as the court considers expedient`  -- 17(8)
+  `give notice to the Attorney General of the intention to apply and of the reasons`  -- 17(10)
+  `take over the application made by the governor`                                   -- 17(11)
+  `withdraw the application`                                                         -- 17(11)
+  `proceed with the application`                                                     -- 17(11)
+
+§ `Article 13 — Effects of registration`
+
+§§ `The registered charity — the facts Article 13 asks about`
+
+-- The subject of Article 13. It carries the Part 3 CandidateCharity (so that Art 16(1)(a),
+-- "the entity NO LONGER meets the charity test", can be decided by the imported
+-- `meets the charity test`), plus the Art 13 operative atoms.
+DECLARE RegisteredCharity HAS
+    name                                                            IS A STRING
+    `the charity as tested under Article 5`                         IS A CandidateCharity
+
+    -- Article 13(1) — the gate over paragraphs (2) to (4).
+    `the entity is registered as a charity, and has not been deregistered`  IS A BOOLEAN
+
+    -- Article 13(2)
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`  IS A BOOLEAN
+
+    -- Article 13(3)
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`  IS A BOOLEAN
+    `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`  IS A BOOLEAN
+    `the entity has obtained the Commissioner's prior approval of the proposed amendment`  IS A BOOLEAN
+
+    -- Article 13(4)
+    `the entity provides public benefit in accordance with its registered public benefit statement`  IS A BOOLEAN
+    `the entity requests the Commissioner's approval of a proposed amendment to that statement`  IS A BOOLEAN
+    `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`  IS A BOOLEAN
+
+    -- Article 13(5)
+    `the charity is entered in the restricted section of the register`  IS A BOOLEAN
+    `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`  IS A BOOLEAN
+    `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`  IS A BOOLEAN
+    `it meets that different condition as specified in that permission`  IS A BOOLEAN
+
+    -- Article 13(6)(a) to (h) — the eight reportable matters.
+    `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`  IS A BOOLEAN
+    `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`  IS A BOOLEAN
+    `(6)(c) a proposal to change the charity's constitution`         IS A BOOLEAN
+    `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`  IS A BOOLEAN
+    `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`  IS A BOOLEAN
+    `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`  IS A BOOLEAN
+    `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`  IS A BOOLEAN
+    `(6)(h) any other matter prescribed by the Minister by Order for this purpose`  IS A BOOLEAN
+
+    -- Article 13(11) — the governor-payment statement, once an Order under 13(9)(b) exists.
+    `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`  IS A BOOLEAN
+    `the charity has made a payment that is inconsistent with that statement`  IS A BOOLEAN
+
+    -- Article 13(13) — the fideicommis / 1862-association carve-out.
+    `the entity is a court-approved fideicommis or an incorporated 1862 association`  IS A BOOLEAN
+    `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`  IS A BOOLEAN
+
+§§ `Article 13(1) — the gate, and Article 13(13) — the carve-out`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(1) — paragraphs (2) to (4) apply` r MEANS
+        "(1) Paragraphs (2) to (4) apply while an entity is registered as a charity, and only cease to apply if the entity is deregistered."
+    ... r's `the entity is registered as a charity, and has not been deregistered`
+
+-- >>> "TO THE EXTENT THAT they are inconsistent" — modelled as one boolean; see the
+--     interpretation calls in the header.
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(13) — the fideicommis or 1862-association carve-out applies` r MEANS
+        "(13) If a court-approved fideicommis or an incorporated 1862 association becomes registered as a charity under this Law, paragraphs (2) and (3) do not apply to that registered charity"
+    ... r's `the entity is a court-approved fideicommis or an incorporated 1862 association`
+    AND "to the extent that they are inconsistent with any order made, whether before or after registration under this Law, by the court under the Loi of 1862."
+    ... r's `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`
+
+§§ `Article 13(2) — a power to add a NON-charitable purpose is of no effect`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(2) — the purported power to add a non-charitable purpose is of no effect` r MEANS
+        "(2) Any provision of the entity's constitution or constitutional Law is of no effect to the extent that it purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable."
+    ... `Article 13(1) — paragraphs (2) to (4) apply` r
+    AND r's `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`
+    AND "(13) ... paragraphs (2) and (3) do not apply ... to the extent that they are inconsistent with any order ... under the Loi of 1862."
+    ... NOT `Article 13(13) — the fideicommis or 1862-association carve-out applies` r
+
+§§ `Article 13(3) — a power to substitute a DIFFERENT CHARITABLE purpose, subject to (a) AND (b)`
+
+-- The proviso limb. Read: the constitutional power SURVIVES, but the amendment it permits
+-- may be made only if (a) evidence AND (b) prior approval. Two escape routes leave the
+-- proviso inapplicable: the entity is no longer registered (13(1)), or the 13(13) carve-out.
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(3) — the proposed amendment of purposes may be made` r MEANS
+        "(3) Any provision of the entity's constitution or constitutional Law that purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose,"
+    ... r's `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`
+    AND     "is to be read as being subject to the entity -"
+        ..  NOT `Article 13(1) — paragraphs (2) to (4) apply` r
+        ..  `Article 13(13) — the fideicommis or 1862-association carve-out applies` r
+        ..      "(a) providing evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment; and"
+            ... r's `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`
+            AND "(b) obtaining the Commissioner's prior approval of the proposed amendment."
+            ... r's `the entity has obtained the Commissioner's prior approval of the proposed amendment`
+
+§§ `Article 13(4) — the duty to provide public benefit per the registered statement`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(4)(a) — provides public benefit in accordance with the registered statement` r MEANS
+        "(a) provide public benefit in accordance with its registered public benefit statement; and"
+    ... r's `the entity provides public benefit in accordance with its registered public benefit statement`
+
+-- A material implication: vacuously satisfied where no amendment to the statement is sought.
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(4)(b) — evidence justifying a request to amend the statement` r MEANS
+        "(b) if it requests the Commissioner's approval of a proposed amendment to that statement, provide evidence, to the satisfaction of the Commissioner, of a reason justifying that request."
+    ..  NOT r's `the entity requests the Commissioner's approval of a proposed amendment to that statement`
+    ..  r's `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(4) — the entity complies with paragraph (4)` r MEANS
+        "(1) Paragraphs (2) to (4) apply while an entity is registered as a charity ..."
+    ..  NOT `Article 13(1) — paragraphs (2) to (4) apply` r
+    ..      "(4) The entity must -"
+        ... `Article 13(4)(a) — provides public benefit in accordance with the registered statement` r
+        AND `Article 13(4)(b) — evidence justifying a request to amend the statement` r
+
+§§ `Article 13(5) — the restricted-section condition`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(5)(b) — the substituted condition, permitted in advance` r MEANS
+        "(b) if, before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article,"
+    ... r's `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`
+    AND "that it meets that condition as specified in that permission."
+    ... r's `it meets that different condition as specified in that permission`
+
+-- Gated on entry in the restricted section: "must, WHILE IT IS ENTERED in the restricted
+-- section of the register, ensure -". A charity in the general section satisfies 13(5)
+-- vacuously.
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(5) — the restricted-section condition is met` r MEANS
+        "(5) A registered charity must, while it is entered in the restricted section of the register, ensure -"
+    ..  NOT r's `the charity is entered in the restricted section of the register`
+    ..  "(a) that it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b); or"
+    ..  r's `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`
+    ..  `Article 13(5)(b) — the substituted condition, permitted in advance` r
+
+§§ `Article 13(6) — the EIGHT-limb duty to report promptly`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(6) — a matter arises that must be promptly reported` r MEANS
+        "(6) A registered charity must promptly report to the Commissioner -"
+    ..  "(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity;"
+    ..  r's `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`
+    ..  "(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section;"
+    ..  r's `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`
+    ..  "(c) a proposal to change the charity's constitution;"
+    ..  r's `(6)(c) a proposal to change the charity's constitution`
+    ..  "(d) a proposal that could result, or an event that has resulted in the charity ceasing to meet the requirements of Article 11(4)(c) or (d);"
+    ..  r's `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`
+    ..  "(e) a reportable matter, in relation to a governor of the charity, if the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2);"
+    ..  r's `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`
+    ..  "(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist;"
+    ..  r's `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`
+    ..  "(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2); and"
+    ..  r's `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`
+    ..  "(h) any other matter prescribed by the Minister by Order for this purpose."
+    ..  r's `(6)(h) any other matter prescribed by the Minister by Order for this purpose`
+
+§§ `Articles 13(8), 13(9), 13(10) and 13(12) — pure Order/Regulation-making powers (INERT STUBS)`
+
+-- These four paragraphs confer power to make subordinate legislation. They have no
+-- computable content of their own: nothing about them is true or false of a given charity
+-- until an Order or Regulations exist. They are carried here as labelled INERT PROSE so
+-- that the corpus has no silent gap, with NO operative outcome. The ONE place where their
+-- output becomes live is Art 13(6)(h) and Art 16(1)(d), each of which is exposed as a
+-- single boolean atom ("a matter / circumstance prescribed by Order") — so a prescribed
+-- matter is a real disjunct, without pretending to know what was prescribed.
+
+`Article 13(8) — Order as to format, timing and lateness of the annual return (STUB)` MEANS
+        "(8) An Order under paragraph (7) may also make provision as to the format and timing of the annual return, the consequences of lateness, and the content of any entries to be made on the register in respect of the annual return."
+#EVAL `Article 13(8) — Order as to format, timing and lateness of the annual return (STUB)`
+
+`Article 13(9) — Order as to governor payments and statements of intention (STUB)` MEANS
+        "(9) The Minister may by Order -"
+    ... "(a) require a registered charity to include in its annual return details of a prescribed description of any payment made, during the year to which the return relates, by or on behalf of the registered charity to a governor, or to a person having a prescribed connection with a governor;"
+    ... "(b) require a registered charity to provide to the Commissioner a statement of its current intentions as to making any payments of such a prescribed description in future;"
+    ... "(c) provide for the entry on the register by the Commissioner of the details included under sub-paragraph (a) in the charity's latest annual return, and of the statement provided under sub-paragraph (b)."
+#EVAL `Article 13(9) — Order as to governor payments and statements of intention (STUB)`
+
+`Article 13(10) — Order granting relief to small charities (STUB)` MEANS
+        "(10) The Minister may by Order, after consulting the Commissioner and any body appearing to the Minister to be representative of interested registered charities, provide that any provision of paragraph (6) or (7), or of any Order under paragraph (7), (8) or (9) -"
+    ... "(a) does not apply to a prescribed description of charity appearing to the Minister to require relief from the burden of that provision by virtue of the small size, or lack of resources or expertise of charities of that description; or"
+    ... "(b) applies to a prescribed description of charity only subject to a modification prescribed by the Order, being a modification that appears to the Minister to give reasonable relief from the burden of that provision, having regard to the small size, or lack of resources or expertise of charities of that description."
+#EVAL `Article 13(10) — Order granting relief to small charities (STUB)`
+
+`Article 13(12) — Regulations as to post-registration conflicts (STUB)` MEANS
+        "(12) If the States make Regulations under Article 11(7), those Regulations may also make provision requiring a registered charity or its governors (or both) to avoid, or report and remedy, a situation arising at a time after registration, being a situation in which, if the charity were at that time applying for registration, there would be grounds under those Regulations to refuse that application."
+#EVAL `Article 13(12) — Regulations as to post-registration conflicts (STUB)`
+
+§§ `Article 13(11) — the governor-payment statement: a prohibition and a permission`
+
+GIVEN r IS A RegisteredCharity
+GIVETH A BOOLEAN
+`Article 13(11)(a) — a payment inconsistent with the statement has been made` r MEANS
+        "(11) A registered charity - (a) must not make any payment that is inconsistent with a statement provided under paragraph (9)(b);"
+    ... r's `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`
+    AND r's `the charity has made a payment that is inconsistent with that statement`
+
+§§ `Article 13 — THE REGULATIVE LAYER: the duties of a registered charity`
+
+-- Art 13(4) — a DUTY on the charity, live only while it is registered (Art 13(1)).
+-- >>> WITHIN 365: a reviewable placeholder. The duty to provide public benefit is
+--     continuing rather than deadline-bound; the number exists only to make the trace run.
+GIVEN r IS A RegisteredCharity
+GIVETH A DEONTIC Actor Action
+`Article 13(4) — the duty to provide public benefit` r MEANS
+    IF   `Article 13(1) — paragraphs (2) to (4) apply` r
+    THEN PARTY Charity MUST `provide public benefit in accordance with the registered public benefit statement` WITHIN 365
+    ELSE FULFILLED
+
+-- Art 13(6) — the duty to report PROMPTLY, once any of the eight matters arises.
+-- >>> WITHIN 14: a REVIEWABLE PLACEHOLDER for the open-textured standard "promptly".
+--     The statute gives no number. What is prompt is a question of fact.
+GIVEN r IS A RegisteredCharity
+GIVETH A DEONTIC Actor Action
+`Article 13(6) — the duty to report promptly` r MEANS
+    IF   `Article 13(6) — a matter arises that must be promptly reported` r
+    THEN PARTY Charity MUST `report the matter to the Commissioner` WITHIN 14
+    ELSE FULFILLED
+
+-- Art 13(7) — the annual return. Unconditional on any registered charity.
+-- >>> WITHIN 365: a placeholder; the real timing is left to an Order under 13(8) (stub above).
+GIVETH A DEONTIC Actor Action
+`Article 13(7) — the duty to send an annual return` MEANS
+    PARTY Charity MUST `send an annual return` WITHIN 365
+
+-- Art 13(11) — the prohibition (a) and the permission (b), woven in parallel.
+-- SHANT: performing the act IS the breach. MAY: never applying is benign.
+GIVETH A DEONTIC Actor Part4bAction
+`Article 13(11) — payments inconsistent with the governor-payment statement` MEANS
+    (PARTY Charity SHANT `make a payment that is inconsistent with a statement provided under Article 13(9)(b)` WITHIN 365)
+    RAND
+    (PARTY Charity MAY `apply to the Commissioner, with reasons, for permission to amend that statement` WITHIN 365)
+
+§ `Article 14 — Powers of court over registered charity`
+
+§§ `Article 14(3) — the non-exhaustive list of orders`
+
+-- CHECKBOX flags, not an enum: an order may combine limbs (an ancillary provision under
+-- (i) can accompany any of (a)-(h)). The catch-all `is an order of some other kind` is
+-- DELIBERATELY NOT a disjunct of `Article 14(3) — the order is among those listed` — it is
+-- what makes the list non-exhaustive, and it is caught by the GENERAL power in 14(2).
+DECLARE Part4CourtOrder HAS
+    description                                                     IS A STRING
+    `(a)(i) prohibiting the charity or a governor from referring to or holding out the entity as a charity or Jersey charity, or as being charitable, having charitable purposes or providing public benefit`  IS A BOOLEAN
+    `(a)(ii) prohibiting the charity or a governor from soliciting donations from the public, as specified in the order`  IS A BOOLEAN
+    `(a)(iii) prohibiting the charity or a governor from taking any other action specified in the order`  IS A BOOLEAN
+    `(b) appointing a person (whether for a specified or indefinite period) to manage the affairs of the charity in place of its governors`  IS A BOOLEAN
+    `(c) appointing a person to be a governor of the charity`        IS A BOOLEAN
+    `(d) suspending or removing a governor of the charity, or any other person concerned in the management or control of the charity`  IS A BOOLEAN
+    `(e) requiring a person (including without prejudice a person carrying on regulated financial services business) who holds property on behalf of the charity, or on behalf of a governor of the charity, not to part with the property without the court's consent`  IS A BOOLEAN
+    `(f) restricting the transactions that may be entered into, or the nature or amount of the payments that may be made, in the administration of the charity without the court's consent`  IS A BOOLEAN
+    `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`  IS A BOOLEAN
+    `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`  IS A BOOLEAN
+    `(i) making such ancillary provision as the court thinks desirable`  IS A BOOLEAN
+    `is an order of some other kind, not among those listed in paragraph (3)`  IS A BOOLEAN
+
+GIVEN o IS A Part4CourtOrder
+GIVETH A BOOLEAN
+`Article 14(3) — the order is among those expressly listed` o MEANS
+        "(3) Without prejudice to the generality of paragraph (2), the orders that the court may make include an order -"
+    ..  "(a) prohibiting (whether for a specified or indefinite period) the charity or a governor from - (i) referring to or holding out the entity as a charity or Jersey charity, or as being charitable, having charitable purposes or providing public benefit,"
+    ..  o's `(a)(i) prohibiting the charity or a governor from referring to or holding out the entity as a charity or Jersey charity, or as being charitable, having charitable purposes or providing public benefit`
+    ..  "(ii) soliciting donations from the public, as specified in the order, or"
+    ..  o's `(a)(ii) prohibiting the charity or a governor from soliciting donations from the public, as specified in the order`
+    ..  "(iii) taking any other action specified in the order;"
+    ..  o's `(a)(iii) prohibiting the charity or a governor from taking any other action specified in the order`
+    ..  "(b) appointing a person (whether a specified or indefinite period) to manage the affairs of the charity in place of its governors;"
+    ..  o's `(b) appointing a person (whether for a specified or indefinite period) to manage the affairs of the charity in place of its governors`
+    ..  "(c) appointing a person to be a governor of the charity;"
+    ..  o's `(c) appointing a person to be a governor of the charity`
+    ..  "(d) suspending or removing a governor of the charity, or any other person concerned in the management or control of the charity;"
+    ..  o's `(d) suspending or removing a governor of the charity, or any other person concerned in the management or control of the charity`
+    ..  "(e) requiring a person (including without prejudice a person carrying on regulated financial services business) who holds property on behalf of the charity, or on behalf of a governor of the charity, not to part with the property without the court's consent;"
+    ..  o's `(e) requiring a person (including without prejudice a person carrying on regulated financial services business) who holds property on behalf of the charity, or on behalf of a governor of the charity, not to part with the property without the court's consent`
+    ..  "(f) restricting the transactions that may be entered into, or the nature or amount of the payments that may be made, in the administration of the charity without the court's consent;"
+    ..  o's `(f) restricting the transactions that may be entered into, or the nature or amount of the payments that may be made, in the administration of the charity without the court's consent`
+    ..  "(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify;"
+    ..  o's `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`
+    ..  "(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct;"
+    ..  o's `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`
+    ..  "(i) making such ancillary provision as the court thinks desirable."
+    ..  o's `(i) making such ancillary provision as the court thinks desirable`
+    -- `is an order of some other kind` is DELIBERATELY not a disjunct.
+
+§§ `Article 14(1) — the two ALTERNATIVE gates`
+
+DECLARE Article14Application HAS
+    `the charity` IS A RegisteredCharity
+
+    -- The chapeau: standing. ">>> Read as a CONJUNCT, not a disjunct" (see header).
+    `the application is made by the Commissioner or the Attorney General`  IS A BOOLEAN
+
+    -- (1)(a) — decided through Part 1's `is misconduct`.
+    `the conduct alleged`                                           IS A MisconductAllegation
+    `it appears to the court that the conduct alleged is or has been in the administration of the charity`  IS A BOOLEAN
+
+    -- (1)(b)
+    `(1)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the property of the charity or securing a proper application of that property in accordance with the charity's registered charitable purposes and registered public benefit statement`  IS A BOOLEAN
+
+    -- Article 14(4) — who may apply to amend or revoke.
+    `the application to amend or revoke is made by the Commissioner, the Attorney General, the registered charity or a person to whom the order was directed`  IS A BOOLEAN
+
+    -- Article 14(5)(b) — "despite anything in the constitution of the charity". This flag
+    -- is carried so the model can SHOW that it does not bite: it appears NOWHERE in the
+    -- gates below. The saving is made operative by its own irrelevance.
+    `the constitution of the charity purports to restrict or exclude the powers of the court`  IS A BOOLEAN
+
+GIVEN app IS AN Article14Application
+GIVETH A BOOLEAN
+`Article 14(1)(a) — misconduct in the administration of the charity` app MEANS
+        "(a) that there is or has been misconduct in the administration of the charity; or"
+    ... `is misconduct` (app's `the conduct alleged`)
+    AND app's `it appears to the court that the conduct alleged is or has been in the administration of the charity`
+
+GIVEN app IS AN Article14Application
+GIVETH A BOOLEAN
+`Article 14(1)(b) — necessary or desirable to protect the property` app MEANS
+        "(b) that it is necessary or desirable to exercise the power for the purpose of protecting the property of the charity or securing a proper application of that property in accordance with the charity's registered charitable purposes and registered public benefit statement."
+    ... app's `(1)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the property of the charity or securing a proper application of that property in accordance with the charity's registered charitable purposes and registered public benefit statement`
+
+GIVEN app IS AN Article14Application
+GIVETH A BOOLEAN
+`Article 14(1) — the court's power arises` app MEANS
+        "(1) The court may exercise any of the powers set out in paragraph (2) in relation to a registered charity if, on an application by the Commissioner or the Attorney General, it appears to the court -"
+    ... app's `the application is made by the Commissioner or the Attorney General`
+    AND     `Article 14(1)(a) — misconduct in the administration of the charity` app
+        OR  `Article 14(1)(b) — necessary or desirable to protect the property` app
+
+§§ `Articles 14(5) and 14(6) — the savings (INERT PROSE, plus one operative consequence)`
+
+`Article 14(5) and 14(6) — the savings` MEANS
+        "(5) The powers of the court under this Article apply -"
+    ... "(a) in addition to and not in derogation from any powers of the court under any other enactment or under customary law; and"
+    ... "(b) despite anything in the constitution of the charity."
+    ... "(6) The powers of the court under this Article are without prejudice to any power of the Commissioner to take any action under this Law in respect of any misconduct."
+#EVAL `Article 14(5) and 14(6) — the savings`
+
+§§ `Article 14 — THE REGULATIVE LAYER: the court's POWERS (MAY, not MUST)`
+
+-- Art 14(2): "The court MAY make any order that the court SEES FIT ..." A power, not a
+-- duty. A court that declines to make any order commits no breach: benign omission under
+-- MAY is FULFILLED. That is precisely what distinguishes 14 from 15(3) and 16(2).
+-- >>> WITHIN 90: a reviewable placeholder; the Article prescribes no period.
+GIVEN app IS AN Article14Application
+GIVETH A DEONTIC Actor Action
+`Article 14(2) — the court's power to make any order it sees fit` app MEANS
+    IF   `Article 14(1) — the court's power arises` app
+    THEN PARTY Court MAY `make an order in respect of the charity` WITHIN 90
+    ELSE FULFILLED
+
+GIVEN app IS AN Article14Application
+GIVETH A DEONTIC Actor Part4bAction
+`Article 14(4) — the court's power to amend or revoke an order` app MEANS
+    IF   app's `the application to amend or revoke is made by the Commissioner, the Attorney General, the registered charity or a person to whom the order was directed`
+    THEN PARTY Court MAY `amend or revoke an order made under Article 14` WITHIN 90
+    ELSE FULFILLED
+
+§ `Article 15 — Deregistration on application by entity`
+
+DECLARE Article15Application HAS
+    `the charity` IS A RegisteredCharity
+    -- Article 15(2)
+    `the entity has provided the Commissioner with any information or document requested by the Commissioner in relation to the entity's proposals for the continuation or winding up of the entity and for the application of any of its property remaining after deregistration`  IS A BOOLEAN
+    -- Article 15(3)(b)
+    `there are grounds, relating to the proposals mentioned in paragraph (2), for refusing to deregister the entity`  IS A BOOLEAN
+
+GIVEN app IS AN Article15Application
+GIVETH A BOOLEAN
+`Article 15(2) — the entity has complied with paragraph (2)` app MEANS
+        "(2) An entity applying for deregistration must provide the Commissioner with any information or document requested by the Commissioner in relation to the entity's proposals for the continuation or winding up of the entity and for the application of any of its property remaining after deregistration."
+    ... app's `the entity has provided the Commissioner with any information or document requested by the Commissioner in relation to the entity's proposals for the continuation or winding up of the entity and for the application of any of its property remaining after deregistration`
+
+GIVEN app IS AN Article15Application
+GIVETH A BOOLEAN
+`Article 15(3)(b) — refusal is available` app MEANS
+        "(b) refuse to deregister the entity on grounds relating to the proposals mentioned in paragraph (2)."
+    ... app's `there are grounds, relating to the proposals mentioned in paragraph (2), for refusing to deregister the entity`
+
+§§ `Article 15 — THE REGULATIVE LAYER: the entity's permission, its duty, and the Commissioner's MUST`
+
+-- Art 15(1)-(2): the entity MAY apply; having applied, it MUST supply what is asked for.
+-- The MAY's HENCE carries the duty: the duty exists only because the entity chose to apply.
+-- >>> WITHIN 56 / WITHIN 28: reviewable placeholders. The Article prescribes no period.
+GIVETH A DEONTIC Actor Part4bAction
+`Articles 15(1) and 15(2) — the entity's application and its duty to inform` MEANS
+    PARTY Applicant MAY `apply to the Commissioner to terminate the registration of the entity` WITHIN 56
+    HENCE PARTY Applicant MUST `provide the information or document requested in relation to the proposals` WITHIN 28
+
+-- Art 15(3): a MUST, with a FORCED CHOICE. The Commissioner may not sit on the file.
+-- >>> Limb (b) is available ONLY where there are grounds relating to the proposals; where
+--     there are none, the ROR collapses to the single duty to deregister. See the header.
+-- Note the ROR is a fold over UNGUARDED duties: no `ELSE FULFILLED` inside a ROR arm
+-- (that would let a non-available branch discharge the whole choice trivially).
+GIVEN app IS AN Article15Application
+GIVETH A DEONTIC Actor Action
+`Article 15(3) — the Commissioner must deregister or refuse` app MEANS
+    IF   `Article 15(2) — the entity has complied with paragraph (2)` app
+    THEN IF   `Article 15(3)(b) — refusal is available` app
+         THEN     (PARTY Commissioner MUST `deregister the entity` WITHIN 56)
+              ROR (PARTY Commissioner MUST `refuse to deregister the entity` WITHIN 56)
+         ELSE      PARTY Commissioner MUST `deregister the entity` WITHIN 56
+    ELSE FULFILLED
+
+§ `Article 16 — Deregistration in other cases`
+
+-- THE CENTRAL CONTRAST OF THIS FILE.
+--
+--   16(1)  The Commissioner MAY deregister — a DISCRETION, and one that arises only after
+--          THREE hurdles: a procedural precondition, a proportionality judgement, and one
+--          of four grounds. Fail any one, and the power does not arise at all. Clear all
+--          three, and the Commissioner may still decline: under MAY, benign omission is
+--          FULFILLED, not BREACH.
+--
+--   16(2)  The Commissioner MUST deregister — a DUTY, on a single, simple ground (the
+--          entity no longer exists), with NO notice, NO invitation to object (there is
+--          nobody to object), NO proportionality gate. Benign omission is BREACH.
+--
+-- The whole difference between a power and a duty is the modality keyword. Everything
+-- else is scaffolding.
+
+DECLARE Article16Case HAS
+    `the charity` IS A RegisteredCharity
+
+    -- 16(1) — the PROCEDURAL PRECONDITION: "after giving the entity written notice
+    -- specifying reasons and inviting objections within a reasonable time specified in
+    -- the notice". Two distinct acts, both required.
+    `the Commissioner has given the entity written notice specifying reasons`  IS A BOOLEAN
+    `that notice invited objections within a reasonable time specified in the notice`  IS A BOOLEAN
+
+    -- 16(1) — the PROPORTIONALITY requirement: "if satisfied ... that it is proportionate
+    -- to do so". A separate hurdle from the grounds: a ground may be made out and
+    -- deregistration still be disproportionate.
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS A BOOLEAN
+
+    -- 16(1)(a) is NOT a field: it is decided by Part 3's `meets the charity test`, negated.
+    -- 16(1)(b), (c), (d):
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS A BOOLEAN
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS A BOOLEAN
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS A BOOLEAN
+
+    -- 16(2)
+    `the Commissioner is satisfied that the entity no longer exists`  IS A BOOLEAN
+
+§§ `Article 16(1) — the FOUR grounds (a)-(d)`
+
+-- (a) — a NEGATIVE limb over Part 3's charity test. "No longer meets" = NOT `meets`.
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1)(a) — the entity no longer meets the charity test` d MEANS
+        "(a) the entity no longer meets the charity test;"
+    ... NOT `meets the charity test` ((d's `the charity`)'s `the charity as tested under Article 5`)
+
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1)(b) — the Commissioner was misled into registering the entity` d MEANS
+        "(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise;"
+    ... d's `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`
+
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1)(c) — failure to comply with a required steps notice` d MEANS
+        "(c) the entity has failed to comply with a required steps notice; or"
+    ... d's `(1)(c) the entity has failed to comply with a required steps notice`
+
+-- (d) is a pure Order-making hook. It has NO computable content of its own — but it IS a
+-- LIVE DISJUNCT, so the single boolean atom "a circumstance prescribed by Order applies"
+-- is exposed rather than stubbed out. The corpus must not have a silent gap here: a
+-- prescribed circumstance really can ground deregistration.
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1)(d) — a circumstance prescribed by Order applies` d MEANS
+        "(d) any other circumstance prescribed by the Minister by Order applies."
+    ... d's `(1)(d) a circumstance prescribed by the Minister by Order applies`
+
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1) — a ground for deregistration is made out` d MEANS
+        "on the ground that -"
+    ..  `Article 16(1)(a) — the entity no longer meets the charity test` d
+    ..  `Article 16(1)(b) — the Commissioner was misled into registering the entity` d
+    ..  `Article 16(1)(c) — failure to comply with a required steps notice` d
+    ..  `Article 16(1)(d) — a circumstance prescribed by Order applies` d
+
+§§ `Article 16(1) — the procedural precondition and the proportionality requirement`
+
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1) — the procedural precondition (notice and invitation to object)` d MEANS
+        "after giving the entity written notice specifying reasons and inviting objections within a reasonable time specified in the notice,"
+    ... d's `the Commissioner has given the entity written notice specifying reasons`
+    AND d's `that notice invited objections within a reasonable time specified in the notice`
+
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1) — the proportionality requirement` d MEANS
+        "if satisfied ... that it is proportionate to do so"
+    ... d's `the Commissioner is satisfied that it is proportionate to deregister the entity`
+
+-- THE DISCRETION ARISES only if ALL THREE hold. Note what this means: a Commissioner who
+-- deregisters a charity that plainly no longer meets the charity test, but who did so
+-- WITHOUT first inviting objections, has not exercised a power at all — there was no power
+-- to exercise. Procedure is not decoration.
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(1) — the discretion to deregister arises` d MEANS
+        "(1) The Commissioner may, by written notice to an entity that is registered as a charity, deregister the entity if satisfied,"
+    ... `Article 16(1) — the procedural precondition (notice and invitation to object)` d
+    AND `Article 16(1) — the proportionality requirement` d
+    AND `Article 16(1) — a ground for deregistration is made out` d
+
+§§ `Article 16(2) — the mandatory case`
+
+GIVEN d IS AN Article16Case
+GIVETH A BOOLEAN
+`Article 16(2) — the duty to deregister arises` d MEANS
+        "(2) If the Commissioner is satisfied that an entity that is registered as a charity no longer exists, the Commissioner must, by written notice to any person purporting to be a governor of the entity or to be responsible for the winding up of the affairs of the entity, deregister the entity."
+    ... d's `the Commissioner is satisfied that the entity no longer exists`
+
+§§ `Article 16 — THE REGULATIVE LAYER: the MAY and the MUST, side by side`
+
+-- Art 16(1) — a POWER. Benign omission is FULFILLED.
+-- >>> WITHIN 56: a reviewable placeholder; the Article prescribes no period for the
+--     Commissioner's decision once the discretion has arisen.
+GIVEN d IS AN Article16Case
+GIVETH A DEONTIC Actor Action
+`Article 16(1) — the Commissioner MAY deregister` d MEANS
+    IF   `Article 16(1) — the discretion to deregister arises` d
+    THEN PARTY Commissioner MAY `deregister the entity` WITHIN 56
+    ELSE FULFILLED
+
+-- Art 16(2) — a DUTY. Benign omission is BREACH.
+GIVEN d IS AN Article16Case
+GIVETH A DEONTIC Actor Action
+`Article 16(2) — the Commissioner MUST deregister` d MEANS
+    IF   `Article 16(2) — the duty to deregister arises` d
+    THEN PARTY Commissioner MUST `deregister the entity` WITHIN 56
+    ELSE FULFILLED
+
+-- Art 16(1) — the procedural precondition, as a live sequence rather than a static fact.
+-- The Commissioner's notice OPENS the entity's window to object; the "reasonable time"
+-- lives here.
+-- >>> WITHIN 28: a REVIEWABLE PLACEHOLDER for "a reasonable time specified in the notice".
+--     The statute deliberately leaves it to the Commissioner to specify, case by case.
+GIVETH A DEONTIC Actor Part4bAction
+`Article 16(1) — the notice, and the entity's window to object` MEANS
+    PARTY Commissioner MAY `give the entity written notice specifying reasons and inviting objections` WITHIN 56
+    HENCE PARTY Charity MAY `object to the proposed deregistration` WITHIN 28
+
+§ `Article 17 — Effects of deregistration`
+
+DECLARE Article17Deregistration HAS
+    name                                                            IS A STRING
+    `the entity`                                                    IS AN Entity
+
+    -- Article 17(2)(a)-(d) — the four-limb conjunction that switches on retrospectivity.
+    `(2)(a) the Commissioner deregisters a charity under Article 16`  IS A BOOLEAN
+    `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`  IS A BOOLEAN
+    `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`  IS A BOOLEAN
+    `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`  IS A BOOLEAN
+
+    -- Article 17(5) — the gate over (6) to (11).
+    `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`  IS A BOOLEAN
+
+    -- Article 17(6)
+    `the entity continues to apply the remaining property for the preserved charitable purposes`  IS A BOOLEAN
+    `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`  IS A BOOLEAN
+
+    -- Article 17(7) — carried so the model can SHOW that it is irrelevant ("Despite any
+    -- provision of the entity's constitution ..."). It appears in NO disjunction below.
+    `a provision of the entity's constitution or constitutional Law purports to empower the entity to amend the preserved charitable purposes or preserved public benefit statement`  IS A BOOLEAN
+
+    -- Article 17(9) — who applies, and on what basis.
+    `the application under paragraph (9) is made by the Attorney General`  IS A BOOLEAN
+    `the application under paragraph (9) is made by a governor of the entity`  IS A BOOLEAN
+    `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`  IS A BOOLEAN
+    `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`  IS A BOOLEAN
+
+    -- Article 17(10) — the condition precedent on a governor's application.
+    `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`  IS A BOOLEAN
+
+§§ `Article 17(2) and 17(3) — RETROSPECTIVE deregistration`
+
+-- A FOUR-LIMB CONJUNCTION. Every limb is required. In particular (c): the past date must
+-- be SPECIFIED IN THE NOTICE. A Commissioner who is satisfied the grounds existed since a
+-- past date, and determines retrospective effect, but does not put the date in the notice,
+-- gets NO retrospective effect. Notice is, again, not decoration.
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(2) — the retrospectivity conditions` g MEANS
+        "(2) Paragraph (3) applies if the Commissioner -"
+    ... "(a) deregisters a charity under Article 16;"
+    ... g's `(2)(a) the Commissioner deregisters a charity under Article 16`
+    AND "(b) is satisfied that the grounds for deregistration have existed since a past date;"
+    ... g's `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`
+    AND "(c) specifies that date in the notice under Article 16(1) or (2); and"
+    ... g's `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`
+    AND "(d) determines that the deregistration should take effect retrospectively."
+    ... g's `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`
+
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(3) — the termination takes effect from the past date, for all purposes` g MEANS
+        "(3) The termination takes effect from the past date specified under paragraph (2)(c) for all purposes, including the purposes of any enactment relating to taxation, but subject to paragraph (4)."
+    ... `Article 17(2) — the retrospectivity conditions` g
+
+-- The consequence the statute singles out, exposed as its own query.
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(3) — the entity is treated as unregistered from the past date for the purposes of any enactment relating to taxation` g MEANS
+        "... for all purposes, including the purposes of any enactment relating to taxation ..."
+    ... `Article 17(3) — the termination takes effect from the past date, for all purposes` g
+
+§§ `Article 17(4) — THE CRIMINAL CARVE-OUT`
+
+-- "An act, that occurred before the date of the giving of the notice under Article 16(1)
+-- or (2) is not rendered an offence MERELY BY VIRTUE OF the operation of paragraph (3)."
+--
+-- Two separate things are being said, and both must be modelled:
+--   1. The retrospective operation of para (3) does NOT reach back to criminalise a past act.
+--   2. "MERELY" — an act that was ALREADY an offence, on some ground that does not depend on
+--      the retrospective deregistration, is untouched by this saving. The carve-out protects
+--      against retrospective criminalisation, not against prosecution.
+--
+-- Model each act as a record with THREE facts: when it occurred, whether para (3) is what
+-- would make it an offence, and whether it is an offence on some INDEPENDENT ground.
+DECLARE Article17ActInQuestion HAS
+    description                                                     IS A STRING
+    `the act occurred before the date of the giving of the notice under Article 16(1) or (2)`  IS A BOOLEAN
+    `the act would be rendered an offence by the operation of paragraph (3)`  IS A BOOLEAN
+    `the act is an offence on a ground independent of the operation of paragraph (3)`  IS A BOOLEAN
+
+GIVEN g IS AN Article17Deregistration
+      a IS AN Article17ActInQuestion
+GIVETH A BOOLEAN
+`Article 17(4) — the carve-out applies to the act` g a MEANS
+        "(4) An act, that occurred before the date of the giving of the notice under Article 16(1) or (2) is not rendered an offence merely by virtue of the operation of paragraph (3)."
+    ... a's `the act occurred before the date of the giving of the notice under Article 16(1) or (2)`
+    AND `Article 17(3) — the termination takes effect from the past date, for all purposes` g
+    AND a's `the act would be rendered an offence by the operation of paragraph (3)`
+    AND "merely by virtue of ..."
+    ... NOT a's `the act is an offence on a ground independent of the operation of paragraph (3)`
+
+-- The operative question: IS the act an offence?
+--   * YES if it is an offence on an independent ground ("merely" does not save it); OR
+--   * YES if paragraph (3) would render it one AND the carve-out does not apply;
+--   * otherwise NO.
+GIVEN g IS AN Article17Deregistration
+      a IS AN Article17ActInQuestion
+GIVETH A BOOLEAN
+`Article 17(4) — the act is an offence` g a MEANS
+        "... is not rendered an offence MERELY by virtue of the operation of paragraph (3)."
+    ..  a's `the act is an offence on a ground independent of the operation of paragraph (3)`
+    ..      `Article 17(3) — the termination takes effect from the past date, for all purposes` g
+        ... a's `the act would be rendered an offence by the operation of paragraph (3)`
+        AND NOT `Article 17(4) — the carve-out applies to the act` g a
+
+-- THE SAFETY PROPERTY, stated as a predicate so it can be asserted of any act:
+--   IF the act occurred before the notice date
+--   AND it is not an offence on any independent ground
+--   THEN it is not an offence.
+-- Written as the material implication (NOT antecedent) OR consequent. Assert it TRUE for
+-- every act below, including acts that para (3) would otherwise criminalise.
+GIVEN g IS AN Article17Deregistration
+      a IS AN Article17ActInQuestion
+GIVETH A BOOLEAN
+`Article 17(4) — SAFETY: no pre-notice act is retrospectively criminalised` g a MEANS
+        "SAFETY PROPERTY: for every act occurring before the notice, whose only source of criminality is the retrospective operation of paragraph (3), that act is NOT an offence."
+    ..  NOT (     a's `the act occurred before the date of the giving of the notice under Article 16(1) or (2)`
+             AND  NOT a's `the act is an offence on a ground independent of the operation of paragraph (3)` )
+    ..  NOT `Article 17(4) — the act is an offence` g a
+
+§§ `Article 17(5) to (8) — the remaining property and the preserved charitable purposes`
+
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(5) — the remaining-property regime applies` g MEANS
+        "(5) Paragraphs (6) to (11) apply, after a charity is deregistered, if and so long as there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')."
+    ... g's `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`
+
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(6) — the entity applies the remaining property for the preserved purposes` g MEANS
+        "(6) The entity must continue to apply the remaining property for the purposes that were its registered charitable purposes immediately before deregistration (the 'preserved charitable purposes'),"
+    ..  NOT `Article 17(5) — the remaining-property regime applies` g
+    ..      g's `the entity continues to apply the remaining property for the preserved charitable purposes`
+        AND "and in accordance with the registered public benefit statement that was in effect immediately before deregistration (the 'preserved public benefit statement')."
+        ... g's `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`
+
+-- A DISABILITY, not a duty. "DESPITE any provision of the entity's constitution ... the
+-- entity has NO POWER to amend." The constitution flag on the record is DELIBERATELY absent
+-- from this predicate: the whole force of "despite" is that it makes no difference. The
+-- test below proves it, by asserting the disability of an entity whose constitution
+-- expressly purports to confer the power.
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(7) — the entity has NO power to amend the preserved purposes or statement` g MEANS
+        "(7) Despite any provision of the entity's constitution, or of the constitutional Law of the entity,"
+    ... `Article 17(5) — the remaining-property regime applies` g
+    AND "the entity has no power to amend the preserved charitable purposes or preserved public benefit statement."
+
+§§ `Article 17(9) and 17(10) — the court's continuing powers over a deregistered entity`
+
+-- 17(10): a CONDITION PRECEDENT. A governor who has not first given notice to the Attorney
+-- General may not apply at all. Modelled as the proviso `(NOT governor) OR gave-notice`:
+-- vacuous where the applicant is the Attorney General.
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(10) — a governor's application is competent` g MEANS
+        "(10) A governor may not apply under paragraph (9) unless the governor has first given notice to the Attorney General of the governor's intention to do so and of the reasons for that intention."
+    ..  NOT g's `the application under paragraph (9) is made by a governor of the entity`
+    ..  g's `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`
+
+GIVEN g IS AN Article17Deregistration
+GIVETH A BOOLEAN
+`Article 17(9) — the court's power over the deregistered entity arises` g MEANS
+        "(9) The court may exercise any of the powers set out in Article 14 in relation to the deregistered entity, as if it were still registered, if,"
+    ... `Article 17(5) — the remaining-property regime applies` g
+    AND     "on an application by the Attorney General or a governor of the entity,"
+        ..  g's `the application under paragraph (9) is made by the Attorney General`
+        ..  g's `the application under paragraph (9) is made by a governor of the entity`
+    AND `Article 17(10) — a governor's application is competent` g
+    AND     "it appears to the court -"
+        ..  "(a) that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered; or"
+        ..  g's `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`
+        ..  "(b) that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement."
+        ..  g's `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`
+
+§§ `Article 17 — THE REGULATIVE LAYER`
+
+-- Art 17(1) — the Commissioner's two post-deregistration duties, woven in parallel.
+-- (a) is a MUST; (b) is a MUST NOT. The retention period is the one number this Part
+-- actually gives us: 10 years. WITHIN 3650 (days) records it without pretending to a
+-- calendar the model does not have.
+GIVETH A DEONTIC Actor Part4bAction
+`Article 17(1) — retention, and the registered number` MEANS
+    (PARTY Commissioner MUST `retain the information registered in respect of the entity for 10 years` WITHIN 3650)
+    RAND
+    (PARTY Commissioner SHANT `assign the registered number of that entity to another registered charity` WITHIN 3650)
+
+-- Art 17(6) — a DUTY, live only while there is remaining property (Art 17(5)).
+GIVEN g IS AN Article17Deregistration
+GIVETH A DEONTIC Actor Part4bAction
+`Article 17(6) — the duty to apply the remaining property for the preserved purposes` g MEANS
+    IF   `Article 17(5) — the remaining-property regime applies` g
+    THEN PARTY Charity MUST `apply the remaining property for the preserved charitable purposes` WITHIN 365
+    ELSE FULFILLED
+
+-- Art 17(7) — the disability, expressed regulatively as a PROHIBITION. The entity has no
+-- power to amend; purporting to amend is a breach.
+GIVEN g IS AN Article17Deregistration
+GIVETH A DEONTIC Actor Part4bAction
+`Article 17(7) — the entity SHANT amend the preserved purposes or statement` g MEANS
+    IF   `Article 17(5) — the remaining-property regime applies` g
+    THEN PARTY Charity SHANT `amend the preserved charitable purposes or preserved public benefit statement` WITHIN 365
+    ELSE FULFILLED
+
+-- Art 17(8) — the lawful route to the same end: not self-help, but an application to the
+-- court. The entity MAY apply; if it does, the court MAY make the order.
+GIVEN g IS AN Article17Deregistration
+GIVETH A DEONTIC Actor Part4bAction
+`Article 17(8) — application to the court to amend the preserved purposes` g MEANS
+    IF   `Article 17(5) — the remaining-property regime applies` g
+    THEN PARTY Charity MAY `apply to the court for an order amending the preserved charitable purposes or preserved public benefit statement` WITHIN 365
+         HENCE PARTY Court MAY `make such amending order, and any ancillary order, as the court considers expedient` WITHIN 90
+    ELSE FULFILLED
+
+-- Art 17(9) — the SAME Article 14 power (the same Action), over an entity that is no longer
+-- registered: "as if it were still registered". A MAY, as in Article 14.
+GIVEN g IS AN Article17Deregistration
+GIVETH A DEONTIC Actor Action
+`Article 17(9) — the court's continuing power to make an order` g MEANS
+    IF   `Article 17(9) — the court's power over the deregistered entity arises` g
+    THEN PARTY Court MAY `make an order in respect of the charity` WITHIN 90
+    ELSE FULFILLED
+
+-- Art 17(10) and (11) — the governor gives notice, applies; the Attorney General may take
+-- the application over, and then elects between withdrawing and proceeding with it.
+GIVETH A DEONTIC Actor Part4bAction
+`Articles 17(10) and 17(11) — the governor's notice and the Attorney General's takeover` MEANS
+    PARTY Governor MUST `give notice to the Attorney General of the intention to apply and of the reasons` WITHIN 28
+    HENCE PARTY AttorneyGeneral MAY `take over the application made by the governor` WITHIN 28
+          HENCE     (PARTY AttorneyGeneral MAY `withdraw the application` WITHIN 90)
+                ROR (PARTY AttorneyGeneral MAY `proceed with the application` WITHIN 90)
+
+§ `Tests — Part 4, Articles 13 to 17`
+
+§§ `The fixtures`
+
+-- A charity that is registered, meets the charity test, and is doing everything right.
+-- Built on Part 3's `Victoria College Trust`, which MEETS the charity test.
+`Jersey Heritage Trust, in good standing` MEANS RegisteredCharity WITH
+    name                                                            IS "Jersey Heritage Trust"
+    `the charity as tested under Article 5`                         IS `Victoria College Trust`
+    `the entity is registered as a charity, and has not been deregistered`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`  IS FALSE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`  IS FALSE
+    `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`  IS FALSE
+    `the entity has obtained the Commissioner's prior approval of the proposed amendment`  IS FALSE
+    `the entity provides public benefit in accordance with its registered public benefit statement`  IS TRUE
+    `the entity requests the Commissioner's approval of a proposed amendment to that statement`  IS FALSE
+    `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`  IS FALSE
+    `the charity is entered in the restricted section of the register`  IS FALSE
+    `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`  IS FALSE
+    `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`  IS FALSE
+    `it meets that different condition as specified in that permission`  IS FALSE
+    `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`  IS FALSE
+    `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`  IS FALSE
+    `(6)(c) a proposal to change the charity's constitution`         IS FALSE
+    `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`  IS FALSE
+    `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`  IS FALSE
+    `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`  IS FALSE
+    `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`  IS FALSE
+    `(6)(h) any other matter prescribed by the Minister by Order for this purpose`  IS FALSE
+    `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`  IS FALSE
+    `the charity has made a payment that is inconsistent with that statement`  IS FALSE
+    `the entity is a court-approved fideicommis or an incorporated 1862 association`  IS FALSE
+    `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`  IS FALSE
+
+#ASSERT `Article 13(1) — paragraphs (2) to (4) apply` `Jersey Heritage Trust, in good standing`
+#ASSERT `Article 13(4) — the entity complies with paragraph (4)` `Jersey Heritage Trust, in good standing`
+-- Not in the restricted section: Art 13(5) is satisfied vacuously.
+#ASSERT `Article 13(5) — the restricted-section condition is met` `Jersey Heritage Trust, in good standing`
+-- Nothing reportable has arisen: the Art 13(6) duty is not triggered.
+#ASSERT NOT `Article 13(6) — a matter arises that must be promptly reported` `Jersey Heritage Trust, in good standing`
+#ASSERT NOT `Article 13(13) — the fideicommis or 1862-association carve-out applies` `Jersey Heritage Trust, in good standing`
+
+-- The SAME charity, but its constitution purports to let it vote itself a NON-charitable
+-- purpose, AND it is in the restricted section without meeting any condition, AND a
+-- reportable matter (a proposal to change its constitution) has arisen, AND it has made a
+-- payment inconsistent with its governor-payment statement. Art 13 bites on every front.
+`Jersey Heritage Trust, misbehaving` MEANS RegisteredCharity WITH
+    name                                                            IS "Jersey Heritage Trust"
+    `the charity as tested under Article 5`                         IS `Victoria College Trust`
+    `the entity is registered as a charity, and has not been deregistered`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`  IS TRUE
+    `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`  IS FALSE   -- no evidence...
+    `the entity has obtained the Commissioner's prior approval of the proposed amendment`  IS FALSE   -- ...and no prior approval
+    `the entity provides public benefit in accordance with its registered public benefit statement`  IS FALSE
+    `the entity requests the Commissioner's approval of a proposed amendment to that statement`  IS TRUE
+    `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`  IS FALSE
+    `the charity is entered in the restricted section of the register`  IS TRUE
+    `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`  IS FALSE
+    `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`  IS FALSE
+    `it meets that different condition as specified in that permission`  IS FALSE
+    `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`  IS FALSE
+    `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`  IS FALSE
+    `(6)(c) a proposal to change the charity's constitution`         IS TRUE    -- limb (c) fires
+    `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`  IS FALSE
+    `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`  IS FALSE
+    `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`  IS FALSE
+    `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`  IS FALSE
+    `(6)(h) any other matter prescribed by the Minister by Order for this purpose`  IS FALSE
+    `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`  IS TRUE
+    `the charity has made a payment that is inconsistent with that statement`  IS TRUE
+    `the entity is a court-approved fideicommis or an incorporated 1862 association`  IS FALSE
+    `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`  IS FALSE
+
+-- 13(2): the purported power to add a non-charitable purpose is a nullity.
+#ASSERT `Article 13(2) — the purported power to add a non-charitable purpose is of no effect` `Jersey Heritage Trust, misbehaving`
+-- 13(3): the power to substitute a DIFFERENT CHARITABLE purpose survives, but neither
+-- (a) evidence nor (b) prior approval has been supplied — so the amendment may NOT be made.
+#ASSERT NOT `Article 13(3) — the proposed amendment of purposes may be made` `Jersey Heritage Trust, misbehaving`
+-- 13(4): both limbs fail — no public benefit per the statement, and a request to amend the
+-- statement made without evidence.
+#ASSERT NOT `Article 13(4)(a) — provides public benefit in accordance with the registered statement` `Jersey Heritage Trust, misbehaving`
+#ASSERT NOT `Article 13(4)(b) — evidence justifying a request to amend the statement` `Jersey Heritage Trust, misbehaving`
+#ASSERT NOT `Article 13(4) — the entity complies with paragraph (4)` `Jersey Heritage Trust, misbehaving`
+-- 13(5): in the restricted section, meeting neither the original nor any substituted condition.
+#ASSERT NOT `Article 13(5) — the restricted-section condition is met` `Jersey Heritage Trust, misbehaving`
+-- 13(6)(c): a reportable matter has arisen. The promptly-report duty is live.
+#ASSERT `Article 13(6) — a matter arises that must be promptly reported` `Jersey Heritage Trust, misbehaving`
+-- 13(11)(a): the inconsistent payment.
+#ASSERT `Article 13(11)(a) — a payment inconsistent with the statement has been made` `Jersey Heritage Trust, misbehaving`
+
+§§ `Article 13(3) — the amendment made properly: evidence AND prior approval`
+
+`Jersey Heritage Trust, amending its purposes properly` MEANS RegisteredCharity WITH
+    name                                                            IS "Jersey Heritage Trust"
+    `the charity as tested under Article 5`                         IS `Victoria College Trust`
+    `the entity is registered as a charity, and has not been deregistered`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`  IS FALSE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`  IS TRUE
+    `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`  IS TRUE
+    `the entity has obtained the Commissioner's prior approval of the proposed amendment`  IS TRUE
+    `the entity provides public benefit in accordance with its registered public benefit statement`  IS TRUE
+    `the entity requests the Commissioner's approval of a proposed amendment to that statement`  IS FALSE
+    `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`  IS FALSE
+    `the charity is entered in the restricted section of the register`  IS FALSE
+    `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`  IS FALSE
+    `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`  IS FALSE
+    `it meets that different condition as specified in that permission`  IS FALSE
+    `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`  IS FALSE
+    `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`  IS FALSE
+    `(6)(c) a proposal to change the charity's constitution`         IS FALSE
+    `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`  IS FALSE
+    `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`  IS FALSE
+    `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`  IS FALSE
+    `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`  IS FALSE
+    `(6)(h) any other matter prescribed by the Minister by Order for this purpose`  IS FALSE
+    `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`  IS FALSE
+    `the charity has made a payment that is inconsistent with that statement`  IS FALSE
+    `the entity is a court-approved fideicommis or an incorporated 1862 association`  IS FALSE
+    `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`  IS FALSE
+
+#ASSERT `Article 13(3) — the proposed amendment of purposes may be made` `Jersey Heritage Trust, amending its purposes properly`
+
+§§ `Article 13(13) — the fideicommis carve-out`
+
+-- A court-approved fideicommis, registered as a charity, whose constitution DOES purport to
+-- permit the addition of a non-charitable purpose — but where paragraphs (2) and (3) are
+-- inconsistent with an order of the court under the Loi of 1862. The carve-out disapplies
+-- (2) and (3): the nullity rule does NOT bite, and the amendment is not subject to the
+-- Commissioner's evidence-and-approval proviso. The 1862 order prevails.
+`the Le Gallais fideicommis` MEANS RegisteredCharity WITH
+    name                                                            IS "the Le Gallais fideicommis"
+    `the charity as tested under Article 5`                         IS `Victoria College Trust`
+    `the entity is registered as a charity, and has not been deregistered`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`  IS TRUE
+    `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`  IS FALSE   -- no evidence given...
+    `the entity has obtained the Commissioner's prior approval of the proposed amendment`  IS FALSE   -- ...and no approval sought
+    `the entity provides public benefit in accordance with its registered public benefit statement`  IS TRUE
+    `the entity requests the Commissioner's approval of a proposed amendment to that statement`  IS FALSE
+    `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`  IS FALSE
+    `the charity is entered in the restricted section of the register`  IS FALSE
+    `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`  IS FALSE
+    `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`  IS FALSE
+    `it meets that different condition as specified in that permission`  IS FALSE
+    `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`  IS FALSE
+    `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`  IS FALSE
+    `(6)(c) a proposal to change the charity's constitution`         IS FALSE
+    `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`  IS FALSE
+    `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`  IS FALSE
+    `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`  IS FALSE
+    `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`  IS FALSE
+    `(6)(h) any other matter prescribed by the Minister by Order for this purpose`  IS FALSE
+    `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`  IS FALSE
+    `the charity has made a payment that is inconsistent with that statement`  IS FALSE
+    `the entity is a court-approved fideicommis or an incorporated 1862 association`  IS TRUE
+    `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`  IS TRUE
+
+#ASSERT `Article 13(13) — the fideicommis or 1862-association carve-out applies` `the Le Gallais fideicommis`
+-- (2) does NOT bite: the constitutional provision is NOT of no effect.
+#ASSERT NOT `Article 13(2) — the purported power to add a non-charitable purpose is of no effect` `the Le Gallais fideicommis`
+-- (3) does NOT bite: the amendment may be made WITHOUT the Commissioner's evidence and
+-- prior approval, because the 1862 order says so.
+#ASSERT `Article 13(3) — the proposed amendment of purposes may be made` `the Le Gallais fideicommis`
+
+§§ `Article 13 — the duties, exercised`
+
+-- The charity in good standing provides public benefit within the year: FULFILLED.
+#TRACE `Article 13(4) — the duty to provide public benefit` `Jersey Heritage Trust, in good standing` AT 0 WITH
+    PARTY Charity DOES `provide public benefit in accordance with the registered public benefit statement` AT 200
+
+-- Art 13(6): a reportable matter has arisen (a proposal to change the constitution). The
+-- charity reports on day 5, inside the "promptly" placeholder of 14 days: FULFILLED.
+#TRACE `Article 13(6) — the duty to report promptly` `Jersey Heritage Trust, misbehaving` AT 0 WITH
+    PARTY Charity DOES `report the matter to the Commissioner` AT 5
+
+-- The SAME charity, which never reports. A MUST: the deadline passes and it is a BREACH.
+#TRACE `Article 13(6) — the duty to report promptly` `Jersey Heritage Trust, misbehaving` AT 0 WITH
+    PARTY Commissioner DOES `send an annual return` AT 400
+
+-- Art 13(7): the annual return, sent.
+#TRACE `Article 13(7) — the duty to send an annual return` AT 0 WITH
+    PARTY Charity DOES `send an annual return` AT 350
+
+-- Art 13(11): the charity makes the inconsistent payment. SHANT — doing the act IS the breach.
+#TRACE `Article 13(11) — payments inconsistent with the governor-payment statement` AT 0 WITH
+    PARTY Charity DOES `make a payment that is inconsistent with a statement provided under Article 13(9)(b)` AT 100
+
+-- Art 13(11): the LAWFUL route — the charity applies for permission to amend the statement
+-- instead, and makes no inconsistent payment. The SHANT is honoured; the MAY is exercised.
+#TRACE `Article 13(11) — payments inconsistent with the governor-payment statement` AT 0 WITH
+    PARTY Charity DOES `apply to the Commissioner, with reasons, for permission to amend that statement` AT 100
+
+§§ `Article 14 — the court's powers`
+
+-- An order of a KIND EXPRESSLY LISTED: suspending a governor, with ancillary provision.
+`an order suspending a governor, with ancillary provision` MEANS Part4CourtOrder WITH
+    description                                                     IS "suspending Ms Le Brun, with ancillary directions"
+    `(a)(i) prohibiting the charity or a governor from referring to or holding out the entity as a charity or Jersey charity, or as being charitable, having charitable purposes or providing public benefit`  IS FALSE
+    `(a)(ii) prohibiting the charity or a governor from soliciting donations from the public, as specified in the order`  IS FALSE
+    `(a)(iii) prohibiting the charity or a governor from taking any other action specified in the order`  IS FALSE
+    `(b) appointing a person (whether for a specified or indefinite period) to manage the affairs of the charity in place of its governors`  IS FALSE
+    `(c) appointing a person to be a governor of the charity`        IS FALSE
+    `(d) suspending or removing a governor of the charity, or any other person concerned in the management or control of the charity`  IS TRUE
+    `(e) requiring a person (including without prejudice a person carrying on regulated financial services business) who holds property on behalf of the charity, or on behalf of a governor of the charity, not to part with the property without the court's consent`  IS FALSE
+    `(f) restricting the transactions that may be entered into, or the nature or amount of the payments that may be made, in the administration of the charity without the court's consent`  IS FALSE
+    `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`  IS FALSE
+    `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`  IS FALSE
+    `(i) making such ancillary provision as the court thinks desirable`  IS TRUE
+    `is an order of some other kind, not among those listed in paragraph (3)`  IS FALSE
+
+#ASSERT `Article 14(3) — the order is among those expressly listed` `an order suspending a governor, with ancillary provision`
+
+-- An order of a kind NOWHERE in the list. It is NOT within paragraph (3) — and it does not
+-- need to be: paragraph (2) is the general power, and (3) is "without prejudice to the
+-- generality" of it. The model shows the list is non-exhaustive rather than merely saying so.
+`an order the court sees fit, of a kind not listed` MEANS Part4CourtOrder WITH
+    description                                                     IS "directing a forensic audit at the charity's expense"
+    `(a)(i) prohibiting the charity or a governor from referring to or holding out the entity as a charity or Jersey charity, or as being charitable, having charitable purposes or providing public benefit`  IS FALSE
+    `(a)(ii) prohibiting the charity or a governor from soliciting donations from the public, as specified in the order`  IS FALSE
+    `(a)(iii) prohibiting the charity or a governor from taking any other action specified in the order`  IS FALSE
+    `(b) appointing a person (whether for a specified or indefinite period) to manage the affairs of the charity in place of its governors`  IS FALSE
+    `(c) appointing a person to be a governor of the charity`        IS FALSE
+    `(d) suspending or removing a governor of the charity, or any other person concerned in the management or control of the charity`  IS FALSE
+    `(e) requiring a person (including without prejudice a person carrying on regulated financial services business) who holds property on behalf of the charity, or on behalf of a governor of the charity, not to part with the property without the court's consent`  IS FALSE
+    `(f) restricting the transactions that may be entered into, or the nature or amount of the payments that may be made, in the administration of the charity without the court's consent`  IS FALSE
+    `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`  IS FALSE
+    `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`  IS FALSE
+    `(i) making such ancillary provision as the court thinks desirable`  IS FALSE
+    `is an order of some other kind, not among those listed in paragraph (3)`  IS TRUE
+
+#ASSERT NOT `Article 14(3) — the order is among those expressly listed` `an order the court sees fit, of a kind not listed`
+
+-- GATE (a): the Commissioner applies, alleging misconduct. Part 1's `is misconduct` decides
+-- the allegation; we reuse its `breach of a required steps notice by the charity`.
+`the Commissioner's Article 14 application, alleging misconduct` MEANS Article14Application WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, misbehaving`
+    `the application is made by the Commissioner or the Attorney General`  IS TRUE
+    `the conduct alleged`                                           IS `breach of a required steps notice by the charity`
+    `it appears to the court that the conduct alleged is or has been in the administration of the charity`  IS TRUE
+    `(1)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the property of the charity or securing a proper application of that property in accordance with the charity's registered charitable purposes and registered public benefit statement`  IS FALSE
+    `the application to amend or revoke is made by the Commissioner, the Attorney General, the registered charity or a person to whom the order was directed`  IS TRUE
+    `the constitution of the charity purports to restrict or exclude the powers of the court`  IS TRUE   -- 14(5)(b): irrelevant, and shown to be
+
+#ASSERT `Article 14(1)(a) — misconduct in the administration of the charity` `the Commissioner's Article 14 application, alleging misconduct`
+#ASSERT NOT `Article 14(1)(b) — necessary or desirable to protect the property` `the Commissioner's Article 14 application, alleging misconduct`
+-- Gate (a) ALONE opens the power: the gates are ALTERNATIVE.
+#ASSERT `Article 14(1) — the court's power arises` `the Commissioner's Article 14 application, alleging misconduct`
+-- ART 14(5)(b), OPERATIVE: the constitution purports to exclude the court's powers, and the
+-- power arises anyway. "Despite anything in the constitution of the charity."
+
+-- GATE (b) ALONE: no misconduct at all, but the property needs protecting.
+`the Attorney General's Article 14 application, to protect the property` MEANS Article14Application WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the application is made by the Commissioner or the Attorney General`  IS TRUE
+    `the conduct alleged`                                           IS `money laundering by an outsider, in relation to the charity`
+    `it appears to the court that the conduct alleged is or has been in the administration of the charity`  IS FALSE   -- the outsider is not in the administration
+    `(1)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the property of the charity or securing a proper application of that property in accordance with the charity's registered charitable purposes and registered public benefit statement`  IS TRUE
+    `the application to amend or revoke is made by the Commissioner, the Attorney General, the registered charity or a person to whom the order was directed`  IS TRUE
+    `the constitution of the charity purports to restrict or exclude the powers of the court`  IS FALSE
+
+#ASSERT NOT `Article 14(1)(a) — misconduct in the administration of the charity` `the Attorney General's Article 14 application, to protect the property`
+#ASSERT `Article 14(1)(b) — necessary or desirable to protect the property` `the Attorney General's Article 14 application, to protect the property`
+#ASSERT `Article 14(1) — the court's power arises` `the Attorney General's Article 14 application, to protect the property`
+
+-- NO STANDING: a disgruntled donor applies. Misconduct or not, the court's Article 14 power
+-- does not arise: the chapeau is a CONJUNCT.
+`a donor's Article 14 application (no standing)` MEANS Article14Application WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, misbehaving`
+    `the application is made by the Commissioner or the Attorney General`  IS FALSE   -- the only change that matters
+    `the conduct alleged`                                           IS `breach of a required steps notice by the charity`
+    `it appears to the court that the conduct alleged is or has been in the administration of the charity`  IS TRUE
+    `(1)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the property of the charity or securing a proper application of that property in accordance with the charity's registered charitable purposes and registered public benefit statement`  IS TRUE
+    `the application to amend or revoke is made by the Commissioner, the Attorney General, the registered charity or a person to whom the order was directed`  IS FALSE
+    `the constitution of the charity purports to restrict or exclude the powers of the court`  IS FALSE
+
+#ASSERT `Article 14(1)(a) — misconduct in the administration of the charity` `a donor's Article 14 application (no standing)`
+#ASSERT NOT `Article 14(1) — the court's power arises` `a donor's Article 14 application (no standing)`
+
+-- The court exercises the Article 14 power: it makes an order.
+#TRACE `Article 14(2) — the court's power to make any order it sees fit` `the Commissioner's Article 14 application, alleging misconduct` AT 0 WITH
+    PARTY Court DOES `make an order in respect of the charity` AT 60
+
+-- The court DECLINES to make any order. Article 14(2) is a MAY: benign omission is
+-- FULFILLED, not BREACH. A court that hears the application and does nothing has not
+-- breached the Law.
+#TRACE `Article 14(2) — the court's power to make any order it sees fit` `the Commissioner's Article 14 application, alleging misconduct` AT 0 WITH
+    PARTY Commissioner DOES `report the matter to the Commissioner` AT 200
+
+-- Art 14(4): the charity applies to have the order revoked, and the court revokes it.
+#TRACE `Article 14(4) — the court's power to amend or revoke an order` `the Commissioner's Article 14 application, alleging misconduct` AT 0 WITH
+    PARTY Court DOES `amend or revoke an order made under Article 14` AT 80
+
+§§ `Article 15 — deregistration on application by the entity`
+
+-- The entity applies, complies with the information request, and there are no grounds
+-- relating to its proposals for refusing. The Commissioner MUST deregister — the ROR
+-- collapses to a single duty, because limb (b) is not available.
+`Jersey Heritage Trust's deregistration application (clean)` MEANS Article15Application WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the entity has provided the Commissioner with any information or document requested by the Commissioner in relation to the entity's proposals for the continuation or winding up of the entity and for the application of any of its property remaining after deregistration`  IS TRUE
+    `there are grounds, relating to the proposals mentioned in paragraph (2), for refusing to deregister the entity`  IS FALSE
+
+#ASSERT `Article 15(2) — the entity has complied with paragraph (2)` `Jersey Heritage Trust's deregistration application (clean)`
+#ASSERT NOT `Article 15(3)(b) — refusal is available` `Jersey Heritage Trust's deregistration application (clean)`
+
+-- The entity complies, but its proposals for the application of the remaining property are
+-- unsatisfactory. NOW limb (b) is open, and the Commissioner has a genuine choice.
+`Jersey Heritage Trust's deregistration application (bad proposals)` MEANS Article15Application WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the entity has provided the Commissioner with any information or document requested by the Commissioner in relation to the entity's proposals for the continuation or winding up of the entity and for the application of any of its property remaining after deregistration`  IS TRUE
+    `there are grounds, relating to the proposals mentioned in paragraph (2), for refusing to deregister the entity`  IS TRUE
+
+#ASSERT `Article 15(3)(b) — refusal is available` `Jersey Heritage Trust's deregistration application (bad proposals)`
+
+-- The entity does NOT comply with the information request. Article 15(3) never engages:
+-- "IF the entity complies with paragraph (2) the Commissioner must -". No duty arises.
+`Jersey Heritage Trust's deregistration application (non-compliant)` MEANS Article15Application WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the entity has provided the Commissioner with any information or document requested by the Commissioner in relation to the entity's proposals for the continuation or winding up of the entity and for the application of any of its property remaining after deregistration`  IS FALSE
+    `there are grounds, relating to the proposals mentioned in paragraph (2), for refusing to deregister the entity`  IS FALSE
+
+#ASSERT NOT `Article 15(2) — the entity has complied with paragraph (2)` `Jersey Heritage Trust's deregistration application (non-compliant)`
+
+-- The entity applies and then supplies the requested information: the MAY's HENCE carries
+-- the duty, and the duty is discharged.
+#TRACE `Articles 15(1) and 15(2) — the entity's application and its duty to inform` AT 0 WITH
+    PARTY Applicant DOES `apply to the Commissioner to terminate the registration of the entity` AT 10
+    PARTY Applicant DOES `provide the information or document requested in relation to the proposals` AT 20
+
+-- The entity applies and then goes silent. The Art 15(2) duty is BREACHED.
+#TRACE `Articles 15(1) and 15(2) — the entity's application and its duty to inform` AT 0 WITH
+    PARTY Applicant DOES `apply to the Commissioner to terminate the registration of the entity` AT 10
+
+-- Art 15(3), clean application: the Commissioner deregisters. FULFILLED.
+#TRACE `Article 15(3) — the Commissioner must deregister or refuse` `Jersey Heritage Trust's deregistration application (clean)` AT 0 WITH
+    PARTY Commissioner DOES `deregister the entity` AT 30
+
+-- Art 15(3), clean application, and the Commissioner does NOTHING. This is a MUST, not a
+-- MAY: sitting on the file is a BREACH. Contrast the Article 14 and Article 16(1) traces.
+#TRACE `Article 15(3) — the Commissioner must deregister or refuse` `Jersey Heritage Trust's deregistration application (clean)` AT 0 WITH
+    PARTY Charity DOES `send an annual return` AT 200
+
+-- Art 15(3), bad proposals: the Commissioner refuses, on grounds relating to the proposals.
+-- The ROR is satisfied by EITHER arm.
+#TRACE `Article 15(3) — the Commissioner must deregister or refuse` `Jersey Heritage Trust's deregistration application (bad proposals)` AT 0 WITH
+    PARTY Commissioner DOES `refuse to deregister the entity` AT 30
+
+§ `Article 16 — THE CENTRAL TEST SUITE: the MAY and the MUST`
+
+§§ `The four grounds, made out in turn`
+
+-- GROUND (a): the entity no longer meets the charity test. We give it the Part 3
+-- `the Jersey Arts Quango` — a CandidateCharity that FAILS the test (its constitution lets
+-- the Minister direct it, so the Art 5(2) knock-out bites).
+`the Quango, no longer meeting the charity test` MEANS RegisteredCharity WITH
+    name                                                            IS "the Jersey Arts Quango"
+    `the charity as tested under Article 5`                         IS `the Jersey Arts Quango`
+    `the entity is registered as a charity, and has not been deregistered`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to include a purpose that is not charitable`  IS FALSE
+    `a provision of the entity's constitution or constitutional Law purports to permit an amendment of the purposes of the entity to add or substitute a different charitable purpose`  IS FALSE
+    `the entity has provided evidence, to the satisfaction of the Commissioner, of a reason justifying the proposed amendment`  IS FALSE
+    `the entity has obtained the Commissioner's prior approval of the proposed amendment`  IS FALSE
+    `the entity provides public benefit in accordance with its registered public benefit statement`  IS TRUE
+    `the entity requests the Commissioner's approval of a proposed amendment to that statement`  IS FALSE
+    `the entity provides evidence, to the satisfaction of the Commissioner, of a reason justifying that request`  IS FALSE
+    `the charity is entered in the restricted section of the register`  IS FALSE
+    `it meets the condition, prescribed under Article 9(2), as to which the Commissioner was satisfied under Article 9(6)(b)`  IS FALSE
+    `before it ceased to meet that condition, the Commissioner gave prior permission for it to remain entered in the restricted section on the basis of a different condition prescribed under that Article`  IS FALSE
+    `it meets that different condition as specified in that permission`  IS FALSE
+    `(6)(a) a change in a matter about which information is entered on the register (whether in the general or restricted section) in relation to that charity`  IS FALSE
+    `(6)(b) any other matter, coming to light after registration or after permission for a change of name, that could, if known before the registration or permission, have led to the Commissioner refusing to register the charity, refusing to accept the name of the charity, or entering it in a different section`  IS FALSE
+    `(6)(c) a proposal to change the charity's constitution`         IS FALSE
+    `(6)(d) a proposal that could result, or an event that has resulted, in the charity ceasing to meet the requirements of Article 11(4)(c) or (d)`  IS FALSE
+    `(6)(e) a reportable matter, in relation to a governor of the charity, of which the charity is aware that the governor has not promptly reported it to the Commissioner under Article 19(2)`  IS FALSE
+    `(6)(f) a matter likely to lead to the charity becoming bankrupt, being wound up or otherwise ceasing to exist`  IS FALSE
+    `(6)(g) if the charity is entered in the restricted section, a proposal to change how or whether the charity meets a condition prescribed under Article 9(2)`  IS FALSE
+    `(6)(h) any other matter prescribed by the Minister by Order for this purpose`  IS FALSE
+    `a statement of current intentions as to future payments has been provided under Article 13(9)(b)`  IS FALSE
+    `the charity has made a payment that is inconsistent with that statement`  IS FALSE
+    `the entity is a court-approved fideicommis or an incorporated 1862 association`  IS FALSE
+    `paragraphs (2) and (3) are inconsistent with an order made, whether before or after registration under this Law, by the court under the Loi of 1862`  IS FALSE
+
+-- GROUND (a), everything else in order: notice given, objections invited, proportionate.
+`Article 16 case — ground (a), the charity test no longer met` MEANS Article16Case WITH
+    `the charity`                                                   IS `the Quango, no longer meeting the charity test`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS TRUE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT `Article 16(1)(a) — the entity no longer meets the charity test` `Article 16 case — ground (a), the charity test no longer met`
+#ASSERT `Article 16(1) — a ground for deregistration is made out` `Article 16 case — ground (a), the charity test no longer met`
+#ASSERT `Article 16(1) — the procedural precondition (notice and invitation to object)` `Article 16 case — ground (a), the charity test no longer met`
+#ASSERT `Article 16(1) — the proportionality requirement` `Article 16 case — ground (a), the charity test no longer met`
+#ASSERT `Article 16(1) — the discretion to deregister arises` `Article 16 case — ground (a), the charity test no longer met`
+#ASSERT NOT `Article 16(2) — the duty to deregister arises` `Article 16 case — ground (a), the charity test no longer met`
+
+-- GROUND (b): the Commissioner was misled. The charity STILL meets the charity test — the
+-- Quango's problem is not this charity's problem — so ground (a) is NOT made out, and (b)
+-- carries the case alone.
+`Article 16 case — ground (b), the Commissioner was misled` MEANS Article16Case WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS TRUE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS TRUE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT NOT `Article 16(1)(a) — the entity no longer meets the charity test` `Article 16 case — ground (b), the Commissioner was misled`
+#ASSERT `Article 16(1)(b) — the Commissioner was misled into registering the entity` `Article 16 case — ground (b), the Commissioner was misled`
+#ASSERT `Article 16(1) — a ground for deregistration is made out` `Article 16 case — ground (b), the Commissioner was misled`
+#ASSERT `Article 16(1) — the discretion to deregister arises` `Article 16 case — ground (b), the Commissioner was misled`
+
+-- GROUND (c): failure to comply with a required steps notice.
+`Article 16 case — ground (c), required steps notice not complied with` MEANS Article16Case WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS TRUE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS TRUE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT `Article 16(1)(c) — failure to comply with a required steps notice` `Article 16 case — ground (c), required steps notice not complied with`
+#ASSERT `Article 16(1) — the discretion to deregister arises` `Article 16 case — ground (c), required steps notice not complied with`
+
+-- GROUND (d): a circumstance PRESCRIBED BY ORDER. The Order's content is unknown to this
+-- model — but the ground is LIVE, and the model says so. No silent gap.
+`Article 16 case — ground (d), a circumstance prescribed by Order` MEANS Article16Case WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS TRUE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS TRUE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT `Article 16(1)(d) — a circumstance prescribed by Order applies` `Article 16 case — ground (d), a circumstance prescribed by Order`
+#ASSERT `Article 16(1) — a ground for deregistration is made out` `Article 16 case — ground (d), a circumstance prescribed by Order`
+#ASSERT `Article 16(1) — the discretion to deregister arises` `Article 16 case — ground (d), a circumstance prescribed by Order`
+
+§§ `Article 16(1) — the two hurdles that stop the power arising even where a ground IS made out`
+
+-- THE PROCEDURAL PRECONDITION NOT MET. The charity plainly no longer meets the charity test.
+-- The Commissioner thinks deregistration proportionate. But no notice was given, and no
+-- objections invited. The DISCRETION DOES NOT ARISE. There is no power to exercise.
+`Article 16 case — ground (a) made out, but NO NOTICE was given` MEANS Article16Case WITH
+    `the charity`                                                   IS `the Quango, no longer meeting the charity test`
+    `the Commissioner has given the entity written notice specifying reasons`  IS FALSE   -- the failure
+    `that notice invited objections within a reasonable time specified in the notice`  IS FALSE   -- and so no invitation either
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT `Article 16(1) — a ground for deregistration is made out` `Article 16 case — ground (a) made out, but NO NOTICE was given`
+#ASSERT `Article 16(1) — the proportionality requirement` `Article 16 case — ground (a) made out, but NO NOTICE was given`
+#ASSERT NOT `Article 16(1) — the procedural precondition (notice and invitation to object)` `Article 16 case — ground (a) made out, but NO NOTICE was given`
+#ASSERT NOT `Article 16(1) — the discretion to deregister arises` `Article 16 case — ground (a) made out, but NO NOTICE was given`
+
+-- HALF the procedure: notice given, but it did NOT invite objections within a reasonable
+-- time. Both acts are required; one is not enough. The audi alteram partem limb is what is
+-- missing, and it is the more important half.
+`Article 16 case — notice given, but NO INVITATION to object` MEANS Article16Case WITH
+    `the charity`                                                   IS `the Quango, no longer meeting the charity test`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS FALSE   -- the failure
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT NOT `Article 16(1) — the procedural precondition (notice and invitation to object)` `Article 16 case — notice given, but NO INVITATION to object`
+#ASSERT NOT `Article 16(1) — the discretion to deregister arises` `Article 16 case — notice given, but NO INVITATION to object`
+
+-- PROPORTIONALITY FAILS. Every procedural box ticked; the ground (a technical failure to
+-- comply with a required steps notice) is squarely made out; and yet deregistration — the
+-- regulatory death penalty — would be disproportionate. The discretion does not arise. This
+-- is the limb a regulator is most tempted to skip, and the model will not let it.
+`Article 16 case — ground made out, but DISPROPORTIONATE` MEANS Article16Case WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS TRUE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS FALSE   -- the failure
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS TRUE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT `Article 16(1) — a ground for deregistration is made out` `Article 16 case — ground made out, but DISPROPORTIONATE`
+#ASSERT `Article 16(1) — the procedural precondition (notice and invitation to object)` `Article 16 case — ground made out, but DISPROPORTIONATE`
+#ASSERT NOT `Article 16(1) — the proportionality requirement` `Article 16 case — ground made out, but DISPROPORTIONATE`
+#ASSERT NOT `Article 16(1) — the discretion to deregister arises` `Article 16 case — ground made out, but DISPROPORTIONATE`
+
+-- NO GROUND AT ALL: perfect procedure, an entirely proportionate view, and nothing to hang
+-- it on. The discretion does not arise.
+`Article 16 case — impeccable procedure, but NO GROUND` MEANS Article16Case WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the Commissioner has given the entity written notice specifying reasons`  IS TRUE
+    `that notice invited objections within a reasonable time specified in the notice`  IS TRUE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS TRUE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS FALSE
+
+#ASSERT NOT `Article 16(1) — a ground for deregistration is made out` `Article 16 case — impeccable procedure, but NO GROUND`
+#ASSERT NOT `Article 16(1) — the discretion to deregister arises` `Article 16 case — impeccable procedure, but NO GROUND`
+
+§§ `Article 16(2) — the MUST`
+
+-- The entity no longer exists. NO notice-and-objection precondition (nobody left to object),
+-- NO proportionality gate, NO ground to establish beyond the fact of non-existence. And the
+-- Commissioner MUST deregister. Note that on these facts the Art 16(1) DISCRETION does NOT
+-- arise at all — no notice, no proportionality finding, no (a)-(d) ground — and yet the
+-- Art 16(2) DUTY does. The two routes are independent.
+`Article 16 case — the entity no longer exists` MEANS Article16Case WITH
+    `the charity`                                                   IS `Jersey Heritage Trust, in good standing`
+    `the Commissioner has given the entity written notice specifying reasons`  IS FALSE
+    `that notice invited objections within a reasonable time specified in the notice`  IS FALSE
+    `the Commissioner is satisfied that it is proportionate to deregister the entity`  IS FALSE
+    `(1)(b) the Commissioner was misled into registering the entity, whether by the entity or by any other person and whether intentionally or otherwise`  IS FALSE
+    `(1)(c) the entity has failed to comply with a required steps notice`  IS FALSE
+    `(1)(d) a circumstance prescribed by the Minister by Order applies`  IS FALSE
+    `the Commissioner is satisfied that the entity no longer exists`  IS TRUE
+
+#ASSERT `Article 16(2) — the duty to deregister arises` `Article 16 case — the entity no longer exists`
+#ASSERT NOT `Article 16(1) — the discretion to deregister arises` `Article 16 case — the entity no longer exists`
+
+§§ `THE MAY AND THE MUST, TRACED SIDE BY SIDE`
+
+-- (1) The Commissioner EXERCISES the Article 16(1) discretion: deregisters on day 30.
+--     The MAY is discharged. FULFILLED.
+#TRACE `Article 16(1) — the Commissioner MAY deregister` `Article 16 case — ground (a), the charity test no longer met` AT 0 WITH
+    PARTY Commissioner DOES `deregister the entity` AT 30
+
+-- (2) The Commissioner DECLINES to exercise it. The ground is made out, the procedure was
+--     impeccable, deregistration would be proportionate — and the Commissioner, having
+--     considered it all, does nothing. THIS IS NOT A BREACH. Benign omission under a MAY is
+--     FULFILLED. That is the whole meaning of a discretion, and it is why Article 16(1) is
+--     a power and Article 16(2) is a duty.
+#TRACE `Article 16(1) — the Commissioner MAY deregister` `Article 16 case — ground (a), the charity test no longer met` AT 0 WITH
+    PARTY Charity DOES `send an annual return` AT 400
+
+-- (3) The Commissioner MUST deregister under 16(2), and does. FULFILLED.
+#TRACE `Article 16(2) — the Commissioner MUST deregister` `Article 16 case — the entity no longer exists` AT 0 WITH
+    PARTY Commissioner DOES `deregister the entity` AT 30
+
+-- (4) The Commissioner MUST deregister under 16(2), and does NOT. Compare trace (2), where
+--     the identical inaction was FULFILLED. Here it is a BREACH. Same actor, same inaction,
+--     same act left undone — different modality, opposite result.
+#TRACE `Article 16(2) — the Commissioner MUST deregister` `Article 16 case — the entity no longer exists` AT 0 WITH
+    PARTY Charity DOES `send an annual return` AT 400
+
+-- (5) Where the discretion never arose (no notice given), the residual is FULFILLED and the
+--     Commissioner has no power to deregister. A deregistration on these facts is not the
+--     exercise of a power; it is an act without authority, and Article 34 is the remedy.
+#TRACE `Article 16(1) — the Commissioner MAY deregister` `Article 16 case — ground (a) made out, but NO NOTICE was given` AT 0 WITH
+    PARTY Charity DOES `send an annual return` AT 400
+
+-- (6) The procedural precondition as a LIVE SEQUENCE: the Commissioner gives notice on day
+--     7; the entity objects on day 20, inside the 28-day "reasonable time" placeholder.
+#TRACE `Article 16(1) — the notice, and the entity's window to object` AT 0 WITH
+    PARTY Commissioner DOES `give the entity written notice specifying reasons and inviting objections` AT 7
+    PARTY Charity DOES `object to the proposed deregistration` AT 20
+
+-- (7) The entity, having received notice, does not object. Both limbs are MAYs: the entity
+--     is not obliged to object, and its silence is not a breach.
+#TRACE `Article 16(1) — the notice, and the entity's window to object` AT 0 WITH
+    PARTY Commissioner DOES `give the entity written notice specifying reasons and inviting objections` AT 7
+
+§ `Article 17 — Effects of deregistration`
+
+§§ `Article 17(2) and (3) — retrospective deregistration, and the four-limb conjunction`
+
+-- All four limbs made out. Retrospective effect follows, "for all purposes, including the
+-- purposes of any enactment relating to taxation".
+`the retrospective deregistration` MEANS Article17Deregistration WITH
+    name                                                            IS "Jersey Heritage Trust, deregistered retrospectively"
+    `the entity`                                                    IS `Jersey Heritage Ltd`
+    `(2)(a) the Commissioner deregisters a charity under Article 16`  IS TRUE
+    `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`  IS TRUE
+    `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`  IS TRUE
+    `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`  IS TRUE
+    `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`  IS TRUE
+    `the entity continues to apply the remaining property for the preserved charitable purposes`  IS TRUE
+    `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to empower the entity to amend the preserved charitable purposes or preserved public benefit statement`  IS TRUE   -- 17(7): irrelevant, and shown to be
+    `the application under paragraph (9) is made by the Attorney General`  IS TRUE
+    `the application under paragraph (9) is made by a governor of the entity`  IS FALSE
+    `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`  IS TRUE
+    `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`  IS FALSE
+    `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`  IS FALSE
+
+#ASSERT `Article 17(2) — the retrospectivity conditions` `the retrospective deregistration`
+#ASSERT `Article 17(3) — the termination takes effect from the past date, for all purposes` `the retrospective deregistration`
+#ASSERT `Article 17(3) — the entity is treated as unregistered from the past date for the purposes of any enactment relating to taxation` `the retrospective deregistration`
+
+-- LIMB (c) MISSING. The Commissioner is satisfied the grounds have existed since a past
+-- date, and determines that deregistration should be retrospective — but never SPECIFIES
+-- THE DATE IN THE NOTICE. Paragraph (3) does not apply. There is no retrospective effect,
+-- and in particular no retrospective tax consequence. Notice is not decoration.
+`the deregistration where the date was never specified in the notice` MEANS Article17Deregistration WITH
+    name                                                            IS "Jersey Heritage Trust, deregistered without a specified date"
+    `the entity`                                                    IS `Jersey Heritage Ltd`
+    `(2)(a) the Commissioner deregisters a charity under Article 16`  IS TRUE
+    `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`  IS TRUE
+    `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`  IS FALSE   -- the missing limb
+    `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`  IS TRUE
+    `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`  IS TRUE
+    `the entity continues to apply the remaining property for the preserved charitable purposes`  IS TRUE
+    `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`  IS TRUE
+    `a provision of the entity's constitution or constitutional Law purports to empower the entity to amend the preserved charitable purposes or preserved public benefit statement`  IS FALSE
+    `the application under paragraph (9) is made by the Attorney General`  IS FALSE
+    `the application under paragraph (9) is made by a governor of the entity`  IS FALSE
+    `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`  IS FALSE
+    `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`  IS FALSE
+    `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`  IS FALSE
+
+#ASSERT NOT `Article 17(2) — the retrospectivity conditions` `the deregistration where the date was never specified in the notice`
+#ASSERT NOT `Article 17(3) — the termination takes effect from the past date, for all purposes` `the deregistration where the date was never specified in the notice`
+#ASSERT NOT `Article 17(3) — the entity is treated as unregistered from the past date for the purposes of any enactment relating to taxation` `the deregistration where the date was never specified in the notice`
+
+§§ `Article 17(4) — THE CRIMINAL CARVE-OUT, asserted explicitly`
+
+-- ACT 1. The charity, while it believed itself registered, held itself out as a charity and
+-- solicited donations on that footing — perfectly lawful at the time. The retrospective
+-- deregistration means it was NOT a registered charity when it did so, and Article 21 makes
+-- it an offence for an unregistered entity to refer to itself as a charity. Paragraph (3),
+-- left to itself, would render this act an offence. THE CARVE-OUT SAVES IT.
+`holding itself out as a charity, before the notice` MEANS Article17ActInQuestion WITH
+    description                                                     IS "referring to itself as a registered charity while soliciting donations, in the months before the notice"
+    `the act occurred before the date of the giving of the notice under Article 16(1) or (2)`  IS TRUE
+    `the act would be rendered an offence by the operation of paragraph (3)`  IS TRUE
+    `the act is an offence on a ground independent of the operation of paragraph (3)`  IS FALSE
+
+#ASSERT `Article 17(4) — the carve-out applies to the act` `the retrospective deregistration` `holding itself out as a charity, before the notice`
+#ASSERT NOT `Article 17(4) — the act is an offence` `the retrospective deregistration` `holding itself out as a charity, before the notice`
+#ASSERT `Article 17(4) — SAFETY: no pre-notice act is retrospectively criminalised` `the retrospective deregistration` `holding itself out as a charity, before the notice`
+
+-- ACT 2. The word "MERELY" is load-bearing. The treasurer stole from the collection plate
+-- before the notice. That was theft when he did it, and it is theft still: the act is an
+-- offence on a ground that owes NOTHING to the retrospective operation of paragraph (3).
+-- Article 17(4) is a shield against retrospective criminalisation, not an amnesty.
+`theft from the charity, before the notice` MEANS Article17ActInQuestion WITH
+    description                                                     IS "the treasurer's theft from the charity's funds, in the months before the notice"
+    `the act occurred before the date of the giving of the notice under Article 16(1) or (2)`  IS TRUE
+    `the act would be rendered an offence by the operation of paragraph (3)`  IS FALSE
+    `the act is an offence on a ground independent of the operation of paragraph (3)`  IS TRUE
+
+#ASSERT NOT `Article 17(4) — the carve-out applies to the act` `the retrospective deregistration` `theft from the charity, before the notice`
+#ASSERT `Article 17(4) — the act is an offence` `the retrospective deregistration` `theft from the charity, before the notice`
+-- And the SAFETY PROPERTY still holds — because its antecedent requires that the act NOT be
+-- an offence on any independent ground. The property is not violated by a genuine thief.
+#ASSERT `Article 17(4) — SAFETY: no pre-notice act is retrospectively criminalised` `the retrospective deregistration` `theft from the charity, before the notice`
+
+-- ACT 3. The hard case for the carve-out: an act that is BOTH caught by paragraph (3) AND an
+-- offence independently. "Merely" is not satisfied — the independent ground stands on its own
+-- feet — so the act IS an offence, and the carve-out does not apply to it.
+`fraudulent claim of charitable tax relief, before the notice` MEANS Article17ActInQuestion WITH
+    description                                                     IS "dishonestly claiming charitable tax relief, in the months before the notice"
+    `the act occurred before the date of the giving of the notice under Article 16(1) or (2)`  IS TRUE
+    `the act would be rendered an offence by the operation of paragraph (3)`  IS TRUE
+    `the act is an offence on a ground independent of the operation of paragraph (3)`  IS TRUE
+
+#ASSERT NOT `Article 17(4) — the carve-out applies to the act` `the retrospective deregistration` `fraudulent claim of charitable tax relief, before the notice`
+#ASSERT `Article 17(4) — the act is an offence` `the retrospective deregistration` `fraudulent claim of charitable tax relief, before the notice`
+#ASSERT `Article 17(4) — SAFETY: no pre-notice act is retrospectively criminalised` `the retrospective deregistration` `fraudulent claim of charitable tax relief, before the notice`
+
+-- CONTROL. The same act as ACT 1, on a deregistration that is NOT retrospective (limb (c)
+-- was never satisfied). Paragraph (3) is not in operation at all, so there is nothing for
+-- the carve-out to carve out of — and nothing that would make the act an offence either.
+#ASSERT NOT `Article 17(4) — the carve-out applies to the act` `the deregistration where the date was never specified in the notice` `holding itself out as a charity, before the notice`
+#ASSERT NOT `Article 17(4) — the act is an offence` `the deregistration where the date was never specified in the notice` `holding itself out as a charity, before the notice`
+#ASSERT `Article 17(4) — SAFETY: no pre-notice act is retrospectively criminalised` `the deregistration where the date was never specified in the notice` `holding itself out as a charity, before the notice`
+
+§§ `Article 17(5) to (8) — the remaining property`
+
+#ASSERT `Article 17(5) — the remaining-property regime applies` `the retrospective deregistration`
+#ASSERT `Article 17(6) — the entity applies the remaining property for the preserved purposes` `the retrospective deregistration`
+-- ART 17(7), OPERATIVE: the entity's constitution EXPRESSLY purports to empower it to amend
+-- the preserved purposes (see the record above) — and it has no such power. "DESPITE any
+-- provision of the entity's constitution." The flag appears nowhere in the predicate; that
+-- is the point.
+#ASSERT `Article 17(7) — the entity has NO power to amend the preserved purposes or statement` `the retrospective deregistration`
+
+-- A deregistered entity with NO remaining property. Paragraphs (6) to (11) do not apply at
+-- all: no preserved purposes to serve, no property to protect, no continuing court power.
+`the deregistered entity with nothing left` MEANS Article17Deregistration WITH
+    name                                                            IS "an entity wound up, with nothing left"
+    `the entity`                                                    IS `Jersey Heritage Ltd`
+    `(2)(a) the Commissioner deregisters a charity under Article 16`  IS TRUE
+    `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`  IS FALSE
+    `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`  IS FALSE
+    `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`  IS FALSE
+    `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`  IS FALSE   -- the gate is shut
+    `the entity continues to apply the remaining property for the preserved charitable purposes`  IS FALSE
+    `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`  IS FALSE
+    `a provision of the entity's constitution or constitutional Law purports to empower the entity to amend the preserved charitable purposes or preserved public benefit statement`  IS FALSE
+    `the application under paragraph (9) is made by the Attorney General`  IS TRUE
+    `the application under paragraph (9) is made by a governor of the entity`  IS FALSE
+    `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`  IS TRUE
+    `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`  IS TRUE
+    `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`  IS FALSE
+
+#ASSERT NOT `Article 17(5) — the remaining-property regime applies` `the deregistered entity with nothing left`
+-- 17(6) is satisfied VACUOUSLY: there is no remaining property to misapply.
+#ASSERT `Article 17(6) — the entity applies the remaining property for the preserved purposes` `the deregistered entity with nothing left`
+#ASSERT NOT `Article 17(7) — the entity has NO power to amend the preserved purposes or statement` `the deregistered entity with nothing left`
+-- And the court's Article 17(9) power does NOT arise, even though everything else about the
+-- application is in order: the gate in 17(5) is shut.
+#ASSERT NOT `Article 17(9) — the court's power over the deregistered entity arises` `the deregistered entity with nothing left`
+
+§§ `Article 17(9) and 17(10) — the court's continuing powers`
+
+-- The Attorney General applies, on ground (9)(a). The power arises. 17(10) is vacuous: the
+-- applicant is not a governor.
+#ASSERT `Article 17(10) — a governor's application is competent` `the retrospective deregistration`
+#ASSERT `Article 17(9) — the court's power over the deregistered entity arises` `the retrospective deregistration`
+
+-- A GOVERNOR applies — WITHOUT first giving notice to the Attorney General. Article 17(10)
+-- is a condition precedent: the application is INCOMPETENT, and the court's power does not
+-- arise, however meritorious the substance.
+`a governor's application, without notice to the Attorney General` MEANS Article17Deregistration WITH
+    name                                                            IS "a governor's application, made without notice to the AG"
+    `the entity`                                                    IS `Jersey Heritage Ltd`
+    `(2)(a) the Commissioner deregisters a charity under Article 16`  IS TRUE
+    `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`  IS FALSE
+    `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`  IS FALSE
+    `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`  IS FALSE
+    `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`  IS TRUE
+    `the entity continues to apply the remaining property for the preserved charitable purposes`  IS FALSE
+    `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`  IS FALSE
+    `a provision of the entity's constitution or constitutional Law purports to empower the entity to amend the preserved charitable purposes or preserved public benefit statement`  IS FALSE
+    `the application under paragraph (9) is made by the Attorney General`  IS FALSE
+    `the application under paragraph (9) is made by a governor of the entity`  IS TRUE
+    `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`  IS TRUE
+    `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`  IS TRUE
+    `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`  IS FALSE   -- the failure
+
+#ASSERT NOT `Article 17(10) — a governor's application is competent` `a governor's application, without notice to the Attorney General`
+#ASSERT NOT `Article 17(9) — the court's power over the deregistered entity arises` `a governor's application, without notice to the Attorney General`
+-- 17(6) is BREACHED on these facts too: the remaining property is not being applied for the
+-- preserved charitable purposes. That is precisely what the governor wants the court to fix.
+#ASSERT NOT `Article 17(6) — the entity applies the remaining property for the preserved purposes` `a governor's application, without notice to the Attorney General`
+
+-- The SAME governor, who this time gives the Attorney General notice first. The application
+-- is competent, and the court's power arises. One field changed.
+`a governor's application, with notice to the Attorney General` MEANS Article17Deregistration WITH
+    name                                                            IS "a governor's application, made after notice to the AG"
+    `the entity`                                                    IS `Jersey Heritage Ltd`
+    `(2)(a) the Commissioner deregisters a charity under Article 16`  IS TRUE
+    `(2)(b) the Commissioner is satisfied that the grounds for deregistration have existed since a past date`  IS FALSE
+    `(2)(c) the Commissioner specifies that date in the notice under Article 16(1) or (2)`  IS FALSE
+    `(2)(d) the Commissioner determines that the deregistration should take effect retrospectively`  IS FALSE
+    `there remains any property of the charity that was acquired before it was deregistered (the 'remaining property')`  IS TRUE
+    `the entity continues to apply the remaining property for the preserved charitable purposes`  IS FALSE
+    `the entity continues to apply the remaining property in accordance with the preserved public benefit statement`  IS FALSE
+    `a provision of the entity's constitution or constitutional Law purports to empower the entity to amend the preserved charitable purposes or preserved public benefit statement`  IS FALSE
+    `the application under paragraph (9) is made by the Attorney General`  IS FALSE
+    `the application under paragraph (9) is made by a governor of the entity`  IS TRUE
+    `(9)(a) it appears to the court that there is or has been any conduct in the administration of the entity in relation to the remaining property, that would have been misconduct if the entity had not been deregistered`  IS TRUE
+    `(9)(b) it appears to the court that it is necessary or desirable to exercise the power for the purpose of protecting the remaining property or securing a proper application of the remaining property for the preserved charitable purposes of the entity and in accordance with the preserved public benefit statement`  IS TRUE
+    `the governor has first given notice to the Attorney General of the governor's intention to apply under paragraph (9) and of the reasons for that intention`  IS TRUE   -- the only change
+
+#ASSERT `Article 17(10) — a governor's application is competent` `a governor's application, with notice to the Attorney General`
+#ASSERT `Article 17(9) — the court's power over the deregistered entity arises` `a governor's application, with notice to the Attorney General`
+
+§§ `Article 17 — the duties and powers, traced`
+
+-- Art 17(1): the Commissioner retains the record for 10 years and never reassigns the
+-- number. Both limbs honoured: the MUST performed, the SHANT refrained from.
+#TRACE `Article 17(1) — retention, and the registered number` AT 0 WITH
+    PARTY Commissioner DOES `retain the information registered in respect of the entity for 10 years` AT 100
+
+-- Art 17(1): the Commissioner reassigns the registered number to a new charity. SHANT —
+-- doing the act IS the breach, whatever else was done right.
+#TRACE `Article 17(1) — retention, and the registered number` AT 0 WITH
+    PARTY Commissioner DOES `retain the information registered in respect of the entity for 10 years` AT 100
+    PARTY Commissioner DOES `assign the registered number of that entity to another registered charity` AT 500
+
+-- Art 17(6): the deregistered entity keeps applying the remaining property for the preserved
+-- charitable purposes.
+#TRACE `Article 17(6) — the duty to apply the remaining property for the preserved purposes` `the retrospective deregistration` AT 0 WITH
+    PARTY Charity DOES `apply the remaining property for the preserved charitable purposes` AT 90
+
+-- Art 17(7): the deregistered entity purports to amend the preserved charitable purposes by
+-- its own act, relying on its constitution. It has NO power to do so, and the SHANT makes
+-- the attempt a breach.
+#TRACE `Article 17(7) — the entity SHANT amend the preserved purposes or statement` `the retrospective deregistration` AT 0 WITH
+    PARTY Charity DOES `amend the preserved charitable purposes or preserved public benefit statement` AT 90
+
+-- Art 17(8): the LAWFUL route to the same end. The entity applies to the court; the court
+-- makes the amending order. Self-help is a breach; an application is a permission.
+#TRACE `Article 17(8) — application to the court to amend the preserved purposes` `the retrospective deregistration` AT 0 WITH
+    PARTY Charity DOES `apply to the court for an order amending the preserved charitable purposes or preserved public benefit statement` AT 90
+    PARTY Court DOES `make such amending order, and any ancillary order, as the court considers expedient` AT 150
+
+-- Art 17(9): the court exercises its continuing Article 14 power over the deregistered entity.
+#TRACE `Article 17(9) — the court's continuing power to make an order` `the retrospective deregistration` AT 0 WITH
+    PARTY Court DOES `make an order in respect of the charity` AT 60
+
+-- Art 17(9), where the power did not arise (no remaining property): FULFILLED, no power.
+#TRACE `Article 17(9) — the court's continuing power to make an order` `the deregistered entity with nothing left` AT 0 WITH
+    PARTY Charity DOES `send an annual return` AT 300
+
+-- Art 17(10)-(11): the governor gives the Attorney General notice; the Attorney General takes
+-- the application over and proceeds with it.
+#TRACE `Articles 17(10) and 17(11) — the governor's notice and the Attorney General's takeover` AT 0 WITH
+    PARTY Governor DOES `give notice to the Attorney General of the intention to apply and of the reasons` AT 10
+    PARTY AttorneyGeneral DOES `take over the application made by the governor` AT 25
+    PARTY AttorneyGeneral DOES `proceed with the application` AT 60
+
+-- The same, but the Attorney General takes it over and WITHDRAWS it. The governor's
+-- application dies in the Attorney General's hands: "may then withdraw or proceed with the
+-- application as the Attorney General sees fit."
+#TRACE `Articles 17(10) and 17(11) — the governor's notice and the Attorney General's takeover` AT 0 WITH
+    PARTY Governor DOES `give notice to the Attorney General of the intention to apply and of the reasons` AT 10
+    PARTY AttorneyGeneral DOES `take over the application made by the governor` AT 25
+    PARTY AttorneyGeneral DOES `withdraw the application` AT 60
+
+-- The governor gives notice; the Attorney General does NOT take the application over. A MAY:
+-- benign omission, FULFILLED. The governor's application proceeds in the governor's own name.
+#TRACE `Articles 17(10) and 17(11) — the governor's notice and the Attorney General's takeover` AT 0 WITH
+    PARTY Governor DOES `give notice to the Attorney General of the intention to apply and of the reasons` AT 10

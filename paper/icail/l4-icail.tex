@@ -1,0 +1,1590 @@
+% ===================================================================
+%  L4: A Functional Programming Language for Computational Law
+%  ICAIL submission DRAFT.
+%
+%  Build:  pdflatex l4-icail ; bibtex l4-icail ; pdflatex l4-icail ; pdflatex l4-icail
+%  (or:    latexmk -pdf l4-icail.tex)
+%
+%  EDITORIAL TODOs (search "TODO"):
+%   - co-authors and affiliations
+%   - confirm what may be disclosed about each pilot (Sec. Experience)
+%   - re-verify Hvitved/CSL operator correspondence against the thesis
+% ===================================================================
+\documentclass[sigconf,nonacm]{acmart}
+
+% --- Packages -------------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\setcopyright{none}
+
+% --- L4 listings style ----------------------------------------------
+\definecolor{l4kw}{RGB}{0,68,136}      % keywords  (deep blue)
+\definecolor{l4reg}{RGB}{150,30,120}   % regulative keywords (magenta)
+\definecolor{l4cmt}{RGB}{110,110,110}  % comments
+\definecolor{l4str}{RGB}{0,120,60}     % strings
+\definecolor{l4bg}{RGB}{248,248,248}
+
+\lstdefinelanguage{L4}{
+  morekeywords={GIVEN,GIVES,GIVETH,MEANS,DECIDE,DECLARE,HAS,IS,ONE,OF,A,AN,THE,
+    WITH,WHERE,CONSIDER,WHEN,THEN,ELSE,OTHERWISE,MATCHES,BRANCH,IF,AND,OR,NOT,
+    TRUE,FALSE,IMPORT,ASSUME,LIST,EMPTY,FOLLOWED,BY,MAYBE,JUST,NOTHING,TYPE,
+    PLUS,MINUS,TIMES,DIVIDED,MODULO,AT,LEAST,MOST,GREATER,THAN,LESS,EQUALS,APPEND},
+  morekeywords=[2]{PARTY,MUST,MAY,SHANT,DO,WITHIN,BEFORE,AFTER,UPON,HENCE,LEST,
+    BREACH,FULFILLED,BECAUSE,PROVIDED,EXACTLY,RAND,ROR,UPDATE,DOES},
+  morekeywords=[3]{@export,@desc},
+  sensitive=true,
+  morecomment=[l]{--},
+  morestring=[b]",
+}
+
+\lstset{
+  language=L4,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{l4kw}\bfseries,
+  keywordstyle=[2]\color{l4reg}\bfseries,
+  keywordstyle=[3]\color{l4kw}\itshape,
+  commentstyle=\color{l4cmt}\itshape,
+  stringstyle=\color{l4str},
+  backgroundcolor=\color{l4bg},
+  frame=tb,
+  framesep=4pt,
+  rulecolor=\color{l4cmt},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  upquote=true,
+  breaklines=true,
+  breakatwhitespace=true,
+  literate={`}{{\char96}}1 {§}{{\S}}1 {'}{{\char39}}1 {>=}{{$\geq$}}1,
+  aboveskip=6pt,
+  belowskip=4pt,
+}
+% Inline code: texttt-based so it is robust inside macro arguments
+% (lstinline cannot be safely captured as a macro argument).
+\newcommand{\bq}{\char96\relax}            % straight backtick
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% --- Metadata -------------------------------------------------------
+\begin{document}
+
+\title{L4: A Functional Programming Language for Computational Law}
+\subtitle{Constitutive Rules as Total Functions, Regulative Contracts as Concurrent Processes}
+
+% TODO: co-authors and affiliations
+\author{Wong Meng Weng}
+\affiliation{%
+  \institution{Centre for Computational Law, Singapore Management University; and Legalese}
+  \city{Singapore}
+  \country{}
+}
+\email{mengwong@legalese.com}
+
+\author{The L4 Team}
+\affiliation{%
+  \institution{Centre for Computational Law, Singapore Management University}
+  \city{Singapore}
+  \country{}
+}
+
+\renewcommand{\shortauthors}{Wong et al.}
+
+\begin{abstract}
+We present \emph{L4}, a statically typed functional programming language
+for computational law, together with its semantic foundations and the
+controlled-natural-language surface syntax that makes it usable by legal
+domain experts. L4 cleanly separates two readings of legal text that the
+literature has long distinguished but that prior formalisms tend to
+conflate. \emph{Constitutive} rules---what counts as what---are encoded as
+total typed functions in the lineage of Haskell-style functional
+programming, giving type safety, exhaustive case analysis, and an
+audit-grade evaluation trace for every decision. \emph{Regulative}
+rules---who must do what, by when, and what happens otherwise---are encoded
+in a deontic/temporal layer whose denotation is a set of timed event
+traces, borrowing heavily from Hvitved's Contract Specification Language
+(CSL) and, through it, from Hoare's Communicating Sequential Processes and
+the event calculus.
+The same source program admits a second, relational reading via the
+standard functional-to-relational transformation familiar from Mercury and
+Curry; this lets L4 be evaluated forward as a decision procedure, run
+backward for abductive planning, and exported as a transition relation to
+symbolic model checkers, so that the search for legal loopholes becomes the
+search for reachable ``double-bind'' states. We describe the language, its
+implementation (parser, type checker, evaluator, language server, REST/MCP
+decision service, and multiple compilation backends), and our design
+rationale for a low-punctuation syntax---indentation in place of
+parentheses, ditto marks, and phrase-shaped identifiers---intended to let
+non-programmers read and write law in black and white.
+\end{abstract}
+
+\keywords{computational law, rules as code, low-code, controlled natural language,
+functional programming, deontic logic, process calculi, contract
+formalisation, legal knowledge representation}
+
+\maketitle
+
+% ===================================================================
+\section{Introduction}
+% ===================================================================
+The corporation, viewed from a sufficient distance, is the sum of its
+contracts: with shareholders, lenders, customers, vendors, employees, and
+the state. Yet the legal department---custodian of this most fundamental
+corporate asset---works in tooling that has barely advanced past the word
+processor. Where the graphic designer has Adobe's suite and the programmer
+commands languages, compilers, version control, debuggers, and test
+frameworks, the lawyer has Microsoft Word. This is a striking asymmetry,
+because the work is not so different: both the programmer and the drafter
+translate a tangle of business goals into a precise textual artefact that
+must anticipate the behaviour of a complex system with many moving parts
+and adversarial participants.
+
+This paper reports on \emph{L4}, a programming language built to close that
+gap. L4 is not a document format, a clause library, or a contract-lifecycle
+database; it is a language, in the sense that PostScript was a language
+before desktop publishing was a product. Its design rests on three
+commitments that, taken together, distinguish it from the existing body of
+work in AI and Law. First, it takes seriously the classical distinction
+between \emph{constitutive} and \emph{regulative} rules
+\cite{searle1969speech,hart1961concept}, giving each a dedicated and
+appropriate formal treatment rather than forcing both into a single
+logic. Second, it grounds its regulative layer in a trace-based,
+concurrency-aware semantics descended from contract DSLs and process
+calculi \cite{hvitved2011thesis,hoare1978csp}, so that multi-party
+obligations with deadlines and reparations are first-class. Third, it is
+deliberately engineered as a \emph{controlled natural language}
+\cite{kuhn2014cnl}: its concrete syntax minimises punctuation, replaces
+parentheses with indentation, and admits identifiers that are whole legal
+phrases, so that a statute and its formalisation can be read side by side
+and recognised as the same text.
+
+\paragraph{Contributions.} We make the following contributions.
+\begin{itemize}
+\item We describe the design of L4 and the rationale for its two-layer
+  architecture: a total typed functional core for constitutive rules
+  (Section~\ref{sec:constitutive}) and a deontic/temporal layer for
+  regulative rules (Section~\ref{sec:regulative}).
+\item We give the semantic foundations of the regulative layer as a
+  trace-based denotational model, and exhibit the correspondence between
+  L4's surface keywords (\code{HENCE}, \code{LEST}, \code{WITHIN},
+  \code{RAND}, \code{ROR}) and the operators of Hvitved's CSL and Hoare's
+  CSP (Section~\ref{sec:regulative}).
+\item We show how a single L4 program supports two readings---functional
+  and relational---via the function-as-graph transformation used in
+  Mercury and Curry, and how the relational reading underwrites abductive
+  planning queries and model-checking-based loophole detection
+  (Section~\ref{sec:relational}).
+\item We document the controlled-natural-language design of L4's surface
+  syntax and the empirical motivation for each choice
+  (Section~\ref{sec:cnl}).
+\item We report on the implementation and on early deployments in the
+  public and private sectors (Sections~\ref{sec:impl}
+  and~\ref{sec:experience}).
+\end{itemize}
+
+% ===================================================================
+\section{Motivation: Why a Language, in the Age of LLMs?}\label{sec:motivation}
+% ===================================================================
+A fair objection greets any new programming language in 2026: why bother?
+Large language models can already program in every language that matters,
+and a generation of ``vibe coders'' has, in effect, stopped writing code by
+hand, describing intent in prose and letting the model fill in the
+syntax. If the machine will write the code, why design a new notation for
+humans to read?
+
+The answer is that law is not like ordinary software, because of what
+happens when it bites. Most of the time a citizen is content to remain a
+rational ignoramus about the rules that govern them: the expected cost of
+understanding a tax schedule or an insurance policy exceeds the expected
+benefit, so people sign and move on. But the calculus inverts the moment
+the stakes become concrete and personal---when a person might go to jail,
+or opens an envelope expecting a bill for \$600 and finds one for
+\$6{,}000. In that moment, ordinary people discover an enormous and
+entirely rational capacity for detail. They want to understand the rule
+\emph{themselves}; they are no longer willing to defer to a black box,
+whether that box is a bureaucrat, a chatbot, or an opaque model whose
+confident paraphrase may or may not track the actual entitlement. A
+plausible-sounding generated answer is precisely what they cannot trust,
+because the disagreement is now adversarial and the counterparty has every
+incentive to read the words differently.
+
+What such situations demand is a rule that is legible \emph{twice over}:
+readable by a non-technical human who needs to check the reasoning against
+their own circumstances, and readable by a computer that can evaluate it,
+test it, and explain it without hallucinating. This dual-legibility
+requirement is not new; it is the recurring ambition of what we would now call
+\emph{low-code}. It is exactly the aspiration that gave us COBOL,
+whose designers wanted business rules expressed in something a manager
+could read, and SQL, whose declarative surface was meant to let analysts,
+not just engineers, ask questions of their data. Both bet that some rules
+are important enough that people will always insist on having them written
+down in black and white. L4 inherits that bet and adds one refinement: the
+black and white should be a \emph{formal} language. Natural-language
+drafting carries avoidable, self-inflicted defects---lexical ambiguity,
+scope ambiguity in coordinated clauses, the notorious unreliability of
+punctuation\footnote{The missing-comma cases are a genre of their own;
+\emph{O'Connor v.\ Oakhurst Dairy} turned a \$5M overtime dispute on the
+absence of a serial comma.}---that a designed notation can simply
+forbid. The role of the LLM, in our architecture, is not to replace this
+notation but to help author and explain it: to draft a first formalisation
+from source text, and to verbalise a rigorous evaluation trace back to the
+user in accessible prose. The neural ``right brain'' handles language; a
+deterministic ``left brain'' handles the rule. L4 is the left brain.
+
+% ===================================================================
+\section{Background and Design Goals}\label{sec:background}
+% ===================================================================
+\paragraph{Constitutive versus regulative.}
+Searle distinguishes regulative rules, which govern antecedently existing
+behaviour (``drive on the left''), from constitutive rules, which create
+the very possibility of that behaviour (``this configuration of pieces
+\emph{counts as} checkmate'') \cite{searle1969speech}. Hart's primary and
+secondary rules and Hohfeld's jural relations draw related lines
+\cite{hart1961concept,hohfeld1913}. The distinction is not academic for a
+formaliser. A constitutive rule---``a person born in the United Kingdom
+after commencement \emph{is} a British citizen if \ldots''---is a
+definition: it relates facts to legal classifications and is naturally a
+\emph{function} from situations to conclusions. A regulative rule---``the
+buyer \emph{must} pay within thirty days, failing which \ldots''---is about
+action over time, blame, and remedy, and is naturally a \emph{process}. The
+two demand different mathematics. A recurring weakness of single-formalism
+approaches is that one of the two is bent to fit the other: deontic notions
+are encoded as ordinary predicates and lose their temporal and reparational
+structure, or definitional computation is shoe-horned into a modal logic
+where it does not belong. L4's central architectural decision is to give
+each its own layer.
+
+\paragraph{Isomorphism.}
+Following the tradition of the British Nationality Act as a logic program
+\cite{sergot1986bna} and the broader rules-as-code movement
+\cite{mohun2020rulesascode}, L4 aims for \emph{isomorphic} encoding: the
+structure of the formal text should mirror the structure of the source. If
+a section has paragraphs (a), (b), and (c) joined by ``and'' and ``or'', the
+encoding should exhibit the same conjunction-and-disjunction tree, so that a
+domain expert can audit the correspondence clause by clause and so that a
+later amendment to the source maps to a localised change in the
+code. Isomorphism is simultaneously a correctness discipline and a
+maintenance strategy; it also drives several surface-syntax choices
+(Section~\ref{sec:cnl}).
+
+\paragraph{Two audiences.}
+L4 must satisfy two readers with incompatible habits. The machine wants an
+unambiguous grammar with a denotational semantics. The lawyer wants prose,
+or as close to prose as rigour permits, and has no patience for sigils. The
+thesis of this paper is that these goals are reconcilable rather than
+opposed: a language can have a wholly conventional formal semantics and,
+\emph{at the same time}, a surface syntax tuned as a controlled natural
+language. Sections~\ref{sec:constitutive}--\ref{sec:relational} make the
+first case; Section~\ref{sec:cnl} makes the second.
+
+% ===================================================================
+\section{The Constitutive Core: A Typed Functional Language}\label{sec:constitutive}
+% ===================================================================
+L4's constitutive core is a statically typed, total, higher-order
+functional language. Types are introduced with \code{DECLARE}: enumerations
+and algebraic data types with \code{IS ONE OF}, and records with
+\code{HAS}.
+
+\begin{lstlisting}
+DECLARE RiskCategory IS ONE OF
+    LowRisk
+    MediumRisk
+    HighRisk
+    Uninsurable
+
+DECLARE Driver HAS
+    name           IS A STRING
+    age            IS A NUMBER
+    accidentCount  IS A NUMBER
+    hasTickets     IS A BOOLEAN
+\end{lstlisting}
+
+Functions are introduced by a signature---\code{GIVEN} naming the inputs and
+\code{GIVETH} (synonym \code{GIVES}) naming the result---followed by a
+definition with \code{MEANS}, or, for boolean-valued rules, by
+\code{DECIDE\,\ldots\,IF}. Pattern matching uses \code{CONSIDER}\,/\,\code{WHEN},
+a type-safe, exhaustiveness-checked case analysis.
+
+\begin{lstlisting}
+GIVEN driver IS A Driver
+GIVETH A RiskCategory
+`assess risk` driver MEANS
+    CONSIDER driver's accidentCount
+    WHEN 0 THEN IF driver's hasTickets
+                THEN MediumRisk
+                ELSE LowRisk
+    WHEN 1 THEN MediumRisk
+    WHEN 2 THEN HighRisk
+    OTHERWISE   Uninsurable
+\end{lstlisting}
+
+Three properties of this core matter for law. \emph{Totality and
+exhaustiveness}: the type checker rejects a \code{CONSIDER} that fails to
+cover its cases, so a formalised rule cannot silently omit a category of
+applicant---the analogue of an unhandled edge case is a compile-time error,
+not a wrong benefit cheque. \emph{Type safety}: a payout formula cannot
+accidentally add a date to a currency. \emph{Explainability}: because the
+core is a pure functional evaluator, every result carries a trace from the
+top-level question down to the deciding sub-condition, with each step
+annotated by the rule that justified it. This trace is what the system shows
+an end user, and what it hands to a language model as ground truth to
+verbalise, rather than asking the model to reason about the law itself.
+
+\paragraph{An isomorphic example.}
+Consider a fragment of the British Nationality Act, the canonical AI-and-Law
+benchmark \cite{sergot1986bna}. The statute's nested ``or''s and ``and''s
+appear directly in the encoding, and the identifiers are the statutory
+phrases themselves (backticks let an identifier contain spaces):
+
+\begin{lstlisting}
+GIVEN p IS A Person
+GIVES A BOOLEAN
+DECIDE `is a British citizen` IF
+         `is born in the United Kingdom after commencement` p
+      OR `is born in a qualifying territory after the appointed day` p
+  AND       `is a British citizen`        OF `father of` p
+         OR `is a British citizen`        OF `mother of` p
+      OR    `is settled in the United Kingdom` OF `father of` p
+         OR `is settled in the United Kingdom` OF `mother of` p
+\end{lstlisting}
+
+Note that the indentation, not parenthesisation, carries the precedence of
+the boolean tree; we return to this in Section~\ref{sec:cnl}. Functions
+marked \code{@export} are lifted automatically into a REST endpoint, an
+OpenAPI schema, and a tool callable by an LLM agent; a single source file
+thus yields an interactive eligibility wizard with citations back to the
+rule that decided each branch.
+
+% ===================================================================
+\section{The Regulative Layer: Contracts as Concurrent Processes}\label{sec:regulative}
+% ===================================================================
+Definitional functions cannot express an obligation. ``The buyer must pay''
+is not true or false of a situation; it is a demand on future conduct that
+is met or breached as events unfold, possibly triggering a remedy. For this
+L4 provides a regulative sub-language built from a five-keyword skeleton:
+
+\begin{lstlisting}
+PARTY   actor
+MUST    action            -- or MAY, SHANT, DO
+WITHIN  deadline
+HENCE   successContinuation
+LEST    failureContinuation
+\end{lstlisting}
+
+\code{MUST}, \code{MAY}, and \code{SHANT} are the deontic modalities
+(obligation, permission, prohibition); \code{DO} is an uncommitted
+action. \code{WITHIN} attaches a deadline. \code{HENCE} and \code{LEST} are
+the continuations taken when the obligation is, respectively, satisfied or
+not---and crucially, \emph{what counts as satisfaction depends on the
+modality}: for \code{MUST}, performing the action by the deadline takes the
+\code{HENCE} branch and letting the deadline lapse takes \code{LEST}; for
+\code{SHANT} the polarity flips, so the prohibition is honoured precisely
+when the deadline passes with no such action. \code{LEST} typically chains a
+\emph{reparation}: a further obligation that repairs the breach, the
+formal home of contrary-to-duty structure that bedevils Standard Deontic
+Logic \cite{chisholm1963ctd,vonwright1951deontic}.
+
+\begin{figure*}[t]
+\begin{lstlisting}
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+    delivery
+    payment HAS amount IS A NUMBER
+
+saleContract MEANS
+    PARTY  Seller
+    MUST   delivery
+    WITHIN 3
+    HENCE ( PARTY  Buyer
+            MUST   payment 100
+            WITHIN 7
+            HENCE  FULFILLED
+            LEST   BREACH BY Buyer BECAUSE "payment not made within 7 days" )
+    LEST   BREACH BY Seller BECAUSE "delivery deadline exceeded"
+
+#TRACE saleContract AT 0 WITH
+    PARTY Seller DOES delivery     AT 2
+    PARTY Buyer  DOES payment 100  AT 5
+-- Result: FULFILLED
+\end{lstlisting}
+\caption{A two-party sale as a regulative contract. \code{HENCE} threads the
+seller's delivery into the buyer's payment obligation; \code{\#TRACE}
+replays a timed event sequence and reports \code{FULFILLED}, a blame-bearing
+\code{BREACH}, or the residual obligation that remains.}
+\label{fig:sale}
+\end{figure*}
+
+\paragraph{Trace-based semantics.}
+The denotation of a regulative contract is a function from a timed event
+trace to an outcome: \code{FULFILLED}, a \code{BREACH} carrying blame and a
+reason, or a \emph{residual} contract describing what remains owed. This is
+exactly the trace-based model that Hvitved gives for multiparty contracts
+in his Contract Specification Language \cite{hvitved2011thesis,
+hvitved2012trace}, itself a descendant of the compositional commercial- and
+financial-contract DSLs of Andersen, Elsman and Henglein and of Peyton
+Jones and Eber \cite{andersen2006compositional, pjeber2000composing}. A
+contract \emph{is} the set of event traces that conform to it; conformance
+checking is trace membership; and the residual is the contract's state after
+a prefix of events has been consumed---the machine-readable answer to ``what
+is still owed, by whom, and by when.'' L4's \code{\#TRACE}
+(Figure~\ref{fig:sale}) is precisely this fold of observed events through the
+denotation. We borrow a great deal from CSL directly: its catalogue of
+obligations, permissions, and prohibitions; its deadlines and its
+reparation (contrary-to-duty) structure; and above all its foundational
+stance that a contract simply \emph{is} the set of traces that conform to
+it. To CSL's contract DSL L4 adds the two things it did not set out to
+provide---a controlled-natural-language surface and an integrated
+constitutive functional core---so that the predicates a contract branches
+on are themselves type-checked, executable law rather than opaque
+atoms. The dual view of a contract as a narrative of timed events that
+initiate and terminate obligations is also exactly the setting of the event
+calculus \cite{kowalski1986events}, which we take as the logical reading of
+the same traces (Section~\ref{sec:relational}).
+
+\paragraph{The CSP lineage.}
+Read operationally, the regulative layer is a small process calculus in the
+tradition of Hoare's Communicating Sequential Processes
+\cite{hoare1978csp,hoare1985csp,roscoe1997theory}. The correspondence is
+direct (Table~\ref{tab:csp}): an obligation \code{PARTY p MUST a HENCE k} is
+a guarded event prefix $p.a \rightarrow k$; \code{HENCE} and \code{LEST}
+form a choice resolved by what the environment---the trace---actually does,
+in the manner of CSP's external choice; \code{RAND} is parallel composition
+that synchronises on completion, so a compound breaches if either side does;
+\code{ROR} is choice between sub-contracts; \code{FULFILLED} is successful
+termination ($\mathit{SKIP}$) and \code{BREACH} is blame-assigning
+termination. The one essential addition is \emph{time}: \code{WITHIN}
+imposes a deadline, placing L4 with Timed CSP \cite{reed1988timedcsp} and the
+timed-automata model that underlies tools such as UPPAAL
+\cite{alur1994timed,behrmann2004uppaal}. Recursion gives recurring
+obligations---a loan's monthly instalments are a function that re-emits next
+period's obligation in its \code{HENCE} branch and a penalised obligation in
+its \code{LEST} branch, bottoming out at \code{FULFILLED}.
+
+\begin{table}[t]
+\caption{L4 regulative keywords and their CSL / CSP analogues.}
+\label{tab:csp}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{L4} & \textbf{CSL / CSP analogue} \\
+\midrule
+\code{PARTY p MUST a HENCE k} & guarded prefix $p.a \rightarrow k$ \\
+\code{WITHIN t}               & timed deadline (Timed CSP clock guard) \\
+\code{HENCE k}                & success continuation \\
+\code{LEST k'}                & failure / timeout cont.; reparation (CTD) \\
+\code{A RAND B}               & synchronising parallel $A \parallel B$ \\
+\code{A ROR B}                & choice $A \,\Box\, B$ \\
+\code{FULFILLED}              & successful termination ($\mathit{SKIP}$) \\
+\code{BREACH}                 & blame-assigning termination \\
+\code{\#TRACE c WITH es}      & trace membership $es \in \mathrm{traces}(c)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Why this matters.}
+Because the regulative layer is a timed concurrent system, the questions a
+lawyer asks about a contract become questions a verification tool can
+answer. ``Is there a state in which one clause obliges an act that another
+forbids?'' is a reachability query over the product of the parties'
+processes---a race condition or, in deontic terms, a contradictory
+conflict. In one of our public-sector deployments
+(Section~\ref{sec:experience}), exactly such a deontic-temporal double bind
+was discovered automatically in live regulation: under an unusual
+interleaving, a party was simultaneously obliged and prohibited from the
+same act. Recasting loophole-finding as state-space search is the bridge to
+the relational reading we turn to next.
+
+% ===================================================================
+\section{Two Readings of One Program: Functional and Relational}\label{sec:relational}
+% ===================================================================
+A function $f : A \to B$ is, set-theoretically, its graph: the relation
+$\{(a, f\,a) : a \in A\}$. Functional-logic languages exploit this
+identity. Mercury annotates predicates with \emph{modes}---which arguments
+are inputs and which outputs---and \emph{determinism}, then compiles the
+relation to efficient code in whichever mode is requested
+\cite{somogyi1996mercury}; Curry integrates functions and relations through
+narrowing and residuation, so that a function may be run with unknown inputs
+and the system searches for those that yield a desired output
+\cite{antoy2010flp,hanus2013curry}. L4 inherits this perspective. Its
+constitutive rules, being total typed functions, compile not only to a
+forward evaluator but also to a relational form: Horn clauses in the manner
+of Prolog, or, for the regulative layer, a transition relation over events
+and fluents in the manner of the event calculus
+\cite{kowalski1986events}. Logical English \cite{kowalski2021logicalenglish}
+demonstrates that this declarative substrate can itself wear a
+natural-language surface; L4 reaches it from the other direction, starting
+from typed functional programming and recovering the relational reading by
+transformation, with Mercury and Curry as the conceptual bridges between the
+two paradigms.
+
+This second reading is not a curiosity; it is what makes L4 a tool for
+\emph{analysis} rather than mere execution. Three capabilities follow.
+
+\emph{Backward / abductive queries.} Run forward, \code{`is a British
+citizen`} classifies a given person. Run backward, the same rule
+characterises the situations under which citizenship holds---useful for
+explanation (``which facts, if changed, would flip this decision?'') and,
+in the regulative layer, for planning: ``what is the \emph{latest} I may
+apply for the loan and still deliver on time?'' is an abductive query over
+the contract's transition relation, of the kind logic programming answers
+natively but a one-directional evaluator cannot.
+
+\emph{Exhaustive scenario generation.} Treating a rule as a relation lets a
+property-based tester enumerate the space of situations and check
+invariants across all of them, rather than the handful of hand-written
+examples that legal code typically ships with. An early experiment imported
+a national benefits calculation---originally a Python rules library with a
+mere handful of unit tests---into a functional setting and generated tests
+across the whole domain of scenarios, surfacing miscalculations that the
+sparse hand-written suite had missed.
+
+\emph{Model checking.} The transition relation can be handed to symbolic
+model checkers---NuSMV, SPIN, TLA+, UPPAAL
+\cite{cimatti2002nusmv,holzmann1997spin,lamport2002specifying,behrmann2004uppaal}---to
+search for states that violate a property written at the specification
+level. Here the letter of the law lives at the object level and the spirit
+of the law lives as property assertions; a counterexample trace is a
+loophole, found the way a security researcher finds an exploit. The
+deontic-temporal conflict of Section~\ref{sec:regulative} is one such
+counterexample.
+
+L4's implementation already carries the seeds of this multi-target
+strategy: a query planner reorders relational goals, and an MLIR/WASM
+backend compiles decision logic to a portable binary
+(Section~\ref{sec:impl}). The point of principle is that \emph{one}
+isomorphic source, authored once by a domain expert, feeds all of these
+analyses; the functional and relational readings are two views of the same
+text, not two artefacts to be kept in sync.
+
+% ===================================================================
+\section{Surface Syntax as Controlled Natural Language}\label{sec:cnl}
+% ===================================================================
+Everything above concerns semantics, and any number of concrete syntaxes
+could carry it. The wager of L4 is that the concrete syntax is where
+adoption is won or lost, and that a formal language can be shaped into a
+\emph{controlled natural language}---a restricted but rigorous fragment of
+English \cite{kuhn2014cnl}---without sacrificing its formal character. The
+design follows a few principles, each with a specific motivation.
+
+\paragraph{Words, not sigils.}
+L4 prefers familiar words to punctuation and symbols: \code{AT LEAST} for
+$\geq$, \code{PLUS} for $+$, \code{'s} for field access (\code{driver's
+age}), \code{OF} for application. A type signature reads as an English
+clause---``\code{GIVEN} a person, \code{GIVES} a boolean''---rather than as
+\code{Person -> Bool}. The cost is verbosity; the benefit is that a reader
+who has never seen a type signature can still parse the sentence. This
+directly serves the dual-legibility requirement of
+Section~\ref{sec:motivation}. The genitive clitic \code{'s} is a small but
+pleasing overload in this spirit: English writes \code{'s} both for
+possession and as the contraction of \emph{is}, so \code{driver's age} reads
+naturally as a \emph{has-a} (the field the driver \emph{has}) while the very
+same clitic glosses as the copula in \emph{is-a} predications---one mark
+spanning exactly the two relations that object orientation keeps apart as
+composition and subtyping.
+
+\paragraph{Two registers.}
+The words that replace the sigils are set in upper case, and the choice is not
+merely cosmetic: it splits the surface into two visual registers. \code{UPPERCASE}
+tokens are the fixed vocabulary of the \emph{language}---\code{AND}, \code{OR},
+\code{NOT}, \code{AT LEAST}, \code{GIVEN}, \code{MEANS}---while
+\bq backtick-quoted lowercase phrases\bq{} are the vocabulary of the \emph{law},
+the terms lifted from the source instrument. A reader can therefore tell at a
+glance which words carry logical force and which merely name domain concepts,
+without yet knowing the grammar---the same typographic convention by which COBOL
+and SQL set their keywords apart from the programmer's own identifiers. The case
+distinction does double duty as documentation.
+
+\paragraph{Indentation, not parentheses.}
+Following the offside rule \cite{landin1966next700}, L4 is
+layout-sensitive, and it puts the layout to specific legal use: the
+indentation of conjuncts and disjuncts encodes the precedence of the
+boolean tree, so that the visual shape of the code is the logical shape of
+the rule. In the British Nationality fragment of
+Section~\ref{sec:constitutive}, the alignment of the \code{OR}s under and
+beside the \code{AND} is what disambiguates the structure---no reader need
+balance a parenthesis, and the indentation can be made to mirror the
+sub-paragraph numbering of the source, advancing isomorphism. This is less the
+import of a programming habit into law than the reverse: indented, enumerated
+sub-paragraphs are how the written law has been set out since the Victorian
+reforms of legislative drafting \cite{coode1843}, and an ordinary word processor
+already indents a statutory list the same way---L4 only makes that indentation
+carry the precedence.
+
+\paragraph{Inert scaffolding and asyndeton.}
+Two further devices let a formalisation reproduce its source almost word for
+word. Where a statute joins its limbs without repeating a connective on every
+line---the \emph{asyndetic} enumeration typical of drafted lists---L4 offers
+\code{...} (three dots) and \code{..} (two dots) as lightweight infix synonyms
+for \code{AND} and \code{OR}. The dot counts are deliberate: three for the three
+letters of \code{AND}, two for the two of \code{OR}, so that in the fixed-width
+register the implicit mark and its spelled-out form occupy the same column and
+the limbs align. The connective can thus sit unobtrusively at the head of a
+continuation line. And a quoted string in a boolean position is treated as
+\emph{inert}: it evaluates to \code{TRUE} inside an \code{AND} and to
+\code{FALSE} inside an \code{OR}, either way leaving the surrounding condition's
+truth value untouched. Inert text lets the drafter paste the chapeau and
+connecting prose of the source---``shall subsist for the life of the author
+and'', ``whichever expires first''---directly into the rule as material the type
+checker accepts and the evaluator ignores. Together with the layout, these let an
+enumerated provision be transcribed limb for limb (Figure~\ref{fig:asyndeton}),
+which is the surface condition for a lawyer to agree that the code is the law.
+
+\begin{figure}[t]
+\begin{lstlisting}
+`grant is allowed` MEANS
+        "the grant is allowed where all of the following hold---"
+    ... `the form was filed on time`
+    ... `the fee was paid`
+    AND `the applicant is eligible`
+
+`is eligible` MEANS
+       "the applicant is eligible if any of---"
+    .. `a citizen`
+    .. `a permanent resident`
+    OR `the holder of a valid pass`
+\end{lstlisting}
+\caption{Asyndeton and inert scaffolding. \code{...} is an implicit \code{AND}
+and \code{..} an implicit \code{OR}, with the final limb spelling out the
+conjunction as a drafted list does; the quoted chapeau is inert---it contributes
+nothing to the truth value---and carries verbatim source text into the rule.}
+\label{fig:asyndeton}
+\end{figure}
+
+\paragraph{Ditto marks.}
+Tabular legal and financial text repeats structure down columns; clerks have
+long abbreviated the repetition with the ditto mark. L4 borrows the
+convention with a caret, \code{\textasciicircum}, which stands for the token directly above
+it, so that aligned tabular data---a schedule of territories, an inventory,
+a fee table---can be written the way a person fills in a form, with repeated
+material elided into columns (Figure~\ref{fig:ditto}). The point is not
+keystrokes saved but cognitive load: the eye reads the column as a unit.
+
+\begin{figure}[t]
+\begin{lstlisting}
+myDeal MEANS
+  Deal WITH
+    buyer  IS Party WITH name IS "Alice Avocado"
+    seller IS Party WITH name IS "Robert Rich"
+    item   IS LIST InventoryItem OF "potato",  12,  Nothing
+                                ^ OF "corn",    120, Nothing
+                                ^ OF "avocado", 2,   Nothing
+    price  IS Money OF usd, MoneyAmount OF 100, 00
+\end{lstlisting}
+\caption{The ditto caret \code{\textasciicircum} repeats the token above it, letting
+aligned tabular data read as columns.}
+\label{fig:ditto}
+\end{figure}
+
+\paragraph{Phrase-shaped identifiers and mixfix.}
+Backtick-delimited identifiers may contain spaces---borrowing the convention,
+familiar to every writer of Markdown, by which backticks fence a span of literal
+text---so an identifier can be the exact statutory phrase
+(\code{\bq is settled in the United Kingdom\bq}).
+Such names may be \emph{mixfix}: arguments interleave with the name, so a
+predicate reads as a sentence---\code{\bq employee\bq{} \bq works for\bq{} \bq employer\bq}
+rather than \code{worksFor(employee, employer)}. Together these let the
+formalisation quote its source, the surface condition for a lawyer to accept
+that the code says what the law says (Figure~\ref{fig:mixfix}).
+
+\begin{figure}[t]
+\begin{lstlisting}
+GIVEN `the worker` IS A Person
+      `the firm`   IS A STRING
+GIVES A BOOLEAN
+`the worker` `works for` `the firm` MEANS
+    `the worker`'s employer EQUALS `the firm`
+
+DECIDE `Alice is entitled to leave` IF
+    `Alice` `works for` "Acme"
+\end{lstlisting}
+\caption{Mixfix: the keyword \code{\bq works for\bq} interleaves with its two
+arguments, so both the definition and the call site
+(\code{\bq Alice\bq{} \bq works for\bq{} \bq Acme\bq}) read as English clauses
+rather than as \code{worksFor(...)}.}
+\label{fig:mixfix}
+\end{figure}
+
+\paragraph{Lineage.}
+L4's surface design inherits from a substantial tradition of controlled and
+computational language for rules. Its low-code ancestors are COBOL and SQL
+(Section~\ref{sec:motivation}), which first wagered that an uppercase,
+English-shaped surface could let non-programmers read business rules; the
+controlled-language tradition since has refined that wager. From Grammatical
+Framework
+\cite{ranta2004gf} we take the discipline of treating a surface syntax as a
+type-theoretical grammar---an abstract syntax with concrete realisations---
+which points toward multilingual rendering of the same rule. From the
+wide-coverage parsing tradition of C\&C and Boxer \cite{curran2007cc,
+bos2008boxer} we take the goal, run in the opposite direction, of mapping
+language to logical form, the ingestion problem an LLM now eases. From the
+enterprise standards SBVR \cite{omg_sbvr} and DMN \cite{omg_dmn} we take the
+demonstrated appetite among business analysts---not only programmers---for
+structured vocabulary, rules, and decision tables; and from CNL efforts such
+as RuleCNL \cite{feuto2014rulecnl}, which compiles a business-rule CNL into
+SBVR, the specific lesson that a controlled surface can target a formal core
+without exposing it. L4's distinctive bet relative to these is to pair the
+CNL surface with an \emph{executable, type-checked} semantics spanning both
+constitutive functions and regulative contracts, and to make the surface
+\emph{isomorphic} to legal source text rather than to a business-analyst
+vocabulary.
+
+We do not claim these choices are free. Verbosity, layout-sensitivity, and
+phrase identifiers each cost something in concision or in editor support,
+and we discuss the trade-offs in Section~\ref{sec:experience}. We do claim
+that they are the right trade-offs for a language whose first reader is a
+domain expert, and that they are made \emph{at the surface}, leaving the
+semantics of Sections~\ref{sec:constitutive}--\ref{sec:relational}
+untouched.
+
+% ===================================================================
+\section{Implementation and Tooling}\label{sec:impl}
+% ===================================================================
+L4 is implemented in Haskell. The core (\textsf{jl4-core}) comprises a
+layout-sensitive parser, a Hindley--Milner-style type checker, and an
+evaluator that produces the explanatory traces of
+Section~\ref{sec:constitutive}. Around it sits a tooling stack intended to
+make a single \code{.l4} file productive: a Language Server Protocol
+implementation for in-editor type checking, inline evaluation, and
+go-to-definition; a REPL with trace and query-planning commands; a decision
+service exposing \code{@export}-annotated functions as REST endpoints and as
+Model Context Protocol tools for LLM agents; a WebAssembly build for
+in-browser and serverless evaluation; and an MLIR backend that compiles
+decision logic to a portable \code{.wasm} binary. The toolchain renders
+every evaluation as a GraphViz \emph{ladder diagram}, and can transpile a
+rule set to Markdown for human review or generate a consumer-facing web
+wizard from the same source. A static analyzer classifies financial
+contracts against the ACTUS and FIBO standards. The web editor at
+\textsf{jl4.legalese.com} runs the entire pipeline client-side.
+
+The role of LLMs in this stack is deliberately bounded. Models assist with
+\emph{ingestion}---drafting a first L4 formalisation from a PDF or a statute
+(Section~\ref{sec:ingestion})---and with \emph{explanation}---verbalising a
+completed, deterministic evaluation trace for a lay user. They are not in the
+reasoning loop. The reasoner is the L4 evaluator, whose every step is
+auditable; the model's natural-language output is guard-railed by, and
+checkable against, that trace. This is how L4 proposes to counter
+hallucination in legal AI: not by trusting the model to reason about the
+law, but by giving it a rigorous artefact to talk about.
+
+% ===================================================================
+\section{Ingestion: The Knowledge-Acquisition Bottleneck Revisited}\label{sec:ingestion}
+% ===================================================================
+% TODO: confirm the proper name and a citation for the "Legal Data Hunter" project.
+The expert systems of the 1980s foundered on the
+\emph{knowledge-acquisition bottleneck}
+\cite{feigenbaum1984,hayesroth1983}: encoding a domain demanded a knowledge
+engineer in slow, costly dialogue with a domain expert, and the brittle
+result rarely repaid the labour. Legal expert systems were no exception. For
+all the elegance of the British Nationality Act as a logic program
+\cite{sergot1986bna}, formalising law one statute at a time, through a scarce
+pairing of programmer and lawyer, never approached the scale of the law
+itself. L4 attacks the bottleneck from two directions.
+
+\paragraph{By hand, but better.}
+Even hand encoding is easier in a language built as a controlled natural
+language with isomorphism as a first-class goal
+(Sections~\ref{sec:background} and~\ref{sec:cnl}). Because the formal text
+mirrors the structure and quotes the wording of its source, a domain expert
+can audit it clause by clause without becoming a programmer. We have found
+this bridge to bear real weight: non-technical business stakeholders are
+able to \emph{read} an L4 ruleset and \emph{sign off} on it as a faithful
+statement of the rules they intend. This is a consequential result, because
+sign-off is precisely the act by which legal responsibility passes from the
+engineer who wrote the code to the accountable party who owns the
+rules---the bridge that a formalism opaque to its domain experts can never
+build. The knowledge-engineer/expert dyad does not vanish, but the gap
+across it narrows; and, as our experience suggests, software engineers
+schooled in requirements analysis are themselves capable wordsmiths who
+surface the ambiguities a business expert would gloss over. Strong types and
+exhaustiveness checking catch missing cases at the moment of encoding rather
+than in production. What hand encoding cannot do is scale: it stays linear
+in scarce expert hours.
+
+\paragraph{At scale, with the type system as oracle.}
+Large language models change the economics of the first pass. A model can
+propose a formalisation of a statute or a policy in seconds, shifting the
+human role from authoring to reviewing. The hazard is the familiar one---a
+fluent encoding that is subtly wrong---and here L4's static type system and
+language server are the decisive guardrail. The type checker is a sound,
+deterministic oracle that rejects ill-typed and non-exhaustive
+formalisations outright, and the LSP reports each violation inline with a
+precise location, so a model can be driven in a generate--check--repair loop
+until the file type-checks, and then until its \code{\#ASSERT} golden tests
+pass---extending the oracle from well-typedness to behaviour. This is the
+paper's neuro-symbolic thesis applied to ingestion itself: the LLM proposes
+and the type system disposes. Strong typing turns open-ended
+natural-language-to-code generation into a constrained search against a
+verifier, the discipline that makes type-directed program synthesis
+tractable, and it lets the system scale ingestion without surrendering
+correctness to a model's confidence.
+
+\paragraph{Corpus at scale.}
+A type-guarded ingestion loop still needs raw material: machine-readable
+primary law. The complementary enabler is the decades-long campaign to
+liberate it. Carl Malamud's Public.Resource.Org and Law.gov, and the
+litigation establishing that the law and the standards incorporated into it
+are not locked behind copyright \cite{publicresource}, have made vast
+quantities of primary legal material publicly accessible; projects in that
+lineage---such as the Legal Data Hunter effort---are now channelling
+statutes, regulations, and codes into ingestible form at scale. With an open
+corpus on one side and a type-guarded LLM loop on the other, the isomorphic
+formalisation of law begins to look tractable at a scale the
+knowledge-acquisition bottleneck once foreclosed. It does not thereby become
+automatic: faithfulness to legislative or contractual \emph{intent}, as
+opposed to structure, remains a matter of human judgement and sign-off
+(Section~\ref{sec:experience}). But formalisation need no longer proceed one
+statute at a time, gated by a scarce dyad.
+
+% ===================================================================
+\section{Applications}\label{sec:apps}
+% ===================================================================
+Because a single \code{.l4} source feeds many backends
+(Section~\ref{sec:impl}), one formalisation supports a spectrum of
+applications across the legal lifecycle---drafting, analysis, citizen
+self-help, and operational decisioning---rather than a single product. We
+sketch four archetypes; the pilots of Section~\ref{sec:experience}
+instantiate them.
+
+\paragraph{Citizen-facing expert systems.}
+From the same source that the type checker validates, the toolchain
+auto-generates an interactive web wizard: a member of the public enters the
+facts of their situation and is shown their obligations or entitlements,
+each answer carrying a citation to the deciding rule and the evaluation
+trace as a plain-language explanation. This is the disruptive wedge of
+Section~\ref{sec:motivation}---the overserved non-consumer who simply wants
+to know where they stand under a regulation or a policy they signed without
+reading. Building such an expert system is, in L4, a side effect of having
+written the rules down at all, not a separate engineering project.
+
+\paragraph{Formal verification and static analysis.}
+The relational reading (Section~\ref{sec:relational}) lets a rule set or a
+draft contract be handed to model-checking backends---NuSMV, SPIN, TLA+,
+UPPAAL---for compile-time static analysis: discovery of race conditions and
+deontic-temporal double binds, of clauses that can never fire or
+obligations that can never be discharged, and of outright inconsistencies in
+legislation under drafting or in a contract under negotiation. Loophole
+hunting becomes exploit hunting. The same machinery turns each party's
+``dozen scenarios I care about'' into a regression suite that runs on every
+redraft, so that an edit from either side that breaks a previously agreed
+property is caught immediately rather than litigated later.
+
+\paragraph{Generative drafting back into natural language.}
+The ingestion direction---natural language to formal rule
+(Section~\ref{sec:ingestion})---is the obvious use of an LLM, but the
+reverse is the more interesting one. Once a rule set
+is formal and has been \emph{proven consistent}, generative AI can render it
+back into fluent English: the statutory prose a Parliament can debate and
+enact, or the clause a counterparty will sign. Here the verified formal
+artefact is the source of truth and the English is a faithful, regenerable
+rendering---the inversion the rules-as-code agenda has long sought
+\cite{mohun2020rulesascode}---rather than the prose being authoritative and
+the logic an after-the-fact gloss that may silently disagree with it. Because
+the model is constrained to verbalise a fixed artefact, the prose cannot
+drift from the logic, and (via grammar-engineering approaches such as
+\cite{ranta2004gf}) the same rule can be rendered in multiple natural
+languages from one source.
+
+\paragraph{Audit-grade enterprise decisioning.}
+At the opposite, high-volume end, the decision service plugs into an
+enterprise business-rules engine for operational decisions---approving or
+denying loan applications, adjudicating insurance claims, determining
+benefit eligibility. The differentiator is not throughput but
+accountability: because every decision carries a deterministic trace from
+the top-level question down to the deciding condition, the outcome is
+explainable and auditable \emph{by construction}. This directly answers the
+transparency expectations that the GDPR's provisions on automated decisions
+gesture at \cite{gdpr2016}---and whose precise extent is contested
+\cite{wachter2017explanation}---and that the EU AI Act makes concrete for
+high-risk systems \cite{aiact2024}. The applicant is entitled to a reason,
+and L4 produces the reason as a first-class artefact: a citable derivation,
+not the post-hoc rationalisation of a model that, in effect, had a gut
+feeling about them.
+
+These archetypes are not four products but four views of one source; the
+platform ambition (Section~\ref{sec:conclusion}) is precisely that an
+ecosystem can build all of them, and others not yet imagined, atop rules
+authored once.
+
+% ===================================================================
+\section{Experience and Open Questions}\label{sec:experience}
+% ===================================================================
+% TODO: confirm what may be disclosed about each engagement; figures and
+%       counterparties are presently described in deliberately general terms.
+L4 has been exercised in pilots across the public and private sectors. With
+a government agency we encoded a piece of secondary legislation for
+regulatory compliance and generated a web wizard that lets members of the
+public enter their circumstances and see their obligations, each answer
+carrying citations to the source rules; the formal-verification pass
+uncovered the deontic-temporal conflict described in
+Section~\ref{sec:regulative}. In the private sector, formalising a major
+insurer's policy revealed an ambiguity in a payout formula with material
+financial exposure. A legislative drafting office has explored L4 for
+future drafting as a rules-as-code exercise of the kind the OECD has urged
+\cite{mohun2020rulesascode}. A payments fintech used L4 to ingest commercial
+agreements dense with fee tables and serve them through an SQL-like API for
+integration with operational systems.
+
+These engagements also exposed the language's rough edges. Layout
+sensitivity, prized for isomorphism, can frustrate authors pasting from word
+processors that mangle whitespace. Phrase-shaped identifiers strain editor
+tooling built for token-shaped names. The regulative layer's defaults for
+omitted \code{HENCE} and \code{LEST} clauses, while convenient, can surprise
+authors who have not internalised the modality-dependent polarity of
+``success.'' Each is a live design question. More fundamentally, the gap
+between an isomorphic formalisation and a \emph{faithful} one---between
+matching the structure of the text and matching the intent behind it---is
+not something the language can close on its own; it remains, as it should, a
+matter for human legal judgement, now better supported by tools.
+
+% ===================================================================
+\section{Related Work}\label{sec:related}
+% ===================================================================
+L4 sits at the confluence of several lines of research; its contribution is
+their combination rather than any single strand.
+
+\paragraph{Contract DSLs and process calculi.}
+The financial-contract pearl of Peyton Jones and Eber
+\cite{pjeber2000composing} and the commercial-contract algebra of Andersen
+et al.\ \cite{andersen2006compositional} established the compositional,
+combinator style that Hvitved's CSL \cite{hvitved2011thesis,hvitved2012trace}
+generalised to multiparty contracts with a trace semantics and blame
+assignment; L4's regulative layer is a direct descendant, adding a
+controlled-natural-language surface and integration with a constitutive
+functional core. Stipula \cite{crafa2022stipula} likewise models legal
+contracts as a process calculus with state and time, reinforcing the
+contracts-as-processes view from an automata angle.
+
+\paragraph{Logic programming of law.}
+The British Nationality Act project \cite{sergot1986bna} is the foundational
+demonstration of isomorphic legislative encoding; PROLEG
+\cite{satoh2011proleg} and the broader argumentation tradition
+\cite{prakken2015law,bench2012history} continue it. Logical English
+\cite{kowalski2021logicalenglish} shares L4's controlled-natural-language
+ambition while remaining within logic programming; L4 differs in starting
+from typed functional programming and reaching the relational reading by
+transformation (Section~\ref{sec:relational}) rather than as its native
+substrate.
+
+\paragraph{Deontic and defeasible reasoning.}
+Defeasible deontic logic and the Regorous line of work
+\cite{governatori2005regorous,governatori2016semantics} model normative
+positions, permissions, and contrary-to-duty structure with great
+care. L4's reparation-via-\code{LEST} is a deliberately operational, less
+expressive treatment of the same contrary-to-duty phenomena
+\cite{chisholm1963ctd}, chosen for executability and for its fit with the
+trace semantics.
+
+\paragraph{Languages for law and smart contracts.}
+Catala \cite{merigoux2021catala} is the closest contemporary in spirit: a
+language for legislation, grounded in default logic, with a strong
+correctness story. L4 differs in its explicit constitutive/regulative split,
+its concurrency-aware contract semantics, and its CNL surface. DAML
+\cite{daml} brings a Haskell-derived functional language to ledger
+contracts but targets execution on distributed ledgers rather than
+isomorphic formalisation of existing law. The symbolic-drafting tradition
+runs back to Allen \cite{allen1957symbolic} and, earlier still, to Coode's
+nineteenth-century anatomy of legislative sentences \cite{coode1843}.
+
+% ===================================================================
+\section{Conclusion and Future Work}\label{sec:conclusion}
+% ===================================================================
+We have presented L4, a functional programming language for computational
+law that separates constitutive rules, treated as total typed functions,
+from regulative rules, treated as timed concurrent processes with a
+trace-based denotation in the lineage of CSL and CSP. We have shown that a
+single isomorphic source admits both a functional reading, for evaluation
+and explanation, and a relational reading, for abductive planning and
+model-checking-based loophole detection; and we have argued that the
+surface syntax can be engineered as a controlled natural language---low on
+punctuation, layout-structured, phrase-named---so that the same text is
+legible to the lawyer and to the machine. The motivation is not technical
+novelty for its own sake but the durable demand, sharpened in the age of
+generative AI, for rules a person can check for themselves precisely when
+the law begins to bite.
+
+Future work runs along three axes: deepening the formal correspondence with
+CSL and Timed CSP to a full proof of adequacy for the regulative semantics;
+maturing the relational backends so that conflict detection and abductive
+planning are push-button for non-experts; and a controlled study of
+authorability, measuring whether L4's CNL design in fact lowers the barrier
+for legally trained, non-programmer authors. The broader aim is a platform:
+a language at the bottom of the stack, in the manner of PostScript, on which
+an ecosystem of legal applications---wizards, checkers, planners,
+integrations---can be built atop rules written once, in black and white,
+and read by everyone.
+
+\begin{acks}
+% TODO: funding, the Centre for Computational Law, collaborators, pilot partners.
+The authors thank colleagues at the Centre for Computational Law and the
+legal and engineering collaborators on the pilots described herein.
+\end{acks}
+
+% ===================================================================
+\appendix
+% ===================================================================
+\section{Extending L4 to PROLEG: A Burden-of-Proof Monad}\label{app:proleg}
+% TODO: this appendix describes work in progress (a parallel effort is building
+%       the two-way parser/transpiler); soften claims further before submission.
+
+This appendix sketches an extension of L4 toward \emph{PROLEG}
+\cite{satoh2011proleg}, Satoh's logic-programming rendering of the
+``presupposed ultimate fact theory'' of the Japanese Civil Code, and the
+theory of the bridge we are building between the two.\footnote{The two-way
+PROLEG$\leftrightarrow$L4 parser and transpiler are under active development
+in a parallel effort; what follows is a design-and-theory note, not a report
+on a finished system. The front end already round-trips canonical PROLEG
+(\code{parse . print = id}) on the fixtures discussed below, and the
+burden-of-proof library of \S\ref{app:burden} type-checks and reproduces the
+reference judgement; the Mode-B emitter is in progress.} PROLEG is an
+attractive target for three reasons aligned with the body of this paper: it
+is a large, real corpus of formalised law (some 2{,}500 rules, validated
+against decades of bar examinations), so it stresses ingestion at scale
+(Section~\ref{sec:ingestion}); it is purely \emph{constitutive} and so
+exercises L4's functional core and its relational reading
+(Section~\ref{sec:relational}); and its native treatment of \emph{burden of
+proof} forces a distinction the body of the paper left implicit---a third
+jural role, neither constitutive definition nor regulative obligation.
+
+\subsection{Canonical PROLEG}
+Canonical PROLEG is ordinary Prolog augmented with a rule arrow \code{<=} and
+a defeasibility operator \code{exception(H,E)}: rule \code{H} is defeated
+when its defeater \code{E} is provable, and exceptions nest. Layered on top
+is a litigation vocabulary---\code{allege}, \code{provide\_evidence},
+\code{admission}, \code{plausible}---that encodes who must establish each
+ultimate fact and to what standard. Figure~\ref{fig:proleg} shows the core of
+the canonical lease fixture: a landlord's cancellation claim, an
+approval-of-sublease defence, and an abuse-of-confidence exception that
+defeats the tenant's \emph{non}-abuse defence---an exception of an exception.
+The fixture is drawn from genuine Japanese law. Article~612 of the Civil
+Code provides that a lessee may not assign or sublease without the lessor's
+consent, and that upon an unauthorised sublease the lessor may cancel the
+contract; the Supreme Court's judgement of 27~January 1966 (Minsh\=u 20-1-136)
+qualified this with the breach-of-trust, or \emph{abuse of confidence},
+doctrine, under which cancellation is barred where the sublease does not in
+fact betray the parties' relationship of trust. That qualification is the
+exception of an exception the fixture encodes; the original statutory text is
+reproduced in the companion Japanese translation of this paper.
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Prolog,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+cancellation_due_to_sublease <=
+    agreement_of_lease_contract, handover_to_lessee,
+    agreement_of_sublease_contract, handover_to_sublessee,
+    using_leased_thing, manifestation_cancellation.
+exception(cancellation_due_to_sublease, get_approval_of_sublease).
+exception(cancellation_due_to_sublease, nonabuse_of_confidence).
+nonabuse_of_confidence <= fact_of_nonabuse_of_confidence.
+exception(nonabuse_of_confidence, abuse_of_confidence).
+abuse_of_confidence    <= fact_of_abuse_of_confidence.
+\end{lstlisting}
+\caption{Canonical PROLEG: the lease-cancellation rulebase
+\cite{satoh2011proleg}, with two defeaters and an exception-of-exception.}
+\label{fig:proleg}
+\end{figure}
+
+\subsection{Two modes of translation}
+We translate in two modes that are, importantly, not two compilers.
+
+\emph{Mode B (decision-only).} Erase the burden layer and read each rule
+purely constitutively: \code{H <= B} becomes \code{DECIDE H IF B}, multiple
+rules for one head become a disjunction, and each \code{exception(H,E)}
+becomes a conjoined \code{AND NOT E}. Figure~\ref{fig:modeb} is the Mode-B
+image of Figure~\ref{fig:proleg}. The translation is the classical reading of
+stratified negation-as-failure \cite{clark1978naf,gelfond1988stable}, and is
+sound exactly when the signed dependency graph is stratified---a condition
+the transpiler must check, not assume.
+
+\begin{figure}[t]
+\begin{lstlisting}
+DECIDE `cancellation due to sublease` IF
+        `agreement of lease contract`
+    AND `handover to lessee`
+    AND `agreement of sublease contract`
+    AND `handover to sublessee`
+    AND `using leased thing`
+    AND `manifestation cancellation`
+    AND NOT `get approval of sublease`    -- exception
+    AND NOT `nonabuse of confidence`      -- exception
+
+DECIDE `nonabuse of confidence` IF
+        `fact of nonabuse of confidence`
+    AND NOT `abuse of confidence`         -- exception-of-exception
+\end{lstlisting}
+\caption{Mode-B L4: defeasibility becomes \code{AND NOT}; the
+exception-of-exception falls out structurally. The output is plain
+constitutive L4, validated by \code{jl4-cli}.}
+\label{fig:modeb}
+\end{figure}
+
+\emph{Mode A (judgement-faithful).} Retain the burden of proof and reify it
+as an L4 library. The key observation is that Mode~A is Mode~B \emph{plus}
+typing each fact as a burden-bearing value and adding a \code{resolve} pass;
+\code{resolve} is exactly the Mode-A-to-Mode-B desugaring. One compiler, two
+fidelities.
+
+\subsection{A clause-by-clause walkthrough}\label{app:walkthrough}
+A translation earns the word \emph{isomorphic} only if a reader can lay the
+two texts side by side and check them clause by clause. We walk the lease
+case of Figure~\ref{fig:proleg} from rulebase to factbase to judgement, to
+make the correspondence explicit.
+
+\paragraph{Rules.} The mapping is local and structural. Two PROLEG rules that
+share a head---\code{contract\_end <= cancellation\_due\_to\_sublease} and
+\code{contract\_end <= expiration\_\ldots}---become one \code{DECIDE} whose
+body is their disjunction. A rule together with the \code{exception/2} clauses
+that name its defeaters---which PROLEG writes as \emph{separate} top-level
+clauses---gathers into a single \code{DECIDE} whose body conjoins the rule's
+premises with one \code{AND NOT} per defeater. This per-head gathering is the
+sole normalisation the translation performs, and it is what makes the L4 rule
+readable as a self-contained statement of when its head holds. Thus the
+six-premise \code{cancellation\_due\_to\_sublease} rule and its two exceptions
+collapse into the single declaration of Figure~\ref{fig:modeb}, and the chain
+\code{nonabuse <= fact\_of\_nonabuse} / \code{exception(nonabuse, abuse)} /
+\code{abuse <= fact\_of\_abuse} becomes the two declarations that close it.
+Rule for rule, the L4 file has the same shape as the PROLEG one.
+
+\paragraph{Facts.} The factbase (Figure~\ref{fig:leasefacts}) is where the
+burden vocabulary does its work. A fact counts as \emph{established} when its
+proponent meets the standard---\code{plausible(F)} holds---or when the
+opposing party concedes it by \code{admission}. Reading the lease factbase
+through that rule: the six constitutive facts of the cancellation claim are
+\code{admission}-ed by the defendant, and so are established; the two approval
+facts are \code{allege}d and evidenced by the defendant but never made
+\code{plausible}, and so are \emph{un}established; while
+\code{fact\_of\_nonabuse} and \code{fact\_of\_abuse} are each \code{plausible},
+and so established. In Mode~B these resolve to the booleans the \code{DECIDE}s
+consume; in Mode~A they are the \code{established}/\code{unestablished}
+injections of Figure~\ref{fig:burdenlease}, each carrying its bearer into the
+ledger.
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Prolog,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+admission(agreement_of_lease_contract, defendant). % +5 constitutive
+allege(approval_of_sublease, defendant).
+provide_evidence(approval_of_sublease, defendant). % but NOT plausible
+allege(fact_of_nonabuse_of_confidence, defendant).
+plausible(fact_of_nonabuse_of_confidence).         % => established
+allege(fact_of_abuse_of_confidence, plaintiff).
+plausible(fact_of_abuse_of_confidence).            % => established
+\end{lstlisting}
+\caption{The lease factbase (excerpt). \code{admission} by the opponent and
+\code{plausible} both establish a fact; an \code{allege}d fact never made
+\code{plausible} stays unestablished---and its bearer loses on it.}
+\label{fig:leasefacts}
+\end{figure}
+
+\paragraph{Judgement.} Evaluating \code{contract\_end} now descends the rules
+deterministically:
+\begin{itemize}
+\item \code{contract\_end} reduces to \code{cancellation} \code{OR}
+  \code{expiration}; the expiration branch has no established facts and fails,
+  so everything rests on cancellation.
+\item \code{cancellation} requires its six constitutive facts (all established
+  by admission), \code{AND NOT get\_approval}, \code{AND NOT nonabuse}.
+\item \code{get\_approval} needs both approval facts, which are unestablished,
+  so it fails---and \code{NOT get\_approval} holds. The defendant's first
+  defence is out.
+\item \code{nonabuse} needs \code{fact\_of\_nonabuse} (established) \code{AND
+  NOT abuse}. But \code{abuse} needs \code{fact\_of\_abuse}, which \emph{is}
+  established, so \code{abuse} holds, \code{NOT abuse} fails, and
+  \code{nonabuse} fails---so \code{NOT nonabuse} holds. This is the exception
+  of an exception: the plaintiff's abuse of confidence defeats the defendant's
+  non-abuse defence.
+\item With both defeaters out, \code{cancellation} holds, \code{contract\_end}
+  holds, and the landlord prevails.
+\end{itemize}
+This descent \emph{is} the L4 evaluation trace---the ladder diagram of
+Section~\ref{sec:impl}---and exactly what the \code{\#ASSERT}s of
+Figure~\ref{fig:burdenlease} check. Because every step cites a rule that
+exists one-for-one in the source, the trace doubles as an audit of the PROLEG
+program: the explanation a reviewer reads is a literal walk over the statute's
+own structure. The burden ledger then adds the dimension Mode~B
+discards---\code{fact\_of\_abuse} on the plaintiff, \code{fact\_of\_nonabuse}
+on the defendant---recovering, for free, the question of who would have lost
+had each fact gone unproven.
+
+\subsection{First-order rules and type reconstruction}
+The lease fixture is propositional, but most of PROLEG is first-order:
+predicates carry positional, untyped arguments. Figure~\ref{fig:minorduress}
+shows a fragment of a second fixture---a minor's rescission of a sale,
+defeated by duress---in which the arguments are buyers, sellers, contracts,
+and dates. Translating it to L4, whose functions are typed and whose fields
+are named, requires \emph{type reconstruction}: inferring from usage that the
+first argument of \code{rescission\_by\_minor\_buyer} is the same sort as the
+\code{Buyer} flowing into \code{minor} and \code{manifestation}, then giving
+that position a name and a type. This is Hindley--Milner-style inference run
+across the predicate signatures, and it is where untyped PROLEG and typed L4
+most visibly diverge---the temporal arguments, for instance, become L4
+\code{Date} values with a real ordering (Section~\ref{sec:regulative}), not
+opaque atoms.
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Prolog,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+rescission_by_minor_buyer(Buyer,Seller,CID,Tc,Tr) <=
+    minor(Buyer),
+    manifestation(rescission(CID),Buyer,Seller,Tr),
+    before_the_day(Tc,Tr).
+exception(manifestation(A,Mfr,Mfe,Ta),
+          manifestation_by_duress(Thr,Mfr,Mfe,A,Ta,Td,Tr)).
+\end{lstlisting}
+\noindent\textit{\footnotesize L4 (Mode B, types reconstructed):}
+\begin{lstlisting}
+GIVEN buyer IS A Person, seller IS A Person,
+      contract IS A ContractId,
+      tContract IS A Date, tRescission IS A Date
+GIVETH A BOOLEAN
+DECIDE `rescission by minor buyer`
+       buyer seller contract tContract tRescission IF
+        `minor` buyer
+    AND `manifestation` (rescission contract) buyer seller tRescission
+    AND tContract `before` tRescission
+
+DECIDE `manifestation` action mfr mfe tAction IF
+        `manifestation fact` action mfr mfe tAction
+    AND NOT `manifestation by duress` ...   -- duress defeats it
+\end{lstlisting}
+\caption{First-order PROLEG and its Mode-B image. Positional untyped
+arguments are reconstructed into named, typed parameters; the
+exception-of-exception (duress defeats the minor's rescission, so the sale
+stands) survives the translation.}
+\label{fig:minorduress}
+\end{figure}
+
+Reconstruction is not merely a convenience: it is a \emph{linter}. The
+published slides for this very example contain typos---a defeater spelled
+\code{minifestation\_by\_duress}, variables \code{Maniester} and
+\code{Mnifestee}---that untyped Prolog accepts silently, since a misspelt
+functor is simply a fresh predicate that never unifies (a defeater that can
+never fire, and so a bug that quietly changes the judgement). L4's name
+resolver and type checker reject exactly these as unbound or ill-typed. The
+type-as-oracle ingestion loop of Section~\ref{sec:ingestion} therefore pays a
+second dividend here: round-tripping PROLEG's corpus through L4 makes the
+corpus audit itself, surfacing the silent drafting errors that a large body
+of untyped rules inevitably accretes.
+
+\subsection{The burden-of-proof monad}\label{app:burden}
+The recurring move in all three traditions the paper touches---deontic
+obligation, residual control, and burden of proof---is to index a normative
+position by a responsible party, $(\textit{position},\textit{party})$. By
+Hohfeld \cite{hohfeld1913} these are three \emph{distinct} positions: the
+obligation-bearer who is blamed on breach (a duty, the agentive subject of
+CSL and of L4's \code{PARTY \ldots MUST}, Section~\ref{sec:regulative}); the
+residual-control holder who decides in the gap (a power); and the bearer of
+the risk of non-persuasion who \emph{loses} if a fact is unproven (a
+liability). The construct here formalises \emph{only} the third, and the
+governing transpiler rule is that a PROLEG party is a burden-role and must
+\emph{never} be synthesised into an L4 obligation.
+
+A proposition's evidential state has two independent dimensions: its
+\emph{truth} (established, refuted, or undecided---naturally \code{Maybe},
+with \code{Nothing} the undecided case) and its \emph{burden} (who must
+establish it). ``A value carrying its evidential subject'' is the coreader /
+environment comonad $(\textit{Subject}, a)$ \cite{uustalu2008comonadic}; it
+becomes a \emph{monad} precisely when the subject carries a monoid---that is,
+once one decides how two burdens combine. There is no sensible
+$\textit{plaintiff} \mathbin{\diamond} \textit{defendant}$, so we do not
+merge subjects but \emph{accumulate} them; the free monoid over elementary
+burdens is an \emph{obligation ledger}, and the comonad-with-monoidal-output
+is then a \code{Writer} monad \cite{wadler1992essence}. Stacked over the
+truth dimension in the order that keeps the ledger even on a failed
+proof---so that blame survives failure---this is
+\code{MaybeT (Writer [Obligation])} (Figure~\ref{fig:provable}). The ledger
+emitted as the \code{Writer} output \emph{is} the responsibility map,
+generated for free by composition; and because conjunction is accumulating
+rather than short-circuiting, that map is structural (it reflects the rule,
+not the run).
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Haskell,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+data Subject    = Plaintiff | Defendant
+data Obligation = Obligation { onWhom :: Subject, what :: Text }
+
+-- truth (Maybe) over a ledger of burdens (Writer); MaybeT is
+-- outside, so Provable a  =  ([Obligation], Maybe a)
+type Provable = MaybeT (Writer [Obligation])
+
+prove      :: Subject -> Text -> Maybe a -> Provable a -- a borne fact
+notProven  :: Provable a -> Provable ()  -- negation as failure
+flipBurden :: Provable a -> Provable a   -- involution = opposite(P)
+absent     :: Provable a -> Provable ()  -- defeater, opposing party
+resolve    :: Provable a -> Bool         -- close the world
+\end{lstlisting}
+\caption{The burden monad \code{L4.Proleg.Burden}. \code{flipBurden} is
+PROLEG's \code{opposite(P)} localised to the exception boundary;
+\code{absent = notProven . flipBurden} is a defeater the opposing party must
+establish.}
+\label{fig:provable}
+\end{figure}
+
+\subsection{The construct in L4 itself}\label{app:burdenl4}
+The construct is not only Haskell theory; it is realised in L4 itself.
+Figure~\ref{fig:burdenl4} excerpts \code{burden.l4}. Because L4 has no
+\code{Monad} typeclass, the monad lives in the evaluator, and the same
+algebra surfaces at the source level as a record carrying the truth
+dimension (\code{MAYBE BOOLEAN}, with \code{NOTHING} the undecided case) and
+an accumulating obligation ledger, together with explicit combinators.
+\code{notProven} is negation as failure; \code{flipBurden} relabels a
+sub-derivation's obligations to the opposite party; \code{resolve} closes the
+world, so \code{NOTHING} becomes \code{FALSE}---the bearer loses. The
+genitive accessor \code{p's truth}---the very \code{'s} overload of
+Section~\ref{sec:cnl}---reads the record field.
+
+\begin{figure}[t]
+\begin{lstlisting}
+DECLARE Subject IS ONE OF Plaintiff, Defendant
+
+DECLARE Obligation HAS
+    onWhom IS A Subject
+    what   IS A STRING
+
+-- Haskell: Provable = MaybeT (Writer [Obligation]).  L4 has no Monad
+-- typeclass, so the algebra surfaces as a record: a truth dimension
+-- (NOTHING = undecided) plus an accumulating obligation ledger.
+DECLARE Provable HAS
+    truth       IS A MAYBE BOOLEAN
+    obligations IS A LIST OF Obligation
+
+GIVEN p IS A Subject, claim IS A STRING, mx IS A MAYBE BOOLEAN
+GIVETH A Provable
+prove p claim mx MEANS
+    Provable WITH
+        truth       IS mx
+        obligations IS LIST (Obligation WITH onWhom IS p, what IS claim)
+
+-- negation as failure: holds iff its argument is not established
+GIVEN p IS A Provable
+GIVETH A Provable
+notProven p MEANS
+    Provable WITH
+        truth       IS (IF isTrue (p's truth) THEN NOTHING ELSE JUST TRUE)
+        obligations IS p's obligations
+
+-- relabel obligations to the opposite party (an involution)
+GIVEN p IS A Provable
+GIVETH A Provable
+flipBurden p MEANS
+    Provable WITH
+        truth       IS p's truth
+        obligations IS flipAll (p's obligations)
+
+-- close the world: established => TRUE, else the burden default
+resolve p MEANS isTrue (p's truth)
+\end{lstlisting}
+\caption{Excerpt of \code{burden.l4}: the burden construct written in L4. The
+record \code{Provable} is the L4 image of \code{MaybeT (Writer
+[Obligation])}; the combinators are the source-level monad operations.}
+\label{fig:burdenl4}
+\end{figure}
+
+The point of writing it in L4 rather than on paper is that the worked
+judgement becomes executable. Figure~\ref{fig:burdenlease} encodes the lease
+case of Figure~\ref{fig:proleg} directly and states the expected outcome as
+\code{\#ASSERT}s that \code{jl4-cli} checks: \code{contractEnd} and
+\code{cancellation} hold, while the approval defence and the non-abuse
+defence do not---the latter defeated by the plaintiff's abuse of confidence,
+an exception of an exception. The closing \code{\#EVAL} prints the
+responsibility ledger; \code{flipBurden} dualises it, re-attributing each
+fact to the party who bears its converse.
+
+\begin{figure}[t]
+\begin{lstlisting}
+-- defendant's first defence: alleged but NOT plausible => unestablished
+getApproval MEANS
+  conj (LIST (unestablished Defendant "approval_of_sublease"),
+             (unestablished Defendant "approval_before_cancellation"))
+
+-- plaintiff's exception-of-exception
+abuse MEANS conj (LIST (established Plaintiff "fact_of_abuse_of_confidence"))
+
+-- defendant's second defence, itself defeated by the plaintiff's abuse
+nonabuse MEANS
+  conj (LIST (established Defendant "fact_of_nonabuse_of_confidence"),
+             (notProven abuse))
+
+cancellation MEANS
+  conj (LIST (established Plaintiff "agreement_of_lease_contract"),
+             -- ... the other five constitutive facts ...
+             (established Plaintiff "manifestation_cancellation"),
+             (notProven getApproval),
+             (notProven nonabuse))
+
+contractEnd MEANS disj (LIST cancellation)
+
+#ASSERT      resolve contractEnd
+#ASSERT      resolve cancellation
+#ASSERT NOT (resolve getApproval)
+#ASSERT NOT (resolve nonabuse)
+
+#EVAL contractEnd's obligations          -- the responsibility ledger
+#EVAL (flipBurden abuse)'s obligations   -- burdens flipped to the opponent
+\end{lstlisting}
+\caption{The lease judgement of \cite{satoh2011proleg} as executable L4. The
+\code{\#ASSERT}s encode the reported outcome; the \code{\#EVAL}s print the
+responsibility ledger that the \code{Writer} dimension accumulates.}
+\label{fig:burdenlease}
+\end{figure}
+
+\subsection{The presumption is the monoidal identity}
+Promoting the structure from a semigroup to a monoid forces a choice a
+semigroup never makes: the identity element---the value of a proposition
+\emph{before any evidence is combined in}. Legally, this unit is the
+\emph{presumption}, and fixing it is a constitutional act. The carrier
+\code{Bool} admits two monoids, De~Morgan duals
+(Table~\ref{tab:presumption}): under $(\vee, \textit{False})$ a charge is not
+established until a sufficient ground flips it true---the presumption of
+innocence; under $(\wedge, \textit{True})$ a claim stands until disproof.
+Same elements, same operation, \emph{different unit---different morality};
+\code{flipBurden} De~Morgan-dualises the one into the other, mirroring
+$\neg\neg = \mathrm{id}$. A \emph{rebuttable} presumption is the identity
+(evidence can move off it); a \emph{conclusive} presumption or a \emph{jus
+cogens} norm is the absorbing element (no evidence moves it). A legal regime
+is thus a pair $(\textit{identity}, \textit{threshold})$---who gets the
+benefit of the doubt, and how much doubt is tolerated; criminal law fixes
+$(\textit{innocent}, \textit{beyond-reasonable-doubt})$, encoding
+Blackstone's ratio \cite{blackstone1769} as, in effect, a decision-theoretic
+loss function over the asymmetric cost of error \cite{hayspier1997burdens}.
+The monad unit law reads jurisprudentially: the presumption on its own moves
+nothing; only evidence ($\mathbin{>\!\!>\!\!=}$) does.
+
+\begin{table}[t]
+\caption{Burden of proof as the per-proposition choice of monoidal identity.}
+\label{tab:presumption}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Monoid on \texttt{Bool}} & \textbf{identity} & \textbf{legal reading} \\
+\midrule
+$(\vee, \textit{False})$  & \textit{False} & presumption of innocence \\
+$(\wedge, \textit{True})$ & \textit{True}  & rebuttable presumption of the claim \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Correspondence and the answer-set image}
+The same non-monotonic content has three faces the bridge must keep aligned
+(Table~\ref{tab:correspondence}). Relationalising L4 as in
+Section~\ref{sec:relational}---functions to predicates by A-normal-form
+flattening with an added output argument---sends \code{Provable} and its
+negation-as-failure to answer-set default negation
+\cite{gelfond1988stable,dung1995argumentation}; stable-model enumeration
+becomes scenario search, and the deontic-temporal double binds of
+Section~\ref{sec:regulative} reappear as unsatisfiable cores, the same
+loophole-as-exploit framing now extended to cover the burden layer.
+Encoding the lease factbase and evaluating \code{contract\_end} with these
+combinators (Figure~\ref{fig:burdenlease}) reproduces the reported
+judgement: the landlord prevails, the
+approval-of-sublease defence fails for want of plausibility, the non-abuse
+defence is itself defeated by abuse of confidence, and the ledger attributes
+each fact to its bearer---establishing, incidentally, that \emph{who bears a
+burden} (the plaintiff, for the constitutive facts) is independent of
+\emph{who establishes it} (here, the defendant's admission).
+
+\begin{table}[t]
+\caption{Three faces of the same defeasible content.}
+\label{tab:correspondence}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+ & \textbf{PROLEG} & \textbf{\texttt{Provable}} & \textbf{ASP} \\
+\midrule
+defeater       & \code{exception} & \code{notProven}  & \code{not e} \\
+closed world   & implicit         & \code{resolve}    & default neg. \\
+proof standard & \code{plausible} & the \code{Maybe}  & weak constr. \\
+burden bearer  & \code{opposite}  & \code{flipBurden} & tie-break \\
+resp.\ map     & ---              & \code{Writer}     & literals/party \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The upshot for the main thesis is that the constitutive/regulative split of
+Section~\ref{sec:background} gains a third lane---evidentiality. The natural
+user-facing artefact is a \emph{responsibility map} with three projections
+(who is on the hook, who decides, who must prove), each a
+$(\textit{position},\textit{party})$ pair drawn from a different Hohfeldian
+register, and the value of having them as separate types is precisely that
+the transpiler cannot silently collapse one into another.
+
+\subsection{Discharging the burden over time: proof actions and an event-sourced factbase}\label{app:proofaction}
+The construct so far is static: it resolves a \emph{fixed} factbase to a
+judgement. But a burden is discharged \emph{over time}, by acts performed before
+deadlines---which is the regulative layer's home ground
+(\S\ref{sec:regulative}), not the constitutive core's. This suggests siting the
+\emph{act of proving} as a deontic action while leaving the \emph{fact} itself
+constitutive. The modality must be \code{MAY}, not \code{MUST}: proving is a
+privilege, not a duty---a party is not sanctioned for failing to prove, it
+simply loses the point---so the Hohfeldian separation above survives even as the
+deontic machinery, which carries a party index, is reused to name the
+burden-bearer. A \emph{proof action}
+\begin{lstlisting}
+PARTY  Plaintiff
+MAY    `prove` `abuse of confidence`
+WITHIN evidenceDeadline
+HENCE  `abuse of confidence is established`
+\end{lstlisting}
+\noindent feeds the constitutive decision: its \code{HENCE} continuation records
+the fact a downstream \code{DECIDE} consumes. This splits the burden into its two
+classical halves---the deadline-bounded \code{MAY} is the burden of
+\emph{production} (act in time or lose the point), and the standard of proof
+gating the \code{HENCE} is the burden of \emph{persuasion}---and renders a
+defeater as a \emph{counter} proof action by the opposing party, ordered by
+deadline, so that the static \code{flipBurden} involution becomes literal
+turn-taking: claim, defence, reply, the shape of pleading itself.
+
+The question this raises is not syntactic---\code{HENCE} already carries an
+arbitrary expression---but semantic: how does the \code{HENCE} record a fact a
+later \code{DECIDE} will read? The answer is \emph{not} a mutable cell and an
+\code{UPDATE} keyword. Establishing facts is state that must never be
+overwritten, for two reasons that pull together. The first is \emph{epistemic
+revision}: evidence is found forged, a witness recants, an appeal admits new
+facts, so a fact once believed established may later be believed false. On top of
+the \emph{logical} non-monotonicity already present---the \code{AND NOT}
+defeaters, which flip a conclusion \emph{within} a knowledge state---this adds a
+second, \emph{temporal} non-monotonicity \emph{across} knowledge states. The
+second reason is audit: the wedge of Section~\ref{sec:apps}, a decision one can
+replay and explain, demands answering \emph{what did the system conclude on date
+$T$, and on what basis}---and a destructive update is precisely what makes that
+question unanswerable.
+
+Both point to an \emph{event-sourced}, \emph{bitemporal} factbase. Nothing is
+mutated: a proof action appends an event stamped with both \emph{valid time}
+(when the fact holds in the world) and \emph{transaction time} (when we recorded
+believing it) \cite{snodgrass2000temporal}, and a correction is a later,
+superseding event rather than an overwrite. The facts a decision reads are then a
+pure projection, \code{established(F) AS OF (validTime, knownAt)}, non-monotone
+in either axis yet computed without mutation---and L4's multi-axis
+\code{TemporalContext} (\S\ref{sec:regulative}) already supplies exactly these
+stamps. The burden ledger of Figure~\ref{fig:provable} is already append-only;
+all that changes is that \code{resolve} graduates from a fold into a temporal,
+supersession-aware projection.
+
+This is \emph{event sourcing}, and for this paper's audience it has a familiar
+logical name: the \emph{event calculus} \cite{kowalski1986events}, whose
+\code{HoldsAt(f,t)} is exactly \code{established(f) AS OF t} and from which the
+regulative layer already descends (\S\ref{sec:regulative}). The same object
+wears several hats---event sourcing for the engineer, the event calculus for the
+logician, a \emph{trace} for the process reading of \S\ref{sec:regulative}, and,
+for the lawyer, \emph{the record}: append-only, corrections filed rather than
+expunged, interrogable as of any date. The capability is not mutation but its
+dual---letting a constitutive \code{DECIDE} \emph{query the regulative
+trace}---and that dual is now realised. L4 provides \code{RECORD} (append to a
+party's own ledger), \code{COMMIT}/\code{ATTEST} (append to the shared
+\emph{official} record), and \code{RECALL} (the projecting read, including
+\code{<party>'s} cross-party and \code{OFFICIAL's} official-record forms). A
+proof action's \code{HENCE} appends with \code{RECORD}, and a later \code{DECIDE}
+reads the fact back with \code{RECALL}, so the record-then-read loop is the
+deontic sequencing \mbox{\code{p HENCE RECORD HENCE q}} threaded through the
+regulative chain; the writes append and never overwrite by construction, the
+no-\code{UPDATE} discipline argued above made concrete. What remains is the
+\emph{second} temporal axis: \code{resolve} graduating from this last-write-wins
+fold into the bitemporal, supersession-aware projection \code{established(F) AS OF
+(validTime, knownAt)}, where a correction is a superseding event rather than the
+latest write, and a typed \code{EnvironmentState} schema linking each read's type
+to the fact it recorded. Those two refinements---not the query capability
+itself---are the work in progress flagged at the head of this appendix.
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{l4-icail}
+
+\end{document}

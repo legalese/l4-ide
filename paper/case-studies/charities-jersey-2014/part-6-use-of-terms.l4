@@ -1,0 +1,1228 @@
+IMPORT prelude
+IMPORT `charities-common`
+IMPORT `part-1-interpretation`
+
+§ `Charities (Jersey) Law 2014 — Part 6 — Use of the expressions 'charity', 'charitable' and related terms (Articles 21-25)`
+
+-- ===========================================================================
+-- PART 6 — USE OF EXPRESSIONS. Articles 21 to 25.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF THE PART. Article 21 is built out of THREE PARALLEL PAIRS. Each
+-- pair names a CLASS of entity, and then regulates the same act twice over —
+-- once STRICTLY against the entity itself, once with a MENS REA against anybody:
+--
+--                       the class of entity                     the forbidden reference
+--   Pair 1  21(1)/(2)   NOT a registered charity                'registered by the Commissioner'
+--   Pair 2  21(3)/(4)   a JERSEY ENTITY, NOT a registered       'charity'
+--                       charity
+--   Pair 3  21(5)/(6)   NOT a registered charity, AND           'charity', in connection with any
+--                       NEITHER a Jersey entity NOR an          of its activities IN JERSEY
+--                       excepted foreign charity (Art 22)
+--
+--   ODD  paragraph — binds THE ENTITY ITSELF. Strict. Two conjunct duties:
+--                    (a) must not refer to itself; and
+--                    (b) must not cause or permit ANOTHER to refer to it.
+--   EVEN paragraph — binds ANY PERSON, and adds a MENS REA CONJUNCTION:
+--                    (a) knows, suspects or has reasonable grounds to suspect
+--                        [the relevant facts]; AND
+--                    (b) INTENDS, by so referring, to cause another person
+--                        (i) to be misled as to the nature of the entity, OR
+--                        (ii) to give property or a financial advantage to it.
+--
+--   21(7)  the EVEN paragraphs apply "whether or not the person making the
+--          reference is also the entity, and is referring to itself". So the two
+--          prohibitions OVERLAP DELIBERATELY: one self-reference, made with the
+--          requisite knowledge and intent, breaches BOTH 21(3) AND 21(4).
+--   21(8)  the States may by Regulations prescribe exceptions to (1) to (6).
+--          A single DEFEATER atom, defeating all six prohibitions.
+--
+-- THE PENALTY ASYMMETRY — and it tracks the mens rea EXACTLY:
+--   21(9)   contravening (2), (4) or (6)  — the MENS REA ones —
+--           2 years' imprisonment AND a fine.
+--   21(10)  contravening (1), (3) or (5)  — the STRICT ones —
+--           a fine of level 3 on the standard scale ONLY. No imprisonment.
+--
+-- Article 23 repeats the two-pronged shape for 'Jersey charity', keyed to the
+-- THREE-limb conjunction in 23(3) — and INVERTS THE PARAGRAPH ORDER of the
+-- penalties: 23(6) is the STRICT offence (level 3 fine) and 23(7) the MENS REA
+-- offence (2 years and a fine). The NUMBERING inverts; the MAPPING does not.
+-- That invariant — "the penalty tracks the mens rea, not the paragraph number" —
+-- is made machine-checkable below (`the penalty tracks the mens rea, not the
+-- paragraph number`), by giving each offence a Part6Penalty record and asserting
+-- over the four of them.
+--
+-- Article 24 (restricting 'charitable' in fundraising) and Article 25 (requiring
+-- registered charities to identify themselves) are PURE POWERS — Regulation- and
+-- Order-making, with no computable content until exercised. They are carried as
+-- labelled INERT-PROSE stubs with #EVAL, so the corpus has no silent gap.
+--
+-- ENCODING STYLE — INERT. The verbatim statutory words ride inline as bare
+-- strings (inert: identity of their context — TRUE under AND, FALSE under OR),
+-- with `...` as AND-sugar and `..` as OR-sugar. LAYOUT IS THE BRACKETING. Only
+-- the operative atoms are lifted to BOOLEANs. Read the left margin and you are
+-- reading Part 6.
+--
+-- THE PAY-OFF. Articles 21 and 23 bite NEGATIVELY: on entities that are NOT
+-- registered charities, that do NOT meet the conditions. So the operative
+-- predicates are negations over facts imported from elsewhere in the corpus —
+-- `is a Jersey entity` (Part 1, Art 2(3)) and an `is a registered charity` atom —
+-- plus `is an excepted foreign charity`, which Article 22 builds here, because
+-- 21(5) and 21(6) turn on it.
+--
+-- >>> INTERPRETATION CALL 1 — 'is a registered charity' AS AN ATOM. Registration
+--     is the subject of Part 4 (Arts 8-17), encoded by another file. Part 6 never
+--     asks HOW an entity came to be registered; it only asks WHETHER it is. So we
+--     take it as a primitive BOOLEAN fact on the entity, not as a computation. If
+--     Part 4 later exposes a `RegisteredCharity` record, this atom is the join
+--     point.
+--
+-- >>> INTERPRETATION CALL 2 — 'or other advantage' (21(2)(b)(ii)) vs 'financial
+--     advantage' (21(4)(b)(ii), 21(6)(b)(ii), 23(2)(b)(ii)). The statute says, in
+--     21(2)(b)(ii), "to give to the entity any property or financial OR OTHER
+--     advantage"; the three later intent limbs drop the words "or other" and say
+--     only "any property or financial advantage". We do NOT know whether that is
+--     a deliberate narrowing or a drafting slip. We encode the intent limb ONCE,
+--     as a single shared predicate with a single atom carrying the WIDER (21(2))
+--     wording, and flag the divergence here. If the narrowing is deliberate, this
+--     model over-criminalises the 21(4)/(6)/23(2) offences at the margin (an
+--     intent to procure a NON-financial, NON-proprietary advantage), and the atom
+--     must be split in two.
+--
+-- >>> INTERPRETATION CALL 3 — THE OBJECTIVE ELEMENT OF THE EVEN PARAGRAPHS. We
+--     read 21(2)/(4)/(6) and 23(2) as requiring BOTH (i) the objective fact — the
+--     entity really IS outside the relevant class ("A person must not refer to an
+--     entity, THAT IS NOT A REGISTERED CHARITY, as ...") — AND (ii) the mens rea
+--     in sub-paragraph (a) about that fact. The alternative reading, that guilty
+--     knowledge alone suffices even where the entity turns out to be perfectly
+--     registered, would criminalise the attempt as the full offence, and the comma
+--     -delimited relative clause is not doing that work. So the objective element
+--     is a conjunct, and both are visible in the encoding.
+--
+-- >>> INTERPRETATION CALL 4 — 'must not cause or permit another person to refer'.
+--     Each odd paragraph is a CONJUNCTION of two duties, (a) self-reference and
+--     (b) causing-or-permitting. In the regulative layer we model the single
+--     SHANT on the referring act, and carry the (b) limb inert alongside: the
+--     Action enum in `charities-common` has one action per reference, not two, and
+--     'causing or permitting another to refer' is the SAME act, attributed. A
+--     fuller model would give the entity a second, distinct action.
+--
+-- >>> INTERPRETATION CALL 5 — THE PROHIBITION WINDOW. `SHANT <act> WITHIN n` needs
+--     a number; the statutory prohibitions are CONTINUOUS and have no deadline. We
+--     use WITHIN 365 throughout as a REVIEWABLE PLACEHOLDER for "at any time",
+--     purely so the traces are executable. Nothing in the logic depends on it.
+--
+-- >>> INTERPRETATION CALL 6 — 22(3)(a) 'the jurisdiction under the law of which it
+--     is established'. Where the Art 22(4) Order has DISAPPLIED the first
+--     condition, the second condition still speaks of "the jurisdiction under the
+--     law of which it is established" — a jurisdiction that 22(2)(a) is no longer
+--     asked to identify. We read 22(3)(a) as continuing to refer to the entity's
+--     actual jurisdiction of establishment, whatever it is; the atom is asked
+--     directly, and is not derived from the 22(2)(a) limbs. See `Guernsey Trust
+--     Co, with an Article 22(4) Order` below, which is the test of exactly this.
+-- ===========================================================================
+
+§§ `The domain — an entity, seen through Part 6`
+
+-- An entity, carrying its Article 2 identity (so the Part 1 predicates apply to
+-- it) plus the facts Part 6 needs. NOTE what is NOT here: nothing about purposes,
+-- public benefit or the charity test. Part 6 does not care whether the entity
+-- DESERVES to be a charity. It cares only whether it IS one on the register, and
+-- what it calls itself.
+DECLARE Part6Entity HAS
+    entity                                                          IS AN Entity
+
+    -- The pivot of the whole Part. See INTERPRETATION CALL 1.
+    `is a registered charity`                                       IS A BOOLEAN
+
+    -- Article 22(2) — the first condition (an excepted foreign charity).
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS A BOOLEAN
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS A BOOLEAN
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS A BOOLEAN
+
+    -- Article 22(3) — the second condition. (3)(b) is NOT a separate field: it is
+    -- `NOT is a registered charity`, the same atom the whole Part turns on.
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS A BOOLEAN
+
+    -- Article 22(4) — the Minister's disapplication of the FIRST condition only.
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS A BOOLEAN
+
+    -- Article 23(3)(c) — the third limb of the 'Jersey charity' conjunction.
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS A BOOLEAN
+
+    -- Article 21(8) and Article 23(4) — the prescribed exceptions. Each is a
+    -- single DEFEATER atom; the Regulation-making power itself is inert prose.
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS A BOOLEAN
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS A BOOLEAN
+
+-- A REFERENCE: one person's act of referring to one entity. The even paragraphs
+-- of Article 21, and Article 23(2), all bite on THIS, not on the entity.
+DECLARE ReferenceByAPerson HAS
+    `the person making the reference`                               IS A STRING
+    `the entity referred to`                                        IS A Part6Entity
+
+    -- The KNOWLEDGE limb, sub-paragraph (a), spelled once per paragraph, because
+    -- the statute spells it once per paragraph and the OBJECT of the knowledge
+    -- differs each time. This is where the three pairs stop rhyming and start to
+    -- diverge: 21(2)(a) has ONE object, 21(4)(a) and 21(6)(a) have TWO.
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS A BOOLEAN
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS A BOOLEAN
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS A BOOLEAN
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS A BOOLEAN
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS A BOOLEAN
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS A BOOLEAN
+
+    -- The INTENT limb, sub-paragraph (b). Textually IDENTICAL in 21(2), 21(4),
+    -- 21(6) and 23(2), save for the two words flagged in INTERPRETATION CALL 2.
+    -- Lifted ONCE, and shared by all four — this is the beam that holds the Part
+    -- together, and it is the single most important thing in it: WITHOUT (b),
+    -- there is no offence under any even paragraph, however guilty the knowledge.
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS A BOOLEAN
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS A BOOLEAN
+
+    -- Article 21(7) / Article 23(5) — recorded, but DELIBERATELY NOT a condition
+    -- of anything. It is the express statement that the even paragraphs are
+    -- INDIFFERENT to this fact. We carry it so the overlap can be demonstrated.
+    `the person making the reference is also the entity, and is referring to itself`  IS A BOOLEAN
+
+§§ `Article 22 — Excepted foreign charities`
+
+-- 22(2)(a) — a disjunction of two routes to a qualifying jurisdiction.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 22(2)(a) — established under the law of a qualifying jurisdiction` e MEANS
+        "(a) established under the law -"
+    ..  "(i) of the United Kingdom, or of any jurisdiction that is part of the United Kingdom, or"
+    ..  e's `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`
+    ..  "(ii) of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order; and"
+    ..  e's `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`
+
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 22(2) — the first condition` e MEANS
+        "(2) The first condition is that the entity is -"
+    ... `Article 22(2)(a) — established under the law of a qualifying jurisdiction` e
+    AND "(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)."
+    ... e's `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`
+
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 22(3) — the second condition` e MEANS
+        "(3) The second condition is that the entity -"
+    ... "(a) is managed wholly or mainly from the jurisdiction under the law of which it is established; and"
+    ... e's `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`
+    AND "(b) is not a registered charity."
+    ... NOT e's `is a registered charity`
+
+-- 22(1) AND 22(4). The Minister's Order under 22(4) disapplies the FIRST condition
+-- ONLY ("despite sub-paragraphs (a) and (b) of paragraph (2)") — the SECOND
+-- condition survives it, and must still be met. So the Order sits inside the
+-- first conjunct as an alternative to it, and nowhere near the second.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`is an excepted foreign charity` e MEANS
+        "(1) For the purpose of Article 21, an entity is an excepted foreign charity if it meets both the condition in paragraph (2) and the condition in paragraph (3)."
+    ...     `Article 22(2) — the first condition` e
+        ..  "(4) The Minister may by Order prescribe that a specified entity is not required to meet the first condition, despite sub-paragraphs (a) and (b) of paragraph (2)."
+        ..  e's `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`
+    AND `Article 22(3) — the second condition` e
+    -- "(5) The States may by Regulations amend paragraph (1), (2) or (3) to make
+    --  different provision as to the conditions that are to be met." — carried
+    --  inert. It changes the LAW, not the facts; until exercised it adds nothing.
+
+§§ `Article 21 — the three classes of entity. THE THREE PAIRS RHYME HERE.`
+
+-- Each pair opens by naming its class. The odd and even paragraphs of the pair
+-- then BOTH quantify over the same class — the odd one to bind the entity, the
+-- even one to supply the objective element of the offence by any person.
+-- Read these three definitions together and the architecture of Article 21 is
+-- plain on the page: three classes, each progressively narrower and further from
+-- Jersey, each attracting the same two-pronged prohibition.
+
+-- PAIR 1 (21(1), 21(2)) — the widest class: ANY entity off the register.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(1) and (2) — the class: an entity that is not a registered charity` e MEANS
+        "An entity that is not a registered charity -"
+    ... NOT e's `is a registered charity`
+
+-- PAIR 2 (21(3), 21(4)) — narrower: a JERSEY entity off the register.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` e MEANS
+        "A Jersey entity that is not a registered charity -"
+    ... `is a Jersey entity` (e's entity)                  -- Part 1, Article 2(3)
+    AND NOT e's `is a registered charity`
+
+-- PAIR 3 (21(5), 21(6)) — narrower still: off the register, AND foreign, AND not
+-- even an excepted foreign charity. Three negations. This is the class that may
+-- not trade on the word 'charity' in Jersey at all.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` e MEANS
+        "An entity that is not a registered charity and is neither a Jersey entity nor an excepted foreign charity (within the meaning of Article 22) -"
+    ... NOT e's `is a registered charity`
+    AND NOT `is a Jersey entity` (e's entity)              -- Part 1, Article 2(3)
+    AND NOT `is an excepted foreign charity` e             -- Article 22, above
+
+§§ `Article 21(8) — the prescribed exceptions: ONE defeater, defeating all six`
+
+-- "(8) The States may by Regulations prescribe exceptions to the prohibitions in
+--  paragraphs (1) to (6)." The Regulation-making POWER is inert prose; its
+--  EXERCISE, in relation to a given entity, is a single BOOLEAN atom that defeats
+--  every one of the six prohibitions. It is subtracted from each of them below.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`an Article 21(8) exception applies` e MEANS
+        "(8) The States may by Regulations prescribe exceptions to the prohibitions in paragraphs (1) to (6)."
+    ... e's `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`
+
+§§ `The INTENT limb — sub-paragraph (b) of 21(2), 21(4), 21(6) and 23(2)`
+
+-- One text, four homes. This predicate is the mens rea's second conjunct, and it
+-- is what separates the two-year offence from the level-3 fine.
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`the intent limb — sub-paragraph (b)` r MEANS
+        "(b) intends, by so referring to the entity, to cause another person -"
+    ..  "(i) to be misled as to the nature of the entity, or"
+    ..  r's `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`
+    ..  "(ii) to give to the entity any property or financial or other advantage."   -- see INTERPRETATION CALL 2
+    ..  r's `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`
+
+§§ `Article 21 — PAIR 1: 'registered by the Commissioner'`
+
+-- 21(1) — STRICT. The entity itself. No state of mind is asked about anything.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` e MEANS
+        "(1) An entity that is not a registered charity -"
+    ... `Article 21(1) and (2) — the class: an entity that is not a registered charity` e
+    AND "(a) must not refer to itself as being registered by the Commissioner; and"
+    AND "(b) must not cause or permit another person to refer to the entity as being registered by the Commissioner."   -- see INTERPRETATION CALL 4
+    AND NOT `an Article 21(8) exception applies` e
+
+-- 21(2) — MENS REA. Any person. Objective element + knowledge + intent.
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`Article 21(2) — a person refers to an entity as being registered by the Commissioner, with the requisite knowledge and intent` r MEANS
+        "(2) A person must not refer to an entity, that is not a registered charity, as being registered by the Commissioner, if the person -"
+    ... `Article 21(1) and (2) — the class: an entity that is not a registered charity` (r's `the entity referred to`)
+    AND "(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity; and"
+    ... r's `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`
+    AND `the intent limb — sub-paragraph (b)` r
+    AND NOT `an Article 21(8) exception applies` (r's `the entity referred to`)
+    -- "(7) Paragraphs (2), (4) and (6) apply whether or not the person making the
+    --  reference is also the entity, and is referring to itself." — carried inert
+    --  BECAUSE IT ADDS NO CONDITION. It removes one. See the 21(7) tests below.
+
+§§ `Article 21 — PAIR 2: 'charity', by a Jersey entity`
+
+-- 21(3) — STRICT. Same shape as 21(1); only the class and the word change.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` e MEANS
+        "(3) A Jersey entity that is not a registered charity -"
+    ... `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` e
+    AND "(a) must not refer to itself as a 'charity'; and"
+    AND "(b) must not cause or permit another person to refer to the entity as a 'charity'."
+    AND NOT `an Article 21(8) exception applies` e
+
+-- 21(4) — MENS REA. Same shape as 21(2); but the knowledge limb now has TWO
+-- objects, because the class has two limbs.
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` r MEANS
+        "(4) A person must not refer to a Jersey entity, that is not a registered charity, as a 'charity', if the person -"
+    ... `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` (r's `the entity referred to`)
+    AND     "(a) knows, suspects or has reasonable grounds to suspect that the entity -"
+        ... "(i) is a Jersey entity, and"
+        ... r's `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`
+        AND "(ii) is not a registered charity; and"
+        ... r's `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`
+    AND `the intent limb — sub-paragraph (b)` r
+    AND NOT `an Article 21(8) exception applies` (r's `the entity referred to`)
+
+§§ `Article 21 — PAIR 3: 'charity', in connection with activities in Jersey`
+
+-- 21(5) — STRICT. Same shape again. The class is the narrowest; the forbidden
+-- reference is qualified ("in connection with any of its activities in Jersey"),
+-- which is carried inert: the qualification is on the ACT, and the act is the
+-- thing the SHANT forbids in the regulative layer.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` e MEANS
+        "(5) An entity that is not a registered charity and is neither a Jersey entity nor an excepted foreign charity (within the meaning of Article 22) -"
+    ... `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` e
+    AND "(a) must not refer to itself as a 'charity' in connection with any of its activities in Jersey; and"
+    AND "(b) must not cause or permit another person to refer to the entity as a 'charity' in connection with any of its activities in Jersey."
+    AND NOT `an Article 21(8) exception applies` e
+
+-- 21(6) — MENS REA. The third and last of the three pairs, and the exact rhyme of
+-- 21(4): objective element, a two-object knowledge limb, the shared intent limb.
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`Article 21(6) — a person refers to a non-excepted foreign entity as a charity in connection with its activities in Jersey, with the requisite knowledge and intent` r MEANS
+        "(6) A person must not refer to an entity, that is not a registered charity and is neither a Jersey entity nor an excepted foreign charity (within the meaning of Article 22), as a 'charity' in connection with any of its activities in Jersey, if the person -"
+    ... `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` (r's `the entity referred to`)
+    AND     "(a) knows, suspects or has reasonable grounds to suspect that the entity -"
+        ... "(i) is neither a Jersey entity nor an excepted foreign charity, and"
+        ... r's `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`
+        AND "(ii) is not a registered charity; and"
+        ... r's `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`
+    AND `the intent limb — sub-paragraph (b)` r
+    AND NOT `an Article 21(8) exception applies` (r's `the entity referred to`)
+
+§§ `Article 23 — Prohibition of unauthorized use of the expression 'Jersey charity'`
+
+-- 23(3) — the three-limb conjunction the whole Article turns on. Unlike Article 21,
+-- which bites on entities OUTSIDE a class, Article 23 bites "UNLESS an entity meets
+-- ALL of the conditions". Same negative logic, differently worded.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 23(3) — the conditions` e MEANS
+        "(3) The conditions are that the entity -"
+    ... "(a) is a registered charity;"
+    ... e's `is a registered charity`
+    AND "(b) is a Jersey entity; and"
+    ... `is a Jersey entity` (e's entity)                  -- Part 1, Article 2(3)
+    AND "(c) is wholly or mainly managed or controlled in or from within Jersey."
+    ... e's `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`
+
+-- 23(4) — the exception. The Article 23 twin of Article 21(8), and it defeats both
+-- 23(1) and 23(2).
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`an Article 23(4) exception applies` e MEANS
+        "(4) Paragraphs (1) and (2) are subject to any exception prescribed by the States by Regulations."
+    ... e's `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`
+
+-- 23(1) — STRICT, on the entity. The rhyme with 21(1)/(3)/(5) is exact.
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` e MEANS
+        "(1) Unless an entity meets all of the conditions in paragraph (3), that entity -"
+    ... NOT `Article 23(3) — the conditions` e
+    AND "(a) must not refer to itself as a 'Jersey charity'; and"
+    AND "(b) must not cause or permit another person to refer to the entity as a 'Jersey charity'."
+    AND NOT `an Article 23(4) exception applies` e
+
+-- 23(2) — MENS REA, on any person. The rhyme with 21(2)/(4)/(6) is exact, and the
+-- knowledge limb has ONE object again — the composite fact "does not meet all of
+-- those conditions".
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`Article 23(2) — a person refers to an entity as a Jersey charity, with the requisite knowledge and intent` r MEANS
+        "(2) Unless an entity meets all of the conditions in paragraph (3), a person must not refer to that entity as a 'Jersey charity', if the person -"
+    ... NOT `Article 23(3) — the conditions` (r's `the entity referred to`)
+    AND "(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions; and"
+    ... r's `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`
+    AND `the intent limb — sub-paragraph (b)` r
+    AND NOT `an Article 23(4) exception applies` (r's `the entity referred to`)
+    -- "(5) Paragraph (2) applies whether or not the person making the reference is
+    --  also the entity, and is referring to itself." — the Article 23 twin of
+    --  21(7). Inert: it adds no condition.
+
+§§ `THE PENALTIES — 21(9), 21(10), 23(6), 23(7). The asymmetry, made machine-checkable.`
+
+-- A penalty, as a record, so that the ASYMMETRY is a computable property of the
+-- Part and not merely a comment. Three fields, because the statute varies along
+-- exactly three axes: is there imprisonment, is there a fine, and is the fine
+-- capped at a level on the standard scale.
+DECLARE Part6Penalty HAS
+    `the paragraph contravened`                                     IS A STRING
+    `maximum term of imprisonment, in years`                        IS A NUMBER
+    `liable to a fine`                                              IS A BOOLEAN
+    `the fine is capped at level 3 on the standard scale`           IS A BOOLEAN
+
+-- Article 21(9) — the MENS REA offences. "An entity or other person, that
+-- contravenes paragraph (2), (4) or (6), commits an offence and is liable to
+-- imprisonment for a term of 2 years and to a fine." Note the addressee: "an
+-- entity OR OTHER PERSON" — 21(7) again, in the offence-creating provision.
+`the penalty under Article 21(9) — contravening (2), (4) or (6)` MEANS Part6Penalty WITH
+    `the paragraph contravened`                                     IS "Article 21(2), (4) or (6) - the mens rea prohibitions"
+    `maximum term of imprisonment, in years`                        IS 2
+    `liable to a fine`                                              IS TRUE
+    `the fine is capped at level 3 on the standard scale`           IS FALSE
+
+-- Article 21(10) — the STRICT offences. "An entity, that contravenes paragraph
+-- (1), (3) or (5), commits an offence and is liable to a fine of level 3 on the
+-- standard scale." No imprisonment. And the addressee is "AN ENTITY" only — the
+-- strict prohibitions bind nobody else.
+`the penalty under Article 21(10) — contravening (1), (3) or (5)` MEANS Part6Penalty WITH
+    `the paragraph contravened`                                     IS "Article 21(1), (3) or (5) - the strict prohibitions"
+    `maximum term of imprisonment, in years`                        IS 0
+    `liable to a fine`                                              IS TRUE
+    `the fine is capped at level 3 on the standard scale`           IS TRUE
+
+-- Article 23(6) — the STRICT offence. Level 3 fine. Note the PARAGRAPH INVERSION:
+-- in Article 21 the mens rea offence came FIRST (21(9)) and the strict offence
+-- SECOND (21(10)); in Article 23 the order is reversed.
+`the penalty under Article 23(6) — contravening (1)` MEANS Part6Penalty WITH
+    `the paragraph contravened`                                     IS "Article 23(1) - the strict prohibition"
+    `maximum term of imprisonment, in years`                        IS 0
+    `liable to a fine`                                              IS TRUE
+    `the fine is capped at level 3 on the standard scale`           IS TRUE
+
+-- Article 23(7) — the MENS REA offence. 2 years and a fine.
+`the penalty under Article 23(7) — contravening (2)` MEANS Part6Penalty WITH
+    `the paragraph contravened`                                     IS "Article 23(2) - the mens rea prohibition"
+    `maximum term of imprisonment, in years`                        IS 2
+    `liable to a fine`                                              IS TRUE
+    `the fine is capped at level 3 on the standard scale`           IS FALSE
+
+GIVEN a IS A Part6Penalty
+      b IS A Part6Penalty
+GIVETH A BOOLEAN
+`is the same penalty as` a b MEANS
+        a's `maximum term of imprisonment, in years` EQUALS b's `maximum term of imprisonment, in years`
+    AND a's `liable to a fine` EQUALS b's `liable to a fine`
+    AND a's `the fine is capped at level 3 on the standard scale` EQUALS b's `the fine is capped at level 3 on the standard scale`
+
+GIVEN heavier IS A Part6Penalty
+      lighter IS A Part6Penalty
+GIVETH A BOOLEAN
+`is a heavier penalty than` heavier lighter MEANS
+        "imprisonment, where the lighter penalty carries none"
+    ... heavier's `maximum term of imprisonment, in years` GREATER THAN lighter's `maximum term of imprisonment, in years`
+    AND "and an uncapped fine, where the lighter penalty's fine is capped at level 3"
+    ... NOT heavier's `the fine is capped at level 3 on the standard scale`
+    AND lighter's `the fine is capped at level 3 on the standard scale`
+
+-- THE INVARIANT OF PART 6, in one predicate. The PARAGRAPH NUMBERING inverts
+-- between Article 21 and Article 23; the MAPPING from mens rea to severity does
+-- not. Mens rea always costs 2 years; strict liability never costs more than a
+-- level 3 fine. If a future amendment broke this, THIS assertion would fail.
+`the penalty tracks the mens rea, not the paragraph number` MEANS
+        "the two MENS REA offences carry the same penalty, though numbered 21(9) and 23(7)"
+    ... `is the same penalty as` `the penalty under Article 21(9) — contravening (2), (4) or (6)` `the penalty under Article 23(7) — contravening (2)`
+    AND "the two STRICT offences carry the same penalty, though numbered 21(10) and 23(6)"
+    ... `is the same penalty as` `the penalty under Article 21(10) — contravening (1), (3) or (5)` `the penalty under Article 23(6) — contravening (1)`
+    AND "and the mens rea penalty is the heavier of the two, in both Articles"
+    ... `is a heavier penalty than` `the penalty under Article 21(9) — contravening (2), (4) or (6)` `the penalty under Article 21(10) — contravening (1), (3) or (5)`
+    AND `is a heavier penalty than` `the penalty under Article 23(7) — contravening (2)` `the penalty under Article 23(6) — contravening (1)`
+
+#ASSERT `the penalty tracks the mens rea, not the paragraph number`
+
+§§ `The offences — guarded liabilities`
+
+-- An offence is COMMITTED where the prohibition is contravened. The guard is the
+-- constitutive predicate; the liability is the penalty record. Because the
+-- offences are guarded, the penalty is only reachable through the contravention —
+-- which is what makes the asymmetry meaningful rather than decorative.
+
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 21(10) — the entity commits the strict offence` e MEANS
+        "(10) An entity, that contravenes paragraph (1), (3) or (5), commits an offence and is liable to a fine of level 3 on the standard scale."
+    ..  `Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` e
+    ..  `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` e
+    ..  `Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` e
+
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`Article 21(9) — the entity or other person commits the mens rea offence` r MEANS
+        "(9) An entity or other person, that contravenes paragraph (2), (4) or (6), commits an offence and is liable to imprisonment for a term of 2 years and to a fine."
+    ..  `Article 21(2) — a person refers to an entity as being registered by the Commissioner, with the requisite knowledge and intent` r
+    ..  `Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` r
+    ..  `Article 21(6) — a person refers to a non-excepted foreign entity as a charity in connection with its activities in Jersey, with the requisite knowledge and intent` r
+
+GIVEN e IS A Part6Entity
+GIVETH A BOOLEAN
+`Article 23(6) — the entity commits the strict offence` e MEANS
+        "(6) An entity that contravenes paragraph (1) commits an offence and is liable to a fine of level 3 on the standard scale."
+    ... `Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` e
+
+GIVEN r IS A ReferenceByAPerson
+GIVETH A BOOLEAN
+`Article 23(7) — the entity or other person commits the mens rea offence` r MEANS
+        "(7) An entity or other person, that contravenes paragraph (2), commits an offence and is liable to imprisonment for a term of 2 years and to a fine."
+    ... `Article 23(2) — a person refers to an entity as a Jersey charity, with the requisite knowledge and intent` r
+
+-- The liability, as a function of the facts. `NOTHING` where no offence is
+-- committed; `JUST` the penalty where one is.
+GIVEN e IS A Part6Entity
+GIVETH A MAYBE Part6Penalty
+`the entity's liability under Article 21` e MEANS
+    IF   `Article 21(10) — the entity commits the strict offence` e
+    THEN JUST `the penalty under Article 21(10) — contravening (1), (3) or (5)`
+    ELSE NOTHING
+
+GIVEN r IS A ReferenceByAPerson
+GIVETH A MAYBE Part6Penalty
+`the person's liability under Article 21` r MEANS
+    IF   `Article 21(9) — the entity or other person commits the mens rea offence` r
+    THEN JUST `the penalty under Article 21(9) — contravening (2), (4) or (6)`
+    ELSE NOTHING
+
+GIVEN e IS A Part6Entity
+GIVETH A MAYBE Part6Penalty
+`the entity's liability under Article 23` e MEANS
+    IF   `Article 23(6) — the entity commits the strict offence` e
+    THEN JUST `the penalty under Article 23(6) — contravening (1)`
+    ELSE NOTHING
+
+GIVEN r IS A ReferenceByAPerson
+GIVETH A MAYBE Part6Penalty
+`the person's liability under Article 23` r MEANS
+    IF   `Article 23(7) — the entity or other person commits the mens rea offence` r
+    THEN JUST `the penalty under Article 23(7) — contravening (2)`
+    ELSE NOTHING
+
+§§ `THE REGULATIVE LAYER — SHANT, because DOING the act IS the breach`
+
+-- These are PROHIBITIONS, not obligations. `PARTY x SHANT a WITHIN n` is exactly
+-- right: refraining discharges it (FULFILLED); committing the act is the BREACH.
+-- Each prohibition is GUARDED by its constitutive predicate — an entity outside
+-- the class is under no prohibition at all, and its contract is FULFILLED from the
+-- start.
+--
+-- The MENS REA prohibitions are parameterised on the ACTING PARTY, because of
+-- Article 21(7) / 23(5): the person making the reference MAY be the entity itself.
+-- So the same duty is instantiated at `Person` (a third party) and at `Charity`
+-- (the entity, referring to itself) — and in the latter case it runs ALONGSIDE the
+-- strict prohibition, RAND-composed. See the 21(7) overlap trace below.
+--
+-- WITHIN 365 throughout — a reviewable placeholder for a continuous prohibition.
+-- See INTERPRETATION CALL 5.
+
+GIVEN e IS A Part6Entity
+GIVETH A DEONTIC Actor Action
+`Article 21(1) — the strict prohibition on the entity` e MEANS
+    IF   `Article 21(1) and (2) — the class: an entity that is not a registered charity` e
+         AND NOT `an Article 21(8) exception applies` e
+    THEN PARTY Charity SHANT `refer to the entity as being registered by the Commissioner` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN r IS A ReferenceByAPerson
+      p IS AN Actor
+GIVETH A DEONTIC Actor Action
+`Article 21(2) — the mens rea prohibition, as it binds a given party` r p MEANS
+    IF   `Article 21(2) — a person refers to an entity as being registered by the Commissioner, with the requisite knowledge and intent` r
+    THEN PARTY p SHANT `refer to the entity as being registered by the Commissioner` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN e IS A Part6Entity
+GIVETH A DEONTIC Actor Action
+`Article 21(3) — the strict prohibition on the Jersey entity` e MEANS
+    IF   `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` e
+         AND NOT `an Article 21(8) exception applies` e
+    THEN PARTY Charity SHANT `refer to the entity as a charity` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN r IS A ReferenceByAPerson
+      p IS AN Actor
+GIVETH A DEONTIC Actor Action
+`Article 21(4) — the mens rea prohibition, as it binds a given party` r p MEANS
+    IF   `Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` r
+    THEN PARTY p SHANT `refer to the entity as a charity` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN e IS A Part6Entity
+GIVETH A DEONTIC Actor Action
+`Article 21(5) — the strict prohibition on the non-excepted foreign entity` e MEANS
+    IF   `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` e
+         AND NOT `an Article 21(8) exception applies` e
+    THEN PARTY Charity SHANT `refer to the entity as a charity` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN r IS A ReferenceByAPerson
+      p IS AN Actor
+GIVETH A DEONTIC Actor Action
+`Article 21(6) — the mens rea prohibition, as it binds a given party` r p MEANS
+    IF   `Article 21(6) — a person refers to a non-excepted foreign entity as a charity in connection with its activities in Jersey, with the requisite knowledge and intent` r
+    THEN PARTY p SHANT `refer to the entity as a charity` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN e IS A Part6Entity
+GIVETH A DEONTIC Actor Action
+`Article 23(1) — the strict prohibition on the entity` e MEANS
+    IF   NOT `Article 23(3) — the conditions` e
+         AND NOT `an Article 23(4) exception applies` e
+    THEN PARTY Charity SHANT `refer to the entity as a Jersey charity` WITHIN 365
+    ELSE FULFILLED
+
+GIVEN r IS A ReferenceByAPerson
+      p IS AN Actor
+GIVETH A DEONTIC Actor Action
+`Article 23(2) — the mens rea prohibition, as it binds a given party` r p MEANS
+    IF   `Article 23(2) — a person refers to an entity as a Jersey charity, with the requisite knowledge and intent` r
+    THEN PARTY p SHANT `refer to the entity as a Jersey charity` WITHIN 365
+    ELSE FULFILLED
+
+-- ARTICLE 21(7), AS A CONTRACT. The entity refers to ITSELF as a 'charity', with
+-- the knowledge and the intent. Paragraph (7) says (4) applies "whether or not the
+-- person making the reference is also the entity, and is referring to itself" — so
+-- the SINGLE act of self-reference falls under BOTH prohibitions at once, and the
+-- entity is liable BOTH to the level 3 fine (21(10), via 21(3)) AND to two years'
+-- imprisonment (21(9), via 21(4)). RAND weaves the two threads; one event breaches
+-- both.
+GIVEN r IS A ReferenceByAPerson
+GIVETH A DEONTIC Actor Action
+`Article 21(7) — the entity referring to ITSELF: the strict and the mens rea prohibitions bind at once` r MEANS
+        `Article 21(3) — the strict prohibition on the Jersey entity` (r's `the entity referred to`)
+    RAND
+        `Article 21(4) — the mens rea prohibition, as it binds a given party` r Charity
+
+§§ `Article 24 — Power to restrict use of the term 'charitable' in soliciting funds (INERT STUB)`
+
+-- A PURE REGULATION-MAKING POWER. There is no computable content until the States
+-- exercise it: no entity is under any duty by force of Article 24 alone. Carried
+-- as a labelled inert-prose stub so the corpus has no silent gap, with NO operative
+-- outcome and NO deontic. If Regulations are ever made, they will "adapt any
+-- provisions of Articles 21 to 23" (24(3)(a)) — i.e. they will be drafted BY
+-- ANALOGY to the three pairs above, and can be encoded by cloning them.
+`Article 24 — the power to restrict the relevant terms in soliciting funds (INERT)` MEANS
+        "(1) The States may by Regulations make provision restricting the use, other than by a registered charity, of any relevant term in relation to the soliciting of donations from the general public or from any prescribed description of persons."
+    ... "(2) The relevant terms are 'charitable', 'public benefit' and any related term (other than 'charity') specified as such in the Regulations."
+    ... "(3) Without prejudice to the generality of paragraph (1) any Regulations under that paragraph -"
+    ... "(a) may make the provision by adapting any provisions of Articles 21 to 23;"
+    ... "(b) may impose the restriction by any means, including by requiring permission to be sought from the Commissioner, who may be given discretion as to whether to grant that permission; and"
+    ... "(c) may provide for the Commissioner to issue guidance as to the operation of the Regulations."
+    ... "(4) The Regulations may make it an offence to contravene a restriction imposed by the Regulations, being an offence carrying a penalty no greater than a fine."
+    -- NOTE the ceiling in 24(4): "no greater than a fine". Whatever the States do
+    -- under Article 24, they may NOT reach the two-year offence of 21(9)/23(7).
+    -- The mens rea premium is reserved to the Law itself.
+
+#EVAL `Article 24 — the power to restrict the relevant terms in soliciting funds (INERT)`
+
+§§ `Article 25 — Power to require registered charities to identify themselves as such (INERT STUB)`
+
+-- A PURE ORDER-MAKING POWER. Same treatment: inert prose, no operative outcome.
+`Article 25 — the power to prescribe identification statements (INERT)` MEANS
+        "(1) The Minister may by Order prescribe statements that must be made (including the manner in which they must be made) by a registered charity in relation to its registration in prescribed descriptions of document or publicity."
+    ... "(2) Without prejudice to the generality of paragraph (1), the provision that may be made includes -"
+    ... "(a) provision requiring the charity to state any or all of the following - (i) that it is a charity, (ii) its charity registration number, (iii) that it is registered with the Commissioner, (iv) how documents relating to its registration may be inspected, (v) the nature of its purposes, (vi) the identity or contact details of one or more of its charity governors;"
+    ... "(b) provision as to the legibility of the statement, and the language or languages in which the statement must or may be made;"
+    ... "(c) provision as to whether the requirement only applies to documents or publicity issued or signed on behalf of the charity, or to other descriptions of document or publicity;"
+    ... "(d) provision as to whether and how the requirement applies to web pages and websites, and the responsibility of the charity for those pages or sites."
+    -- Article 25 is the MIRROR of Article 21: 21 forbids the unregistered from
+    -- SAYING they are charities; 25 empowers the Minister to compel the registered
+    -- to say that they ARE. The register speaks through both.
+
+#EVAL `Article 25 — the power to prescribe identification statements (INERT)`
+
+§ `Tests — Part 6`
+
+-- The underlying Article 2 entities come from Part 1:
+--   `Jersey Heritage Ltd`                — a Jersey company: an entity, a JERSEY entity
+--   `St Ouen Angling Club`               — an unincorporated association: a JERSEY entity via Art 2(3)(b)
+--   `Guernsey Trust Co (a foreign entity)` — a (1)(j) entity: NOT a Jersey entity
+-- and one is spelled fresh here, for a UK charity.
+
+§§ `A UK charity, as an Article 2(1)(j) entity`
+
+`Oxfam GB (a UK company)` MEANS Entity WITH
+    name                                                            IS "Oxfam GB"
+    `(a) the trustees of a trust, taken together`                   IS FALSE
+    `(b) the fideicommissaires of a court-approved fideicommis, taken together`  IS FALSE
+    `(c) an incorporated 1862 association`                          IS FALSE
+    `(d) a foundation`                                              IS FALSE
+    `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`  IS FALSE
+    `(f) a company`                                                 IS FALSE   -- not a Jersey company
+    `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`  IS FALSE
+    `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
+    `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
+    `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS TRUE
+    `is a body corporate`                                           IS TRUE
+    `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
+    `(ba)(ii) is established under the law of Jersey`                IS FALSE
+    `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
+    `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
+    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
+
+#ASSERT `is an entity within Article 2(1)` `Oxfam GB (a UK company)`
+#ASSERT NOT `is a Jersey entity` `Oxfam GB (a UK company)`
+
+§§ `Scenario 1 — a registered Jersey charity. NO prohibition bites.`
+
+`Jersey Heritage, a registered charity` MEANS Part6Entity WITH
+    entity                                                          IS `Jersey Heritage Ltd`
+    `is a registered charity`                                       IS TRUE
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS TRUE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS TRUE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+-- Every one of the three classes is defined NEGATIVELY, and registration knocks
+-- out all three at once. This is the whole point of the register.
+#ASSERT NOT `Article 21(1) and (2) — the class: an entity that is not a registered charity` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 21(10) — the entity commits the strict offence` `Jersey Heritage, a registered charity`
+-- And Article 23: all three conditions met, so it MAY call itself a 'Jersey charity'.
+#ASSERT `Article 23(3) — the conditions` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` `Jersey Heritage, a registered charity`
+#ASSERT NOT `Article 23(6) — the entity commits the strict offence` `Jersey Heritage, a registered charity`
+-- Nor is it an excepted foreign charity: 22(3)(b) fails, because it IS registered.
+#ASSERT NOT `is an excepted foreign charity` `Jersey Heritage, a registered charity`
+
+-- The prohibition is a standing FULFILLED: it never bites, so the entity may say
+-- what it likes.
+#TRACE `Article 21(3) — the strict prohibition on the Jersey entity` `Jersey Heritage, a registered charity` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a charity` AT 10
+
+#TRACE `Article 23(1) — the strict prohibition on the entity` `Jersey Heritage, a registered charity` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a Jersey charity` AT 10
+
+§§ `Scenario 2 — an unregistered Jersey entity. 21(1) AND 21(3) bite. Strict: level 3 fine.`
+
+`St Ouen Angling Club, not registered` MEANS Part6Entity WITH
+    entity                                                          IS `St Ouen Angling Club`
+    `is a registered charity`                                       IS FALSE
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS TRUE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS TRUE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+-- PAIR 1 and PAIR 2 both catch it; PAIR 3 does not, because it IS a Jersey entity.
+#ASSERT `Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` `St Ouen Angling Club, not registered`
+#ASSERT `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` `St Ouen Angling Club, not registered`
+#ASSERT NOT `Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` `St Ouen Angling Club, not registered`
+#ASSERT `Article 21(10) — the entity commits the strict offence` `St Ouen Angling Club, not registered`
+-- The penalty is the LEVEL 3 FINE. No imprisonment: the entity had no mens rea asked of it.
+#ASSERT `the entity's liability under Article 21` `St Ouen Angling Club, not registered` EQUALS JUST `the penalty under Article 21(10) — contravening (1), (3) or (5)`
+-- Article 23 too: it fails condition (a).
+#ASSERT NOT `Article 23(3) — the conditions` `St Ouen Angling Club, not registered`
+#ASSERT `Article 23(6) — the entity commits the strict offence` `St Ouen Angling Club, not registered`
+#ASSERT `the entity's liability under Article 23` `St Ouen Angling Club, not registered` EQUALS JUST `the penalty under Article 23(6) — contravening (1)`
+
+-- The Club prints 'charity' on its collection tin. SHANT: doing the act IS the breach.
+#TRACE `Article 21(3) — the strict prohibition on the Jersey entity` `St Ouen Angling Club, not registered` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a charity` AT 10
+
+-- The Club that says nothing: refraining discharges the prohibition. FULFILLED.
+#TRACE `Article 21(3) — the strict prohibition on the Jersey entity` `St Ouen Angling Club, not registered` AT 0 WITH
+    PARTY Commissioner DOES `publish and maintain guidance on the charity test` AT 10
+
+§§ `Scenario 2a — the SAME club, but the States have prescribed an Article 21(8) exception.`
+
+-- One field differs. The exception DEFEATS every one of the six prohibitions.
+`St Ouen Angling Club, within an Article 21(8) exception` MEANS Part6Entity WITH
+    entity                                                          IS `St Ouen Angling Club`
+    `is a registered charity`                                       IS FALSE
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS TRUE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS TRUE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS TRUE   -- the only change
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+-- The CLASS still catches it — it is still an unregistered Jersey entity...
+#ASSERT `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` `St Ouen Angling Club, within an Article 21(8) exception`
+-- ...but the PROHIBITION does not bite, and there is no offence.
+#ASSERT NOT `Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` `St Ouen Angling Club, within an Article 21(8) exception`
+#ASSERT NOT `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` `St Ouen Angling Club, within an Article 21(8) exception`
+#ASSERT NOT `Article 21(10) — the entity commits the strict offence` `St Ouen Angling Club, within an Article 21(8) exception`
+-- Note the SCOPE of the 21(8) exception: it reaches only "the prohibitions in
+-- paragraphs (1) to (6)". Article 23 has its OWN exception, in 23(4) — which the
+-- States have NOT made here. So the Club is still caught by 23(1).
+#ASSERT `Article 23(6) — the entity commits the strict offence` `St Ouen Angling Club, within an Article 21(8) exception`
+
+#TRACE `Article 21(3) — the strict prohibition on the Jersey entity` `St Ouen Angling Club, within an Article 21(8) exception` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 3 — an EXCEPTED FOREIGN CHARITY (Art 22). Pair 3 does NOT bite.`
+
+`Oxfam GB, an excepted foreign charity` MEANS Part6Entity WITH
+    entity                                                          IS `Oxfam GB (a UK company)`
+    `is a registered charity`                                       IS FALSE   -- 22(3)(b): NOT on the Jersey register
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS TRUE   -- 22(2)(a)(i)
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE   -- 22(2)(b)
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS TRUE   -- 22(3)(a)
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+#ASSERT `Article 22(2) — the first condition` `Oxfam GB, an excepted foreign charity`
+#ASSERT `Article 22(3) — the second condition` `Oxfam GB, an excepted foreign charity`
+#ASSERT `is an excepted foreign charity` `Oxfam GB, an excepted foreign charity`
+
+-- PAIR 3 IS DEFEATED BY ARTICLE 22. It is unregistered and foreign — but excepted.
+#ASSERT NOT `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` `Oxfam GB, an excepted foreign charity`
+#ASSERT NOT `Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` `Oxfam GB, an excepted foreign charity`
+-- PAIR 2 does not bite either: it is not a Jersey entity.
+#ASSERT NOT `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` `Oxfam GB, an excepted foreign charity`
+-- But PAIR 1 STILL BITES. Article 22 excepts it from being called a 'charity'; it
+-- does NOT license it to claim it is REGISTERED BY THE COMMISSIONER. It is not.
+#ASSERT `Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` `Oxfam GB, an excepted foreign charity`
+#ASSERT `Article 21(10) — the entity commits the strict offence` `Oxfam GB, an excepted foreign charity`
+-- And it may not call itself a JERSEY charity either: 23(3)(a), (b) and (c) all fail.
+#ASSERT NOT `Article 23(3) — the conditions` `Oxfam GB, an excepted foreign charity`
+#ASSERT `Article 23(6) — the entity commits the strict offence` `Oxfam GB, an excepted foreign charity`
+
+-- Oxfam GB says 'charity' on its Jersey appeal. No prohibition; FULFILLED.
+#TRACE `Article 21(5) — the strict prohibition on the non-excepted foreign entity` `Oxfam GB, an excepted foreign charity` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 4 — a NON-EXCEPTED foreign entity. Pair 3 DOES bite.`
+
+-- Guernsey is not part of the United Kingdom, and (in this scenario) has not been
+-- prescribed by the Minister under 22(2)(a)(ii). So the FIRST condition fails at
+-- limb (a), and the entity is not an excepted foreign charity.
+`Guernsey Trust Co, a non-excepted foreign entity` MEANS Part6Entity WITH
+    entity                                                          IS `Guernsey Trust Co (a foreign entity)`
+    `is a registered charity`                                       IS FALSE
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE   -- Guernsey is not part of the UK
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE   -- and it has not been prescribed
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE   -- even though 22(2)(b) IS satisfied
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS TRUE   -- and so is 22(3)(a)
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+-- 22(2)(a) fails, and so the first condition fails, and so it is not excepted...
+#ASSERT NOT `Article 22(2)(a) — established under the law of a qualifying jurisdiction` `Guernsey Trust Co, a non-excepted foreign entity`
+#ASSERT NOT `Article 22(2) — the first condition` `Guernsey Trust Co, a non-excepted foreign entity`
+-- ...even though the SECOND condition is met in full.
+#ASSERT `Article 22(3) — the second condition` `Guernsey Trust Co, a non-excepted foreign entity`
+#ASSERT NOT `is an excepted foreign charity` `Guernsey Trust Co, a non-excepted foreign entity`
+
+-- PAIR 3 BITES: unregistered, not a Jersey entity, not excepted.
+#ASSERT `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` `Guernsey Trust Co, a non-excepted foreign entity`
+#ASSERT `Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` `Guernsey Trust Co, a non-excepted foreign entity`
+#ASSERT `Article 21(10) — the entity commits the strict offence` `Guernsey Trust Co, a non-excepted foreign entity`
+#ASSERT `the entity's liability under Article 21` `Guernsey Trust Co, a non-excepted foreign entity` EQUALS JUST `the penalty under Article 21(10) — contravening (1), (3) or (5)`
+
+#TRACE `Article 21(5) — the strict prohibition on the non-excepted foreign entity` `Guernsey Trust Co, a non-excepted foreign entity` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 4a — Article 22(4): the Minister disapplies the FIRST condition.`
+
+-- The SAME Guernsey entity, but the Minister has prescribed under 22(4) that it is
+-- "not required to meet the first condition, despite sub-paragraphs (a) and (b) of
+-- paragraph (2)". Only ONE field differs. The second condition still has to be met
+-- — and is. So it BECOMES an excepted foreign charity, and Pair 3 falls away.
+`Guernsey Trust Co, with an Article 22(4) Order` MEANS Part6Entity WITH
+    entity                                                          IS `Guernsey Trust Co (a foreign entity)`
+    `is a registered charity`                                       IS FALSE
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS TRUE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS TRUE   -- the only change
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+-- The first condition is STILL not met on its own terms...
+#ASSERT NOT `Article 22(2) — the first condition` `Guernsey Trust Co, with an Article 22(4) Order`
+-- ...but the Order dispenses with it, and the second condition carries the day.
+#ASSERT `is an excepted foreign charity` `Guernsey Trust Co, with an Article 22(4) Order`
+#ASSERT NOT `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` `Guernsey Trust Co, with an Article 22(4) Order`
+#ASSERT NOT `Article 21(5) — a non-excepted foreign entity refers to itself, or causes or permits another to refer to it, as a charity in connection with its activities in Jersey` `Guernsey Trust Co, with an Article 22(4) Order`
+-- ...but PAIR 1 STILL BITES, exactly as it does for Oxfam GB above. This assertion
+-- was WRONG on a first pass, and the checker caught it. Being an excepted foreign
+-- charity licenses the WORD 'charity'. It does not license a claim of REGISTRATION,
+-- and 22(3)(b) makes the point unanswerable: an excepted foreign charity is, BY
+-- DEFINITION, an entity that "is not a registered charity". So Article 21(1) bites
+-- on EVERY excepted foreign charity, always, and the level 3 fine of 21(10) with it.
+#ASSERT `Article 21(1) — the entity refers to itself, or causes or permits another to refer to it, as being registered by the Commissioner` `Guernsey Trust Co, with an Article 22(4) Order`
+#ASSERT `Article 21(10) — the entity commits the strict offence` `Guernsey Trust Co, with an Article 22(4) Order`
+
+§§ `Scenario 5 — the THIRD PARTY, with the knowledge AND the intent. 21(4): two years.`
+
+-- Mr Marett prints a flyer soliciting donations for the Angling Club, calling it a
+-- 'charity'. He knows perfectly well what it is, and what it is not, and he means
+-- the reader to give it money.
+`Mr Marett's flyer, with the knowledge and the intent` MEANS ReferenceByAPerson WITH
+    `the person making the reference`                               IS "Mr Marett"
+    `the entity referred to`                                        IS `St Ouen Angling Club, not registered`
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS TRUE
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS FALSE
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS TRUE
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS FALSE
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS TRUE   -- the intent limb is MADE OUT, via (ii)
+    `the person making the reference is also the entity, and is referring to itself`  IS FALSE
+
+#ASSERT `the intent limb — sub-paragraph (b)` `Mr Marett's flyer, with the knowledge and the intent`
+#ASSERT `Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` `Mr Marett's flyer, with the knowledge and the intent`
+#ASSERT `Article 21(9) — the entity or other person commits the mens rea offence` `Mr Marett's flyer, with the knowledge and the intent`
+-- TWO YEARS AND A FINE. Contrast the Club's own level 3 fine, on the same facts.
+#ASSERT `the person's liability under Article 21` `Mr Marett's flyer, with the knowledge and the intent` EQUALS JUST `the penalty under Article 21(9) — contravening (2), (4) or (6)`
+-- 21(6) does not bite on him: the Club IS a Jersey entity, so the Pair 3 class fails.
+#ASSERT NOT `Article 21(6) — a person refers to a non-excepted foreign entity as a charity in connection with its activities in Jersey, with the requisite knowledge and intent` `Mr Marett's flyer, with the knowledge and the intent`
+
+#TRACE `Article 21(4) — the mens rea prohibition, as it binds a given party` `Mr Marett's flyer, with the knowledge and the intent` Person AT 0 WITH
+    PARTY Person DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 6 — THE MOST IMPORTANT NEGATIVE TEST IN THE PART. The intent limb fails.`
+
+-- The SAME Mr Marett, the SAME flyer, the SAME guilty knowledge — but he is a
+-- pedant, not a fraudster: he calls the Club a 'charity' loosely, meaning nothing
+-- by it, intending neither to mislead anyone nor to extract a penny. The mens rea
+-- is a CONJUNCTION of (a) and (b). (b) fails. THERE IS NO OFFENCE UNDER 21(4).
+--
+-- This is the hinge of the whole Part. Everything in Article 21 that carries a
+-- custodial sentence carries it because of sub-paragraph (b), and nothing else.
+`Mr Marett's flyer, with the knowledge but WITHOUT the intent` MEANS ReferenceByAPerson WITH
+    `the person making the reference`                               IS "Mr Marett"
+    `the entity referred to`                                        IS `St Ouen Angling Club, not registered`
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS TRUE
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS FALSE
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS TRUE
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS FALSE   -- no intent to mislead...
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS FALSE   -- ...and no intent to extract
+    `the person making the reference is also the entity, and is referring to itself`  IS FALSE
+
+-- The knowledge limb (a) is FULLY made out...
+#ASSERT `Mr Marett's flyer, with the knowledge but WITHOUT the intent`'s `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`
+#ASSERT `Mr Marett's flyer, with the knowledge but WITHOUT the intent`'s `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`
+-- ...and the objective element is FULLY made out...
+#ASSERT `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` (`Mr Marett's flyer, with the knowledge but WITHOUT the intent`'s `the entity referred to`)
+-- ...but the INTENT limb (b) is not, and the conjunction fails.
+#ASSERT NOT `the intent limb — sub-paragraph (b)` `Mr Marett's flyer, with the knowledge but WITHOUT the intent`
+#ASSERT NOT `Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` `Mr Marett's flyer, with the knowledge but WITHOUT the intent`
+#ASSERT NOT `Article 21(2) — a person refers to an entity as being registered by the Commissioner, with the requisite knowledge and intent` `Mr Marett's flyer, with the knowledge but WITHOUT the intent`
+#ASSERT NOT `Article 21(9) — the entity or other person commits the mens rea offence` `Mr Marett's flyer, with the knowledge but WITHOUT the intent`
+#ASSERT NOT `Article 23(2) — a person refers to an entity as a Jersey charity, with the requisite knowledge and intent` `Mr Marett's flyer, with the knowledge but WITHOUT the intent`
+#ASSERT NOT `Article 23(7) — the entity or other person commits the mens rea offence` `Mr Marett's flyer, with the knowledge but WITHOUT the intent`
+-- NO LIABILITY. Not two years; not a fine; nothing at all.
+#ASSERT `the person's liability under Article 21` `Mr Marett's flyer, with the knowledge but WITHOUT the intent` EQUALS NOTHING
+#ASSERT `the person's liability under Article 23` `Mr Marett's flyer, with the knowledge but WITHOUT the intent` EQUALS NOTHING
+
+-- The prohibition never attaches, so the very same act is no breach at all.
+-- Set this trace beside Scenario 5's and the mens rea is doing all the work.
+#TRACE `Article 21(4) — the mens rea prohibition, as it binds a given party` `Mr Marett's flyer, with the knowledge but WITHOUT the intent` Person AT 0 WITH
+    PARTY Person DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 7 — ARTICLE 21(7): the entity refers to ITSELF, with the mens rea. BOTH prohibitions bite.`
+
+-- "(7) Paragraphs (2), (4) and (6) apply whether or not the person making the
+--  reference is also the entity, and is referring to itself."
+--
+-- So the Club's own fundraising appeal, drafted by its own committee, calling the
+-- Club a 'charity', meaning the reader to give it money, is at once:
+--    * a contravention of 21(3) — the STRICT prohibition on the entity: level 3 fine; AND
+--    * a contravention of 21(4) — the MENS REA prohibition on any person: 2 years.
+-- ONE act. TWO offences. The overlap is DELIBERATE, and 21(7) says so expressly.
+`the Club's own appeal, referring to itself with the mens rea` MEANS ReferenceByAPerson WITH
+    `the person making the reference`                               IS "St Ouen Angling Club (itself)"
+    `the entity referred to`                                        IS `St Ouen Angling Club, not registered`
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS TRUE
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS FALSE
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS TRUE
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS TRUE
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS TRUE
+    `the person making the reference is also the entity, and is referring to itself`  IS TRUE   -- 21(7): IRRELEVANT to liability
+
+-- BOTH bite, on the SAME facts:
+#ASSERT `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` (`the Club's own appeal, referring to itself with the mens rea`'s `the entity referred to`)
+#ASSERT `Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` `the Club's own appeal, referring to itself with the mens rea`
+-- BOTH offences are committed, and BOTH penalties are engaged:
+#ASSERT `Article 21(10) — the entity commits the strict offence` (`the Club's own appeal, referring to itself with the mens rea`'s `the entity referred to`)
+#ASSERT `Article 21(9) — the entity or other person commits the mens rea offence` `the Club's own appeal, referring to itself with the mens rea`
+#ASSERT `the entity's liability under Article 21` (`the Club's own appeal, referring to itself with the mens rea`'s `the entity referred to`) EQUALS JUST `the penalty under Article 21(10) — contravening (1), (3) or (5)`
+#ASSERT `the person's liability under Article 21` `the Club's own appeal, referring to itself with the mens rea` EQUALS JUST `the penalty under Article 21(9) — contravening (2), (4) or (6)`
+
+-- ONE event. TWO breaches. The RAND weaves the strict thread and the mens rea
+-- thread, and the single self-reference breaks both.
+#TRACE `Article 21(7) — the entity referring to ITSELF: the strict and the mens rea prohibitions bind at once` `the Club's own appeal, referring to itself with the mens rea` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 8 — Article 21(6): the mens rea prohibition on the NON-excepted foreign entity...`
+
+`the fundraiser's appeal for the Guernsey entity` MEANS ReferenceByAPerson WITH
+    `the person making the reference`                               IS "a Jersey fundraising agency"
+    `the entity referred to`                                        IS `Guernsey Trust Co, a non-excepted foreign entity`
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS FALSE
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS TRUE
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS TRUE
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS TRUE
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS TRUE
+    `the person making the reference is also the entity, and is referring to itself`  IS FALSE
+
+#ASSERT `Article 21(6) — a person refers to a non-excepted foreign entity as a charity in connection with its activities in Jersey, with the requisite knowledge and intent` `the fundraiser's appeal for the Guernsey entity`
+#ASSERT `Article 21(9) — the entity or other person commits the mens rea offence` `the fundraiser's appeal for the Guernsey entity`
+#ASSERT `the person's liability under Article 21` `the fundraiser's appeal for the Guernsey entity` EQUALS JUST `the penalty under Article 21(9) — contravening (2), (4) or (6)`
+-- 21(4) does NOT bite: the entity is not a Jersey entity, so the Pair 2 class fails.
+#ASSERT NOT `Article 21(4) — a person refers to a Jersey entity as a charity, with the requisite knowledge and intent` `the fundraiser's appeal for the Guernsey entity`
+-- But 21(2) DOES: it is an entity that is not a registered charity, and the agency
+-- knew it. Pairs 1 and 3 stack.
+#ASSERT `Article 21(2) — a person refers to an entity as being registered by the Commissioner, with the requisite knowledge and intent` `the fundraiser's appeal for the Guernsey entity`
+
+#TRACE `Article 21(6) — the mens rea prohibition, as it binds a given party` `the fundraiser's appeal for the Guernsey entity` Person AT 0 WITH
+    PARTY Person DOES `refer to the entity as a charity` AT 10
+
+§§ `Scenario 9 — ...and the SAME appeal, for an entity that IS an excepted foreign charity.`
+
+-- Identical state of mind — the agency believes the entity to be unregistered and
+-- unexcepted, and means to extract money. But it is WRONG about the world: Oxfam GB
+-- IS an excepted foreign charity. The OBJECTIVE ELEMENT fails, and so does 21(6).
+-- (See INTERPRETATION CALL 3: guilty knowledge alone is not the offence.)
+`the fundraiser's appeal for Oxfam GB` MEANS ReferenceByAPerson WITH
+    `the person making the reference`                               IS "a Jersey fundraising agency"
+    `the entity referred to`                                        IS `Oxfam GB, an excepted foreign charity`
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS FALSE
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS TRUE
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS TRUE
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS TRUE
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS TRUE
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS TRUE
+    `the person making the reference is also the entity, and is referring to itself`  IS FALSE
+
+-- The mens rea is identical to Scenario 8's...
+#ASSERT `the intent limb — sub-paragraph (b)` `the fundraiser's appeal for Oxfam GB`
+-- ...but Article 22 defeats the objective element, and 21(6) does not bite.
+#ASSERT NOT `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` (`the fundraiser's appeal for Oxfam GB`'s `the entity referred to`)
+#ASSERT NOT `Article 21(6) — a person refers to a non-excepted foreign entity as a charity in connection with its activities in Jersey, with the requisite knowledge and intent` `the fundraiser's appeal for Oxfam GB`
+-- 21(2) still bites, though: Oxfam GB really is not registered by the Commissioner,
+-- and the agency really did know it. Article 22 excepts the word 'charity'; it does
+-- not except a claim of REGISTRATION.
+#ASSERT `Article 21(2) — a person refers to an entity as being registered by the Commissioner, with the requisite knowledge and intent` `the fundraiser's appeal for Oxfam GB`
+#ASSERT `Article 21(9) — the entity or other person commits the mens rea offence` `the fundraiser's appeal for Oxfam GB`
+
+#TRACE `Article 21(6) — the mens rea prohibition, as it binds a given party` `the fundraiser's appeal for Oxfam GB` Person AT 0 WITH
+    PARTY Person DOES `refer to the entity as a charity` AT 10
+
+§§ `Article 23(3) — each limb of the three-limb conjunction, failing in turn`
+
+-- LIMB (a) FAILS — not a registered charity. (The Angling Club, above: Jersey
+-- entity, managed in Jersey, but off the register.)
+#ASSERT NOT (`St Ouen Angling Club, not registered`'s `is a registered charity`)
+#ASSERT `is a Jersey entity` (`St Ouen Angling Club, not registered`'s entity)
+#ASSERT `St Ouen Angling Club, not registered`'s `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`
+#ASSERT NOT `Article 23(3) — the conditions` `St Ouen Angling Club, not registered`
+#ASSERT `Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` `St Ouen Angling Club, not registered`
+
+-- LIMB (b) FAILS — a registered charity, managed in Jersey, but NOT a Jersey entity.
+-- (Registration under Part 4 does not require Jersey establishment; being a JERSEY
+-- charity does.)
+`Oxfam GB, registered in Jersey but not a Jersey entity` MEANS Part6Entity WITH
+    entity                                                          IS `Oxfam GB (a UK company)`
+    `is a registered charity`                                       IS TRUE    -- limb (a): MET
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS TRUE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS FALSE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS TRUE    -- limb (c): MET
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+#ASSERT `Oxfam GB, registered in Jersey but not a Jersey entity`'s `is a registered charity`
+#ASSERT NOT `is a Jersey entity` (`Oxfam GB, registered in Jersey but not a Jersey entity`'s entity)   -- limb (b): FAILS
+#ASSERT `Oxfam GB, registered in Jersey but not a Jersey entity`'s `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`
+#ASSERT NOT `Article 23(3) — the conditions` `Oxfam GB, registered in Jersey but not a Jersey entity`
+#ASSERT `Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` `Oxfam GB, registered in Jersey but not a Jersey entity`
+#ASSERT `Article 23(6) — the entity commits the strict offence` `Oxfam GB, registered in Jersey but not a Jersey entity`
+-- Note the CONSEQUENCE of registration for Article 21: a registered charity is
+-- outside every one of the three classes, and no Article 21 prohibition touches it.
+#ASSERT NOT `Article 21(10) — the entity commits the strict offence` `Oxfam GB, registered in Jersey but not a Jersey entity`
+-- And 22(3)(b) now fails too, so it is no longer an excepted foreign charity: it
+-- does not need to be. Registration supersedes exception.
+#ASSERT NOT `is an excepted foreign charity` `Oxfam GB, registered in Jersey but not a Jersey entity`
+
+-- LIMB (c) FAILS — a registered Jersey charity, but managed and controlled from
+-- London. Registered: yes. Jersey entity: yes. Managed in or from Jersey: NO.
+`Jersey Heritage, registered but managed from London` MEANS Part6Entity WITH
+    entity                                                          IS `Jersey Heritage Ltd`
+    `is a registered charity`                                       IS TRUE    -- limb (a): MET
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS FALSE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS FALSE   -- limb (c): FAILS
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
+
+#ASSERT `Jersey Heritage, registered but managed from London`'s `is a registered charity`            -- limb (a): MET
+#ASSERT `is a Jersey entity` (`Jersey Heritage, registered but managed from London`'s entity)         -- limb (b): MET
+#ASSERT NOT `Jersey Heritage, registered but managed from London`'s `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`   -- limb (c): FAILS
+#ASSERT NOT `Article 23(3) — the conditions` `Jersey Heritage, registered but managed from London`
+#ASSERT `Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` `Jersey Heritage, registered but managed from London`
+#ASSERT `Article 23(6) — the entity commits the strict offence` `Jersey Heritage, registered but managed from London`
+#ASSERT `the entity's liability under Article 23` `Jersey Heritage, registered but managed from London` EQUALS JUST `the penalty under Article 23(6) — contravening (1)`
+-- A REGISTERED charity, and yet an OFFENDER — if it calls itself a 'Jersey charity'.
+-- It may still call itself a 'charity' (Art 21(3) needs it to be UNregistered).
+#ASSERT NOT `Article 21(3) — a Jersey entity refers to itself, or causes or permits another to refer to it, as a charity` `Jersey Heritage, registered but managed from London`
+
+#TRACE `Article 23(1) — the strict prohibition on the entity` `Jersey Heritage, registered but managed from London` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a Jersey charity` AT 10
+
+§§ `Scenario 10 — Article 23(4): the prescribed exception defeats the 'Jersey charity' prohibition.`
+
+`Jersey Heritage, managed from London, within an Article 23(4) exception` MEANS Part6Entity WITH
+    entity                                                          IS `Jersey Heritage Ltd`
+    `is a registered charity`                                       IS TRUE
+    `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
+    `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
+    `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
+    `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`  IS FALSE
+    `an Order under Article 22(4) prescribes that this entity is not required to meet the first condition`  IS FALSE
+    `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
+    `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS TRUE   -- the only change
+
+-- The conditions are STILL not met — limb (c) still fails...
+#ASSERT NOT `Article 23(3) — the conditions` `Jersey Heritage, managed from London, within an Article 23(4) exception`
+-- ...but 23(1) and 23(2) are "subject to any exception prescribed by the States by
+-- Regulations", and the exception defeats them both.
+#ASSERT NOT `Article 23(1) — an entity that does not meet all the conditions refers to itself, or causes or permits another to refer to it, as a Jersey charity` `Jersey Heritage, managed from London, within an Article 23(4) exception`
+#ASSERT NOT `Article 23(6) — the entity commits the strict offence` `Jersey Heritage, managed from London, within an Article 23(4) exception`
+#ASSERT `the entity's liability under Article 23` `Jersey Heritage, managed from London, within an Article 23(4) exception` EQUALS NOTHING
+
+#TRACE `Article 23(1) — the strict prohibition on the entity` `Jersey Heritage, managed from London, within an Article 23(4) exception` AT 0 WITH
+    PARTY Charity DOES `refer to the entity as a Jersey charity` AT 10
+
+§§ `Scenario 11 — Article 23(2)/(7): the third party who calls it a 'Jersey charity'. Two years.`
+
+`the marketing agency's brochure` MEANS ReferenceByAPerson WITH
+    `the person making the reference`                               IS "a marketing agency"
+    `the entity referred to`                                        IS `Jersey Heritage, registered but managed from London`
+    `21(2)(a) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS FALSE   -- it IS registered, and everyone knows it
+    `21(4)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is a Jersey entity`  IS TRUE
+    `21(4)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS FALSE
+    `21(6)(a)(i) knows, suspects or has reasonable grounds to suspect that the entity is neither a Jersey entity nor an excepted foreign charity`  IS FALSE
+    `21(6)(a)(ii) knows, suspects or has reasonable grounds to suspect that the entity is not a registered charity`  IS FALSE
+    `23(2)(a) knows, suspects or has reasonable grounds to suspect that the entity does not meet all of those conditions`  IS TRUE   -- it knows the management is in London
+    `(b)(i) intends, by so referring to the entity, to cause another person to be misled as to the nature of the entity`  IS TRUE
+    `(b)(ii) intends, by so referring to the entity, to cause another person to give to the entity any property or financial or other advantage`  IS TRUE
+    `the person making the reference is also the entity, and is referring to itself`  IS FALSE
+
+-- NO Article 21 offence at all — the entity is registered, so every Article 21
+-- class fails. But Article 23 catches it, because 'Jersey charity' asks MORE.
+#ASSERT NOT `Article 21(9) — the entity or other person commits the mens rea offence` `the marketing agency's brochure`
+#ASSERT `Article 23(2) — a person refers to an entity as a Jersey charity, with the requisite knowledge and intent` `the marketing agency's brochure`
+#ASSERT `Article 23(7) — the entity or other person commits the mens rea offence` `the marketing agency's brochure`
+-- TWO YEARS AND A FINE (23(7)), where the entity itself would face only the level 3
+-- fine (23(6)) for the same words. The asymmetry, again, and inverted in numbering.
+#ASSERT `the person's liability under Article 23` `the marketing agency's brochure` EQUALS JUST `the penalty under Article 23(7) — contravening (2)`
+
+#TRACE `Article 23(2) — the mens rea prohibition, as it binds a given party` `the marketing agency's brochure` Person AT 0 WITH
+    PARTY Person DOES `refer to the entity as a Jersey charity` AT 10
