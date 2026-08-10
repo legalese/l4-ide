@@ -26,7 +26,7 @@
 - **`prelude.l4`** (+168 lines against `main`) — the `§§ Sets` section: `DECLARE SET OF a HAS elements IS A LIST OF a`, plus `emptySet` / `setFromList` / `setToList` / `setSize`, `` `is in` `` / `` `is subset of` `` / `` `set equals` ``, and `UNION` / `INTERSECT` / `` `LESS` `` / `WITHOUT` with `@infixl 6` on `UNION`/`WITHOUT` and `@infixl 7` on `INTERSECT` so bare chains re-associate the way `PLUS`/`TIMES` do. Overloads for `__PLUS__`, `__MINUS__` and `__EQUALS__`; the `__AND__`/`__OR__` overloads are deliberately **absent**, with the removal and its reason recorded inline at the site. Three `@nonexhaustive` annotations are added (`at`, `maximum`, `minimum`) — those `CONSIDER`s have no `WHEN EMPTY` arm and the annotation is how the exhaustiveness oracle is told so.
   Note that the `MAYBE NUMBER` extremum bodies are *not* part of this diff: `main` already carries the corrected pattern-matching form (`88bdf75d`), and PR #184 was the port of that fix onto `unstable`. Relative to `main`, only the annotations and the Sets section move.
 - **`daydate.l4`** (+83) — the `YMD` binding with its `ASSUME `YMD refused an out-of-range month or day`` bottom, and the new `§§ Calendar Arithmetic` section holding `add months` (day-clamped) and `add years`.
-- **`actus-schedule.l4`** (−12 net) — the `add months` definition is deleted; a comment in its place says where it went and why the definition could not simply be left behind. The module already `IMPORT`s `daydate`, so callers resolve unchanged.
+- **`actus-schedule.l4`** (+7 / −17) — the `add months` definition is deleted; a comment in its place says where it went and why the definition could not simply be left behind. The module already `IMPORT`s `daydate`, so callers resolve unchanged.
 - **`README.md`** (+85) — a resolution-order section (`JL4_LIBRARY_PATH` → project root → importer-relative → embedded → XDG → VSCode bundle, first hit wins, with the rationale for why project-scoped tiers outrank the embed and machine-global tiers rank below it); an "Editing these files? Read this first" block on the TH embed-staleness gotcha; the `DATE`/`Date` breaking-change section demoted from "Upcoming" to "proposed, not landed"; and a dated correction of a paragraph that had attributed `Date`'s rolling behaviour to `YMD`.
 
 ### Import resolution
@@ -63,7 +63,7 @@ Counts I measured directly against this tree while assembling the PR: `hierarchy
 
 **This PR is not standalone. It needs `lang-syntax-typecheck` to compile and to check.** Concretely:
 
-- `prelude.l4` carries three `@nonexhaustive` annotations and four `@infixl` declarations. `origin/main` has **no** occurrence of `nonexhaustive` anywhere under `jl4-core/src/L4/`, and **no** `infixl` in `Lexer.hs` or `Parser/ResolveAnnotation.hs`. Both annotation families — the `CONSIDER` exhaustiveness oracle and the fixity mechanism — are in `lang-syntax-typecheck`. Without it, this prelude does not check.
+- `prelude.l4` carries three `@nonexhaustive` annotations and three `@infixl` declarations, and the whole diff against `main` is `+168 / −0` — pure addition. `origin/main` has **no** occurrence of `nonexhaustive` anywhere under `jl4-core/src/L4/`, and **no** `infixl` in `Lexer.hs` or `Parser/ResolveAnnotation.hs`. Both annotation families — the `CONSIDER` exhaustiveness oracle and the fixity mechanism — are in `lang-syntax-typecheck`. Without it, this prelude does not check.
 - `Import/Resolution.hs` calls `TypeCheck.unionImportedCheckEnv` and populates `constBodies` and `sectionPaths`. All three live in `TypeCheck.hs` / `TypeCheck/Types.hs`, in `lang-syntax-typecheck`. This is a compile-time dependency, not a behavioural one.
 - `ResolutionCascadeSpec.hs` asserts the *absence* of `MissingEntityInfo` and of the vacuous self-mismatch. The fix it guards is in `TypeCheck.hs`, in `lang-syntax-typecheck`. Landed alone against `main`, this spec fails.
 - `ymd-constructor.l4` opens with `TIMEZONE IS "Etc/UTC"`, and its `.ep.golden` is a byte-identical exactprint. The `TIMEZONE`-exactprint fix (PR #130) is in `Parser.hs`, in `lang-syntax-typecheck`. Without it that golden cannot hold.
@@ -88,7 +88,7 @@ Unstable PRs folded into this one:
 
 - #109 — `'•'` bullet syntax + hierarchy library for isomorphic recitals/outlines *(the `hierarchy.l4` half; the lexer/parser half is in `lang-syntax-typecheck`)*
 - #122 — `feat(prelude): SET OF a` — set-theoretic operators (SET-OPERATORS-SPEC Phases 1+2)
-- #124 — mixfix exactprint fixes *(the refreshed library `.ep.golden`s only)*
+- #124 — `fix(parser): exact-print mixfix call sites in source order (#918)` *(the refreshed library `.ep.golden`s only; the parser fix is in `lang-syntax-typecheck`)*
 - #130 — `fix(format): l4 format identity` for TIMEZONE/UNLESS/unicode/multi-clause DECIDE + corpus invariant *(the library `.ep.golden` regenerations)*
 - #133 — `feat(prelude): fixity for set operators` — bare UNION/INTERSECT chains (Phase 3d)
 - #134 — Library resolution: embedded stdlib outranks ambient XDG/bundle copies (B′) *(the `libraries/README.md` documentation only)*
