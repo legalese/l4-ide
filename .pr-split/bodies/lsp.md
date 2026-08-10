@@ -194,7 +194,7 @@ the constructor-arity siblings above.
    must go together, in whichever direction the assembler prefers.
 2. **The cabal stanza is in no theme's manifest.** `jl4-lsp/jl4-lsp.cabal` gains the
    `test-suite jl4-lsp-test` block (`hspec-discover`, `other-modules: HoverDisplaySpec,
-   LibraryResolutionSpec`), and that file appears in none of the 25 `.files` lists — along with
+   LibraryResolutionSpec`), and that file appears in no theme's `.files` list — along with
    `cabal.project`, `jl4/jl4.cabal`, `jl4-core/jl4-core.cabal`, `jl4-service/jl4-service.cabal`
    and `jl4/tests/Main.hs`. Without it the three new test files are dead code that never compiles
    and `jl4-lsp-test` does not exist, so every "10 examples, 0 failures" above is unverifiable.
@@ -214,7 +214,8 @@ returns to having no test suite at all.
 Folded into this PR, from the theme manifest:
 
 - **#128** — `feat(fixity): @infixl/@infixr/@infix declarations for binary identifier operators`
-  (contributes the fixity/`@ref` resolve-warning renderings in `Rules.hs`)
+  (contributes the `FixityAnnotationMisplaced` / `FixityAnnotationNoLocation` renderings in
+  `Rules.hs`, from its adversarial-review commit `8ba51c1d`)
 - **#134** — `Library resolution: embedded stdlib outranks ambient XDG/bundle copies (B′) + shadow warning + dev/prod docs`
 - **#167** — `fix(build): restore the embedded stdlib, and make its absence a build error`
   (contributes `EmbedStatus` and the deduplicated not-found path list)
@@ -227,6 +228,8 @@ Folded into this PR, from the theme manifest:
 Earlier `unstable` PRs whose commits these files still carry, and whose measurements are quoted
 above:
 
+- **#48** — `feat(jl4-core): attach @ref annotations to AST nodes` (its finding 2, "warnings
+  discarded", is what wired `RefUnattached` / `RefNoLocation` into LSP diagnostics here)
 - **#64** — `fix(shake): seed embedded libraries into the VFS to prevent cache poisoning`
 - **#82** — `fix(lsp): make SWarn non-fatal to typecheck success`
 - **#88** — `fix(viz): ladder auto-refresh recomputes canInline against the fresh module (#557)`
