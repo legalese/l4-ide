@@ -146,30 +146,36 @@ this one.
 
 ## Independence
 
-**Mostly standalone, with one real dependency edge — in the other direction.**
+**Buildable and mergeable on its own. Two siblings depend on it; it depends on none of them.**
 
-- **Nothing here is compiled or tested.** No Haskell, no TypeScript, no goldens. The only CI surface
-  is `format:check`, so the markdown must be clean under the pinned prettier `3.4.2` (CLAUDE.md §3.1)
-  — a bare `npx prettier` will reformat the tables and fail.
-- **The `go` pipeline reads files in this PR at runtime.** `etc/go/lib/register-validate.mjs`
-  resolves `specs/todo/single-instruction-demo/schemas` as its schema directory,
+- **Nothing here is compiled or tested.** No Haskell, no TypeScript, no goldens. On `main`'s CI the
+  only job a `specs/`-only change reaches is the docs job, whose substance is `prettier --check .`
+  — so the markdown must be clean under the pinned prettier `3.4.2` (CLAUDE.md §3.1); a bare
+  `npx prettier` will reformat the tables and fail. `doc/test-docs.sh` link-checks only files under
+  `doc/`, so nothing validates the links **out of** `specs/`.
+- **`go-pipeline` depends on this PR.** `etc/go/lib/register-validate.mjs` resolves
+  `specs/todo/single-instruction-demo/schemas` as its schema directory,
   `etc/go/lib/denovo-diff.mjs` reads `surface-map.schema.json`, `etc/go/selftest.mjs` reads both the
-  schemas and the `fixtures/` directory, and `etc/go/gate-verify.sh` reads `gate-allowed-signers` as
-  its only allowed-signers source. **The `go-pipeline` theme therefore depends on this PR**, not the
-  reverse: if `go-pipeline` lands without these files, its validator has no schemas, its selftests
-  have no fixtures, and HG1/HG2 verification has no signer file to consult.
+  schemas and the `fixtures/` directory, and `etc/go/gate-verify.sh` names
+  `specs/todo/single-instruction-demo/gate-allowed-signers` as its only allowed-signers source. Land
+  `go-pipeline` without this and its validator has no schemas, its selftests have no fixtures, and
+  HG1/HG2 verification has no signer file to consult. **This PR should land first.**
+- **`docs` depends on this PR too.** Four `doc/` pages on `unstable` link to files added here —
+  `specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`, `specs/todo/QUESTION-ORDERING-SPEC.md`,
+  `specs/todo/SET-OPERATORS-SPEC.md`, `specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md`. `doc/test-docs.sh`
+  treats a relative link with no target as a hard `LINK_ERRORS` failure, so the docs theme goes red if
+  it lands first. (A fifth target, `specs/todo/BOUNDED-DEONTICS-SPEC.md`, already exists on `main`.)
 - **Status headers describe siblings' code.** Many banners here are written in the present tense
   about code that lives in `dmn-export`, `go-pipeline`, `ladder-viz`, `lang-sets`,
   `lang-syntax-typecheck`, `corpus-regcf`, `bpmn-export`, `mlir` and `agent-tooling`. Landing this
-  before those makes those sentences forward-looking, which is precisely what CLAUDE.md §4.1
-  forbids. If the merge order puts this first, the honest fix is a one-line dated note at the top of
-  the affected files rather than rewriting the specs.
-- **Cross-references leave `specs/`.** Several documents link to `doc/concepts/language-design/`
-  pages that belong to the **docs** and **papers** themes (notably
-  `dmn-analysis-prior-art.md` and `logic-not-flowcharts.md`), and to
-  `.claude/skills/running-the-l4-pipeline/` in **agent-tooling**. These are relative markdown links,
-  so they render as dead links rather than breaking anything, but a reviewer following them before
-  those themes land will hit 404s.
+  first makes those sentences forward-looking, which is what CLAUDE.md §4.1 forbids. The cheap,
+  honest fix is one dated line at the top of the affected files ("describes work landing in
+  `<theme>`"), not rewriting the specs — and it should be reverted as each sibling lands.
+- **Outbound cross-references are cosmetic.** Documents here link to `doc/concepts/language-design/`
+  pages owned by the **docs** and **papers** themes (notably `dmn-analysis-prior-art.md` and
+  `logic-not-flowcharts.md`) and to `.claude/skills/running-the-l4-pipeline/` in **agent-tooling**.
+  Nothing checks these, so they degrade to dead links rather than breaking CI, but a reviewer
+  following them before those themes land will hit 404s.
 
 ## Risk if rejected
 

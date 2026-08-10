@@ -94,23 +94,28 @@ Drop this and the DMN/BPMN exporters, the ROBDD verifier and the NLG linearizer 
 
 **Provenance**
 
-Folded from these `unstable` PRs (taking only the CLI and service parts of the ones that span several themes):
+Folded from these `unstable` PRs, taking only the CLI and service parts of the ones that span several themes. The ones that carry the substance here are **#154**, **#167**, **#207** and **#210**; the rest contribute one-file follow-through.
 
-- #110 — `feat(query-plan): TYPICALLY priors for question ordering (v2)`
-- #116 — `ladder-core: the viz-expr adapter, the TYPICALLY bridge, the Markdown carriers — and IMPLIES as a seam (§24, §25)`
-- #130 — `format-fidelity`
-- #134 — `library-resolution-shadow`
-- #154 — `feat(surfaces): l4 export CLI (S0) + jl4-service /ladder (S1)`
-- #159 — `fix(state-graph): derive the LEST edge's caption from the modal and the deadline`
-- #160 — `feat(dmn): two engine flavors, and the naming fix that makes either one load`
-- #162 — `feat(regcf): cut BPMN from the corpus itself; triage every projection finding`
-- #167 — `fix(build): restore the embedded stdlib, and make its absence a build error`
-- #180 — `feat(dmn): hydration for computed fields + MAYBE→null (R8-d′) + isJust recognition`
-- #182, #183 — the BKM phase-4/5 DMN certification work
-- #185 — `exhaustiveness for multi-clause DECIDEs: analyse the clause matrix before desugaring (OPEN-6)`
-- #189 — `Merge main into unstable` (carries the JSON Schema builtin-type repair and the batch CSV fix)
-- #190 — `mlir-parity-land`
-- #198 — `feat(bpmn): emit a businessRuleTask delegating each guarded gateway to DMN`
-- #207 — `feat(cli): l4 verify + l4 nlg — P8 measures 5/5 controls and 0 findings over 43 analysed decisions; p7-tnr regenerates and diffs`
-- #210 — `fix(atomid): ladder ∩ query-plan atom ids 0/2 → 2/2 on Reg CF, 0/11 → 11/11 on Charities; twin bindings reach every occurrence`
-- #214 — `fix(print): make prettyLayout round-trip, and stop it silently changing the answer`
+| PR | title | what it contributes here |
+| --- | --- | --- |
+| #110 | TYPICALLY priors for question ordering (v2) | `prob`/info-gain ranking in `jl4-query-plan`, priors threaded into `Backend.DecisionQueryPlan`, the parity fixture in `QueryPlanSpec` |
+| #116 | ladder-core: the viz-expr adapter, the TYPICALLY bridge, the Markdown carriers — and IMPLIES as a seam (§24, §25) | the `Verdict` field on the query plan, and the `BImplies` / vacuous-TRUE spec groups |
+| #130 | fix(format): l4 format identity for TIMEZONE/UNLESS/unicode/multi-clause DECIDE + corpus invariant | `TStringLit` gaining its raw-slice field; the `L4/API.hs` match arity |
+| #134 | Library resolution: embedded stdlib outranks ambient XDG/bundle copies (B′) + shadow warning + dev/prod docs | Warning-level import-resolution lines reaching CLI stderr |
+| #154 | feat(surfaces): l4 export CLI (S0) + jl4-service /ladder (S1) | `L4.Cli.Export`, the `/ladder` route, `--max-ladder-nodes`, the CBOR-rehydration fix in `Compiler.hs` |
+| #159 | fix(state-graph): derive the LEST edge's caption from the modal and the deadline | state-graph follow-through in the CLI/service surface |
+| #160 | fix(dmn): two engine flavors (R7), with both engines checking answers not just liveness | the `--flavor` axis `l4 export` exposes |
+| #162 | feat(regcf): cut BPMN from the corpus itself; triage every projection finding | the `ControlPlane.hs` fix — the recompile shortcut keyed on requested id as well as content hash |
+| #167 | fix(build): restore the embedded stdlib, and make its absence a build error | `EmbeddedLibraries.hs` + `TH.hs` failing loudly, and the embedded tier named in the not-found diagnostic |
+| #180 | feat(dmn): hydration for computed fields + MAYBE→null (R8-d′) + isJust recognition | export-side follow-through |
+| #182 | Phase 0.5: land the exhaustiveness oracle on unstable | `@nonexhaustive` in `L4.Export`'s `@desc` flag vocabulary |
+| #183 | DMN Phase 4: un-lifting analysis + totality + R6 population filter | `isNonexhaustiveDecide`, export-side follow-through |
+| #185 | exhaustiveness for multi-clause DECIDEs: analyse the clause matrix before desugaring (OPEN-6) | export-side follow-through |
+| #189 | Merge main into unstable: absorb docs overhaul, VS Code MCP tooling, batch CSV fix — oracle preserved | the `Batch.hs` and `Run.hs` conflict resolutions, and `Export/Document.hs` adapted to the 4-field `OptionallyTypedName` |
+| #190 | MLIR parity campaign: land the fail-loud bugfix ledger on unstable | `enrichParamTypes` (bare-head DECIDE parameter types from `EntityInfo`) |
+| #198 | feat(bpmn): wire each guarded gateway to the emitted DMN — form G measured against jBPM, all 6 BPMN goldens resolve, one contradiction found and fixed | what `l4 export --to=bpmn` now emits |
+| #207 | feat(cli): l4 verify + l4 nlg — P8 measures 5/5 controls and 0 findings over 43 analysed decisions; p7-tnr regenerates and diffs | `L4.Cli.Verify`, `L4.Cli.Nlg`, `footerDoc` in `Main.hs` |
+| #210 | fix(atomid): ladder ∩ query-plan atom ids 0/2 → 2/2 on Reg CF, 0/11 → 11/11 on Charities; twin bindings reach every occurrence | the atomId join, the twin multimap, the README and `DataPlane` prose corrections |
+| #214 | fix(print): make prettyLayout round-trip, and stop it silently changing the answer | `l4 batch` — the reported `#932` failure was in the filter→print→parse path `batchCmd` drives |
+
+Not attributable to any PR in the list above: several of the older `l4 batch` and JSON Schema commits predate this numbering and reached `unstable` through earlier merges — `582b956c` (batch output formats, `--output`, `--continue-on-error`, CSV type inference), `291cd005` (unbuffered ndjson, exponent CSV cells, MAYBE param validation), `3a8d77e7` (shell injection in `l4 trace`, backslash corruption in `l4 batch`), `4be7553d` (fail `l4 check`/`run` on cyclic imports), `87c8b2e4` (valid JSON Schema for builtin types, T3), `04d5c5b5` (leftover tmp staging dir on redeploy, `smucclaw/l4-ide#850`), and `d7aa1631` (a crashed `#EVAL` fails `l4 run`).
