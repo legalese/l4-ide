@@ -1,4 +1,4 @@
-# feat(wizards): two citizen-facing web wizards — Housing Act possession and Reg CF — generated from L4 schemas
+# feat(wizards): citizen web wizards over Housing Act possession and Reg CF, generated from L4 schemas
 
 **What this adds**
 
@@ -26,6 +26,8 @@ upstream issue number is named in the source commits for either app.
 
 **What's in it**
 
+91 files, 7,140 insertions, 1 deletion (the one-character `turbo.json` line).
+
 *`ts-apps/housing-wizard` — 36 files, 2,432 insertions*
 
 - A generic, unit-tested **schema→widget renderer**: `labels.ts` / `classify.ts` /
@@ -41,7 +43,7 @@ upstream issue number is named in the source commits for either app.
   response shape-validation, so a redeployed-and-drifted schema produces a graceful error rather
   than a false "all clear".
 
-*`ts-apps/regcf-wizard` — 53 files, plus 2 nix expressions*
+*`ts-apps/regcf-wizard` — 52 files, plus 2 nix expressions and one `turbo.json` line*
 
 - An entry page that is a **hub, not a questionnaire** — the corpus serves founders and investors,
   and one linear form would ask a founder about resale restrictions.
@@ -125,7 +127,10 @@ Honest, and it differs sharply between the two apps.
   `jl4-client-rpc`, which is already on `main`, and it imports only three types from it
   (`FunctionParameter`, `FunctionParameters`, `ExportedFunctionInfo`) — all present on `main`
   today. The root `workspaces` glob is already `ts-apps/*`, so no root manifest edit is needed.
-  It builds, lints, type-checks and tests on `main` as-is.
+  It builds, lints, type-checks and tests on `main` as-is, via the ordinary turbo `^build`
+  ordering its README documents (`jl4-client-rpc` ships only `dist/` and has no `types` field, so
+  it must be built before `svelte-check` runs — which `npx turbo run check --filter=housing-wizard`
+  does for you).
 - **`regcf-wizard` does not build without `ladder-viz`.** Its `package.json` depends on
   `@repo/ladder-svg` and `@repo/ladder-core`, and neither package exists on `main` — both are new
   in the **ladder-viz** theme, which is also where the `LadderController` that
@@ -144,8 +149,11 @@ Honest, and it differs sharply between the two apps.
   anything defines the option — so if someone imported this module *and* enabled it before
   ci-build lands, contributing `bundles.regcf` would silently drop the base two. Unimported and
   disabled, as it arrives here, it serves nothing and evaluates nothing.
-- **`package-lock.json` is in ci-build,** not here, so the workspace-link records for both apps
-  land with that theme.
+- **`package-lock.json` and the root `package.json` are in ci-build,** not here, so the
+  workspace-link records for both apps land with that theme. Note that the root `overrides.vite`
+  pin differs between the branches (`^6.0.7` on `main`, `6.4.2` on `unstable`); PR #200's
+  clean-room `rm -rf node_modules && npm ci` was measured on the `6.4.2` base, so an installer run
+  against `main`'s pin has not been measured either way.
 - The one shared-file edit, `turbo.json`'s added `BASE_PATH`, is additive to an `env` array and
   conflicts with nothing.
 - Two façade/spec files these apps read are *not* in this PR:
