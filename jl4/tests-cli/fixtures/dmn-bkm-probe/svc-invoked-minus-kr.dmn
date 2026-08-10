@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE D3. THE ISOLATION for D2. Byte-identical to svc-invoked.dmn with exactly
+  ONE element deleted: the <knowledgeRequirement> pointing at the decisionService.
+  The FEEL call `bundle(n: n + 100)` is still there, and so is the service.
+
+  Without this file, D2's Camunda failure could be blamed on the presence of a
+  decisionService, or on a service that has a variable, or on the file's shape at
+  large. With it, the cause is pinned to the one element that differs.
+
+  Section 13.4 row 3. MEASURED: Camunda 8.7.6 parses this file and evaluates all
+  its decisions; the calling decision answers null, because a service is still
+  not invocable there, but nothing THROWS. So the ClassCastException D2 provokes
+  is specifically the knowledgeRequirement-to-decisionService EDGE, not the
+  service and not the call.
+
+  MEASURED ON KIE, and it is NOT what one might guess: KIE also NEEDS the edge.
+  Removing it makes KIE refuse at compile time with
+
+      ERROR [ERR_COMPILING_FEEL] Error compiling FEEL expression
+      'bundle(n: n + 100)' for name 'via_bundle' on node 'via_bundle':
+      Unknown variable 'bundle'
+
+  which is the SAME diagnostic KIE gives for a BKM whose knowledgeRequirement is
+  missing (see bkm-chain-nokr.dmn). So on KIE the knowledgeRequirement is what
+  puts an invocable's name into a caller's FEEL scope, uniformly, for BKMs and
+  for services alike. Wired HarnessMustFail on the KIE leg for that reason.
+
+  Net effect of the D2/D3 pair: the edge is REQUIRED by KIE and FATAL to Camunda,
+  which is the whole of DmnFlavor in one sentence.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_svc_invoked_minus_kr" name="svc_invoked_minus_kr" namespace="https://legalese.com/l4/dmn/svc_invoked_minus_kr" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_step" name="step">
+    <variable id="decision_step_var" name="step" typeRef="number"/>
+    <informationRequirement id="ir_step_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_step_lit">
+      <text>n * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_total" name="total">
+    <variable id="decision_total_var" name="total" typeRef="number"/>
+    <informationRequirement id="ir_total_step">
+      <requiredDecision href="#decision_step"/>
+    </informationRequirement>
+    <literalExpression id="decision_total_lit">
+      <text>step + 1</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_bundle" name="bundle">
+    <variable id="svc_bundle_var" name="bundle" typeRef="number"/>
+    <outputDecision href="#decision_total"/>
+    <encapsulatedDecision href="#decision_step"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+  <decision id="decision_via_bundle" name="via_bundle">
+    <variable id="decision_via_bundle_var" name="via_bundle" typeRef="number"/>
+    <informationRequirement id="ir_via_bundle_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_via_bundle_lit">
+      <text>bundle(n: n + 100)</text>
+    </literalExpression>
+  </decision>
+</definitions>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEMENT B, and this file is a PINNED NEGATIVE for Camunda: the per-spouse
+  predicate as a DECISION TABLE, bound to the name `eligible` by a boxed-context
+  entry INSIDE the one decision node (no BKM), and invoked from the quantifier
+  in the final result entry.
+
+  Schema-valid DMN 1.3 - a context entry holds any expression,
+  tFunctionDefinition is an expression, and a decision table is an expression -
+  and KIE 8.44 validates, builds and answers it 5/5. zeebe-dmn 8.7.6 REJECTS it
+  at parse: "expected literal expression but found '...DecisionTableImpl...'".
+  Measured 2026-07-30; that split is the fact this fixture pins. The empirical
+  two-engine intersection admits a tabular per-element predicate ONLY via a BKM
+  (see spouse-bkm-table.dmn), which is what promotes BKM emission (spec Phase 5,
+  section 6) from fidelity-nice to portability-critical.
+
+  UPGRADE RISK, on purpose: a future zeebe-dmn bump may LEARN to parse this
+  file. The Camunda leg of this fixture is asserted MUST-FAIL, so that upgrade
+  will turn the suite red HERE and nowhere else. That red is good news, not a
+  regression: it means the engine intersection has widened, the boxed-context
+  placement has become portable, and the "BKM is the only portable lambda"
+  claim (spec section 6 measured note; the Knot 2 discussion) is stale. Flip
+  the Camunda expectation to MUST-PASS, update both of those write-ups, and
+  reconsider whether Phase 5 is still the only route to an analyzable
+  per-element predicate.
+
+  KIE still emits exactly one warning here - MISSING_TYPE_REF on `eligible` -
+  and it is structurally unsatisfiable: the type it asks for is the function
+  type Spouse -> boolean, which DMN's itemDefinition language cannot spell.
+  That warning is the "no exponentials on the edges" observation, made by the
+  vendor's own validator, and the suite pins it.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_spouse_context_table" name="spouse_context_table" namespace="https://legalese.com/l4/dmn/spouse_context_table" exporter="hand">
+  <itemDefinition id="itemdef_spouse" name="Spouse">
+    <itemComponent id="itemdef_spouse_c1" name="income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_spouse_c2" name="qualifying_candidate">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_spouses" name="Spouses" isCollection="true">
+    <typeRef>Spouse</typeRef>
+  </itemDefinition>
+  <inputData id="input_spouses" name="spouses">
+    <variable id="input_spouses_var" name="spouses" typeRef="Spouses"/>
+  </inputData>
+  <decision id="decision_children_eligible" name="children_eligible" label="children eligible">
+    <variable id="decision_children_eligible_var" name="children_eligible" typeRef="boolean"/>
+    <informationRequirement id="ir_spouses">
+      <requiredInput href="#input_spouses"/>
+    </informationRequirement>
+    <context id="ctx_children_eligible">
+      <contextEntry id="ce_eligible">
+        <variable id="ce_eligible_var" name="eligible"/>
+        <functionDefinition id="fd_eligible">
+          <formalParameter id="fd_eligible_p1" name="s" typeRef="Spouse"/>
+          <decisionTable id="dt_eligible" hitPolicy="UNIQUE" outputLabel="eligible">
+            <input id="dt_eligible_i1">
+              <inputExpression id="dt_eligible_i1e" typeRef="number">
+                <text>s.income</text>
+              </inputExpression>
+            </input>
+            <input id="dt_eligible_i2">
+              <inputExpression id="dt_eligible_i2e" typeRef="boolean">
+                <text>s.qualifying_candidate</text>
+              </inputExpression>
+            </input>
+            <output id="dt_eligible_o1"/>
+            <rule id="dt_eligible_r1">
+              <inputEntry id="dt_eligible_r1i1"><text>&lt; 100000</text></inputEntry>
+              <inputEntry id="dt_eligible_r1i2"><text>-</text></inputEntry>
+              <outputEntry id="dt_eligible_r1o"><text>true</text></outputEntry>
+            </rule>
+            <rule id="dt_eligible_r2">
+              <inputEntry id="dt_eligible_r2i1"><text>&gt;= 100000</text></inputEntry>
+              <inputEntry id="dt_eligible_r2i2"><text>true</text></inputEntry>
+              <outputEntry id="dt_eligible_r2o"><text>true</text></outputEntry>
+            </rule>
+            <rule id="dt_eligible_r3">
+              <inputEntry id="dt_eligible_r3i1"><text>&gt;= 100000</text></inputEntry>
+              <inputEntry id="dt_eligible_r3i2"><text>false</text></inputEntry>
+              <outputEntry id="dt_eligible_r3o"><text>false</text></outputEntry>
+            </rule>
+          </decisionTable>
+        </functionDefinition>
+      </contextEntry>
+      <contextEntry id="ce_result">
+        <literalExpression id="ce_result_literal">
+          <text>some s in spouses satisfies eligible(s)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+</definitions>

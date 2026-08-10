@@ -1,0 +1,4 @@
+@export This function echoes a product code as-is
+GIVEN code IS A STRING
+GIVETH A STRING
+echoCode code MEANS code

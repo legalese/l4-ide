@@ -1,0 +1,12 @@
+-- Regression fixture for LIBRARY-RESOLUTION-SHADOW-SPEC (Option B′).
+--
+-- This file lives alone in its directory: no project-root or sibling copy of
+-- `prelude` exists, so with JL4_LIBRARY_PATH unset the import must fall
+-- through the project-scoped tiers. The CLI test plants a POISONED prelude in
+-- a fabricated XDG store (~/.local/share/jl4/libraries): under the pre-B′
+-- ordering that ambient copy shadowed the binary's own embedded stdlib and
+-- this check would fail; under B′ the embedded copy outranks it and the check
+-- succeeds — with a warning naming both differing copies (Option E).
+IMPORT prelude
+
+ok MEANS TRUE

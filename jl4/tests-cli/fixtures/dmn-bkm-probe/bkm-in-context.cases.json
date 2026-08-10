@@ -1,0 +1,34 @@
+{
+  "note": [
+    "Cases for bkm-in-context.dmn (probe B1). 3 cases x 2 decisions = 6 value",
+    "checks per engine. Every case asserts the FULL hydrated record, so the",
+    "BKM-computed entry is measured directly and not merely inferred from the",
+    "downstream decision agreeing. The three cases hit all three grades."
+  ],
+  "cases": [
+    {
+      "name": "A. grade A",
+      "context": { "investor_raw": { "annual_income": 250000, "net_worth": 10 } },
+      "expect": {
+        "investor": { "annual_income": 250000, "net_worth": 10, "grade": "A" },
+        "eligible": true
+      }
+    },
+    {
+      "name": "B. grade B (boundary at 100000)",
+      "context": { "investor_raw": { "annual_income": 100000, "net_worth": 20 } },
+      "expect": {
+        "investor": { "annual_income": 100000, "net_worth": 20, "grade": "B" },
+        "eligible": false
+      }
+    },
+    {
+      "name": "C. grade C",
+      "context": { "investor_raw": { "annual_income": 5, "net_worth": 30 } },
+      "expect": {
+        "investor": { "annual_income": 5, "net_worth": 30, "grade": "C" },
+        "eligible": false
+      }
+    }
+  ]
+}

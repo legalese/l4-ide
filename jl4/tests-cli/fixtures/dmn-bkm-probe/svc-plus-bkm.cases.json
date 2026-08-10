@@ -1,0 +1,13 @@
+{
+  "note": [
+    "Cases for svc-plus-bkm.dmn (probe D4). 3 cases x 2 decisions = 6 value",
+    "checks per engine. The two bands carry DIFFERENT rates (0.02 vs 0.05), so",
+    "a band that failed to reach the rate table, or a table that fell through,",
+    "moves the charge rather than agreeing. Case B pins the >= 100 boundary."
+  ],
+  "cases": [
+    { "name": "A. n = 200, big band, rate 0.02", "context": { "n": 200 }, "expect": { "band": "big", "charge": 5 } },
+    { "name": "B. n = 100, boundary, still big",  "context": { "n": 100 }, "expect": { "band": "big", "charge": 3 } },
+    { "name": "C. n = 20, small band, rate 0.05", "context": { "n": 20 },  "expect": { "band": "small", "charge": 2 } }
+  ]
+}

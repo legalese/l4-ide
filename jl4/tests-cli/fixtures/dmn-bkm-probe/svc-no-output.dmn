@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE D5. NEGATIVE CONTROL for section 2.3.1's "prefer exactly one
+  outputDecision per service": a <decisionService> with NO <outputDecision> at
+  all, only an encapsulatedDecision.
+
+  The reason this needs a probe rather than a reading is that the XSD does NOT
+  catch it. DMN13.xsd:516 declares outputDecision with minOccurs="0", so a
+  service with none is SCHEMA VALID and Xerces waves it through. Whatever
+  rejects it, if anything does, is a MODEL validator, not the schema, and model
+  validators are exactly what the two engines disagree about.
+
+  What each leg is asked:
+    KIE   : does kie-dmn-validation raise, and does evaluateDecisionService throw
+            when there is nothing to return?
+    Camunda 8 : has no service leg, so the only question is whether the malformed
+            service perturbs the parse or the ordinary decisions.
+
+  WHAT THIS DECIDES. If KIE rejects, section 2.3.1's preference is engine-backed on
+  the `kie` flavor and the emitter can rely on it. If both engines are quiet, the
+  emitter must guarantee the invariant itself, and a service with no output is a
+  silent no-op rather than an error, which is the worse failure mode: a section
+  emitted as an empty service would simply never be callable, with no diagnostic.
+
+  MEASURED 2026-07-31, and the two engines split exactly as the probe was shaped
+  to detect:
+    Xerces    : VALID, as predicted from DMN13.xsd:516's minOccurs="0".
+    KIE 8.44  : validator ERROR [REQ_NOT_FOUND] "Decision service 'empty' does
+                not define any output decisions in top segment (outputDecision
+                count: 0, encapsulatedDecision count: 1)". BUILD CLEAN. The
+                ordinary decision still answers correctly. And
+                evaluateDecisionService THROWS
+                  java.lang.IllegalArgumentException: Kie DMN API parameter
+                  'decisionIds' cannot be empty.
+    Camunda 8 : completely silent. Parses, 0 errors, `step` correct. A service
+                with no output is a no-op there and nothing says so.
+
+  So section 2.3.1's preference is engine-backed on `kie` (at validate time, and
+  loudly at call time) and entirely unbacked on the default flavor. Wired
+  HarnessMustFail on the KIE leg and HarnessMustPass on the Camunda leg.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_svc_no_output" name="svc_no_output" namespace="https://legalese.com/l4/dmn/svc_no_output" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_step" name="step">
+    <variable id="decision_step_var" name="step" typeRef="number"/>
+    <informationRequirement id="ir_step_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_step_lit">
+      <text>n * 2</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_empty" name="empty">
+    <variable id="svc_empty_var" name="empty" typeRef="number"/>
+    <encapsulatedDecision href="#decision_step"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+</definitions>
