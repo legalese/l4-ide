@@ -97,3 +97,44 @@ Two softer ordering notes from the same attribution pass:
   ditto (^) column metric", which reads like a front-end concern, but
   `Text.Megaparsec.Unicode.isWideChar` has exactly one importer in the tree,
   `jl4-core/src/L4/Print/Columnar.hs`. The comment is worth rewording.
+
+## The edge `depcheck.mjs` cannot see, and it is the load-bearing one
+
+**`depcheck.mjs` resolves module imports. It is therefore known-incomplete for constructor-level
+dependencies** — a theme can depend on another through a data constructor of a module that `main`
+already has, and no import edge appears. There is exactly one such case here, found by the audit
+pass and verified independently:
+
+**`lang-syntax-typecheck` removes the `Expr` constructor `Exponent`** (present on `origin/main`
+in `jl4-core/src/L4/Syntax.hs`, gone on `origin/unstable`). On `main`, that constructor is
+pattern-matched by modules belonging to **five different themes**:
+
+| module | theme | `Exponent` sites on main |
+| --- | --- | --- |
+| `L4/Syntax.hs`, `L4/Desugar.hs`, `L4/TypeCheck.hs`, `L4/TypeCheck/Annotation.hs`, `L4/Parser/ResolveAnnotation.hs` | lang-syntax-typecheck | 12 |
+| `L4/EvaluateLazy/Machine.hs` | **lang-eval-ledger** | 1 |
+| `L4/Nlg.hs`, `L4/Export/Document.hs` | **service-cli** | 3 |
+| `L4/Print.hs` | **lang-printer** | 1 |
+| `jl4-mlir/src/L4/MLIR/{Lower,Schema}.hs` | **mlir** | 9 |
+
+The dependency runs **both ways**, which is what makes it unbreakable at file granularity:
+
+- **`lang-syntax-typecheck` alone will not compile.** Deleting the constructor leaves four other
+  themes' modules referring to a name that is no longer in scope — a hard error.
+- **None of those four alone will compile either.** Each drops its `Exponent` arm while the
+  constructor still exists, so an exhaustive `case` over `Expr` goes incomplete — and
+  `-Wall … -Werror` (see `CLAUDE.md` §3) makes that fatal too.
+- The same hazard is symmetric for the two constructors `unstable` **adds** (`Record`, `ReadCell`).
+
+This is a property of splitting, at file level, a change that was semantically atomic (upstream
+PR #83, *"refactor(jl4-core): remove dead Exponent AST constructor"*). It cannot be fixed by
+reordering.
+
+**Recommendation: merge these five as one merge-queue batch** — `lang-syntax-typecheck`,
+`lang-eval-ledger`, `lang-printer`, `service-cli`, `mlir` — or land them in immediate succession
+and accept that `main` does not build in between. Every other PR in the set is unaffected.
+
+The alternative, if they must land separately, is to re-cut `Syntax.hs` and the ten consumer
+modules at hunk level the way `spine/hunks.json` already does for the `.cabal` files and
+`jl4/tests/Main.hs` — carrying the constructor and every arm in one PR, and each theme's other
+edits separately. That is a larger piece of work and was not attempted here.
