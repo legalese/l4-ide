@@ -107,8 +107,8 @@ which touches `jl4-core/libraries/actus-schedule.l4` — a different, retained a
 
 Dropping this leaves ~6.7k lines of unbuilt, untested demo code in `main`, with `rdf4h` — a
 dependency nothing else in the tree uses — still on the critical path of `cabal build all`, and
-leaves `main` and
-`unstable` diverging on a whole package directory — which will keep producing conflicts in
+leaves `main` and `unstable` diverging on a whole package directory, which will keep producing
+conflicts in
 `cabal.project`, `README.md` and `AGENTS.md` for as long as the divergence lasts. Nothing breaks
 functionally; the cost is carrying weight and merge friction indefinitely.
 

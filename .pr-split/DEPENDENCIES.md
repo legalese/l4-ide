@@ -21,3 +21,19 @@ Every other PR may merge in any order.
 `ci-build` should merge **last**: the workflow it ships references check scripts that arrive
 with the feature PRs, so landing it early would redden `main` for checks whose subjects are
 not there yet.
+
+## A pre-existing golden gap on `main`, and what it means for merge order
+
+`etc/check-corpus-goldens.mjs` (shipped by **ci-build**) fails on **plain `origin/main`**, today,
+before any of this work: three fixtures carry no goldens —
+
+    jl4/examples/not-ok/export-after-giveth.l4
+    jl4/examples/not-ok/export-before-decide.l4
+    jl4/examples/not-ok/export-between-given-giveth.l4
+
+The twelve goldens that close that gap are in **lang-syntax-typecheck**, which is the only
+slice that passes the check standalone. Every other slice merely inherits main's existing gap;
+none of them introduce one.
+
+So: **`ci-build` must merge after `lang-syntax-typecheck`.** Landing the checker first would
+turn `main` red for a defect that predates all of these PRs.
