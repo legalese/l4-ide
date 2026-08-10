@@ -37,3 +37,24 @@ none of them introduce one.
 
 So: **`ci-build` must merge after `lang-syntax-typecheck`.** Landing the checker first would
 turn `main` red for a defect that predates all of these PRs.
+
+## Two more edges, found by building and installing rather than by reading
+
+- **`wizard-regcf` needs `ladder-viz`.** `ts-apps/regcf-wizard` depends on the workspace packages
+  `@repo/ladder-core` and `@repo/ladder-svg`, and *both directories are new on unstable* — they do
+  not exist on `main`. `npm ci` on the wizard slice alone fails with
+  `404 Not Found - GET .../@repo%2fladder-core`. This is why the wizards are two PRs and not one:
+  **`wizard-housing` needs nothing that is not already on `main`** (it uses `jl4-client-rpc`, which
+  main has), so it ships a regenerated root lockfile and stands alone.
+
+- **`cabal.project` is no longer a shared file.** It carried two unrelated one-line edits: dropping
+  `./jl4-actus-analyzer` and adding `./jl4-proleg`. Each PR now makes its own edit, so neither can
+  leave `cabal build all` pointing at a directory that is not there. (On `unstable` that exact
+  mistake happened once already — PR #63 landed without its `cabal.project` edit and `f2f646fc`
+  had to repair it the next day.)
+
+## Note on the root lockfile
+
+`package-lock.json` is touched by both **ci-build** (which adds `lint-staged`) and
+**wizard-housing** (which adds a workspace). Whichever lands second needs a plain `npm install`
+to reconcile. That is ordinary lockfile traffic, not a design problem.
