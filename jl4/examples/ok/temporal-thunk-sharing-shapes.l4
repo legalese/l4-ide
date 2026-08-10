@@ -1,0 +1,103 @@
+-- T6 regression: which value shapes share thunks (and must now re-evaluate
+-- per temporal context), vs which re-evaluate per use anyway (and must be
+-- left alone).
+--
+-- Leaky-at-baseline shapes (1, 1b, 3, 4, 5) must now produce DIFFERENT,
+-- context-correct values on each side of an `EVAL AS OF SYSTEM TIME`
+-- boundary. Safe shapes (2, 6) are no-regression sentinels: function bodies
+-- and WHERE locals were never memoized across calls.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+-- serial(2025-01-31) = 739646 (ambient); serial(2000-01-01) = 730484 (past).
+
+TIMEZONE IS "Etc/UTC"
+
+past MEANS DATE_FROM_DMY 1 1 2000
+
+-- expected: 730484 (control)
+#EVAL past
+-- expected: 739646 (control)
+#EVAL DATE_SERIAL (DATE_FROM_DMY 31 1 2025)
+
+----------------------------------------------------------------------------
+-- SHAPE 1 (inside-out): top-level nullary binding
+----------------------------------------------------------------------------
+b1 MEANS DATE_SERIAL TODAY
+
+-- expected: 730484
+#EVAL `EVAL AS OF SYSTEM TIME` past b1
+-- expected: 739646 (pre-fix: 730484)
+#EVAL b1
+
+----------------------------------------------------------------------------
+-- SHAPE 1b (outside-in): same shape, ambient force first
+----------------------------------------------------------------------------
+b1b MEANS DATE_SERIAL TODAY
+
+-- expected: 739646
+#EVAL b1b
+-- expected: 730484 (pre-fix: 739646)
+#EVAL `EVAL AS OF SYSTEM TIME` past b1b
+
+----------------------------------------------------------------------------
+-- SHAPE 2 (safe): function called twice — body re-evaluated per call
+----------------------------------------------------------------------------
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+f2 n MEANS DATE_SERIAL TODAY PLUS n
+
+-- expected: 730484
+#EVAL `EVAL AS OF SYSTEM TIME` past (f2 0)
+-- expected: 739646 (correct at baseline too)
+#EVAL f2 0
+
+----------------------------------------------------------------------------
+-- SHAPE 3: nullary binding whose RHS is a function call — the RESULT sits
+-- in one shared thunk
+----------------------------------------------------------------------------
+b3 MEANS f2 0
+
+-- expected: 730484
+#EVAL `EVAL AS OF SYSTEM TIME` past b3
+-- expected: 739646 (pre-fix: 730484)
+#EVAL b3
+
+----------------------------------------------------------------------------
+-- SHAPE 4: record FIELD of a shared record value
+----------------------------------------------------------------------------
+DECLARE Wrap HAS stamp IS A NUMBER
+
+w4 MEANS Wrap (DATE_SERIAL TODAY)
+
+-- expected: 730484
+#EVAL `EVAL AS OF SYSTEM TIME` past (w4's stamp)
+-- expected: 739646 (pre-fix: 730484)
+#EVAL w4's stamp
+
+----------------------------------------------------------------------------
+-- SHAPE 5: Var-aliased ARGUMENT — a callee's internal AS OF scope forces
+-- the CALLER's shared binding through the aliased reference
+----------------------------------------------------------------------------
+b5 MEANS DATE_SERIAL TODAY
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+peek5 x MEANS `EVAL AS OF SYSTEM TIME` past (x PLUS 0)
+
+-- expected: 730484 (b5 forced via the aliased ref inside the internal override)
+#EVAL peek5 b5
+-- expected: 739646 (pre-fix: 730484 — caller's binding was poisoned)
+#EVAL b5
+
+----------------------------------------------------------------------------
+-- SHAPE 6 (safe): WHERE binding inside a function body — fresh per call
+----------------------------------------------------------------------------
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+g6 n MEANS t PLUS n
+  WHERE t MEANS DATE_SERIAL TODAY
+
+-- expected: 730484
+#EVAL `EVAL AS OF SYSTEM TIME` past (g6 0)
+-- expected: 739646 (correct at baseline too)
+#EVAL g6 0

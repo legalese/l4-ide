@@ -1,0 +1,19 @@
+-- Bitemporal RECALL (smucclaw/l4-ide#914 §2B): RECALL reads THROUGH the
+-- ambient temporal context. A RECORD under EVAL UNDER VALID TIME carries an
+-- explicit valid-from stamp; a RECALL under EVAL UNDER VALID TIME selects,
+-- among visible entries, the one whose positional valid interval covers the
+-- point; a bare RECALL is unchanged (whole log, last write wins).
+--
+-- One directive = one ledger (withFreshLedger), so the writes and the reads
+-- share a LIST, whose elements evaluate left-to-right.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+IMPORT prelude
+
+-- A GST-style regime history for one cell: 7 effective 2023-01-01, then 9
+-- effective 2024-01-01. Reads: mid-2023 -> 7 (the 2023 interval), mid-2024
+-- -> 9 (the open 2024 interval), mid-2022 -> before the facts, a principled
+-- NOTHING (-> 0 via fromMaybe), bare -> last write wins (9), unchanged.
+-- expected: LIST 7, 9, 7, 9, 0, 9
+#EVAL LIST (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2023) (RECORD `rate` IS 7)), (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2024) (RECORD `rate` IS 9)), (fromMaybe 0 (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2023) (RECALL `rate`))), (fromMaybe 0 (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2024) (RECALL `rate`))), (fromMaybe 0 (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2022) (RECALL `rate`))), (fromMaybe 0 (RECALL `rate`))

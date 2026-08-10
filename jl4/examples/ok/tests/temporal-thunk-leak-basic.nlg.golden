@@ -1,0 +1,11 @@
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `today snapshot`
+`today snapshot`
+`today snapshot 2`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `today snapshot 2`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2010 and `today snapshot 3`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `today snapshot 3`
+`today snapshot 3`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `day after today`
+`day after today`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `now snapshot`
+`now snapshot`

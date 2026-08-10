@@ -1,0 +1,25 @@
+-- Bitemporal RECALL x per-day interval iterators — DECIDED SEMANTICS
+-- (smucclaw/l4-ide#914 §2B/§2C). The interval builtins (EVER BETWEEN etc.)
+-- stamp the fact-time axis per stepped day, and since #914 RECALL reads
+-- through that axis: a predicate RECALLing a cell is evaluated against the
+-- ledger AS OF EACH ITERATION DAY. A contemporaneous write (valid-from =
+-- the harness clock's day, 2025-01-31) is therefore NOT visible on 2020
+-- iteration days, but IS visible in a window covering its valid-from day.
+-- This is the per-day regime selection that makes e.g. Housing Act Ground 8
+-- ("arrears at notice AND at hearing") expressible — the read-side twin of
+-- the interval builtins' RULES EFFECTIVE DATE stamping.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+IMPORT prelude
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`x is set on` MEANS fromMaybe 0 (RECALL `x`) GREATER THAN 0
+
+-- expected: LIST 1, 200, 100 — the write is valid from 2025-01-31, so a
+-- January-2020 window never sees it (the per-day RECALL yields NOTHING on
+-- every stepped day: EVER -> FALSE -> 200) while a window covering
+-- 2025-01-31 does (EVER -> TRUE -> 100). Each stepped day is its own
+-- temporal scope for the predicate's RECALL.
+#EVAL LIST (RECORD `x` IS 1), (IF `EVER BETWEEN` (DATE_FROM_DMY 1 1 2020) (DATE_FROM_DMY 3 1 2020) `x is set on` THEN 100 ELSE 200), (IF `EVER BETWEEN` (DATE_FROM_DMY 30 1 2025) (DATE_FROM_DMY 1 2 2025) `x is set on` THEN 100 ELSE 200)

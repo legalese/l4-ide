@@ -1,0 +1,34 @@
+-- T6 regression: an exception raised inside an `EVAL AS OF SYSTEM TIME`
+-- scope must not leak the temporal override into subsequent directives.
+--
+-- Pre-fix, 'raiseException' unwound the frame stack without interpreting
+-- the EvalAsOfSystemTime2 restore frame, so the override stayed in the
+-- ambient context: directive 3 reported the OVERRIDDEN serial instead of
+-- the ambient one, and directive 4 cached a freshly forced shared binding
+-- under the leaked context. Fixed by (a) interpreting temporal-restore
+-- frames during exceptional unwinding ('unwindFrame' in Machine.hs) and
+-- (b) an unconditional ambient-context restore at the directive boundary
+-- ('nfDirective').
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z,
+-- so ambient DATE_SERIAL TODAY = 739646; serial of 2000-01-01 = 730484.
+
+TIMEZONE IS "Etc/UTC"
+
+past MEANS DATE_FROM_DMY 1 1 2000
+
+-- expected: 739646 (ambient control)
+#EVAL DATE_SERIAL TODAY
+
+-- expected: Division by zero (raised INSIDE the override scope)
+#EVAL `EVAL AS OF SYSTEM TIME` past (1 DIVIDED BY 0)
+
+-- expected: 739646 (pre-fix leaked 730484 — the override survived the
+-- exceptional unwind into this directive)
+#EVAL DATE_SERIAL TODAY
+
+fresh MEANS DATE_SERIAL TODAY
+
+-- expected: 739646 (pre-fix the shared binding was forced and cached under
+-- the leaked 2000-01-01 context)
+#EVAL fresh

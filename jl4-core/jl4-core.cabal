@@ -100,6 +100,8 @@ library
     L4.DirectiveFilter
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
+    L4.Evaluate.ValueLazyJSON
+    L4.Evaluate.Ledger
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
@@ -167,12 +169,24 @@ test-suite jl4-core-test
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    TracePostprocessSpec
+    LedgerSubstrateSpec
+    LedgerThunkCacheSpec
+    RecordLedgerSpec
+    LedgerRenderingSpec
+    M4PartyLedgerSpec
+    M45ReadSpec
+    M5DeonticSequencingSpec
+    BitemporalSubstrateSpec
+    BitemporalRecallSpec
+    TraceOrderingSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,

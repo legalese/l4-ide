@@ -1,0 +1,8 @@
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `WHEN LAST` with `DATE_FROM_DMY` with 5, 1 and 2020 and `is today`
+`today snapshot`
+`WHEN NEXT` with `DATE_FROM_DMY` with 10, 1 and 2025 and `on or before shared A`
+`shared today A`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 15, 6 and 2020 and `WHEN LAST` with `DATE_FROM_DMY` with 15, 6 and 2020 and `on or before shared B`
+`shared today B`
+`shared today C`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 15, 6 and 2020 and `WHEN NEXT` with `DATE_FROM_DMY` with 10, 6 and 2020 and `equals shared C`
