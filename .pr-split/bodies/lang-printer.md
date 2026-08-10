@@ -107,9 +107,10 @@ are documented in `CLAUDE.md` §3.2 / §3.2.1, including the cleanup the second 
 
 - `jl4/examples/ok/ref-annotation.l4` with its four `jl4-test` goldens — the fixture for `@ref` on
   expression-level nodes.
-- Four `.ep.golden` deltas that restore a postfix-mixfix operand exactprint had been dropping:
-  `DECIDE same_module_postfix IS \`is even\`` → `… IS 4 \`is even\``, plus the same shape in
-  `time-tests`, `postfix-with-variables` and `mixfix-cross-module-postfix-call`.
+- Four `.ep.golden` deltas that restore a postfix-mixfix operand exactprint had been dropping —
+  ``DECIDE same_module_postfix IS `is even` `` became ``DECIDE same_module_postfix IS 4 `is even` `` —
+  plus the same shape in `time-tests`, `postfix-with-variables` and
+  `mixfix-cross-module-postfix-call`.
 - One `.schema.golden` delta where builtin types now emit real JSON Schema (`"type": "string"`)
   instead of a dangling `$ref: "#/$defs/STRING"` with no matching `$defs` entry.
 
