@@ -5,6 +5,7 @@
 etc/check-corpus-goldens.mjs
 nix/configuration.nix
 nix/default.nix
+nix/jl4-service/configuration.nix
+nix/jl4-web/package.nix
 package-lock.json
 package.json
-turbo.json

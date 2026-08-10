@@ -27,6 +27,9 @@ specs/research/mermaid-planb/ladder-as-railroad-factored.mmd
 specs/research/mermaid-planb/ladder-as-railroad-nnf.mmd
 specs/research/mermaid-planb/s415-full.mmd
 specs/roadmap/future-features.md
+specs/todo/ACTUS-L4-BRIDGE-SPEC.md
+specs/todo/ADVANCED-FP-TOPICS.md
+specs/todo/BATCH-PROCESSING-SPEC.md
 specs/todo/BOUNDED-DEONTICS-SPEC.md
 specs/todo/CHARTING-LIBRARY-SPEC.md
 specs/todo/DEONTIC-LOAN-COVENANT-MODEL.md
@@ -35,6 +38,7 @@ specs/todo/DMN-PHASE5-BUILD-PLAN.md
 specs/todo/DMN-RECURSION-FLATTENING-SPEC.md
 specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md
 specs/todo/EXCEL-DATE-COMPAT-SPEC.md
+specs/todo/FETCH-POST-JSON-SPEC.md
 specs/todo/FIDELITY-SEVERITY-AXIS-SPEC.md
 specs/todo/HOMOICONICITY-SPEC.md
 specs/todo/IMPLICIT-PROPS-DESIGN.md
@@ -43,9 +47,17 @@ specs/todo/INLINE-DMNMD-SPEC.md
 specs/todo/ISSUE-635-PLANNING-STATUS.md
 specs/todo/L4-VERSIONING.md
 specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md
+specs/todo/LIST-SYNTAX-RELAXATION-SPEC.md
+specs/todo/MATH-LIBRARY-SPEC.md
+specs/todo/MULTILINE-MIXFIX-SPEC.md
 specs/todo/PARENT-NODE-ASSERTION-SPEC.md
+specs/todo/PATTERN-MATCHING-SPEC.md
 specs/todo/PRODUCT-STRATEGY-2025-01.md
+specs/todo/QUALIA-BASED-CONTRACT-CLASSIFICATION-SPEC.md
 specs/todo/QUESTION-ORDERING-SPEC.md
+specs/todo/REF-ANNOTATION-SPEC.md
+specs/todo/RUNTIME-CLOCK-AND-DATEVALUE-SPEC.md
+specs/todo/SECTION-LEXICAL-SCOPING-SPEC.md
 specs/todo/SECTION-RANKING-SPEC.md
 specs/todo/SET-OPERATORS-SPEC.md
 specs/todo/STATEFUL-CONTRACT-DEPLOYMENT.md
@@ -56,6 +68,7 @@ specs/todo/TEMPORAL_EVAL_SPEC.md
 specs/todo/TEMPORAL_PRELUDE_MACROS.md
 specs/todo/TIER1-WIP-INDEX.md
 specs/todo/UPON-EXTERNAL-EVENTS-SPEC.md
+specs/todo/batch-json-output.md
 specs/todo/consider-exhaustiveness-builtin-containers.md
 specs/todo/consider-exhaustiveness-imported-enums.md
 specs/todo/consider-exhaustiveness-scope-hardening.md

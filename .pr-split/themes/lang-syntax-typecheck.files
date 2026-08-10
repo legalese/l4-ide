@@ -16,6 +16,7 @@ jl4-core/test/EdgeCrashSpec.hs
 jl4-core/test/MixfixParserSpec.hs
 jl4-core/test/PatternMatchParserSpec.hs
 jl4-core/test/UnifySpec.hs
+jl4/examples/not-ok/empty.l4
 jl4/examples/not-ok/tc/assert-directive-ambiguity.l4
 jl4/examples/not-ok/tc/deontic-action-type-mismatch.l4
 jl4/examples/not-ok/tc/deontic-party-action-agreement.l4
@@ -188,6 +189,8 @@ jl4/examples/not-ok/tc/value-actor-agreement.l4
 jl4/examples/not-ok/tc/value-actor-duplex.l4
 jl4/examples/not-ok/tc/value-actor-procure.l4
 jl4/examples/not-ok/tc/variadic-construction-limits.l4
+jl4/examples/not-ok/tests/empty.ep.golden
+jl4/examples/not-ok/tests/empty.nlg.golden
 jl4/examples/not-ok/tests/export-after-giveth.ep.golden
 jl4/examples/not-ok/tests/export-after-giveth.golden
 jl4/examples/not-ok/tests/export-after-giveth.nlg.golden

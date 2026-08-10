@@ -57,6 +57,3 @@ jl4/examples/legal/regcf/tests/regcf.ep.golden
 jl4/examples/legal/regcf/tests/regcf.golden
 jl4/examples/legal/regcf/tests/regcf.nlg.golden
 jl4/examples/legal/regcf/tests/regcf.schema.golden
-jl4/examples/lsp/hover/tests/desc-hover.hover.golden
-jl4/examples/ok/tests/export-explicit-default.schema.golden
-jl4/examples/ok/tests/export-no-explicit-default.schema.golden

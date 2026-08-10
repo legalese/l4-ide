@@ -112,6 +112,11 @@ jl4/examples/state-graphs/y.dot
 jl4/examples/state-graphs/z.dot
 jl4/examples/state-graphs/z.png
 jl4/examples/state-graphs/z.svg
+jl4/ok/inert/asyndetic-disjunction.l4
+jl4/ok/inert/basic.l4
+jl4/ok/inert/cheating-415.l4
+jl4/ok/inert/context-aware.l4
+jl4/ok/inert/nested-context.l4
 jl4/tests/VizAutoRefresh.hs
 jl4/tests/VizGuardedRows.hs
 jl4/tests/VizImplies.hs

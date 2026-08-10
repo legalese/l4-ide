@@ -16,22 +16,26 @@ rather than each being checked only against itself.
 
 **Why**
 
-Reg CF is the unit of comparison for the Lexipedia-superset programme (spec
-`specs/todo/lexipedia-superset/SPEC.md`; the programme is tracked upstream at
-smucclaw/l4-ide#136 and answers the critique in smucclaw/l4-ide#135). The claim under test is
-that a wiki page which retypes the law in prose cannot avoid drifting from it, whereas a corpus
-that binds each figure once and projects everything else cannot drift that way. That claim needed
-a real body of law encoded at real size before it was worth anything. Formalising the Part found
-nine divergences on the mirrored page — the first of which is a substantive misstatement of law,
-not a stale number (§3 of the README) — and gave the DMN, BPMN, ladder, wizard and orchestrator
-work a subject with genuine legal shape to be measured against.
+Reg CF is the unit of comparison for the Lexipedia-superset programme, whose spec is
+`specs/todo/lexipedia-superset/SPEC.md` (landed on `unstable` in PR #136; the `logic-not-flowcharts`
+critique it answers landed in PR #135). **No upstream smucclaw/l4-ide issue is named for the
+corpus itself** — the source PRs cite the in-repo spec, and the upstream issue numbers that do
+appear in this window (#932, #933, #936, #937) belong to the printer and exporter fixes that ride
+in the sibling themes, not here. The claim under test is that a wiki page which retypes the law in
+prose cannot avoid drifting from it, whereas a corpus that binds each figure once and projects
+everything else cannot drift that way. That claim needed a real body of law encoded at real size
+before it was worth anything. Formalising the Part found nine divergences on the mirrored page —
+the first of which is a substantive misstatement of law, not a stale number (§3 of the README) —
+and gave the DMN, BPMN, ladder, wizard and orchestrator work a subject with genuine legal shape to
+be measured against.
 
 ---
 
 ## What's in it
 
-62 files under `jl4/examples/legal/regcf/` (plus three goldens elsewhere — see Independence),
-22,687 insertions.
+62 files, 22,687 insertions and 8 deletions against `main`: 59 under
+`jl4/examples/legal/regcf/`, plus three goldens elsewhere that belong to sibling themes — see
+Independence.
 
 ### The mirror corpus
 
@@ -55,11 +59,12 @@ carve-out, which did not exist before 2021. Rule dates below commencement land o
 
 ### The wizard façade
 
-`regcf-wizard.l4`, **939 lines, 8 `@export`ed functions, 29 `#ASSERT` lines** — the deployable
-surface (`can-this-company-raise`, `investment-limit-check`, `raise-check`,
-`reporting-exit-check`, `resale-check`, plus the rule-date control). It exists as a separate file
+`regcf-wizard.l4`, **939 lines, 6 `@export`ed functions, 29 `#ASSERT` lines** — the deployable
+surface: `raise check` (the default export), `investment limit check`, `resale check`,
+`reporting exit check`, `can this company raise`, and the law-time control `investment limit
+under the rules effective on`. It exists as a separate file
 because the corpus itself cannot be deployed: its field names are the CFR's own sentences, and
-#162 measured 23 of the corpus's 41 field names over the service's 60-character sanitisation cap
+PR #162 measured 23 of the corpus's 41 field names over the service's 60-character sanitisation cap
 (longest 288), with `227.503(a)` and `227.201` both truncating to `section-227`.
 `tests/regcf.schema.golden` therefore reads `No @export annotations found in file`, as intended —
 the corpus stays authoritative and the façade carries the deployment surface.

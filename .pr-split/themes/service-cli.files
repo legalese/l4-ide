@@ -39,3 +39,5 @@ jl4/app/L4/Cli/Run.hs
 jl4/app/L4/Cli/Trace.hs
 jl4/app/L4/Cli/Verify.hs
 jl4/app/Main.hs
+jl4/examples/ok/tests/export-explicit-default.schema.golden
+jl4/examples/ok/tests/export-no-explicit-default.schema.golden

@@ -24,3 +24,4 @@ jl4-actus-analyzer/test/FeatureExtractorSpec.hs
 jl4-actus-analyzer/test/HybridSpec.hs
 jl4-actus-analyzer/test/MatchingSpec.hs
 jl4-actus-analyzer/test/ObligationGraphSpec.hs
+jl4-actus-analyzer/test/Spec.hs

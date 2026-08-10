@@ -8,3 +8,4 @@ jl4-lsp/src/LSP/L4/SemanticTokens.hs
 jl4-lsp/test/HoverDisplaySpec.hs
 jl4-lsp/test/LibraryResolutionSpec.hs
 jl4-lsp/test/Spec.hs
+jl4/examples/lsp/hover/tests/desc-hover.hover.golden
