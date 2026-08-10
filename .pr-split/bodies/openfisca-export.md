@@ -59,13 +59,33 @@ One limit a reviewer should read rather than discover: OpenFisca stores `value_t
 
 **Independence**
 
-This PR is close to standalone but **not fully self-contained as manifested** — it needs three pieces of wiring that live outside its 35 files:
+The corpus and docs are standalone, but the Haskell **does not build against `main` as it stands on `unstable`**, and it needs wiring that no theme owns. Three separate things, in descending order of severity.
 
-- `jl4-core/jl4-core.cabal` must list `L4.OpenFisca.IR`, `L4.OpenFisca.Lower`, `L4.OpenFisca.Emit`, and `jl4/jl4.cabal` must list `L4.Cli.OpenFisca`. **Neither cabal file appears in any of the 25 theme manifests**, so these two edits have no owner and must be carried here (or the modules do not build). Both are pure additive `other-modules`/`exposed-modules` entries.
-- `jl4/app/Main.hs` carries the `openfisca` subcommand registration (the `CmdOpenFisca` constructor, the `command "openfisca"` block and its dispatch arm). That file is assigned to the **service-cli** theme. Without it the library and CLI module compile but the command is unreachable.
-- `jl4/tests-cli/Main.hs` carries the golden test cases (29 OpenFisca-related lines in the combined diff). That file is assigned to the **tests-cli** theme. The `expected/*.py` goldens in this PR are the fixtures those cases read, so the goldens land here and the assertions land there.
+*1. A hard compile dependency on the TYPICALLY AST change (theme: `lang-syntax-typecheck`).*
 
-Beyond that it is genuinely independent: the backend reads a typechecked `Module Resolved` through the existing `getExportedFunctions` entry point and touches no shared evaluator, printer or type-checker code. It does not depend on **dmn-export** or **bpmn-export** despite being a sibling exporter — the three share no code. It does not touch the parallel `jl4/experiments/openfisca/` corpus (the **experiments** theme). One caveat inherited from the language side: the examples use current L4 surface syntax, so if **lang-syntax-typecheck** changes how `DECLARE … IS ONE OF`, `CONSIDER`, `BRANCH` or `@desc` parse, these `.l4` files and their goldens move with it.
+`Lower.hs` on `unstable` pattern-matches AST constructors at an arity `main` does not have:
+
+| constructor | fields on `main` | fields on `unstable` | `Lower.hs` patterns |
+| --- | --- | --- | --- |
+| `MkTypedName` | 4 | 5 (adds TYPICALLY default) | 5 — line 424 |
+| `MkOptionallyTypedName` | 3 | 4 (adds TYPICALLY default) | 4 — lines 696, 699 |
+
+These are arity errors, not warnings: cherry-picked onto `main` unchanged, the module does not compile. Commit `c55761d8` is exactly the adaptation ("OpenFisca.Lower … 3 pattern sites gain a wildcard for the ignored default") and it was written *after* the merge, against a field this PR does not introduce. So either **lang-syntax-typecheck** lands first, or those three patterns are back-adapted to `main`'s arity by dropping one wildcard each — a mechanical change, but it must be made deliberately rather than discovered in CI.
+
+By contrast, commit `91a43d79` (removal of the dead `Exponent` arm from `constructorName`) is **not** a dependency in either direction: that function ends in a `_ -> "expression"` catch-all, so it is exhaustive whether or not `main`'s `Expr` still carries the constructor.
+
+*2. Build wiring with no owner.*
+
+`jl4-core/jl4-core.cabal` must list `L4.OpenFisca.IR`, `L4.OpenFisca.Lower`, `L4.OpenFisca.Emit`, and `jl4/jl4.cabal` must list `L4.Cli.OpenFisca`. **Neither cabal file appears in any of the 25 theme manifests**, so these edits have no owner and must be carried here or the modules are never compiled. Both are purely additive module-list entries.
+
+*3. Two files that carry this feature's wiring but belong to sibling themes.*
+
+- `jl4/app/Main.hs` holds the subcommand registration (the `CmdOpenFisca` constructor, the `command "openfisca"` block, and its dispatch arm) and is assigned to **service-cli**. Without it the library and CLI module compile but `l4 openfisca` is unreachable.
+- `jl4/tests-cli/Main.hs` holds the golden test cases (29 OpenFisca-related lines in the combined diff) and is assigned to **tests-cli**. The `expected/*.py` goldens ship here while the assertions that read them ship there, so neither half is testable alone.
+
+That the theme carries 35 files against PR #40's 39 changed files is consistent with exactly these four being elsewhere.
+
+Beyond those, it is genuinely independent: the backend reads a typechecked `Module Resolved` through the existing `getExportedFunctions` entry point and touches no shared evaluator, printer or type-checker code. It does not depend on **dmn-export** or **bpmn-export** despite being a sibling exporter — the three share no code. It does not touch the parallel `jl4/experiments/openfisca/` corpus (the **experiments** theme). The `.l4` examples also use current L4 surface syntax, so further **lang-syntax-typecheck** changes to how `DECLARE … IS ONE OF`, `CONSIDER`, `BRANCH` or `@desc` parse would move these files and their goldens with them.
 
 The three files under `site/vendor/` are vendored third-party assets, checked in so the demo site is self-contained and needs no network: Highlight.js v11.11.1 (BSD-3-Clause, licence header intact in the minified file), its GitHub Dark theme CSS, and an L4 grammar compiled for the same Highlight.js version. Nothing in the Haskell build depends on them; they are read only by `build_site.py`.
 
@@ -73,13 +93,13 @@ One design boundary PR #40 calls out and a reviewer may want to push on: a decis
 
 **Risk if rejected**
 
-L4 loses its only bridge to the dominant rules-as-code engine, and with it the only external oracle in the tree — the cross-engine checks against openfisca-core and policyengine-core are the sole place where an L4 answer is confirmed by software Legalese did not write. The backend is additive and unreferenced by the rest of the compiler, so dropping it breaks nothing else, provided the `jl4-core.cabal` / `jl4.cabal` module entries and the `Main.hs` subcommand block are dropped with it — leaving those in place without the modules is a build failure.
+L4 loses its only bridge to the dominant rules-as-code engine, and with it the only external oracle in the tree — the cross-engine checks against openfisca-core and policyengine-core are the sole place where an L4 answer is confirmed by software Legalese did not write. The backend is additive and unreferenced by the rest of the compiler, so dropping it breaks nothing else *provided its wiring is dropped too*: the `jl4-core.cabal` / `jl4.cabal` module entries and the `Main.hs` `openfisca` subcommand block must go with it, and the OpenFisca cases must come out of `tests-cli/Main.hs`. Any of those left behind without these modules is a build failure in a sibling PR.
 
 **Provenance**
 
 - legalese/l4-ide#40 — `feat(openfisca): L4 → OpenFisca bridge` (branch `mengwong/openfisca-backend`, merged into `unstable` 2026-07-06; 10 commits, 39 changed files, +4292)
 
-The nine commits behind the theme's 35 files:
+The nine feature commits behind the theme's 35 files, all from that branch:
 
 | commit | subject |
 | --- | --- |
