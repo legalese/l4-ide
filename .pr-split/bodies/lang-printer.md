@@ -228,11 +228,22 @@ parser rules; `RefAnnotationSpec` needs `L4/Parser/ResolveAnnotation.hs` and the
 `DirectiveAmbiguitySpec` needs the `prune` repair in `L4/TypeCheck.hs`. **All of those files are
 owned by lang-syntax-typecheck.** Only `PrintRoundtripSpec` tests code that is in this PR.
 
-**Three of the goldens likewise encode other themes' behaviour.** The four `.ep.golden` deltas record
-the restored postfix-mixfix operand from `fix(parser): add missing anno hole for funcName in
-mixfixPostfixOp` — **lang-syntax-typecheck**. `mixfix-garden-path.schema.golden` records the repaired
+**The goldens likewise encode other themes' behaviour.** The four `.ep.golden` deltas record the
+restored postfix-mixfix operand from `fix(parser): add missing anno hole for funcName in
+mixfixPostfixOp`, a one-line change to `L4/Parser.hs` — **lang-syntax-typecheck**. That commit
+produced six goldens, and the file-level split sends four here and two (`mixfix-basic.ep.golden`,
+`mixfix-multiline.ep.golden`) to **lang-sets**, so all three PRs have to land for the `.ep.golden`
+suite to agree with the parser. `mixfix-garden-path.schema.golden` records the repaired
 `L4/JsonSchema.hs` output — **service-cli**. `ref-annotation.l4` and its four goldens are the corpus
 fixture for the `@ref` feature — **lang-syntax-typecheck** again.
+
+**And the strongest form of that dependency: the `exactprint identity` invariant this PR adds is red
+without lang-syntax-typecheck.** The invariant compares exactprint against the verbatim source for
+every corpus file, and the mangling it was written to catch — the swapped `Event` `atFirst` branches
+(#919), the dropped postfix-mixfix operand, the `TIMEZONE`/`UNLESS`/unicode/multi-clause-`DECIDE`
+families (#130) — is repaired in `L4/Syntax.hs`, `L4/Parser.hs` and `L4/Lexer.hs`, none of which are
+in this PR. #130's "0/243 non-identity" was measured on a tree that already had those fixes. So this
+is not a soft ordering preference: land lang-syntax-typecheck first or this PR's own new test fails.
 
 **What is genuinely this PR's own:** `L4/Print.hs`, `L4/Print/Columnar.hs`, `L4/Parser/Anno.hs`,
 `PrintRoundtripSpec.hs`, and the two invariants in `jl4/tests/Main.hs`. In the other direction
