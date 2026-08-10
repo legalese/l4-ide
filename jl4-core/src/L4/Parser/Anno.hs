@@ -12,6 +12,7 @@ module L4.Parser.Anno (
   annoHole,
   annoLexeme,
   annoLexeme_,
+  optionalHole,
 
   -- * Utilities for source annotations
   inlineAnnoHole,
@@ -136,6 +137,22 @@ epaToHiddenCluster p = CsnCluster
 
 annoHole :: (Functor f, HasSrcRange a) => f a -> AnnoParser_ f t a
 annoHole p = wrapAnnoParser $ fmap withHoleAnno p
+
+-- | Make a component optional while keeping exact-print hole alignment.
+--
+-- During exact-printing, 'flattenConcreteNodes' zips the 'AnnoHole's of a
+-- node against its constructor fields /positionally/, and a 'Nothing' field
+-- still consumes one hole slot. An optional component that contributes no
+-- hole when absent would therefore shift all later holes by one, silently
+-- dropping the last field's tokens. This combinator contributes exactly one
+-- (empty) 'AnnoHole' when the component is absent.
+--
+-- The given component must contribute exactly one 'AnnoHole' itself
+-- (e.g. @annoLexeme keyword *> annoHole subnode@).
+optionalHole :: Alternative f => AnnoParser_ f t a -> AnnoParser_ f t (Maybe a)
+optionalHole p = wrapAnnoParser $
+  fmap Just <$> unwrapAnnoParser p
+    <|> pure (WithAnno [mkHoleWithSrcRangeHint Nothing] Nothing)
 
 annoEpa :: (HasField "range" t SrcRange, Functor f) => f (Epa_ t a) -> AnnoParser_ f t a
 annoEpa p = wrapAnnoParser $ fmap withEpaAnno p
