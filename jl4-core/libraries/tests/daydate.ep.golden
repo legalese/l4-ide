@@ -80,6 +80,42 @@ GIVEN dt IS A DATETIME
 GIVETH A DATE
 `Date` AKA `Days to date` MEANS DATETIME_DATE dt
 
+-- YMD year month day  -> the date, in ISO 8601 argument order, with the
+-- arguments BOUNDS-CHECKED. This is the recommended constructor for new
+-- code, on two grounds:
+--
+--   * big-endian year-month-day reads the way ISO 8601 writes it, so a
+--     day/month transposition is harder to WRITE;
+--   * unlike `Date d m y`, YMD REFUSES out-of-range components instead of
+--     rolling them: `YMD 2026 28 7` (a transposition) and `YMD 2023 2 29`
+--     (no such leap day) stop evaluation loudly, where `Date` rolls forward
+--     silently.
+--
+-- The check is a component round-trip: build the candidate with `Date`,
+-- then require its year, month and day to equal the arguments. Any rolled
+-- component fails the comparison, so leap years are handled by the same
+-- arithmetic that builds the date and no calendar logic is duplicated.
+--
+-- The pair is deliberate: YMD is the STRICT constructor for literals;
+-- `Date d m y` is unchanged as the LENIENT, rolling constructor, which date
+-- arithmetic relies on (`Date 1 (month PLUS 6) year` is idiomatic). The
+-- refusal is a deliberate ASSUME bottom: evaluation that reaches it stops
+-- with "... is an assumed term", naming the binding below.
+ASSUME `YMD refused an out-of-range month or day` IS A DATE
+
+GIVEN year  IS A NUMBER
+      month IS A NUMBER
+      day   IS A NUMBER
+GIVETH A DATE
+`YMD` AKA `Year month day` MEANS
+    IF      DATE_YEAR  candidate EQUALS year
+        AND DATE_MONTH candidate EQUALS month
+        AND DATE_DAY   candidate EQUALS day
+    THEN candidate
+    ELSE `YMD refused an out-of-range month or day`
+    WHERE
+        candidate MEANS Date day month year
+
 
 
 §§ `Datestamp Constructors`
@@ -337,6 +373,53 @@ GIVEN date  IS A DATE
 GIVETH A NUMBER
 `Years to days` MEANS
     `Years to days` (DATE_YEAR date)
+
+
+
+§§ `Calendar Arithmetic`
+
+
+-- Add a whole number of months or years to a date, CLAMPING the day to the last
+-- day of the target month when the original day does not exist there. 31 January
+-- plus one month is 29 February in a leap year and 28 February otherwise; the
+-- first anniversary of 29 February 2024 is 28 February 2025.
+--
+-- The clamp is not one convention picked from several. It is what Excel's EDATE
+-- does, what `actus-schedule` already did for schedule generation, and -- MEASURED
+-- on 2026-08-05 against Drools/KIE 8.44.0.Final and Camunda 8.7.6 (zeebe-dmn) --
+-- what FEEL's `date + duration("P1Y")` does on both DMN engines, over months and
+-- years alike, in all six probed cases. Agreeing with all three is the point: it
+-- is what lets an L4 module that computes an anniversary export to DMN and get
+-- the same answer back from an engine we do not control.
+--
+-- Contrast `Date d m y`, which is LENIENT and ROLLS FORWARD: `Date 29 2 2025` is
+-- 1 March 2025, not 28 February. Rolling is right for component arithmetic of the
+-- `Date 1 (month PLUS 6) year` kind and wrong for an anniversary, and the two
+-- differ by exactly one day on precisely the dates anybody litigates. Note that
+-- FEEL has no rolling form at all: `date(2025, 2, 29)` evaluates to null on both
+-- engines, so an anniversary written by reconstructing components cannot be
+-- exported at all, whereas one written here can.
+
+GIVEN date   IS A DATE
+      months IS A NUMBER
+GIVETH A DATE
+`add months` MEANS
+    DATE_FROM_DMY clampedDay newMonth newYear
+    WHERE
+        totalMonths MEANS DATE_MONTH date PLUS FLOOR months
+        newYear     MEANS DATE_YEAR date
+                              PLUS FLOOR ((totalMonths MINUS 1) DIVIDED BY `Months in a year`)
+        newMonth    MEANS ((totalMonths MINUS 1) MODULO `Months in a year`) PLUS 1
+        lastDay     MEANS `Days in month` newMonth newYear
+        clampedDay  MEANS IF   DATE_DAY date GREATER THAN lastDay
+                          THEN lastDay
+                          ELSE DATE_DAY date
+
+GIVEN date  IS A DATE
+      years IS A NUMBER
+GIVETH A DATE
+`add years` MEANS
+    `add months` date (FLOOR years TIMES `Months in a year`)
 
 
 

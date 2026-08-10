@@ -29,6 +29,7 @@ import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
 import Optics
+import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
@@ -46,6 +47,16 @@ main :: IO ()
 main = do
   dataDir <- Paths_jl4.getDataDir
   dataDirCore <- Paths_jl4_core.getDataDir
+  -- Make the golden suite self-sufficient under a bare `cabal test`: point
+  -- library resolution at the bundled core libraries unless the caller has
+  -- already chosen a store. Without this, examples that IMPORT a library (e.g.
+  -- actus-library-test) fail locally because embedded transitive resolution is
+  -- incomplete. CI already exports JL4_LIBRARY_PATH, so this only restores
+  -- local/CI parity; an explicit setting is respected.
+  mLibEnv <- lookupEnv "JL4_LIBRARY_PATH"
+  case mLibEnv of
+    Just _  -> pure ()
+    Nothing -> setEnv "JL4_LIBRARY_PATH" (dataDirCore </> "libraries")
   envFixed <- JL4Lazy.readFixedNowEnv
   let fallbackNow =
         fromMaybe (error "Internal: invalid fallback timestamp for JL4 tests")
@@ -85,16 +96,33 @@ main = do
 l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> IO (Golden String)
 l4Golden evalConfig isOk dir inputFile = do
   (output, _) <- capture (checkFile evalConfig isOk inputFile)
+  scrubLibPath <- mkLibraryPathScrubber
+  let normalize = scrubLibPath . normalizeWhitespaceString . stripAnsiCodesString
   pure
     Golden
-      { output = normalizeWhitespaceString $ stripAnsiCodesString output
+      { output = normalize output
       , encodePretty = show
       , writeToFile = writeFile
-      , readFromFile = fmap (normalizeWhitespaceString . stripAnsiCodesString) . readFile
+      , readFromFile = fmap normalize . readFile
       , goldenFile = dir </> (takeFileName inputFile -<.> "golden")
       , actualFile = Just (dir </> (takeFileName inputFile -<.> "actual"))
       , failFirstTime = True
       }
+
+-- | Build a scrubber that replaces the (absolute, machine-specific)
+-- @JL4_LIBRARY_PATH@ prefix with a stable @$JL4_LIBRARY_PATH@ token, so goldens
+-- that capture import-resolution logs like @Found on filesystem: <abspath>@ are
+-- portable across machines and CI. In jl4-test @JL4_LIBRARY_PATH@ is always set
+-- (see 'main'), so a library import is always resolved from the filesystem at
+-- that path; the only environment-dependent part of the log is the prefix.
+-- No-op when the variable is unset or empty.
+mkLibraryPathScrubber :: IO (String -> String)
+mkLibraryPathScrubber = do
+  mp <- lookupEnv "JL4_LIBRARY_PATH"
+  pure $ case mp of
+    Just p | not (null p) ->
+      Text.unpack . Text.replace (Text.pack p) "$JL4_LIBRARY_PATH" . Text.pack
+    _ -> id
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do
