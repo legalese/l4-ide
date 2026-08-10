@@ -164,11 +164,11 @@ or CI configuration reads that directory:
   next PR that touches a `.ts` file. That happened three times on `unstable`, and the three
   repair commits are folded in, so the tree as submitted is prettier-`3.4.2`-clean.
 - The one cross-theme thread is cosmetic, not functional. `the-letter-and-the-spirit/README.md`
-  notes that a canonical copy of `cheating-415-poh-yuan-nie.l4` also lives in the corpus at
-  `jl4/examples/ok/inert/`, which lands with the **ladder-viz** theme. The bundled copy is what
-  `reproduce.sh` actually resolves (`./cheating-415-poh-yuan-nie.l4`, its first lookup path), so
-  the exhibit reproduces whether or not ladder-viz lands; if ladder-viz is dropped, only the
-  README's "canonical copy also in…" pointer goes stale.
+  says a canonical copy of `cheating-415-poh-yuan-nie.l4` also lives in the corpus (it writes the
+  path as `jl4/ok/inert/`; the file is actually at `jl4/examples/ok/inert/`), and that corpus copy
+  lands with the **ladder-viz** theme. The bundled copy is what `reproduce.sh` actually resolves —
+  `./cheating-415-poh-yuan-nie.l4`, its first lookup path — so the exhibit reproduces whether or
+  not ladder-viz lands. If ladder-viz is dropped, only that prose pointer goes stale.
 - `paper/README.md` links to `specs/todo/{yc-safe,corporate-resolutions,godel-loophole}/SPEC-NOTES.md`
   and to `doc/concepts/language-design/logic-not-flowcharts.md`. Those live in the **specs** and
   **docs** themes. If either is dropped, this PR has dead relative links — it does not fail to
