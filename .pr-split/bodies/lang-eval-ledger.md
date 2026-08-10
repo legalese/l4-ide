@@ -34,6 +34,9 @@ Three gaps, each of which produced a well-typed, diagnostic-free _wrong answer_.
 
 ## What's in it
 
+180 files: 7 evaluator modules, 12 unit-test spec modules, 30 new `.l4` fixtures with their 120
+goldens, and 11 existing `.ep.golden` files re-blessed.
+
 **Evaluator core — 7 Haskell modules** (`jl4-core/src/L4/`)
 
 - `TemporalContext.hs` — the eight-axis context, `EvalClause`/`applyEvalClauses`, and the T6
