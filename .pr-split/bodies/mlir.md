@@ -102,7 +102,7 @@ and `test/Main.hs` at 572 → 1593), 5 `.mjs` (2 of them new), 7 markdown, 1 cab
 22 test fixtures (`.l4` probes and their `.cases.json` case tables), 10 files under
 `coverage-report/`, and one `.cases.json` for an existing `jl4/examples` file.
 
-**Documentation.** `PARITY-HUNT-LOG.md` (new, ~560 lines) is the reviewer's guide: a
+**Documentation.** `PARITY-HUNT-LOG.md` (new, 558 lines) is the reviewer's guide: a
 13-entry status ledger in three states — ✅ fixed, 🟡 fail-loud (silent-wrong gone, the
 backend refuses and routes to fallback, capability gap still open), 🔴 open — with the
 "what was tried and rejected" for each. `coverage-report/PARITY-COVERAGE.md` (new) carries
