@@ -91,15 +91,16 @@ so an unsupported helper marks its callers unsupported too.
   under bare `node`. `canonical` / `extractValue` / `ulpEqual` / `classifyOutcome` are
   faithful extractions from the harness; `gateVerdict` is the hardened single source of
   truth replacing an inline `parityFails = differs + wasm-error`.
-- `scripts/parity-gate.test.mjs` (new, the largest single test file here) and a
-  substantially rewritten `scripts/parity-harness.mjs`.
-- `runtime/jl4-runtime.mjs` and its unit test both roughly double.
+- `scripts/parity-gate.test.mjs` (new, 645 lines) covers it, and
+  `scripts/parity-harness.mjs` is reworked (472 → 577 lines).
+- `runtime/jl4-runtime.mjs` grows 4401 → 4684 lines with substantial churn inside that;
+  its unit test goes 179 → 720.
 
-**By kind.** 54 files: 8 Haskell (`Lower.hs` is the bulk of it, plus `Schema.hs`, `ABI.hs`,
-`Marshal.hs`, `Pipeline.hs`, `Runtime/Builtins.hs`, `app/Main.hs`, `test/Main.hs`), 5 `.mjs`
-(2 of them new), 7 markdown, 1 cabal file, 22 test fixtures (`.l4` probes and their
-`.cases.json` case tables), 10 files under `coverage-report/`, and one `.cases.json` for an
-existing `jl4/examples` file.
+**By kind.** 54 files: 8 Haskell (`Lower.hs` is the bulk — 2695 → 3441 lines — plus
+`Schema.hs`, `ABI.hs`, `Marshal.hs`, `Pipeline.hs`, `Runtime/Builtins.hs`, `app/Main.hs`,
+and `test/Main.hs` at 572 → 1593), 5 `.mjs` (2 of them new), 7 markdown, 1 cabal file,
+22 test fixtures (`.l4` probes and their `.cases.json` case tables), 10 files under
+`coverage-report/`, and one `.cases.json` for an existing `jl4/examples` file.
 
 **Documentation.** `PARITY-HUNT-LOG.md` (new, ~560 lines) is the reviewer's guide: a
 13-entry status ledger in three states — ✅ fixed, 🟡 fail-loud (silent-wrong gone, the
