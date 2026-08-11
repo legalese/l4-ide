@@ -502,8 +502,8 @@ sequence, assert:
 - Final storage state (balances, allowances, totalSupply) matches.
 - Reverts happen at the same call sites with the same reason strings.
 
-This is the EVM equivalent of the current 56/56 WASM parity matrix
-against `jl4-service`.
+This is the EVM equivalent of the current 20/20 WASM parity matrix
+against `jl4-service` (see `FEATURE-PARITY-PLAN.md`).
 
 ### 6.4 Gas regression tracking
 

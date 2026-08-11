@@ -1,0 +1,14 @@
+IMPORT prelude
+
+DECLARE Party IS ONE OF `alice`
+DECLARE Action IS ONE OF `pay`
+
+@export provided demo
+GIVEN `allowed` IS A BOOLEAN
+GIVETH A DEONTIC OF Party, Action
+`demo` MEANS
+    PARTY `alice`
+    MUST `pay` PROVIDED `allowed`
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH

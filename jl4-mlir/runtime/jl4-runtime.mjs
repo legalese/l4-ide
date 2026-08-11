@@ -528,14 +528,42 @@ export function runDeontic(contract, startTime, events, args, meta) {
 // "a OF b, c" result line ("PARTY buyer MUST pay …" for a sale
 // contract after the seller delivered).
 function runDeonticInternal(contract, startTime, events, args, meta) {
-  const t0 = Number(startTime);
-  const sortedEvents = (events || [])
-    .slice()
-    .sort((a, b) => Number(a.at) - Number(b.at));
+  // A null/undefined contract must never reach the walk below: the
+  // 'while (current)' loop would be skipped and the trailing
+  // 'if (!current) return FULFILLED' would silently report a satisfied
+  // obligation for a function that has no contract at all. Both the
+  // value path ('invokeDeontic') and the trace path
+  // ('invokeFunctionWithReasoning') guard this before calling in, but
+  // we re-check here so the exported 'runDeontic' is safe in isolation.
+  if (contract == null) {
+    throw new DeonticInputError(
+      "deontic function has no compiled contract metadata",
+    );
+  }
+  // Deontic time arithmetic runs in EXACT rationals, never raw f64. jl4-service
+  // parses each request number as Aeson Scientific (exact base-10) and does the
+  // deadline arithmetic in Rational, emitting `fromRational` as the wire Double.
+  // The SAME single op in JS f64 (e.g. -0.95 + 1, or 15.1 - 2.2) rounds to a
+  // DIFFERENT double than fromRational(exact), so the shortest-round-trip wire
+  // bytes diverged for fractional inputs — a silent-wrong at supported:true
+  // (deadline 12.899999999999999 vs the reference's 12.9). We recover each
+  // input's exact decimal via `String(x)` (JS shortest-round-trip == the user's
+  // source decimal for the request values in scope) and parse it losslessly,
+  // mirroring the args path's `ratFromDecimalString(String(value))`. Integer
+  // inputs are unaffected (String(5)="5" -> 5/1 -> bare "5" on the wire).
+  const toRat = (x) => ratFromDecimalString(String(x));
+  const t0 = toRat(startTime);
+  // jl4-service replays the event LIST in SUBMISSION ORDER — jl4-core's
+  // ScrutinizeEvents walks the Cons chain exactly as given (CodeGen.hs builds
+  // it with no sort), and each event is timing-checked against the current
+  // obligation's deadline BEFORE any party/action match. An earlier version
+  // of this runtime sorted events by `at`; that reordered the stream and
+  // inverted FULFILLED-vs-BREACH verdicts on out-of-order inputs (a silent
+  // wrong answer at supported:true). We therefore MUST NOT sort.
+  const evts = (events || []).slice();
   const ctx = { args: args || {}, meta: meta || null };
 
   let current = contract;
-  let now = t0;
   let obligationStart = t0; // when the *current* obligation became active
   let cursor = 0;
 
@@ -547,83 +575,125 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     }
     if (current.kind !== "OBLIGATION") break;
 
-    const deadlineLit =
-      current.deadline == null ? null : Number(current.deadline);
-    const absoluteDeadline =
-      deadlineLit == null ? null : obligationStart + deadlineLit;
-
-    while (
-      cursor < sortedEvents.length &&
-      Number(sortedEvents[cursor].at) < now
-    ) {
-      cursor++;
-    }
-    let matchingIdx = -1;
-    for (let i = cursor; i < sortedEvents.length; i++) {
-      const ev = sortedEvents[i];
-      if (deonticEventMatchesObligation(ev, current, ctx)) {
-        matchingIdx = i;
-        break;
-      }
+    // Refuse prohibition (MUSTNOT / SHANT) loudly rather than compute
+    // an inverted answer. The matched-event branch below treats any
+    // performed action as fulfillment ('current = current.hence …'),
+    // but jl4-core flips a MUSTNOT to LEST/BREACH when the prohibited
+    // action IS performed before the deadline
+    // (EvaluateLazy/Machine.hs:1037-1051). Schema.hs's 'modalToText'
+    // emits exactly "MUST" | "MAY" | "MUSTNOT", so this only fires for
+    // genuine prohibition nodes — the MUST/MAY sale/seatbelt/breach
+    // fixtures never reach it. We deliberately do NOT attempt correct
+    // prohibition semantics here.
+    if (current.modal === "MUSTNOT") {
+      throw new DeonticInputError(
+        "unsupported deontic modal MUSTNOT (prohibition): the JS " +
+          "runtime would compute an inverted result; refusing rather " +
+          "than returning a silently wrong answer",
+      );
     }
 
     const modal = current.modal || "MUST";
-    if (matchingIdx === -1) {
-      // No matching event. Find the latest event time the simulator
-      // has 'observed' — anything from 'cursor' onward, capped at
-      // the obligation's deadline (events past the deadline lapse
-      // it before they're observed for this obligation).
-      let lastObserved = now;
-      for (let i = cursor; i < sortedEvents.length; i++) {
-        const et = Number(sortedEvents[i].at);
-        if (absoluteDeadline != null && et > absoluteDeadline) break;
-        if (et > lastObserved) lastObserved = et;
-      }
+    const deadlineLit =
+      current.deadline == null ? null : toRat(current.deadline);
+    const absoluteDeadline =
+      deadlineLit == null ? null : ratAdd(obligationStart, deadlineLit);
 
-      // If any event sits strictly past the deadline → obligation
-      // lapsed, take LEST.
-      if (
-        absoluteDeadline != null &&
-        sortedEvents.some((e) => Number(e.at) > absoluteDeadline)
-      ) {
-        current = current.lest || { kind: "BREACH" };
-        continue;
+    // Walk the remaining events IN ORDER, mirroring jl4-core's
+    // ScrutinizeEvent loop (EvaluateLazy/Machine.hs:942-1057):
+    //   * timing check FIRST — an event whose stamp is strictly past the
+    //     obligation's absolute deadline discharges it (MAY → HENCE) or
+    //     breaches it (MUST/DO → LEST, else DeadlineMissed) NAMING that
+    //     event, even if a *later* event would have matched;
+    //   * otherwise, a party+action match fulfils the obligation and
+    //     continues with HENCE against the remaining events;
+    //   * a non-matching within-deadline event is "observed" (it advances
+    //     time) and we keep scanning.
+    // The absolute deadline is invariant as time advances (jl4-core keeps
+    // deadline = time + due while shrinking due), so a fixed
+    // 'obligationStart + deadlineLit' is faithful.
+    let advancedNode = false;
+    let observedAny = false;
+    let lastObserved = obligationStart;
+    for (let i = cursor; i < evts.length; i++) {
+      const ev = evts[i];
+      const stamp = toRat(ev.at);
+      if (absoluteDeadline != null && ratCmp(stamp, absoluteDeadline) > 0) {
+        // Deadline lapsed at this event.
+        if (modal === "MAY") {
+          // Permission not exercised in time — that's fine; continue with
+          // HENCE (defaults to FULFILLED).
+          current = current.hence || { kind: "FULFILLED" };
+        } else if (current.lest) {
+          // Explicit LEST clause takes over.
+          current = current.lest;
+        } else {
+          // MUST/DO with no LEST → DeadlineMissed breach that names the
+          // lapsing event's party/action/time (jl4-core Machine.hs:995).
+          return {
+            value: deonticBreachToWire(
+              deonticDeadlineMissedNode(
+                current,
+                ev,
+                stamp,
+                absoluteDeadline,
+                ctx,
+              ),
+            ),
+            residual: null,
+            ctx,
+          };
+        }
+        obligationStart = stamp;
+        cursor = i + 1;
+        advancedNode = true;
+        break;
       }
-
-      if (modal === "MAY") {
-        // MAY is a permission — no event = terminal FULFILLED.
-        current = { kind: "FULFILLED" };
-        continue;
+      // Within deadline: did this event satisfy the obligation?
+      if (deonticEventMatchesObligation(ev, current, ctx)) {
+        // MUST/MAY/DO: action performed → fulfilled, continue with HENCE.
+        // (MUSTNOT is refused above, so a match here is always fulfilment.)
+        current = current.hence || { kind: "FULFILLED" };
+        obligationStart = stamp;
+        cursor = i + 1;
+        advancedNode = true;
+        break;
       }
-
-      // Residual OBLIGATION. If 'now' has advanced past the
-      // obligation's start (real events tested against it), surface
-      // the *remaining* time as a JSON number; otherwise hand back
-      // the original WITHIN literal as a string (matches
-      // jl4-service's lazy display of un-instantiated obligations).
-      const advanced = lastObserved > obligationStart;
-      const remainingNum =
-        advanced && absoluteDeadline != null
-          ? absoluteDeadline - lastObserved
-          : null;
-      return {
-        value: deonticObligationToWire(current, ctx, remainingNum),
-        residual: current,
-        residualDeadline: remainingNum,
-        ctx,
-      };
+      // Non-matching within-deadline event: observed, advances time.
+      // jl4-core advances `time` to THIS event's stamp UNCONDITIONALLY, in
+      // submission order (Machine.hs Contract5 pushes Contract6 with
+      // time = ev'time; Contract8/Contract10's non-match path carries that
+      // stamp forward via `newTime <- allocateValue time`). The residual
+      // ValObligation's `due` therefore shrinks to
+      //   absoluteDeadline − (stamp of the LAST observed event in submission
+      //   order),
+      // NOT − MAX(stamps). Tracking a running maximum diverged from the
+      // reference on descending / out-of-order observed events (a byte-
+      // differing supported:true response). So this is last-wins, not max.
+      observedAny = true;
+      lastObserved = stamp;
     }
 
-    const ev = sortedEvents[matchingIdx];
-    const evTime = Number(ev.at);
-    if (absoluteDeadline != null && evTime > absoluteDeadline) {
-      current = current.lest || { kind: "BREACH" };
-      continue;
-    }
-    now = evTime;
-    cursor = matchingIdx + 1;
-    obligationStart = now; // the next obligation in the cascade starts here
-    current = current.hence || { kind: "FULFILLED" };
+    if (advancedNode) continue;
+
+    // Events exhausted with no match and no lapse → residual obligation.
+    // jl4-core returns the still-open ValObligation here for EVERY modal
+    // (Machine.hs:939): a MAY that was simply never exercised surfaces as an
+    // open permission, NOT FULFILLED.
+    // Exact residual: absoluteDeadline − (stamp of the LAST observed event).
+    // Kept as a rational so the value wire renders `fromRational` bytes.
+    const remainingNum =
+      observedAny && absoluteDeadline != null
+        ? ratSub(absoluteDeadline, lastObserved)
+        : null;
+    return {
+      value: deonticObligationToWire(current, ctx, remainingNum, observedAny),
+      residual: current,
+      // The trace path (non-gated) formats residualDeadline via String();
+      // hand it the correctly-rounded Double so String() stays a number.
+      residualDeadline: remainingNum == null ? null : ratToDouble(remainingNum),
+      ctx,
+    };
   }
 
   if (!current) return { value: "FULFILLED", residual: null, ctx };
@@ -752,22 +822,52 @@ function deonticStripBackticks(s) {
   return s;
 }
 
-function deonticObligationToWire(o, ctx, remainingNum) {
+// The L4 SOURCE spelling of a name: backticked unless it is a bare identifier.
+// This is what `Print.prettyLayout` emits, and it is what the reference falls
+// back to when it prints an UNEVALUATED party expression. The evaluated value
+// of the same party is the plain name (`Backend.Jl4.constructorText`) — see
+// 'deonticObligationToWire' for which case gets which.
+function deonticSourceSpelling(s) {
+  if (typeof s !== "string") return s;
+  return /^[A-Za-z][A-Za-z0-9_]*$/.test(s) ? s : "`" + s + "`";
+}
+
+function deonticObligationToWire(o, ctx, remainingNum, observed) {
   const resolvedParty = resolveDeonticExpr(o.party, ctx);
   const resolvedAction = resolveDeonticExpr(o.action, ctx);
-  // Record-typed parties wrap as @{<TypeName>: <fields>}@ — pull
-  // the type name from the request's parameter schema (the wasm
-  // bundle's @x-l4-type@ stamp). Literal-string parties stay as-is.
-  const taggedParty =
-    o.party && o.party.param != null
+  // Party rendering mirrors jl4-service's lazy ValObligation display.
+  // A residual obligation whose party is a GIVEN parameter (@PARTY driver@)
+  // is only *resolved* once an event has been scrutinized against it: if the
+  // relevant event stream was empty ('observed' false), jl4-service prints the
+  // un-evaluated parameter NAME ("driver"), not the record value
+  // (Jl4.hs:1085 serializeEitherValue Left → prettyLayout of the party expr).
+  // Once an event has been compared, the party is a resolved value that
+  // records tag as @{<TypeName>: …}@ from the bundle's @x-l4-type@ stamp.
+  //
+  // A LITERAL party (@PARTY `the seller`@) splits the same way, and an earlier
+  // version of this comment claimed it "prints identically either way". That
+  // stopped being true at a9caf2f6: unobserved, the reference still prints the
+  // unevaluated expression via `prettyLayout` and the backticks survive;
+  // observed, it prints the constructor VALUE via `constructorText` and they do
+  // not. The schema carries the plain name, so the source spelling is
+  // reconstructed here rather than stored twice.
+  let party;
+  if (o.party && typeof o.party === "object" && o.party.param != null) {
+    party = observed
       ? deonticTagRecord(resolvedParty, ctx, o.party.param)
-      : resolvedParty;
+      : o.party.param;
+  } else {
+    party = observed ? resolvedParty : deonticSourceSpelling(resolvedParty);
+  }
   // 'deadline' on the wire: number = "remaining time after observed
   // events", string = "original WITHIN literal, untouched". The
-  // walker picks which one to pass.
+  // walker picks which one to pass. When present, 'remainingNum' is an
+  // EXACT rational; ratToAesonValue emits it as the reference does
+  // (`fromRational` -> Aeson Double for non-integers, bare integer for
+  // integers) so fractional residual deadlines are byte-identical.
   const deadline =
     remainingNum != null
-      ? remainingNum
+      ? ratToAesonValue(remainingNum)
       : o.deadline == null
         ? null
         : String(o.deadline);
@@ -776,9 +876,70 @@ function deonticObligationToWire(o, ctx, remainingNum) {
       action: resolvedAction,
       deadline,
       modal: o.modal,
-      party: taggedParty,
+      party,
     },
   };
+}
+
+// Build the marker node the wire serializer turns into a jl4-service
+// DeadlineMissed breach object. 'ev' is the first event whose timestamp
+// lapsed a MUST/DO obligation with no LEST clause; jl4-core names that
+// event's party, action, and time in the breach (Machine.hs:995 →
+// serializeBreachReason at Jl4.hs:1216).
+function deonticDeadlineMissedNode(
+  obligation,
+  ev,
+  stamp,
+  absoluteDeadline,
+  ctx,
+) {
+  return {
+    kind: "BREACH",
+    _deadlineMissed: {
+      eventParty: deonticRenderEventParty(ev.party, obligation, ctx),
+      eventAction: deonticRenderEnumName(ev.action),
+      timestamp: stamp,
+      obligationAction: resolveDeonticExpr(obligation.action, ctx),
+      deadline: absoluteDeadline,
+    },
+  };
+}
+
+// Render an event's party the way jl4-service serializes 'ev'party':
+// record-typed parties tag with the obligation party's L4 type name
+// (@{Driver: {...}}@); scalar/enum parties render as their L4 constructor
+// name (backtick-quoted when not a plain identifier).
+function deonticRenderEventParty(evParty, obligation, ctx) {
+  if (
+    evParty != null &&
+    typeof evParty === "object" &&
+    !Array.isArray(evParty)
+  ) {
+    const paramName =
+      obligation.party && obligation.party.param != null
+        ? obligation.party.param
+        : null;
+    return paramName ? deonticTagRecord(evParty, ctx, paramName) : evParty;
+  }
+  return deonticRenderEnumName(evParty);
+}
+
+// Approximate L4's 'Print.prettyLayout' of an enum-constructor name: a name
+// that is a plain identifier prints bare; anything with spaces / punctuation
+// is backtick-quoted. Enum constructors in the deontic corpus follow this
+// rule (@drive@ vs @`wear seatbelt`@).
+// A party / event-action name as the JSON payload should carry it: PLAIN.
+//
+// This used to backtick anything that wasn't a bare identifier, mirroring
+// `Print.prettyLayout`. jl4-service stopped doing that (a9caf2f6): it renders a
+// constructor through `Backend.Jl4.constructorText`, which carries no
+// backticks, because the service declares the un-backticked spelling in its own
+// `returnSchema` enum and was otherwise handing out a schema its responses
+// fail. `eventAction` and every party field follow the plain spelling;
+// `obligationAction` does NOT — that one is still `prettyLayout` of an
+// unevaluated Name on the reference side, so it keeps its backticks.
+function deonticRenderEnumName(name) {
+  return name;
 }
 
 // Wrap a resolved parameter value in its L4 type name when the
@@ -799,16 +960,42 @@ function deonticTagRecord(value, ctx, paramName) {
 }
 
 function deonticBreachToWire(b) {
-  // Bare BREACH (no BY / BECAUSE) wires as the literal string sentinel.
-  if (b == null || (b.by == null && b.because == null)) return "BREACH";
-  // jl4-service wraps explicit @BREACH BY p BECAUSE r@ as a tagged
-  // record { detail, party, reason: "explicit" }. The BECAUSE clause
-  // is an L4 string literal that pretty-prints with surrounding
-  // double quotes; strip them so the wire 'detail' is the bare text.
+  // jl4-service ALWAYS emits a structured object for a breach — never a bare
+  // "BREACH" string. There are two shapes:
+  //
+  //   * DeadlineMissed — a MUST/DO obligation lapsed with no LEST clause
+  //     (Jl4.hs:1216). Built by 'deonticDeadlineMissedNode' and tagged with
+  //     '_deadlineMissed'.
+  //   * ExplicitBreach — an explicit @LEST BREACH [BY p] [BECAUSE r]@ (or a
+  //     top-level BREACH). Emitted for EVERY explicit breach, including the
+  //     clause-less @LEST BREACH@ where party/detail are null (Jl4.hs:1228).
+  if (b && b._deadlineMissed) {
+    const d = b._deadlineMissed;
+    // 'deadline' (absolute, = obligationStart + WITHIN) and 'timestamp'
+    // (the lapsing event's stamp) are EXACT rationals; ratToAesonValue
+    // renders them the way jl4-service's `fromRational` does so fractional
+    // breach numbers stay byte-identical (0.05 -> "5.0e-2", not the f64
+    // "5.0000000000000044e-2").
+    return {
+      BREACH: {
+        deadline: ratToAesonValue(d.deadline),
+        eventAction: d.eventAction,
+        eventParty: d.eventParty,
+        obligationAction: d.obligationAction,
+        reason: "deadline_missed",
+        timestamp: ratToAesonValue(d.timestamp),
+      },
+    };
+  }
+  // Explicit breach. The BECAUSE clause is an L4 string literal that
+  // pretty-prints with surrounding double quotes; strip them so the wire
+  // 'detail' is the bare text. Missing BY / BECAUSE serialize as null.
+  const detail = b == null ? null : stripStringLiteralQuotes(b.because);
+  const party = b == null ? null : b.by;
   return {
     BREACH: {
-      detail: stripStringLiteralQuotes(b.because),
-      party: b.by,
+      detail: detail == null ? null : detail,
+      party: party == null ? null : party,
       reason: "explicit",
     },
   };
@@ -1391,12 +1578,12 @@ function buildInnerEvalTraceSubtree(
   startTime,
   events,
   value,
-  residualContract,
-  residualDeadline,
+  _residualContract,
+  _residualDeadline,
   contractBodyText,
   innerResultText,
   args,
-  givenParams,
+  _givenParams,
   explicitBreach,
 ) {
   const fnNameRendered =
@@ -1478,7 +1665,7 @@ function buildFnApplicationSubtree(
   paramSchemas,
   args,
   fnNameRendered,
-  contractBodyText,
+  _contractBodyText,
 ) {
   const unwrappedArgs = paramSchemas
     .map((p) => "unwrapped_" + p.name)
@@ -1877,8 +2064,8 @@ function buildEvalTraceCallFrame(
   paramSchemas,
   contractBodyText,
   innerResultText,
-  value,
-  explicitBreach,
+  _value,
+  _explicitBreach,
 ) {
   // The "a" leaf always shows the chosen branch's body text. For
   // svc's parameterised wrapper this means the IF-resolved body
@@ -1951,7 +2138,7 @@ function renderResidualForParamCtx(
 
 // Render the primary obligation's party with its type tag —
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
-function renderActiveDeonticExpr(expr, args, meta, givenParams) {
+function renderActiveDeonticExpr(expr, args, meta, _givenParams) {
   if (expr == null) return "";
   if (typeof expr === "string") return expr;
   if (expr.param != null) {
@@ -2187,6 +2374,19 @@ export function createRuntime(opts) {
   // helper-call translation needed (a helper's param shares the
   // caller's pointer, so it shares the JS object too).
   const valueByPtr = new Map();
+  // Per-call exact byte-length of every string produced by `writeString`
+  // (marshalled inputs + all computed strings), keyed by the data pointer.
+  // The wire ABI stores strings as NUL-terminated UTF-8, but a STRING may
+  // legitimately CONTAIN U+0000 (a single 0x00 byte). A NUL-terminated
+  // reader would truncate such a string at the first embedded NUL, so a
+  // string like "a\0" would compare EQUAL to "a" — a silent wrong
+  // answer that disagrees with jl4-service's Data.Text (which keeps the
+  // whole string). Recording the true length here lets `readCString` read
+  // exactly the bytes that were written, embedded NULs included. Compiler-
+  // emitted string globals are not registered here and fall back to the
+  // NUL scan (unchanged behaviour for the byte-identical corpus); a source
+  // literal containing U+0000 is refused at compile time instead.
+  const strLenByPtr = new Map();
   // Kept for back-compat tests but no longer the primary mechanism.
   const forcedFields = new Set();
   const resetHeap = () => {
@@ -2196,6 +2396,7 @@ export function createRuntime(opts) {
     tracePool.reset();
     forcedFields.clear();
     valueByPtr.clear();
+    strLenByPtr.clear();
   };
   // Surface peak-allocation telemetry so the HTTP wrapper can log it
   // or expose it as a header for monitoring per-eval memory pressure.
@@ -2215,6 +2416,15 @@ export function createRuntime(opts) {
   function readCString(p) {
     const ptr = Number(p);
     if (!ptr) return "";
+    // Prefer the exact recorded length so embedded NUL bytes (U+0000) are
+    // preserved rather than truncating the string at the first one. Only
+    // strings produced by `writeString` are registered; compiler-emitted
+    // globals fall through to the NUL scan (they never contain U+0000 — a
+    // source literal with one is refused at compile time).
+    const known = strLenByPtr.get(ptr);
+    if (known !== undefined) {
+      return Buffer.from(memU8.subarray(ptr, ptr + known)).toString("utf8");
+    }
     let end = ptr;
     while (end < memU8.length && memU8[end] !== 0) end++;
     return Buffer.from(memU8.subarray(ptr, end)).toString("utf8");
@@ -2225,6 +2435,9 @@ export function createRuntime(opts) {
     const p = allocBytes(bytes.length + 1);
     memU8.set(bytes, p);
     memU8[p + bytes.length] = 0;
+    // Record the exact byte length so `readCString` can recover the full
+    // string even when it contains an embedded NUL (see `strLenByPtr`).
+    strLenByPtr.set(p, bytes.length);
     return p;
   }
 
@@ -2515,11 +2728,18 @@ export function createRuntime(opts) {
     if (type === "DATETIME") return formatDatetime(raw);
     return Number(raw);
   }
+  // MAYBE on the VALUE wire, matching jl4-service since a9caf2f6: NOTHING is
+  // JSON `null` and `JUST x` is `x`. The old `"NOTHING"` / `{JUST:[x]}` shapes
+  // were wrong twice over — `"NOTHING"` is indistinguishable from a genuine
+  // string answer (which is exactly what `MAYBE STRING` exists to avoid), and
+  // the JUST wrapper made every optional field a tagged union the caller has to
+  // unwrap. The TRACE path (`walkMaybe`) still speaks `{JUST:[…]}`; that is a
+  // different surface and `prettyResultText` / `prettyL4Value` still accept it.
   function unmarshalMaybe(raw, innerType) {
     const ptr = Number(f64ToU64(raw));
-    if (!ptr) return "NOTHING";
+    if (!ptr) return null;
     const tag = memView.getFloat64(ptr, true);
-    if (tag === 0.0) return "NOTHING";
+    if (tag === 0.0) return null;
     let payload;
     if (innerType === "NUMBER") {
       // The slot holds the f64 bit-pattern of a rational handle.
@@ -2530,7 +2750,7 @@ export function createRuntime(opts) {
     else if (innerType === "STRING")
       payload = readCString(Number(memView.getBigUint64(ptr + 8, true)));
     else payload = memView.getFloat64(ptr + 8, true);
-    return { JUST: [payload] };
+    return payload;
   }
   // M7+ — when the schema carries a structured 'returnSchema' (record /
   // enum / list / maybe), use it to decode the wasm return faithfully.
@@ -2559,13 +2779,14 @@ export function createRuntime(opts) {
       return schema.values[idx];
     return idx;
   }
+  // See 'unmarshalMaybe': NOTHING is null, JUST x is x.
   function unmarshalMaybeStructured(raw, innerSchema) {
     const ptr = Number(f64ToU64(raw));
-    if (!ptr) return "NOTHING";
+    if (!ptr) return null;
     const tag = memView.getFloat64(ptr, true);
-    if (tag === 0.0) return "NOTHING";
+    if (tag === 0.0) return null;
     const slot = memView.getFloat64(ptr + 8, true);
-    return { JUST: [unmarshalWithSchema(slot, innerSchema)] };
+    return unmarshalWithSchema(slot, innerSchema);
   }
   function unmarshalRecord(raw, schema) {
     const ptr = Number(f64ToU64(raw));
@@ -2577,12 +2798,15 @@ export function createRuntime(opts) {
       const slot = memView.getFloat64(ptr + i * 8, true);
       out[fname] = unmarshalWithSchema(slot, (schema.fields || {})[fname]);
     }
-    // Match svc's prettyLayout convention: multi-word constructor
-    // names render with surrounding backticks in the JSON envelope.
-    const tagName = /\s/.test(schema.name)
-      ? "`" + schema.name + "`"
-      : schema.name;
-    return { [tagName]: out };
+    // The constructor's PLAIN name, matching `Backend.Jl4.constructorText`.
+    // This used to backtick multi-word names to mirror `prettyLayout`; the
+    // reference stopped doing that in a9caf2f6 for the same reason it stopped
+    // backticking parties — the backticked spelling fails the enum the service
+    // declares in its own returnSchema. No multi-word record tag appears in the
+    // sweep corpus, so this arm is corrected by construction rather than
+    // measured; the single-word tags it does exercise (OBLIGATION, BREACH,
+    // Driver) are unaffected either way.
+    return { [schema.name]: out };
   }
 
   function unmarshalResult(raw, returnType, returnSchema) {
@@ -2652,6 +2876,31 @@ export function createRuntime(opts) {
         readCString(Number(f64ToU64(aF))) === readCString(Number(f64ToU64(bF)))
           ? 1
           : 0,
+      // Ordered comparison — content, NOT pointer. Returns -1/0/1 as a
+      // plain number (same ABI as __l4_rat_cmp), lexicographic by Unicode
+      // CODE POINT to match jl4-core's Data.Text Ord. We iterate with
+      // codePointAt rather than JS-native `<` because native `<` orders by
+      // UTF-16 code UNIT, which disagrees for astral-plane chars (e.g.
+      // "😀" U+1F600 encodes as 0xD83D 0xDE00; its high surrogate 0xD83D
+      // sorts BELOW a BMP char like U+E000 under code units, but ABOVE it
+      // under code points). str_cmp("😀","") must be +1, not -1.
+      __l4_str_cmp: (aF, bF) => {
+        const a = readCString(Number(f64ToU64(aF)));
+        const b = readCString(Number(f64ToU64(bF)));
+        let i = 0;
+        let j = 0;
+        while (i < a.length && j < b.length) {
+          const ca = a.codePointAt(i);
+          const cb = b.codePointAt(j);
+          if (ca !== cb) return ca < cb ? -1 : 1;
+          i += ca > 0xffff ? 2 : 1;
+          j += cb > 0xffff ? 2 : 1;
+        }
+        // A prefix sorts before the longer string; equal when both end.
+        if (i < a.length) return 1;
+        if (j < b.length) return -1;
+        return 0;
+      },
       __l4_str_len: (sF) => readCString(Number(f64ToU64(sF))).length,
       // NUMBER → STRING. Matches jl4-core: integers print with no decimal
       // point, non-integers print as their correctly-rounded shortest Double.
@@ -2811,8 +3060,16 @@ export function createRuntime(opts) {
       __l4_is_integer: (xF) => (isInteger(ratUnbox(xF)) ? 1 : 0),
       // String intrinsics (all string args arrive as f64-bitcast pointers).
       // STRINGLENGTH / INDEXOF return NUMBER → handle.
+      //
+      // INDEXING UNIT: jl4-service is Data.Text, which counts/indexes by
+      // Unicode CODE POINT. JS native .length / .indexOf / .charAt /
+      // .substring count UTF-16 code UNITS — for astral-plane chars
+      // (>= U+10000, stored as surrogate pairs) the two disagree
+      // (STRINGLENGTH "😀" must be 1, not 2) and unit-based slicing can
+      // split a surrogate pair in half. Every index-carrying builtin below
+      // therefore converts through code points, never raw units.
       __l4_string_length: (sF) =>
-        ratFromInt(readCString(Number(f64ToU64(sF))).length),
+        ratFromInt([...readCString(Number(f64ToU64(sF)))].length),
       __l4_to_upper: (sF) =>
         u64ToF64(writeString(readCString(Number(f64ToU64(sF))).toUpperCase())),
       __l4_to_lower: (sF) =>
@@ -2837,29 +3094,40 @@ export function createRuntime(opts) {
         )
           ? 1
           : 0,
-      __l4_index_of: (hF, nF) =>
-        ratFromInt(
-          readCString(Number(f64ToU64(hF))).indexOf(
-            readCString(Number(f64ToU64(nF))),
-          ),
-        ),
-      __l4_char_at: (sF, iH) =>
-        u64ToF64(
+      // Code-point index: JS indexOf yields a UNIT index; the reference
+      // (Text.breakOn + Text.length of the prefix) yields a code-POINT
+      // index. Convert by measuring the matched prefix in code points.
+      // Empty needle → 0 and not-found → -1 agree on both sides.
+      __l4_index_of: (hF, nF) => {
+        const h = readCString(Number(f64ToU64(hF)));
+        const unitIdx = h.indexOf(readCString(Number(f64ToU64(nF))));
+        return ratFromInt(unitIdx < 0 ? -1 : [...h.slice(0, unitIdx)].length);
+      },
+      // CHARAT indexes by code point (Text.index); out of bounds → ""
+      // (reference: i < 0 || i >= Text.length → empty string).
+      __l4_char_at: (sF, iH) => {
+        const points = [...readCString(Number(f64ToU64(sF)))];
+        const i = Number(numToInt(iH, "CHARAT"));
+        return u64ToF64(
+          writeString(i < 0 || i >= points.length ? "" : points[i]),
+        );
+      },
+      // SUBSTRING(s, start, len) is take-len-after-drop-start
+      // (Text.take len (Text.drop start s)) — the third argument is a
+      // LENGTH, not an end index (JS .substring treats it as an end
+      // index — wrong for any start > 0), and both are code-point
+      // counts. Text.drop clamps a negative start to 0; Text.take of a
+      // non-positive length is "".
+      __l4_substring: (sF, iH, jH) => {
+        const points = [...readCString(Number(f64ToU64(sF)))];
+        const start = Math.max(0, Number(numToInt(iH, "SUBSTRING")));
+        const len = Number(numToInt(jH, "SUBSTRING"));
+        return u64ToF64(
           writeString(
-            readCString(Number(f64ToU64(sF))).charAt(
-              Number(numToInt(iH, "CHARAT")),
-            ),
+            len <= 0 ? "" : points.slice(start, start + len).join(""),
           ),
-        ),
-      __l4_substring: (sF, iH, jH) =>
-        u64ToF64(
-          writeString(
-            readCString(Number(f64ToU64(sF))).substring(
-              Number(numToInt(iH, "SUBSTRING")),
-              Number(numToInt(jH, "SUBSTRING")),
-            ),
-          ),
-        ),
+        );
+      },
       __l4_replace: (sF, aF, bF) => {
         const s = readCString(Number(f64ToU64(sF)));
         const a = readCString(Number(f64ToU64(aF)));
@@ -3094,6 +3362,15 @@ export function createRuntime(opts) {
     // trace-mode column shows 'trace-differs' until the
     // 'decodeArgs'/'CONSIDER InputArgs' wrapper lands).
     if (meta.isDeontic) {
+      // A deontic function with no compiled contract must NOT fall
+      // through to 'runDeonticInternal(null, …)', which would walk a
+      // null tree and silently return FULFILLED. Guard the trace path
+      // exactly like the value path ('invokeDeontic').
+      if (!meta.deonticContract) {
+        throw new DeonticInputError(
+          "deontic function has no compiled contract metadata",
+        );
+      }
       const startTime = args.startTime;
       const events = args.events;
       if (startTime === undefined || startTime === null) {
@@ -3467,7 +3744,7 @@ export function createRuntime(opts) {
 
   // M5 slice 4A — synthetic IF sub-tree for `__NOT__ a` ⟶
   // `IF a THEN FALSE ELSE TRUE`. Single arg, no short-circuit.
-  function synthesizeNotDesugar(frame, node, parentResultText, lookupNode) {
+  function synthesizeNotDesugar(frame, _node, parentResultText, lookupNode) {
     if (frame.children.length < 1) return [];
     const argTruth = frameTruth(frame.children[0], lookupNode);
     const aText =
@@ -3911,12 +4188,6 @@ export function createRuntime(opts) {
 // (matching `responseTag` in jl4-service's Api.hs).
 // ---------------------------------------------------------------------------
 
-const EMPTY_REASONING = {
-  exampleCode: [],
-  explanation: [],
-  children: [],
-};
-
 export function isEmptyReasoning(r) {
   return (
     r &&
@@ -3937,6 +4208,18 @@ export function isEmptyReasoning(r) {
 // keep the slice-1 behaviour of bare strings.
 export function prettyResultText(value, returnType) {
   if (value === null || value === undefined) return "NOTHING";
+  // A MAYBE payload arrives UNWRAPPED on the value wire (see 'unmarshalMaybe'),
+  // but the pretty surface is jl4-core's `prettyLayout` of the L4 value, which
+  // still says `JUST OF …`. The two surfaces disagree on purpose: JSON unwraps,
+  // prose does not. The `{JUST:[…]}` branch below still serves the trace path,
+  // so this arm skips that shape and lets the old one handle it.
+  if (
+    typeof returnType === "string" &&
+    returnType.startsWith("MAYBE ") &&
+    !(value && typeof value === "object" && Array.isArray(value.JUST))
+  ) {
+    return "JUST OF " + prettyResultText(value, returnType.slice(6));
+  }
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "string") {
     // If the return type says STRING, jl4-service renders the value
