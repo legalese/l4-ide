@@ -41,6 +41,4 @@ jl4/examples/legal/charities-cleanroom/tests/charity-test.golden
 jl4/examples/legal/charities-cleanroom/tests/charity-test.nlg.golden
 jl4/examples/legal/charities-cleanroom/tests/charity-test.schema.golden
 jl4/examples/legal/promissory-note.l4
-jl4/examples/legal/tests/ceo-performance-award.schema.golden
 jl4/examples/legal/tests/promissory-note.ep.golden
-jl4/examples/legal/tests/promissory-note.golden

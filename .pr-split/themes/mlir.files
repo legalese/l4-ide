@@ -3,7 +3,6 @@ jl4-mlir/MLIR-REVIEW.md
 jl4-mlir/PARITY-HUNT-LOG.md
 jl4-mlir/README.md
 jl4-mlir/SOLIDITY-BACKEND-PLAN.md
-jl4-mlir/app/Main.hs
 jl4-mlir/coverage-report/FINDINGS.md
 jl4-mlir/coverage-report/PARITY-COVERAGE.md
 jl4-mlir/coverage-report/coverage.json
@@ -23,12 +22,7 @@ jl4-mlir/scripts/parity-gate.mjs
 jl4-mlir/scripts/parity-gate.test.mjs
 jl4-mlir/scripts/parity-harness.mjs
 jl4-mlir/src/L4/MLIR/ABI.hs
-jl4-mlir/src/L4/MLIR/Lower.hs
-jl4-mlir/src/L4/MLIR/Marshal.hs
-jl4-mlir/src/L4/MLIR/Pipeline.hs
 jl4-mlir/src/L4/MLIR/Runtime/Builtins.hs
-jl4-mlir/src/L4/MLIR/Schema.hs
-jl4-mlir/test/Main.hs
 jl4-mlir/test/fixtures/datetime-probe.cases.json
 jl4-mlir/test/fixtures/deontic-breach.cases.json
 jl4-mlir/test/fixtures/deontic-sale.cases.json
