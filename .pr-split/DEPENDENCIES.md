@@ -137,12 +137,20 @@ reordering.
 **Recommendation: merge these as one merge-queue batch**, or land them in immediate succession and
 accept that `main` does not build in between.
 
-> **Corrected 2026-08-11, by building.** This section previously named **five** themes
+> **Corrected 2026-08-11, by building and testing.** This section previously named **five** themes
 > (`lang-syntax-typecheck`, `lang-eval-ledger`, `lang-printer`, `service-cli`, `mlir`) and said
 > "Every other PR in the set is unaffected." That is wrong. Merging those five onto `main` and
 > running `cabal build all` under GHC 9.10.3 **fails**, and each successive repair pulled in another
-> theme. The batch is **twelve**: the five above plus `lang-imports-stdlib`, `ladder-viz`,
-> `dmn-export`, `bpmn-export`, `openfisca-export`, `lsp` and `actus-archive`.
+> theme.
+>
+> **Twelve build; fifteen pass tests.** The build-green set is the five above plus
+> `lang-imports-stdlib`, `ladder-viz`, `dmn-export`, `bpmn-export`, `openfisca-export`, `lsp` and
+> `actus-archive`. At twelve, `cabal build all` exits 0 and six of seven suites pass, but `jl4-test`
+> fails **39 of 2508** — 8 mixfix goldens owned by `lang-sets`, 3 `promissory-note` /
+> `ceo-performance-award` goldens owned by `corpus-legal-new`, and 28 DMN/BPMN tests that read *the
+> Reg CF corpus*, owned by `corpus-regcf`. Adding those three gives **2568 examples, 0 failures**.
+> Since the merge queue's required check is *Haskell Build **& Test***, the set that can actually
+> merge is **fifteen**.
 >
 > The reasoning here was sound but the survey was too narrow: `Exponent` is one of *several*
 > type-level changes that cut across themes. `lang-syntax-typecheck` also widens `MkAssume` 4→5,
@@ -150,7 +158,7 @@ accept that `main` does not build in between.
 > `MkCheckEnv`, and adds `unqualifiedNameToText`; `lang-eval-ledger` widens `MkEvalDirectiveResult`
 > 3→4; `service-cli` adds a field to `FunctionSchema.Parameter`. Each has its own set of consumers.
 >
-> Two members could not have been found by reading at all:
+> Three findings could not have been reached by reading at all:
 >
 > - **`actus-archive`.** `jl4-actus-analyzer` is on `main` and in `main`'s `cabal.project`, so
 >   `cabal build all` compiles it; its `FeatureExtractor.hs:519` matches `MkTypedName` with 4
@@ -158,6 +166,13 @@ accept that `main` does not build in between.
 >   any single PR never sees this, because the build dies inside `jl4-core` first.
 > - **`lsp`.** `jl4-lsp/src/LSP/L4/Inspector.hs` matches `EL.MkEvalDirectiveResult` with 3
 >   arguments in five places.
+> - **The three corpus themes are load-bearing for the suite.** This section already warned that
+>   goldens encode siblings' behaviour; what building shows is which ones and how many. Note that
+>   `lang-sets`, `corpus-legal-new` and `corpus-regcf` are also precisely the PRs whose own CI
+>   reports green **without running a single test**, because the `haskell` paths-filter in
+>   `pr-checks.yml` matches `**/*.hs`, `**/*.cabal`, `cabal.project` and `jl4-core/libraries/**` but
+>   **not `jl4/examples/**`**. That hole predates this work and `unstable` does not close it; it is
+>   worth an upstream issue of its own.
 >
 > The full evidence chain — six builds, with the verbatim first error of each failing one — is in
 > `.pr-split/BATCH.md`, which is spliced into all twelve PR bodies by

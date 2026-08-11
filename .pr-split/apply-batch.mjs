@@ -9,7 +9,9 @@ import { readFileSync, writeFileSync } from 'node:fs'
 const bdir = process.argv[2] ?? '.pr-split/bodies'
 const bfile = process.argv[3] ?? '.pr-split/BATCH.md'
 
-// The twelve themes measured to be inseparable — see BATCH.md for the evidence.
+// The fifteen themes measured to be inseparable — see BATCH.md for the evidence.
+// The first twelve are needed to build; the last three to make the golden suite pass.
+// The merge queue's required check is "Haskell Build & Test", so all fifteen merge together.
 const MEMBERS = [
   'lang-syntax-typecheck',
   'lang-eval-ledger',
@@ -23,6 +25,9 @@ const MEMBERS = [
   'lsp',
   'mlir',
   'actus-archive',
+  'lang-sets',
+  'corpus-legal-new',
+  'corpus-regcf',
 ]
 
 const batch = readFileSync(bfile, 'utf8').trim()
