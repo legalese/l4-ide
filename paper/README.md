@@ -7,6 +7,16 @@ of the others zooms into. Once the papers go out, the intention is to consolidat
 (with the concept notes below) into a single **Book of L4**; this file is the assembly
 index.
 
+## The Book — [`book/`](book/)
+
+The papers are all **Part II and later**: every one presupposes a reader who already believes
+law can be formalised and wants to know how we do it. [`book/DESIGN.md`](book/DESIGN.md) designs
+the missing half — _An Introduction to Computational Law, Using L4_: the history and its five
+recurring failure modes, then logic by logic, each entering as the repair of a named failure of
+the last, from subsumption to the point where formalisation stops. It also records where each
+existing facet lands in the assembly. **Design note; nothing drafted** except a specimen chapter
+opening, which exists so the plan can be judged on prose rather than on outline.
+
 ## Papers
 
 | Facet                                           | Directory                                                | What it is                                                                                                                                                           |
