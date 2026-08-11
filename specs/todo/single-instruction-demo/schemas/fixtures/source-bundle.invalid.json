@@ -1,0 +1,60 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "bna",
+  "citation": "British Nationality Act 1981 (c. 61), section 1",
+  "retrieved": "2026-08-02",
+  "note": "INVALID FIXTURE. Structurally well-formed on purpose so the x-rules run. Rules expected to fire: document-ids-unique, archive-method-requires-archive-url, integrity-digest-or-immutable-capture, assembled-digest-matches, covers-or-absent-reason, covers-range-ordered, in-force-or-absent-reason, annotation-markers-unique-within-document, incomplete-inventory-explains. The assembled artifact deliberately points at a file that IS on this branch with a deliberately wrong digest, so digest checking is proved red rather than merely proved skippable.",
+  "in_force": {
+    "statement": "a banner attributed to a document this bundle does not carry",
+    "as_of": "2026-07-04",
+    "document": "no-such-document"
+  },
+  "assembled": {
+    "local_path": "etc/go/README.md",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "note": "a real file on this branch, and a digest that is not its digest"
+  },
+  "documents": [
+    {
+      "id": "dup",
+      "role": "current",
+      "title": "direct retrieval carrying an archive_url",
+      "citation": "none",
+      "url": "https://example.invalid/a",
+      "retrieved": "2026-08-02",
+      "retrieval_method": "direct",
+      "archive_url": "https://example.invalid/archive/a",
+      "integrity": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "sha256_absent_reason": "both a digest and a reason for having none"
+      },
+      "covers": { "from": "2020-01-01", "to": "2019-01-01" }
+    },
+    {
+      "id": "dup",
+      "role": "current",
+      "title": "a duplicate id, with no covers and no reason for having none",
+      "citation": "none",
+      "url": "https://example.invalid/b",
+      "retrieved": "2026-08-02",
+      "retrieval_method": "archive",
+      "archive_url": "https://example.invalid/archive/b",
+      "integrity": {
+        "sha256_absent_reason": "pinned by the capture instead"
+      },
+      "annotations": [
+        {
+          "scheme": "modification",
+          "markers": ["C1", "C2"],
+          "inventory_complete": false
+        },
+        {
+          "scheme": "amendment",
+          "markers": ["C2"],
+          "inventory_complete": true
+        }
+      ]
+    }
+  ]
+}

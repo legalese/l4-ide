@@ -1,0 +1,111 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "bna",
+  "note": "INVALID FIXTURE. Structurally well-formed on purpose so the x-rules run. Rules expected to fire: entry-ids-unique, search-ids-unique, search-outcome-matches-findings, search-findings-resolve, findings-attributed-to-a-search, binding-effect-declared, suppressive-effects-need-a-rule-version-arm, binding-routes-into-the-encoding, interpretive-routes-to-a-fork, prospective-dated-or-flagged, url-or-absent-reason, effective-from-exclusive, disposition-entry-resolves, markers-disposed-once, and — when the peers are given — fork-refs-resolve, dispositions-name-bundle-markers, annotation-inventory-disposed.",
+  "searches": [
+    {
+      "id": "S1",
+      "question": "a search that claims no findings while listing one",
+      "method": "web-search",
+      "scope": "nowhere",
+      "performed": "2026-08-02",
+      "outcome": "no-findings",
+      "findings": ["E1"],
+      "coverage_note": "none"
+    },
+    {
+      "id": "S1",
+      "question": "a duplicate search id, which also lists an entry that does not exist",
+      "method": "web-search",
+      "scope": "nowhere",
+      "performed": "2026-08-02",
+      "outcome": "findings",
+      "findings": ["E-DOES-NOT-EXIST"],
+      "coverage_note": "none"
+    }
+  ],
+  "entries": [
+    {
+      "id": "E1",
+      "class": "binding",
+      "summary": "class binding with no binding_effect declared",
+      "provenance": {
+        "source": "nowhere",
+        "retrieved": "2026-08-02",
+        "citation": "none"
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "encoded",
+      "disposition_note": "disposed as encoded but names neither a rule-version arm nor a fork",
+      "found_by": ["S1"]
+    },
+    {
+      "id": "E1",
+      "class": "binding",
+      "binding_effect": "struck",
+      "summary": "a duplicate entry id, struck without a rule-version arm",
+      "provenance": {
+        "source": "nowhere",
+        "url": "https://example.invalid/",
+        "url_absent_reason": "both a url and an absent reason",
+        "retrieved": "2026-08-02",
+        "citation": "none"
+      },
+      "routing": { "fork_ids": ["A-DOES-NOT-EXIST"], "currency_risk": false },
+      "disposition": "encoded",
+      "disposition_note": "routes to a fork id no fork register has",
+      "found_by": ["S1"]
+    },
+    {
+      "id": "E3",
+      "class": "interpretive",
+      "summary": "interpretive, disposed as encoded, naming no fork",
+      "provenance": {
+        "source": "nowhere",
+        "url": "https://example.invalid/",
+        "retrieved": "2026-08-02",
+        "citation": "none"
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "encoded",
+      "disposition_note": "nothing to join on",
+      "found_by": ["S2-DOES-NOT-EXIST"]
+    },
+    {
+      "id": "E4",
+      "class": "prospective",
+      "summary": "undated, unflagged, and carrying both effective_from spellings at once",
+      "provenance": {
+        "source": "nowhere",
+        "url": "https://example.invalid/",
+        "retrieved": "2026-08-02",
+        "citation": "none"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2027-01-01",
+        "effective_from_absent_reason": "and an absent reason too"
+      },
+      "disposition": "deferred",
+      "disposition_note": "see the routing",
+      "found_by": ["S1"]
+    }
+  ],
+  "dispositions": [
+    {
+      "document": "bna-s1-revised",
+      "markers": ["C1"],
+      "disposition": "scoped-out",
+      "entry": "E-DOES-NOT-EXIST",
+      "note": "names an entry that is not in this register"
+    },
+    {
+      "document": "bna-s1-revised",
+      "markers": ["C1", "Z9"],
+      "disposition": "scoped-out",
+      "note": "C1 is disposed twice, and Z9 is in no bundle inventory"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "bna",
+  "citation": "British Nationality Act 1981 (c. 61), section 1 — acquisition of British citizenship by birth or adoption",
+  "retrieved": "2026-08-02",
+  "note": "FIXTURE, NOT A COMMITTED BUNDLE. Transcribed from the PROVENANCE header of jl4/examples/legal/bna/source-s1.txt (PR #195, unmerged at this writing), so the local paths point forward and the digest checks report `skip` on branches where that file is absent. Only documents the smoke run actually retrieved appear. The 1986 CACM paper is deliberately NOT listed even though the run fetched it, because its retrieval URL was never recorded in the provenance file and inventing one is the exact failure SMOKE-REPORT.md §3.3 caught.",
+  "in_force": {
+    "statement": "British Nationality Act 1981, Section 1 is up to date with all changes known to be in force on or before 04 July 2026. There are changes that may be brought into force at a future date.",
+    "as_of": "2026-07-04",
+    "document": "bna-s1-revised"
+  },
+  "assembled": {
+    "local_path": "jl4/examples/legal/bna/source-s1.txt",
+    "sha256": "a84c2b524dcf4b70900ecde967b656e99a9d4c5e896ea36eb3cced7e771913ac",
+    "note": "The provenance-headed artifact P3 encodes from: the verbatim s 1 text with its F/C annotation lists, plus a s 50 definitional annex. This is the only digest in the bundle that pins bytes we hold, which is why the schema keeps it separate from the retrieved documents."
+  },
+  "documents": [
+    {
+      "id": "bna-s1-revised",
+      "role": "current",
+      "title": "British Nationality Act 1981, section 1 — Acquisition by birth or adoption (legislation.gov.uk revised text)",
+      "citation": "British Nationality Act 1981 (c. 61) s 1",
+      "url": "https://www.legislation.gov.uk/ukpga/1981/61/section/1",
+      "retrieved": "2026-08-02",
+      "retrieval_method": "archive",
+      "archive_url": "https://web.archive.org/web/20260705112453/https://www.legislation.gov.uk/ukpga/1981/61/section/1",
+      "archive_timestamp": "20260705112453",
+      "integrity": {
+        "sha256_absent_reason": "Direct retrieval was blocked by an AWS WAF JavaScript challenge (HTTP 202, x-amzn-waf-action: challenge) for both curl and WebFetch, so the bytes came from a Wayback capture we do not hold. The capture is immutable and pinned by its timestamp; the digest that is checkable is the assembled artifact's."
+      },
+      "covers": { "from": "2021-07-01", "to": null },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "F13",
+            "F14",
+            "F15",
+            "F16",
+            "F17",
+            "F18",
+            "F19"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "legislation.gov.uk's inline textual-amendment markers, resolved in the \"Textual Amendments\" list printed below the section. Preserved because P2 disposes over them and P5 joins on that disposition table — the words alone would not have carried the inventory."
+        },
+        {
+          "scheme": "modification",
+          "markers": ["C1", "C2", "C3", "C4", "C5"],
+          "inventory_complete": true,
+          "inventory_note": "The \"Modifications etc. (not altering text)\" list. Completeness is asserted here precisely because the hand sweep dropped C2 (SMOKE-REPORT.md §3.5); declaring the inventory complete is what turns the cross-file disposition check on."
+        }
+      ]
+    },
+    {
+      "id": "bna-s50-revised",
+      "role": "current",
+      "title": "British Nationality Act 1981, section 50 — Interpretation (definitional extracts)",
+      "citation": "British Nationality Act 1981 (c. 61) s 50(1), (1A)-(1B), (2)-(5)",
+      "url": "https://www.legislation.gov.uk/ukpga/1981/61/section/50",
+      "retrieved": "2026-08-02",
+      "retrieval_method": "archive",
+      "archive_url": "https://web.archive.org/web/20260719130201/https://www.legislation.gov.uk/ukpga/1981/61/section/50",
+      "archive_timestamp": "20260719130201",
+      "integrity": {
+        "sha256_absent_reason": "Same WAF challenge as s 1; retrieved from a Wayback capture and pinned by its timestamp."
+      },
+      "covers_absent_reason": "The s 50 version points were not enumerated during retrieval — only the extracts relied on were taken — and no rule-version work reads this document, so a range would be an unmeasured claim.",
+      "annotations": []
+    },
+    {
+      "id": "bna-s1-clml-xml",
+      "role": "corroboration",
+      "title": "British Nationality Act 1981 s 1 — CLML XML (legislation.gov.uk data.xml)",
+      "citation": "British Nationality Act 1981 (c. 61) s 1, CLML representation",
+      "url": "https://www.legislation.gov.uk/ukpga/1981/61/section/1/data.xml",
+      "retrieved": "2026-08-02",
+      "retrieval_method": "archive",
+      "archive_url": "https://web.archive.org/web/20241009092719/https://www.legislation.gov.uk/ukpga/1981/61/section/1/data.xml",
+      "archive_timestamp": "20241009092719",
+      "integrity": {
+        "sha256_absent_reason": "A Wayback capture we do not hold; pinned by its timestamp."
+      },
+      "covers_absent_reason": "The capture declares a CLML validity date of 2023-12-15, which pins when it was current rather than the range of law it states. The range was not determined, because this document is corroboration — it carries the identical s 1 text and so shows the Wayback HTML rendering did not drift — and no encoded text is taken from it."
+    }
+  ]
+}
