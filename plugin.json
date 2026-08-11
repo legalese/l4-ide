@@ -1,4 +1,5 @@
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "l4-computational-law",
   "version": "0.2.0",
   "description": "L4 programming language for computational law - encode contracts, regulations, and policies as executable, testable, verifiable programs",
