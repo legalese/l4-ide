@@ -1,0 +1,38 @@
+-- NEGATIVE fixture for D-SVCEMPTY (spec §15.12's companion note).
+--
+-- Two sections, one per message form:
+--
+--   * `pinned scenarios` holds ONLY rule-date-rebinding decides. R12 drops
+--     them all, so the § has no emitted members and no <decisionService> —
+--     D-SVCEMPTY arm (i) says so (before the note, the § simply vanished).
+--   * `fees` keeps its one decide, but a singleton § has no encapsulated
+--     member and no input decision, so it cannot satisfy DMN 1.3 §6.3.10's
+--     decisionService shape — D-SVCEMPTY arm (ii), the previously silent
+--     probe-D5 skip, made loud.
+--
+-- Neither § may draw D-FLAVOR-NOSERVICE: that note is gated on the service
+-- actually emitting (a note naming an element id the artifact does not
+-- contain would be describing a different file).
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `fees`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A NUMBER
+`the fee` MEANS
+    IF `RULES EFFECTIVE DATE` AT LEAST Date 1 1 2024 THEN 9 ELSE 3
+
+§§ `pinned scenarios`
+
+GIVETH A NUMBER
+`the fee under the 2016 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 9 2016) `the fee`
+
+GIVETH A NUMBER
+`the fee under the 2019 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) `the fee`

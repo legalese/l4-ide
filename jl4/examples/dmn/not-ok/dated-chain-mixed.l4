@@ -1,0 +1,45 @@
+-- NEGATIVE fixture for the rule-date interval table (spec §15.3, R10).
+--
+-- A MIXED chain: arms 1 and 3 are rule-date guards, arm 2 is an ordinary
+-- boolean. There is no single date axis to put on a column, so there is no
+-- honest interval table -- and half-converting it would be worse than either
+-- alternative, because a chain that mixes a law-time arm with an ordinary one
+-- is exactly how a temporal bug hides. The recogniser is therefore
+-- ALL-OR-NOTHING (the shape "L4.OpenFisca.Lower"'s `splitDated` uses), and this
+-- is the arm of that rule with no other witness in the tree: the corpus's
+-- `financial statements required` matches ZERO rows and so is `NotDated`, which
+-- is a different code path with a different outcome.
+--
+-- Expected: one D-DATEDCHAIN (Blocking) naming arm 2, and the sound
+-- boolean-column fallback still ships.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `mixed dated chain`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A DATE
+`the 2024 rate change` MEANS Date 1 1 2024
+
+GIVETH A DATE
+`GST commenced` MEANS Date 1 4 1994
+
+ASSUME `no GST rate exists before commencement` IS A NUMBER
+
+ASSUME `the transitional relief applies` IS A BOOLEAN
+
+GIVEN change IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` change MEANS
+    `RULES EFFECTIVE DATE` AT LEAST change
+
+GIVETH A NUMBER
+`GST rate percent` MEANS
+    BRANCH IF `the rules in force include` `the 2024 rate change` THEN 9
+           IF `the transitional relief applies`                   THEN 0
+           IF `the rules in force include` `GST commenced`        THEN 3
+           OTHERWISE `no GST rate exists before commencement`

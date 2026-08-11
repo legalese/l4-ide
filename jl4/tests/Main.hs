@@ -41,6 +41,7 @@ import LSP.L4.Rules
 
 import qualified Hover
 import qualified SemanticTokens
+import qualified DmnExport
 
 main :: IO ()
 main = do
@@ -67,6 +68,7 @@ main = do
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
+    DmnExport.spec examplesRoot
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do
