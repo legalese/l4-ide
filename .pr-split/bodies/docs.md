@@ -221,6 +221,24 @@ Nothing breaks, because nothing here compiles into a binary; what is lost is eve
 is it like this" and "how do I use it", plus the #166 retraction, which means the incorrect
 Calvanese/Drools attribution stands uncorrected wherever it has already been repeated.
 
+## This PR is prose only — its subject matter ships elsewhere
+
+Everything here is under `doc/` — 91 files, the tutorials, references and essays. **This PR contains no code**, and no code PR
+contains any of these files: `partition.mjs` matches the prose paths before any feature rule, so the
+separation is total rather than incidental.
+
+The features described here ship in #257 (language core), #251 (specs), #242.
+
+**The risk, stated plainly.** If this PR is approved and those are not, `main` acquires
+documentation for behaviour it does not have. If those are approved and this is not, shipped
+features go undocumented — and for `specs/`, a ruling that has been *decided* has nowhere to be
+*recorded*, which is exactly the failure this repo's `CLAUDE.md` §4 was written against: *"A
+decision is recorded in its owning document in the same PR, or it is not decided."*
+
+So this PR should be approved **as part of a set, and landed after** the PRs above — not on its own
+merits alone. If any of them is rejected, this one needs re-cutting to drop the corresponding pages
+before it merges.
+
 ## Provenance
 
 Folded from these `unstable` PRs, taking only their `doc/` and `jl4/GRAMMAR.md` contents:

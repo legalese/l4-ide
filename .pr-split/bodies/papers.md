@@ -190,6 +190,24 @@ step with the code. Nothing in the build breaks — no sibling PR imports, compi
 anything under `paper/` — so the cost is entirely in lost writing and lost provenance, not in red
 CI.
 
+## This PR is prose only — its subject matter ships elsewhere
+
+Everything here is under `paper/` — 67 files, the papers and worked exhibits. **This PR contains no code**, and no code PR
+contains any of these files: `partition.mjs` matches the prose paths before any feature rule, so the
+separation is total rather than incidental.
+
+The features described here ship in #257 (language core) and the corpus PRs.
+
+**The risk, stated plainly.** If this PR is approved and those are not, `main` acquires
+documentation for behaviour it does not have. If those are approved and this is not, shipped
+features go undocumented — and for `specs/`, a ruling that has been *decided* has nowhere to be
+*recorded*, which is exactly the failure this repo's `CLAUDE.md` §4 was written against: *"A
+decision is recorded in its owning document in the same PR, or it is not decided."*
+
+So this PR should be approved **as part of a set, and landed after** the PRs above — not on its own
+merits alone. If any of them is rejected, this one needs re-cutting to drop the corresponding pages
+before it merges.
+
 ## Provenance
 
 Unstable PRs folded into this one:
