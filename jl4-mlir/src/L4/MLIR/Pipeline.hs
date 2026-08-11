@@ -34,7 +34,7 @@ import L4.MLIR.Runtime.Builtins (builtinDeclarations)
 import L4.MLIR.Schema (WasmBundle, bundleExports, applyDiagnostics, writeBundleFile)
 
 import L4.Syntax (Module, Resolved)
-import L4.TypeCheck.Types (InfoMap)
+import L4.TypeCheck.Types (InfoMap, EntityInfo)
 
 import Data.Map.Strict (Map)
 
@@ -121,7 +121,7 @@ compileToPipeline config filepath = do
     Right (tc, deps) -> do
       let mainModule = tc.module'
           depModules = map (.module') deps
-          (mlirMod, lowerDiags) = lowerModuleWithDepsInfoDiag tc.infoMap mainModule depModules
+          (mlirMod, lowerDiags) = lowerModuleWithDepsInfoDiag tc.infoMap tc.entityInfo mainModule depModules
           baseName = maybe (takeBaseName filepath) id config.outputName
           -- Build the function schema bundle — this is what the `run`
           -- subcommand (and any external caller, including jl4-service)
@@ -180,21 +180,21 @@ computeVersion :: FilePath -> Text
 computeVersion _ = "0.1.0"
 
 -- | Lower an L4 module with its resolved dependencies and the
--- typechecker's 'InfoMap'. Dependencies contribute their type
--- declarations and extern function declarations; their bodies are
--- not re-emitted.
-lowerModuleWithDepsInfo :: InfoMap -> Module Resolved -> [Module Resolved] -> MLIRModule
-lowerModuleWithDepsInfo info mainMod deps =
-  fst (lowerModuleWithDepsInfoDiag info mainMod deps)
+-- typechecker's 'InfoMap' + (substituted) 'EntityInfo'. Dependencies
+-- contribute their type declarations and extern function declarations;
+-- their bodies are not re-emitted.
+lowerModuleWithDepsInfo :: InfoMap -> EntityInfo -> Module Resolved -> [Module Resolved] -> MLIRModule
+lowerModuleWithDepsInfo info entInfo mainMod deps =
+  fst (lowerModuleWithDepsInfoDiag info entInfo mainMod deps)
 
 -- | Like 'lowerModuleWithDepsInfo' but also returns per-function lowering
 -- diagnostics (sanitized WASM symbol → unsupported-construct reasons),
 -- which the pipeline threads into the schema. The builtins + dedup
 -- post-pass doesn't touch diagnostics, so they pass through unchanged.
 lowerModuleWithDepsInfoDiag
-  :: InfoMap -> Module Resolved -> [Module Resolved] -> (MLIRModule, Map Text [Text])
-lowerModuleWithDepsInfoDiag info mainMod deps =
-  let (baseMlir, diags) = lowerProgramWithDiagnostics info mainMod deps
+  :: InfoMap -> EntityInfo -> Module Resolved -> [Module Resolved] -> (MLIRModule, Map Text [Text])
+lowerModuleWithDepsInfoDiag info entInfo mainMod deps =
+  let (baseMlir, diags) = lowerProgramWithDiagnostics info entInfo mainMod deps
       builtins = builtinDeclarations
       -- Dedup + synth-externs happens *after* the builtins are
       -- prepended, so the post-pass sees every declaration in the
@@ -211,7 +211,7 @@ compileToMLIR filepath = do
     Right (tc, deps) -> do
       let mainModule = tc.module'
           depModules = map (.module') deps
-      pure $ Right $ lowerModuleWithDepsInfo tc.infoMap mainModule depModules
+      pure $ Right $ lowerModuleWithDepsInfo tc.infoMap tc.entityInfo mainModule depModules
 
 -- | Write MLIR textual IR to a file.
 emitMLIRFile :: MLIRModule -> FilePath -> IO ()

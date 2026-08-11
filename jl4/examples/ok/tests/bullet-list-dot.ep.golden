@@ -1,0 +1,54 @@
+-- The '•' bullet marker.
+--
+-- Like '-', a '•' at the offside of a line opens a list element and the block
+-- desugars to a LIST. Unlike '-', '•' has no arithmetic meaning, so it is also
+-- allowed in ARGUMENT position — letting bullet children nest under a
+-- constructor with no LIST literal and no parentheses, to arbitrary depth.
+
+IMPORT prelude
+IMPORT hierarchy
+
+-- Generic: '•' is just a list literal (any element type), exactly like '-'.
+DECIDE xs IS
+  • 1
+  • 2
+  • 3
+#EVAL xs                          -- LIST 1, 2, 3
+
+DECIDE strs IS
+  • "alpha"
+  • "beta"
+#EVAL strs                        -- LIST "alpha", "beta"
+
+DECIDE negItems IS
+  • -5
+  • 7
+#EVAL negItems                    -- LIST -5, 7  (a fused negative literal is a fine item)
+
+DECIDE exprItems IS
+  • 1 + 2
+  • 3 * 4
+#EVAL exprItems                   -- LIST 3, 12  (each item is a full expression)
+
+-- '•' children nest under `item` to arbitrary depth — no LIST, no parens.
+-- A child '•' lines up directly under its parent's `item` (the "• " marker
+-- sits two columns to the left of it); any deeper indent works too.
+`nested` MEANS
+  item "Parent"
+    • item "a"
+    • item "Sub"
+      • item "b"
+      • item "c"
+    • item "d"
+#EVAL `render outline` `body scheme` `nested`       -- Parent / a / b Sub / b.i b / b.ii c / c d
+
+-- Grandchildren may also indent further past the parent's text; both styles
+-- coexist because '•' arguments are admitted at any column >= the parent's.
+`deeperNested` MEANS
+  item "Parent"
+    • item "a"
+    • item "Sub"
+        • item "b"
+        • item "c"
+    • item "d"
+#EVAL `render outline` `body scheme` `deeperNested` -- Parent / a / b Sub / b.i b / b.ii c / c d

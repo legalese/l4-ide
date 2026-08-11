@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+temporal-thunk-leak-intra.l4:26:1-104:
+  -1857
+temporal-thunk-leak-intra.l4:36:1-104:
+  1857
+temporal-thunk-leak-intra.l4:46:1-156:
+  3652
+temporal-thunk-leak-intra.l4:55:1-104:
+  0

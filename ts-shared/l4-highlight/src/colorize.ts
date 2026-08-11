@@ -26,6 +26,8 @@ const TOKEN_PATTERNS: [RegExp, PatternType][] = [
   [/^`[^`]*`/, 'variable'],
   // Rational and integer numbers (including negative)
   [/^-?\d+(?:\.\d+)?/, 'number'],
+  // Bullet-list marker (• offside symbol; CSymbol → LSP Operator)
+  [/^•/, 'operator'],
   // Operators (try longer ones first via regex alternation)
   [/^(?:>=|<=|==|!=|&&|\|\||=>|[+\-*/<>=])/, 'operator'],
   // Identifiers and keywords (starts with letter, may contain digits and _)

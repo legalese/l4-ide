@@ -1,0 +1,48 @@
+IMPORT prelude
+
+§ `Set operators — Phase 3d: fixity, so word chains need no parentheses`
+
+-- The prelude declares @infixl 6 on UNION/WITHOUT and @infixl 7 on
+-- INTERSECT, so bare unparenthesized chains re-associate by precedence
+-- (INTERSECT binds tighter than UNION, mirroring × over +). Each bare
+-- chain below is paired with its explicitly-parenthesized reading; the
+-- results must match.
+
+`nyers`   MEANS setFromList (LIST "alice", "bob")
+`njers`   MEANS setFromList (LIST "carol")
+`voters`  MEANS setFromList (LIST "bob", "carol", "dave")
+
+§§ `INTERSECT binds tighter than UNION`
+
+-- bare: nyers UNION (njers INTERSECT voters)
+#EVAL setToList (`nyers` UNION `njers` INTERSECT `voters`)
+-- explicit control (must match)
+#EVAL setToList (`nyers` UNION (`njers` INTERSECT `voters`))
+
+§§ `Same operator: left-associative`
+
+a MEANS setFromList (LIST 1, 2)
+b MEANS setFromList (LIST 2, 3)
+c MEANS setFromList (LIST 3, 4)
+
+#EVAL setToList (a UNION b UNION c)
+#EVAL setToList ((a UNION b) UNION c)
+
+§§ `Explicit parentheses still override precedence`
+
+-- (nyers UNION njers) INTERSECT voters = {bob, carol}
+#EVAL setToList ((`nyers` UNION `njers`) INTERSECT `voters`)
+
+§§ `WITHOUT (@infixl 6) mixes with UNION at the same precedence, left-assoc`
+
+-- (a UNION b) WITHOUT c = {1,2,3} \ {3,4} = {1,2}
+#EVAL setToList (a UNION b WITHOUT c)
+#EVAL setToList ((a UNION b) WITHOUT c)
+
+§§ `Longer mixed chain`
+
+d MEANS setFromList (LIST 4, 5)
+
+-- a UNION (b INTERSECT c) UNION d — INTERSECT groups first
+#EVAL setToList (a UNION b INTERSECT c UNION d)
+#EVAL setToList ((a UNION (b INTERSECT c)) UNION d)

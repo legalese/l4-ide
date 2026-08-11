@@ -3,7 +3,7 @@ IMPORT timezone
 § `Timezone declaration tests`
 
 -- Test document timezone declaration with a timezone constant
-EST
+TIMEZONE IS EST
 
 -- Verify TIMEZONE builtin returns the timezone string
 DECIDE `document timezone` IS TIMEZONE

@@ -160,15 +160,24 @@ postDeploymentHandler multipart = do
       version = computeVersion sourceMap
 
   registry <- liftIO $ readTVarIO env.deploymentRegistry
+  -- The recompile shortcut is keyed on the CONTENT hash, so it must also be
+  -- keyed on the requested id. Matching content alone meant that asking for a
+  -- new deployment whose bytes happened to equal an existing one returned HTTP
+  -- 200 naming the OTHER deployment, and created nothing: a subsequent
+  -- @GET /deployments/<the id you asked for>@ 404s. Documented as "skips
+  -- recompilation", it actually skipped deployment creation. Deploying the
+  -- same bundle twice under two names is exactly what you do to compare them,
+  -- and the caller had no way to tell it had not happened.
   let existingMatch =
         [ (did, meta)
         | (did, DeploymentReady _ meta) <- Map.toList registry
         , meta.metaVersion == version
+        , did == deployId
         ]
 
   case existingMatch of
     ((existingId, existingMeta):_) ->
-      -- Identical sources already deployed — no recompile, no job.
+      -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
       pure (mkStatus existingId.unDeploymentId "ready" (Just existingMeta) Nothing)
     [] -> do
       let cfg = env.options

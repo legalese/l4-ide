@@ -1,0 +1,30 @@
+-- Test: section lexical scoping with shadowed names.
+--
+-- An unqualified name resolves to the *nearest enclosing section's* binding,
+-- shadowing identically-named bindings in outer (ancestor) scopes. Names from
+-- non-ancestor sections still require qualification. See
+-- SECTION-LEXICAL-SCOPING-SPEC.md.
+
+-- top-level binding
+bonus MEANS 10
+
+§ employment
+salary MEANS 5000
+bonus MEANS 20                  -- shadows the top-level bonus within § employment
+
+§§ `full time`
+-- `salary` is inherited unqualified from the parent § employment.
+-- `bonus` resolves to § employment's bonus (20, the nearest enclosing section),
+-- shadowing the top-level bonus (10).
+pay MEANS salary PLUS bonus
+#EVAL pay                       -- 5020
+
+§ contractor
+-- No local bonus here. The top-level bonus is an ancestor and shadows the
+-- same-typed § employment binding (a non-ancestor sibling), so this resolves
+-- to the top-level bonus (10).
+rate MEANS bonus PLUS 5
+#EVAL rate                      -- 15
+-- Fully-qualified cross-section access is unchanged.
+empBonus MEANS employment.bonus
+#EVAL empBonus                  -- 20

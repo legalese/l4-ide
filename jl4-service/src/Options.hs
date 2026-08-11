@@ -25,6 +25,23 @@ data Options = Options
   , maxCompileMemoryMb    :: !Int
   , evalTimeout           :: !Int
   , compileTimeout        :: !Int
+  , maxLadderNodes        :: !Int
+  -- ^ Ceiling on the size of a ladder visualization, in IR nodes.
+  --
+  -- Unlike the other limits here this one bounds a RESPONSE, not an input or a
+  -- runtime. The ladder is built by distributing OR over AND to reach CNF, so
+  -- its size is exponential in the width of a disjunction of conjunctions:
+  -- @(a AND b) OR (c AND d) OR …@ over 2n variables expands to 2^n clauses.
+  -- Measured on this service, 8 variables give a 12 KB response, 16 give 366 KB
+  -- and 32 give tens of megabytes over minutes — while the request that asks
+  -- for it is a bare unauthenticated GET holding one of the
+  -- 'maxConcurrentRequests' slots the whole time. No timeout bounds that: the
+  -- cost is in serializing the answer, not in computing it.
+  --
+  -- The default is far above anything a person could read off a diagram
+  -- (a few hundred nodes is already a wall of boxes) and far below the
+  -- pathological cases, so a legitimate model should never meet it. Raise it if
+  -- one does.
   }
 
 -- | Build the CLI parser with environment variable defaults.
@@ -45,6 +62,7 @@ buildOpts = do
   envMaxCompMem <- readEnvInt "JL4_MAX_COMPILE_MEMORY_MB"
   envEvalTO     <- readEnvInt "JL4_EVAL_TIMEOUT"
   envCompTO     <- readEnvInt "JL4_COMPILE_TIMEOUT"
+  envMaxLadder  <- readEnvInt "JL4_MAX_LADDER_NODES"
 
   let parser = Options
         <$> option auto
@@ -146,6 +164,15 @@ buildOpts = do
                   <> value (maybe 60 id envCompTO)
                   <> showDefault
                   <> help "Compilation timeout in seconds (env: JL4_COMPILE_TIMEOUT)"
+              )
+        <*> option auto
+              ( long "max-ladder-nodes"
+                  <> metavar "COUNT"
+                  <> value (maybe 10000 id envMaxLadder)
+                  <> showDefault
+                  <> help
+                       "Maximum ladder-diagram size, in IR nodes, that query-plan and ladder \
+                       \will build or serve (env: JL4_MAX_LADDER_NODES)"
               )
 
   pure $ info

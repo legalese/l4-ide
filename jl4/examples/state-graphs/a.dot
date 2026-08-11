@@ -8,5 +8,25 @@ digraph {
          ,fontsize=11];
     edge [fontname=Helvetica
          ,fontsize=10];
+    0 [label="initial\nALL OF"
+      ,fillcolor=white
+      ,style=filled
+      ,shape=diamond
+      ,fillcolor="#e6dcf5"];
+    1 [label=z
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#ffffff"];
+    2 [label=z
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#ffffff"];
+    0 -> 1 [label=""
+           ,color="#6f42c1"
+           ,style=solid];
+    0 -> 2 [label=""
+           ,color="#6f42c1"
+           ,style=solid];
 }
-

@@ -16,6 +16,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
+import L4.FunctionSchema (typicallyToJson)
 import L4.Syntax
 import Optics
 
@@ -35,7 +36,7 @@ data SchemaType
   | SBoolean !(Maybe Text)
   | SNull
   | SArray !SchemaType !(Maybe Text)
-  | SObject ![(Text, SchemaType, Bool)] !(Maybe Text)
+  | SObject ![(Text, SchemaType, Bool, Maybe Aeson.Value)] !(Maybe Text)
   | SRef !Text !(Maybe Text)
   | SOneOf ![SchemaType] !(Maybe Text)
   | SEnum ![Text] !(Maybe Text)
@@ -74,6 +75,11 @@ schemaTypeToValue :: SchemaType -> Aeson.Value
 schemaTypeToValue st =
   Aeson.object $ schemaTypeToFields st
 
+-- | Render a property schema, attaching a TYPICALLY "default" when present.
+propertyToValue :: SchemaType -> Maybe Aeson.Value -> Aeson.Value
+propertyToValue st mdef =
+  Aeson.object $ schemaTypeToFields st <> maybe [] (\d -> ["default" .= d]) mdef
+
 schemaTypeToFields :: SchemaType -> [(Aeson.Key, Aeson.Value)]
 schemaTypeToFields = \case
   SString desc -> typeField "string" <> descField desc
@@ -88,8 +94,8 @@ schemaTypeToFields = \case
   SObject props desc ->
     let (propFields, reqFields) =
           foldr
-            ( \(name, ty, req) (ps, rs) ->
-                ( (Key.fromText name, schemaTypeToValue ty) : ps
+            ( \(name, ty, req, mdef) (ps, rs) ->
+                ( (Key.fromText name, propertyToValue ty mdef) : ps
                 , if req then name : rs else rs
                 )
             )
@@ -145,15 +151,16 @@ buildParamsSchema ctx params =
   let (props, defs) = foldr addParam ([], ctx.ctxCollectedDefs) params
    in (SObject props Nothing, defs)
  where
-  addParam :: ExportedParam -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
+  addParam :: ExportedParam -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
   addParam param (acc, defs) =
-    case param.paramType of
+    let mdef = typicallyToJson =<< param.paramDefault
+    in case param.paramType of
       Nothing ->
-        ((param.paramName, SString param.paramDescription, param.paramRequired) : acc, defs)
+        ((param.paramName, SString param.paramDescription, param.paramRequired, mdef) : acc, defs)
       Just ty ->
         let (schema, newDefs) = typeToJsonSchema ctx{ctxCollectedDefs = defs} ty
             schemaWithDesc = addDescription schema param.paramDescription
-         in ((param.paramName, schemaWithDesc, param.paramRequired) : acc, newDefs)
+         in ((param.paramName, schemaWithDesc, param.paramRequired, mdef) : acc, newDefs)
 
   addDescription :: SchemaType -> Maybe Text -> SchemaType
   addDescription st Nothing = st
@@ -176,21 +183,36 @@ typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text Sch
 typeToJsonSchema ctx = \case
   Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
   TyApp _ name args ->
+    -- Match on the lower-cased builtin name: L4's resolved builtin type names
+    -- are ALL-CAPS (NUMBER/STRING/BOOLEAN/DATE/DATETIME/LIST/MAYBE), so a
+    -- case-sensitive match against "Number"/… never fired and every builtin
+    -- fell through to a dangling `$ref: "#/$defs/NUMBER"`. Mirror the naming
+    -- convention used by L4.FunctionSchema.primitiveJsonType. The declares
+    -- lookup below deliberately keeps the ORIGINAL-case `typeName` as its key.
     let typeName = resolvedToText name
-     in case (typeName, args) of
-          ("Number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("String", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("Boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("Integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("Date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
-          ("DateTime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
-          ("List", [inner]) ->
+     in case (Text.toLower typeName, args) of
+          ("number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
+          ("int", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
+          ("integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
+          ("float", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
+          ("double", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
+          ("string", []) -> (SString Nothing, ctx.ctxCollectedDefs)
+          ("text", []) -> (SString Nothing, ctx.ctxCollectedDefs)
+          ("boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+          ("bool", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+          ("date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
+          ("datetime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
+          ("time", []) -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
+          ("list", [inner]) ->
             let (innerSchema, defs) = typeToJsonSchema ctx inner
              in (SArray innerSchema Nothing, defs)
-          ("Optional", [inner]) ->
+          ("listof", [inner]) ->
+            let (innerSchema, defs) = typeToJsonSchema ctx inner
+             in (SArray innerSchema Nothing, defs)
+          ("optional", [inner]) ->
             let (innerSchema, defs) = typeToJsonSchema ctx inner
              in (SAnyOf [innerSchema, SNull] Nothing, defs)
-          ("Maybe", [inner]) ->
+          ("maybe", [inner]) ->
             let (innerSchema, defs) = typeToJsonSchema ctx inner
              in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
@@ -226,14 +248,14 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
           let (schema, defs) = typeToJsonSchema ctx ty
            in (addDescToSchema schema desc, defs)
  where
-  addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addField ctx' (MkTypedName fieldAnn fieldName fieldTy _) (acc, defs) =
+  addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
+  addField ctx' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =
     let fieldNameText = resolvedToText fieldName
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
         schemaWithDesc = addDescToSchema fieldSchema fieldDesc
         isRequired = not (isMaybeOrOptionalType fieldTy)
-     in ((fieldNameText, schemaWithDesc, isRequired) : acc, newDefs)
+     in ((fieldNameText, schemaWithDesc, isRequired, typicallyToJson =<< mTypically) : acc, newDefs)
 
   addDescToSchema :: SchemaType -> Maybe Text -> SchemaType
   addDescToSchema st Nothing = st
@@ -274,14 +296,14 @@ enumWithPayloads ctx' desc constructors =
   buildOption :: ConDecl Resolved -> ([SchemaType], Map Text SchemaType) -> ([SchemaType], Map Text SchemaType)
   buildOption (MkConDecl _ name fields) (acc, defs) =
     let tagName = resolvedToText name
-        tagProp = ("tag", SConst tagName Nothing, True)
+        tagProp = ("tag", SConst tagName Nothing, True, Nothing)
         (fieldProps, newDefs) = foldr (addConField ctx'{ctxCollectedDefs = defs}) ([], defs) fields
         allProps = tagProp : fieldProps
         objSchema = SObject allProps Nothing
      in (objSchema : acc, newDefs)
 
-  addConField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy _) (acc, defs) =
+  addConField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
+  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =
     let fieldNameText = resolvedToText fieldName
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx''{ctxCollectedDefs = defs} fieldTy
@@ -301,11 +323,14 @@ enumWithPayloads ctx' desc constructors =
             SAnyOf opts _ -> SAnyOf opts (Just d)
             SStringFormat fmt _ -> SStringFormat fmt (Just d)
             SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy)) : acc, newDefs)
+     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy), typicallyToJson =<< mTypically) : acc, newDefs)
 
--- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema
+-- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema.
+-- Lower-cased for the same reason: the resolved builtin name is ALL-CAPS "MAYBE",
+-- so the old case-sensitive match never fired and MAYBE-typed record fields were
+-- wrongly emitted as required.
 isMaybeOrOptionalType :: Type' Resolved -> Bool
-isMaybeOrOptionalType (TyApp _ name [_]) = resolvedToText name `elem` ["Maybe", "Optional"]
+isMaybeOrOptionalType (TyApp _ name [_]) = Text.toLower (resolvedToText name) `elem` ["maybe", "optional"]
 isMaybeOrOptionalType _ = False
 
 resolvedToText :: Resolved -> Text

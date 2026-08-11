@@ -30,7 +30,7 @@ import qualified Base.Text as Text
 import L4.Annotation (HasSrcRange(..))
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..), SrcSpan(..))
 import L4.Lexer (PError(..))
-import L4.TypeCheck.Types (CheckErrorWithContext(..), Severity(..), CheckError(..))
+import L4.TypeCheck.Types (CheckErrorWithContext(..), Severity(..), severity)
 import L4.TypeCheck (prettyCheckError)
 import qualified L4.EvaluateLazy as EL
 
@@ -96,12 +96,6 @@ checkErrorToDiagnostic err = SimpleDiagnostic
   , sdMessage  = Text.unlines (prettyCheckError err.kind)
   , sdSource   = "check"
   }
-  where
-    severity (MkCheckErrorWithContext e _) =
-      case e of
-        CheckInfo {}    -> SInfo
-        CheckWarning {} -> SWarn
-        _               -> SError
 
 -- | Convert a parse error to a platform-agnostic diagnostic.
 -- Note: Parse errors have a SrcSpan (no URI) rather than a full SrcRange.
@@ -117,7 +111,7 @@ parseErrorToDiagnostic err = SimpleDiagnostic
 --
 -- Failed assertions get Error severity, successful evaluations get Info.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
-evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace) = SimpleDiagnostic
+evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
   , sdSeverity = case res of
       EL.Assertion False -> DSError

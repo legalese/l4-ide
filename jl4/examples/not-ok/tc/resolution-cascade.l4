@@ -1,0 +1,30 @@
+-- Regression fixture for issue #920.
+--
+-- `Verdict` is declared twice, so naming it in a GIVETH is genuinely ambiguous.
+-- The ONE error the user should see is that ambiguity.
+--
+-- What used to happen instead: resolution handed back an `OutOfScope` sentinel
+-- with an unregistered unique, and checking the body against that poisoned
+-- signature produced, per branch of the IF, both
+--
+--   "I've encountered a resolved name that has no additional information
+--    stored for it: Verdict. This is an error in this system and should be
+--    reported as a bug."
+--
+-- and the vacuous
+--
+--   "must match its type signature ... namely Verdict but is here of type
+--    Verdict"
+--
+-- -- five diagnostics for one mistake, four of them noise, and one of them
+-- accusing the compiler of a bug the user had not hit.
+--
+-- The golden for this file must therefore contain exactly the ambiguity error.
+
+DECLARE Verdict IS ONE OF yes, no
+
+DECLARE Verdict IS ONE OF maybe, perhaps
+
+GIVEN x IS A BOOLEAN
+GIVETH A Verdict
+`decide it` MEANS IF x THEN yes ELSE no

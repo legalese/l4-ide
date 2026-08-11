@@ -1,0 +1,9 @@
+`setToList` with `_ UNION _` with `nyers` and `_ INTERSECT _` with `njers` and `voters`
+`setToList` with `_ UNION _` with `nyers` and `_ INTERSECT _` with `njers` and `voters`
+`setToList` with `UNION` with `_ UNION _` with `a` and `b` and `c`
+`setToList` with `_ UNION _` with `_ UNION _` with `a` and `b` and `c`
+`setToList` with `_ INTERSECT _` with `_ UNION _` with `nyers` and `njers` and `voters`
+`setToList` with `WITHOUT` with `_ UNION _` with `a` and `b` and `c`
+`setToList` with `_ WITHOUT _` with `_ UNION _` with `a` and `b` and `c`
+`setToList` with `UNION` with `_ UNION _` with `a` and `_ INTERSECT _` with `b` and `c` and `d`
+`setToList` with `_ UNION _` with `_ UNION _` with `a` and `_ INTERSECT _` with `b` and `c` and `d`

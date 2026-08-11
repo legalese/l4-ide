@@ -3,7 +3,7 @@
     "description": "Is the temperature warm?",
     "properties": {
         "temperature": {
-            "$ref": "#/$defs/NUMBER"
+            "type": "number"
         }
     },
     "required": [

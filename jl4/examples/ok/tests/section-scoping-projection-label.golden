@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-scoping-projection-label.l4:57:1-42:
+  TRUE
+section-scoping-projection-label.l4:58:1-40:
+  FALSE
+section-scoping-projection-label.l4:59:1-40:
+  TRUE
+section-scoping-projection-label.l4:60:1-46:
+  FALSE
+section-scoping-projection-label.l4:61:1-31:
+  TRUE
+section-scoping-projection-label.l4:62:1-31:
+  "USD"

@@ -17,6 +17,8 @@ module TestData (
   assumeParamJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
+  dnfBlowupJL4,
+  twinLeavesJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -30,6 +32,7 @@ import Control.Monad.Trans.Except
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 rodentAndVerminFunctionSpec :: IO ValidatedFunction
 rodentAndVerminFunctionSpec = either (error . show) id <$> runExceptT rodentAndVerminFunction
@@ -45,16 +48,16 @@ rodentAndVerminFunction = do
             let
               params =
                 Map.fromList
-                  [ ("Loss or Damage.caused by insects", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by insects?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("Loss or Damage.caused by birds", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by birds?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("Loss or Damage.caused by vermin", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by vermin?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("Loss or Damage.caused by rodents", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by rodents?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("Loss or Damage.to Contents", Parameter "string" Nothing Nothing ["true", "false"] "Is the damage to your contents?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("Loss or Damage.ensuing covered loss", Parameter "string" Nothing Nothing ["true", "false"] "Is the damage ensuing covered loss" Nothing Nothing Nothing Nothing Nothing)
-                  , ("any other exclusion applies", Parameter "string" Nothing Nothing ["true", "false"] "Are any other exclusions besides mentioned ones?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("a household appliance", Parameter "string" Nothing Nothing ["true", "false"] "Did water escape from a household appliance due to an animal?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("a swimming pool", Parameter "string" Nothing Nothing ["true", "false"] "Did water escape from a swimming pool due to an animal?" Nothing Nothing Nothing Nothing Nothing)
-                  , ("a plumbing, heating, or air conditioning system", Parameter "string" Nothing Nothing ["true", "false"] "Did water escape from a plumbing, heating or conditioning system due to an animal?" Nothing Nothing Nothing Nothing Nothing)
+                  [ ("Loss or Damage.caused by insects", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by insects?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("Loss or Damage.caused by birds", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by birds?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("Loss or Damage.caused by vermin", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by vermin?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("Loss or Damage.caused by rodents", Parameter "string" Nothing Nothing ["true", "false"] "Was the damage caused by rodents?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("Loss or Damage.to Contents", Parameter "string" Nothing Nothing ["true", "false"] "Is the damage to your contents?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("Loss or Damage.ensuing covered loss", Parameter "string" Nothing Nothing ["true", "false"] "Is the damage ensuing covered loss" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("any other exclusion applies", Parameter "string" Nothing Nothing ["true", "false"] "Are any other exclusions besides mentioned ones?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("a household appliance", Parameter "string" Nothing Nothing ["true", "false"] "Did water escape from a household appliance due to an animal?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("a swimming pool", Parameter "string" Nothing Nothing ["true", "false"] "Did water escape from a swimming pool due to an animal?" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  , ("a plumbing, heating, or air conditioning system", Parameter "string" Nothing Nothing ["true", "false"] "Did water escape from a plumbing, heating or conditioning system due to an animal?" Nothing Nothing Nothing Nothing Nothing Nothing)
                   ]
             in
               MkParameters
@@ -174,6 +177,49 @@ GIVEN walks IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 |]
+
+-- | A decision with TWIN atoms: one compound leaf written twice.
+--
+-- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes
+-- through 'L4.Viz.Ladder.leafFromExpr', which mints a fresh @unique@ per
+-- occurrence. The two occurrences share a label and an input-ref closure, so
+-- 'L4.Viz.Ladder.generateAtomId' gives them one atomId between them: one
+-- question, two BDD variables.
+--
+-- Answering that question FALSE refutes both disjuncts and settles the whole
+-- decision — but only if the binding reaches both variables. That makes "did
+-- the answer land" observable on the wire as a change in @determined@, rather
+-- than as a property of a map. Used by the atomId tests in 'IntegrationSpec'.
+twinLeavesJL4 :: Text
+twinLeavesJL4 =
+  [i|
+@export twins
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE twins IF (n GREATER THAN 5 AND p) OR (n GREATER THAN 5 AND q)
+|]
+
+-- | @(x0 AND x1) OR (x2 AND x3) OR …@ over @n@ boolean parameters, as an
+-- @\@export@.
+--
+-- Small in the source and enormous in the ladder: reaching the AND/OR normal
+-- form a ladder draws distributes OR over AND, so this expands to 2^(n/2)
+-- clauses. Used to pin the @maxLadderNodes@ refusal on the HTTP surface, where
+-- it matters most — @\/ladder@ is an unauthenticated, CORS-open GET.
+dnfBlowupJL4 :: Int -> Text
+dnfBlowupJL4 n =
+  Text.unlines
+    [ "@export blowup"
+    , "GIVEN " <> Text.intercalate "\n      " [param k <> " IS A BOOLEAN" | k <- [0 .. n - 1]]
+    , "GIVETH A BOOLEAN"
+    , "DECIDE blowup IF "
+        <> Text.intercalate " OR "
+             [ "(" <> param k <> " AND " <> param (k + 1) <> ")" | k <- [0, 2 .. n - 2] ]
+    ]
+ where
+  param k = "x" <> Text.pack (show (k :: Int))
 
 -- | L4 source with a module-level ASSUME referenced by an @export.
 -- Exercises the ASSUME→parameter promotion path in the direct-AST

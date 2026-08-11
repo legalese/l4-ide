@@ -89,9 +89,36 @@ export type QueryAtom = {
   inputRefs?: { rootUnique: number; path: string[] }[]
 }
 
+/**
+ * What may be TOLD to a user, as opposed to what the function evaluates to.
+ *
+ * These are the ladder's two lamps, on the wire. For a rule stated as a seam
+ * (`scope IMPLIES requirement`), `Complies` and `NotApplicable` are BOTH
+ * `determined === true` — so a client that switches on `determined` will sooner or
+ * later tell someone they complied with a rule that never reached them. Switch on this
+ * instead. See DESIGN §25.3.
+ *
+ * Mirror of `Verdict` in `BooleanDecisionQuery.hs` and `decision-query.ts`.
+ */
+export type Verdict =
+  | 'Undetermined'
+  | 'Holds'
+  | 'Fails'
+  | 'Complies'
+  | 'InBreach'
+  | 'NotApplicable'
+
+export type QueryOutcome = {
+  /** The FUNCTION's truth value. Correct, and not a verdict. */
+  determined: boolean | null
+  /** What may be shown to a user. */
+  verdict: Verdict
+  support: QueryAtom[]
+}
+
 export type QueryImpact = {
-  ifTrue: { determined: boolean | null; support: QueryAtom[] }
-  ifFalse: { determined: boolean | null; support: QueryAtom[] }
+  ifTrue: QueryOutcome
+  ifFalse: QueryOutcome
 }
 
 export type QueryAsk = {
@@ -104,7 +131,15 @@ export type QueryAsk = {
 }
 
 export type QueryPlanResponse = {
+  /** The FUNCTION's truth value. Correct, and NOT a verdict — see {@link Verdict}. */
   determined: boolean | null
+  /** What may be shown to a user. Switch on THIS, not on `determined`. */
+  verdict: Verdict
+  /**
+   * Atoms still worth asking about — computed against the VERDICT, so it can be
+   * non-empty even when `determined` is settled: a met requirement does not tell you
+   * whether the rule bit you, and the scope still does.
+   */
   stillNeeded: QueryAtom[]
   ranked: QueryAtom[]
   inputs: {

@@ -1,0 +1,30 @@
+-- T6 sentinel: TODAY is INDEPENDENT of the valid-time axis.
+--
+-- Update (option (b), 2026-07-08): tcValidTime is no longer fully latent —
+-- `RULES EFFECTIVE DATE` now reads it as a fallback (crValidTime is a real
+-- CtxReads field with an instrumented reader). But TODAY still reads only
+-- tcSystemTime, so `EVAL UNDER VALID TIME` remains value-transparent for the
+-- TODAY-based thunks below and must NOT perturb their caching. This golden
+-- now LOCKS that independence (the valid-time→law-version flow is exercised
+-- by temporal-rule-version-validtime.l4 instead). Values are unchanged.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z;
+-- serial(2025-01-31) = 739646.
+
+TIMEZONE IS "Etc/UTC"
+
+-- expected: 5 (override transparent for context-free values)
+#EVAL `EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2000) (2 PLUS 3)
+
+`shared today V` MEANS DATE_SERIAL TODAY
+
+-- expected: 739646 — the shared thunk is forced (and cached) while
+-- tcValidTime is overridden to 2000-01-01; TODAY correctly ignores it
+#EVAL `EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2000) `shared today V`
+
+-- expected: 739646 — the cache remains valid at ambient (no read axis
+-- differs), so this also guards against over-invalidation
+#EVAL `shared today V`
+
+-- expected: 739646 (control)
+#EVAL DATE_SERIAL (DATE_FROM_DMY 31 1 2025)

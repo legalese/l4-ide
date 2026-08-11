@@ -1,0 +1,16 @@
+`past`
+`DATE_SERIAL` with `DATE_FROM_DMY` with 31, 1 and 2025
+`EVAL AS OF SYSTEM TIME` with `past` and `b1`
+`b1`
+`b1b`
+`EVAL AS OF SYSTEM TIME` with `past` and `b1b`
+`EVAL AS OF SYSTEM TIME` with `past` and `f2` with 0
+`f2` with 0
+`EVAL AS OF SYSTEM TIME` with `past` and `b3`
+`b3`
+`EVAL AS OF SYSTEM TIME` with `past` and `w4` 's `stamp`
+`w4` 's `stamp`
+`peek5` with `b5`
+`b5`
+`EVAL AS OF SYSTEM TIME` with `past` and `g6` with 0
+`g6` with 0
