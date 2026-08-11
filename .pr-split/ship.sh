@@ -62,8 +62,17 @@ Upstream unstable PRs folded in: ${prs:-n/a}
 Co-Authored-By: ${SHIP_COAUTHOR}
 Claude-Session: ${SHIP_SESSION}"
 
+# --force-with-lease with no value compares against the branch's upstream, but
+# build-branch.sh cuts the branch from origin/main, so there is no upstream for
+# claude/aug2026-<theme> and git refuses with "stale info". It only worked on the
+# first push because the remote ref did not exist yet and no force was needed.
+# Name the expected remote sha explicitly: still a lease (a concurrent push by
+# another session is rejected), but one git can actually evaluate.
+lease=$(git -C "$wt" rev-parse -q --verify "refs/remotes/origin/${branch}" 2>/dev/null || true)
+if [ -n "$lease" ]; then lease_arg="--force-with-lease=${branch}:${lease}"; else lease_arg=""; fi
+
 for attempt in 1 2 3 4 5; do
-  if git -C "$wt" push -q -u origin "$branch" --force-with-lease 2>/tmp/push-err; then
+  if git -C "$wt" push -q -u origin "$branch" $lease_arg 2>/tmp/push-err; then
     echo "$theme: pushed $n files -> $branch"; exit 0
   fi
   cat /tmp/push-err >&2
