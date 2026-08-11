@@ -52,3 +52,23 @@ never enter the orchestrator's context:
 
   read the PR body -> compare with the file bytes (use `sed -n '3,$p'`, not a summarising read)
   -> if different, call mcp__github__update_pull_request with the corrected body.
+
+
+## Verification-pass state (as of the session-limit interruption)
+
+Round 1 checked 15 of 26 PRs; 11 failed on the session limit. Of the 15: 4 exact, 7 repaired
+(#232, #234, #237, #240, #241, #242, #243), 4 flagged **unresolved** because the drift ran the
+*other* way — the live PR body was newer than the file, since it carried corrections made by hand
+at posting time. Those agents were right not to clobber.
+
+Those hand-corrections have since been folded back into the files:
+
+- `bpmn-export.md`  — the `.cabal` registrations ARE carried (spine slicing), not missing.
+- `corpus-regcf.md` — 59 files; the three rerouted goldens now belong to lsp / service-cli.
+- `agent-tooling.md`— the `.claude/skills` symlink redirect; "twenty-six PRs".
+- `ci-build.md`     — merge-last banner; eleven files; `turbo.json` moved to wizard-regcf;
+                      #167's cabal half is lang-imports-stdlib, not service-cli; the third hard
+                      dependency (corpus goldens red on main); wizard-housing / wizard-regcf.
+
+**The file on disk is authoritative from here on.** Round 2 re-verifies the 16 outstanding PRs
+(the 4 unresolved + #232, which round 1 reset to the pre-correction text, + the 11 never checked).
