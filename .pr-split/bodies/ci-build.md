@@ -229,7 +229,7 @@ harness grows a baseline — which a later commit on this branch (`572972f4`) su
 ## Independence
 
 **This PR is not standalone, and it should not be reviewed as though it were.** It is the gate layer;
-most of what it gates lives elsewhere.
+most of what it gates lives elsewhere. Three of its dependencies are hard.
 
 *Hard dependency 1 — `npm ci` fails without it.* `package-lock.json` here is the regenerated
 whole-workspace lock. It contains entries resolving to `ts-apps/housing-wizard`,
@@ -257,8 +257,6 @@ turns `main` red for a defect that predates all of these PRs.
 behind a paths filter, so if the sibling's files are absent the filter never fires and the job never
 runs — no red check, just no coverage:
 
-- `Corpus Goldens Present` runs unconditionally and is genuinely standalone (pure Node, no build),
-  but its 352-file count only holds once the new corpora land — **corpus-legal-new**, **corpus-regcf**.
 - `Go Orchestrator` needs `etc/go/**` and `.claude/skills/**` — **go-pipeline**, **agent-tooling**.
 - `BPMN Soundness` needs `etc/check-bpmn-*`, `etc/kie/**`, `jl4/examples/bpmn/**` — **bpmn-export**.
 - `DMN Engine Checks` needs `etc/kie-dmn-check/**`, `etc/camunda-dmn-check/**`,
