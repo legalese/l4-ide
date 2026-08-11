@@ -15,6 +15,7 @@ etc/go/lib/deposit-prelude.sh
 etc/go/lib/digest.mjs
 etc/go/lib/discover.mjs
 etc/go/lib/dmn-tables.mjs
+etc/go/lib/doctor.mjs
 etc/go/lib/fidelity-counts.mjs
 etc/go/lib/gate-payload.mjs
 etc/go/lib/known-defects.mjs
@@ -29,6 +30,7 @@ etc/go/lib/receipt.mjs
 etc/go/lib/register-validate.mjs
 etc/go/lib/split-digraphs.mjs
 etc/go/lib/subject.mjs
+etc/go/lib/toolchain.sh
 etc/go/lib/verdict.mjs
 etc/go/lib/verify-run.mjs
 etc/go/phases/p0-preflight.sh

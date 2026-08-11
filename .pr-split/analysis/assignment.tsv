@@ -138,6 +138,7 @@ go-pipeline	etc/go/lib/deposit-prelude.sh
 go-pipeline	etc/go/lib/digest.mjs
 go-pipeline	etc/go/lib/discover.mjs
 go-pipeline	etc/go/lib/dmn-tables.mjs
+go-pipeline	etc/go/lib/doctor.mjs
 go-pipeline	etc/go/lib/fidelity-counts.mjs
 go-pipeline	etc/go/lib/gate-payload.mjs
 go-pipeline	etc/go/lib/known-defects.mjs
@@ -152,6 +153,7 @@ go-pipeline	etc/go/lib/receipt.mjs
 go-pipeline	etc/go/lib/register-validate.mjs
 go-pipeline	etc/go/lib/split-digraphs.mjs
 go-pipeline	etc/go/lib/subject.mjs
+go-pipeline	etc/go/lib/toolchain.sh
 go-pipeline	etc/go/lib/verdict.mjs
 go-pipeline	etc/go/lib/verify-run.mjs
 go-pipeline	etc/go/phases/p0-preflight.sh
