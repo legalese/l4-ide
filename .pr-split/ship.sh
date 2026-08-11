@@ -20,12 +20,16 @@ fi
 # cabal.project carries two unrelated one-line edits — dropping the archived
 # package and adding the new one. Each belongs with the PR that does the work,
 # so neither PR leaves `cabal build all` pointing at a directory that is not there.
+# `sed -i` without a backup suffix is GNU-only; BSD/macOS sed reads the next
+# argument as the suffix and then fails. Write through a temp file instead, and
+# use perl for the multi-line insert, which BSD sed also will not take as `\n`.
 case "$theme" in
   actus-archive)
-    sed -i '\|^  \./jl4-actus-analyzer$|d' "$wt/cabal.project"
+    grep -v '^  \./jl4-actus-analyzer$' "$wt/cabal.project" > "$wt/cabal.project.tmp"
+    mv "$wt/cabal.project.tmp" "$wt/cabal.project"
     git -C "$wt" add -- cabal.project ;;
   proleg)
-    sed -i 's|^  \./jl4-service$|  ./jl4-service\n  ./jl4-proleg|' "$wt/cabal.project"
+    perl -0pi -e 's|^  \./jl4-service$|  ./jl4-service\n  ./jl4-proleg|m' "$wt/cabal.project"
     git -C "$wt" add -- cabal.project ;;
 esac
 
@@ -44,12 +48,19 @@ if [ "$n" -eq 0 ]; then echo "$theme: nothing staged, skipping" >&2; exit 1; fi
 
 prs=$(cut -f1 "${mdir}/${theme}.prs" 2>/dev/null | grep . | paste -sd, - || true)
 
+# The session trailers must name the session that actually re-cut the branch.
+# Hardcoding them means a later re-ship silently misattributes the work to the
+# session that first wrote this script — the exact failure the user-level
+# CLAUDE.md warns about. Override per run; the defaults are the original cut.
+: "${SHIP_COAUTHOR:=Claude Opus 5 <noreply@anthropic.com>}"
+: "${SHIP_SESSION:=https://claude.ai/code/session_015FabdLGbnDrbNWpQfFGNtK}"
+
 git -C "$wt" -c user.name="Claude" -c user.email="noreply@anthropic.com" \
   commit -q -m "$title" -m "Re-cut from the unstable integration branch for review against main.
 Upstream unstable PRs folded in: ${prs:-n/a}
 
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_015FabdLGbnDrbNWpQfFGNtK"
+Co-Authored-By: ${SHIP_COAUTHOR}
+Claude-Session: ${SHIP_SESSION}"
 
 for attempt in 1 2 3 4 5; do
   if git -C "$wt" push -q -u origin "$branch" --force-with-lease 2>/tmp/push-err; then

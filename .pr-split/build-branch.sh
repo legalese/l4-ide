@@ -43,7 +43,11 @@ fi
 
 if [ -s "$take" ]; then
   # xargs in chunks: the manifests run to hundreds of paths.
-  xargs -a "$take" -d '\n' -n 200 git -C "$wt" checkout origin/unstable --
+  # NUL-delimited via `tr` rather than `xargs -a … -d '\n'`: -a and -d are GNU
+  # extensions that BSD/macOS xargs rejects outright ("xargs: invalid option --
+  # a"), and because the loop below still ran, the script exited 0 having staged
+  # nothing from unstable. Fails silently on a Mac; -0 works on both.
+  tr '\n' '\0' < "$take" | xargs -0 -n 200 git -C "$wt" checkout origin/unstable --
 fi
 
 while IFS= read -r f; do
@@ -56,7 +60,7 @@ done < "$redirect"
 rm -f "$redirect"
 
 if [ -s "$drop" ]; then
-  xargs -a "$drop" -d '\n' -n 200 git -C "$wt" rm -q -r --ignore-unmatch --
+  tr '\n' '\0' < "$drop" | xargs -0 -n 200 git -C "$wt" rm -q -r --ignore-unmatch --
 fi
 
 echo "== ${theme}: $(git -C "$wt" diff --cached --numstat origin/main | wc -l) files staged"
