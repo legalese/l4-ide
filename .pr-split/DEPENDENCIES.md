@@ -16,7 +16,11 @@ Five edges exist. Everything not listed here has no compile-time dependency on a
 | `service-cli` needs `dmn-export`, `bpmn-export`, `openfisca-export` | `l4 export` is the CLI surface over all three back ends |
 
 Suggested merge order: `ladder-viz` -> `dmn-export` -> `bpmn-export` / `openfisca-export` -> `service-cli`.
-Every other PR may merge in any order.
+
+**These five edges are real but they are not the binding constraint.** All five of those themes, and
+seven more, turn out to be in a single indivisible merge batch — see *"The edge `depcheck.mjs`
+cannot see"* below and `.pr-split/BATCH.md`. Ordering within the batch is moot; it merges as a unit.
+Every PR outside the batch may merge in any order.
 
 `ci-build` should merge **last**: the workflow it ships references check scripts that arrive
 with the feature PRs, so landing it early would redden `main` for checks whose subjects are
@@ -130,9 +134,36 @@ This is a property of splitting, at file level, a change that was semantically a
 PR #83, *"refactor(jl4-core): remove dead Exponent AST constructor"*). It cannot be fixed by
 reordering.
 
-**Recommendation: merge these five as one merge-queue batch** — `lang-syntax-typecheck`,
-`lang-eval-ledger`, `lang-printer`, `service-cli`, `mlir` — or land them in immediate succession
-and accept that `main` does not build in between. Every other PR in the set is unaffected.
+**Recommendation: merge these as one merge-queue batch**, or land them in immediate succession and
+accept that `main` does not build in between.
+
+> **Corrected 2026-08-11, by building.** This section previously named **five** themes
+> (`lang-syntax-typecheck`, `lang-eval-ledger`, `lang-printer`, `service-cli`, `mlir`) and said
+> "Every other PR in the set is unaffected." That is wrong. Merging those five onto `main` and
+> running `cabal build all` under GHC 9.10.3 **fails**, and each successive repair pulled in another
+> theme. The batch is **twelve**: the five above plus `lang-imports-stdlib`, `ladder-viz`,
+> `dmn-export`, `bpmn-export`, `openfisca-export`, `lsp` and `actus-archive`.
+>
+> The reasoning here was sound but the survey was too narrow: `Exponent` is one of *several*
+> type-level changes that cut across themes. `lang-syntax-typecheck` also widens `MkAssume` 4→5,
+> `MkTypedName` 4→5 and `MkOptionallyTypedName` 3→4, adds strict fields to `MkCheckState` and
+> `MkCheckEnv`, and adds `unqualifiedNameToText`; `lang-eval-ledger` widens `MkEvalDirectiveResult`
+> 3→4; `service-cli` adds a field to `FunctionSchema.Parameter`. Each has its own set of consumers.
+>
+> Two members could not have been found by reading at all:
+>
+> - **`actus-archive`.** `jl4-actus-analyzer` is on `main` and in `main`'s `cabal.project`, so
+>   `cabal build all` compiles it; its `FeatureExtractor.hs:519` matches `MkTypedName` with 4
+>   arguments. The package is deleted by `unstable`, so the fix is that `actus-archive` lands. CI on
+>   any single PR never sees this, because the build dies inside `jl4-core` first.
+> - **`lsp`.** `jl4-lsp/src/LSP/L4/Inspector.hs` matches `EL.MkEvalDirectiveResult` with 3
+>   arguments in five places.
+>
+> The full evidence chain — six builds, with the verbatim first error of each failing one — is in
+> `.pr-split/BATCH.md`, which is spliced into all twelve PR bodies by
+> `.pr-split/apply-batch.mjs`. Edit `BATCH.md` and re-run that script to update every member.
+
+Everything outside those twelve is either independent or a one-way dependent that can follow.
 
 The alternative, if they must land separately, is to re-cut `Syntax.hs` and the ten consumer
 modules at hunk level the way `spine/hunks.json` already does for the `.cabal` files and
