@@ -9,23 +9,14 @@ import { readFileSync, writeFileSync } from 'node:fs'
 const bdir = process.argv[2] ?? '.pr-split/bodies'
 const bfile = process.argv[3] ?? '.pr-split/BATCH.md'
 
-// The fifteen themes measured to be inseparable — see BATCH.md for the evidence.
-// The first twelve are needed to build; the last three to make the golden suite pass.
-// The merge queue's required check is "Haskell Build & Test", so all fifteen merge together.
+// The seven still-open PRs that were in the pre-consolidation interlock. The other eight
+// were consolidated into #257 and are closed; re-running this must not resurrect their roster.
 const MEMBERS = [
-  'lang-syntax-typecheck',
-  'lang-eval-ledger',
-  'lang-imports-stdlib',
-  'lang-printer',
-  'ladder-viz',
   'service-cli',
   'dmn-export',
   'bpmn-export',
   'openfisca-export',
-  'lsp',
   'mlir',
-  'actus-archive',
-  'lang-sets',
   'corpus-legal-new',
   'corpus-regcf',
 ]
