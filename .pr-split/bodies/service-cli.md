@@ -121,6 +121,29 @@ Folded from these `unstable` PRs, taking only the CLI and service parts of the o
 
 Not attributable to any PR in the list above: several of the older `l4 batch` and JSON Schema commits predate this numbering and reached `unstable` through earlier merges — `582b956c` (batch output formats, `--output`, `--continue-on-error`, CSV type inference), `291cd005` (unbuffered ndjson, exponent CSV cells, MAYBE param validation), `3a8d77e7` (shell injection in `l4 trace`, backslash corruption in `l4 batch`), `4be7553d` (fail `l4 check`/`run` on cyclic imports), `87c8b2e4` (valid JSON Schema for builtin types, T3), `04d5c5b5` (leftover tmp staging dir on redeploy, `smucclaw/l4-ide#850`), and `d7aa1631` (a crashed `#EVAL` fails `l4 run`).
 
+## Blast radius
+
+**3 new files**, 11 modified.
+
+Build registration only:
+
+- `jl4-service/jl4-service.cabal` — registers new modules
+- `jl4/jl4.cabal` — registers new modules
+
+Within the CLI, service and their libraries (this PR's own files):
+
+- `jl4-core/src/L4/API/EmbeddedLibraries.hs`
+- `jl4-core/src/L4/API/EmbeddedLibraries/TH.hs`
+- `jl4-wasm/app/QueryPlanWasm.hs`
+- `jl4/app/L4/Cli/Batch.hs`
+- `jl4/app/L4/Cli/Check.hs`
+- `jl4/app/L4/Cli/Common.hs`
+- `jl4/app/L4/Cli/Run.hs`
+- `jl4/app/L4/Cli/Trace.hs`
+- …and 1 more, all under the same tree
+
+**No file outside the CLI, service and their libraries is touched.**
+
 ## This PR was part of an interlock that has since been consolidated
 
 An earlier revision of this section named a **15-PR merge batch** that had to land as one unit. That

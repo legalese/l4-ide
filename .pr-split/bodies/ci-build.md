@@ -226,6 +226,26 @@ harness grows a baseline — which a later commit on this branch (`572972f4`) su
 
 ---
 
+## Blast radius
+
+**3 new files**, 8 modified.
+
+Build registration only:
+
+- `package-lock.json` — lockfile for its new workspace
+- `package.json` — workspace entry
+
+Within CI workflows, hooks and nix config (this PR's own files):
+
+- `.github/workflows/pr-checks.yml`
+- `.husky/pre-commit`
+- `nix/configuration.nix`
+- `nix/default.nix`
+- `nix/jl4-service/configuration.nix`
+- `nix/jl4-web/package.nix`
+
+**No file outside CI workflows, hooks and nix config is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This PR is not standalone, and it should not be reviewed as though it were.** It is the gate layer;

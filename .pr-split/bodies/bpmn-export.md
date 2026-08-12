@@ -193,6 +193,18 @@ every golden at zero warnings, so the file _opens_ — that is the whole of the 
 
 ---
 
+## Blast radius
+
+**53 new files**, 3 modified.
+
+Build registration only:
+
+- `jl4-core/jl4-core.cabal` — registers new modules
+- `jl4/jl4.cabal` — registers new modules
+- `jl4/tests/Main.hs` — registers its test group
+
+**No file outside the BPMN back end and its checkers is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This PR is not standalone. It sits on top of four siblings and cannot compile without two of them.**

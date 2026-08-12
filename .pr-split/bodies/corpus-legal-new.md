@@ -143,6 +143,17 @@ them here beyond the suite banners of the PRs that produced them — #125 report
 goldens 1120/0" and #214 reports `jl4-test` 2550/0. Both are figures for the whole tree at their
 respective tips, not for these files.
 
+## Blast radius
+
+**42 new files**, 2 modified.
+
+Within the legal corpus (this PR's own files):
+
+- `jl4/examples/legal/promissory-note.l4`
+- `jl4/examples/legal/tests/promissory-note.ep.golden`
+
+**No file outside the legal corpus is touched, and no existing production source is modified.**
+
 ## Independence
 
 All 46 files are data or prose under `jl4/examples/legal/`. **No Haskell, no TypeScript, no CI

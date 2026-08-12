@@ -97,6 +97,16 @@ A note the source PR was careful about, carried forward: the ladder payload's le
 `"value":"UnknownV"` on the wire and stay `UnknownV` when the query plan binds them — the valuation
 is the client's, the verdict beside it is still the service's.
 
+## Blast radius
+
+**54 new files**, 1 modified.
+
+Build registration only:
+
+- `turbo.json` — build-pipeline entry
+
+**No file outside the Reg CF wizard app is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This PR cannot build without `ladder-viz`, and that is measured, not assumed.**

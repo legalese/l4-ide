@@ -190,6 +190,24 @@ slice): `cabal build all` clean under GHC 9.10.3 with `-Wall -Werror`; `jl4-test
 examples 0 failures; `jl4-core-test` 269/0; `jl4-service-test` 311/0; `jl4-lsp-test` 10/0;
 `jl4-websessions-test` 1/0; `l4-cli-test` 125/0; `prettier --check .` clean.
 
+## Blast radius
+
+**33 new files**, 15 modified.
+
+Within the jl4-mlir package (this PR's own files):
+
+- `jl4-mlir/FEATURE-PARITY-PLAN.md`
+- `jl4-mlir/README.md`
+- `jl4-mlir/SOLIDITY-BACKEND-PLAN.md`
+- `jl4-mlir/coverage-report/FINDINGS.md`
+- `jl4-mlir/coverage-report/coverage.json`
+- `jl4-mlir/coverage-report/coverage.txt`
+- `jl4-mlir/jl4-mlir.cabal`
+- `jl4-mlir/runtime/jl4-runtime.mjs`
+- …and 7 more, all under the same tree
+
+**No file outside the jl4-mlir package is touched, and no existing production source is modified.**
+
 ## Independence
 
 **Not standalone.** This PR is the `jl4-mlir` package only, and it needs three things from

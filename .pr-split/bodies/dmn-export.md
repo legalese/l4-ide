@@ -198,6 +198,18 @@ on the shipped `expected/regcf-corpus.dmn`, verbatim:
 
 ---
 
+## Blast radius
+
+**93 new files**, 3 modified.
+
+Build registration only:
+
+- `jl4-core/jl4-core.cabal` — registers new modules
+- `jl4/jl4.cabal` — registers new modules
+- `jl4/tests/Main.hs` — registers its test group
+
+**No file outside the DMN back end and its harnesses is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This PR is not standalone.** It is the largest single body of code in the split and it sits in the

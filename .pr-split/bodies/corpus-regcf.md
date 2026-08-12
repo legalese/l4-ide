@@ -211,6 +211,14 @@ documents, and a reviewer may reasonably ask for it to be re-measured before mer
 
 ---
 
+## Blast radius
+
+**59 new files**.
+
+Nothing existing is modified at all — this PR is **purely additive**, entirely within the Reg CF corpus.
+
+**No file outside the Reg CF corpus is touched, and no existing production source is modified.**
+
 ## Independence
 
 This PR is **not** standalone, and the dependencies run one way — it is the *input* to the

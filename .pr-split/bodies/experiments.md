@@ -49,6 +49,16 @@ Quoted from the source commits and PRs.
 
 No golden files are added or changed by this PR, and no suite counts are claimed for it: nothing here is inside a `jl4-test` glob (see Independence).
 
+## Blast radius
+
+**63 new files**, 1 modified.
+
+Within the experiments tree (this PR's own files):
+
+- `jl4/experiments/thailand-cosmetics/prelude.l4`
+
+**No file outside the experiments tree is touched, and no existing production source is modified.**
+
 ## Independence
 
 **Not in any test glob.** `jl4/tests/Main.hs` globs `ok/**`, `legal/**`, `not-ok/**`, `lsp/**` under `jl4/examples`, plus `jl4-core/libraries/*.l4`. Neither `jl4/experiments/` nor `jl4/examples/experiments/` matches any of them, and `etc/check-corpus-goldens.mjs` is kept in step with exactly those roots. So this PR ships **no goldens**, correctly, and cannot turn the Haskell suite red on its own or on anyone else's branch. The flip side is that nothing in CI is watching these files, which is precisely how the vendored-prelude defect survived.

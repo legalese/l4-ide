@@ -161,6 +161,24 @@ revealed it. Since this lands the page against `main` rather than the `unstable`
 were measured on, **every number inside it should be re-checked against whatever actually ships**,
 and the same applies to the counts in `dmn-analysis-prior-art.md`.
 
+## Blast radius
+
+**53 new files**, 39 modified.
+
+Within the documentation tree (this PR's own files):
+
+- `doc/concepts/README.md`
+- `doc/concepts/SUMMARY.md`
+- `doc/concepts/language-design/linguistic-syntax.md`
+- `doc/concepts/legal-modeling/regulative-rules.md`
+- `doc/courses/advanced/module-a1-regulatory.md`
+- `doc/courses/advanced/module-a2-cross-cutting-examples.l4`
+- `doc/courses/advanced/module-a2-cross-cutting.md`
+- `doc/courses/advanced/module-a3-contracts.md`
+- …and 31 more, all under the same tree
+
+**No file outside the documentation tree is touched, and no existing production source is modified.**
+
 ## Independence
 
 Not standalone. This one has a measurable CI dependency, and it is worth stating precisely rather

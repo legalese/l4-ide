@@ -122,6 +122,17 @@ Two later commits from *other* themes also touched `jl4-core/src/L4/OpenFisca/Lo
 
 The theme's `.prs` manifest is empty; the PR number above was recovered from the merge commit `b3715710 Merge pull request #40 from legalese/mengwong/openfisca-backend`.
 
+## Blast radius
+
+**35 new files**, 2 modified.
+
+Build registration only:
+
+- `jl4-core/jl4-core.cabal` — registers new modules
+- `jl4/jl4.cabal` — registers new modules
+
+**No file outside the OpenFisca back end is touched, and no existing production source is modified.**
+
 ## This PR was part of an interlock that has since been consolidated
 
 An earlier revision of this section named a **15-PR merge batch** that had to land as one unit. That

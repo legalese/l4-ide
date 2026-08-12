@@ -66,6 +66,14 @@ All figures below are quoted from the source PRs' own bodies.
 
 ---
 
+## Blast radius
+
+**91 new files**.
+
+Nothing existing is modified at all — this PR is **purely additive**, entirely within the go orchestrator.
+
+**No file outside the go orchestrator is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This PR is not standalone.** It merges cleanly on its own — all 89 files are new, so there is nothing to conflict with — but the pipeline it installs is a harness over other themes' artifacts, and several of those are hard runtime dependencies rather than nice-to-haves:

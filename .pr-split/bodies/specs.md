@@ -144,6 +144,24 @@ Quoted from the source PRs and from the documents themselves:
 Where a status header says BUILT or SHIPPED, it is describing code that lands in a sibling PR, not in
 this one.
 
+## Blast radius
+
+**64 new files**, 16 modified.
+
+Within the specs tree (this PR's own files):
+
+- `specs/roadmap/future-features.md`
+- `specs/todo/BOUNDED-DEONTICS-SPEC.md`
+- `specs/todo/CHARTING-LIBRARY-SPEC.md`
+- `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`
+- `specs/todo/EXCEL-DATE-COMPAT-SPEC.md`
+- `specs/todo/HOMOICONICITY-SPEC.md`
+- `specs/todo/ISSUE-635-PLANNING-STATUS.md`
+- `specs/todo/L4-VERSIONING.md`
+- …and 8 more, all under the same tree
+
+**No file outside the specs tree is touched, and no existing production source is modified.**
+
 ## Independence
 
 **Buildable and mergeable on its own. Two siblings depend on it; it depends on none of them.**

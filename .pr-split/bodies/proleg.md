@@ -163,3 +163,28 @@ No numbered `unstable` PR maps to this theme — the manifest lists none, and th
 - `0b6091c2` — `chore(format): prettier --write docs/specs added by batched PRs` (formatting only,
   touching `docs/proleg-concrete-syntax.md` among many files; the reformatted text is what is
   carried here).
+## Blast radius
+
+**12 new files**, 1 modified.
+
+Build registration only:
+
+- `cabal.project` — registers the package in the build
+
+**No file outside the new jl4-proleg package is touched, and no existing production source is modified.**
+
+The package is **inert with respect to the rest of the tree, in both directions**:
+
+- **Nothing depends on it.** No `.cabal` in the repo lists `jl4-proleg`; no source outside
+  `jl4-proleg/` imports `L4.Proleg`; it appears in no nix, release or CI configuration.
+- **It depends on nothing here.** Its `build-depends` are `base`, `text` and `transformers`. It does
+  not link `jl4-core` and references no compiler type.
+
+That second point is the one that matters, and it is where `jl4-actus-analyzer` differed: that
+package *did* list `jl4-core` and *did* pattern-match `MkTypedName`, so it sat in `cabal build all`
+as a hostage — widening a constructor in the compiler broke it, which is exactly why removing it
+became a mandatory member of the #257 interlock. `jl4-proleg` cannot do that.
+
+Removing it later, should it not earn its keep, is `rm -rf jl4-proleg/` plus one line of
+`cabal.project`, with no possibility of regression elsewhere.
+

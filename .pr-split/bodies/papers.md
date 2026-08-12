@@ -148,6 +148,14 @@ Quoted faithfully from the source PRs:
   measurements are about their code, not about `paper/`, and are left with the themes that own
   that code.
 
+## Blast radius
+
+**67 new files**.
+
+Nothing existing is modified at all — this PR is **purely additive**, entirely within the paper tree.
+
+**No file outside the paper tree is touched, and no existing production source is modified.**
+
 ## Independence
 
 **Genuinely standalone.** Every path in this PR is under `paper/`, and nothing in the build, test

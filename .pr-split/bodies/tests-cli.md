@@ -60,6 +60,16 @@ Quoted from the source PRs, each measured on its own tree:
 
 The 161 `it` blocks in the source expand at run time — the 23-row probe matrix contributes two legs each, and one helper is instantiated twice — which is why the run counts above exceed the static block count. The last figure measured in a source PR is #207's 202/79; the date-arithmetic clamp probe landed after it and adds four more engine legs.
 
+## Blast radius
+
+**108 new files**, 1 modified.
+
+Within the black-box CLI suite (this PR's own files):
+
+- `jl4/tests-cli/Main.hs`
+
+**No file outside the black-box CLI suite is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This PR is not standalone.** It is a test suite, and it tests other themes' code. Specifically:

@@ -54,6 +54,16 @@ It was built with two adversarial multi-agent workflows; "the review found **0 b
 
 Measured for this split: the lockfile regeneration adds 798 lines and removes none.
 
+## Blast radius
+
+**36 new files**, 1 modified.
+
+Build registration only:
+
+- `package-lock.json` — lockfile for its new workspace
+
+**No file outside the housing wizard app is touched, and no existing production source is modified.**
+
 ## Independence
 
 **This one is genuinely standalone — which is exactly why it is its own PR rather than sharing one

@@ -176,6 +176,19 @@ these pages document**, quoted because the pages quote them and a reviewer check
 No quantitative claim is made here for the doc changes themselves beyond the diffstat
 (`14 files, +3,644 / −24`) and the per-file line counts above, which were read off the tree.
 
+## Blast radius
+
+**10 new files**, 4 modified.
+
+Within the agent/skill docs and repo-root records (this PR's own files):
+
+- `AGENTS.md`
+- `README.md`
+- `skills/writing-l4-rules/SKILL.md`
+- `skills/writing-l4-rules/references/gotchas.md`
+
+**No file outside the agent/skill docs and repo-root records is touched, and no existing production source is modified.**
+
 ## Independence
 
 **It can merge alone and cannot break a build.** Nothing here is compiled, imported, linked or
