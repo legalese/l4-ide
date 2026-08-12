@@ -473,10 +473,23 @@ half-shipping two layers.
 and `#ASSERT` in a lowerable module is a free test case with a pinned
 expected answer.
 
+**`examples/not-ok/` is out of scope, by construction.** Those 53 modules are
+front-end rejection tests — misplaced `@export`, type errors, ambiguous
+overloads — whose golden output _is_ a diagnostic. The lowering consumes a
+typechecked `Module Resolved`, so a module that never typechecks never
+reaches it. They are therefore excluded from the census denominator (the
+fragment fraction of §6.1 is over `examples/ok/`) and they place no
+obligation on any emitter. The one thing they must not do is silently
+inflate a coverage figure: the `--report` census counts them in a separate
+`not-typechecked` bucket rather than as lowering rejections, because the two
+are different failures and conflating them would make the fragment look
+narrower than it is.
+
 Mechanism, staged with the legs:
 
-1. **R0 census.** `l4 relational --report FILE` lowers a module and reports:
-   in-fragment or not; per-rejection constructor counts; stratified or not.
+1. **R0 census.** `l4 relational --report FILE` (surface shape is LP-R11)
+   lowers a module and reports: in-fragment or not; per-rejection
+   constructor counts; not-typechecked; stratified or not.
    Run over the corpus, this yields the _measured_ fragment fraction. Prior
    to measurement we estimate — and this is an estimate, not a claim — that
    between a third and two-thirds of `examples/ok/` lowers in v1: the
@@ -526,10 +539,16 @@ it burden-blind, which §1.3 says is the one thing it must not be.
 | R3    | LE emitter (templates from `@nlg`), golden suite seeded from natural4 lessons | ~1,000-1,500 LOC | LE documents load in the reference LE engine and answer queries identically |
 | R4    | PROLEG emitter over `jl4-proleg`'s AST                                        | ~400-700 LOC     | lease fixture round-trip (§6.4); burden fidelity per LP-R6 ruling           |
 
-Estimates are calibrated against the in-tree backends: `L4.Dmn.Lower` alone
-is ~6,800 lines for a harder target; the OpenFisca triple is smaller; the
-natural4 LE transpiler was ~2,400 lines with the template problem unsolved
-at source.
+Estimates are calibrated against the in-tree backends, counting **code
+lines, not file lines** — the distinction matters here because this
+codebase comments heavily. `L4/Dmn/Lower.hs` is 6,792 lines but only 3,581
+of them are code; 2,787 (41%) are comment, much of it the design-note
+haddock this spec cites in §2.2. The OpenFisca triple (`IR` 147, `Lower`
+826, `Emit` 304 file-lines) is smaller. The natural4 LE transpiler was
+~2,400 lines with the template problem unsolved at source. Read the table
+above as code lines on the same basis; a reviewer comparing it against
+`wc -l` on an existing backend will otherwise conclude the estimates are
+half what they should be.
 
 ## 8. Prior art
 
@@ -695,6 +714,16 @@ decision?`)? OPEN.
 - **LP-R10 (LE reference engine).** Which Logical English implementation
   pins the golden suite, and does the harness execute LE documents or only
   diff them textually? OPEN.
+- **LP-R11 (CLI surface).** R0's census and every emitter need a user-facing
+  entry point, written above as `l4 relational --report FILE`. That shape is
+  a placeholder, not a ruling: it is a new top-level subcommand on a surface
+  this spec does not own. Options: one `l4 relational` subcommand with a
+  `--target` flag (swipl / asp / scasp / le / proleg), one subcommand per
+  target in the manner of the existing exporters, or a report-only flag on
+  an existing command with emission arriving later. natural4's ~30
+  independently-registered transpiler modes (§8.3, "surface sprawl") are the
+  cautionary precedent for the per-target option. Whoever owns the `l4`
+  subcommand surface rules this before R0 lands. OPEN.
 
 ## References
 
