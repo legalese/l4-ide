@@ -12,12 +12,13 @@ index.
 **Every facet presupposes a reader who already believes law can be formalised** and wants to know
 how we do it, so none of them can open a book. [`book/DESIGN.md`](book/DESIGN.md) designs the
 missing half — _An Introduction to Computational Law, Using L4_: a short prologue on the history
-and its five recurring failure modes, then a ten-chapter arc in which each logic enters as the
-repair of a named failure of the last, from subsumption to the point where formalisation stops.
-The foundations are **interleaved, not stacked** — there is no theory part, each chapter runs the
-L4 for the concept it opens with, and §6 records where every facet above lands in that arc.
-**Design note; nothing drafted** except a specimen chapter opening, which exists so the plan can
-be judged on prose rather than on outline.
+and its five recurring failure modes, then an eleven-chapter arc in which each logic enters as the
+repair of a named failure of the last, from subsumption through **must be** (the material
+conditional) and **must do** (deontics) to the point where formalisation stops. The foundations
+are **interleaved, not stacked** — there is no theory part, each chapter runs the L4 for the
+concept it opens with, and §6 records where every facet above lands in that arc. **Design note;
+nothing drafted** except a specimen chapter opening, which exists so the plan can be judged on
+prose rather than on outline.
 
 ## Papers
 
