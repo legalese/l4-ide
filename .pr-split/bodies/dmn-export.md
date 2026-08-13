@@ -33,18 +33,19 @@ theme, not here.
 
 ## What's in it
 
-**101 files, +32,380 / −135.**
+**96 files, +32,256 insertions, zero deletions.** Apart from three build-registration files, every
+file is new.
 
 ### Exporter core — 6 Haskell modules, ~10,300 lines
 
-| module | lines | what it does |
-| --- | --- | --- |
-| `jl4-core/src/L4/Dmn/IR.hs` | 1350 | the DMN 1.3-shaped IR (`Drg`, `Decision`, `DecisionTable`, `UnaryTest`, `FeelExpr`, `ItemDefinition`), plus FEEL surface syntax: `renderNumber`, `quoteFeelString`, `reservedFeelWords`, `reservedFeelTypeNames`, `uniquifyIn`. Knows nothing about XML. |
-| `jl4-core/src/L4/Dmn/Lower.hs` | 6792 | `Module Resolved` → `Drg`, by way of `L4.Viz.GuardedRows`. Table lowering, itemDefinitions, hydrator decisions for computed fields, `MAYBE`→FEEL `null`, `YMD`/`Date` folding to `date("YYYY-MM-DD")`, rule-date interval tables, BKM emission and call-site invocation, decisionService splitting, the deontic verdict table, and every fidelity note's text. |
-| `jl4-core/src/L4/Dmn/Analysis.hs` | 1002 | the un-lifting (tier) analysis over call sites, totality/termination certification, and cycle detection over the requirement graph. |
-| `jl4-core/src/L4/Dmn/Emit.hs` | 632 | `Drg` → DMN 1.3 XML, including `DMNDI` diagram geometry so the file opens in a modeler rather than as a blank canvas. |
-| `jl4-core/src/L4/Dmn/Markdown.hs` | 455 | the same IR → dmnmd markdown, with its **own** loss list. Two emitters over one IR is the argument, not a convenience — the alternative is two hand-maintained exporters that quietly disagree about what a number looks like. |
-| `jl4-core/src/L4/Interchange/Fidelity.hs` | 81 | the shared, dependency-free note/severity/report type. Deliberately small so the decision-side and process-side tracks can share it without coupling to each other — the BPMN exporter imports it too. |
+| module                                  | lines | what it does                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jl4-core/src/L4/Dmn/IR.hs`             | 1350  | the DMN 1.3-shaped IR (`Drg`, `Decision`, `DecisionTable`, `UnaryTest`, `FeelExpr`, `ItemDefinition`), plus FEEL surface syntax: `renderNumber`, `quoteFeelString`, `reservedFeelWords`, `reservedFeelTypeNames`, `uniquifyIn`. Knows nothing about XML.                                                                                 |
+| `jl4-core/src/L4/Dmn/Lower.hs`          | 6792  | `Module Resolved` → `Drg`, by way of `L4.Viz.GuardedRows`. Table lowering, itemDefinitions, hydrator decisions for computed fields, `MAYBE`→FEEL `null`, `YMD`/`Date` folding to `date("YYYY-MM-DD")`, rule-date interval tables, BKM emission and call-site invocation, decisionService splitting, the deontic verdict table, and every fidelity note's text. |
+| `jl4-core/src/L4/Dmn/Analysis.hs`       | 1002  | the un-lifting (tier) analysis over call sites, totality/termination certification, and cycle detection over the requirement graph.                                                                                                                                                                                                     |
+| `jl4-core/src/L4/Dmn/Emit.hs`           | 632   | `Drg` → DMN 1.3 XML, including `DMNDI` diagram geometry so the file opens in a modeler rather than as a blank canvas.                                                                                                                                                                                                                   |
+| `jl4-core/src/L4/Dmn/Markdown.hs`       | 455   | the same IR → dmnmd markdown, with its **own** loss list. Two emitters over one IR is the argument, not a convenience — the alternative is two hand-maintained exporters that quietly disagree about what a number looks like.                                                                                                          |
+| `jl4-core/src/L4/Interchange/Fidelity.hs` | 81    | the shared, dependency-free note/severity/report type. Deliberately small so the decision-side and process-side tracks can share it without coupling to each other — the BPMN exporter imports it too.                                                                                                                                  |
 
 `FidelitySeverity` is ordered `Blocking < Lossy < Advisory`, and the doc comment is explicit that
 `Blocking` is a statement about **the target notation**, not about your file: "the target cannot
@@ -82,7 +83,7 @@ exactly the Camunda misparse the flavor work was built around.
 - **42 goldens** under `expected/`: 11 `.dmn`, 10 `.dmn.md`, 21 fidelity reports. The `svc.kie.*`
   pair is the flavor split made visible — on the `kie` flavor a call site becomes
   `knowledgeRequirement` → `decisionService` and emits `special_assessment(p: 150, q: 5) +
-  base_charge`, where the `camunda` flavor emits an `informationRequirement` and the raw-L4
+base_charge`, where the `camunda` flavor emits an `informationRequirement` and the raw-L4
   fallback ``(`special rate` OF 150, 5) PLUS `base charge` ``.
 - `jl4/examples/dmn/README.md` (545 lines) — the exhibit index, the pipeline diagram, the engine
   instructions, and the dated measurement log.
@@ -92,9 +93,12 @@ exactly the Camunda misparse the flavor work was built around.
 - `jl4/tests/DmnExport.hs` (4198 lines) — the golden driver plus the property tests: the law-time
   invariant, the cycle-refusal family, the flavor same-bytes/divergence assertions, the tier-split
   census, and the BKM probe matrix.
-- **8 evaluation-trace goldens move** (`jl4/examples/{ok,legal}/tests/*.golden`, −135 lines net).
-  These are *not* DMN goldens — they record `L4.Print.prettyLayout` output and move with the printer
-  round-trip repair. See **Independence**.
+
+An earlier cut of this theme also carried 8 evaluation-trace goldens
+(`jl4/examples/{ok,legal}/tests/*.golden`) that record `L4.Print.prettyLayout` output. They were
+never DMN artifacts — they move with the printer round-trip repair, and they now ride in
+[#257](https://github.com/legalese/l4-ide/pull/257) alongside the printer that produces them. Their
+departure is why this diff now has zero deletions.
 
 ---
 
@@ -194,21 +198,20 @@ on the shipped `expected/regcf-corpus.dmn`, verbatim:
   output value(s) as expected`
 - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227 (70 decision(s))`;
   `1 file(s), 22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated, 1540/1540 value(s)
-  as expected`
+as expected`
 
 ---
 
 ## Blast radius
 
-**93 new files**, 3 modified.
+**93 new files**, 3 modified — and the 3 are build registration only:
 
-Build registration only:
+- `jl4-core/jl4-core.cabal` — registers the new modules
+- `jl4/jl4.cabal` — registers the new modules
+- `jl4/tests/Main.hs` — registers the test group
 
-- `jl4-core/jl4-core.cabal` — registers new modules
-- `jl4/jl4.cabal` — registers new modules
-- `jl4/tests/Main.hs` — registers its test group
-
-**No file outside the DMN back end and its harnesses is touched, and no existing production source is modified.**
+**Zero deletions. No file outside the DMN back end and its harnesses is touched, and no existing
+production source is modified.**
 
 ## Independence
 
@@ -217,53 +220,48 @@ middle of the dependency graph. Honestly:
 
 **It needs, to build:**
 
-- **`ladder-viz`** — `jl4-core/src/L4/Viz/GuardedRows.hs`. `L4.Dmn.Lower` is *driven by* the
-  `normaliseGuarded` normaliser; there is no table lowering without it. Hard compile-time
-  dependency.
+- **#257 (the language core)** — three ways. `L4.Dmn.Lower` is *driven by* the `normaliseGuarded`
+  normaliser in `L4.Viz.GuardedRows` (formerly the `ladder-viz` theme); there is no table lowering
+  without it. The raw-L4 verbatim fallback inside `<text>` elements is `prettyLayout` output
+  (formerly `lang-printer`), so the `.dmn` goldens encode the repaired printer's behaviour. And
+  the clause-matrix exhaustiveness (PR #185) and BPMN-wiring (PR #198) hunks in `Analysis.hs`,
+  `IR.hs` and `Lower.hs` cooperate with analyses whose home is #257. Today's CI failure is the
+  first of these, verbatim: `Not in scope: data constructor 'Record'` in `Analysis.hs` —
+  a constructor #257 adds.
 - **Shared cabal plumbing not owned by any theme** — the `L4.Dmn.*` / `L4.Interchange.Fidelity`
   stanzas in `jl4-core/jl4-core.cabal`, the `DmnExport` other-module in `jl4/jl4.cabal`, and the
-  `goldenSubjects` registration in `jl4/tests/Main.hs`. These must be merged, not chosen.
+  `goldenSubjects` registration in `jl4/tests/Main.hs`. These are line-sliced spine files; each
+  PR carries only its own hunks and the union reconstructs `unstable`.
 
 **It needs, for its goldens to be reproducible:**
 
-- **`corpus-regcf`** — `jl4/examples/legal/regcf/regcf.l4`. Four of the 42 goldens
+- **corpus-regcf (#235)** — `jl4/examples/legal/regcf/regcf.l4`. Four of the 42 goldens
   (`regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`) and `regcf-corpus.cases.json` are cut
   from that file; without it they regenerate to nothing. The 1540/1540 headline is a measurement of
   *that corpus through this exporter*, so the two are joint evidence.
-- **`lang-printer`** — `L4.Print.prettyLayout`. Two ways: the raw-L4 verbatim fallback inside
-  `<text>` elements is `prettyLayout` output, so the `.dmn` goldens encode printer behaviour; and
-  the 8 evaluation-trace goldens in this file set (`ok/lazytrace*.golden`, `ok/contracts.golden`,
-  `ok/prohibition.golden`, `legal/ceo-performance-award.golden`,
-  `legal/directive-showcase.golden`, `legal/ny-environmental-7.3.golden`) move **only** because of
-  the round-trip repair in PR #214 — they are printer goldens that landed in this file set because
-  they were touched by a PR this theme also draws from. If `lang-printer` is dropped, those eight
-  files should be dropped with it.
-- **`lang-syntax-typecheck`** — PR #185's clause-matrix exhaustiveness added 19 lines to
-  `L4/Dmn/Analysis.hs` and 11 to `Lower.hs`; PR #198's BPMN→DMN wiring added 10 to `IR.hs` and 6 to
-  `Lower.hs`. Those hunks ride along here, but the analysis they cooperate with lives elsewhere.
 
 **It needs, to be reachable and gated by a user:**
 
-- **`service-cli`** — `jl4-core/src/L4/Export.hs` and `jl4/app/L4/Cli/Export.hs`, i.e.
-  `l4 export --to=dmn|dmn-md`. Without it the exporter is a library entry point exercised only by
-  the test suite (which is exactly the state PR #154 was opened to fix).
-- **`tests-cli`** — `jl4/tests-cli/Main.hs` is where the engine legs are actually invoked under
+- **service-cli (#252)** — `jl4/app/L4/Cli/Export.hs`, i.e. `l4 export --to=dmn|dmn-md`. Without it
+  the exporter is a library entry point exercised only by the test suite (which is exactly the
+  state PR #154 was opened to fix).
+- **tests-cli (#253)** — `jl4/tests-cli/Main.hs` is where the engine legs are actually invoked under
   `L4_DMN_ENGINE_CHECK=1 KIE_CHECK_REQUIRED=1 CAMUNDA_CHECK_REQUIRED=1`. This PR ships the
   harnesses; that PR ships the calls.
-- **`ci-build`** — the `dmn-engines` job in `.github/workflows/pr-checks.yml`.
-- **`specs`** — `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, `DMN-PHASE5-BUILD-PLAN.md`,
+- **ci-build (#233)** — the `dmn-engines` job in `.github/workflows/pr-checks.yml`.
+- **specs (#251)** — `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, `DMN-PHASE5-BUILD-PLAN.md`,
   `FIDELITY-SEVERITY-AXIS-SPEC.md`. Note text and code comments cite these by section number
   (§6.2, §11-R8, §15.12, §16), so dropping the specs leaves live dangling references.
 
 **What depends on it (not the other way round):**
 
-- **`bpmn-export`** imports `L4.Interchange.Fidelity` from this PR. The module is deliberately
+- **bpmn-export (#232)** imports `L4.Interchange.Fidelity` from this PR — today's CI failure on
+  #232 is exactly `Could not find module 'L4.Interchange.Fidelity'`. The module is deliberately
   dependency-free in the other direction — it knows nothing about DMN.
-- **`go-pipeline`** and **`corpus-legal-new`** consume the exporter to cut projections.
+- **go-pipeline (#239)** and **corpus-legal-new (#234)** consume the exporter to cut projections.
 
 **What it does not need at all:** `agent-tooling`, `wizard-housing`, `wizard-regcf`, `mlir`,
-`proleg`, `openfisca-export`, `actus-archive`, `papers`, `experiments`, `lang-sets`, `lsp`, `docs`,
-and anything in `ladder-viz` beyond `GuardedRows.hs`.
+`proleg`, `openfisca-export`, `papers`, `experiments`, `docs`.
 
 ---
 
@@ -304,10 +302,11 @@ named in the metadata line at the top of this body and in the merge-order guide.
 The full measurement — six builds, with the verbatim first error of each failing one — is recorded
 in `.pr-split/DEPENDENCIES.md` on the branch `claude/unstable-branch-reorganization-6cle91`.
 
-
 ## Provenance
 
-Unstable PRs folded into this one:
+This theme was re-cut in the 12 August reconciliation: 8 evaluation-trace goldens it had carried
+moved to #257 with the printer repair that produces them, taking it from 101 files to 96 and its
+deletions to zero. Unstable PRs folded into this one:
 
 - **#143** — `mengwong/dmn-export`, *feat(dmn): DMN 1.3 exporter, with fidelity reporting that
   blocks on unexecutable output* — the originating PR. Not listed in the theme manifest; recovered
@@ -349,8 +348,8 @@ Unstable PRs folded into this one:
 - **#208** — `legalese/mengwong/inert-label-truncation` — *Enumeration labels: inert never shadows
   active* (goldens unmoved in value; associativity only).
 - **#214** — `legalese/mengwong/printer-batch-and-gensym` — *fix(print): make prettyLayout
-  round-trip* (the 8 evaluation-trace goldens and the corpus `<text>` re-render; the printer itself
-  belongs to `lang-printer`).
+  round-trip* (the corpus `<text>` re-render; the printer itself, and the 8 evaluation-trace
+  goldens this theme once carried for it, are in #257).
 - **#224** — `legalese/mengwong/go-explainer` — *The explainer stage, a BPMN renderer, the grouping
   tutorial, and the de novo Reg CF run*. Contributes two calendar-arithmetic lowerings to
   `Lower.hs` (+84 lines): `Day d2 MINUS Day d1` as a peephole rendering to `(d2 - d1).days`, and

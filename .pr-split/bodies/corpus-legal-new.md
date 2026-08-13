@@ -10,7 +10,7 @@ charity test**, written without sight of the encoding this repo already had, the
 as a control. After this lands, the repo has both a fresh de novo subject that the demo pipeline can
 be smoke-tested against end to end, and — for the first time — a genuine two-encoding control for
 measuring how much of an L4 encoding is forced by the statute and how much is the encoder's choice.
-The PR also carries five small golden/comment deltas on the pre-existing `promissory-note` and
+The PR also carries three small deltas on the pre-existing `promissory-note` and
 `ceo-performance-award` examples.
 
 **Why.** Two gaps. First, every corpus in the tree had been encoded by the same hands under the same
@@ -30,6 +30,8 @@ unsound-under-a-binder parameter lift hiding behind it (smucclaw/l4-ide#936), an
 `unstable` red — the episode that put §3.1 of `CLAUDE.md` on the page.
 
 ## What's in it
+
+**44 files, +34,297 / −21.**
 
 **`jl4/examples/legal/bna/` — British Nationality Act 1981 s 1 (13 files)**
 
@@ -60,23 +62,27 @@ unsound-under-a-binder parameter lift hiding behind it (smucclaw/l4-ide#936), an
 - `charity-test.cases.json` (25 worlds × 40 decisions, every pin L4-evaluated).
 - `tests/charity-test.{golden,ep.golden,nlg.golden,schema.golden}`.
 
-**Five deltas on existing legal examples**
+**Three deltas on existing legal examples**
 
-- `promissory-note.l4` — comment sync only: the illustrative `#TRACE` output in the prose was stale,
-  and now explains why the residual obligation prints its `PARTY` and `WITHIN` in *evaluated* form
-  (the full `Commercial Borrower` value, and `61` rather than the symbolic
-  `Default After Days Beyond Commencement`).
-- `promissory-note.golden` — the same residual obligation, now rendered on one line, following the
-  `prettyLayout` repair.
-- `promissory-note.ep.golden` — regenerated after the `Event` exactprint `atFirst` branches were
-  un-swapped; every `PARTY … DOES … AT …` event had been printing with its operands rotated one
-  keyword slot.
-- `ceo-performance-award.schema.golden` — builtin types now emit real JSON Schema
-  (`"type": "boolean"`, `"format": "date"`, `items` on `LIST`, `anyOf`+`null` on `MAYBE`) instead of
-  dangling `$ref: "#/$defs/BOOLEAN"` with no matching `$defs` entry.
-- `ceo-performance-award.cases.json.pending` — a curated parity case file deliberately **not** named
-  `.cases.json`, so the parity harness does not auto-load it while the function still refuses on the
-  WASM backend. Its `__doc__` block names the two backend gaps that must land before it is renamed.
+- `promissory-note.l4` — comment sync: the illustrative `#TRACE` output quoted in the prose was
+  stale, and now explains why the residual obligation prints its `PARTY` and `WITHIN` in
+  *evaluated* form (the full `Commercial Borrower` value, and `61` rather than the symbolic
+  `Default After Days Beyond Commencement`). Comments only; nothing evaluates differently.
+- `promissory-note.ep.golden` — the exactprint golden for that same file. An exactprint golden
+  reproduces its source *including comments*, so the comment sync above forces this re-bless; the
+  two files are a self-consistent pair inside this PR. Measured: the delta between #257's interim
+  version of this golden and this one is byte-for-byte the comment sync. See **Independence** for
+  the deliberate two-step staging with #257.
+- `ceo-performance-award.cases.json.pending` — a curated parity case file deliberately **not**
+  named `.cases.json`, so the parity harness does not auto-load it while the function still refuses
+  on the WASM backend. Its `__doc__` block names the two backend gaps that must land before it is
+  renamed.
+
+An earlier cut of this theme carried two further golden deltas — `promissory-note.golden` (the
+one-line residual obligation the `prettyLayout` repair produces) and
+`ceo-performance-award.schema.golden` (the repaired builtin-type JSON Schema output). Both record
+the output of code that now lives in [#257](https://github.com/legalese/l4-ide/pull/257), so they
+moved there with it in the 12 August reconciliation, taking this theme from 46 files to 44.
 
 ## Evidence
 
@@ -138,54 +144,46 @@ attributes BNA's green to the exporter rather than to the ruling: "the **pre-rul
 emitted with today's binary, produces **0 blocking notes** and KIE `25 / 1075/1075 / 325/325` —
 identical."
 
-**The five `promissory-note` / `ceo-performance-award` deltas.** No quantitative claim is made about
-them here beyond the suite banners of the PRs that produced them — #125 reports "jl4-core 169/0, jl4
-goldens 1120/0" and #214 reports `jl4-test` 2550/0. Both are figures for the whole tree at their
-respective tips, not for these files.
-
 ## Blast radius
 
 **42 new files**, 2 modified.
 
-Within the legal corpus (this PR's own files):
+The 2 modified are a self-consistent pair: `promissory-note.l4` (comment-only) and
+`tests/promissory-note.ep.golden` (the exactprint golden that mirrors those comments).
 
-- `jl4/examples/legal/promissory-note.l4`
-- `jl4/examples/legal/tests/promissory-note.ep.golden`
-
-**No file outside the legal corpus is touched, and no existing production source is modified.**
+**No file outside the legal corpus is touched. No Haskell, no TypeScript, no CI configuration** —
+the only executable files are two Python generators (`make-cases.py`, `make-surface-map.py`) that
+nothing in the build invokes.
 
 ## Independence
 
-All 46 files are data or prose under `jl4/examples/legal/`. **No Haskell, no TypeScript, no CI
-configuration** — the only executable files are two Python generators (`make-cases.py`,
-`make-surface-map.py`) that nothing in the build invokes.
+All 44 files are data or prose under `jl4/examples/legal/`.
 
-**The two new corpora are self-contained.** They typecheck, run and golden against the language as
-`main` already has it: `jl4-test` writes exactly four goldens per `.l4` file (`.golden`,
-`.ep.golden`, `.nlg.golden`, `.schema.golden`) and all eight of theirs were produced by the
-unmodified suite. Nothing here needs a sibling to land first.
+**Nothing here breaks a build in any order.** But three couplings deserve honest statement:
 
-**Three of the five deltas on the pre-existing examples are not.** Each records the output of a code
-change that lives elsewhere, and each will mismatch if that theme is dropped:
-
-- **`lang-printer`** — `promissory-note.golden` records the one-line residual obligation the
-  `prettyLayout` repair produces (#214).
-- **`lang-syntax-typecheck`** — `promissory-note.ep.golden` records the *un-swapped* `Event`
-  exactprint order (#125, `jl4-core/src/L4/Syntax.hs`).
-- **`service-cli`** — `ceo-performance-award.schema.golden` records the repaired
-  `jl4-core/src/L4/JsonSchema.hs` output.
-
-The remaining two are inert: `promissory-note.l4` is a comment-only edit, and
-`ceo-performance-award.cases.json.pending` is deliberately named so that no harness loads it.
-
-**`dmn-export` is a softer dependency than it looks.** The committed `bna.dmn`, `bna.fidelity.txt`
-and `bna.dmn.fidelity.txt` were re-cut on the exporter *after* the `YMD → FEEL date()` lowering
-landed, so without that theme `l4 export` will not reproduce these bytes and the fidelity report will
-read 3 blocking notes rather than 0. But no test regenerates them — `jl4-test` writes only the four
-`tests/*.golden` files, and the `.dmn` / `.fidelity.txt` sidecars are committed evidence — so the
-suite stays green either way. The charities projections are the opposite case entirely: they were cut
-*before* the quantifier fix and their whole point is to record the refusal, so they are already
-consistent with `main` and need `dmn-export` not at all.
+- **#257 (the language core) is a de facto prerequisite for the suite to certify these corpora.**
+  The goldens were cut on `unstable`'s tree. Nothing on `main` fails to *compile* against them,
+  but the batch measurement behind the merge-order guide found that `jl4-test` only goes fully
+  green with the corpus themes and the language core together — and checking the charities corpus
+  against `main`'s typechecker without the #929 overload pre-filter (which rides in #257) takes
+  hours rather than seconds. Note also that none of this shows up in this PR's own CI: the
+  `haskell` paths-filter does not match `jl4/examples/**`, so this corpus-only PR skips the
+  Haskell job entirely — the hole filed upstream as
+  [smucclaw/l4-ide#941](https://github.com/smucclaw/l4-ide/issues/941).
+- **The `promissory-note.ep.golden` staging with #257 is deliberate and ordered.** #257 re-blesses
+  that golden to an interim state (its repaired printer, the *old* source comments); this PR then
+  lands the comment sync and the final golden together. Measured while drafting: the delta between
+  the two versions is byte-for-byte the comment sync. Land #257 first, then this; reversing the
+  order leaves the suite red between the two merges.
+- **dmn-export (#236) is a softer dependency than it looks.** The committed `bna.dmn`,
+  `bna.fidelity.txt` and `bna.dmn.fidelity.txt` were re-cut on the exporter *after* the
+  `YMD → FEEL date()` lowering landed, so without that theme `l4 export` will not reproduce these
+  bytes and the fidelity report will read 3 blocking notes rather than 0. But no test regenerates
+  them — `jl4-test` writes only the four `tests/*.golden` files, and the `.dmn` /
+  `.fidelity.txt` sidecars are committed evidence — so the suite stays green either way. The
+  charities projections are the opposite case entirely: they were cut *before* the quantifier fix
+  and their whole point is to record the refusal, so they are already consistent with `main` and
+  need `dmn-export` not at all.
 
 **`go-pipeline` depends on this PR, not the reverse.** `etc/go/phases/p1`–`p4` cite
 `bna/SMOKE-REPORT.md` §2 as their requirements source, and the `specs` theme's
@@ -195,9 +193,11 @@ are absent, so nothing hard-breaks). In the other direction, `charities-cleanroo
 `etc/go/lib/denovo-diff.mjs` — a `go-pipeline` file — but only as a reproduction instruction; the
 oracle's output is committed here verbatim, so the comparison is readable and auditable without it.
 
-Suggested landing order: `lang-syntax-typecheck`, `lang-printer` and `service-cli` before this one,
-`dmn-export` ideally but not necessarily. If any slips, the affected golden can be reverted in this
-PR to whatever `main` actually emits; the two new corpora are unaffected either way.
+**`mlir` (#247) reads `ceo-performance-award.cases.json.pending`** from here as one cell of its
+extended parity sweep — a reproducibility coupling, not a build one.
+
+Suggested landing order: **#257 before this one** (for the golden staging above); `dmn-export`
+ideally but not necessarily.
 
 ## Risk if rejected
 
@@ -205,10 +205,10 @@ The repo loses its only two-encoding control — nothing else in the tree can te
 encoding decision from a house-style habit — and it loses the two adversarial corpora whose emitted
 DMN is the *reason* the `dmn-export` fixes exist, leaving those fixes with no committed artifact
 demonstrating the defect they close. It also strands `go-pipeline` and `specs`, whose phase scripts
-and fixtures are written against `bna/SMOKE-REPORT.md`, `bna.l4` and `source-s1.txt` by name. Nothing
-on `main` stops compiling, but the three golden deltas on the pre-existing `promissory-note` and
-`ceo-performance-award` examples would have to be re-homed inside whichever sibling theme carries
-their code change, or the golden suite goes red the moment that theme lands.
+and fixtures are written against `bna/SMOKE-REPORT.md`, `bna.l4` and `source-s1.txt` by name.
+Nothing on `main` stops compiling, but if #257 has landed, its interim `promissory-note.ep.golden`
+stays interim — a golden that no longer matches the comments its source will never receive — and
+the `.pending` parity case file `mlir` reads disappears from its sweep.
 
 ## This PR was part of an interlock that has since been consolidated
 
@@ -236,10 +236,11 @@ named in the metadata line at the top of this body and in the merge-order guide.
 The full measurement — six builds, with the verbatim first error of each failing one — is recorded
 in `.pr-split/DEPENDENCIES.md` on the branch `claude/unstable-branch-reorganization-6cle91`.
 
-
 ## Provenance
 
-Unstable PRs folded into this one:
+This theme was re-cut in the 12 August reconciliation: `promissory-note.golden` and
+`ceo-performance-award.schema.golden` moved to #257 with the printer and JSON Schema code that
+produces them, taking it from 46 files to 44. Unstable PRs folded into this one:
 
 - **#195** — `corpus/bna-smoke`: the de novo BNA 1981 s 1 corpus, its DMN projection, cases and
   `SMOKE-REPORT.md`.
@@ -253,14 +254,11 @@ Unstable PRs folded into this one:
 - **#206** — `mengwong/exporter-fixes`: the BNA projection re-cut on the post-#196 exporter (this
   theme takes only the regenerated `bna.dmn` / fidelity sidecars; the exporter code is
   `dmn-export`).
-- **#214** — `mengwong/printer-batch-and-gensym`: the `promissory-note.golden` move (code is
-  `lang-printer`).
-- **#125** — `mengwong/fix-event-exactprint`: the `promissory-note.ep.golden` regeneration (code is
-  `lang-syntax-typecheck`).
+- **#125** — `mengwong/fix-event-exactprint`: the exactprint repair whose effect on
+  `promissory-note.ep.golden` lands here jointly with the comment sync (the code is in #257).
 - **#190** — `mengwong/mlir-parity-land`: `ceo-performance-award.cases.json.pending`, the pinned
   refusal case file from ledger #8.
 
-Two of the small golden deltas also carry work from unstable merges earlier than the list above —
-`ceo-performance-award.schema.golden` from the `fix/schema-eval-robustness` merge, and the
-`promissory-note.l4` comment sync from the `fix/deontic-breach-semantics` merge — which the
-file-level split assigns here because the affected files are legal-corpus files.
+The `promissory-note.l4` comment sync reached `unstable` through the `fix/deontic-breach-semantics`
+merge, earlier than the numbered list above; the file-level split assigns it here because it is a
+legal-corpus file.
