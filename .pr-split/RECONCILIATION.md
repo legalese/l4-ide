@@ -17,6 +17,37 @@ The rule applied was mechanical: *remove whatever `lang-core` now carries, excep
 line-sliced spine files.* `service-cli` landing on exactly 14 is the confirmation that the rule is
 the right one.
 
+## The rule missed one file — corrected 2026-08-13, `service-cli` is now 13
+
+`jl4-wasm/app/QueryPlanWasm.hs` stayed in `service-cli` and should not have. The rule was applied by
+**path prefix**, and the three prefixes it swept — `jl4-service/`, `jl4-query-plan/`, `jl4-repl/` —
+do not cover the WASM entry point that *consumes* `jl4-query-plan`. So the file's two edits, the
+`priorsByUnique` field and the `UBoolVar` 5→6 pattern, were separated from the modules that define
+them.
+
+That made #257 and #252 a **cycle, not an ordering**: #257 had `unstable`'s `VizExpr` against
+`main`'s five-argument pattern; #252 had the updated call site against `main`'s `VizExpr`. Both
+failed their WASM job, in mirror image, and no merge sequence cleared it.
+
+Why it survived every check we ran:
+
+- `jl4-wasm` is **not in `cabal.project`**, so `cabal build all` — the measurement behind the
+  15-PR batch and behind #257's own fixed point — never compiled it.
+- `depcheck.mjs` reads module imports, and this is an arity edge, invisible to it (the limitation
+  already recorded in `DEPENDENCIES.md`, biting once more).
+- The byte-identity sweep passed: **both** branches held a file byte-identical to some baseline —
+  #257 to `main`, #252 to `unstable`. Identity against *a* baseline is not consistency *within* a
+  branch, and only the second would have caught this.
+
+Corrected by moving the file to #257 and re-shipping both. Verified at blob level: for all three of
+`jl4-wasm/app/QueryPlanWasm.hs`, `jl4-core/src/L4/Viz/VizExpr.hs` and
+`jl4-query-plan/src/L4/Decision/QueryPlan.hs`, #257 now holds `unstable`'s copy and #252 holds
+`main`'s. Awaiting the WASM job on both.
+
+**The generalisable check**, not yet run for the other themes: for every file a branch changes, its
+`main`-vs-`unstable` counterparts should be on the *same side* as the definitions they reference. A
+prefix-based partition cannot guarantee that on its own.
+
 ## Two small discrepancies in #257's body, not in the code
 
 - It says `mlir` keeps **49** files; the rule gives **48**. The difference is

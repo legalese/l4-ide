@@ -8,7 +8,10 @@ branch="claude/aug2026-${theme}"
 body="${bdir}/${theme}.md"
 
 [ -f "$body" ] || { echo "no body for $theme" >&2; exit 1; }
-title=$(head -1 "$body" | sed 's/^#\s*//')
+# `\s` is a GNU extension; BSD/macOS sed reads it as a literal `s`, so `^#\s*`
+# strips the hash and leaves the space, and the commit subject ships indented.
+# POSIX character class works on both.
+title=$(head -1 "$body" | sed 's/^#[[:space:]]*//')
 [ -n "$title" ] || { echo "empty title for $theme" >&2; exit 1; }
 
 bash "$(dirname "$0")/build-branch.sh" "$theme" "$wt" "$mdir"

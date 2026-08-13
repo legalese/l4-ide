@@ -1,6 +1,5 @@
 jl4-core/src/L4/API/EmbeddedLibraries.hs
 jl4-core/src/L4/API/EmbeddedLibraries/TH.hs
-jl4-wasm/app/QueryPlanWasm.hs
 jl4/app/L4/Cli/Batch.hs
 jl4/app/L4/Cli/Check.hs
 jl4/app/L4/Cli/Common.hs

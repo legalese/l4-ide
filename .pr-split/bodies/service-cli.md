@@ -10,7 +10,14 @@ Three separate gaps drove this. First, the DMN and BPMN exporters were reachable
 
 **What's in it**
 
-43 files, roughly +4,477 / −345.
+**13 files, +2,145 / −105** as this branch now stands.
+
+> **Read this section as the history of the work, not as an inventory of this diff.** It was written
+> when the theme carried 43 files, and it was not rewritten when the boundary moved: 31 files
+> (`jl4-service/`, `jl4-query-plan/`, `jl4-repl/` and the `jl4-core` library modules) went to
+> **#257** in the 12 August reconciliation, and `jl4-wasm/app/QueryPlanWasm.hs` followed on
+> 13 August. The **Blast radius** section at the foot of this body is measured from the branch and
+> is the accurate account of what is here.
 
 _New CLI subcommands (3 new modules, ~1,460 lines)_
 
@@ -42,7 +49,7 @@ _jl4-core and jl4-query-plan support (10 modules, 2 goldens)_
 - `L4/FunctionSchema.hs`, `L4/Export.hs` — `TYPICALLY` defaults surface as a JSON Schema `default` (`typicallyToJson`, literals and TRUE/FALSE only); `enrichParamTypes` fills bare-head DECIDE parameter types from `EntityInfo`, refusing to guess when the inferred type still has an inference variable; `@nonexhaustive` joins the `@desc` flag vocabulary.
 - `L4/API/EmbeddedLibraries.hs` + `TH.hs` — the TH splice now `fail`s instead of embedding `[]`, so a stdlib-less binary is a build error rather than a binary that answers "Module not found: prelude" for every `IMPORT`. `L4/API.hs` and the not-found diagnostic name the embedded tier and deduplicate the path list.
 - `jl4-query-plan/src/L4/Decision/{BooleanDecisionQuery,QueryPlan}.hs` — `binaryEntropy` + memoized `prob`, expected-posterior information-gain ranking mirroring the TypeScript `decision-query.ts`, priors threaded from `TYPICALLY`, a `Verdict` field (`Undetermined | Holds | Fails | Complies | InBreach | NotApplicable`), and `atomIdByUnique` inverted with a multimap rather than last-wins `Map.fromList` — an `atomId` names a *question*, and answering it must bind every occurrence.
-- `jl4-repl/app/Main.hs`, `jl4-wasm/app/QueryPlanWasm.hs`, `L4/Nlg.hs`, `L4/Export/Document.hs` — mechanical follow-through for AST changes owned by other themes (see Independence).
+- `jl4-repl/app/Main.hs`, `jl4-wasm/app/QueryPlanWasm.hs`, `L4/Nlg.hs`, `L4/Export/Document.hs` — mechanical follow-through for AST changes owned by other themes (see Independence). **All four are now in #257**, which owns those AST changes; `QueryPlanWasm.hs` moved on 13 August because keeping it here made the two PRs a cycle at the WASM target rather than an ordering.
 
 **Evidence**
 
@@ -123,7 +130,7 @@ Not attributable to any PR in the list above: several of the older `l4 batch` an
 
 ## Blast radius
 
-**3 new files**, 11 modified.
+**3 new files**, 10 modified.
 
 Build registration only:
 
@@ -134,7 +141,6 @@ Within the CLI, service and their libraries (this PR's own files):
 
 - `jl4-core/src/L4/API/EmbeddedLibraries.hs`
 - `jl4-core/src/L4/API/EmbeddedLibraries/TH.hs`
-- `jl4-wasm/app/QueryPlanWasm.hs`
 - `jl4/app/L4/Cli/Batch.hs`
 - `jl4/app/L4/Cli/Check.hs`
 - `jl4/app/L4/Cli/Common.hs`
