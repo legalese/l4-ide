@@ -44,9 +44,22 @@ Corrected by moving the file to #257 and re-shipping both. Verified at blob leve
 `jl4-query-plan/src/L4/Decision/QueryPlan.hs`, #257 now holds `unstable`'s copy and #252 holds
 `main`'s. Awaiting the WASM job on both.
 
-**The generalisable check**, not yet run for the other themes: for every file a branch changes, its
-`main`-vs-`unstable` counterparts should be on the *same side* as the definitions they reference. A
-prefix-based partition cannot guarantee that on its own.
+**The generalisable check.** The root cause is narrower than it looks, and it is now bounded. What
+made this file invisible was not the prefix rule by itself but that **`cabal build all` could not
+see it** — so the exposure is exactly the Haskell packages outside `cabal.project`. Measured on
+`origin/main`: `cabal.project` lists nine packages, and the top-level directories holding a `.hs`
+file changed between `main` and `unstable` are `jl4-core` (75), `jl4-actus-analyzer` (23),
+`jl4-service` (19), `jl4` (17), `jl4-lsp` (12), `jl4-mlir` (8), `jl4-proleg` (6), `jl4-query-plan`
+(2), `jl4-wasm` (1) and `jl4-repl` (1).
+
+Only two of those are not in `main`'s `cabal.project`:
+
+- **`jl4-proleg`** — added to `cabal.project` by #249, which is therefore built whenever it is
+  present. #249's CI is green, so it is covered.
+- **`jl4-wasm`** — one file, which is the one this note is about.
+
+So there is **no second instance of this defect in the Haskell layer**. The TypeScript and Nix
+surfaces are gated separately by CI and are not covered by this argument.
 
 ## Two small discrepancies in #257's body, not in the code
 
