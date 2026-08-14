@@ -79,10 +79,10 @@ Within the black-box CLI suite (this PR's own files):
 - **`bpmn-export`** — hard dependency for the three BPMN blocks, which read `jl4/examples/bpmn/offering.l4` and its `expected/` goldens.
 - **`openfisca-export`** — hard dependency for all 14 `l4 openfisca` blocks, which compare stdout against `jl4/examples/openfisca/expected/*.py`.
 - **`corpus-regcf`** — hard dependency for the two `l4 nlg` golden comparisons (`examples/legal/regcf/tests/regcf{,-wizard}.nlg.golden`) and for the corpus engine leg.
-- **`lsp`** and **`lang-imports-stdlib`** — behavioural dependency. The nine library-shadow blocks assert the B′ precedence order and the exact wording of the shadow warning (`[chosen]   project root`, ``Multiple differing copies of module `daydate` ``), which are produced by the resolver in `jl4-lsp/src/LSP/L4/Rules.hs`.
+- **#257** (which absorbed the `lsp` and `lang-imports-stdlib` themes) — behavioural dependency. The nine library-shadow blocks assert the B′ precedence order and the exact wording of the shadow warning (`[chosen]   project root`, ``Multiple differing copies of module `daydate` ``), which are produced by the resolver in `jl4-lsp/src/LSP/L4/Rules.hs`.
 - **`ci-build`** — not needed to compile or run, but it owns `.github/workflows/pr-checks.yml`, where the `dmn-engines` job runs the two harness scripts directly with `*_CHECK_REQUIRED` set. `Main.hs` documents in situ that CI does **not** invoke `l4-cli-test` for the engine legs; the suite is the developer-facing entry point and the job is the gate.
 
-What it does **not** need: any change to `jl4/jl4.cabal`'s `test-suite l4-cli-test` stanza (verified byte-identical between `main` and `unstable`), and nothing from `ladder-viz`, `mlir`, `proleg`, `papers`, `wizard-*` or the spec/docs themes.
+What it does **not** need: any change to `jl4/jl4.cabal`'s `test-suite l4-cli-test` stanza (verified byte-identical between `main` and `unstable`), and nothing from `mlir`, `proleg`, `papers`, `wizard-*` or the spec/docs themes.
 
 Ordering advice: land `service-cli`, `dmn-export`, `bpmn-export`, `openfisca-export` and `corpus-regcf` first; this PR is a natural late merge.
 

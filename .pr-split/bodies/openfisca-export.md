@@ -61,7 +61,7 @@ One limit a reviewer should read rather than discover: OpenFisca stores `value_t
 
 The corpus and docs are standalone, but the Haskell **does not build against `main` as it stands on `unstable`**, and it needs wiring that no theme owns. Three separate things, in descending order of severity.
 
-*1. A hard compile dependency on the TYPICALLY AST change (theme: `lang-syntax-typecheck`).*
+*1. A hard compile dependency on the TYPICALLY AST change (now in [#257](https://github.com/legalese/l4-ide/pull/257), formerly `lang-syntax-typecheck`).*
 
 `Lower.hs` on `unstable` pattern-matches AST constructors at an arity `main` does not have:
 
@@ -70,7 +70,7 @@ The corpus and docs are standalone, but the Haskell **does not build against `ma
 | `MkTypedName` | 4 | 5 (adds TYPICALLY default) | 5 — line 424 |
 | `MkOptionallyTypedName` | 3 | 4 (adds TYPICALLY default) | 4 — lines 696, 699 |
 
-These are arity errors, not warnings: cherry-picked onto `main` unchanged, the module does not compile. Commit `c55761d8` is exactly the adaptation ("OpenFisca.Lower … 3 pattern sites gain a wildcard for the ignored default") and it was written *after* the merge, against a field this PR does not introduce. So either **lang-syntax-typecheck** lands first, or those three patterns are back-adapted to `main`'s arity by dropping one wildcard each — a mechanical change, but it must be made deliberately rather than discovered in CI.
+These are arity errors, not warnings: cherry-picked onto `main` unchanged, the module does not compile. Commit `c55761d8` is exactly the adaptation ("OpenFisca.Lower … 3 pattern sites gain a wildcard for the ignored default") and it was written *after* the merge, against a field this PR does not introduce. So either **#257** lands first, or those three patterns are back-adapted to `main`'s arity by dropping one wildcard each — a mechanical change, but it must be made deliberately rather than discovered in CI.
 
 By contrast, commit `91a43d79` (removal of the dead `Exponent` arm from `constructorName`) is **not** a dependency in either direction: that function ends in a `_ -> "expression"` catch-all, so it is exhaustive whether or not `main`'s `Expr` still carries the constructor.
 
@@ -85,7 +85,7 @@ By contrast, commit `91a43d79` (removal of the dead `Exponent` arm from `constru
 
 That the theme carries 35 files against PR #40's 39 changed files is consistent with exactly these four being elsewhere.
 
-Beyond those, it is genuinely independent: the backend reads a typechecked `Module Resolved` through the existing `getExportedFunctions` entry point and touches no shared evaluator, printer or type-checker code. It does not depend on **dmn-export** or **bpmn-export** despite being a sibling exporter — the three share no code. It does not touch the parallel `jl4/experiments/openfisca/` corpus (the **experiments** theme). The `.l4` examples also use current L4 surface syntax, so further **lang-syntax-typecheck** changes to how `DECLARE … IS ONE OF`, `CONSIDER`, `BRANCH` or `@desc` parse would move these files and their goldens with them.
+Beyond those, it is genuinely independent: the backend reads a typechecked `Module Resolved` through the existing `getExportedFunctions` entry point and touches no shared evaluator, printer or type-checker code. It does not depend on **dmn-export** or **bpmn-export** despite being a sibling exporter — the three share no code. It does not touch the parallel `jl4/experiments/openfisca/` corpus (the **experiments** theme). The `.l4` examples also use current L4 surface syntax, so further front-end changes (#257 and successors) to how `DECLARE … IS ONE OF`, `CONSIDER`, `BRANCH` or `@desc` parse would move these files and their goldens with them.
 
 The three files under `site/vendor/` are vendored third-party assets, checked in so the demo site is self-contained and needs no network: Highlight.js v11.11.1 (BSD-3-Clause, licence header intact in the minified file), its GitHub Dark theme CSS, and an L4 grammar compiled for the same Highlight.js version. Nothing in the Haskell build depends on them; they are read only by `build_site.py`.
 

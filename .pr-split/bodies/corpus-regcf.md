@@ -228,16 +228,16 @@ projection themes, not their output.
 
 - `RULES EFFECTIVE DATE` / `EVAL UNDER RULES EFFECTIVE AT`, dated `BRANCH` chains, `DATE`
   literals, `TIMEZONE`, `MAYBE`, and the `@ref` / `@desc` / `@export` annotations — owned by
-  **lang-syntax-typecheck** and **lang-eval-ledger**.
+  [#257](https://github.com/legalese/l4-ide/pull/257) (formerly **lang-syntax-typecheck** and **lang-eval-ledger**).
 - `IMPORT prelude` and `IMPORT daydate`, including `daydate`'s Calendar Arithmetic section
   (`add months` / `add years`, with the month-end clamp) that the 501(a) anniversary fix moved in
-  from `actus-schedule` — owned by **lang-imports-stdlib**.
+  from `actus-schedule` — owned by #257 (formerly **lang-imports-stdlib**).
 
 Without those, `regcf.l4` does not typecheck and `jl4-test` goes red.
 
 **Its goldens encode other themes' behaviour.** The `.ep.golden` files are byte-for-byte copies of
-their sources and are safe. `tests/regcf.golden` is not: commit `07a95495` in **lang-printer**
-(#214) rewrote 161 of its lines when `prettyLayout` was repaired, and `f39cea88` re-derived it
+their sources and are safe. `tests/regcf.golden` is not: commit `07a95495` in the printer repair
+(#214, now in #257) rewrote 161 of its lines when `prettyLayout` was repaired, and `f39cea88` re-derived it
 again when a rebase moved every line reference. `.nlg.golden` output is shaped by the clitic and
 enumeration-label work in #205 / #208. If any of those land after this PR, these goldens need
 re-blessing — that is expected churn, not a defect.
@@ -246,16 +246,16 @@ re-blessing — that is expected churn, not a defect.
 elsewhere:
 
 - `jl4/examples/lsp/hover/tests/desc-hover.hover.golden` — the `@desc` leading-space trim from
-  #162 (`L4.Syntax.getDesc`), owned by **lsp**.
+  #162 (`L4.Syntax.getDesc`), owned by what is now #257.
 - `jl4/examples/ok/tests/export-explicit-default.schema.golden` and
   `export-no-explicit-default.schema.golden` — the same trim plus a JSON-Schema change
-  (`"$ref": "#/$defs/NUMBER"` → inline `"type": "number"`), owned by **service-cli**.
+  (`"$ref": "#/$defs/NUMBER"` → inline `"type": "number"`), owned by what is now #257.
 
-They are routed here only because the Reg CF work is what forced them. **If lsp and service-cli
-land separately, these three should travel with their code, not with this PR.**
+They are routed here only because the Reg CF work is what forced them. **They no longer do: all three now ride in #257 with their code, and this PR is 59 Reg CF
+files only** — see the routing correction below.
 
-**What it does not need.** Nothing here depends on **dmn-export**, **bpmn-export**, **ladder-viz**
-or **go-pipeline** to compile or to pass its own four goldens. Their Reg CF artifacts
+**What it does not need.** Nothing here depends on **dmn-export**, **bpmn-export**, the ladder work
+in #257, or **go-pipeline** to compile or to pass its own four goldens. Their Reg CF artifacts
 (`jl4/examples/dmn/expected/regcf-corpus.*`, the three Reg CF BPMN goldens, the ladder drift test
 `ts-shared/ladder-svg/test/regcf-figures.test.ts`) live in those themes and will need
 re-derivation whenever the corpus text moves — which is the intended relationship, not a
@@ -280,8 +280,9 @@ diff that caught the 501(a) leap-day defect goes with it.
 **A routing correction made during the split.** Three goldens that the Reg CF work happened to
 force — `jl4/examples/lsp/hover/tests/desc-hover.hover.golden` (the `@desc` leading-space trim in
 `L4.Syntax.getDesc`) and `jl4/examples/ok/tests/export-{explicit,no-explicit}-default.schema.golden`
-(that trim plus a JSON-Schema inlining change) — were initially routed here and have been moved to
-the **lsp** and **service-cli** PRs, which carry the code that produces them. This PR is Reg CF
+(that trim plus a JSON-Schema inlining change) — were initially routed here and now ride in
+#257, which carries the code that produces them (they moved first to the `lsp` and
+`service-cli` themes, then into #257 with the consolidation). This PR is Reg CF
 files only.
 
 ## This PR was part of an interlock that has since been consolidated

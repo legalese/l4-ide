@@ -206,16 +206,16 @@ whether to merge prose ahead of the code it describes.** Specifically:
   theme **ci-build**. Merged alone, this is a pointer to a file that is not there yet.
 - `CLAUDE.md` §3.2 / §3.2.1 / §3.2.2 describe the `prettyLayout round-trip` property, the
   `JL4_EVALDIFF` differential and the `JL4_PRETTY_DUMP_DIR` debugging switch. Those belong with the
-  printer work — theme **lang-printer**.
+  printer work, now in [#257](https://github.com/legalese/l4-ide/pull/257).
 - `SKILL.md`'s new CLI bullet documents `l4 export --to=dmn|dmn-md|bpmn` with `--fidelity-report`.
   The subcommand is carried by **service-cli**, and the exporters behind it by **dmn-export** and
   **bpmn-export**.
 - `SKILL.md`'s date paragraph and the `gotchas.md` footgun entry teach `YMD`, which lives in
-  `jl4-core/libraries/daydate.l4` — theme **lang-imports-stdlib**.
+  `jl4-core/libraries/daydate.l4` — now in #257 (formerly **lang-imports-stdlib**).
 - The `README.md` / `AGENTS.md` table edit is only *correct* once `jl4-actus-analyzer` is actually
-  gone; that removal is theme **actus-archive**. Landing this first leaves the tables briefly
-  understating the tree; landing actus-archive first without this leaves them overstating it. The
-  second failure mode is the worse one, so the safe order is actus-archive first or both together.
+  gone; that removal now rides in #257 (formerly **actus-archive**). Landing this first leaves the tables
+  briefly understating the tree; landing #257 first without this leaves them overstating it. The
+  second failure mode is the worse one, so the safe order is #257 first or both together.
 
 Everything else — the five repo-root design records, `state-ledger.md`, `sets.md`, the drafting
 patterns, and every part of `CLAUDE.md` other than §3.1's third trap and §3.2 — is genuinely

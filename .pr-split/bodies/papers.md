@@ -174,9 +174,9 @@ or CI configuration reads that directory:
 - The one cross-theme thread is cosmetic, not functional. `the-letter-and-the-spirit/README.md`
   says a canonical copy of `cheating-415-poh-yuan-nie.l4` also lives in the corpus (it writes the
   path as `jl4/ok/inert/`; the file is actually at `jl4/examples/ok/inert/`), and that corpus copy
-  lands with the **ladder-viz** theme. The bundled copy is what `reproduce.sh` actually resolves —
+  lands with #257 (formerly the **ladder-viz** theme). The bundled copy is what `reproduce.sh` actually resolves —
   `./cheating-415-poh-yuan-nie.l4`, its first lookup path — so the exhibit reproduces whether or
-  not ladder-viz lands. If ladder-viz is dropped, only that prose pointer goes stale.
+  not #257 lands. If #257 is dropped, only that prose pointer goes stale.
 - `paper/README.md` links to `specs/todo/{yc-safe,corporate-resolutions,godel-loophole}/SPEC-NOTES.md`
   and to `doc/concepts/language-design/logic-not-flowcharts.md`. Those live in the **specs** and
   **docs** themes. If either is dropped, this PR has dead relative links — it does not fail to
@@ -224,8 +224,8 @@ Unstable PRs folded into this one:
 - **#132** — `docs(papers): Hohfeld higher-order section + Book-of-L4 index` (`mengwong/l4-papers`)
 - **#134** — `Library resolution: embedded stdlib outranks ambient XDG/bundle copies (B′)…`
   (`docs/library-resolution-shadow`) — **paper-relevant part only**: one prettier-format commit
-  over `paper/README.md` and the Hohfeld design note. The library-resolution substance belongs to
-  the `lang-imports-stdlib` and `docs` themes.
+  over `paper/README.md` and the Hohfeld design note. The library-resolution substance is in
+  #257 and the `docs` theme.
 - **#171** — `paper(bounded-deontics): MAY-dual + state-explosion related work (van der Meyden)`
   (`docs/bd-vdmeyden-relwork`)
 - **#172** — `feat(regcf): the rule-version axis…` (`mengwong/regcf-rule-version`) —

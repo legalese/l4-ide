@@ -211,7 +211,7 @@ Build registration only:
 
 Hard code dependencies:
 
-- **`ladder-viz`** owns `jl4-core/src/L4/StateGraph.hs`, which is the exporter's entire input.
+- **[#257](https://github.com/legalese/l4-ide/pull/257) (formerly `ladder-viz`)** owns `jl4-core/src/L4/StateGraph.hs`, which is the exporter's entire input.
   `main` already has a `L4.StateGraph`, but not the one `L4.Bpmn.Lower` imports: it exports neither
   `FanKind`, `BranchGuard`, `GuardAtom`, `branchGuardAtoms`, `renderBranchGuard` nor `lestArmWording`,
   all of which `Lower.hs` uses. **This will not compile against `main`'s `StateGraph`.** That theme
@@ -311,7 +311,7 @@ Unstable PRs folded into this one:
 - **#157** — `test/bpmn-kie-checker`: the soundness gate, the jBPM/KIE harness, the `sound/` and
   `unsound/` piles, and the historical-output measurement. No Haskell changed.
 - **#159** — `fix/stategraph-modal-labels`: the `LEST` caption derivation, whose wording the goldens
-  encode. (Code in `ladder-viz`; `BpmnExport.hs` gains "the LEST caption where BPMN actually consumes
+  encode. (Code now in #257; `BpmnExport.hs` gains "the LEST caption where BPMN actually consumes
   it".)
 - **#162** — `feat/regcf-projections`: BPMN cut from the real corpus, `IF`-headed rules, `TargetSelf`
   loops, branch guards on flows, `gatewayDirection` computed from edges and gated.

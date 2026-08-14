@@ -121,7 +121,7 @@ This is as close to standalone as anything in the split.
 - **One line outside the manifest**: the package must be registered in `cabal.project`
   (`  ./jl4-proleg`). No theme in the split owns `cabal.project`, so this PR should carry that
   single added line. It is purely additive — it does **not** touch the `./jl4-actus-analyzer` entry,
-  whose removal belongs to the **actus-archive** theme.
+  whose removal now rides in [#257](https://github.com/legalese/l4-ide/pull/257) (formerly the **actus-archive** theme).
 - **Goldens**: none, and none are needed. `jl4-proleg/l4/burden.l4` sits outside every glob
   `jl4/tests/Main.hs` walks (`jl4/examples/ok/**`, `legal/**`, `not-ok/**`, `jl4-core/libraries/*`),
   so it neither requires a `tests/` directory nor can trip `etc/check-corpus-goldens.mjs`. Its two
@@ -129,8 +129,7 @@ This is as close to standalone as anything in the split.
   encodes behaviour owned by another theme.
 - **Language features**: `burden.l4` uses only constructs already present on `main` — `MAYBE`/`JUST`/
   `NOTHING`, record `DECLARE`/`WITH`, `CONSIDER`/`WHEN`, `FOLLOWED BY`, `'s` projection, `#EVAL`,
-  `#ASSERT`, `§§` sections. It does not depend on **lang-syntax-typecheck**, **lang-sets**,
-  **lang-printer** or **lang-imports-stdlib**.
+  `#ASSERT`, `§§` sections. It does not depend on any of the language-core work consolidated in #257.
 - **Reverse dependencies** (siblings that cite *this*, not the other way round): the **specs**
   theme's `specs/done/STATE-AS-LEDGER-SPEC.md` names `jl4-proleg/src/L4/Proleg/Burden.hs` as the
   already-implemented Writer lane it generalises, and cites this package's transformer-order choice,

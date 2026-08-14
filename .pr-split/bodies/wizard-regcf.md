@@ -109,13 +109,13 @@ Build registration only:
 
 ## Independence
 
-**This PR cannot build without `ladder-viz`, and that is measured, not assumed.**
+**This PR cannot build without the ladder packages now in [#257](https://github.com/legalese/l4-ide/pull/257), and that is measured, not assumed.**
 
-- **`ladder-viz` — hard.** `package.json` depends on `@repo/ladder-svg` and `@repo/ladder-core`,
-  and **neither package exists on `main`** — both are new in the ladder-viz theme, which is also
-  where the `LadderController` that `components/Ladder.svelte` mounts lives. Running `npm ci` on
-  this slice alone fails with `404 Not Found - GET .../@repo%2fladder-core`. **This PR must land
-  after ladder-viz.** (This is precisely why the two wizards are separate PRs: the housing wizard
+- **#257 — hard.** `package.json` depends on `@repo/ladder-svg` and `@repo/ladder-core`, and
+  **neither package exists on `main`** — both are new in #257 (formerly the `ladder-viz` theme),
+  which is also where the `LadderController` that `components/Ladder.svelte` mounts lives. Running
+  `npm ci` on this slice alone fails with `404 Not Found - GET .../@repo%2fladder-core`. **This PR
+  must land after #257.** (This is precisely why the two wizards are separate PRs: the housing wizard
   needs nothing new and stands alone.)
 - **`corpus-regcf` and `service-cli` — soft.** The five surfaces are drawn from the six exports of
   `jl4/examples/legal/regcf/regcf-wizard.l4`, owned by corpus-regcf; the `/query-plan` endpoint and
@@ -162,7 +162,7 @@ evaluation of the flake fails.
   performed — 6 exports driven live on loopback` (branch `mengwong/wizard-deploy-ready`)
 - **legalese/l4-ide#177** — `feat(ladder): Step 4 — the LadderSvg displayer` — contributes no file
   to this PR (it deliberately touched nothing under `ts-apps/`); listed because this app consumes
-  the `LadderController` it introduced, which ships in the **ladder-viz** theme.
+  the `LadderController` it introduced, which now ships in #257.
 
 Split note: on `unstable` this shipped alongside the Housing Act wizard. They are separated here
 because their dependency stories differ completely — bundling them would have made the standalone

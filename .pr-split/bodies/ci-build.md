@@ -256,21 +256,22 @@ whole-workspace lock. It contains entries resolving to `ts-apps/housing-wizard`,
 `ts-apps/regcf-wizard`, `ts-shared/ladder-core` and `ts-shared/ladder-svg`. The root `workspaces`
 glob is `ts-apps/*` + `ts-shared/*`, so a lockfile naming workspace directories that are not on disk
 will not install. Those four directories belong to **wizard-housing**, **wizard-regcf** and
-**ladder-viz** (the two shared packages). Either they land with or before this PR, or the lockfile has to be regenerated
+#257 (which carries the two shared ladder packages). Either they land with or before this PR, or the lockfile has to be regenerated
 against the reduced tree.
 
 *Hard dependency 2 — the sdist step is red against `main` as it stands.* The Haskell job's
 `The sdist must carry the standard library` step fails today: `main`'s `jl4-core/jl4-core.cabal`
 still has `data-files: libraries/*.l4` **after** the `safe-mode` and `serialise-support` flag
 stanzas, which is exactly the defect the step detects. That reordering is #167's other half, and in
-this split it travels with the **lang-imports-stdlib** PR (verified: that branch's `jl4-core.cabal`
-slice is precisely the `data-files` move). **This PR must merge after lang-imports-stdlib.**
+this split it travels with #257 (verified when the slice was still separate: the
+`lang-imports-stdlib` cut of `jl4-core.cabal` was precisely the `data-files` move, and #257
+carries it now). **This PR must merge after #257.**
 
 *Hard dependency 3 — the corpus-goldens job is red against `main` as it stands.* Run against plain
 `origin/main`, `etc/check-corpus-goldens.mjs` exits 1: three fixtures —
 `jl4/examples/not-ok/export-{after-giveth,before-decide,between-given-giveth}.l4` — have no goldens
 at all. This is a **pre-existing** gap on `main`, not one this split introduces. The twelve goldens
-that close it are in the **lang-syntax-typecheck** PR. **This PR must merge after that one**, or it
+that close it are in #257. **This PR must merge after it**, or it
 turns `main` red for a defect that predates all of these PRs.
 
 *Jobs that skip harmlessly, but do nothing useful, without their sibling.* Each of these is gated
@@ -326,7 +327,7 @@ Unstable PRs folded into this one (the CI/build portion of each; several span ot
   commit on the same file, `572972f4 ci(bpmn): give the jBPM check a baseline, so a new finding
   cannot land green`, closes the gap #163 named.
 - **#167** `fix(build): restore the embedded stdlib, and make its absence a build error` — the sdist
-  CI step (its cabal/TH half is in **lang-imports-stdlib**).
+  CI step (the cabal `data-files` move is in #257; the TH fail-loudly half is in `service-cli`).
 - **#200** `wizard-deploy-ready` — the `nix/` registration lines.
 - **#224** `The explainer stage, a BPMN renderer, the grouping tutorial, and the de novo Reg CF run`
   — a 151-file omnibus; what this PR takes from it is the `go` job's later steps and the arrival of

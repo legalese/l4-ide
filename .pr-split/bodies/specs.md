@@ -146,7 +146,8 @@ this one.
 
 ## Blast radius
 
-**64 new files**, 16 modified.
+**64 new files**, 16 modified, 13 renamed — the renames are all `specs/todo/` → `specs/done/`
+promotions, content otherwise intact.
 
 Within the specs tree (this PR's own files):
 
@@ -184,8 +185,8 @@ Within the specs tree (this PR's own files):
   treats a relative link with no target as a hard `LINK_ERRORS` failure, so the docs theme goes red if
   it lands first. (A fifth target, `specs/todo/BOUNDED-DEONTICS-SPEC.md`, already exists on `main`.)
 - **Status headers describe siblings' code.** Many banners here are written in the present tense
-  about code that lives in `dmn-export`, `go-pipeline`, `ladder-viz`, `lang-sets`,
-  `lang-syntax-typecheck`, `corpus-regcf`, `bpmn-export`, `mlir` and `agent-tooling`. Landing this
+  about code that lives in `dmn-export`, `go-pipeline`, `corpus-regcf`, `bpmn-export`, `mlir`,
+  `agent-tooling` and #257 (which absorbed `ladder-viz`, `lang-sets` and `lang-syntax-typecheck`). Landing this
   first makes those sentences forward-looking, which is what CLAUDE.md §4.1 forbids. The cheap,
   honest fix is one dated line at the top of the affected files ("describes work landing in
   `<theme>`"), not rewriting the specs — and it should be reverted as each sibling lands.

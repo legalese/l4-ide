@@ -12,7 +12,7 @@ The demo pipeline had a specification (`specs/todo/single-instruction-demo/SPEC.
 
 ## What's in it
 
-89 files, all new — `git diff --stat origin/main...origin/unstable` over this theme's paths reports **20223 insertions, 0 deletions**. By kind: **27 shell scripts, 27 `.mjs` modules, 30 markdown files, 5 JSON descriptors**.
+91 files, all new — measured against `origin/main` on the branch as re-shipped: **20,869 insertions, 0 deletions**. By kind: **28 shell scripts, 28 `.mjs` modules, 30 markdown files, 5 JSON descriptors**. (An earlier cut said 89 files; the re-ship that closed the #228 coverage gap added `etc/go/lib/doctor.mjs` and `etc/go/lib/toolchain.sh` and refreshed eight stale files.)
 
 ### The driver and its libraries (`etc/go/`)
 
@@ -82,7 +82,7 @@ Nothing existing is modified at all — this PR is **purely additive**, entirely
 - **`service-cli`** — `p8-verify.sh` invokes `l4 verify` and `p7-tnr.sh` invokes `l4 nlg`. Both subcommands are Haskell (`jl4/app/L4/Cli/Verify.hs`, `jl4/app/L4/Cli/Nlg.hs`) and are carried by that theme. Without them those two legs cannot run.
 - **`tests-cli`** — `p8-verify.sh` reproduces five committed control fixtures (`jl4/tests-cli/fixtures/verify-{clean,unsat,dead-branch,vacuous-guard,seam}.l4`) before it will report anything; a control that does not reproduce makes the leg `BROKEN`.
 - **`corpus-regcf`** — `subject.json` names `jl4/examples/legal/regcf/regcf.l4`, `regcf-wizard.l4` and the five de novo deposits under `jl4/examples/legal/regcf/denovo/`. `lib/subject.mjs` treats a leg entry naming a missing file as a hard error, so the sidecar as committed resolves only once those files exist.
-- **`dmn-export`, `bpmn-export`, `ladder-viz`** — the `legs` object names their goldens and demo entry point (`jl4/examples/dmn/expected/regcf-corpus.dmn`, `jl4/examples/dmn/regcf-corpus.cases.json`, `jl4/examples/bpmn/expected/`, `ts-shared/ladder-svg` `demo:regcf`). Those legs are declared members of the milestone, so their goldens are not optional to a `COMPLETE` verdict.
+- **`dmn-export`, `bpmn-export`, and [#257](https://github.com/legalese/l4-ide/pull/257) (formerly `ladder-viz`)** — the `legs` object names their goldens and demo entry point (`jl4/examples/dmn/expected/regcf-corpus.dmn`, `jl4/examples/dmn/regcf-corpus.cases.json`, `jl4/examples/bpmn/expected/`, `ts-shared/ladder-svg` `demo:regcf`). Those legs are declared members of the milestone, so their goldens are not optional to a `COMPLETE` verdict.
 - **`ci-build`** — the `go:` paths filter and the `Go Orchestrator` job live in `.github/workflows/pr-checks.yml`, which that theme carries. Landing this PR without it means `etc/go/**` and `.claude/**` changes still match no filter and run no job, which is exactly the hole PR #193 opened the filter to close.
 
 **What it does not need.** No Haskell and no TypeScript source is touched here, and the orchestrator never runs `cabal` by design — the build lock is a shared resource and concurrent invocations in one worktree corrupt each other. Every missing tool produces a `SKIPPED` receipt naming what is missing and what it was needed for (`JL4_LSP_CMD` absent ⇒ the ladder leg skips; no loopback `jl4-service` ⇒ the MCP leg skips), so the pipeline degrades to honest accounting rather than to failure when a sibling is not present.

@@ -196,10 +196,9 @@ Three concrete consequences, each verified against `origin/main` rather than ass
 
 1. **Three of the seven doc `.l4` files use language features `main` does not have.**
    `gst-rate-change-example.l4` calls `RULES EFFECTIVE DATE`, `EVAL UNDER RULES EFFECTIVE AT` and
-   `EVAL UNDER VALID TIME` (**lang-eval-ledger**, with the type-environment entry in
-   **lang-syntax-typecheck**); `sets-example.l4` uses `SET OF`, `UNION` and `setSize`
-   (**lang-imports-stdlib**, which carries `jl4-core/libraries/prelude.l4`); `typically-example.l4`
-   uses `TYPICALLY` (**lang-syntax-typecheck**). None of those three strings appears anywhere in
+   `EVAL UNDER VALID TIME` (all [#257](https://github.com/legalese/l4-ide/pull/257)); `sets-example.l4` uses `SET OF`, `UNION` and `setSize`
+   (#257, which carries `jl4-core/libraries/prelude.l4`); `typically-example.l4`
+   uses `TYPICALLY` (#257). None of those three strings appears anywhere in
    `origin/main`'s `jl4-core/`. Landed alone, those files fail `l4` and turn the docs job red.
    `logic-not-flowcharts-example.l4`, `grouping-and-precedence.l4`,
    `module-a2-cross-cutting-examples.l4` and `yield-example.l4` use only features `main` already
@@ -208,26 +207,24 @@ Three concrete consequences, each verified against `origin/main` rather than ass
    missing target as an error: `specs/todo/SET-OPERATORS-SPEC.md`,
    `specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md`, `specs/todo/QUESTION-ORDERING-SPEC.md` and
    `specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md` (all **specs**), and
-   `jl4-core/src/L4/Evaluate/Ledger.hs` (**lang-eval-ledger**). A sixth,
+   `jl4-core/src/L4/Evaluate/Ledger.hs` (#257). A sixth,
    `specs/todo/BOUNDED-DEONTICS-SPEC.md`, already exists on `main`. Every *intra*-`doc/` link in
    these pages resolves to a file either already on `main` or included in this PR — checked
    exhaustively — so `doc/` is internally closed.
 3. **The seven grouping figures are committed generator output**, produced by
-   `ts-shared/ladder-svg/demo/grouping.ts`, which lives in **ladder-viz**. The SVGs render
+   `ts-shared/ladder-svg/demo/grouping.ts`, which lives in #257. The SVGs render
    standalone; only *regenerating* them needs that sibling.
 
 Beyond CI, several pages document code that lands elsewhere and would otherwise be accurate prose
 about a feature `main` does not have: `syntax/README.md`, `cheat-sheet.md` and `jl4/GRAMMAR.md`
-(the `•` production and `@infixl`/`@infixr`/`@infix` — **lang-syntax-typecheck**);
-`libraries/resolution.md` and the `errors/README.md` correction (the B′ precedence flip —
-**lang-imports-stdlib**, with the shadow warning in **lsp**); `builtins/README.md` (the deep EVAL
-pin — **lang-eval-ledger**); `libraries/daydate.md` (`YMD` — **lang-imports-stdlib**);
-`query-planning/` (the ROBDD planner — **ladder-viz**).
+(the `•` production and `@infixl`/`@infixr`/`@infix`);
+`libraries/resolution.md` and the `errors/README.md` correction (the B′ precedence flip and the
+shadow warning); `builtins/README.md` (the deep EVAL pin); `libraries/daydate.md` (`YMD`);
+`query-planning/` (the ROBDD planner). All of that code is now consolidated in #257.
 
 It does **not** need **corpus-regcf**, **go-pipeline**, **dmn-export**, **bpmn-export**, **mlir**,
 **papers**, **proleg**, **experiments**, **service-cli**, **tests-cli**, or either wizard theme.
-Suggested merge order: **lang-syntax-typecheck**, **lang-imports-stdlib**, **lang-eval-ledger** and
-**specs** before this; **ladder-viz** whenever.
+Suggested merge order: **#257** and **specs** before this; nothing else gates it.
 
 ## Risk if rejected
 

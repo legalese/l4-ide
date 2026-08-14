@@ -108,5 +108,5 @@ and no nix or CI file references it.
 
 Split note: on `unstable` this shipped alongside the Reg CF wizard. They are separated here
 because their dependency stories differ completely — this one needs nothing that is not already on
-`main`, while the Reg CF wizard cannot build without `ladder-viz`. Bundling them would have made
+`main`, while the Reg CF wizard cannot build without the ladder packages now in #257. Bundling them would have made
 the standalone app un-mergeable on its own.
