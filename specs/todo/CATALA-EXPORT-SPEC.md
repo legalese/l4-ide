@@ -462,7 +462,14 @@ corpora. The pipeline is executed **[E]**: `catala-proof` installs from the same
 via opam), and `catala proof` over the Mode B module reports "No errors found during the proof
 mode run" — with the honesty note that on the seed example both VCs are near-trivial (single
 exception; `condition` base), so this validates the toolchain path, not yet an interesting
-proposition. P4's exit remains a corpus with genuinely overlapping-looking provisos. Conversely L4-side verification (exhaustiveness oracle, `#CHECK`, ROBDD tooling) runs
+proposition. P4's exit remains a corpus with genuinely overlapping-looking provisos.
+
+Route disclosure (portfolio seam S3, draft PR #262): everything in this section is the
+**emitted-artifact route** — Z3 via the Catala proof plugin over our emitted code, proving
+properties _of the emitted module_ (its exception ladders don't overlap, its defaults are
+non-empty). It is distinct from the direct SMT lowering route
+(`VERIFICATION-BACKEND-LOWERING-SPEC` Phase 1), which proves properties of the L4 source
+itself. Both routes stand; any proof claim made from this spec's pipeline names this route. Conversely L4-side verification (exhaustiveness oracle, `#CHECK`, ROBDD tooling) runs
 _before_ emission and transfers its guarantees into the total fragment.
 
 ### 4.12 Tooling mirrors
