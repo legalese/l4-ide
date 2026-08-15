@@ -36,6 +36,16 @@
 > _those teach L4 and this teaches computational law by way of L4_: the review found one hazard,
 > one gap (`MAYBE`), and one unpaid debt from ch. 1 (rule-version time), and changed chs. 1, 5
 > and 7. The arc is now eleven chapters with a contingent twelfth.
+>
+> **Third review, 2026-08-13.** Meng, on the axis just adopted: the Searle dichotomy "runs aground
+> on real-world scenarios" — to qualify for tax benefits you must _be_ married, but to be married
+> you must have turned up somewhere and _said certain words_. Must-be and must-do **stack**; they
+> do not partition. **D15** (§4.1.1) is the resolution, and it is Meng's: the rule is constitutive
+> of a classification — window A counts as compliant, window B does not — while the deontic force
+> is **ambient** ("thou shalt comply") and, importantly, _recoverable_ from the surrounding
+> instrument. The thread is picked up in ch. 6, where A.3 returns as a **dominator** exhibit.
+> **D16** (§4.3) adds a debt register, because the ch. 1 miss found in the second review was a
+> promise nobody was tracking, and D15 opens two more.
 
 ---
 
@@ -177,24 +187,24 @@ A prologue and eleven chapters. Every row names its exhibit (all already in this
 bibliography) and its cash-out (**D4**: an uncashed row is cut). The grouping in the left column
 is a reading aid, not a set of Parts — the unit is the chapter.
 
-| #        | Chapter                                | The concept it opens with                                                                    | The L4 it runs                                                                                    | The break that generates the next                            | Exhibit                                                    |
-| -------- | -------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| **0**    | Calculemus, and five graves            | The history, by failure mode (§5)                                                            | —                                                                                                 | Why it might be different now                                | Leibniz; the spreadsheet                                   |
-| _core_   |                                        |                                                                                              |                                                                                                   |                                                              |                                                            |
-| **1**    | The smallest legal act                 | Subsumption; the syllogism; the major premise as artifact                                    | `DECIDE … IF`; the evaluation trace as explanation                                                | The major premise is a _sentence_                            | any two-element provision                                  |
-| **2**    | The sentence that means two things     | Propositional structure; parse multiplicity; the canons as disambiguation rules              | **The CNL surface**: words not sigils, layout as bracketing, phrase identifiers, asyndeton, ditto | The pinned sentence isn't a definition — it makes a _demand_ | Oakhurst; Lockhart; Rogers/Bell                            |
-| **3**    | **Must be**                            | The material conditional; scope vs demand; **compliance is three-valued**; logic is not flow | `IMPLIES`; vacuous truth; the **ladder** as derived view — two sinks, one changeover              | It applies to _a_ window; the statute says _any_             | GPDO Class A para A.3 (the window rule)                    |
-| **4**    | Every person who                       | Predicate logic; quantifier scope; ∀∃ as the shape of good law                               | `DECLARE`, records, enums, `GIVEN`/`GIVETH`, `CONSIDER` exhaustiveness, the empty-set trap        | Real rules have exceptions                                   | British Nationality Act (CACM 1986)                        |
-| **5**    | Unless, notwithstanding, provided that | Defeasibility; non-monotonicity; burdens; **absence of a fact ≠ falsity of a fact**          | Layered defeat; override graphs; `MAYBE`; the burden-of-proof monad                               | Nothing yet tells anyone to _do_ anything                    | Jersey charity test (defeater on a defeater); PROLEG lease |
-| _acts_   |                                        |                                                                                              |                                                                                                   |                                                              |                                                            |
-| **6**    | **Must do** (may do, must not do)      | Deontics — **derived** from action, goal and consequence, not primitive                      | `PARTY`/`MUST`/`HENCE`/`LEST`; the dominator `MUST`                                               | Obligations have clocks; clocks collide                      | the daycare fine; contrary-to-duty                         |
-| **7**    | **Time, twice**                        | Two clocks: deadlines _inside_ a rule; versions _over_ it. Traces, concurrency, races        | `WITHIN`; `#TRACE`; the LTS; the three time axes and rule-version pinning                         | Now you have a rule base worth asking                        | the PDPA race; a statute amended mid-facts                 |
-| _asking_ |                                        |                                                                                              |                                                                                                   |                                                              |                                                            |
-| **8**    | Asking the rules questions             | Deduction, **abduction**, induction — and which of the three we refuse                       | The relational reading; abductive planning; the ROBDD interview                                   | An answer can't show you it is wrong                         | the eligibility interview                                  |
-| **9**    | Checking                               | Verification as the missing test suite; the white-hat Bad Man                                | Dead letters, semantic diff, exhaustiveness, model checking                                       | Some questions aren't of this kind                           | the corporate constitution; s415; the Lexipedia drift      |
-| _limits_ |                                        |                                                                                              |                                                                                                   |                                                              |                                                            |
-| **10**   | Where this stops                       | Open texture; vagueness; standards vs rules; **detect ≠ resolve**                            | Enumerate-mode encoding; the ambiguity fork and its witness                                       | Who gets to check any of this                                | _Poh Yuan Nie_ ¶28; the determinacy strata                 |
-| **11**   | Seeing like a citizen                  | Legibility as civic infrastructure                                                           | —                                                                                                 | —                                                            | the political-economy facet                                |
+| #        | Chapter                                | The concept it opens with                                                                                              | The L4 it runs                                                                                    | The break that generates the next                            | Exhibit                                                    |
+| -------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| **0**    | Calculemus, and five graves            | The history, by failure mode (§5)                                                                                      | —                                                                                                 | Why it might be different now                                | Leibniz; the spreadsheet                                   |
+| _core_   |                                        |                                                                                                                        |                                                                                                   |                                                              |                                                            |
+| **1**    | The smallest legal act                 | Subsumption; the syllogism; the major premise as artifact                                                              | `DECIDE … IF`; the evaluation trace as explanation                                                | The major premise is a _sentence_                            | any two-element provision                                  |
+| **2**    | The sentence that means two things     | Propositional structure; parse multiplicity; the canons as disambiguation rules                                        | **The CNL surface**: words not sigils, layout as bracketing, phrase identifiers, asyndeton, ditto | The pinned sentence isn't a definition — it makes a _demand_ | Oakhurst; Lockhart; Rogers/Bell                            |
+| **3**    | **Must be**                            | The material conditional; the rule as **constitutive of a classification**; three-valued compliance; logic is not flow | `IMPLIES`; vacuous truth; the **ladder** as derived view — two sinks, one changeover              | It applies to _a_ window; the statute says _any_             | GPDO Class A para A.3 (the window rule)                    |
+| **4**    | Every person who                       | Predicate logic; quantifier scope; ∀∃ as the shape of good law                                                         | `DECLARE`, records, enums, `GIVEN`/`GIVETH`, `CONSIDER` exhaustiveness, the empty-set trap        | Real rules have exceptions                                   | British Nationality Act (CACM 1986)                        |
+| **5**    | Unless, notwithstanding, provided that | Defeasibility; non-monotonicity; burdens; **absence of a fact ≠ falsity of a fact**                                    | Layered defeat; override graphs; `MAYBE`; the burden-of-proof monad                               | Nothing yet tells anyone to _do_ anything                    | Jersey charity test (defeater on a defeater); PROLEG lease |
+| _acts_   |                                        |                                                                                                                        |                                                                                                   |                                                              |                                                            |
+| **6**    | **Must do** (may do, must not do)      | Deontics — **derived** from action, goal and consequence; the must-be/must-do stack                                    | `PARTY`/`MUST`/`HENCE`/`LEST`; the dominator `MUST`                                               | Obligations have clocks; clocks collide                      | **A.3 again**, as a dominator; marriage ⇐ the ceremony     |
+| **7**    | **Time, twice**                        | Two clocks: deadlines _inside_ a rule; versions _over_ it. Traces, concurrency, races                                  | `WITHIN`; `#TRACE`; the LTS; the three time axes and rule-version pinning                         | Now you have a rule base worth asking                        | the PDPA race; a statute amended mid-facts                 |
+| _asking_ |                                        |                                                                                                                        |                                                                                                   |                                                              |                                                            |
+| **8**    | Asking the rules questions             | Deduction, **abduction**, induction — and which of the three we refuse                                                 | The relational reading; abductive planning; the ROBDD interview                                   | An answer can't show you it is wrong                         | the eligibility interview                                  |
+| **9**    | Checking                               | Verification as the missing test suite; the white-hat Bad Man                                                          | Dead letters, semantic diff, exhaustiveness, model checking                                       | Some questions aren't of this kind                           | the corporate constitution; s415; the Lexipedia drift      |
+| _limits_ |                                        |                                                                                                                        |                                                                                                   |                                                              |                                                            |
+| **10**   | Where this stops                       | Open texture; vagueness; standards vs rules; **detect ≠ resolve**                                                      | Enumerate-mode encoding; the ambiguity fork and its witness                                       | Who gets to check any of this                                | _Poh Yuan Nie_ ¶28; the determinacy strata                 |
+| **11**   | Seeing like a citizen                  | Legibility as civic infrastructure                                                                                     | —                                                                                                 | —                                                            | the political-economy facet                                |
 
 Notes that are decisions, not commentary:
 
@@ -258,22 +268,65 @@ ch. 6 and finds that the same treatment will not hold it. That is D2's "one step
 again, and it is a far better introduction to the constitutive/regulative split than the ICAIL
 paper's — which, correctly for its audience, simply cites Searle and moves on.
 
-**The prior art, and a distinction the book must not blur.** "Must be" / "must do" is the
-**ought-to-be vs ought-to-do** distinction in deontic logic (German legal theory's
-_Seinsollen_/_Tunsollen_); von Wright and Castañeda are the usual anchors, and Meyer's dynamic
-deontic logic is an ought-to-do treatment. `[verify all four before drafting — attributions are
-from memory, and this is precisely the kind of claim the field will check.]` What matters is that
-it is a **third cut**, not a restatement of the two the book already uses:
+**The prior art.** "Must be" / "must do" is the **ought-to-be vs ought-to-do** distinction in
+deontic logic (German legal theory's _Seinsollen_/_Tunsollen_); von Wright and Castañeda are the
+usual anchors, and Meyer's dynamic deontic logic is an ought-to-do treatment. `[verify all four
+before drafting — attributions are from memory, and this is precisely the kind of claim the field
+will check.]`
 
-- **Searle:** constitutive vs regulative — does the rule _create_ the activity, or govern
-  antecedently existing behaviour?
-- **von Wright:** ought-to-be vs ought-to-do — does the norm demand a state or an act?
-- **L4:** constitutive core vs regulative layer — which formalism executes it?
+#### 4.1.1 The Searle problem, and the reading that dissolves it (D15)
 
-"All windows must be obscure-glazed" is **regulative** on Searle's cut, **ought-to-be** on von
-Wright's, and lives in L4's **constitutive core**. Those three facts are consistent and are
-routinely conflated, including by us. The chapter should say so plainly, because a reader who
-thinks "constitutive core" means "constitutive rule" has been misled by our own naming.
+The obvious next move is to line the new axis up against Searle's and call it a third cut. **That
+does not survive contact with real instruments** (Meng, 2026-08-13), and the book has to say so
+rather than inherit a tidy dichotomy that does not hold.
+
+**The counterexample.** To qualify for a tax benefit you must **be** married. To be married, you
+must have turned up at a particular place at a particular time and **said certain words**. The
+must-be bottoms out in a must-do. Push on any status — married, resident, registered, licensed,
+incorporated, of age — and the same thing happens: it is the residue of acts, or of the passage of
+time, or of someone else's determination. **Must-be and must-do do not partition law; they
+_stack_.** A working legal analysis walks up and down that stack constantly, and a book that
+presents ch. 3 and ch. 6 as two disjoint kinds of rule will have taught something false.
+
+**D15 — the resolution the book adopts: the rule constitutes a classification; the deontic force
+is ambient, and recoverable.** For A.3: window A **counts as** a compliant window, window B counts
+as a non-compliant one — that is a constitutive judgement in Searle's own "X counts as Y in context
+C" form. What makes the sentence feel obligatory is not in the sentence. It is the ambient
+expectation that **thou shalt comply**, which sits outside the provision.
+
+Three things follow, and they are the reason this is a repair rather than a redescription:
+
+1. **It explains the encoding.** A statute that says "must be" is encoded as a Boolean function, and
+   that looks like a loss of force until you see that the force was never in that sentence. The
+   provision does the classifying; the obligation lives elsewhere. Nothing was dropped — it was
+   **factored**.
+2. **The ambient expectation is usually findable, and finding it is a discipline.** "Ambient" must
+   not become a licence to wave. In the GPDO case the force is recoverable from the surrounding
+   instrument: Class A grants permitted development _subject to_ these conditions, so the "or else
+   what?" is that you lose the permission and fall back to needing express consent, with
+   enforcement behind that. So the chapter teaches a practice, not a shrug: **when you encode a
+   must-be rule as a Boolean, you have factored out a goal index — go find it and write it down.**
+   That is the Bounded Deontics "or else what?" discipline arriving three chapters before the
+   theory that names it.
+3. **It hands ch. 6 its best exhibit, which is a rule the reader already knows.** "Thou shalt
+   comply" gets analysed in ch. 6, and the window comes back: the goal is _development is permitted
+   under Class A_, obscure glazing lies on every path to it, and therefore it is a **dominator** —
+   a `MUST` derived, not declared (**D11**). Demonstrating the dominator thesis on a statute the
+   reader encoded themselves in ch. 3 is worth more than any fresh exhibit, and it makes chs. 3 and
+   6 a matched pair rather than two chapters that happen to rhyme.
+
+**So the honest statement about Searle is stronger than "three cuts."** The constitutive/regulative
+distinction does not sort _rules_; a single provision routinely plays both roles, and which role you
+read it in is a modelling decision with consequences. `[The non-exhaustiveness of the dichotomy is
+contested ground in the literature — find the critics rather than asserting it ourselves.]` What
+L4's two layers sort is not Searle's kinds but **what the formalism must carry**: a classification
+needs a Boolean function, a demand on an agent over time needs a transition system. A reader who
+thinks "constitutive core" means "constitutive rule" has been misled by our own naming, and the
+chapter should say so in as many words.
+
+**A debt this opens, deliberately.** Ch. 3 leaves two threads hanging for ch. 6 — _where did the
+force go?_ and _this state is the residue of acts_ — and it should hang them explicitly rather than
+leave the reader to notice the gap. See §4.3.
 
 **Four arguments for before rather than after:**
 
@@ -381,6 +434,42 @@ Rogers). Ch. 2 is therefore the best-sourced chapter in the arc and its shape ca
 settled. Note the one adaptation the genre demands: the tutorial's job is to stop you writing an
 ambiguous line, while the chapter's job is to establish that the ambiguity was **avoidable** — same
 material, different burden of proof.
+
+### 4.3 Breaks and debts — and a register for the second kind (D16)
+
+D3 gave every chapter a **break**: the failure that generates the _next_ chapter. That worked, and
+it is why the arc has a plot. But it turns out to model only half of what chapters actually owe
+each other, and the missing half has already cost us once.
+
+A **break** is discharged immediately, by the chapter that follows. A **debt** is a promise made in
+one chapter and cashed several chapters later — and because nothing was tracking them, ch. 1's
+version-and-amendment-history debt went unpaid through two full revisions of this note and was
+caught only by reading a tutorial index (§4.2, finding 3). That is a **D4 failure with no detector**:
+the cash-out test asks whether a concept names an affordance, and says nothing about whether a
+promise was kept.
+
+**D16 — debts are tracked in a register, and a chapter may not be considered drafted while it owes
+an unlisted one.**
+
+| Debt                                                           | Incurred | Paid   | Note                                                                                        |
+| -------------------------------------------------------------- | -------- | ------ | ------------------------------------------------------------------------------------------- |
+| The major premise has a **version and an amendment history**   | ch. 1    | ch. 7  | The miss that motivated this register; rule-effective time (§4.2)                           |
+| A decision is **checkable by someone other than its maker**    | ch. 1    | ch. 11 | The politics, planted in ch. 1 and grown up in the coda                                     |
+| The rule that **commands** rather than classifies              | ch. 1    | ch. 6  | Displayed on ch. 1's opening pages, not analysed (§4.2, finding 1)                          |
+| The ambiguity was **avoidable**, and the waste is measurable   | ch. 2    | ch. 10 | The avoidable-ambiguity tax; ch. 2 asserts it, only the determinacy material can measure it |
+| **Where did the force go?** — the ambient "thou shalt comply"  | ch. 3    | ch. 6  | D15; the window returns as the dominator exhibit                                            |
+| A **status is the residue of acts** (married ⇐ said the words) | ch. 3    | ch. 6  | D15; the must-be/must-do stack, and why the two are not a partition                         |
+| **Absence of a fact is not falsity of a fact**                 | ch. 5    | ch. 8  | `MAYBE` and the burden in ch. 5; what an abductive query does with an unknown, in ch. 8     |
+| The reader can **read a ladder**                               | ch. 3    | —      | Not a debt but a capability: every later chapter spends it, so ch. 3 must actually teach it |
+
+Two disciplines fall out, and both are cheap:
+
+- **A chapter's draft is not done until its outgoing debts are in this table**, and a chapter that
+  pays one should say so in the text — the reader who remembers the promise is the reader who
+  trusts the book.
+- **An unpaid debt at the end of the arc is a missing chapter**, and should be argued for on that
+  footing rather than smuggled in. That is precisely the shape of the open question about
+  version-time in §4.2's finding 3.
 
 ---
 
@@ -490,20 +579,20 @@ records what lands where, so drafting can aim at it. Note what the interleaving 
 no facet is a Part any more; each is **distributed across the chapters whose problem it answers**,
 which is a real editorial cost and is the price of D13.
 
-| Facet                                                                                   | Lands in                        | Note                                                                                                                  |
-| --------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| ICAIL §§3–5 (constitutive/regulative; the two-layer architecture)                       | chs. 3, 6 — and ch. 1's framing | The book **earns** the split via _must be_/_must do_ (§4.1) rather than citing Searle; `doc/concepts/legal-modeling/` |
-| ICAIL §7 + [`../cnl-affordances/`](../cnl-affordances/)                                 | **ch. 2**, then reprised        | The facet most at risk of becoming the manual (§1): it must keep answering ch. 1's break, not enumerate keywords      |
-| [`logic-not-flowcharts.md`](../../doc/concepts/language-design/logic-not-flowcharts.md) | **ch. 3**, ladder reused after  | The source for the whole chapter: `IMPLIES`, three-valued compliance, logic-is-not-flow, the ladder as _view_         |
-| [`../bounded-deontics/`](../bounded-deontics/)                                          | ch. 6                           | Obligation derived, not declared (**D11**); concede Anderson 1958 in the chapter, not a footnote (**D7**)             |
-| ICAIL PROLEG appendix; the burden monad                                                 | ch. 5                           | The burden layer is the reason ch. 5 is not just "exceptions"                                                         |
-| `doc/tutorials/multi-temporal-modeling/`                                                | ch. 7                           | The three time axes — ch. 1's unpaid debt (§4.2, finding 3)                                                           |
-| [`../formal-methods-in-law/`](../formal-methods-in-law/)                                | chs. 8–9                        | Its §8 honest map is **mandatory**: this material is in several states of existence and each must be marked           |
-| [`../cls-determinacy-frontier/`](../cls-determinacy-frontier/)                          | ch. 10                          | The determinacy strata and the avoidable-ambiguity tax, which ch. 2 promised and only here can be measured            |
-| [`../political-economy/`](../political-economy/)                                        | ch. 11                          | The coda; ch. 1's reviewability point, grown up                                                                       |
-| [`../case-studies/`](../case-studies/); `the-letter-and-the-spirit/`                    | worked examples throughout      | Jersey charity test → ch. 5; s415 → chs. 2 and 9; GCO → ch. 7                                                         |
-| `doc/concepts/language-design/` (tables, trees, order)                                  | chs. 3, 4, 9                    | Cited, not re-derived (**D10**)                                                                                       |
-| `doc/tutorials/getting-started/grouping-and-precedence.md`                              | **ch. 2**                       | Effectively a draft of the chapter already (§4.2)                                                                     |
+| Facet                                                                                   | Lands in                        | Note                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ICAIL §§3–5 (constitutive/regulative; the two-layer architecture)                       | chs. 3, 6 — and ch. 1's framing | The book **earns** the split via _must be_/_must do_ (§4.1) rather than citing Searle; `doc/concepts/legal-modeling/`                                                                         |
+| ICAIL §7 + [`../cnl-affordances/`](../cnl-affordances/)                                 | **ch. 2**, then reprised        | The facet most at risk of becoming the manual (§1): it must keep answering ch. 1's break, not enumerate keywords                                                                              |
+| [`logic-not-flowcharts.md`](../../doc/concepts/language-design/logic-not-flowcharts.md) | **ch. 3**, ladder reused after  | The source for the whole chapter: `IMPLIES`, three-valued compliance, logic-is-not-flow, the ladder as _view_                                                                                 |
+| [`../bounded-deontics/`](../bounded-deontics/)                                          | ch. 6, seeded in ch. 3          | Obligation derived, not declared (**D11**); the "or else what?" goal-index arrives in ch. 3 as a drafting discipline (**D15**); concede Anderson 1958 in the chapter, not a footnote (**D7**) |
+| ICAIL PROLEG appendix; the burden monad                                                 | ch. 5                           | The burden layer is the reason ch. 5 is not just "exceptions"                                                                                                                                 |
+| `doc/tutorials/multi-temporal-modeling/`                                                | ch. 7                           | The three time axes — ch. 1's unpaid debt (§4.2, finding 3)                                                                                                                                   |
+| [`../formal-methods-in-law/`](../formal-methods-in-law/)                                | chs. 8–9                        | Its §8 honest map is **mandatory**: this material is in several states of existence and each must be marked                                                                                   |
+| [`../cls-determinacy-frontier/`](../cls-determinacy-frontier/)                          | ch. 10                          | The determinacy strata and the avoidable-ambiguity tax, which ch. 2 promised and only here can be measured                                                                                    |
+| [`../political-economy/`](../political-economy/)                                        | ch. 11                          | The coda; ch. 1's reviewability point, grown up                                                                                                                                               |
+| [`../case-studies/`](../case-studies/); `the-letter-and-the-spirit/`                    | worked examples throughout      | Jersey charity test → ch. 5; s415 → chs. 2 and 9; GCO → ch. 7                                                                                                                                 |
+| `doc/concepts/language-design/` (tables, trees, order)                                  | chs. 3, 4, 9                    | Cited, not re-derived (**D10**)                                                                                                                                                               |
+| `doc/tutorials/getting-started/grouping-and-precedence.md`                              | **ch. 2**                       | Effectively a draft of the chapter already (§4.2)                                                                                                                                             |
 
 **D12, unchanged and now sharper.** The verification material (chs. 8–9) is **written last**,
 because its shipped/designed boundary moves and a book that gets it wrong is worse than no book.
@@ -644,5 +733,8 @@ TAXMAN — is telling practitioners something true about the world they already 
    compliance, and teaching the reader to read a ladder — and if it does not work, D14 is wrong.
 4. **Verify the citations.** §5's bibliography and §4.1's ought-to-be/ought-to-do attributions
    (von Wright, Castañeda, Meyer, _Seinsollen_/_Tunsollen_) are from memory and carry `[verify]`.
+   §4.1.1 additionally owes a literature check on the **non-exhaustiveness of Searle's dichotomy**:
+   D15 is a modelling decision we can defend on our own terms, but the claim that a single provision
+   routinely plays both roles should be attributed to the critics who made it, not asserted fresh.
 5. **Write the prologue** — it carries the history argument alone now (§10), so it is the test of
    whether D6's split works.
