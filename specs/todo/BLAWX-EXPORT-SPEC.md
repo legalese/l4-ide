@@ -879,7 +879,9 @@ earmark in R10, not a deliverable).
 - **P2 — Blawx round-trip.** Docker instance up (images on `/Volumes/transcend` per
   environment constraint); `/import/` accepts every golden; run endpoint agrees with L4 on the
   full `#EVAL` population; eId prediction verified against `clean-law` (R4). Exit: tier-2 green
-  on the seed corpus.
+  on the seed corpus. _A single-example smoke of this whole phase was already executed during
+  the design pass (Appendix A): import 302, answer `Amount = 1000` with justification tree,
+  eIds as predicted — so P2's risk is volume, not mechanism._
 - **P3 — editability.** `renderXml`; re-save fixpoint holds for every seed workspace (R12).
   Exit: byte-identical `scasp_encoding` after UI open-and-save of every workspace.
 - **P4 — the showcase.** A statute corpus (BNA §1 or a Housing Act ground — both have
@@ -891,14 +893,23 @@ earmark in R10, not a deliverable).
   tests re-expressed as `#EVAL`s, and both engines agreeing on every query. Exit: the bird
   example round-trips Blawx → L4 → Blawx with the fixpoint intact.
 
-## Appendix A — worked example **[E for the rules and test, U for the envelope]**
+## Appendix A — worked example **[E — executed at both tiers; Blockly XML remains U]**
 
 The same source module as the Catala study's Appendix A, for cross-bridge comparability.
-_Executed 2026-08-16: the `sec_1_section`/`sec_2_section` rules below plus the test facts,
-assembled in `reasoner.py` load order over a `blawx_comparison` library subset and run under
-SWI-Prolog 9.2.9 + the s(CASP) pack (the R13 tier-1 harness, prototyped for this spec),
-answer `?- benefit_amount(a1,Amount).` with `Amount = 1000` — the L4-oracle value. The YAML
-envelope, declarations, and Blockly XML remain **[U]** pending the Docker round-trip._
+_Executed 2026-08-16, twice. **Tier 1**: the `sec_1_section`/`sec_2_section` rules below plus
+the test facts, assembled in `reasoner.py` load order over a `blawx_comparison` library
+subset and run under SWI-Prolog 9.2.9 + the s(CASP) pack, answer
+`?- benefit_amount(a1,Amount).` with `Amount = 1000` — the L4-oracle value. **Tier 2**: a
+hand-authored `.blawx` of this example (minimal declarations, empty `xml_content`) was
+accepted by `POST /import/` on a running `lexpedite/blawx:latest` container (linux/amd64
+under emulation on the arm64 reference machine), and
+`POST /admin/benefit-act/test/benefit_amount_1/run/` returned
+`{"Answers":[{"Variables":{"Amount":1000},…` **with an English justification tree** —
+"…because 70 is greater than or equal to 65, and 50000 is less than or equal to 100000 …
+1000 + 0 is 1000" — even before `#pred` emission. The imported ruledoc's regenerated Akoma
+Ntoso carries exactly the predicted eIds `sec_1`/`sec_2` and slug `benefit-act`, verifying
+R4's eId-prediction mechanism, and the duplicated bridge lines deduplicated correctly under
+the `% BLAWX CHECK DUPLICATES` pass. Only the Blockly XML pairing (P3) remains **[U]**._
 
 ```l4
 DECLARE Applicant HAS
