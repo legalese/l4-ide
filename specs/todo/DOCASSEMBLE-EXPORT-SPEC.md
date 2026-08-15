@@ -69,7 +69,7 @@ The OpenFisca backend fixes the architectural shape **[E]**:
 (`Lower.hs:63`), per-function results combined with `partitionEithers` so all errors surface at
 once (`Lower.hs:76-81`), every unsupported `Expr` constructor refused with a named phrase
 (`constructorName`, `Lower.hs:387-405`), name sanitisation total and collision-checked
-(`pyIdent` `Lower.hs:758-773`, `checkCollisions` `Lower.hs:806-826`), and an emitter that builds
+(`pyIdent` `Lower.hs:754`, `checkCollisions` `Lower.hs:814`), and an emitter that builds
 `[Text]` rather than a pretty-printer `Doc` "so indentation is exact and golden-stable"
 (`Emit.hs:5-6`) — doubly binding for YAML, an indentation-sensitive format.
 
@@ -85,11 +85,14 @@ What docassemble buys that no existing backend does:
 1. **An elicitation runtime.** Docassemble's assembly loop evaluates `mandatory` blocks and, on
    an undefined variable, catches the exception, recovers the name, and backchains to whichever
    `question:` or `code:` block defines it, indexed most-specific-first
-   (`docassemble_base/docassemble/base/parse.py`: assembly loop, exception handler, `askfor`,
-   variable index) **[R]**. That is L4's `queryDecision` support-set computed lazily at runtime.
+   (`parse.py:8539` loop, `:8781` handler, `:9059` `askfor`, `:4738` variable index; candidate
+   ordering at `:9092`) **[E via survey]**. That is L4's `queryDecision` support-set computed
+   lazily at runtime.
    One L4 source therefore becomes a _conversation_, not a form.
 2. **Document assembly on the same dependency engine.** `attachment` blocks (DOCX/Jinja2,
-   fillable PDF) participate in the same variable-seeking loop **[R]** — a verdict screen that
+   fillable PDF) participate in the same variable-seeking loop — an attachment with
+   `variable name:` registers as seekable like any block (`parse.py:5002`, sought at
+   `:9514-9530`) **[E via survey]** — so a verdict screen that
    also assembles the notice or the demand letter is a capability neither OpenFisca nor Catala
    nor our own housing wizard offers.
 3. **A deployed install base in exactly our adjacent market** — legal aid, court self-help,
@@ -104,7 +107,8 @@ in §7 and rulings in §8.
 - **Backward chaining by exception.** `Interview.assemble()` (`parse.py:8539` **[E]**) re-runs
   mandatory blocks from the top on every pass; an undefined variable raises
   `NameError`/`DAAttributeError`/`DAIndexError`; the handler recovers the variable name from
-  the exception and `askfor()` finds the defining block, most-specific candidate first **[R]**.
+  the exception and `askfor()` finds the defining block, most-specific candidate first
+  (the four-key sort at `parse.py:9092`) **[E via survey]**.
   Demonstrated end-to-end headlessly in this session: a `mandatory` verdict screen pulled a
   `code:` block which pulled a `yesno` question, unprompted (Appendix B) **[E]**. Two
   consequences bind the emitter: driver code must be **idempotent** (pure references and
@@ -146,6 +150,23 @@ in §7 and rulings in §8.
   imports `flask_app`, `login_as_admin`) **[E]**, so it is an in-container tool, not a venv
   tool; (c) a real server over `/api/session/*`, with `GET /api/interview_data` as the
   vocabulary check **[R]** — the demo path, not the test path.
+- **Eager/lazy edges of the pruner.** Generator forms short-circuit; list forms do not:
+  `all(...)`/`any(...)` over a generator stops at the first decisive element, while
+  `all([...])`, list comprehensions, and f-strings evaluate everything. In generated code this
+  is a semantic difference, not style (R9). Two escape hatches run eagerly by design: `need:`
+  (evaluated before question text renders) and Mako in question prose (lazy, top-to-bottom,
+  `strict_undefined`).
+- **A built-in explanation seam.** `explain(text, category=…)` appends-if-absent to
+  `_internal['explanations']`, read back by `logic_explanation(category)`
+  (`util.py:13227-13270`) **[E via survey]**; the canonical pattern is
+  `docassemble_demo/.../examples/explain.yml`. Because of short-circuit evaluation, calls
+  placed in rule blocks record _exactly the rules that fired, in execution order_ — an
+  audit-grade "why" trace for free. Separately, the engine's own seeking trace
+  (`InterviewStatus.get_history()`, `parse.py:597-650`) records which block fired for which
+  variable, but only under `debug` — a developer/harness oracle, not a user-facing one.
+- **Interview-scale guards.** `loop limit` and `recursion limit` both default 500
+  (`parse.py:7942-7943`), raised via `features:` — a large generated rule graph should emit
+  these scaled to its size.
 - **Version floor.** `requires-python >= 3.12` (`docassemble_base/pyproject.toml:14`) **[E]**;
   playground packages require `pyproject.toml` with a valid SPDX license expression as of
   1.8.0 **[R]** — both bind M2's package emission.
@@ -154,14 +175,14 @@ in §7 and rulings in §8.
 
 All **[E]**. The selection layer is `L4.Export`:
 
-- `getExportedFunctions :: Module Resolved -> [ExportedFunction]` (`Export.hs:115`); only
-  explicit `@export` counts (`Export.hs:120-122`); topmost is promoted to default when none is
-  marked (`Export.hs:124-127`).
+- `getExportedFunctions :: Module Resolved -> [ExportedFunction]` (`Export.hs:125`); only
+  explicit `@export` counts (`Export.hs:131-132`); topmost is promoted to default when none is
+  marked (`Export.hs:133-136`).
 - `ExportedFunction` carries name, description, params, return type, and the `Decide Resolved`
-  itself (`Export.hs:42-49`). `ExportedParam` carries `paramDescription` (falling back from the
-  parameter's `@desc` to the _type's_ `@desc` via `buildTypeDescMap`, `Export.hs:213-226` — free
+  itself (`Export.hs:44-51`). `ExportedParam` carries `paramDescription` (falling back from the
+  parameter's `@desc` to the _type's_ `@desc` via `buildTypeDescMap`, `Export.hs:270` — free
   prose on a record `DECLARE` reaches every question generated from that record),
-  `paramRequired = not . isMaybeType` (`Export.hs:201`), and `paramDefault` from `TYPICALLY`.
+  `paramRequired = not . isMaybeType` (`Export.hs:258`), and `paramDefault` from `TYPICALLY`.
 - Structured `@desc` payloads follow the `descKeyword` convention
   (`L4/OpenFisca/Lower.hs:446-455`): first word is the tag, remainder is payload. This backend
   reserves the tag `docassemble` for per-declaration overrides (§8.6) rather than inventing new
@@ -169,22 +190,22 @@ All **[E]**. The selection layer is `L4.Export`:
 - Post-resolution expressions arrive with infix operators desugared to builtin applications
   (`__PLUS__`, `__AND__`, …; `L4/Desugar.hs:145-147`); `IfThenElse`/`MultiWayIf`/`Consider`/
   `Proj`/`Lit`/`Percent`/`Where`/`LetIn` survive as constructors; a bare variable is a nullary
-  `App` (`Syntax.hs:347-348`); booleans arrive as names, not literals (`Lower.hs:328-331`).
+  `App` (`Syntax.hs:350-351`); booleans arrive as names, not literals (`Lower.hs:328-331`).
 - `WHERE` is `Where Anno (Expr n) [LocalDecl n]`, `LocalDecl = LocalDecide … | LocalAssume …`
-  (`Syntax.hs:254,449-451`) — every binding is a full `Decide`, possibly with its own `GIVEN`s.
+  (`Syntax.hs:257,452-454`) — every binding is a full `Decide`, possibly with its own `GIVEN`s.
 - Record fields: `MkTypedName` 4th field is the `TYPICALLY` default, 5th distinguishes stored
-  (`Nothing`) from computed/`MEANS` (`Just expr`) fields (`Syntax.hs:125-134`); stored fields
+  (`Nothing`) from computed/`MEANS` (`Just expr`) fields (`Syntax.hs:129-131`); stored fields
   become questions, computed fields become `code:` blocks, mirroring `Lower.hs:620`.
-- `TYPICALLY` today: lexes and parses (`Lexer.hs:330`, `Parser.hs:654,1221,1230`), reaches
-  `FunctionSchema.parameterDefault` (`FunctionSchema.hs:46,242-244`), feeds query-plan priors,
-  and is **ignored by the evaluator** (`EvaluateLazy/Machine.hs:3186` binds and drops it). The
+- `TYPICALLY` today: lexes and parses (`Lexer.hs:331`, `Parser.hs:655,1244,1253`), reaches
+  `FunctionSchema.parameterDefault` (`FunctionSchema.hs:46,245-247`), feeds query-plan priors,
+  and is **ignored by the evaluator** (`EvaluateLazy/Machine.hs:3374` binds and drops it). The
   status header of `TYPICALLY-DEFAULTS-SPEC.md` ("BACKED OUT") predates this re-landing as
   metadata and is stale on that point.
 - The question-ordering machinery is a pure library, `jl4-query-plan` (deps: base, aeson,
   containers, jl4-core, text): `compileDecisionQuery`/`queryDecision`
   (`BooleanDecisionQuery.hs:369,437`), six-valued `Verdict` (`:210-224`), seam-aware support
   (`supportIdxOf`, `:259-269`), UUIDv5 atom ids and field-path-level asks
-  (`QueryPlan.hs:204,38-84`). It sits _above_ jl4-core in the dependency order, which forces the
+  (`QueryPlan.hs:204-210, :38-86`). It sits _above_ jl4-core in the dependency order, which forces the
   placement decision in R1. Its input is the ladder-pass `BoolExpr`, not `Expr Resolved`, and
   the ~30-line glue is currently duplicated in jl4-lsp and jl4-wasm — a third copy is refused;
   see §8.5.
@@ -195,33 +216,33 @@ The organising principle, per the commissioning instruction: **as much as possib
 encoding survives, by name and by structure.** An L4 reader and a docassemble reader should
 recognise the same program.
 
-| L4 construct                                             | docassemble target                                                                                   | survival                             |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `@export` `DECIDE`/`MEANS` (boolean or numeric goal)     | goal variable defined by a `code:` block; the default function drives the single `mandatory` block   | clean                                |
-| `GIVEN p IS A <Record>`                                  | `objects:` instance of a generated `DAObject` subclass                                               | clean, R2                            |
-| stored record field                                      | one `question:` block per field (`generic object` style), label = backticked L4 name, help = `@desc` | clean, R2                            |
-| computed (`MEANS`) record field                          | `code:` block on the attribute                                                                       | clean                                |
-| `WHERE`/`LET` binding, zero-`GIVEN`                      | one namespaced `code:` block each                                                                    | clean, R3                            |
-| `WHERE` binding with `GIVEN`s (local function)           | Python function in the generated module, called from `code:` blocks                                  | clean, R3                            |
-| non-exported top-level `DECIDE` reachable from an export | `code:` block (no `@export` needed for helpers, unlike OpenFisca's cross-entity contract)            | clean, R3                            |
-| `AND`/`OR`/`NOT`, comparisons, arithmetic                | Python operators, fully parenthesised; operand order preserved = question order                      | clean                                |
-| `IF…THEN…ELSE`, `BRANCH`, `CONSIDER` over enums          | Python conditionals / `if…elif…else` chains in `code:` blocks                                        | clean                                |
-| top-level `IMPLIES` in an exported decision (the seam)   | scope and requirement as separate variables; scope-first driver; six-valued verdict                  | R4 — the landmine                    |
-| `DECLARE … IS ONE OF` (nullary constructors)             | `datatype: radio` + `choices:`, values = constructor names as strings                                | clean, R6                            |
-| constructors with payloads                               | deferred: `show if` follow-up fields                                                                 | M4                                   |
-| `STRING`                                                 | `datatype: text` — docassemble has strings (Catala does not)                                         | clean                                |
-| `NUMBER` (exact `Rational`)                              | `datatype: number` (Python float) — same class of divergence as OpenFisca's float32, Advisory note   | R6                                   |
-| `DATE`, date comparisons                                 | `datatype: date`, `DADateTime` comparisons                                                           | clean for comparisons; arithmetic M4 |
-| `MAYBE OF T`                                             | optional field, erased as in `FunctionSchema.hs:147-148`                                             | R8, Advisory                         |
-| `TYPICALLY`                                              | `default:` prefill                                                                                   | R7, Advisory                         |
-| `@desc` on decide/param/type                             | `question:` text, field `help:`                                                                      | clean                                |
-| `@ref` citations                                         | verdict-screen citations and YAML comments (M2); `under:` text                                       | Lossy-none, M2                       |
-| `#EVAL`/`#ASSERT` fixtures                               | round-trip oracle inputs (R10); **not emitted** into the interview, per the DMN R0 precedent         | n/a                                  |
-| `LIST OF`                                                | `DAList` gathering (`.gather()`, `there_is_another`)                                                 | M4                                   |
-| deontic (`PARTY MUST … HENCE/LEST`)                      | none; docassemble multi-user roles/actions are a plausible future mapping, not attempted             | **Blocking** note                    |
-| temporal (`EVAL … UNDER RULES EFFECTIVE AT`, four pins)  | none                                                                                                 | **Lossy** note                       |
-| ledger (`RECORD`/`FETCH`/`ATTEST`)                       | none (docassemble's `DAWeb` exists for outbound HTTP, unused)                                        | **Blocking** note                    |
-| `Inert` prose scaffolding                                | Markdown in `subquestion`/section headers where attached; else dropped with Advisory note            | partial                              |
+| L4 construct                                             | docassemble target                                                                                                                                                                                           | survival                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| `@export` `DECIDE`/`MEANS` (boolean or numeric goal)     | goal variable defined by a `code:` block; the default function drives the single `mandatory` block                                                                                                           | clean                                |
+| `GIVEN p IS A <Record>`                                  | `objects:` instance of a generated `DAObject` subclass                                                                                                                                                       | clean, R2                            |
+| stored record field                                      | one `question:` block per field (`generic object` style), label = backticked L4 name, help = `@desc`                                                                                                         | clean, R2                            |
+| computed (`MEANS`) record field                          | `code:` block on the attribute                                                                                                                                                                               | clean                                |
+| `WHERE`/`LET` binding, zero-`GIVEN`                      | one namespaced `code:` block each                                                                                                                                                                            | clean, R3                            |
+| `WHERE` binding with `GIVEN`s (local function)           | Python function in the generated module, called from `code:` blocks                                                                                                                                          | clean, R3                            |
+| non-exported top-level `DECIDE` reachable from an export | `code:` block (no `@export` needed for helpers, unlike OpenFisca's cross-entity contract)                                                                                                                    | clean, R3                            |
+| `AND`/`OR`/`NOT`, comparisons, arithmetic                | Python operators, fully parenthesised; operand order preserved = question order                                                                                                                              | clean                                |
+| `IF…THEN…ELSE`, `BRANCH`, `CONSIDER` over enums          | Python conditionals / `if…elif…else` chains in `code:` blocks                                                                                                                                                | clean                                |
+| top-level `IMPLIES` in an exported decision (the seam)   | scope and requirement as separate variables; scope-first driver; six-valued verdict                                                                                                                          | R4 — the landmine                    |
+| `DECLARE … IS ONE OF` (nullary constructors)             | `datatype: radio` + `choices:`, values = constructor names as strings                                                                                                                                        | clean, R6                            |
+| constructors with payloads                               | deferred: `show if` follow-up fields                                                                                                                                                                         | M4                                   |
+| `STRING`                                                 | `datatype: text` — docassemble has strings (Catala does not)                                                                                                                                                 | clean                                |
+| `NUMBER` (exact `Rational`)                              | `datatype: number` (Python float) — same class of divergence as OpenFisca's float32, Advisory note                                                                                                           | R6                                   |
+| `DATE`, date comparisons                                 | `datatype: date` → tz-aware `DADateTime`; comparisons safe among docassemble-produced values; every emitted literal routed through `as_datetime()`                                                           | clean for comparisons; arithmetic M4 |
+| `MAYBE OF T`                                             | optional field, erased as in `FunctionSchema.hs:147-148`                                                                                                                                                     | R8, Advisory                         |
+| `TYPICALLY`                                              | `default:` prefill                                                                                                                                                                                           | R7, Advisory                         |
+| `@desc` on decide/param/type                             | `question:` text, field `help:`                                                                                                                                                                              | clean                                |
+| `@ref` citations                                         | `explain()` calls in emitted rule blocks; `logic_explanation()` on verdict screens; `auto terms:` glossary for defined terms                                                                                 | clean, M2                            |
+| `#EVAL`/`#ASSERT` fixtures                               | round-trip oracle inputs (R10); **not emitted** into the interview, per the DMN R0 precedent                                                                                                                 | n/a                                  |
+| `LIST OF`                                                | `DAList` gathering driven by `complete_attribute` (one pivot variable per element record; sub-questions arrive by short-circuit demand); `elements=[…]` for computed lists; `list collect:` for bounded ones | M4                                   |
+| deontic (`PARTY MUST … HENCE/LEST`)                      | none; docassemble multi-user roles/actions are a plausible future mapping, not attempted                                                                                                                     | **Blocking** note                    |
+| temporal (`EVAL … UNDER RULES EFFECTIVE AT`, four pins)  | none                                                                                                                                                                                                         | **Lossy** note                       |
+| ledger (`RECORD`/`FETCH`/`ATTEST`)                       | none (docassemble's `DAWeb` exists for outbound HTTP, unused)                                                                                                                                                | **Blocking** note                    |
+| `Inert` prose scaffolding                                | Markdown in `subquestion`/section headers where attached; else dropped with Advisory note                                                                                                                    | partial                              |
 
 ## 5. What does not map, and how loss is declared
 
@@ -277,14 +298,15 @@ directory gets an annotated copy, as the OpenFisca examples did).
   function (R9). Provenance header comments name the source file and the pinned docassemble
   version the output was validated against.
 - **CLI.** `l4 docassemble FILE [-o OUT] [--fail-on=…]`, body copied in shape from
-  `OpenFisca.hs:46-74`; five registration edits (`Main.hs:34,54,91-93,136`; `jl4.cabal:56`);
-  jl4-core.cabal gains the three modules beside `:149-151`. The verb-vs-`l4 export` question is
+  `OpenFisca.hs:46-74`; five registration edits (`Main.hs:37,58,101-103,172`; `jl4.cabal:60`);
+  jl4-core.cabal gains the three modules beside `:151-153`. The verb-vs-`l4 export` question is
   R1. The new verb name cannot collide with a plausible filename because of the bare-filepath
-  fallthrough to `l4 run` (`Main.hs:57-61`) — "docassemble" is safe.
+  fallthrough to `l4 run` (`Main.hs:61-67`) — "docassemble" is safe.
 - **Tests.** `jl4/examples/docassemble/{*.l4, expected/*.yml, not-ok/, README.md,
 roundtrip_check.py}`, hand-registered `expectGolden` blocks appended after
-  `jl4/tests-cli/Main.hs:1327`, byte-exact, each failure printing its regeneration command
-  (`Main.hs:288-304` precedent).
+  the `describe "l4 openfisca"` block at
+  `jl4/tests-cli/Main.hs:2331`, byte-exact, each failure printing its regeneration command
+  (`Main.hs:345` precedent).
 
 ## 8. Open rulings
 
@@ -301,7 +323,7 @@ the `l4 export` side anyway. Backend triple in jl4-core. The M3 plan-embedding s
 `jl4/app`, which then adds a jl4-query-plan dependency, following the jl4-wasm precedent of
 depending only on jl4-core + jl4-query-plan; the `vizExprToBoolExpr` glue gets _lifted into
 jl4-query-plan_ rather than duplicated a fourth time (it exists twice today:
-`jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs:111-152`, `jl4-wasm/app/QueryPlanWasm.hs:82-109`) **[E]**.
+`jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs:150`, `jl4-wasm/app/QueryPlanWasm.hs:82`) **[E]**.
 
 **Cost.** The IR must anticipate M3 (a slot for an optional embedded plan) so M3 does not
 rework Emit. **What would close it:** sign-off, plus a one-line check that `cabal build exe:l4`
@@ -310,7 +332,8 @@ stays clean when jl4-query-plan is added in M3.
 ### 8.2 R2 — records become DAObject subclasses; questions are per _field_, not per record
 
 **Evidence.** Docassemble's unit of asking is the variable, and every `DAObject` attribute is
-independently seekable; `generic object` questions cover any instance **[R]**. The shipped
+independently seekable (`util.py:1211`); `generic object` questions cover any instance
+(`parse.py:2736-2739`) **[E]**. The shipped
 housing wizard renders whole-record forms at once and is recorded as the gap this backend
 closes **[E]** (`housing-act-citizen-wizard-demo.md`). One-screen-per-record would reproduce
 that flat form inside docassemble and forfeit pruning: a screen's fields are all demanded
@@ -324,6 +347,17 @@ computed field yields a `code:` block. Nested records nest as attribute objects.
 sanitisation is `pyIdent`-shaped, total, collision-checked; the original name always survives
 as the label, so the user-facing interview speaks L4's vocabulary even where Python cannot.
 
+The engine's candidate ordering makes the generic layer sound: `askfor` expands a sought name
+into abstract variants and sorts candidates non-generic-first, then more-dots-first, then
+more-brackets-first (the four-key sort at `parse.py:9092`; class matching walks the MRO,
+`parse.py:7770-7775`) **[E via survey]** — so generic-object questions are a _fallback layer_
+and any concrete hand-written override in a customised package beats them without
+coordination. Emit questions under the wildcard language `'*'`. Two mechanical contracts:
+every generated variable name must be a valid Python expression path (the missing-name string
+is regex-recovered and fed back to `eval`), and generated object constructions always pass
+`instanceName` explicitly — docassemble otherwise sniffs the caller's bytecode to recover it,
+which machine-generated call shapes will defeat.
+
 **Cost.** Multi-field single-screen grouping (a genuine UX preference sometimes) is deferred; a
 later `@desc docassemble screen …` grouping override can restore it. **What would close it:**
 the R10 harness demonstrating that a two-record, six-field example asks only the fields the
@@ -331,7 +365,7 @@ goal's evaluation actually demands.
 
 ### 8.3 R3 — survival: every reachable decision becomes a named `code:` block
 
-**Evidence.** `Where` bindings are full `Decide`s (`Syntax.hs:254,449-451`) **[E]**. OpenFisca
+**Evidence.** `Where` bindings are full `Decide`s (`Syntax.hs:257,452-454`) **[E]**. OpenFisca
 refuses `Where{}` ("later milestone", `Lower.hs:387-405`) and requires cross-referenced
 decisions to be `@export`ed; neither restriction is forced here, because docassemble variables
 are free and backchaining resolves references in any order **[E/R]**.
@@ -373,7 +407,10 @@ else:
 ```
 
 so docassemble's own control flow forces scope resolution before requirement questions — the
-seam semantics fall out of block structure with no BDD at runtime. Non-seam boolean goals get
+seam semantics fall out of block structure with no BDD at runtime. The driver opens with
+`clear_explanations()` and every emitted rule block contributes `explain()` lines carrying its
+rule's `@ref`/`@desc` text (M2), so the verdict screen's reasoning list is exactly the rules
+that fired, in order, deduplicated — the `explain.yml` pattern (§2). Non-seam boolean goals get
 `Holds`/`Fails`; every verdict value gets its own terminal `event:` screen carrying the goal's
 `@desc` and (M2) `@ref` citations. `Undetermined` cannot be reached in v1 (docassemble asks
 until defined); it becomes reachable in M3/M4 when "I don't know" answers arrive (the
@@ -387,7 +424,9 @@ run that never asks a requirement question.
 
 ### 8.5 R5 — question order: native backchaining v1; embedded compiled plan M3
 
-**Evidence.** Docassemble's order = block/operand order (short-circuit) **[R]**; L4's default =
+**Evidence.** Docassemble's order = block/operand order — a `code:` block is plain `exec`
+(`parse.py:3706`, `exec_with_trap` `:10175`), so CPython short-circuit is the pruner
+**[E via survey]**; L4's default =
 declaration order, deliberately (`QUESTION-ORDERING-SPEC.md`) **[E]**; the info-gain ranker
 exists as a pure library with a ~190-line TypeScript port proving the evaluator is trivially
 portable (`ts-shared/boolean-analysis/src/robdd.ts`, `decision-query.ts:134`) **[E]**. The
@@ -423,6 +462,15 @@ payloads: refused in v1 by name, M4 via `show if` follow-ups. A `@desc docassemb
 tag is reserved for per-field datatype/UI refinement (e.g. `currency`, `dropdown`) without new
 grammar, per the `descKeyword` convention **[E]**.
 
+Three server-side coercion facts bound this ruling (all **[E via survey]**, in
+`docassemble_webapp/.../interview/views.py:1334-1470`): `currency` coerces through `float()` —
+never emit it for exact-decimal money semantics; an _empty_ integer submits as `0` and an empty
+number as `0.0`, never `None`; an empty date submits as `''`. Choice keys arrive as the verbatim
+strings written (`parse.py:7661-7713`), but a choice list whose keys are _all_ YAML booleans is
+silently retyped boolean (`parse.py:7725-7756`) — emit type-homogeneous string choices. And a
+`default:` without `datatype:` infers the field's type from the default's Python type
+(`parse.py:4107-4108`) — always emit both together.
+
 **What would close it:** the enum golden plus an R10 run where a `CONSIDER` over a 3-way enum
 asks one radio question and takes the right arm.
 
@@ -440,17 +488,24 @@ plan priors only. **What would close it:** sign-off; it is reversible by flag la
 ### 8.8 R8 — `MAYBE` erased to optionality
 
 **Evidence.** Both shipped schema consumers erase `MAYBE OF T` to `T` + not-required
-(`FunctionSchema.hs:147-148`, `Export.hs:201`) **[E]**; docassemble optionality is
-per-datatype-shaped (empty string vs `None`) **[R]**.
+(`FunctionSchema.hs:147-148`, `Export.hs:258`) **[E]**; docassemble optionality is
+per-datatype-shaped — see the R6 coercion facts (`views.py:1334-1470`) **[E via survey]**.
 
-**Proposal.** Follow the house erasure; `required: False`; lowering of `MAYBE`-consuming
-expressions treats absent as the L4 `NOTHING` branch only where the source pattern-matches on
-it, else refuses by name. Advisory note per erased field. **What would close it:** one golden
-with a `MAYBE STRING` field exercising both present and absent paths under R10.
+**Proposal, revised against the coercion facts in R6.** Blanket erasure is unsound for
+numerics and dates: an unanswered number submits as `0`/`0.0` and an unanswered date as `''`
+(`views.py:1396,1412,1374` **[E via survey]**), so "absent" is indistinguishable from a real
+answer. v1 therefore splits by type: `MAYBE BOOLEAN` → `yesnomaybe` (three-state; `None` _is_
+`NOTHING`, exact, no loss); `MAYBE STRING` → `required: False` with `''` read as `NOTHING`
+(Advisory note — a deliberately empty answer is conflated); `MAYBE NUMBER`/`MAYBE DATE` →
+refused by name in v1, pending an M4 paired is-known question design. `MAYBE`-consuming
+expressions lower only where the source pattern-matches on presence; else refused by name.
+**What would close it:** goldens for the boolean and string cases exercising present and
+absent paths under R10, and one not-ok fixture for `MAYBE NUMBER`.
 
 ### 8.9 R9 — emission hygiene (the silent-YAML defence)
 
-Bundled because they are all "docassemble will not tell you" facts **[R]**:
+Bundled because they are all "docassemble will not tell you" facts, each verified at the
+cited line:
 
 1. **Mako escaping.** Every L4-derived string (names, `@desc`, `@ref`) passes through one
    escape function neutralising `${`, `%` at line start, and YAML-significant leaders.
@@ -465,6 +520,21 @@ Bundled because they are all "docassemble will not tell you" facts **[R]**:
    test asserts the emitter's key vocabulary is a subset of the vendored list. No runtime
    dependency on the docassemble source tree (the 1.2 rule: local evidence, never a build dep).
 6. **Idempotent drivers; never wrap exceptions** (§2).
+7. **Never an unindented `---` in generated prose.** Interview files are split into blocks by a
+   _regex on whole lines_ (`parse.py:138`, applied `:8330`) before YAML parsing — a bare `---`
+   inside a `subquestion: |` scalar silently cuts the interview in half. Indent every generated
+   prose line at least one space; tabs are rewritten to spaces and a trailing `...` line is
+   stripped (`:8332-8333`).
+8. **Respect the parser's few hard errors**: exactly one directive per `question:` block and no
+   directive without `question:` (`parse.py:1938-1944`); `mandatory:` and `initial:` are
+   mutually exclusive and `mandatory:` is legal only on question/code/objects/attachment/data
+   blocks (`:2366-2371`). Top-level keys are lower-cased on entry (`:1871-1873`) — emit
+   lower-case only.
+9. **Generator forms only** for emitted `any`/`all` (§2): `all(...)` short-circuits and prunes;
+   `all([...])` eagerly demands every variable. List comprehensions and f-strings are likewise
+   eager — never route a lazily-needed variable through them.
+10. **Emit `features: loop limit` / `recursion limit`** scaled to the module when the emitted
+    graph could plausibly approach the 500 defaults (`parse.py:7942-7943`).
 
 **What would close it:** review of the whitelist against the pinned docassemble version in the
 R10 harness, plus one not-ok fixture per hygiene rule where feasible.
@@ -503,6 +573,13 @@ re-assemble) → assert the verdict screen equals L4's `#EVAL` oracle. Pinned
 (`docassemble.base==1.10.*`), documented in the example README, absent from CI and from
 build-depends, per the topology rule that external checkouts are local evidence only. Altitude
 (c) (`dainstall --playground` + `/api/session/*`) is the demo recipe, not the test gate.
+Refinements from the survey: `config.load` is skippable entirely — the `get_configuration`
+hookimpl can serve the dict directly, parameterised `{'debug': True}` in the harness (the
+seeking trace only records under debug) and `False` in production-shaped runs; never touch
+`interview_cache` (its `get_index` hits `get_server_redis` unconditionally); question text is
+rendered by the vendored `docassemble_mako`, not upstream Mako; and
+`docassemble_demo/.../random_test.py` is prior art for walking a question's fields and
+synthesising answers by datatype.
 
 **What would close it:** rodents round-trip green: emit → load → answer per fixture → verdict
 equals `#EVAL`. The probe closes the _feasibility_ half already; what remains is running it
@@ -513,7 +590,7 @@ against emitted rather than hand-written YAML.
 **Evidence.** Every existing backend's golden contract is one deterministic text artifact
 **[E]** (`expectGolden`, byte-exact). A real deployment wants the namespaced package
 (`docassemble.<pkg>` with `pyproject.toml`/SPDX, `data/questions/`, the generated module,
-`data/sources/`) **[R]**.
+`data/sources/`) **[E via survey]** (§8.11).
 
 **Proposal.** v1: `l4 docassemble FILE -o interview.yml` emits a single self-contained YAML
 (functions module inlined via docassemble's ability to carry code in the interview file, or the
@@ -521,6 +598,20 @@ module emitted as a second `-o`-adjacent file when unavoidable — measured duri
 implementation). M2: `--package DIR` writes the installable tree, embedding the original `.l4`
 under `data/sources/` so the encoding travels with its compilation — survival extended to
 provenance. Goldens stay on the YAML; the package tree gets a shape test, not byte goldens.
+
+The M2 tree targets the **modern PEP 420 shape**, exemplar `docassemble_demo/pyproject.toml`
+**[E via survey]**: `pyproject.toml` only (`name = "docassemble.l4<slug>"`, SPDX license,
+`requires-python >= 3.12`, `[tool.setuptools.packages.find] where = ["."]`), `MANIFEST.in`
+with `graft docassemble/l4<slug>/data`, **no** `docassemble/__init__.py` (setuptools'
+pyproject path defaults to PEP420 namespace finding; only the legacy `setup.py` +
+`find_packages()` shape needs the namespace `__init__.py` — and `dacreate` emits an
+inconsistent hybrid of the two, so its `setup.py` is not copied). The generated runtime module
+is a _sibling_ of `data/`, loaded via `modules: [.l4runtime]` — the leading dot is package-name
+concatenation, one level only, and `modules:` does `import *`, which is exactly how a shared
+L4 helper library reaches every `code:` block. Every emitted `data/` subdirectory carries at
+least one real file (empty directories survive neither git nor zip). Deploy loop: `dainstall
+--watch --playground` for iteration (YAML-only redeploys skip the server restart; any `.py`
+change forces one); Playground project names must not start with a digit.
 
 **What would close it:** v1 sign-off; M2 gated on the R10 harness existing to consume it.
 
@@ -537,6 +628,11 @@ provenance. Goldens stay on the YAML; the package tree gets a shape test, not by
 4. **Pruning/seam transcripts**: scripted sessions demonstrating R2 (unneeded fields never
    asked) and R4 (scope-first, NotApplicable reachable) — these are the claims that make this
    backend worth having, so they are tested as claims, not assumed.
+5. **Seeking-trace oracle**: with debug on, `InterviewStatus.get_history()` names which block
+   fired for which variable in which order — the harness compares that against the L4
+   evaluation trace, catching "right answer via the wrong rule", which answer-comparison alone
+   cannot. Attachment blocks get an explicit post-condition check, because a failed attachment
+   eval is swallowed into a log line (`parse.py:9523-9526`).
 
 ## 10. Sequencing
 
@@ -544,14 +640,21 @@ provenance. Goldens stay on the YAML; the package tree gets a shape test, not by
   strings, dates-as-comparisons, nullary enums, records (nested), `WHERE` survival, seam
   verdict. First examples: `rodents-and-vermin.l4` (annotated copy), one seam example, one enum
   example.
-- **M2 — the loop closed.** `--package`, `data/sources` provenance, R10 harness green,
-  `@ref` citations on verdict screens, push recipe (`dainstall`/API) in the README.
+- **M2 — the loop closed.** `--package` (PEP 420 shape, R11), `data/sources` provenance, R10
+  harness green, `@ref` citations via `explain()`/`logic_explanation()` on verdict screens plus
+  `auto terms:` glossary entries for L4 defined terms, push recipe (`dainstall`/API) in the
+  README.
 - **M3 — the differentiator.** `--plan`: embedded `CompiledDecisionQuery` + Python port of
   `queryDecision`/`verdictOf`, UUIDv5 `id:`s, info-gain ordering, measured against declaration
   order on a real corpus. Requires the R1 packaging move and the `vizExprToBoolExpr` lift.
-- **M4 — breadth.** `LIST OF` via `DAList` gathering; payload constructors via `show if`; date
-  arithmetic; the document-assembly demo (verdict screen that also assembles the letter) — the
-  capability that justifies the backend to the outside world.
+- **M4 — breadth.** `LIST OF` via `DAList` gathering (`complete_attribute` as the per-element
+  pivot); payload constructors via `show if`; `MAYBE NUMBER`/`DATE` via paired is-known
+  questions; date arithmetic (routing every literal through `as_datetime()`; never
+  `date_difference().years`, whose mean-Gregorian-year float is unsound for statutory age —
+  use calendar-exact `.plus()`/`.minus()`); a `review:` block with `skip undefined: False` as
+  a compliance-checklist view; and the document-assembly demo (a verdict screen that also
+  assembles the letter, `variable name:` on every attachment) — the capability that justifies
+  the backend to the outside world.
 
 ## 11. Non-goals (v1)
 
