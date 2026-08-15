@@ -303,10 +303,15 @@ cleaner landing than DMN's, since Catala scopes natively separate input/internal
 ### 4.3 Branching and pattern matching
 
 `CONSIDER` over enum constructors maps to `match … with pattern` one-for-one, including payload
-binders (`-- Case1 content x :`) and `OTHERWISE` → `anything`. Both languages statically require
-exhaustiveness (L4: the landed oracle; Catala: `compiler/dcalc/from_scopelang.ml:222-236` **[E]**
-— "The constructor %a of enum %a is missing from this pattern matching"), so
-exhaustiveness _transfers_ rather than being re-derived. Catala's `-- anything :` wildcard arm
+binders (`-- Case1 content x :`) and `OTHERWISE` → `anything`. Both languages statically detect
+non-exhaustiveness, at different severities: L4's oracle **warns** (`PatternMatchesMissing`,
+`TypeCheck.hs:1550` — landed on `unstable` via PR #182; a fall-through raises
+`NonExhaustivePatterns` at runtime, `EvaluateLazy/Exceptions.hs:45`), while Catala **errors**
+(`compiler/dcalc/from_scopelang.ml:222-236` **[E]** — "The constructor %a of enum %a is missing
+from this pattern matching"). The transfer therefore has a direction: a warned-but-tolerated
+partial `CONSIDER` in L4 becomes a hard typecheck failure in the emitted module, so the lowering
+either treats the warning as an error for the export fragment or emits an explicit `impossible`
+arm — the honest rendering of "the L4 author asserts this case cannot arise". Catala's `-- anything :` wildcard arm
 receives `OTHERWISE`, and `impossible` (optionally `#[error.message = "…"]`-annotated) is the arm
 for cases L4 proves unreachable. Catala patterns are constructor-only:
 `CONSIDER` over numeric or string literals and `BRANCH` cascades become `if`/`else` chains
