@@ -27,8 +27,10 @@ checkout at `/Volumes/transcend/src/blawx`, commit `02eded1` (2026-08-16; `BLAWX
 "v1.6.22-alpha"`, `blawx/settings.py:16`). L4 facts were read from `l4-ide` at `8af7d332`
 (`origin/unstable`, the base of this branch). No Blawx instance was running when this spec was
 first written, so emitted-code examples begin life **[U]**; standing up the Docker instance and
-promoting them is R13's first deliverable. SWI-Prolog 9.2.9 exists on the reference machine
-without the s(CASP) pack **[E]**; Docker/colima was installed for this purpose 2026-08-16.
+promoting them is R13's first deliverable. During this pass the s(CASP) pack was installed
+into the local SWI-Prolog 9.2.9 and a tier-1 harness prototype executed Appendix A's rules
+and test successfully **[E]** (see the appendix header); the Docker leg (colima, VM data on
+`/Volumes/transcend` per environment constraint) was provisioned for tier 2.
 
 > **A warning about the reference corpus, discovered the hard way.** Most of Blawx's shipped
 > examples carry _stale_ generator output. `mortality.yaml` — the obvious "minimal reference
@@ -711,8 +713,12 @@ over the P2 corpus.
 ### 8.7 R7 — numbers: CLP comparisons; exactness is a measurement, not an assumption
 
 **Evidence.** `blawx_comparison` over `#=`-family constraints (`passthrough.py:13-18` **[E]**);
-arithmetic through Prolog `is` (`scasp_generator.js:550-557` **[E]**); SWI float-division
-default **[U]** for the s(CASP)-embedded case. **Proposal.** Comparisons → `blawx_comparison`;
+arithmetic through Prolog `is` (`scasp_generator.js:550-557` **[E]**). First measurement,
+2026-08-16 **[E]**: under SWI-Prolog 9.2.9 + the current s(CASP) pack on the reference
+machine, `X is 1 / 3` inside a `scasp/2` goal binds `X = 1r3` — an exact rational, not a
+float — so the feared float-division cliff does not appear on this toolchain; the P1
+experiment must repeat this _inside Blawx's Docker image_ (its pinned SWI/scasp may differ)
+before the exactness claim generalises. **Proposal.** Comparisons → `blawx_comparison`;
 arithmetic → `is` goals; integral literals as integers; ship P1 with a numeric-fidelity
 experiment (division, large integers, rational round-trip vs L4's exact evaluator) whose
 results are recorded in the bridge doc _before_ any exactness claim is written — the
@@ -884,9 +890,14 @@ earmark in R10, not a deliverable).
   tests re-expressed as `#EVAL`s, and both engines agreeing on every query. Exit: the bird
   example round-trips Blawx → L4 → Blawx with the fixpoint intact.
 
-## Appendix A — worked example **[U]**
+## Appendix A — worked example **[E for the rules and test, U for the envelope]**
 
 The same source module as the Catala study's Appendix A, for cross-bridge comparability.
+_Executed 2026-08-16: the `sec_1_section`/`sec_2_section` rules below plus the test facts,
+assembled in `reasoner.py` load order over a `blawx_comparison` library subset and run under
+SWI-Prolog 9.2.9 + the s(CASP) pack (the R13 tier-1 harness, prototyped for this spec),
+answer `?- benefit_amount(a1,Amount).` with `Amount = 1000` — the L4-oracle value. The YAML
+envelope, declarations, and Blockly XML remain **[U]** pending the Docker round-trip._
 
 ```l4
 DECLARE Applicant HAS
