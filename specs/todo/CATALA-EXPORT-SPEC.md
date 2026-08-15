@@ -305,13 +305,18 @@ cleaner landing than DMN's, since Catala scopes natively separate input/internal
 `CONSIDER` over enum constructors maps to `match … with pattern` one-for-one, including payload
 binders (`-- Case1 content x :`) and `OTHERWISE` → `anything`. Both languages statically detect
 non-exhaustiveness, at different severities: L4's oracle **warns** (`PatternMatchesMissing`,
-`TypeCheck.hs:1550` — landed on `unstable` via PR #182; a fall-through raises
-`NonExhaustivePatterns` at runtime, `EvaluateLazy/Exceptions.hs:45`), while Catala **errors**
+`TypeCheck.hs:1934` at `8af7d332` via `git show`, not a working tree — landed on `unstable` via
+PR #182; a fall-through raises `NonExhaustivePatterns` at runtime,
+`EvaluateLazy/Exceptions.hs:45`), while Catala **errors**
 (`compiler/dcalc/from_scopelang.ml:222-236` **[E]** — "The constructor %a of enum %a is missing
-from this pattern matching"). The transfer therefore has a direction: a warned-but-tolerated
+from this pattern matching"). L4 authors may mark deliberate partiality with `@nonexhaustive`
+(`Lexer.hs:83,444`, `withNonexhaustiveFlag` `TypeCheck.hs:690-691` at `8af7d332` — present on
+`unstable` since the #256 main-merge; absent from checkouts one merge behind, which briefly
+misled this spec's session). The transfer therefore has a direction: a warned-but-tolerated
 partial `CONSIDER` in L4 becomes a hard typecheck failure in the emitted module, so the lowering
-either treats the warning as an error for the export fragment or emits an explicit `impossible`
-arm — the honest rendering of "the L4 author asserts this case cannot arise". Catala's `-- anything :` wildcard arm
+treats the warning as an error for the export fragment, except that an `@nonexhaustive`-marked
+`CONSIDER` lowers its missing arms to explicit `impossible` — the honest rendering of "the L4
+author asserts these cases cannot arise", now backed by the author's own annotation. Catala's `-- anything :` wildcard arm
 receives `OTHERWISE`, and `impossible` (optionally `#[error.message = "…"]`-annotated) is the arm
 for cases L4 proves unreachable. Catala patterns are constructor-only:
 `CONSIDER` over numeric or string literals and `BRANCH` cascades become `if`/`else` chains
