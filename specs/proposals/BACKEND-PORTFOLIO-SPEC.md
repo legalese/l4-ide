@@ -202,6 +202,15 @@ independently in at least two of: the OpenFisca doc §6, CATALA-EXPORT-SPEC §7/
 - **I6 — Spec form.** Status header in the present tense with a date; `[E]`/`[U]` evidence marks;
   rulings `R1..Rn` with the measurement → ruling → cost → case-against → not-decided template; a
   ruling-status table at §0.
+- **I7 — Priority is compiled away only under a disjointness proof.** Ordered first-match
+  constructs (`BRANCH`/`CONSIDER`, DMN FIRST hit policy, Catala exception ladders, LP clause
+  order) may be flattened to an unordered form (UNIQUE tables, boolean normal form, Catala
+  Mode A) only when arm disjointness is proven or the priority is made explicit in the output.
+  The shared implementation is `L4.Viz.GuardedRows` (`normaliseGuarded`/`flattenGuarded`),
+  already consumed by DMN's FIRST↔proof-gated-UNIQUE duality with `OTHERWISE` →
+  `defaultOutputEntry` (`jl4-core/src/L4/Dmn/Lower.hs:1203,20` **[E]**); Catala's Mode A/B gate
+  (PR #260 R4) and #258's "the two readings must agree" are the same seam. Surfaced by the
+  catala-bridge session from DMN's implementation, 2026-08-16.
 
 ## 5. The exportable core (P3)
 
@@ -230,16 +239,17 @@ Analogous per-target rulings, so a session deciding one can see its neighbours. 
 authoritative; disagreement across a row is fine when the targets genuinely differ, and a drift
 bug when they don't.
 
-| concern          | rulings across the portfolio                                                                                                                                                                                                     |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| number lowering  | Catala R2 (decimal-default, money never inferred); OpenFisca (float32, documented caveat); DMN (FEEL number); DocAssemble TBD. Guidance: exact-by-default, every lossy target documents its loss list.                           |
-| dates            | Catala R3 (never auto-pick a rounding mode; the Feb-31 three-way divergence); OpenFisca periods; DMN/FEEL date gap (tracked in DMN spec); UPPAAL clocks (verification spec Phase 3).                                             |
-| name mangling    | DMN R3 (fold, not keep) — adopted portfolio-wide as I5.                                                                                                                                                                          |
-| `TYPICALLY`      | Catala R10 (`context`); DocAssemble prefill (spec `09ac99f8`); Blawx `#abducible` (PR #261); `RUNTIME-INPUT-STATE-SPEC.md` owns the L4-side trichotomy. Landed carrier: PR #92 (metadata-only), consumed by ordering v2 in #110. |
-| `STRING`         | Catala R11 (elide with warning); DocAssemble in-domain (owns the only affirmative STRING ruling).                                                                                                                                |
-| defeasibility    | owned by `SUBJECT-TO-NOTWITHSTANDING-SPEC.md`; evidence: Catala §5.2, Blawx §1.1/§5.2 (see §3.3).                                                                                                                                |
-| tests/oracle     | I2/I3 here; instances: OpenFisca `roundtrip_check.py`, Catala R7, #258 §6, Blawx (PR #261).                                                                                                                                      |
-| CLI verb surface | #258's ruling on LP verbs; Blawx defers to it; execution bridges use one verb each (I1).                                                                                                                                         |
+| concern                 | rulings across the portfolio                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| number lowering         | Catala R2 (decimal-default, money never inferred); OpenFisca (float32, documented caveat); DMN (FEEL number); DocAssemble TBD. Guidance: exact-by-default, every lossy target documents its loss list.                                                                                                                                            |
+| dates                   | Catala R3 (never auto-pick a rounding mode; the Feb-31 three-way divergence); OpenFisca periods; DMN/FEEL date gap (tracked in DMN spec); UPPAAL clocks (verification spec Phase 3).                                                                                                                                                              |
+| name mangling           | DMN R3 (fold, not keep) — adopted portfolio-wide as I5.                                                                                                                                                                                                                                                                                           |
+| `TYPICALLY`             | Catala R10 (`context`); DocAssemble prefill (spec `09ac99f8`); Blawx `#abducible` (PR #261); `RUNTIME-INPUT-STATE-SPEC.md` owns the L4-side trichotomy. Landed carrier: PR #92 (metadata-only), consumed by ordering v2 in #110.                                                                                                                  |
+| `STRING`                | Catala R11 (elide with warning); DocAssemble in-domain (owns the only affirmative STRING ruling).                                                                                                                                                                                                                                                 |
+| defeasibility           | owned by `SUBJECT-TO-NOTWITHSTANDING-SPEC.md`; evidence: Catala §5.2, Blawx §1.1/§5.2 (see §3.3).                                                                                                                                                                                                                                                 |
+| exhaustiveness severity | L4's oracle WARNS (`PatternMatchesMissing` via `addWarning`, `jl4-core/src/L4/TypeCheck.hs:1550`) where Catala and DMN-UNIQUE ERROR — export lowerings close the gap (warning-as-error inside the fragment, or explicit arms; Catala R4/§4.3, commit `62fdc49a`). The `@nonexhaustive` decorator is NOT on `unstable` — do not design against it. |
+| tests/oracle            | I2/I3 here; instances: OpenFisca `roundtrip_check.py`, Catala R7, #258 §6, Blawx (PR #261).                                                                                                                                                                                                                                                       |
+| CLI verb surface        | #258's ruling on LP verbs; Blawx defers to it; execution bridges use one verb each (I1).                                                                                                                                                                                                                                                          |
 
 ## 7. Double-covered seams (P4)
 
@@ -286,6 +296,10 @@ sign-off from both sides' specs in their next revision.
 - **Session mechanics:** each bridge session keeps its spec's status header true and its memory
   file current; this census updates in the same PR as any state change it reports (see the
   status-header charge at the top of this document).
+- **Cite pinning:** evidence cites name a commit and are read via `git show <commit>:<path>` —
+  never a working tree, including the reference checkout, which may lag or lead (this bit two
+  sessions on 2026-08-16: a correction and a self-audit both traced to `fe8d37d3` working-tree
+  reads masquerading as `8af7d332` facts).
 - **One file, one editor:** cross-cutting files (`SUBJECT-TO-NOTWITHSTANDING-SPEC.md`, this
   document) are edited through the portfolio session while multiple bridge sessions are live, by
   the convention established 2026-08-16 (the Blawx session routed its prior-art pointer here
