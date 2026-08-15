@@ -7,8 +7,9 @@ triple plus a CLI verb, mirroring the shipped OpenFisca backend (`jl4-core/src/L
 `jl4/app/L4/Cli/OpenFisca.hs`), and later a `Parse`/`Lift` pair for the import direction (R14).
 Siblings: `CATALA-EXPORT-SPEC.md` (PR #260) is the house template this spec follows;
 `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` (PR #258) proposes the shared relational
-middle-end this spec consumes (§1.1, R2); `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` gains prior-art
-evidence from §5.2._
+middle-end this spec consumes (§1.1, R2); the defeasibility prior-art evidence of §5.2 is
+consolidated into `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` by PR #262, whose
+`BACKEND-PORTFOLIO-SPEC.md` records this bridge as seam S2 of the backend portfolio._
 
 **One-line summary.** Where OpenFisca receives L4's `@export` decisions as Python formulas and
 Catala would receive them as scopes, Blawx receives them as **s(CASP) logic programs**: the
