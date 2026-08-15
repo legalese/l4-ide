@@ -84,26 +84,35 @@ equality rather than tolerance **[E]** (PR #260).
 
 ### 2.2 Interchange
 
-| target      | state                                                                            | owning artifact                                                                                                                        |
-| ----------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| DMN         | **SHIPPED** through Phase 3; BKM Phases 4/5 planned **[E]**                      | `jl4-core/src/L4/Dmn/{IR,Lower,Emit,Markdown}.hs`; `l4 export --to=dmn\|dmn-md`; `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` (R1–R8) |
-| BPMN        | **SHIPPED**; wired to DMN via `businessRuleTask` (PR #198) **[E]**               | `jl4-core/src/L4/Bpmn/{IR,Lower,Emit}.hs`, fed by `L4.StateGraph`; `l4 export --to=bpmn`                                               |
-| JSON schema | **SHIPPED** (service export surface)                                             | `jl4-service` / `l4 export`                                                                                                            |
-| LegalRuleML | **FUTURE** — tentative; research commissioned 2026-08-16, report pending **[U]** | this document (row to be re-pinned to the research report)                                                                             |
+| target      | state                                                                                                                                | owning artifact                                                                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| DMN         | **SHIPPED** through Phase 3; BKM Phases 4/5 planned **[E]**                                                                          | `jl4-core/src/L4/Dmn/{IR,Lower,Emit,Markdown}.hs`; `l4 export --to=dmn\|dmn-md`; `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` (R1–R8) |
+| BPMN        | **SHIPPED**; wired to DMN via `businessRuleTask` (PR #198) **[E]**                                                                   | `jl4-core/src/L4/Bpmn/{IR,Lower,Emit}.hs`, fed by `L4.StateGraph`; `l4 export --to=bpmn`                                               |
+| JSON schema | **SHIPPED** (service export surface)                                                                                                 | `jl4-service` / `l4 export`                                                                                                            |
+| LegalRuleML | **FUTURE** — researched 2026-08-16; verdict: viable as a publication-and-provenance artifact, NOT an interoperability bridge **[E]** | `specs/research/LEGALRULEML-RESEARCH.md`                                                                                               |
 
 BPMN is the one shipped consumer of the **regulative** layer: it lowers the deontic state graph
 (`L4.StateGraph`) into process XML **[E]** (`jl4/app/L4/Cli/Export.hs:10-11`). Known DMN gaps
 (FEEL date lowering, exporter conformance) are tracked in the DMN spec and upstream issues, not
 here.
 
-LegalRuleML (OASIS) is tentatively listed because — if its remembered shape survives primary-source
-verification — it would be the first _interchange_ consumer of the strata this census shows nearly
-empty: deontic statements with reparation chains (candidate landing for
-`MUST`/`WITHIN`/`HENCE`/`LEST`), `Override` defeasibility (a candidate third battle-tested
-prior-art datapoint for `SUBJECT-TO-NOTWITHSTANDING-SPEC.md`, after Catala and Blawx), temporal
-efficacy/in-force intervals (candidate landing for `EVAL … UNDER RULES EFFECTIVE AT`), and
-source-isomorphism links (candidate landing for `@ref` provenance). Every clause in this paragraph
-is **[U]** until the commissioned report pins it.
+LegalRuleML (OASIS Standard, 2021-08-30) was researched 2026-08-16 —
+`specs/research/LEGALRULEML-RESEARCH.md` pins every claim here. The remembered shape partly
+survived: it IS the first interchange candidate for the near-empty strata, but as a
+**publication-and-provenance artifact, not an interoperability bridge** — every reasoner that
+consumed it is dead (Regorous HTTP 410, SPINdle 2017, TC repo frozen 2020-07) and the standard is
+deliberately semantics-free. CLEAN mappings **[E]**: directed deontic operators with `Bearer`
+slots (`PARTY p MUST`); `SuborderList` = Governatori & Rotolo's ⊗, an exact `LEST` cascade;
+`TemporalCharacteristic` in-force/efficacy pins (`EVAL … UNDER RULES EFFECTIVE AT` restated in
+the standard's own motivating example); `Alternatives` (the ambiguity register — flagship fit);
+`LegalSources`/`Association` with Akoma Ntoso conventions (`@ref`/`@ref-map`). OUT: `WITHIN`
+deadlines, `HENCE` success continuations, `RAND`/`ROR`, `#TRACE`, effects. The constitutive core
+is relational there, so an emitter sits downstream of #258's `L4.Relational`. Day-one validation
+gate verified: stock `xmllint` passes all 30 shipped goldens offline; the honest strongest claim
+is schema-valid + conformance-clause-conformant + structurally faithful — there is no round-trip
+tier, and any "LegalRuleML support" claim is about a file format, never a running system. Its
+`Override` + strength trio is now cited as the third defeasibility prior-art datapoint in
+`SUBJECT-TO-NOTWITHSTANDING-SPEC.md`.
 
 ### 2.3 Interaction
 
