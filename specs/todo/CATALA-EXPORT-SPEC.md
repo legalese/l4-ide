@@ -11,13 +11,15 @@ primary emission, and every module that ships one also ships the equivalence app
 re-checks it. **R7 is live:** each `#EVAL`/`#ASSERT` becomes a `#[test]` scope whose expected block
 the CLI fills from L4's own evaluator. **R8 is live:** `§` headings, inert scaffolding, `@ref`
 citations and `@desc` become the literate weave. **R9 is live:** `etc/validate-catala.mjs` runs
-`catala typecheck` + `clerk test` over the committed goldens and skips with one line when no
-toolchain is present. Six exhibits under `jl4/examples/catala/` carry committed goldens — including
-the OpenFisca `flat-tax`/`household` ports that P1's exit criterion names — and all six have been
-run through catala 1.2.1: `catala typecheck` green ×6, `clerk test` 32/32 green, `catala proof`
-green on the nested-guard one. **Not yet built:** R3's emitted day-granular helper for the lenient
-`Date` constructor, `SET OF` emulation (§4.7), and lambda-lifting of `WHERE` bindings (so a rule
-whose ladder shape hides under a `WHERE` — Appendix A's `benefit amount` — still emits in Mode A).
+`catala typecheck` + `catala proof` + `clerk test` over the committed goldens and skips with one
+line when no toolchain is present. Eight goldens under `jl4/examples/catala/expected/` — seven
+exhibits plus the `--boolean-only` rendering of one of them, including the OpenFisca
+`flat-tax`/`household` ports that P1's exit criterion names — have been run through catala 1.2.1:
+`catala typecheck` green ×8, `catala proof` green ×8 (no overlapping exceptions), `clerk test`
+60/60 green. **R3 is live in full:** the lenient `Date day month year` compiles through an emitted
+day-granular helper (§8.3 addendum), agreeing with L4 on the roll-forward cases. **Not yet built:**
+`SET OF` emulation (§4.7) and lambda-lifting of `WHERE` bindings (so a rule whose ladder shape hides
+under a `WHERE` — Appendix A's `benefit amount` — still emits in Mode A).
 §10's P1/P2/P3/P4 remain the sequencing; **P1 and P2 are met** on the exhibit corpus, P3 is met in
 form (`statute.l4`) but not on a real statute, and P4 is untouched._
 
@@ -35,6 +37,20 @@ _Rulings signed off, 2026-08-16 (same day): all eleven ANSWERED — R1–R3, R5�
 reversed to Mode-B-primary with a hardened equivalence gate (§8.4). Implementation of P1/P2
 commences on branch `mengwong/catala-backend`; this spec remains the owning document for the
 rulings._
+
+_Adversarial review round, 2026-08-16 (third session). What review changed, all in the same commit
+as the fixes: (a) a new §6.1 records that L4's `AND`/`OR`/`IMPLIES` short-circuit and Catala's
+`and`/`or` do not — the emitter now writes the conditional form, and a ladder whose later
+conditions could raise falls back to Mode A; (b) §8.4 gains a "what the gate does not check"
+paragraph, because the grid lifts the atoms to boolean inputs and so validates the ladder
+\_construction_ rather than the emitted rule's text — the emitted prose now says so too; (c)
+§8.4(b)'s promised `catala proof` pass is now actually run by the harness, with the two limits that
+forced it to be partial written down; (d) §8.2's promised per-coercion note is now emitted; (e)
+§8.3's day-granular helper for the lenient `Date` is now built and validated; (f) §8.7's promised
+human-format companion block is now emitted; (g) §8.11 gains the whole-value comparison case the
+field-read check did not cover; (h) §6's `SET OF` clause is corrected — it described a planned
+state in the present tense. Five `not-ok` fixtures under `jl4/examples/catala/not-ok/` pin the
+shapes that used to compile to Catala saying something other than what the L4 says.\_
 
 **One-line summary.** Just as an `@export`-annotated `DECIDE`/`MEANS` over a subject record is
 exactly an OpenFisca variable, it is exactly a Catala scope; L4's helper functions are exactly
@@ -548,14 +564,47 @@ would adopt, formalised and battle-tested.
 `l4 catala` accepts a type-checked module containing: `DECLARE` records/enums; first-order,
 non-recursive, monomorphic-or-prenex `GIVEN`/`GIVETH`/`MEANS`/`DECIDE` functions over
 `BOOLEAN`/`NUMBER`/`DATE`/records/enums/`MAYBE`/lists; `CONSIDER`/`BRANCH`/`IF`/`WHERE`;
-prelude list combinators with literal lambda arguments; `SET OF` under the §4.7 emulation;
-uninspected `STRING` fields/params under R11's elision; `ASSUME`d inputs;
-`@export`/`@desc`/`@ref`/`TYPICALLY` annotations; `#EVAL`/`#ASSERT`.
+prelude list combinators with literal lambda arguments; uninspected `STRING` fields/params under
+R11's elision; `ASSUME`d inputs; `@export`/`@desc`/`@ref`/`TYPICALLY` annotations;
+`#EVAL`/`#ASSERT`. Dates are the whole of R3: `YMD` maps to native construction, and the lenient
+`Date day month year` maps to the emitted day-granular helper (§8.3 addendum).
+
+`SET OF` is **not** in the accepted fragment. §4.7's emulation is designed and not built — there is
+no set case in `lowerType`, so a `SET OF` type reaches the "outside the v1 Catala fragment"
+rejection like any other. (An earlier draft of this section listed it as accepted, which described
+a plan in the present tense; the status header said the opposite, and §6 is the section a reader
+consults for this question.)
 
 Everything else — `STRING` computation, recursion, function-typed parameters, `DEONTIC`/`PARTY`,
 `#TRACE`, ledger/effect keywords, temporal pins — is rejected with a `LowerError` naming the
 construct and its source range, in one batch (all errors reported, not first-error-wins),
 following `OpenFisca.hs`'s "cannot compile these decisions" presentation **[E]**.
+
+### 6.1 Operator strictness: L4 short-circuits, Catala's `and`/`or` do not
+
+Measured, both directions, against L4's evaluator and catala 1.2.1:
+
+| expression                                              | L4      | Catala as `and`/`or`               |
+| ------------------------------------------------------- | ------- | ---------------------------------- |
+| `FALSE AND (5 / 0 GREATER THAN 1)`                      | `FALSE` | aborts: division by zero           |
+| `g's n EQUALS 0 OR 100 / g's n GREATER THAN 5`, n=0     | `TRUE`  | aborts: division by zero           |
+| `(if (0.0 = 0.0) then true else ((100.0 / 0.0) > 5.0))` | —       | `true` — Catala's `if` **is** lazy |
+
+So the emitter never writes Catala's `and`/`or` for an L4 connective. `a AND b` is
+`if a then b else false`, `a OR b` is `if a then true else b`, and `a IMPLIES b` is
+`if a then b else true` (a literal left operand folds away, so inert scaffolding does not wrap
+every rule it annotates in `if true then …`). This is not a stylistic choice: the guard-then-use
+idiom — `x IS 0 OR total / x > k`, `x IS NOT 0 AND total / x > k` — is ordinary in rules-as-code,
+and under strict `or` it compiles to a module that raises where the source returns a value. Nothing
+warned: `catala typecheck` was green and only an `#EVAL` that happened to exercise the guarded
+value failed.
+
+The same divergence reaches Mode B by a different route. Catala's default calculus evaluates
+**every** rung's condition to decide which apply, while L4's cascade stops at the first guard that
+holds. The lowering therefore declines to ship a ladder when any condition **after the first** can
+raise — a division, a modulo, or a bounds-checked date — and records the reason in the artifact as
+a Mode A fallback. The first condition is exempt (both readings evaluate it) and so are the
+consequences (neither reading evaluates an arm it did not select).
 
 ## 7. Architecture
 
@@ -616,6 +665,16 @@ drift is real only if we _chose_ integer). Money inference is rejected because c
 changes values (§4.5). **Not decided.** The future money-annotation surface and its relation to
 `@desc` conventions and `currency.l4`.
 
+**Addendum, 2026-08-16 (adversarial review): the promised note is now emitted.** It was not, for
+the first three implementation sessions — `ECoerce` rendered as a bare `(decimal of e)` and the
+notes block was empty, so a reader was given no signal that a representation change had been
+inserted on their behalf. `CatRuleDef`/`CatTopdef` now carry `rdNotes`/`tdNotes`, collected by
+scanning the lowered expression for `ECoerce` and written as `#` comment lines above the definition
+(the emitter writes an expression on one line, so a comment _inside_ it is not available). The
+`integer of` note says explicitly that the coercion **rounds** rather than refusing a non-integral
+value — which matters most at `YMD`/`Date` on non-literal components, where an L4 `NUMBER` of
+2000.5 becomes year 2001.
+
 ### 8.3 R3 — dates: native ops for `YMD`-style code, emitted day-arithmetic for lenient `Date`
 
 **ANSWERED 2026-08-16 — as proposed.**
@@ -633,6 +692,29 @@ proposal, still awaiting the same sign-off): refusal-values map to `#[error.mess
 impossible` — it is first-class, message-carrying, and legal exactly where refusals occur (match
 arms, whole bodies; §2.1) — not to an `optional` result, which would infect every downstream
 type. The stdlib `Date` module supplies most of the helper surface §4.6 describes.
+
+**Addendum, 2026-08-16 (adversarial review): the helper is built, and it is three lines, not
+twenty.** Until this round the lenient constructor was a hard `LowerError` — honest, and disclosed
+in the status header, but R3 was half-implemented. The emitted helper is
+
+```catala
+declaration l4_lenient_date content date
+  depends on day_ content decimal, month_ content decimal, year_ content decimal
+  equals (((Date.of_year_month_day of (integer of year_), 1, 1)
+           + (((integer of month_) - 1) * (1 month)))
+          + (((integer of day_) - 1) * (1 day)))
+```
+
+"1 January of the year, plus `month - 1` months, plus `day - 1` days". Adding months to a **1st**
+can never round, so Catala's month-rounding policy — the thing that made a direct mapping
+impossible — never applies, and no `#[date_rounding]` attribute is needed. Executed against both
+languages on the four interesting shapes, which agree: `Date 31 2 1900` ↦ `1900-03-03`,
+`Date 31 2 2020` ↦ `2020-03-02`, `Date 1 13 2020` ↦ `2021-01-01`, `Date 0 3 2020` ↦ `2020-02-29`.
+`jl4/examples/catala/registry.l4` carries it as a live exhibit (29 February 2020 plus five years ↦
+1 March 2025). The other arities of daydate's overloaded `Date` — from a serial number, a string, a
+`DATETIME` — remain rejected, and the diagnostic now says which arity is the supported one. Note
+that `day`, `month` and `year` are Catala keywords, so the parameter names carry `catIdent`'s
+disambiguating underscore.
 
 ### 8.4 R4 — Mode B primary, Mode A as reference rendering; equivalence gate hardened
 
@@ -664,6 +746,39 @@ ruling will not ship. For a rewrite over a `content` variable the arms' values a
 pairwise-distinct decimal witnesses — sound because Catala's exception mechanism does not inspect
 the value it selects, so the rewrite is uniform in the consequence type and distinct witnesses make
 _which arm won_ observable. §10.3 records what this gate caught on its first day.
+
+**Addendum, 2026-08-16 (adversarial review): what the gate checks, and what it does not.** The
+paragraph above claims more than the grid delivers, and the difference matters to the kind of
+reader — a regulator, a reviewer — this artifact is written for. Two limits, now stated in the
+emitted prose as well as here:
+
+1. **The atoms are lifted to boolean scope _inputs_.** So the grid decides a question about control
+   flow — that the ladder's priority order reproduces first-match at this shape and arity — and
+   never evaluates the atom expressions themselves. No assignment can exhibit an atom that
+   _raises_, which is why §6.1's strictness divergence is handled in the lowering rather than left
+   to the gate.
+2. **The comparison scopes are freshly built from `provisoLadder`/`armLadder` and never mention the
+   emitted rule.** Take a committed golden, flip one token in the shipped rule — `consequence not
+fulfilled` to `consequence fulfilled`, which inverts a proviso — and the grid still passes,
+   because it re-runs its own copies. The grid is a per-instance property test of the ladder
+   _construction_; that the emitted text is well-typed is `catala typecheck`'s claim, and that it
+   computes what L4 computes is the R7 `#[test]` scopes' claim. (Closing this properly means
+   emitting an `AgreeAt` over concrete records that calls the real scope, with witnesses derived
+   from the atoms — Appendix B's original shape. That needs a solver for the witnesses and is not
+   built; saying so is the interim.)
+
+**Addendum: (b)'s `catala proof` pass is now run — partially, and the partiality is the point.**
+`etc/validate-catala.mjs` gained it as layer 2 of three. What it buys is `NoOverlappingExceptions`:
+the ladders are built as a **linear** chain precisely so two rungs can never both win, and this is
+the only thing in the pipeline that would notice a future edit to `armLadder`/`provisoLadder`
+making them siblings again — the agreement grid cannot, because it exercises the same builder.
+Verified to bite: a hand-written pair of sibling exceptions is reported as "At least two exceptions
+overlap for this variable", with a counterexample. Two limits, recorded rather than papered over.
+`catala proof` reports through **warnings** and exits 0 even when it finds something, so the
+harness greps its output rather than trusting the exit code. And its `NoEmptyError` half is **not**
+enforced: Z3 cannot encode our structures ("[Z3 encoding] EStruct unsupported" on `statute`) and
+reports "might return an empty error" for scopes that demonstrably cannot (`tariff`'s test scopes),
+so enforcing it would fail on correct output. Those are printed as notes on the OK line.
 
 _The proposal as originally drafted:_
 
@@ -724,6 +839,22 @@ comparison. **Against.** Using `clerk --reset` then diffing
 against L4 would be less code but inverts the oracle. **Not decided.** Whether `#ASSERT`
 failures should also emit as Catala `assertion`s inside the test scope (runtime-checked both
 sides).
+
+**Addendum, 2026-08-16 (adversarial review): the human-format companion is now emitted, and it is
+L4's rendering.** The Cost paragraph's mitigation had not shipped; only the JSON block existed.
+Each filled test block is now followed by one line of **prose** — "L4 computes that as: `1000`." —
+deliberately not a second ` ```catala-test-cli ` fence, so `clerk test` has nothing extra to
+compare and the block stays documentation. The rendering is L4's own (`prettyLayoutNF`) rather than
+Catala's pretty printer: L4 is the oracle, and reproducing Catala's format would mean running
+Catala to find out what to expect, which is the self-comparison R7 exists to avoid. That it differs
+from Catala's rendering (`1,000.0`) is the disclosed fact, not a defect.
+
+**Addendum: a false `#ASSERT` now warns.** R7's oracle is L4, so an `#ASSERT` that is FALSE in L4
+is transcribed faithfully as `{"result":false}` and `clerk test` duly passes on it — which reads,
+to anyone scanning the run, as "the source's assertion holds". It does not. The block is still
+emitted (agreement is what R7 tests), but the CLI now says on stderr, and in the emitted notes
+block, that the assertion behind it is false in L4 itself. The "not decided" question above —
+whether `#ASSERT` failures should also emit as Catala `assertion`s — is untouched.
 
 ### 8.8 R8 — the literate envelope is emitted from inert scaffolding and `§` structure
 
@@ -816,6 +947,23 @@ measurement shows it would reject half the seed corpus and the BNA statute for f
 no semantics, which fails this spec's "as much as possible survives" brief. **Not decided.**
 Whether the elision list should be emitted machine-readably (a manifest) for round-trip tooling
 that wants to reconstruct the full record shape.
+
+**Addendum, 2026-08-16 (adversarial review): "never compared" now includes the comparisons nobody
+writes down.** The condition above says the string must be "never an argument to a string builtin,
+**never compared**, never scrutinised", and the implementation enforced that for an explicit field
+_read_ only. A whole-record `EQUALS` reads every field implicitly and lowers to Catala `(a = b)`
+over the **narrowed** structure, so the elided field drops out of the comparison: for
+`P HAS name IS A STRING, age IS A NUMBER`, L4 answers `FALSE` on two records differing only in
+`name` and the emitted Catala answered `true`. The same hole existed for `elem`/`contains` over a
+`LIST OF P`, for `MAYBE P` equality, and for any record equality nested inside another record.
+
+The check is now at the comparison site, not the projection. When a module emits any narrowed
+structure, an `EQUALS` or `elem` must have at least one operand whose type is known and provably
+free of a narrowed structure (transitively, through lists, options, record fields and enum
+payloads); otherwise it is a `LowerError` naming the structures. When nothing was narrowed — every
+module that does not use `STRING` at all — the check is skipped entirely and costs nothing. A
+best-effort type is used deliberately: an operand whose type the lowering cannot determine is
+treated as unsafe, which over-rejects rather than under-rejects.
 
 ## 9. Non-goals (v1)
 

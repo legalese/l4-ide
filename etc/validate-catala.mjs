@@ -8,19 +8,39 @@
 // this script prints one clear SKIP line and exits 0. It exits non-zero only
 // for a real failure: a golden the toolchain rejects.
 //
-// TWO LAYERS, and they are not the same claim:
+// THREE LAYERS, and they are not the same claim:
 //
 //   1. `catala typecheck` -- the emitted module is well-formed Catala and its
 //      types agree. This catches syntax and arity, and nothing semantic.
-//   2. `clerk test` -- every ```catala-test-cli block in the golden is re-run
+//   2. `catala proof` -- §8.4(b)'s proof pass. What it buys us here is
+//      NoOverlappingExceptions: the Mode B ladders are built as a LINEAR chain
+//      precisely so that two rungs can never both win, and this is the only
+//      thing in the pipeline that would notice if a future edit to
+//      `armLadder`/`provisoLadder` made them siblings again (a `Conflict` at
+//      run time, which the agreement grid cannot see because it exercises the
+//      same builder). Verified to bite: a hand-written pair of sibling
+//      exceptions is reported as "At least two exceptions overlap for this
+//      variable", with a counterexample.
+//
+//      Two limits, recorded rather than papered over. `catala proof` reports
+//      through WARNINGS and exits 0 even when it finds something, so this
+//      script greps rather than trusting the exit code. And its NoEmptyError
+//      half is NOT enforced: Z3 cannot encode our structures ("[Z3 encoding]
+//      EStruct unsupported" on statute) and reports "might return an empty
+//      error" for scopes that demonstrably cannot (tariff's test scopes), so
+//      enforcing it would fail on correct output. Those are printed as notes.
+//   3. `clerk test` -- every ```catala-test-cli block in the golden is re-run
 //      and its output compared. Those blocks hold values computed by *L4's*
 //      evaluator (R7), and the Mode A/B equivalence grids emitted under R4, so
 //      a green `clerk test` is the claim that matters: the two languages agree
 //      on these points, and the exception ladders agree with the reference
 //      rendering they were rewritten from.
 //
-// Layer 2 is why this harness exists at all. §10.3 records the ladder-direction
-// bug that `catala typecheck` was green on and `clerk test` caught.
+// Layer 3 is why this harness exists at all. §10.3 records the ladder-direction
+// bug that `catala typecheck` was green on and `clerk test` caught. Note that
+// `clerk test` prints its ALL TESTS PASSED banner over ZERO tests and exits 0,
+// so the banner alone is not evidence; the counts are parsed below and a run
+// that executed nothing is a failure.
 //
 // USAGE
 //
@@ -42,14 +62,31 @@
 // finds the `catala` opam switch by itself. See R9 for the build recipe.
 //
 // A NOTE ON FILE NAMES. Catala requires a module's `> Module Name` header to
-// equal the capitalised basename of the file it is in, but our goldens are
-// named after their L4 sources (`flat-tax.catala_en` declares `Module
-// FlatTax`). So each golden is COPIED into a scratch directory under the name
-// Catala wants before it is checked; the repo copy is never renamed and never
-// written to. The scratch directory also needs a one-time `clerk start`, which
-// writes clerk.toml and _build -- another reason not to do this in-tree.
+// equal the file's basename with its first letter capitalised, but our goldens
+// are named after their L4 sources (`flat-tax.catala_en` declares `Module
+// FlatTax`, and no file named `flat-tax` can host any module at all, since `-`
+// is not an identifier character). So each golden is COPIED into a scratch
+// directory under the name Catala wants before it is checked; the repo copy is
+// never renamed and never written to. The scratch directory also needs a
+// one-time `clerk start`, which writes clerk.toml and _build -- another reason
+// not to do this in-tree.
+//
+// The staged name is READ OUT OF THE FILE (its `> Module X` line) rather than
+// re-derived from the basename by a second implementation of the mangling.
+// That is deliberate: the previous version re-implemented `catUpper` in JS and
+// diverged from it (it split on `_`, which the Haskell does not), so a golden
+// could have been staged under a name its own header did not claim. Reading
+// the header cannot diverge. Every OK line below names the staged file, so the
+// evidence describes a command a reader can actually run.
 
-import { readdir, mkdtemp, copyFile, rm } from "node:fs/promises";
+import {
+  readdir,
+  mkdtemp,
+  mkdir,
+  copyFile,
+  readFile,
+  rm,
+} from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -138,17 +175,13 @@ if (files.length === 0) {
   process.exit(0);
 }
 
-// `flat-tax.catala_en` -> `FlatTax.catala_en`, matching `> Module FlatTax`.
-// This mirrors L4.Catala.IR.catUpper; a mismatch is a real failure, and the
-// toolchain reports it as one rather than being silently papered over here.
-function catalaFileName(golden) {
-  const stem = basename(golden).replace(/\.catala_en$/, "");
-  const camel = stem
-    .split(/[-_ ]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join("");
-  return `${camel}.catala_en`;
+// `flat-tax.catala_en` declaring `> Module FlatTax` -> `FlatTax.catala_en`.
+// The name comes out of the file, never out of a second copy of the mangling.
+async function catalaFileName(golden) {
+  const text = await readFile(golden, "utf8");
+  const m = /^>\s*Module\s+([A-Za-z][A-Za-z0-9_]*)/m.exec(text);
+  if (!m) return null;
+  return `${m[1]}.catala_en`;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,14 +212,29 @@ try {
       failed++;
       continue;
     }
-    const name = catalaFileName(golden);
-    await copyFile(golden, join(work, name));
-    staged.push({ golden, name });
+    const name = await catalaFileName(golden);
+    if (!name) {
+      console.error(
+        `FAIL  ${golden}  (no \`> Module <Name>\` header: catala cannot load it)`,
+      );
+      failed++;
+      continue;
+    }
+    // One subdirectory per golden. Two goldens can legitimately declare the
+    // same module -- `bands.catala_en` and `bands-boolean-only.catala_en` are
+    // two renderings of one L4 source and both say `> Module Bands` -- and
+    // staging them flat would have one silently overwrite the other. `clerk
+    // test` walks the tree from the directory it is started in, so a single
+    // `clerk start` at the top still covers all of them.
+    const dir = basename(golden).replace(/\.catala_en$/, "");
+    await mkdir(join(work, dir), { recursive: true });
+    await copyFile(golden, join(work, dir, name));
+    staged.push({ golden, name, dir });
   }
 
   // Layer 1: typecheck, per file, so a failure names the file.
-  for (const { golden, name } of staged) {
-    const tc = run(catala, ["typecheck", name], { cwd: work });
+  for (const { golden, name, dir } of staged) {
+    const tc = run(catala, ["typecheck", `${dir}/${name}`], { cwd: work });
     const out = `${tc.stdout ?? ""}${tc.stderr ?? ""}`;
     if (tc.status !== 0 || !out.includes("Typechecking successful")) {
       console.error(
@@ -200,7 +248,9 @@ try {
       failed++;
       continue;
     }
-    console.log(`OK    ${golden}\n       catala typecheck: successful`);
+    console.log(
+      `OK    ${golden}\n       staged as ${dir}/${name}; catala typecheck: successful`,
+    );
   }
 
   if (failed > 0) {
@@ -210,7 +260,56 @@ try {
     process.exit(1);
   }
 
-  // Layer 2: one `clerk test` over the whole directory.
+  // Layer 2: `catala proof`. It reports through warnings and exits 0 whatever
+  // it finds, so the output is what is inspected, and only the overlapping
+  // exceptions half is fatal -- see the header for why NoEmptyError is not.
+  for (const { golden, name, dir } of staged) {
+    const pf = run(catala, ["proof", `${dir}/${name}`], { cwd: work });
+    const out = `${pf.stdout ?? ""}${pf.stderr ?? ""}`;
+    if (pf.status !== 0) {
+      console.error(
+        `FAIL  ${golden}  (catala proof exited ${pf.status})\n` +
+          out
+            .trim()
+            .split("\n")
+            .map((l) => `       ${l}`)
+            .join("\n"),
+      );
+      failed++;
+      continue;
+    }
+    if (/exceptions overlap/.test(out)) {
+      console.error(
+        `FAIL  ${golden}  (catala proof: overlapping exceptions -- a Mode B ` +
+          `ladder has sibling rungs that can both fire, which is a Conflict at ` +
+          `run time)\n` +
+          out
+            .trim()
+            .split("\n")
+            .map((l) => `       ${l}`)
+            .join("\n"),
+      );
+      failed++;
+      continue;
+    }
+    const soft = [
+      /might return an empty error/.test(out) && "NoEmptyError (not enforced)",
+      /translation to Z3 failed/.test(out) && "Z3 encoding incomplete",
+    ].filter(Boolean);
+    console.log(
+      `OK    ${golden}\n       catala proof: no overlapping exceptions` +
+        (soft.length ? `; notes: ${soft.join(", ")}` : ""),
+    );
+  }
+
+  if (failed > 0) {
+    console.error(
+      `\n${failed} file(s) failed catala proof; clerk test not run.`,
+    );
+    process.exit(1);
+  }
+
+  // Layer 3: one `clerk test` over the whole directory.
   const test = run(clerk, ["test"], { cwd: work });
   const out = `${test.stdout ?? ""}${test.stderr ?? ""}`;
   const tail = out.trim().split("\n").slice(-12).join("\n");
@@ -218,7 +317,26 @@ try {
     console.error(`FAIL  clerk test\n${tail}`);
     process.exit(1);
   }
-  console.log(`\nOK    clerk test over ${staged.length} file(s)\n${tail}`);
+  // `clerk test` prints ALL TESTS PASSED over an empty directory, so the banner
+  // is not the evidence -- the count is. A run that executed nothing means the
+  // R7 blocks vanished (fillTests drops a block whose oracle has no value), and
+  // that must not read as a pass.
+  const counts = /tests\s+(\d+)\s+(\d+)\s+(\d+)/.exec(
+    out.replace(/\u001b\[[0-9;]*m/g, ""),
+  );
+  const ran = counts ? Number(counts[3]) : 0;
+  if (ran < staged.length) {
+    console.error(
+      `FAIL  clerk test ran ${ran} test(s) across ${staged.length} file(s); ` +
+        `expected at least one per file. An emitted module with no ` +
+        `\`\`\`catala-test-cli block proves nothing, and ALL TESTS PASSED over ` +
+        `zero tests is not a pass.\n${tail}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `\nOK    clerk test over ${staged.length} file(s), ${ran} test(s)\n${tail}`,
+  );
 } finally {
   await rm(work, { recursive: true, force: true });
 }

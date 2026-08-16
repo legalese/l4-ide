@@ -34,7 +34,6 @@ Total monthly income of a household (sum of member salaries)
 
 ```catala
 scope HouseholdIncome:
-  # Mode A fallback: no exception ladder is derivable for this rule's shape
   definition household_income
     equals
       (Decimal.sum of (map each m among h.members to m.salary))
@@ -58,3 +57,5 @@ scope Test1:
 $ catala test-scope Test1 --disable-warnings -F json
 {"result":"2500"}
 ```
+
+L4 computes that as: `2500`.

@@ -30,7 +30,6 @@ Flat tax on salary
 
 ```catala
 scope FlatTaxOnSalary:
-  # Mode A fallback: no exception ladder is derivable for this rule's shape
   definition flat_tax_on_salary
     equals
       (p.salary * 0.25)
@@ -54,3 +53,5 @@ scope Test1:
 $ catala test-scope Test1 --disable-warnings -F json
 {"result":"500"}
 ```
+
+L4 computes that as: `500`.

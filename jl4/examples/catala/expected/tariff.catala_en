@@ -35,12 +35,28 @@ declaration scope TariffPayable:
 #[test] declaration scope Test1:
   output result content decimal
 
+#[description = "Test 1 again, with `cap` omitted so the scope's TYPICALLY default supplies it (R10). Same expected value, from the same L4 directive."]
+#[test] declaration scope Test1Default:
+  output result content decimal
+
 #[description = "Test 2, from the L4 directive at tariff.l4:38:1-78."]
 #[test] declaration scope Test2:
   output result content decimal
 
-#[description = "Test 3, from the L4 directive at tariff.l4:39:1-69."]
+#[description = "Test 2 again, with `cap` omitted so the scope's TYPICALLY default supplies it (R10). Same expected value, from the same L4 directive."]
+#[test] declaration scope Test2Default:
+  output result content decimal
+
+#[description = "Test 3, from the L4 directive at tariff.l4:43:1-81."]
 #[test] declaration scope Test3:
+  output result content decimal
+
+#[description = "Test 3 again, with `cap` omitted so the scope's TYPICALLY default supplies it (R10). Same expected value, from the same L4 directive."]
+#[test] declaration scope Test3Default:
+  output result content decimal
+
+#[description = "Test 4, from the L4 directive at tariff.l4:45:1-69."]
+#[test] declaration scope Test4:
   output result content decimal
 ```
 
@@ -50,7 +66,6 @@ The per-unit rate for an account's customer class.
 
 ```catala
 scope UnitRate:
-  # Mode A fallback: no exception ladder is derivable for this rule's shape
   definition unit_rate
     equals
       (match a.class with pattern -- Domestic : 0.2 -- Commercial : 0.35 -- Industrial : 0.5)
@@ -66,7 +81,6 @@ scope TariffPayable:
     equals
       500.0
 
-  # Mode A fallback: no exception ladder is derivable for this rule's shape
   definition tariff_payable
     equals
       (if (cap <= (a.units_used * (output of UnitRate with { -- a: a }).unit_rate)) then cap else (a.units_used * (output of UnitRate with { -- a: a }).unit_rate))
@@ -91,6 +105,22 @@ $ catala test-scope Test1 --disable-warnings -F json
 {"result":"350"}
 ```
 
+L4 computes that as: `350`.
+
+```catala
+scope Test1Default:
+  definition result
+    equals
+      (output of TariffPayable with { -- a: Account { -- class: Commercial -- units_used: 1000.0 } }).tariff_payable
+```
+
+```catala-test-cli
+$ catala test-scope Test1Default --disable-warnings -F json
+{"result":"350"}
+```
+
+L4 computes that as: `350`.
+
 ```catala
 scope Test2:
   definition result
@@ -103,14 +133,60 @@ $ catala test-scope Test2 --disable-warnings -F json
 {"result":"20"}
 ```
 
+L4 computes that as: `20`.
+
+```catala
+scope Test2Default:
+  definition result
+    equals
+      (output of TariffPayable with { -- a: Account { -- class: Domestic -- units_used: 100.0 } }).tariff_payable
+```
+
+```catala-test-cli
+$ catala test-scope Test2Default --disable-warnings -F json
+{"result":"20"}
+```
+
+L4 computes that as: `20`.
+
 ```catala
 scope Test3:
+  definition result
+    equals
+      (output of TariffPayable with { -- a: Account { -- class: Industrial -- units_used: 2000.0 } -- cap: 500.0 }).tariff_payable
+```
+
+```catala-test-cli
+$ catala test-scope Test3 --disable-warnings -F json
+{"result":"500"}
+```
+
+L4 computes that as: `500`.
+
+```catala
+scope Test3Default:
+  definition result
+    equals
+      (output of TariffPayable with { -- a: Account { -- class: Industrial -- units_used: 2000.0 } }).tariff_payable
+```
+
+```catala-test-cli
+$ catala test-scope Test3Default --disable-warnings -F json
+{"result":"500"}
+```
+
+L4 computes that as: `500`.
+
+```catala
+scope Test4:
   definition result
     equals
       (output of UnitRate with { -- a: Account { -- class: Industrial -- units_used: 0.0 } }).unit_rate
 ```
 
 ```catala-test-cli
-$ catala test-scope Test3 --disable-warnings -F json
+$ catala test-scope Test4 --disable-warnings -F json
 {"result":"1/2"}
 ```
+
+L4 computes that as: `0.5`.

@@ -36,4 +36,10 @@ GIVETH A NUMBER
 
 #EVAL `tariff payable` (Account WITH class IS commercial, unitsUsed IS 1000) 500
 #EVAL `tariff payable` (Account WITH class IS domestic, unitsUsed IS 100) 500
+-- The cap BINDS here (2000 units at 0.50 is 1000, over the 500 cap), which is
+-- what makes the emitted `definition cap equals 500.0` observable: the twin
+-- test scope R10 emits for this directive omits `cap`, so a wrong default
+-- would change its answer. With a non-binding cap it would not.
+#EVAL `tariff payable` (Account WITH class IS industrial, unitsUsed IS 2000) 500
+
 #EVAL `unit rate` (Account WITH class IS industrial, unitsUsed IS 0)

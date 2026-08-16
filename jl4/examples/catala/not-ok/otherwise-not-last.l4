@@ -1,0 +1,20 @@
+-- REJECTED (§4.3). L4's CONSIDER is first-match, so the OTHERWISE here shadows
+-- both WHEN arms and `pick` is the constant 99. A Catala `match` must write
+-- `-- anything` last, and an if/else chain assembled arms-then-default answers
+-- 11 for n = 1 — so lowering this by reordering would change the law.
+--
+-- `l4 check` reports this file as clean: nothing but the Catala lowering
+-- catches it, which is why it is a fixture.
+
+DECLARE Thing HAS n IS A NUMBER
+
+@export
+GIVEN t IS A Thing
+GIVETH A NUMBER
+`pick` t MEANS
+  CONSIDER t's n
+    OTHERWISE 99
+    WHEN 1 THEN 11
+    WHEN 2 THEN 22
+
+#EVAL `pick` (Thing WITH n IS 1)   -- 99 in L4
