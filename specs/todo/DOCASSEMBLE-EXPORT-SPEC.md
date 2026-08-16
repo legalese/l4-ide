@@ -38,24 +38,26 @@ golden pins it.
 
 ## 0. Ruling status
 
-| ruling | state        | detail                                                                                   |
-| ------ | ------------ | ---------------------------------------------------------------------------------------- |
-| R1     | **PROPOSED** | CLI surface: own verb; package placement; plan lives above core, §8.1                    |
-| R2     | **PROPOSED** | records → DAObject subclasses, one question per _field_, §8.2                            |
-| R3     | **PROPOSED** | survival: every reachable `DECIDE`/`WHERE` binding → one `code:` block, §8.3             |
-| R4     | **PROPOSED** | the verdict seam: scope-first driver, six-valued verdict, §8.4                           |
-| R5     | **PROPOSED** | question order: native backchaining v1, embedded plan M3, §8.5                           |
-| R6     | **PROPOSED** | datatype map; enums as string-valued radios; floats, §8.6                                |
-| R7     | **PROPOSED** | `TYPICALLY` → `default:`, Advisory divergence, §8.7                                      |
-| R8     | **PROPOSED** | `MAYBE` erased to optionality, as both schema paths do, §8.8                             |
-| R9     | **PROPOSED** | emission hygiene: Mako escaping, `sets:`, `id:`, `depends on:`, self-validation, §8.9    |
-| R10    | **PROPOSED** | validation harness: headless docassemble.base, proven by probe, never a build dep, §8.10 |
-| R11    | **PROPOSED** | artifact shape: bare YAML v1, installable package M2, §8.11                              |
+| ruling | state                   | detail                                                                                   |
+| ------ | ----------------------- | ---------------------------------------------------------------------------------------- |
+| R1     | **ANSWERED** 2026-08-16 | CLI surface: own verb; package placement; plan lives above core, §8.1                    |
+| R2     | **ANSWERED** 2026-08-16 | records → DAObject subclasses, one question per _field_, §8.2                            |
+| R3     | **ANSWERED** 2026-08-16 | survival: every reachable `DECIDE`/`WHERE` binding → one `code:` block, §8.3             |
+| R4     | **ANSWERED** 2026-08-16 | the verdict seam: scope-first driver, six-valued verdict, §8.4                           |
+| R5     | **ANSWERED** 2026-08-16 | question order: native backchaining v1, embedded plan M3, §8.5                           |
+| R6     | **ANSWERED** 2026-08-16 | datatype map; enums as string-valued radios; floats, §8.6                                |
+| R7     | **ANSWERED** 2026-08-16 | `TYPICALLY` → `default:`, Advisory divergence, §8.7                                      |
+| R8     | **ANSWERED** 2026-08-16 | `MAYBE` erased to optionality, as both schema paths do, §8.8                             |
+| R9     | **ANSWERED** 2026-08-16 | emission hygiene: Mako escaping, `sets:`, `id:`, `depends on:`, self-validation, §8.9    |
+| R10    | **ANSWERED** 2026-08-16 | validation harness: headless docassemble.base, proven by probe, never a build dep, §8.10 |
+| R11    | **ANSWERED** 2026-08-16 | artifact shape: bare YAML v1, installable package M2, §8.11                              |
 
-No ruling is ANSWERED yet; all await sign-off. Each states in §8 what evidence exists, what is
-proposed, what it costs, and what would close it. (State vocabulary follows the bridge-family
-convention set by `CATALA-EXPORT-SPEC.md`; the DMN spec's OPEN/ANSWERED is the same ladder with
-PROPOSED as the pre-sign-off rung.)
+All eleven ANSWERED 2026-08-16: signed off by Meng in session `xpile-docassemble` after a
+quiz-card review of the full roster; none contested. Each §8 section retains its evidence, its
+cost, and its original closure condition — where that condition names an implementation
+artifact (a golden, a harness transcript), the ruling is decided but the artifact is still
+owed, and M1/M2 deliver it. (State vocabulary follows the bridge-family convention set by
+`CATALA-EXPORT-SPEC.md`.)
 
 ## 1. Purpose, direction, precedent
 
