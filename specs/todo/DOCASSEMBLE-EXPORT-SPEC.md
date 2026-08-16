@@ -1,12 +1,13 @@
 # L4 → Docassemble: interview export and transpiler spec
 
-_Status: **design, not yet implemented.** Written 2026-08-16 on branch `mengwong/docassemble-bridge`.
-Nothing exists under `jl4-core/src/L4/Docassemble/`; there is no `docassemble` subcommand in
-`jl4/app/Main.hs`; the only occurrences of the word "docassemble" anywhere in the tree are two
-hyperlinks in `tmp/aswathy-briefing.html:532,640`. What would make the present tense true: an
-`L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core plus a CLI verb in jl4, mirroring the
-shipped OpenFisca backend (`jl4-core/src/L4/OpenFisca/`, `jl4/app/L4/Cli/OpenFisca.hs`), emitting
-a docassemble interview that a stock docassemble server runs unmodified._
+_Status: **M1 implemented.** Designed 2026-08-16 on branch `mengwong/docassemble-bridge`;
+M1 (the static core, §10) landed the same day on branch `mengwong/docassemble-backend`: the
+`L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core plus the `l4 docassemble` CLI verb in
+jl4, mirroring the shipped OpenFisca backend. Verified by the golden + refusal tests under
+`describe "l4 docassemble"` in `jl4/tests-cli/Main.hs`, and by the R10 headless round-trip: all
+eleven `#EVAL` cases of the four examples under `jl4/examples/docassemble/` ran green against
+`docassemble.base` 1.10.7 (checkout `1b6678384`) in-process. M2 (installable package, `@ref`
+citations), M3 (embedded plan) and M4 (breadth) remain unimplemented._
 
 **One-line summary.** Docassemble discovers evaluation order at runtime by backchaining on
 undefined variables — the same "what do we still need to ask?" question L4's query planner
@@ -365,6 +366,16 @@ later `@desc docassemble screen …` grouping override can restore it. **What wo
 the R10 harness demonstrating that a two-record, six-field example asks only the fields the
 goal's evaluation actually demands.
 
+**Implementation note (2026-08-16, M1).** M1 narrows this ruling: record-typed parameters are
+instantiated as plain `DAObject` (no generated subclass yet — a subclass needs the generated
+Python module, which arrives with M2's `--package`), and every stored field yields a
+_specific-instance_ question on the concrete attribute path (`i.field`), not a `generic object`
+fallback layer; nested record fields are instantiated by `code:` blocks passing `instanceName`
+explicitly, honouring the bytecode-sniffing contract above. The closure artifact is delivered in
+narrowed form: the R10 harness shows per-field demand-driven asking — the `defaults` example's
+promo-code question is never asked on the short-circuited path, and the seam example's
+requirement questions are never asked on the NotApplicable path.
+
 ### 8.3 R3 — survival: every reachable decision becomes a named `code:` block
 
 **Evidence.** `Where` bindings are full `Decide`s (`Syntax.hs:257,452-454`) **[E]**. OpenFisca
@@ -540,6 +551,13 @@ cited line:
 
 **What would close it:** review of the whitelist against the pinned docassemble version in the
 R10 harness, plus one not-ok fixture per hygiene rule where feasible.
+
+**Implementation note (2026-08-16, M1).** One mechanism fact, probed the hard way against the
+vendored `docassemble_mako` at the 1.10.7 pin: **backslash is not a Mako escape** — `\${ x }`
+still evaluates `x` (and renders a stray `\`). The literal spelling that works is the Mako
+expression `${'${'}`, which is what `escapeL4` emits for every `${` in L4-derived prose; the
+`defaults.l4` example's deliberately Mako-hostile `@desc` pins this in both the golden and the
+round-trip. Line-leading `%` → `%%` works as expected.
 
 ### 8.10 R10 — validation harness: headless `docassemble.base`, proven by probe, never a dependency
 
