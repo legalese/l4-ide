@@ -55,6 +55,7 @@ import qualified Data.Text as Text
 import Optics (cosmosOf, gplate, toListOf, (^.))
 
 import L4.Annotation (getAnno, rangeOf)
+import L4.Catala.Emit (renderCatType)
 import L4.Catala.Equivalence (EqvUnit (..), equivalenceUnit)
 import L4.Catala.IR
 import L4.Export
@@ -184,6 +185,7 @@ data ScopeSig = ScopeSig
   , ssParams  :: ![(Text, Bool)]  -- ^ per @GIVEN@, in order: name, and whether it survives (R11)
   , ssAssumes :: ![Text]          -- ^ extra @input@s from module-level @ASSUME@s, in order
   , ssOutput  :: !Text
+  , ssOutTy   :: !(Maybe CatType) -- ^ the declared result type, when it has a Catala shape
   }
 
 -- | A private toplevel helper's calling convention.
@@ -191,6 +193,7 @@ data HelperSig = HelperSig
   { hsName   :: !Text
   , hsL4     :: !Text
   , hsParams :: ![(Text, Bool)]
+  , hsRet    :: !(Maybe CatType)
   }
 
 -- ---------------------------------------------------------------------------
@@ -199,6 +202,19 @@ data HelperSig = HelperSig
 
 data Ctx = Ctx
   { cxVars     :: !(Map Unique Text)          -- ^ in-scope values (inputs, binders, lets)
+  , cxBound    :: !(Map Text Text)
+    -- ^ the inverse of 'cxVars' at the /Catala/ end: mangled name → the L4 name
+    -- currently bound to it. 'catIdent' is not injective, so two distinct L4
+    -- locals can land on one Catala identifier and the inner @let@ would
+    -- silently shadow the outer; 'bindLocal' consults this to reject that.
+  , cxVarTys   :: !(Map Unique CatType)
+    -- ^ declared types of the bindings whose type we know (parameters, @ASSUME@
+    -- inputs). Used only by 'knownTy', for R11's whole-value comparison guard.
+  , cxNarrowed :: !(Set Text)
+    -- ^ Catala structures that lost a field on the way out (R11 elision, or a
+    -- field type with no Catala counterpart). Empty in almost every module, and
+    -- when it is empty the comparison guard costs nothing.
+  , cxTypeKids :: !(Map Text [CatType])       -- ^ named type → the types it contains
   , cxCons     :: !(Map Unique ConInfo)
   , cxCases    :: !(Map Text [Text])          -- ^ enumeration → its constructors, in order
   , cxTypes    :: !(Map Unique Text)          -- ^ every type declared in this module
@@ -282,11 +298,14 @@ buildModule opts mod' efs =
                         | au <- Map.findWithDefault [] eu assumeUse
                         , ai <- maybeToList (Map.lookup au assumes) ]
           , ssOutput  = catIdent ef.exportName
+          , ssOutTy   = Map.lookup eu decides >>= (.diGiveth) >>= bareTy
           } )
     | ef <- efs, let eu = getUnique (decideName ef.exportDecide)
     ]
   hsigs = Map.fromList
-    [ (di.diUnique, HelperSig (catIdent di.diName) di.diName (paramsOf elided (Just di)))
+    [ ( di.diUnique
+      , HelperSig (catIdent di.diName) di.diName (paramsOf elided (Just di))
+                  (di.diGiveth >>= bareTy) )
     | di <- helpers
     ]
 
@@ -320,9 +339,42 @@ buildModule opts mod' efs =
     | (path, Decide _ (MkDecide _ _ (MkAppForm _ fnRes _ _) _)) <- topDeclsWithPath mod'
     ]
 
+  -- R11's disclosed cost has a second half the field-level check does not see:
+  -- a structure that lost a field is *narrower* than its L4 source, so a
+  -- whole-value comparison of two such records — `a EQUALS b`, `elem x xs` —
+  -- ignores the elided field in Catala and does not in L4. These are the
+  -- structures for which that is true; 'checkComparable' uses them.
+  narrowed = Set.fromList
+    [ ri.riName
+    | ri <- dedupOn (.riL4) (Map.elems records), f <- ri.riFields
+    , case f.rfStatus of
+        FEmitted _      -> False
+        FElidedComputed -> False   -- a MEANS field is derived, not stored: not part of equality
+        FElidedString   -> True
+        FUnsupported _  -> True
+    ]
+
+  -- Named type → the types reachable through it, so 'safeCatType' can decide
+  -- whether a comparison touches a narrowed structure transitively.
+  typeKids enums = Map.fromListWith (<>) $
+       [ (ri.riName, [ t | f <- ri.riFields, FEmitted t <- [f.rfStatus] ])
+       | ri <- dedupOn (.riL4) (Map.elems records) ]
+    <> [ (e.enName, mapMaybe (.caContent) e.enCases) | e <- enums ]
+
+  -- R3's lenient `Date d m y`: emitted, once, as a day-granular helper (§8.3).
+  needsLenientDate = or
+    [ isLenientDate r args
+    | u <- reach, di <- maybeToList (Map.lookup u decides)
+    , App _ r args <- toListOf (cosmosOf (gplate @(Expr Resolved))) di.diBody
+    ]
+
   assemble enums =
     let ctx = Ctx
           { cxVars     = Map.empty
+          , cxBound    = Map.empty
+          , cxVarTys   = Map.empty
+          , cxNarrowed = narrowed
+          , cxTypeKids = typeKids enums
           , cxCons     = consMap
           , cxCases    = Map.fromList [ (e.enName, map (.caName) e.enCases) | e <- enums ]
                            <> Map.singleton maybeEnum ["Present", "Absent"]
@@ -342,6 +394,7 @@ buildModule opts mod' efs =
     in (\lowered tops ->
           let (tests, testNotes) = collectTests ctx decides mod'
               eqvs               = concatMap eqvUnitsOf lowered
+              tops'              = [ lenientDateTopdef | needsLenientDate ] <> tops
               notes = nub (  fieldNotes
                           <> Map.elems elided
                           <> concatMap (.lsNotes) lowered
@@ -351,7 +404,7 @@ buildModule opts mod' efs =
                , modSource   = moduleSource mod'
                , modWarnings = notes
                , modSegments = weave modTitle (moduleSource mod') notes structs enums
-                                     tops lowered eqvs tests
+                                     tops' lowered eqvs tests
                })
        <$> vList [ lowerExport ctx assumes assumeUse decides sectionPaths ef | ef <- efs ]
        <*> vList [ lowerHelper ctx di | di <- helpers ]
@@ -360,12 +413,223 @@ buildModule opts mod' efs =
   -- The names the equivalence harness (R4) and the test emitter (R7) will claim.
   -- They are predictable from the export list, so they can join the collision
   -- check before anything is lowered.
+  --
+  -- The equivalence prefix carries no index because 'eqvUnitsOf' numbers the
+  -- rules that /carry/ an equivalence descriptor rather than all the rules in
+  -- the scope, and a scope has exactly one of those (its main rule); the
+  -- `TYPICALLY` @context@ defaults that share the scope body do not shift it.
+  -- Keep those two facts together: this list is what makes a clash an L4-level
+  -- diagnostic instead of a Catala one, and it is only as good as its guesses.
   generatedNames =
        [ ( catUpper ef.exportName <> "Eqv" <> sfx
          , "<generated equivalence scope for `" <> ef.exportName <> "`>" )
        | ef <- efs, sfx <- ["Row", "ModeA", "ModeB", "Agree", "Grid"] ]
-    <> [ ("Test" <> tshow i, "<generated #EVAL test scope " <> tshow i <> ">")
-       | i <- [1 .. length [ () | Directive _ _ <- topDecls mod' ]] ]
+    <> [ ("Test" <> tshow i <> sfx, "<generated #EVAL test scope " <> tshow i <> ">")
+       | i <- [1 .. length [ () | Directive _ _ <- topDecls mod' ]]
+       , sfx <- ["", defaultTestSuffix] ]
+
+-- ---------------------------------------------------------------------------
+-- Binding names: 'catIdent' is not injective, so binders need a check too
+-- ---------------------------------------------------------------------------
+
+-- | Bring one L4 name into scope under its mangled Catala spelling, rejecting
+-- the case where a /different/ L4 name is already bound to that spelling.
+--
+-- 'collisionCheck' cannot see this: it works over the module's flat namespaces,
+-- and locals are scoped. But the hazard is the same one and worse, because
+-- Catala's @let@ shadows silently rather than erroring. @\`foo bar\`@ and
+-- @fooBar@ both mangle to @foo_bar@, and
+--
+-- @
+-- total MEANS a PLUS b WHERE \`foo bar\` MEANS 1; fooBar MEANS 100;
+--                            a MEANS \`foo bar\`; b MEANS fooBar
+-- @
+--
+-- evaluates to 101 in L4 and, before this check existed, to 200 in the emitted
+-- Catala. Re-binding the /same/ L4 name is left alone: that is ordinary
+-- shadowing, and Catala reproduces it.
+bindLocal :: Maybe SrcRange -> Ctx -> Unique -> Text -> V Ctx
+bindLocal rng ctx u l4 = case Map.lookup v ctx.cxBound of
+  Just prev | prev /= l4 -> vErr rng clash
+  _ -> pure ctx { cxVars  = Map.insert u v ctx.cxVars
+                , cxBound = Map.insert v l4 ctx.cxBound }
+ where
+  v = catIdent l4
+  clash =
+    "name collision among bindings in scope: `" <> l4 <> "` and `" <> prev'
+    <> "` both compile to the Catala identifier `" <> v <> "`, so the inner binding would "
+    <> "silently shadow the outer one instead of failing — rename one."
+  prev' = Map.findWithDefault "?" v ctx.cxBound
+
+-- | 'bindLocal' over a list, left to right, plus the types we know for them.
+bindParams :: Maybe SrcRange -> Ctx -> [(Unique, Text, Maybe CatType)] -> V Ctx
+bindParams rng = foldl step . pure
+ where
+  step vc (u, l4, mty) = vc `vThen` \c ->
+    (\c' -> c' { cxVarTys = maybe c'.cxVarTys (\t -> Map.insert u t c'.cxVarTys) mty })
+      <$> bindLocal rng c u l4
+
+-- ---------------------------------------------------------------------------
+-- R11's second half: whole-value comparison over a narrowed structure
+-- ---------------------------------------------------------------------------
+
+-- | A best-effort type for an expression. 'Nothing' means "not determined
+-- here"; this exists only to answer 'checkComparable', never to typecheck.
+knownTy :: Ctx -> Expr Resolved -> Maybe CatType
+knownTy ctx = go
+ where
+  go = \case
+    Lit _ (NumericLit _ _) -> Just TDecimal
+    Percent _ _            -> Just TDecimal
+    And _ _ _              -> Just TBool
+    Or _ _ _               -> Just TBool
+    Not _ _                -> Just TBool
+    Implies _ _ _          -> Just TBool
+    Equals _ _ _           -> Just TBool
+    Leq _ _ _              -> Just TBool
+    Geq _ _ _              -> Just TBool
+    Lt _ _ _               -> Just TBool
+    Gt _ _ _               -> Just TBool
+    Plus _ _ _             -> Just TDecimal
+    Minus _ _ _            -> Just TDecimal
+    Times _ _ _            -> Just TDecimal
+    DividedBy _ _ _        -> Just TDecimal
+    Modulo _ _ _           -> Just TDecimal
+    Proj _ _ f             -> case Map.lookup (getUnique f) ctx.cxFields of
+      Just rf | FEmitted t <- rf.rfStatus -> Just t
+      _                                   -> Nothing
+    IfThenElse _ _ t e     -> go t <|> go e
+    MultiWayIf _ gs oth    -> listToMaybe (mapMaybe go ([ b | MkGuardedExpr _ _ b <- gs ] <> [oth]))
+    Where _ inner _        -> go inner
+    LetIn _ _ inner        -> go inner
+    List _ (x : _)         -> TList <$> go x
+    Cons _ x _             -> TList <$> go x
+    AppNamed _ r _ _       -> (\ri -> TNamed ri.riName) <$> Map.lookup (getUnique r) ctx.cxRecords
+    App _ r args           -> appTy r args
+    _                      -> Nothing
+
+  appTy r args
+    | Just t  <- arith                        = Just t
+    | u == TC.trueUnique || u == TC.falseUnique = Just TBool
+    | u == TC.justUnique, [a] <- args         = TOption <$> go a
+    | Just ci <- Map.lookup u ctx.cxCons      = Just (TNamed ci.ciEnum)
+    | Just ri <- Map.lookup u ctx.cxRecords   = Just (TNamed ri.riName)
+    | Just t  <- Map.lookup u ctx.cxVarTys, null args = Just t
+    | Just ai <- Map.lookup u ctx.cxAssumes   = ai.aiType >>= bareTy
+    | Just sg <- Map.lookup u ctx.cxScopes    = sg.ssOutTy
+    | Just hs <- Map.lookup u ctx.cxHelpers   = hs.hsRet
+    | otherwise                               = Nothing
+   where
+    u  = getUnique r
+    nm = plainName r
+    arith
+      | nm `elem` ["__PLUS__", "__MINUS__", "__TIMES__", "__DIVIDE__", "__MODULO__"] = Just TDecimal
+      | nm `elem` [ "__EQUALS__", "__LEQ__", "__GEQ__", "__LT__", "__GT__"
+                  , "__AND__", "__OR__", "__NOT__", "__IMPLIES__" ]                  = Just TBool
+      | nm `elem` ["count", "length"]                                                = Just TDecimal
+      | nm `elem` ["null", "elem", "any", "all", "and", "or"]                        = Just TBool
+      | otherwise                                                                    = Nothing
+
+-- | Does this type reach a structure that lost a field on the way out?
+safeCatType :: Ctx -> CatType -> Bool
+safeCatType ctx = go Set.empty
+ where
+  go seen = \case
+    TNamed n
+      | Set.member n ctx.cxNarrowed -> False
+      | Set.member n seen           -> True
+      | otherwise -> all (go (Set.insert n seen)) (Map.findWithDefault [] n ctx.cxTypeKids)
+    TList t   -> go seen t
+    TOption t -> go seen t
+    _         -> True
+
+-- | §8.11 conditions R11's elision on the string being "never compared". A
+-- field /read/ is checked at the projection; a whole-value comparison reads
+-- every field at once and was not, so @a EQUALS b@ over a record whose STRING
+-- field was elided quietly compared the narrowed structures and answered
+-- @true@ where L4 answered @false@. Reject that here, by name.
+--
+-- The check is skipped entirely when nothing was narrowed, which is every
+-- module that does not use STRING at all.
+checkComparable :: Ctx -> Maybe SrcRange -> Text -> [Expr Resolved] -> V ()
+checkComparable ctx rng what operands
+  | Set.null ctx.cxNarrowed        = pure ()
+  | any (maybe False (safeCatType ctx) . knownTy ctx) operands = pure ()
+  | otherwise = vErr rng
+      ( what <> " compares whole values, and this module emits structure(s) "
+     <> Text.intercalate ", " [ "`" <> n <> "`" | n <- Set.toList ctx.cxNarrowed ]
+     <> " narrower than their L4 sources (a field was elided under R11, §8.11). A Catala "
+     <> "comparison over the narrowed structure ignores the elided field, so it can answer "
+     <> "`true` where L4 answers `false`. Compare the fields you mean, or drop the elided "
+     <> "field from the declaration." )
+
+-- ---------------------------------------------------------------------------
+-- R3's lenient `Date d m y`, as an emitted day-granular helper (§8.3)
+-- ---------------------------------------------------------------------------
+
+-- | The Catala name of the emitted helper. It joins the toplevel-helper
+-- namespace, so 'collisionCheck' sees it like any other.
+lenientDateName :: Text
+lenientDateName = "l4_lenient_date"
+
+-- Both spellings, as everywhere else a prelude name is recognised: daydate
+-- declares @\`Date\` AKA \`Days to date\`@, so the /defining/ name at a call
+-- site is the alias and @plainName@ alone does not find it.
+isLenientDate :: Resolved -> [a] -> Bool
+isLenientDate r args =
+  length args == 3
+  && "Date" `elem` [ plainName r, unqualifiedRawNameToText (rawName (getActual r)) ]
+
+-- | daydate's @Date day month year@ rolls out-of-range components /forward/
+-- (Feb 31 1900 ↦ 1900-03-03), which is neither of Catala's two month-rounding
+-- policies. R3 rules that it compiles through an emitted helper reproducing
+-- that behaviour in day-granular Catala, and this is it: start at the 1st of
+-- January of the year, add @month - 1@ months (adding months to a 1st never
+-- rounds, so the policy never applies), then add @day - 1@ days.
+--
+-- Checked against catala 1.2.1 and against L4's own evaluator on the four
+-- interesting shapes — @Date 31 2 1900@ ↦ @1900-03-03@, @Date 31 2 2020@ ↦
+-- @2020-03-02@, @Date 1 13 2020@ ↦ @2021-01-01@, @Date 0 3 2020@ ↦
+-- @2020-02-29@ — which agree on all four.
+lenientDateTopdef :: CatTopdef
+lenientDateTopdef = CatTopdef
+  { tdName   = lenientDateName
+  , tdL4     = "Date"
+  , tdDesc   = Just "daydate's lenient `Date day month year`, which rolls out-of-range \
+                    \components forward, in day-granular Catala (R3, §8.3)."
+    -- `day`, `month` and `year` are Catala keywords, so the parameter names go
+    -- through 'catIdent' like any other (it appends the disambiguating `_`).
+  , tdParams = [ (catIdent "day", TDecimal)
+               , (catIdent "month", TDecimal)
+               , (catIdent "year", TDecimal) ]
+  , tdReturn = TDate
+  , tdBody   =
+      EBin BAdd
+        (EBin BAdd
+          (EStdCall "Date.of_year_month_day"
+            [ECoerce TInteger (EVar (catIdent "year")), ELit (LInt 1), ELit (LInt 1)])
+          (EBin BMul (EBin BSub (ECoerce TInteger (EVar (catIdent "month"))) (ELit (LInt 1)))
+                     (ELit (LDuration [(1, DUMonth)]))))
+        (EBin BMul (EBin BSub (ECoerce TInteger (EVar (catIdent "day"))) (ELit (LInt 1)))
+                   (ELit (LDuration [(1, DUDay)])))
+  , tdNotes  =
+      [ "R2 coercion: `integer of` on each component. L4 NUMBERs are decimals and Catala's "
+        <> "date construction takes integers, so a non-integral component is ROUNDED here "
+        <> "rather than refused (§8.2)."
+      ]
+  }
+
+-- | The suffix of the extra R7 scope that pins a @TYPICALLY@ default (R10).
+defaultTestSuffix :: Text
+defaultTestSuffix = "Default"
+
+-- | A context-free lowering of a declared type, for the signature tables. It
+-- answers 'Nothing' rather than reporting: every use site is checked by
+-- 'lowerType' anyway.
+bareTy :: Type' Resolved -> Maybe CatType
+bareTy t = case runV (lowerTypeBare t) of
+  Right ty -> Just ty
+  Left _   -> Nothing
 
 elisionNote :: Text -> Text -> Text
 elisionNote fn p =
@@ -499,17 +763,24 @@ inertTexts e =
 -- ---------------------------------------------------------------------------
 
 -- | Every Mode B rewrite in one scope, paired with the scope that owns it.
+--
+-- The index runs over the rules that /carry/ an equivalence descriptor, not
+-- over every rule in the scope body. That matters because a @TYPICALLY@
+-- parameter puts its @context@ default in the same body (R10): numbering all
+-- the rules would move a scope's only ladder off index 0 and mint names —
+-- @\<Scope\>Eqv1Row@ — that @generatedNames@ does not reserve and
+-- 'collisionCheck' therefore cannot see. Keep the two in step.
 eqvUnitsOf :: LoweredScope -> [(Text, EqvUnit)]
 eqvUnitsOf ls =
   [ (ls.lsBody.sbName, eu)
-  | (i, rd) <- zip [0 :: Int ..] ls.lsBody.sbRules
+  | (i, rd) <- zip [0 :: Int ..] eqvRules
   , Just eqv <- [rd.rdEqv]
-  , eu <- maybeToList (equivalenceUnit (base i) (human i) eqv)
+  , eu <- maybeToList (equivalenceUnit (base i) (human i rd) eqv)
   ]
  where
-  base i  = ls.lsBody.sbName <> "Eqv" <> (if i == 0 then "" else tshow i)
-  human i = ls.lsL4 <> (if i == 0 then "" else " / " <> ruleVar i)
-  ruleVar i = maybe "" (.rdVar) (listToMaybe (drop i ls.lsBody.sbRules))
+  eqvRules  = [ rd | rd <- ls.lsBody.sbRules, isJust rd.rdEqv ]
+  base i    = ls.lsBody.sbName <> "Eqv" <> (if i == 0 then "" else tshow i)
+  human i rd = ls.lsL4 <> (if i == 0 then "" else " / " <> rd.rdVar)
 
 -- ---------------------------------------------------------------------------
 -- Tests (R7, §8.7)
@@ -534,7 +805,7 @@ collectTests ctx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mo
  where
   go _ [] us ns = (reverse us, reverse ns)
   go i (d : ds) us ns = case plan i d of
-    Right u        -> go (i + 1) ds (u : us) ns
+    Right made     -> go (i + 1) ds (reverse made <> us) ns
     Left Nothing   -> go i ds us ns
     Left (Just n)  -> go i ds us (n : ns)
 
@@ -554,27 +825,84 @@ collectTests ctx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mo
                                       \wraps a call to an @export decision (§8.7)"))
     Just ty -> case runV (lowerExpr ctx e) of
       Left errs -> Left (Just (skipNote i (Text.intercalate "; " [ x.errMsg | x <- errs ])))
-      Right ce  -> Right TestUnit
-        { tuDecl = CatScopeDecl
-            { sdName   = name
-            , sdL4     = name
-            , sdDesc   = Just ("Test " <> tshow i <> ", from the L4 directive at "
-                               <> maybe "an unknown position" prettySrcRange rng <> ".")
-            , sdIsTest = True
-            , sdVars   = [ CatScopeVar "result" "result" VarOutput (ShContent ty) Nothing ]
-            }
-        , tuBody = CatScopeBody name
-            [ CatRuleDef
-                { rdVar = "result"
-                , rdModeA = [CatClause ClPlain Nothing (ConsEquals ce)]
-                , rdModeB = Nothing, rdEmitted = ModeA
-                , rdFallback = Nothing, rdEqv = Nothing
-                } ]
-        -- See 'L4.Catala.Equivalence' for why @--disable-warnings@ is here.
-        , tuCli = CatTestCli ("catala test-scope " <> name <> " --disable-warnings -F json") [] rng
-        }
+      Right ce  -> Right (unit name desc ty ce : defaultTwin i rng ty ce e)
      where
       name = "Test" <> tshow i
+      desc = "Test " <> tshow i <> ", from the L4 directive at "
+             <> maybe "an unknown position" prettySrcRange rng <> "."
+
+      unit nm dsc t body = TestUnit
+        { tuDecl = CatScopeDecl
+            { sdName   = nm
+            , sdL4     = nm
+            , sdDesc   = Just dsc
+            , sdIsTest = True
+            , sdVars   = [ CatScopeVar "result" "result" VarOutput (ShContent t) Nothing ]
+            }
+        , tuBody = CatScopeBody nm
+            [ CatRuleDef
+                { rdVar = "result"
+                , rdModeA = [CatClause ClPlain Nothing (ConsEquals body)]
+                , rdModeB = Nothing, rdEmitted = ModeA
+                , rdFallback = Nothing, rdEqv = Nothing
+                , rdNotes = coercionNotes body
+                } ]
+        -- See 'L4.Catala.Equivalence' for why @--disable-warnings@ is here.
+        , tuCli = CatTestCli ("catala test-scope " <> nm <> " --disable-warnings -F json") [] rng
+        }
+
+  -- R10's `context` default is otherwise never the value under test. L4 has no
+  -- way to omit an argument, so every emitted test supplies one and the
+  -- `definition cap equals 500.0` the lowering wrote is dead: change it in the
+  -- artifact and nothing fails. When a directive happens to pass exactly the
+  -- TYPICALLY value, this emits a twin scope that omits it — same L4 oracle,
+  -- but now the emitted default is what produces the answer, so the one place
+  -- R10's divergence is observable is under test.
+  defaultTwin i rng ty ce e = case (ce, headDecide e) of
+    (EScopeOut s fs out, Just di) -> case matchedDefaults di fs of
+      []      -> []
+      dropped ->
+        [ TestUnit
+            { tuDecl = CatScopeDecl
+                { sdName   = nm
+                , sdL4     = nm
+                , sdDesc   = Just ("Test " <> tshow i <> " again, with "
+                                   <> Text.intercalate ", " [ "`" <> d <> "`" | d <- dropped ]
+                                   <> " omitted so the scope's TYPICALLY default supplies it \
+                                      \(R10). Same expected value, from the same L4 directive.")
+                , sdIsTest = True
+                , sdVars   = [ CatScopeVar "result" "result" VarOutput (ShContent ty) Nothing ]
+                }
+            , tuBody = CatScopeBody nm
+                [ CatRuleDef
+                    { rdVar = "result"
+                    , rdModeA = [ CatClause ClPlain Nothing (ConsEquals
+                                    (EScopeOut s [ f | f <- fs, fst f `notElem` dropped ] out)) ]
+                    , rdModeB = Nothing, rdEmitted = ModeA
+                    , rdFallback = Nothing, rdEqv = Nothing, rdNotes = []
+                    } ]
+            , tuCli = CatTestCli ("catala test-scope " <> nm <> " --disable-warnings -F json")
+                        [] rng
+            }
+        ]
+     where
+      nm = "Test" <> tshow i <> defaultTestSuffix
+    _ -> []
+
+  -- The context parameters this call supplied with exactly their own default.
+  matchedDefaults di fs =
+    [ p
+    | g <- di.diGivens
+    , Just d <- [givenTypically g]
+    , let p = catIdent (givenText g)
+    , Right dv <- [runV (lowerExpr ctx d)]
+    , lookup p fs == Just dv
+    ]
+
+  headDecide e = case e of
+    App _ r _        -> Map.lookup (getUnique r) decides
+    AppNamed _ r _ _ -> Map.lookup (getUnique r) decides
+    _                -> Nothing
 
   skipNote i why =
     "directive " <> tshow i <> " did not become a Catala `#[test]` scope: " <> why
@@ -663,7 +991,15 @@ assumeClosure decides assumes elided exportUs = fixpoint initial
 -- | Distinct L4 names that mangle to one Catala name would silently conflate in
 -- Catala's flat namespaces; reject that, as the OpenFisca backend does. Catala
 -- keeps capitalised names (structures, enumerations, scopes) in one namespace
--- and lowercase toplevels in another, and each structure's fields in their own.
+-- and lowercase toplevels in another, each structure's fields in their own, and
+-- enumeration /constructors/ in a fifth.
+--
+-- The constructor namespace is module-wide, not per-enumeration: Catala rejects
+-- an unqualified case name that two enumerations both declare ("This
+-- constructor name is ambiguous, it can belong to Colour or Fruit"), and we
+-- always emit unqualified. So a constructor's key here is @Enum.case@, which
+-- makes @red@ in two enumerations a reportable clash even though the two L4
+-- names are spelled the same.
 collisionCheck
   :: [CatStruct] -> [CatEnum] -> Map Unique ScopeSig -> Map Unique HelperSig
   -> [(Text, Text)] -> V ()
@@ -677,7 +1013,11 @@ collisionCheck structs enums sigs hsigs generated = case clashes of
          <> [ (e.enName, e.enL4) | e <- enums ]
          <> [ (sg.ssScope, sg.ssL4) | sg <- Map.elems sigs ]
          <> generated )
-    <> report "toplevel helper" [ (h.hsName, h.hsL4) | h <- Map.elems hsigs ]
+    <> report "enumeration constructor"
+         [ (c.caName, e.enL4 <> "." <> c.caL4) | e <- enums, c <- e.enCases ]
+    <> report "toplevel helper"
+         (  [ (h.hsName, h.hsL4) | h <- Map.elems hsigs ]
+         <> [ (lenientDateName, "<generated day-granular `Date` helper>") ] )
     <> concat [ report ("field of structure `" <> s.stName <> "`")
                   [ (f.fdName, f.fdL4) | f <- s.stFields ]
               | s <- structs ]
@@ -727,29 +1067,32 @@ lowerExportDi
   :: Ctx -> Map Unique AssumeInfo -> Map Unique [Unique] -> DecideInfo -> ExportedFunction
   -> [Text] -> V LoweredScope
 lowerExportDi outer assumes assumeUse di ef path =
-  vList (map checkGivenShape di.diGivens) *> retType `vThen` build
+  vList (map checkGivenShape di.diGivens) *> retType `vThen` \retTy ->
+    bodyCtx `vThen` build retTy
  where
   assumeUs = Map.findWithDefault [] di.diUnique assumeUse
   assumeVs = mapMaybe (`Map.lookup` assumes) assumeUs
 
-  bodyCtx = outer
-    { cxVars = Map.fromList
-        (  [ (getUnique (givenName g), catIdent (givenText g))
-           | g <- di.diGivens, not (Map.member (getUnique (givenName g)) outer.cxElided) ]
-        <> [ (getUnique r, catIdent (givenText g))
-           | (r, g) <- zip di.diAppArgs di.diGivens
-           , not (Map.member (getUnique (givenName g)) outer.cxElided) ]
-        <> [ (u, ai.aiName) | (u, ai) <- zip assumeUs assumeVs ] )
-    , cxAssumeOK = True
-    , cxNonexh   = di.diNonexh
-    }
+  -- The scope's own variables share one Catala namespace, and 'catIdent' is not
+  -- injective, so the parameters, the ASSUMEd inputs and the output name all go
+  -- through 'bindLocal' rather than straight into a map (see its haddock).
+  bodyCtx =
+    ( \c -> c { cxAssumeOK = True, cxNonexh = di.diNonexh } )
+    <$> bindParams di.diRange
+          outer { cxBound = Map.singleton (catIdent di.diName) di.diName }
+          (  [ (getUnique (givenName g), givenText g, givenType g >>= bareTy)
+             | g <- di.diGivens, not (Map.member (getUnique (givenName g)) outer.cxElided) ]
+          <> [ (getUnique r, givenText g, givenType g >>= bareTy)
+             | (r, g) <- zip di.diAppArgs di.diGivens
+             , not (Map.member (getUnique (givenName g)) outer.cxElided) ]
+          <> [ (u, ai.aiL4, ai.aiType >>= bareTy) | (u, ai) <- zip assumeUs assumeVs ] )
 
   retType = case di.diGiveth of
     Nothing -> vBad [LowerError di.diName di.diRange
                       "no GIVETH: Catala needs the declared result type of an exported decision"]
     Just t  -> lowerType outer di.diRange t
 
-  build retTy =
+  build retTy bodyCtx' =
     let outShape = case retTy of TBool -> ShCondition; t -> ShContent t
         outName  = catIdent di.diName
         desc     = if Text.null ef.exportDescription then di.diDesc
@@ -772,8 +1115,8 @@ lowerExportDi outer assumes assumeUse di ef path =
           })
        <$> vList (map scopeInput di.diGivens)
        <*> vList (map assumeInput assumeVs)
-       <*> vList (map typicallyDefault di.diGivens)
-       <*> lowerRule bodyCtx outName outShape di.diBody
+       <*> vList (map (typicallyDefault bodyCtx') di.diGivens)
+       <*> lowerRule bodyCtx' outName outShape di.diBody
 
   checkGivenShape g = case givenType g of
     Nothing -> vBad [LowerError di.diName di.diRange
@@ -816,7 +1159,7 @@ lowerExportDi outer assumes assumeUse di ef path =
 
   -- R10: the scope defines the TYPICALLY value; the caller may override it, and
   -- Catala's default calculus gives the caller's value exception priority.
-  typicallyDefault g = case givenTypically g of
+  typicallyDefault innerCtx g = case givenTypically g of
     Nothing -> pure Nothing
     Just d  -> (\e -> Just CatRuleDef
                         { rdVar      = catIdent (givenText g)
@@ -825,8 +1168,9 @@ lowerExportDi outer assumes assumeUse di ef path =
                         , rdEmitted  = ModeA
                         , rdFallback = Nothing
                         , rdEqv      = Nothing
+                        , rdNotes    = []
                         })
-               <$> lowerExpr bodyCtx d
+               <$> lowerExpr innerCtx d
 
 -- | A fallback from the primary (Mode B) rendering is reported; the ordinary
 -- case — a ladder that carries its equivalence grid — is not noise worth
@@ -845,21 +1189,22 @@ lowerHelper outer di = vIn di.diName $ case di.diGiveth of
   Nothing -> vBad [LowerError di.diName di.diRange
                     ("helper `" <> di.diName <> "` has no GIVETH; a Catala toplevel declaration "
                      <> "needs its result type stated")]
-  Just gt -> CatTopdef (catIdent di.diName) di.diName di.diDesc
-               <$> (concat <$> vList (map param di.diGivens))
-               <*> lowerType outer di.diRange gt
-               <*> lowerExpr bodyCtx di.diBody
+  Just gt -> bodyCtx `vThen` \bodyCtx' ->
+    (\ps ret body -> CatTopdef (catIdent di.diName) di.diName di.diDesc
+                       ps ret body (coercionNotes body))
+      <$> (concat <$> vList (map param di.diGivens))
+      <*> lowerType outer di.diRange gt
+      <*> lowerExpr bodyCtx' di.diBody
  where
-  bodyCtx = outer
-    { cxVars = Map.fromList
-        (  [ (getUnique (givenName g), catIdent (givenText g))
-           | g <- di.diGivens, not (Map.member (getUnique (givenName g)) outer.cxElided) ]
-        <> [ (getUnique r, catIdent (givenText g))
-           | (r, g) <- zip di.diAppArgs di.diGivens
-           , not (Map.member (getUnique (givenName g)) outer.cxElided) ] )
-    , cxAssumeOK = False
-    , cxNonexh   = di.diNonexh
-    }
+  bodyCtx =
+    ( \c -> c { cxAssumeOK = False, cxNonexh = di.diNonexh } )
+    <$> bindParams di.diRange
+          outer { cxBound = Map.singleton (catIdent di.diName) di.diName }
+          (  [ (getUnique (givenName g), givenText g, givenType g >>= bareTy)
+             | g <- di.diGivens, not (Map.member (getUnique (givenName g)) outer.cxElided) ]
+          <> [ (getUnique r, givenText g, givenType g >>= bareTy)
+             | (r, g) <- zip di.diAppArgs di.diGivens
+             , not (Map.member (getUnique (givenName g)) outer.cxElided) ] )
   param g
     | Map.member (getUnique (givenName g)) outer.cxElided = pure []
     | otherwise = case givenType g of
@@ -882,25 +1227,33 @@ lowerHelper outer di = vIn di.diName $ case di.diGiveth of
 -- comment in the artifact and as a warning on stderr.
 lowerRule :: Ctx -> Text -> CatVarShape -> Expr Resolved -> V CatRuleDef
 lowerRule ctx var shape body =
-  (\modeA modeB -> case modeB of
+  (\modeA modeB -> withNotes $ case modeB of
+      -- No ladder was derivable, so nothing was fallen back /from/: this is an
+      -- ordinary definition, and calling it a "Mode A fallback" in the artifact
+      -- would put R4's fallback warning on every rule in every file and drown
+      -- the ones that mean something.
       Nothing -> CatRuleDef
         { rdVar = var, rdModeA = modeA, rdModeB = Nothing
-        , rdEmitted = ModeA, rdEqv = Nothing
-        , rdFallback = Just "no exception ladder is derivable for this rule's shape"
+        , rdEmitted = ModeA, rdEqv = Nothing, rdFallback = Nothing, rdNotes = []
         }
       Just (clauses, _) | ctx.cxBoolOnly -> CatRuleDef
         { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
-        , rdEmitted = ModeA, rdEqv = Nothing
+        , rdEmitted = ModeA, rdEqv = Nothing, rdNotes = []
         , rdFallback = Just "--boolean-only: the Mode A reference rendering was requested"
+        }
+      Just (clauses, _) | Just why <- strictnessVeto body -> CatRuleDef
+        { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
+        , rdEmitted = ModeA, rdEqv = Nothing, rdNotes = []
+        , rdFallback = Just why
         }
       Just (clauses, eqv)
         | n <- eqvAtomCount eqv, n > 0, n <= eqvRowLimit -> CatRuleDef
             { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
-            , rdEmitted = ModeB, rdFallback = Nothing, rdEqv = Just eqv
+            , rdEmitted = ModeB, rdFallback = Nothing, rdEqv = Just eqv, rdNotes = []
             }
         | otherwise -> CatRuleDef
             { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
-            , rdEmitted = ModeA, rdEqv = Nothing
+            , rdEmitted = ModeA, rdEqv = Nothing, rdNotes = []
             , rdFallback = Just
                 ( "an exception ladder was derived, but it ranges over "
                 <> tshow (eqvAtomCount eqv) <> " atomic conditions and §8.4's standing "
@@ -917,6 +1270,66 @@ lowerRule ctx var shape body =
                ShCondition -> CatClause ClPlain (Just e) ConsFulfilled
                ShContent _ -> CatClause ClPlain Nothing (ConsEquals e) ])
     <$> lowerExpr ctx body
+
+  withNotes rd = rd
+    { rdNotes = nub (concatMap coercionNotes
+                       [ e | cl <- emittedClauses rd
+                           , e <- maybeToList cl.clCondition <> conseqExprs cl.clConseq ]) }
+  conseqExprs = \case ConsEquals e -> [e]; _ -> []
+
+-- | R4's ladder evaluates /every/ rung's condition, because Catala's default
+-- calculus has to know which rungs apply. L4's cascade stops at the first
+-- guard that holds, and its @AND@\/@OR@ short-circuit. Where a later condition
+-- can raise — a division, a modulo, a bounds-checked date — those two are not
+-- the same program, so the ladder is not shipped for that rule.
+--
+-- The first condition is evaluated under either reading, so it is exempt; the
+-- consequences are exempt too, since neither rendering evaluates the arm it
+-- did not select.
+strictnessVeto :: Expr Resolved -> Maybe Text
+strictnessVeto body
+  | any mayRaiseL4 laterConditions = Just reason
+  | otherwise                      = Nothing
+ where
+  laterConditions = drop 1 $ case peelProvisos body of
+    Just (base, provisos) -> base : provisos
+    Nothing -> case cascadeArms body of
+      Just (arms, _) -> map fst arms
+      Nothing        -> []
+  reason =
+    "an exception ladder was derived, but a condition after the first one can raise (a "
+    <> "division, a modulo, or a bounds-checked date). Catala evaluates every rung's "
+    <> "condition and L4 stops at the first match, so the ladder would abort where the "
+    <> "source returns a value; the short-circuiting reference rendering is emitted instead."
+
+-- | Can evaluating this expression stop the run rather than produce a value?
+-- Over the §6 fragment that is division, modulo, and @YMD@\/@Date@ construction
+-- (which refuse out-of-range components).
+mayRaiseL4 :: Expr Resolved -> Bool
+mayRaiseL4 e = any risky (toListOf (cosmosOf (gplate @(Expr Resolved))) e)
+ where
+  risky = \case
+    DividedBy {} -> True
+    Modulo {}    -> True
+    App _ r _    -> plainName r `elem` ["__DIVIDE__", "__MODULO__", "YMD", "Date"]
+    _            -> False
+
+-- | R2's promised per-coercion note (§8.2). @CatExpr@ has no comment slot and
+-- the emitter writes an expression on one line, so the notes are collected from
+-- the lowered tree and written as @#@ comments above the definition they belong
+-- to — which is where a reader looking at the definition will see them.
+coercionNotes :: CatExpr -> [Text]
+coercionNotes e =
+  [ note t | ECoerce t _ <- catUniverse e ]
+ where
+  note TInteger =
+    "R2 coercion: `integer of` was inserted at an integer-demanding position. L4 NUMBERs are \
+    \decimals, and this ROUNDS rather than refusing a non-integral value (§8.2)."
+  note TDecimal =
+    "R2 coercion: `decimal of` was inserted to widen a Catala `integer` (a list length, a date \
+    \component) back to the decimal L4 uses for every NUMBER (§8.2)."
+  note t =
+    "R2 coercion: a representation change to `" <> renderCatType t <> "` was inserted here (§8.2)."
 
 -- | Derive the exception-ladder rendering of a rule, when its shape admits one.
 --
@@ -990,13 +1403,24 @@ cascadeArms = \case
 
 -- | A @CONSIDER@ whose patterns are all literals is an equality cascade; Catala
 -- patterns are constructor-only, so this is the shape §4.3 sends to @if@/@else@.
+--
+-- The @OTHERWISE@ must be the /last/ branch. L4's @CONSIDER@ is first-match, so
+-- an @OTHERWISE@ written before a @WHEN@ shadows it and the whole cascade
+-- collapses to that one value; an if\/else chain assembled arms-then-default
+-- would answer with the shadowed arm instead. That is a change of denotation
+-- rather than of shape, so this returns 'Nothing' and 'lowerConsider' rejects
+-- with §4.3's message. (Nothing else catches it: @l4 check@ reports the
+-- literal case as clean.)
 litConsiderArms :: Expr Resolved -> Maybe ([(Expr Resolved, Expr Resolved)], Expr Resolved)
 litConsiderArms (Consider ann scrut branches)
-  | not (null whens), [oth] <- others, length whens + 1 == length branches =
+  | (initial, [MkBranch _ (Otherwise _) oth]) <- splitAt (length branches - 1) branches
+  , not (null initial)
+  , Just whens <- traverse litBranch initial =
       Just ([ (Equals ann scrut (Lit ann l), b) | (l, b) <- whens ], oth)
  where
-  whens  = [ (l, b) | MkBranch _ (When _ (PatLit _ l)) b <- branches ]
-  others = [ b      | MkBranch _ (Otherwise _)         b <- branches ]
+  litBranch = \case
+    MkBranch _ (When _ (PatLit _ l)) b -> Just (l, b)
+    _                                  -> Nothing
 litConsiderArms _ = Nothing
 
 -- ---------------------------------------------------------------------------
@@ -1077,11 +1501,14 @@ lowerExpr ctx = go
     -- Both spellings of the operators appear: L4 desugars infix syntax into
     -- builtin applications after name resolution, but the constructors survive
     -- in some positions, so each is handled twice.
-    And _ a b          -> EBin BAnd <$> go a <*> go b
-    Or _ a b           -> EBin BOr  <$> go a <*> go b
-    Not _ a            -> EUn UNot  <$> go a
-    Implies _ a b      -> (\x y -> EBin BOr (EUn UNot x) y) <$> go a <*> go b
-    Equals _ a b       -> EBin BEq  <$> go a <*> go b
+    -- L4's booleans short-circuit and Catala's `and`/`or` do not, so both
+    -- spellings go through the conditional forms ('catAnd', 'catOr').
+    And _ a b          -> catAnd     <$> go a <*> go b
+    Or _ a b           -> catOr      <$> go a <*> go b
+    Not _ a            -> EUn UNot   <$> go a
+    Implies _ a b      -> catImplies <$> go a <*> go b
+    Equals _ a b       -> checkComparable ctx (rangeOf e) "`EQUALS`" [a, b]
+                            *> (EBin BEq <$> go a <*> go b)
     Leq _ a b          -> EBin BLeq <$> go a <*> go b
     Geq _ a b          -> EBin BGeq <$> go a <*> go b
     Lt  _ a b          -> EBin BLt  <$> go a <*> go b
@@ -1160,13 +1587,17 @@ lowerExpr ctx = go
       in case topoSort nodes of
         Left cyc -> bad e ("recursive WHERE/LET bindings have no Catala counterpart (R6): "
                            <> Text.intercalate ", " [ nm | (u, nm, _) <- bs, u `elem` cyc ])
-        Right ordered -> foldLets ctx ordered inner
+        Right ordered -> foldLets (rangeOf e) ctx ordered inner
 
-  foldLets c [] inner = lowerExpr c inner
-  foldLets c ((u, nm, b) : rest) inner =
-    let v = catIdent nm
-    in ELet v <$> lowerExpr c b
-              <*> foldLets (c { cxVars = Map.insert u v c.cxVars }) rest inner
+  foldLets _ c [] inner = lowerExpr c inner
+  foldLets rng c ((u, nm, b) : rest) inner =
+    -- The binding is lowered in the context /before/ itself (the list is
+    -- topologically sorted, so it can only mention earlier ones), and the
+    -- binder joins the context through 'bindLocal' so that two L4 locals
+    -- mangling to one Catala identifier are a diagnostic rather than a silent
+    -- shadow.
+    bindLocal rng c u nm `vThen` \c' ->
+      ELet (catIdent nm) <$> lowerExpr c b <*> foldLets rng c' rest inner
 
   asNullaryDecide = \case
     LocalDecide _ (MkDecide _ (MkTypeSig _ (MkGivenSig _ []) _) (MkAppForm _ n [] _) b) ->
@@ -1181,7 +1612,10 @@ lowerExpr ctx = go
 lowerApp :: Ctx -> Expr Resolved -> Resolved -> [Expr Resolved] -> V CatExpr
 lowerApp ctx e ref args
   | Just mk <- firstOf builtinOp =
-      vList (map (lowerExpr ctx) args) `vThen` (either bad pure . mk)
+         (if "__EQUALS__" `elem` names
+            then checkComparable ctx (rangeOf e) "`EQUALS`" args
+            else pure ())
+      *> (vList (map (lowerExpr ctx) args) `vThen` (either bad pure . mk))
   | u == TC.trueUnique  = pure (ELit (LBool True))
   | u == TC.falseUnique = pure (ELit (LBool False))
   | u == TC.emptyUnique = pure (EList [])
@@ -1276,9 +1710,36 @@ lowerConsider ctx whole scrut branches
         <$> vList [ (,) <$> lowerExpr ctx c <*> lowerExpr ctx v | (c, v) <- arms ]
         <*> lowerExpr ctx dflt
     Nothing -> bad "a CONSIDER over literals compiles to an if/else chain (Catala patterns are \
-                   \constructor-only), so it needs a final OTHERWISE and no other pattern kind (§4.3)"
+                   \constructor-only), so every branch must be a literal WHEN and the OTHERWISE \
+                   \must be the last of them. An OTHERWISE that is not last shadows the branches \
+                   \after it under L4's first-match rule, and the chain would not (§4.3)"
 
-  constructorMatch =
+  -- L4 takes the first matching branch; a Catala `match` takes the arm whose
+  -- constructor fits, and `-- anything` has to be written last. Reordering a
+  -- source that relies on first-match is a change of denotation, so the shapes
+  -- where the two disagree are rejected instead: a branch standing after an
+  -- OTHERWISE, or after an earlier branch with the same constructor, is dead in
+  -- L4 and live in the emitted `match`.
+  shadowed =
+    [ msg
+    | (i, MkBranch _ lhs _) <- zip [0 :: Int ..] branches
+    , msg <- case lhs of
+        Otherwise _ | i < length branches - 1 ->
+          [ "this CONSIDER has an OTHERWISE that is not its last branch, so the "
+            <> tshow (length branches - 1 - i) <> " branch(es) after it are unreachable in L4 "
+            <> "(CONSIDER is first-match) but would be reachable in the emitted Catala `match`, "
+            <> "which must write `-- anything` last. Move the OTHERWISE to the end (§4.3)." ]
+        When _ (PatApp _ con _)
+          | (getUnique con `elem` [ getUnique c
+                                  | MkBranch _ (When _ (PatApp _ c _)) _ <- take i branches ]) ->
+          [ "this CONSIDER matches `" <> resolvedToText con <> "` twice; the second arm is dead in "
+            <> "L4 and Catala rejects a duplicate pattern outright. Remove it (§4.3)." ]
+        _ -> []
+    ]
+
+  constructorMatch
+    | (m : _) <- shadowed = bad m
+    | otherwise =
     vList (map armOf branches) `vThen` \arms0 ->
     lowerExpr ctx scrut `vThen` \s ->
       let named    = [ (ci, a) | (Just ci, a) <- arms0 ]
@@ -1318,9 +1779,9 @@ lowerConsider ctx whole scrut branches
       PatApp _ con [] -> conInfo con `vThen` \ci ->
         (\b -> (Just ci, CatArm (PCon ci.ciCase Nothing) b)) <$> lowerExpr ctx body
       PatApp _ con [PatVar _ v] -> conInfo con `vThen` \ci ->
-        let nmv  = catIdent (resolvedToText v)
-            ctx' = ctx { cxVars = Map.insert (getUnique v) nmv ctx.cxVars }
-        in (\b -> (Just ci, CatArm (PCon ci.ciCase (Just nmv)) b)) <$> lowerExpr ctx' body
+        bindLocal (rangeOf whole) ctx (getUnique v) (resolvedToText v) `vThen` \ctx' ->
+          (\b -> (Just ci, CatArm (PCon ci.ciCase (Just (catIdent (resolvedToText v)))) b))
+            <$> lowerExpr ctx' body
       PatApp _ _ ps ->
         bad ("Catala's `-- C content x` binds at most one payload and does not nest; this arm "
              <> "carries " <> tshow (length ps) <> " sub-pattern(s) (§4.3)")
@@ -1368,7 +1829,10 @@ combinator ctx nm args = case (nm, args) of
   ("count",     [l])    -> Just (ECoerce TDecimal . ENumberOf <$> lo l)
   ("length",    [l])    -> Just (ECoerce TDecimal . ENumberOf <$> lo l)
   ("null",      [l])    -> Just ((\l' -> EBin BEq (ENumberOf l') (ELit (LInt 0))) <$> lo l)
-  ("elem",      [x, l]) -> Just (flip EContains <$> lo x <*> lo l)
+  -- `contains` compares whole elements, so it is a comparison site for R11's
+  -- narrowed-structure guard exactly as `EQUALS` is.
+  ("elem",      [x, l]) -> Just (checkComparable ctx (rangeOf x) "`elem`" [x]
+                                   *> (flip EContains <$> lo x <*> lo l))
   ("append",    [a, b]) -> Just (EAppend <$> lo a <*> lo b)
   ("max",       [a, b]) -> Just (pick BGeq a b)
   ("min",       [a, b]) -> Just (pick BLeq a b)
@@ -1383,9 +1847,8 @@ combinator ctx nm args = case (nm, args) of
   -- one-argument function is applied to a synthesised binder.
   binder1 f l mk = case f of
     Lam _ (MkGivenSig _ [p]) fb ->
-      let v    = catIdent (givenText p)
-          ctx' = ctx { cxVars = Map.insert (getUnique (givenName p)) v ctx.cxVars }
-      in mk v <$> lo l <*> lowerExpr ctx' fb
+      bindLocal (rangeOf f) ctx (getUnique (givenName p)) (givenText p) `vThen` \ctx' ->
+        mk (catIdent (givenText p)) <$> lo l <*> lowerExpr ctx' fb
     Lam _ (MkGivenSig _ ps) _ ->
       vErr (rangeOf f) ("this combinator takes a one-argument function, but the lambda binds "
                         <> tshow (length ps) <> " (R5)")
@@ -1398,11 +1861,11 @@ combinator ctx nm args = case (nm, args) of
 
   fold2 f i l = case f of
     Lam _ (MkGivenSig _ [acc, x]) fb ->
-      let va   = catIdent (givenText acc)
-          vx   = catIdent (givenText x)
-          ctx' = ctx { cxVars = Map.insert (getUnique (givenName acc)) va
-                                  (Map.insert (getUnique (givenName x)) vx ctx.cxVars) }
-      in EFold vx va <$> lo l <*> lo i <*> lowerExpr ctx' fb
+      bindParams (rangeOf f) ctx
+        [ (getUnique (givenName acc), givenText acc, Nothing)
+        , (getUnique (givenName x),   givenText x,   Nothing) ] `vThen` \ctx' ->
+          EFold (catIdent (givenText x)) (catIdent (givenText acc))
+            <$> lo l <*> lo i <*> lowerExpr ctx' fb
     _ -> vErr (rangeOf f)
            "`foldl` needs a two-argument literal lambda (GIVEN acc, x YIELD …) to absorb into \
            \Catala's `combine all … in … initially … with …` (R5)"
@@ -1435,10 +1898,13 @@ fnRef1 ctx = \case
 -- exactly what @YMD@'s refusal value denotes, §8.3), and the component getters
 -- map onto the implicitly-imported @Date@ stdlib module.
 --
--- The /lenient/ @Date d m y@ constructor is deliberately absent: its
--- roll-forward overflow rule (Feb 31 ↦ Mar 3) equals neither of Catala's two
--- rounding policies, so R3 calls for an emitted day-granular helper, which this
--- pass does not yet build. Rejecting is the honest option until it does.
+-- The /lenient/ @Date day month year@ constructor goes through the emitted
+-- day-granular helper R3 calls for ('lenientDateTopdef'): its roll-forward
+-- overflow rule (Feb 31 ↦ Mar 3) equals neither of Catala's two month-rounding
+-- policies, but it is exactly "1 January, plus @month-1@ months, plus @day-1@
+-- days", and adding months to a 1st never rounds. The other arities of @Date@
+-- (from a serial number, a string, a @DATETIME@) have no Catala counterpart and
+-- are still rejected.
 dateBuiltin :: Ctx -> Expr Resolved -> Text -> [Expr Resolved] -> Maybe (V CatExpr)
 dateBuiltin ctx e nm args = case (nm, args) of
   ("YMD", [y, m, d])
@@ -1455,10 +1921,13 @@ dateBuiltin ctx e nm args = case (nm, args) of
   ("DATE_YEAR",  [d]) -> Just (getter "Date.get_year" d)
   ("DATE_MONTH", [d]) -> Just (getter "Date.get_month" d)
   ("DATE_DAY",   [d]) -> Just (getter "Date.get_day" d)
+  ("Date", [d, m, y]) -> Just
+    ( (\d' m' y' -> ECall lenientDateName [d', m', y'])
+      <$> lowerExpr ctx d <*> lowerExpr ctx m <*> lowerExpr ctx y )
   ("Date", _) -> Just $ vErr (rangeOf e)
-    "the lenient `Date d m y` constructor rolls out-of-range components forward (Feb 31 ↦ Mar 3), \
-    \which matches neither of Catala's rounding policies; R3 compiles it through an emitted \
-    \day-granular helper that this pass does not yet build. Use `YMD year month day` (§4.6)."
+    "only the three-argument `Date day month year` has a Catala counterpart (an emitted \
+    \day-granular helper, R3 §8.3). Building a date from a serial number, a string or a \
+    \DATETIME has none — Catala has no string type and no datetime (§4.6, §4.8)."
   _ -> Nothing
  where
   getter f d = ECoerce TDecimal . EStdCall f . (: []) <$> lowerExpr ctx d
@@ -1492,11 +1961,13 @@ builtinOp nm = case nm of
   "__GEQ__"     -> Just (bin BGeq)
   "__LT__"      -> Just (bin BLt)
   "__GT__"      -> Just (bin BGt)
-  "__AND__"     -> Just (bin BAnd)
-  "__OR__"      -> Just (bin BOr)
+  -- L4's boolean connectives short-circuit; Catala's `and`/`or` are strict, so
+  -- all three go through the conditional forms. See 'catAnd'.
+  "__AND__"     -> Just (\case [a, b] -> Right (catAnd a b);     xs -> arity 2 xs)
+  "__OR__"      -> Just (\case [a, b] -> Right (catOr a b);      xs -> arity 2 xs)
   "__NOT__"     -> Just (\case [a] -> Right (EUn UNot a); xs -> arity 1 xs)
-  -- Catala has no `implies`; @a => b@ is @(not a) or b@ (§4.3).
-  "__IMPLIES__" -> Just (\case [a, b] -> Right (EBin BOr (EUn UNot a) b); xs -> arity 2 xs)
+  -- Catala has no `implies`; @a => b@ is @if a then b else true@ (§4.3).
+  "__IMPLIES__" -> Just (\case [a, b] -> Right (catImplies a b); xs -> arity 2 xs)
   _             -> Nothing
  where
   bin op = \case [a, b] -> Right (EBin op a b); xs -> arity 2 xs

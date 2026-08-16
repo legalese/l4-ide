@@ -133,7 +133,8 @@ varShape = \case
 
 topdefLines :: CatTopdef -> [Text]
 topdefLines t =
-     descAttr t.tdDesc
+     [ "# " <> n | n <- t.tdNotes ]
+  <> descAttr t.tdDesc
   <> [ "declaration " <> t.tdName <> " content " <> renderCatType t.tdReturn ]
   <> params
   <> [ ind 1 <> "equals " <> renderCatExpr t.tdBody ]
@@ -156,12 +157,19 @@ scopeBodyLines b =
 
 -- | Emit the chosen rendering of a rule. When the emitter falls back from Mode
 -- B to Mode A the reason is written as a Catala comment, so the fallback is
--- visible in the artifact and never silent (R4, §8.4).
+-- visible in the artifact and never silent (R4, §8.4). @rdFallback@ is set only
+-- when a ladder /was/ derivable and was not shipped; a rule that never had a
+-- Mode B rendering carries no such note, so the comment stays a signal rather
+-- than boilerplate.
+--
+-- @rdNotes@ carries the lowering's own advisories about this rule — R2's
+-- representation coercions above all (§8.2).
 ruleLines :: CatRuleDef -> [Text]
 ruleLines rd =
      [ ind 1 <> "# Mode A fallback: " <> reason
      | ModeA <- [rd.rdEmitted], Just reason <- [rd.rdFallback]
      ]
+  <> [ ind 1 <> "# " <> n | n <- rd.rdNotes ]
   <> intersperseBlank [ clauseLines rd.rdVar c | c <- emittedClauses rd ]
 
 clauseLines :: Text -> CatClause -> [Text]
@@ -296,8 +304,11 @@ renderLit = \case
   LDec r         -> renderDecimal r
   LMoney r       -> "$" <> renderDecimal r
   LDate y m d    -> "|" <> pad 4 y <> "-" <> pad 2 (toInteger m) <> "-" <> pad 2 (toInteger d) <> "|"
-  LDuration []   -> "0 day"
-  LDuration ps   -> Text.intercalate " + " [ tshow n <> " " <> durUnit u | (n, u) <- ps ]
+  -- Parenthesised: `n day` is two tokens to Catala's parser, so an unbracketed
+  -- one loses to any neighbouring operator — `x * 1 month` is a syntax error
+  -- while `x * (1 month)` is what was meant.
+  LDuration []   -> "(0 day)"
+  LDuration ps   -> paren (Text.intercalate " + " [ tshow n <> " " <> durUnit u | (n, u) <- ps ])
  where
   pad :: Int -> Integer -> Text
   pad n v = Text.justifyRight n '0' (tshow v)

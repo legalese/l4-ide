@@ -26,6 +26,22 @@
 -- scope, an @Agree@ comparison scope, and a @#[test]@ grid whose expected
 -- answer is @true@ by construction (so, unlike an R7 test block, it needs no
 -- oracle).
+--
+-- __The guarantee is narrower than "the emitted rule was checked", and the
+-- emitted prose says so.__ Two limits follow from lifting the atoms:
+--
+--   * the atoms are scope /inputs/, so no assignment can exhibit an atom that
+--     /raises/ (a division by zero inside a guard, say). Strictness divergences
+--     between L4 and Catala are therefore invisible here; they are handled in
+--     the lowering instead, which emits short-circuiting conditionals for
+--     @AND@\/@OR@\/@IMPLIES@ ('catAnd', 'catOr') and declines to ship a ladder
+--     whose non-first conditions could raise;
+--   * the scopes below are freshly built from 'provisoLadder' \/ 'armLadder'
+--     and never mention the emitted rule, so the grid is a property test of the
+--     ladder /construction/ at this shape and arity — it is invariant under an
+--     edit to the rule's own text. That the emitted text is well-typed is
+--     @catala typecheck@'s claim; that it computes what L4 computes is the R7
+--     @#[test]@ scopes' claim.
 module L4.Catala.Equivalence
   ( EqvUnit (..)
   , equivalenceUnit
@@ -144,7 +160,7 @@ equivalenceUnit base human eqv
 
   plainRule v cs = CatRuleDef
     { rdVar = v, rdModeA = cs, rdModeB = Nothing
-    , rdEmitted = ModeA, rdFallback = Nothing, rdEqv = Nothing }
+    , rdEmitted = ModeA, rdFallback = Nothing, rdEqv = Nothing, rdNotes = [] }
 
   -- The two renderings, over the lifted atoms. These mirror the lowering's own
   -- constructions exactly: 'provisoLadder' and 'armLadder' are the same
@@ -154,7 +170,7 @@ equivalenceUnit base human eqv
   modeAClauses = case eqv.eqKind of
     EqvProviso k ->
       [ CatClause ClPlain
-          (Just (foldl (\acc i -> EBin BAnd acc (EUn UNot (atom i))) (atom 0) [1 .. k]))
+          (Just (foldl (\acc i -> catAnd acc (EUn UNot (atom i))) (atom 0) [1 .. k]))
           ConsFulfilled ]
     EqvArmsCond ks d ->
       [ CatClause ClPlain
@@ -191,11 +207,21 @@ equivalenceUnit base human eqv
        [ "### Equivalence check for `" <> human <> "`"
        , ""
        , "The rule above is emitted as an exception ladder (Mode B). The scopes below"
-       , "re-run both renderings — the ladder and the boolean reference form Mode A —"
-       , "over every one of the " <> tshow rows <> " truth assignments to its "
-         <> tshow n <> " atomic condition" <> (if n == 1 then "" else "s") <> ","
-       , "and `" <> gridS <> "` fails if they ever disagree. The check is part of the"
-       , "artifact, so it re-runs on every validation (R4, §8.4)."
+       , "rebuild both renderings — the ladder and the boolean reference form Mode A —"
+       , "from the same ladder builders the rule above was built with, over every one of"
+       , "the " <> tshow rows <> " truth assignments to its " <> tshow n <> " atomic condition"
+         <> (if n == 1 then "" else "s") <> ", and `" <> gridS <> "` fails"
+       , "if they ever disagree. The check is part of the artifact, so it re-runs on"
+       , "every validation (R4, §8.4)."
+       , ""
+       , "**What this does and does not establish.** The atoms are lifted to boolean"
+       , "*inputs*, so the grid decides a question about control flow: that the ladder's"
+       , "priority order reproduces first-match for a rewrite of this shape and this"
+       , "arity. It does not evaluate the atom expressions themselves, so it cannot see"
+       , "a difference that lives inside one of them; and it exercises freshly built"
+       , "copies rather than the text of the rule above, so it does not detect an edit"
+       , "made to that text after emission. Those two claims belong to `catala"
+       , "typecheck` and to the `#[test]` scopes whose expected values L4 computed."
        , ""
        , "The atoms, as they appear in the emitted rule:"
        , ""

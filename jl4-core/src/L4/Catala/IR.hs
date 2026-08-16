@@ -63,6 +63,10 @@ module L4.Catala.IR
   , CatUnOp (..)
   , CatArm (..)
   , CatPat (..)
+  , catAnd
+  , catOr
+  , catImplies
+  , catUniverse
     -- * Name mangling (injective-by-check, keyword-safe)
   , catIdent
   , catUpper
@@ -191,6 +195,11 @@ data CatTopdef = CatTopdef
   , tdParams :: ![(Text, CatType)]
   , tdReturn :: !CatType
   , tdBody   :: !CatExpr
+  , tdNotes  :: ![Text]
+    -- ^ lowering notes, emitted as @#@ comments above the declaration. R2's
+    -- representation coercions land here (§8.2: "emit a lowering note at each
+    -- coercion"), because a reader must be told when the emitter inserted a
+    -- rounding or a widening on their behalf.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -223,6 +232,8 @@ data CatRuleDef = CatRuleDef
     -- ^ the propositional shape of the Mode B rewrite, from which
     -- 'L4.Catala.Equivalence' builds the module's standing equivalence scopes.
     -- Present exactly when @rdEmitted = 'ModeB'@.
+  , rdNotes    :: ![Text]
+    -- ^ lowering notes, emitted as @#@ comments above the rule. See 'tdNotes'.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -483,6 +494,76 @@ data CatPat
   = PCon !Text !(Maybe Text)   -- ^ @-- C [content x]@
   | PAnything                  -- ^ @-- anything@
   deriving stock (Eq, Show, Generic)
+
+-- ---------------------------------------------------------------------------
+-- Lazy booleans
+-- ---------------------------------------------------------------------------
+
+-- | L4's @AND@\/@OR@\/@IMPLIES@ short-circuit; Catala's @and@\/@or@ do not.
+--
+-- Verified both ways against the real toolchain: @#EVAL FALSE AND (5 \/ 0 > 1)@
+-- is @FALSE@ in L4, while the same shape written with Catala's @and@ aborts the
+-- run with "a value is being used as denominator in a division and it computed
+-- to zero"; Catala's @if … then … else@ /is/ lazy, and
+-- @(if (0.0 = 0.0) then true else ((100.0 \/ 0.0) > 5.0))@ evaluates to @true@.
+--
+-- The guard-then-use idiom (@x IS 0 OR total \/ x > k@) is ordinary in
+-- rules-as-code, so the emitter always writes the conditional form. Catala's
+-- @and@\/@or@ are still in the IR ('BAnd', 'BOr') because a hand-written or
+-- future emission may want them where both operands are known total; nothing in
+-- the L4 lowering produces them.
+-- A literal left operand folds away rather than becoming a conditional on a
+-- constant: inert scaffolding lowers to @TRUE@ (§4.3) and would otherwise wrap
+-- every rule it annotates in an @if true then … else false@.
+catAnd :: CatExpr -> CatExpr -> CatExpr
+catAnd (ELit (LBool True))  b = b
+catAnd (ELit (LBool False)) _ = ELit (LBool False)
+catAnd a b                    = EIf a b (ELit (LBool False))
+
+catOr :: CatExpr -> CatExpr -> CatExpr
+catOr (ELit (LBool True))  _ = ELit (LBool True)
+catOr (ELit (LBool False)) b = b
+catOr a b                    = EIf a (ELit (LBool True)) b
+
+-- | Catala has no @implies@; @a => b@ is @if a then b else true@ (§4.3), which
+-- is also the short-circuiting reading L4 gives it.
+catImplies :: CatExpr -> CatExpr -> CatExpr
+catImplies (ELit (LBool True))  b = b
+catImplies (ELit (LBool False)) _ = ELit (LBool True)
+catImplies a b                    = EIf a b (ELit (LBool True))
+
+-- | Every node of an expression tree, itself included — for the small
+-- structural scans the lowering runs over its own output (R2's coercion notes).
+catUniverse :: CatExpr -> [CatExpr]
+catUniverse e = e : concatMap catUniverse (kids e)
+ where
+  kids = \case
+    ELit _            -> []
+    EVar _            -> []
+    EStruct _ fs      -> map snd fs
+    EReplace x fs     -> x : map snd fs
+    EProj x _         -> [x]
+    ECon _ mx         -> maybeToList mx
+    EMatch x arms     -> x : map (.armBody) arms
+    EIf c t f         -> [c, t, f]
+    ELet _ x b        -> [x, b]
+    EBin _ a b        -> [a, b]
+    EUn _ a           -> [a]
+    ECall _ as        -> as
+    EScopeOut _ fs _  -> map snd fs
+    EList es          -> es
+    EMapEach _ l b    -> [l, b]
+    EFilter _ l b     -> [l, b]
+    EFold _ _ l i b   -> [l, i, b]
+    EExists _ l b     -> [l, b]
+    EForAll _ l b     -> [l, b]
+    EContains l x     -> [l, x]
+    EAppend a b       -> [a, b]
+    ENumberOf l       -> [l]
+    EExtremum _ l d   -> [l, d]
+    ECoerce _ x       -> [x]
+    EStdCall _ as     -> as
+    EImpossible _     -> []
 
 -- ---------------------------------------------------------------------------
 -- Name mangling

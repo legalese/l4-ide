@@ -191,10 +191,15 @@ spec = do
                        , ClException (Just "eligible_for_benefit_p0")
                        ]
           map (.clConseq) cs `shouldBe` [ConsFulfilled, ConsNotFulfilled]
-          -- the base keeps the disjunction; the exception carries the proviso
+          -- The base keeps the disjunction and the exception carries the
+          -- proviso. The disjunction is a conditional, not Catala's `or`:
+          -- L4's OR short-circuits and Catala's does not, so `x IS 0 OR
+          -- total / x > k` would abort under `or` where the source returns a
+          -- value ('catAnd'/'catOr').
           map (.clCondition) cs
-            `shouldBe` [ Just (EBin BOr (EBin BGeq (EProj (EVar "a") "age") (ELit (LDec 65)))
-                                        (EProj (EVar "a") "is_veteran"))
+            `shouldBe` [ Just (EIf (EBin BGeq (EProj (EVar "a") "age") (ELit (LDec 65)))
+                                   (ELit (LBool True))
+                                   (EProj (EVar "a") "is_veteran"))
                        , Just (EBin BGt (EProj (EVar "a") "income") (ELit (LDec 100000)))
                        ]
 
@@ -348,10 +353,11 @@ spec = do
         ]
       let r = ruleOf "ok" (scopeBody "Ok" m)
           ms = EProj (EVar "h") "members"
+      -- `AND` is the short-circuiting conditional, not Catala's strict `and`.
       map (.clCondition) r.rdModeA `shouldBe`
-        [ Just (EBin BAnd
-                 (EBin BGt (EStdCall "Decimal.sum" [ms]) (ELit (LDec 0)))
-                 (EForAll "m" ms (EBin BGeq (EVar "m") (ELit (LDec 0))))) ]
+        [ Just (EIf (EBin BGt (EStdCall "Decimal.sum" [ms]) (ELit (LDec 0)))
+                    (EForAll "m" ms (EBin BGeq (EVar "m") (ELit (LDec 0))))
+                    (ELit (LBool False))) ]
 
     it "turns TYPICALLY into a context variable with an in-scope default (R10)" $ do
       m <- lowerOk $ Text.unlines
@@ -660,7 +666,7 @@ spec = do
                                 (Just (ELit (LBool True))) ConsFulfilled
                             ]
                         , rdModeB = Nothing, rdEmitted = ModeA, rdFallback = Nothing
-                        , rdEqv = Nothing
+                        , rdEqv = Nothing, rdNotes = []
                         } ]) ]
                 ]
             }

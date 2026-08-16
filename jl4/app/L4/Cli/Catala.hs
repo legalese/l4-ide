@@ -12,10 +12,15 @@
 -- fails rather than self-accepts, which is exactly what @clerk test --reset@
 -- would not give us.
 --
--- Catala requires a module's @> Module \<Name\>@ header to equal the
--- capitalised basename of the file it lives in, so when @-o@ names an output
--- file the module name is taken from that basename; otherwise it comes from
--- the L4 source's basename.
+-- Catala requires a module's @> Module \<Name\>@ header to equal the file's
+-- basename /with its first letter capitalised/ — not a CamelCasing of it.
+-- Checked against catala 1.2.1: @flat_tax.catala_en@ wants @Flat_tax@ and
+-- rejects @FlatTax@ ("Rename the module to Flat_tax"), while
+-- @helper2.catala_en@ is happy with @Helper2@. So when @-o@ names an output
+-- file the module name is that basename capitalised, and a basename that
+-- cannot /be/ a Catala module name — one holding a @-@, a @.@ or a space — is
+-- rejected here rather than by the toolchain later. Without @-o@ the output
+-- goes to stdout and the name comes from the L4 source's basename.
 module L4.Cli.Catala
   ( CatalaOptions(..)
   , catalaOptionsParser
@@ -23,6 +28,7 @@ module L4.Cli.Catala
   ) where
 
 import Base (Map, Text)
+import Data.Char (isAlpha, isAlphaNum, isAscii, toUpper)
 import qualified Base.Text as Text
 import Data.Ratio (denominator, numerator)
 import qualified Data.Map.Strict as Map
@@ -43,7 +49,7 @@ import L4.Evaluate.ValueLazy (NF (..), Value (..))
 import L4.EvaluateLazy (EvalDirectiveResult (..), EvalDirectiveValue (..))
 import L4.EvaluateLazy.Machine (pattern ValBool)
 import L4.Parser.SrcSpan (SrcRange)
-import L4.Print (ConstructorFieldNames, extractConstructorFieldNames)
+import L4.Print (ConstructorFieldNames, extractConstructorFieldNames, prettyLayoutNF)
 import L4.Syntax (Resolved, getUnique, rawName, rawNameToText, getOriginal)
 import qualified L4.TypeCheck.Environment as TC
 
@@ -100,32 +106,54 @@ catalaCmd opts = do
             )
           exitFailure
         Right m0 -> do
-          let fields        = extractConstructorFieldNames tc.entityInfo
-              oracle        = evalOracle (fromMaybe [] mEval)
-              (m1, tNotes)  = fillTests fields oracle m0
-              m             = nameFor opts.catOutput m1
-          -- Warnings are advice, not failure: fallbacks and elisions must be
-          -- visible (R4, R11), but they do not stop emission.
-          mapM_ (\w -> hPutStrLn stderr ("l4 catala: " <> Text.unpack w))
-                (m.modWarnings <> tNotes)
-          let out = renderModule m
-          case opts.catOutput of
-            Just f  -> Text.writeFile f out
-            Nothing -> Text.putStr out
-          exitSuccess
+          let fields       = extractConstructorFieldNames tc.entityInfo
+              oracle       = evalOracle (fromMaybe [] mEval)
+              (m1, tNotes) = fillTests fields oracle m0
+          case nameFor opts.catOutput m1 of
+            Left err -> do
+              putDiagnostics ["l4 catala: " <> err]
+              exitFailure
+            Right m -> do
+              -- Warnings are advice, not failure: fallbacks and elisions must
+              -- be visible (R4, R11), but they do not stop emission.
+              mapM_ (\w -> hPutStrLn stderr ("l4 catala: " <> Text.unpack w))
+                    (m.modWarnings <> tNotes)
+              let out = renderModule m
+              case opts.catOutput of
+                Just f  -> Text.writeFile f out
+                Nothing -> Text.putStr out
+              exitSuccess
  where
   fromMaybe d = maybe d id
 
   -- @-o Benefit.catala_en@ fixes the module name; keep the document's own
   -- top-level heading in step with it so the artifact does not name itself two
   -- different things.
-  nameFor Nothing  m = m
-  nameFor (Just f) m =
-    let nm = catUpper (Text.pack (takeBaseName f))
-    in m { modName = nm, modSegments = retitle nm m.modSegments }
+  nameFor Nothing  m = Right m
+  nameFor (Just f) m = case catalaModuleName base of
+    Just nm -> Right m { modName = nm, modSegments = retitle nm m.modSegments }
+    Nothing -> Left (badBase base)
+   where base = Text.pack (takeBaseName f)
+
+  badBase base =
+    "-o " <> base <> ": Catala requires a module's name to be the file's basename with its first \
+    \letter capitalised, and `" <> base <> "` cannot be a Catala module name (only letters, digits \
+    \and `_`, starting with a letter). Write to a file whose basename is a valid one — e.g. `"
+    <> Text.filter (\c -> isAscii c && (isAlphaNum c || c == '_')) base <> ".catala_en`."
+
   retitle nm (SegProse (l : ls) : rest)
     | "# " `Text.isPrefixOf` l = SegProse (("# " <> nm) : ls) : rest
   retitle _ segs = segs
+
+-- | The module name Catala will demand for a file with this basename, or
+-- 'Nothing' when no module can live in a file so named.
+catalaModuleName :: Text -> Maybe Text
+catalaModuleName base = case Text.uncons base of
+  Just (h, rest)
+    | isAscii h, isAlpha h, Text.all identChar rest -> Just (Text.cons (toUpper h) rest)
+  _ -> Nothing
+ where
+  identChar c = isAscii c && (isAlphaNum c || c == '_')
 
 -- ---------------------------------------------------------------------------
 -- R7: the expected blocks are filled from L4's evaluator
@@ -159,14 +187,33 @@ fillTests fields oracle m =
         Just (Reduction (Left _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
         Just (Assertion b) ->
-          ([ SegTestCli t { tcOutput = [ wrap (if b then "true" else "false") ] } ], [])
+          ( [ SegTestCli t { tcOutput = [ wrap (if b then "true" else "false") ] }
+            , humanBlock (if b then "TRUE" else "FALSE") ]
+          -- R7's oracle is L4, so a false #ASSERT is transcribed faithfully as
+          -- `{"result":false}` and `clerk test` passes on it — which reads, to
+          -- anyone scanning the run, as "the source's assertion holds". It does
+          -- not, and that has to be said out loud.
+          , [ "the L4 assertion behind `" <> t.tcCommand <> "` is FALSE in L4 itself. The emitted "
+              <> "block expects `false` and will pass, because R7 tests L4/Catala agreement and "
+              <> "not the assertion — fix the assertion in the L4 source."
+            | not b ] )
         Just (Reduction (Right v)) -> case catalaJson fields v of
           Nothing   -> ([], [ note t "its value has no Catala JSON rendering" ])
-          Just json -> ([ SegTestCli t { tcOutput = [ wrap json ] } ], [])
+          Just json -> ([ SegTestCli t { tcOutput = [ wrap json ] }
+                        , humanBlock (prettyLayoutNF fields v) ], [])
     _ -> ([seg], [])
 
   wrap v = "{\"result\":" <> v <> "}"
   note t why = "no expected output for `" <> t.tcCommand <> "`: " <> why
+
+  -- §8.7's disclosed cost and its mitigation: a JSON expected block is exact
+  -- but not legible (`{"result":"1/4"}`), so the same value goes beside it in
+  -- prose. It is prose, not a second ` ```catala-test-cli ` fence, precisely so
+  -- that it is documentation and not a second thing for `clerk test` to
+  -- compare. The rendering is L4's own — L4 is the oracle, and reproducing
+  -- Catala's pretty printer would mean running Catala to find out what to
+  -- expect, which is the self-comparison R7 exists to avoid.
+  humanBlock v = SegProse [ "L4 computes that as: `" <> Text.strip v <> "`." ]
 
 -- | Render an L4 normal form the way @catala interpret -F json@ prints the
 -- corresponding Catala value.
