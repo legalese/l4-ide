@@ -5,13 +5,19 @@ a single docassemble interview YAML that a stock docassemble server (or the
 headless harness below) runs unmodified. Design and rulings R1–R11:
 `specs/todo/DOCASSEMBLE-EXPORT-SPEC.md`.
 
-_Status: corpus, backend, goldens and harness all landed 2026-08-16 on branch
+_Status: M1 (corpus, backend, goldens and harness) landed 2026-08-16 on branch
 `mengwong/docassemble-backend`; the same day a review pass repaired five
 defects and added the `computed-and-shadow` / `assume-via-fn` exhibits. The
 `expected/` goldens are committed and pinned by the `l4 docassemble` cases in
-`jl4/tests-cli/Main.hs`; all sixteen round-trip cases below were run green
+`jl4/tests-cli/Main.hs`; the sixteen M1 round-trip cases below were run green
 against `docassemble.base` 1.10.7 (local checkout, commit `1b6678384`) in the
 venv recipe of this README._
+
+_**M2 is not implemented.** Its acceptance tests were written fail-first on
+2026-08-17 and are red: `--package` does not exist, `@ref` never reaches the
+docassemble lowerer, and no `explain()` / `logic_explanation()` /
+`auto terms:` is emitted. The `citations` corpus file and the last two rows of
+the #EVAL table below belong to M2; see "M2 acceptance tests — RED"._
 
 The organising principle: **as much as possible of an L4 encoding survives, by
 name and by structure.** An L4 reader and a docassemble reader should
@@ -72,6 +78,18 @@ recognise the same program.
     see references that travel through inlined bodies.
   - `just-payload-pattern.l4` — `WHEN JUST TRUE`: a payload-value match, not
     a binder; the R8 presence erasure cannot express it, refused by name.
+- `citations.l4` — **the M2 example; its M2 behaviour is NOT implemented**
+  (see the RED section below). Three sub-decisions, each carrying a statutory
+  `@ref`, conjoined by `AND` so a FALSE first conjunct short-circuits the
+  other two away. One ref uses the plain `@ref …` form, one the inline
+  `<<…>>` form, and the third is deliberately Mako-hostile (it begins with
+  `%` and contains a literal `${ … }`) — the same discipline `defaults.l4`
+  applies to `@desc`, applied to `@ref`. Today `l4 docassemble
+  citations.l4` emits a correct interview that carries **no** citations, no
+  `explain()` and no `auto terms:` glossary; that is what M2 has to change.
+  It has no `expected/citations.yml` golden on purpose: R11 and the RED
+  phase both say the M2 surface gets shape assertions, not a byte golden
+  written before the feature exists.
 - `roundtrip_check.py` — drives the emitted interview headlessly in real
   `docassemble.base` and asserts the verdict/goal equals the L4 `#EVAL`
   oracle (fixture table in the file; one case per #EVAL).
@@ -151,6 +169,63 @@ Per the repo topology rule, the harness is local evidence only: pinned in
 this README, run by hand in the venv, never referenced by CI and never a
 build dependency.
 
+### Driving a package tree, and comparing two sources
+
+```
+python roundtrip_check.py <source> <example-name> [--also=<source>] [--quiet]
+```
+
+`<source>` is **either** a bare interview YAML **or** a `l4 docassemble FILE
+--package DIR` tree (M2/R11); the two are told apart by `os.path.isdir`, and a
+package tree is resolved to its
+`docassemble/l4<slug>/data/questions/<stem>.yml`, with the package name and
+`sys.path` entry that make its `modules: [.l4runtime]` block importable —
+docassemble execs it as `from <question.package>.l4runtime import *`
+(`parse.py:8569-8573` at `1b6678384`).
+
+`--also=<source>` (repeatable) drives the **same** example against a second
+source and asserts the per-case `(goal, verdict, citations)` triple is
+identical. That is the M2 claim _packaging must not change meaning_, tested as
+a claim:
+
+```sh
+l4 docassemble jl4/examples/docassemble/citations.l4 -o /tmp/citations.yml
+l4 docassemble jl4/examples/docassemble/citations.l4 --package /tmp/citepkg
+/tmp/da-venv/bin/python jl4/examples/docassemble/roundtrip_check.py \
+    /tmp/citations.yml citations --also=/tmp/citepkg
+```
+
+## M2 acceptance tests — RED, the feature is NOT implemented
+
+_Written 2026-08-17 as the fail-first half of M2 (spec §10). `--package` does
+not exist, `@ref` never reaches the docassemble lowerer, and nothing emits
+`explain()` / `logic_explanation()` / `auto terms:`. The tests below therefore
+FAIL, deliberately, and they are the contract the implementation has to meet._
+
+What is red, and where:
+
+- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble --package (M2/R11: …)"`
+  — nine shape assertions over the written tree (PEP 420 shape including the
+  namespace `__init__.py` that must be **absent**, `pyproject.toml`,
+  `MANIFEST.in`, byte-identical `data/sources` provenance, the `modules:`
+  wiring, no empty directories, determinism, the `--package`/`--output`
+  refusal, and a hostile-filename slug).
+- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble citations (M2: …)"` —
+  six assertions over the emitted interview (per-rule `explain()` with that
+  rule's own citation and **not** its neighbour's, `logic_explanation()` on
+  every verdict screen, one `auto terms:` block carrying the L4 defined
+  terms, herald/delimiter stripping, Mako escaping, and the emitter's own
+  key vocabulary).
+- `roundtrip_check.py`'s `citations` example — the claim that makes the
+  milestone worth having: on the `cap exceeded` path the verdict screen must
+  cite `17 CFR 227.100(a)(1)` **and nothing else**, because the other two
+  rules were short-circuited away and decided nothing.
+
+What is _not_ red and must stay green through M2: the six `expected/*.yml`
+goldens, the six `expected/*.fidelity.txt` sidecars (now pinned by a test,
+which they were not before), the `not-ok/` refusals, and the six round-trip
+examples above.
+
 ## The #EVAL expectation table (mirrored in `roundtrip_check.py`)
 
 | example | case | inputs | L4 #EVAL | docassemble assertion |
@@ -171,3 +246,5 @@ build dependency.
 | computed-and-shadow | below minimum | salary 2000 (alternative pruned) | FALSE | = False, no alternative question asked |
 | assume-via-fn | over | amount 60, base rate 50 | (hand-computed) TRUE | `over_threshold` = True |
 | assume-via-fn | under | amount 30, base rate 50 | (hand-computed) FALSE | = False |
+| citations | exempt | raised 1 000 000, one intermediary T, registered T | TRUE | `offering_exempt` = True; **RED:** screen cites all three rules, in order |
+| citations | cap exceeded | raised 9 000 000 (only fixture supplied) | FALSE | = False, no rule-2/3 question asked; **RED:** screen cites `17 CFR 227.100(a)(1)` and nothing else |

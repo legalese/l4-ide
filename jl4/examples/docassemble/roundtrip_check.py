@@ -3,10 +3,16 @@ drive it headlessly in real docassemble.base (no server, no Redis, no Flask),
 and assert the verdict/goal equals the L4 #EVAL oracle.
 
 Usage (inside the docassemble venv -- recipe in README.md):
-    python roundtrip_check.py <emitted.yml> <example-name> [--quiet]
+    python roundtrip_check.py <source> <example-name> [--also=<source>] [--quiet]
+
+<source> is EITHER a bare interview YAML (`l4 docassemble FILE -o out.yml`)
+OR a package tree (`l4 docassemble FILE --package DIR`, M2/R11); the two are
+told apart by os.path.isdir, and a package tree is resolved to its
+docassemble/l4<slug>/data/questions/<stem>.yml with the package name and
+sys.path entry that make its `modules: [.l4runtime]` block importable.
 
 <example-name> is one of: rodents-and-vermin, seam, enum-triage, defaults,
-computed-and-shadow, assume-via-fn.
+computed-and-shadow, assume-via-fn, citations.
 Each example carries one fixture case per #EVAL in its .l4 source; the drive
 loop assembles, reads the pending question's field variable names, writes the
 fixture's answer for each into the interview's user_dict, and re-assembles,
@@ -14,7 +20,24 @@ until a terminal (fieldless / deadend) screen is reached. A question for a
 variable that has NO fixture is a hard failure -- deliberately: the seam
 example's NotApplicable case carries only the scope answer, so being asked a
 requirement question on that path fails the run (the R4 scope-first claim,
-tested as a claim).
+tested as a claim). The citations example uses the same device for the
+short-circuit claim.
+
+`--also=<source>` (repeatable) drives the SAME example against a second
+source and asserts the per-case (goal, verdict, citations) triple is
+identical. That is the M2 claim "packaging must not change meaning", tested
+as a claim:
+
+    python roundtrip_check.py out.yml citations --also=pkgdir
+
+What the citations example additionally asserts, per case:
+  * the explanation history docassemble accumulated (what
+    logic_explanation() returns on the verdict screen) is EXACTLY the
+    citations of the rules that fired, in order -- short-circuited rules did
+    not decide anything, so citing them would be citing law that never fired;
+  * the RENDERED verdict screen carries each citation verbatim, which is the
+    only honest proof that Mako-hostile citation text survived escaping;
+  * the interview's `auto terms:` glossary carries every L4 defined term.
 
 Debug defaults to True (--quiet turns it off): under debug the engine records
 its seeking history, which is printed on failure.
@@ -26,6 +49,7 @@ config.yml). Never import docassemble.base.interview_cache: its get_index
 hits get_server_redis unconditionally.
 """
 
+import os
 import re
 import sys
 import types
@@ -35,11 +59,14 @@ import types
 # dict that the get_configuration hookimpl serves).
 # ---------------------------------------------------------------------------
 
-args = [a for a in sys.argv[1:] if not a.startswith("--")]
-flags = {a for a in sys.argv[1:] if a.startswith("--")}
+_raw = sys.argv[1:]
+args = [a for a in _raw if not a.startswith("--")]
+alsos = [a.split("=", 1)[1] for a in _raw if a.startswith("--also=")]
+flags = {a for a in _raw if a.startswith("--") and not a.startswith("--also=")}
 if len(args) != 2:
     raise SystemExit(__doc__)
 YAML_PATH, WHICH = args
+SOURCE_PATHS = [YAML_PATH] + alsos
 DEBUG = "--quiet" not in flags
 
 # ---------------------------------------------------------------------------
@@ -153,7 +180,25 @@ except ImportError:  # pragma: no cover - older layouts re-export it in parse
 # "goal" names the emitted goal variable's candidate spellings and the L4
 # #EVAL value; "verdict", when present, is the R4 six-valued verdict expected
 # from a seam-lowered driver, asserted iff a verdict variable is found.
+#
+# M2 adds three optional per-case keys, all exercised by the citations
+# example: "explanations" (the EXACT ordered citation list the verdict screen
+# must carry), "screen_contains" and "screen_omits" (substrings of the
+# rendered verdict screen), plus one per-example key, "autoterms" (the
+# `auto terms:` glossary docassemble must have parsed).
 # ---------------------------------------------------------------------------
+
+# The three citations carried by citations.l4, herald-stripped: L4's own
+# `@ref ` prefix and the inline `<< >>` delimiters are L4 syntax and must
+# never reach a user-facing docassemble screen.
+CITE_CAP = "17 CFR 227.100(a)(1) — offering maximum"
+CITE_ONE_INTERMEDIARY = "17 CFR 227.100(a)(3) — sales through one intermediary only"
+# Deliberately Mako-hostile: BEGINS with `%` (a Mako control line at start of
+# line, which would make the whole line vanish) and carries a literal
+# `${ ... }` (a Mako expression, which would be evaluated). It must reach the
+# rendered screen VERBATIM -- that is the R9.1 escaping claim, and rendering is
+# the only place it can honestly be proven.
+CITE_REGISTERED = "% of the proceeds retained is set out at ${ fee_schedule } — 17 CFR 227.300(a)"
 
 EXAMPLES = {
     "rodents-and-vermin": {
@@ -321,6 +366,57 @@ EXAMPLES = {
              "goal": False, "verdict": "Fails"},
         ],
     },
+    "citations": {
+        # M2. Three sub-decisions, each carrying a statutory @ref, conjoined
+        # by AND. CPython's `and` short-circuits, and docassemble only seeks a
+        # variable it actually needs, so the SECOND case must fire rule 1 and
+        # nothing else -- and must therefore cite rule 1 and nothing else.
+        "goal_candidates": ["offering_exempt", "interview_goal"],
+        "verdict_candidates": ["verdict", "offering_exempt_verdict"],
+        # Every L4 defined term that must reach the `auto terms:` glossary.
+        # Keys are as docassemble stores them: lowercased and
+        # whitespace-collapsed (parse.py:2905 at 1b6678384).
+        "autoterms": {
+            "offering":
+                "A securities offering made in reliance on the crowdfunding exemption",
+            "within the annual cap":
+                "The amount sold in reliance on the exemption in the preceding 12 months "
+                "does not exceed $5,000,000",
+            "sold through a single intermediary":
+                "The offering is conducted exclusively through a single intermediary",
+            "the intermediary is registered":
+                "The intermediary is registered with the Commission as a funding portal",
+        },
+        "cases": [
+            {
+                "label": "exempt (all three rules fire)",
+                "fixtures": {
+                    "amount_raised_in_12_months": 1000000,
+                    "sold_through_one_intermediary": True,
+                    "intermediary_is_registered": True,
+                },
+                "goal": True,
+                "verdict": "Holds",
+                "explanations": [CITE_CAP, CITE_ONE_INTERMEDIARY, CITE_REGISTERED],
+                "screen_contains": [CITE_CAP, CITE_ONE_INTERMEDIARY, CITE_REGISTERED],
+            },
+            {
+                # Deliberately cap-only, the same device the seam example's
+                # NotApplicable case uses: rules 2 and 3 are short-circuited
+                # away, so being ASKED their questions fails the run, and
+                # CITING them fails the run too.
+                "label": "cap exceeded (rules 2 and 3 short-circuited away)",
+                "fixtures": {
+                    "amount_raised_in_12_months": 9000000,
+                },
+                "goal": False,
+                "verdict": "Fails",
+                "explanations": [CITE_CAP],
+                "screen_contains": [CITE_CAP],
+                "screen_omits": [CITE_ONE_INTERMEDIARY, CITE_REGISTERED],
+            },
+        ],
+    },
 }
 
 MAX_EXTRA_STEPS = 8  # assemble passes beyond one-per-fixture before giving up
@@ -386,6 +482,109 @@ def find_variable(user_dict, candidates):
         if key is not None:
             return key, user_dict[key]
     return None, None
+
+
+def resolve_source(path):
+    """Return (yaml_text, package_name, label) for a bare YAML file or for a
+    `l4 docassemble --package DIR` tree (M2/R11).
+
+    For a package tree the interview lives at
+    docassemble/l4<slug>/data/questions/<stem>.yml and its `modules:` block
+    names `.l4runtime`. docassemble execs that as
+    `from <question.package>.l4runtime import *` (parse.py:8569-8573 at
+    1b6678384), so two things have to be right: the `package` we hand
+    InterviewSourceString, and DIR being on sys.path so `docassemble.l4<slug>`
+    is importable next to the installed `docassemble.base`. Both resolve
+    because `docassemble` is a PEP 420 namespace package in the venv --
+    site-packages/docassemble has no __init__.py -- which is exactly why R11
+    forbids emitting one into the generated tree.
+    """
+    if os.path.isdir(path):
+        ns = os.path.join(path, "docassemble")
+        if not os.path.isdir(ns):
+            raise SystemExit(
+                f"{path!r} is a directory but has no docassemble/ inside it; "
+                f"expected a `l4 docassemble --package` tree")
+        pkgs = [d for d in sorted(os.listdir(ns))
+                if os.path.isdir(os.path.join(ns, d))]
+        if len(pkgs) != 1:
+            raise SystemExit(
+                f"expected exactly one generated package under {ns!r}, found {pkgs!r}")
+        pkg = pkgs[0]
+        qdir = os.path.join(ns, pkg, "data", "questions")
+        if not os.path.isdir(qdir):
+            raise SystemExit(f"package {pkg!r} has no data/questions/ directory")
+        ymls = [f for f in sorted(os.listdir(qdir)) if f.endswith((".yml", ".yaml"))]
+        if len(ymls) != 1:
+            raise SystemExit(
+                f"expected exactly one interview under {qdir!r}, found {ymls!r}")
+        abspath = os.path.abspath(path)
+        if abspath not in sys.path:
+            sys.path.insert(0, abspath)
+        with open(os.path.join(qdir, ymls[0]), encoding="utf-8") as handle:
+            return handle.read(), f"docassemble.{pkg}", f"package:{path}"
+    with open(path, encoding="utf-8") as handle:
+        return handle.read(), "docassemble.l4roundtrip", f"yaml:{path}"
+
+
+def explanations_of(user_dict, category="default"):
+    """The explanation history docassemble's explain() accumulated, in order.
+
+    explain() appends to this_thread.internal['explanations'][category]
+    (util.py:13227 at 1b6678384) and assemble sets
+    `this_thread.internal = user_dict['_internal']` (parse.py:8554), so
+    reading it back off the user_dict is reading exactly what
+    logic_explanation() (util.py:13259) returns on the verdict screen --
+    without depending on how the screen chose to lay it out.
+
+    Note explain() dedupes by string, so a repeated citation appears once;
+    the assertions below are written to expect that.
+    """
+    internal = user_dict.get("_internal", {}) or {}
+    return list((internal.get("explanations", {}) or {}).get(category, []))
+
+
+def rendered_screen(status):
+    """The Mako-rendered text of the screen the interview ended on.
+
+    InterviewStatus.populate sets question_text/subquestion_text from the
+    rendered content (parse.py:576-577), i.e. AFTER Mako. A citation that
+    Mako ate -- a line-leading `%` swallowed as a control line, a `${ ... }`
+    evaluated away -- is missing here and present in the YAML, which is why
+    the escaping claim is asserted at this altitude and not on the emitted
+    text.
+    """
+    parts = []
+    for attr in ("question_text", "subquestion_text"):
+        value = getattr(status, attr, None)
+        if value:
+            parts.append(str(value))
+    return "\n".join(parts)
+
+
+def check_autoterms(interview, example, label):
+    """Assert the interview parsed an `auto terms:` glossary carrying every
+    L4 defined term the example names.
+
+    Asserted against interview.autoterms rather than against the YAML text so
+    that it is docassemble, not this script, deciding the block was
+    well-formed: a glossary emitted in a block that also has a `question` key
+    is silently ignored (`if 'auto terms' in data and 'question' not in data`,
+    parse.py:2878 at 1b6678384) and would simply not be here.
+    """
+    expected = example.get("autoterms")
+    if not expected:
+        return
+    got = {}
+    for lang_table in (getattr(interview, "autoterms", {}) or {}).values():
+        for term, vals in lang_table.items():
+            got[term] = vals["definition"]
+    wrong = {t: d for t, d in expected.items() if got.get(t) != d}
+    if wrong:
+        raise RoundTripFailure(
+            f"[{label}] the interview's `auto terms:` glossary is missing or wrong "
+            f"for {sorted(wrong)}: got {got!r}, expected {expected!r}")
+    print(f"  [glossary] {len(expected)} L4 defined terms present  OK")
 
 
 def values_equal(got, expected):
@@ -490,6 +689,36 @@ def check_case(interview, current_info, example, case):
             f"variable {example['verdict_candidates']} is defined at the end of "
             f"the interview")
 
+    # M2: the citation claim. logic_explanation() must name EXACTLY the rules
+    # that fired, in order. A short-circuited rule did not decide anything, so
+    # a citation for it on the verdict screen is a citation to law that never
+    # applied -- the failure this example exists to catch.
+    got_explanations = explanations_of(user_dict)
+    expected_explanations = case.get("explanations")
+    if expected_explanations is not None:
+        if got_explanations == expected_explanations:
+            checked.append(f"citations {got_explanations!r}")
+        else:
+            problems.append(
+                f"verdict-screen citations are {got_explanations!r}, expected "
+                f"exactly {expected_explanations!r} in that order")
+
+    # M2: the escaping claim, at the only altitude where it is honest -- after
+    # Mako has rendered the screen.
+    rendered = rendered_screen(status)
+    for needle in case.get("screen_contains", []):
+        if needle in rendered:
+            checked.append(f"screen cites {needle!r}")
+        else:
+            problems.append(
+                f"the rendered verdict screen does not carry {needle!r} verbatim "
+                f"(Mako escaping, R9.1); rendered text was {rendered!r}")
+    for needle in case.get("screen_omits", []):
+        if needle in rendered:
+            problems.append(
+                f"the rendered verdict screen cites {needle!r}, a rule that was "
+                f"short-circuited away and decided nothing on this path")
+
     unused = sorted(set(fuzz(k) for k in case["fixtures"])
                     - {fuzz(v.split('.')[-1]) for _, _, asked in transcript for v in asked}
                     - {fuzz(v) for _, _, asked in transcript for v in asked})
@@ -500,15 +729,19 @@ def check_case(interview, current_info, example, case):
     if problems:
         dump_debug(status, transcript, user_dict)
         raise RoundTripFailure(f"case {case['label']!r}: " + "; ".join(problems))
+    # The observation `--also` compares across sources: packaging must not
+    # change the meaning of the interview.
+    return {
+        "goal": goal_value,
+        "verdict": verdict_value,
+        "explanations": got_explanations,
+    }
 
 
 def main():
     example = EXAMPLES.get(WHICH)
     if example is None:
         raise SystemExit(f"unknown example: {WHICH!r} (known: {sorted(EXAMPLES)})")
-
-    with open(YAML_PATH, encoding="utf-8") as handle:
-        content = handle.read()
 
     # current_info: the 'action' key must be ABSENT entirely --
     # process_action tests `'action' not in current_info`, so `action: None`
@@ -543,13 +776,34 @@ def main():
         "arguments": {},
     }
 
+    observations = {}
     with global_context(empty_globals()):
-        source = InterviewSourceString(
-            content=content, path="interview.yml", package="docassemble.l4roundtrip")
-        interview = parse.Interview(source=source)
-        print(f"== round-trip: {WHICH} == ({len(interview.questions_list)} blocks, debug={DEBUG})")
-        for case in example["cases"]:
-            check_case(interview, current_info, example, case)
+        for src_path in SOURCE_PATHS:
+            content, package, label = resolve_source(src_path)
+            source = InterviewSourceString(
+                content=content, path="interview.yml", package=package)
+            interview = parse.Interview(source=source)
+            print(f"== round-trip: {WHICH} == [{label}] "
+                  f"({len(interview.questions_list)} blocks, debug={DEBUG})")
+            check_autoterms(interview, example, label)
+            observations[label] = {
+                case["label"]: check_case(interview, current_info, example, case)
+                for case in example["cases"]
+            }
+
+        # M2: packaging must not change meaning. The same example driven from a
+        # bare YAML and from inside a generated package must reach the same
+        # goal, the same verdict and the same citations, case by case.
+        labels = list(observations)
+        for other in labels[1:]:
+            for case_label, obs in observations[labels[0]].items():
+                if observations[other][case_label] != obs:
+                    raise RoundTripFailure(
+                        f"case {case_label!r} differs between {labels[0]!r} and "
+                        f"{other!r}: {obs!r} vs {observations[other][case_label]!r} "
+                        f"-- packaging changed the meaning of the interview")
+        if len(labels) > 1:
+            print(f"AGREEMENT OK across {len(labels)} sources: {labels}")
     print("ROUND-TRIP OK")
 
 

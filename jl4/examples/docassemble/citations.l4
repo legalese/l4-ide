@@ -1,0 +1,82 @@
+-- M2: statutory citations on the verdict screen, and a glossary of L4 defined
+-- terms.
+--
+-- Three sub-decisions, each carrying a statutory `@ref`, conjoined by AND so
+-- that a FALSE first conjunct short-circuits the other two away.  The
+-- docassemble backend must:
+--
+--   * attach each rule's citation to the `code:` block that decides it, via
+--     docassemble's `explain()` (util.py:13227), so that the verdict screen's
+--     `logic_explanation()` (util.py:13259) names EXACTLY the rules that
+--     actually fired, in evaluation order, and omits the short-circuited ones;
+--   * strip L4's own `@ref ` herald and the inline `<< >>` delimiters, so a
+--     citation reads as prose and never as L4 syntax;
+--   * escape Mako-hostile citation text — the third citation deliberately
+--     BEGINS with `%` (a Mako control line at start of line) and contains a
+--     literal `${ ... }` (a Mako expression), the same hostility the
+--     `defaults` example already applies to `@desc` (R9.1);
+--   * emit an `auto terms:` glossary block whose entries are the L4 defined
+--     terms — the `DECLARE`d type and each `MEANS`-bound sub-decision —
+--     defined by their `@desc` text.
+--
+-- The two #EVALs below are the round-trip oracle AND the citation oracle:
+--   * the "exempt" case fires all three rules, so all three citations appear,
+--     in declaration order;
+--   * the "cap exceeded" case fires only the first, so ONLY the first
+--     citation may appear — the other two rules were never reached, and a
+--     verdict screen that cites them would be citing law that did not decide
+--     anything.
+
+@desc A securities offering made in reliance on the crowdfunding exemption
+DECLARE Offering
+    HAS
+      @desc The aggregate amount sold in reliance on the exemption in the preceding 12 months, in dollars
+      `amount raised in 12 months`    IS A NUMBER
+      @desc Whether the whole offering was conducted through a single intermediary
+      `sold through one intermediary` IS A BOOLEAN
+      @desc Whether that intermediary is registered with the Commission as a funding portal
+      `intermediary is registered`    IS A BOOLEAN
+
+@export Whether this offering qualifies for the crowdfunding exemption
+GIVEN o IS AN Offering @desc The offering under assessment
+GIVETH A BOOLEAN
+DECIDE `offering exempt` o IF
+        `within the annual cap`
+    AND `sold through a single intermediary`
+    AND `the intermediary is registered`
+ WHERE
+    @ref 17 CFR 227.100(a)(1) — offering maximum
+    @desc The amount sold in reliance on the exemption in the preceding 12 months does not exceed $5,000,000
+    `within the annual cap` MEANS
+        o's `amount raised in 12 months` AT MOST 5000000
+
+    <<17 CFR 227.100(a)(3) — sales through one intermediary only>>
+    @desc The offering is conducted exclusively through a single intermediary
+    `sold through a single intermediary` MEANS
+        o's `sold through one intermediary`
+
+    @ref % of the proceeds retained is set out at ${ fee_schedule } — 17 CFR 227.300(a)
+    @desc The intermediary is registered with the Commission as a funding portal
+    `the intermediary is registered` MEANS
+        o's `intermediary is registered`
+
+-- Exempt: all three rules fire, so the verdict screen must cite all three,
+-- in declaration order.
+#EVAL `offering exempt` OF
+        Offering
+        WITH
+            `amount raised in 12 months`    IS 1000000
+            `sold through one intermediary` IS TRUE
+            `intermediary is registered`    IS TRUE
+-- TRUE
+
+-- Cap exceeded: the first conjunct is FALSE, so the second and third rules
+-- are short-circuited away and never decide anything. The verdict screen must
+-- cite 17 CFR 227.100(a)(1) and NOTHING ELSE.
+#EVAL `offering exempt` OF
+        Offering
+        WITH
+            `amount raised in 12 months`    IS 9000000
+            `sold through one intermediary` IS TRUE
+            `intermediary is registered`    IS TRUE
+-- FALSE
