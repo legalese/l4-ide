@@ -472,12 +472,16 @@ daExampleDir = "examples/docassemble"
 daCitationsSource :: FilePath
 daCitationsSource = daExampleDir </> "citations.l4"
 
--- | The six M1 examples, each with a committed @.yml@ and @.fidelity.txt@
--- golden under @examples/docassemble/expected/@.
+-- | Every example with a committed @.yml@ and @.fidelity.txt@ golden under
+-- @examples/docassemble/expected/@: the six from M1, plus @citations@, whose
+-- golden the RED phase deliberately left unwritten (\"writing a golden before
+-- the feature exists would force the implementer to match formatting choices I
+-- have no basis to decide\") and the GREEN phase supplies now that the M2 shape
+-- is settled.
 daBareExamples :: [String]
 daBareExamples =
   [ "rodents-and-vermin", "seam", "enum-triage"
-  , "defaults", "computed-and-shadow", "assume-via-fn"
+  , "defaults", "computed-and-shadow", "assume-via-fn", "citations"
   ]
 
 -- | The three citations carried by @citations.l4@, herald-stripped: L4's own
@@ -2933,6 +2937,15 @@ spec bin = do
       for_ ["ev_offering_exempt_screen_holds", "ev_offering_exempt_screen_fails"] \sid -> do
         blk <- blockWithId sout sid
         shouldNotContain' ("the " ++ sid ++ " screen") blk "${ fee_schedule }"
+
+    -- Added by the GREEN phase, which the RED phase asked for by name: the
+    -- shape assertions above say what must be true of the M2 emission, and
+    -- this pins the exact bytes so a later change to the citation or glossary
+    -- rendering has to be deliberate. It is the same `expectGolden` contract
+    -- the six M1 examples ride on.
+    it "compiles the @ref citations + glossary example to its golden interview" $
+      expectGolden bin ["docassemble", daCitationsSource]
+                       "examples/docassemble/expected/citations.yml"
 
     it "declares the M2 block keys in its own emitter vocabulary (R9.5)" $ do
       -- `modules` and `auto terms` are already in the vendored 1.10.7
