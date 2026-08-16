@@ -43,8 +43,11 @@ import qualified Data.Text as Text
 
 import Optics ((^.), cosmosOf, foldMapOf, gplate)
 
+import L4.Annotation (getAnno)
 import L4.Docassemble.IR
-import L4.Export (ExportedFunction (..), TypeDescMap, buildTypeDescMap, getExportedFunctions, isExportedDecide)
+import L4.Export
+  ( DescFlags (..), ExportedFunction (..), ParsedDesc (..), TypeDescMap
+  , buildTypeDescMap, getExportedFunctions, isExportedDecide, parseDescText )
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..))
 import L4.Syntax
@@ -113,6 +116,18 @@ data RecordSpec = MkRecordSpec
   , rsFields :: ![FieldSpec]
   }
 
+-- | The two annotations M2 carries off a definition site.
+--
+-- 'defRef' is the definition's @\@ref@ citation with L4's own syntax removed;
+-- 'defDesc' is its @\@desc@ gloss, and only a /plain/ one — the @\@export@ form
+-- rides in the same slot ('L4.Export.parseDescText' consumes the keyword) and
+-- is the interview's own title prose, not a definition of a term.
+data DefAnns = MkDefAnns
+  { defRef  :: !(Maybe Text)
+  , defDesc :: !(Maybe Text)
+  }
+  deriving stock (Eq, Show)
+
 data TopDecide = MkTopDecide
   { tdU        :: !Unique
   , tdL4       :: !Text
@@ -120,6 +135,7 @@ data TopDecide = MkTopDecide
   , tdParams   :: ![Resolved]
   , tdBody     :: !(Expr Resolved)
   , tdExported :: !Bool
+  , tdAnns     :: !DefAnns
   }
 
 data Ctx = MkCtx
@@ -130,6 +146,7 @@ data Ctx = MkCtx
   , ctxTopByU   :: !(Map Unique TopDecide)
   , ctxAssumes  :: !(Map Unique (Assume Resolved))
   , ctxTypeDesc :: !TypeDescMap
+  , ctxGloss    :: ![(Text, Text)]                 -- ^ the @auto terms:@ glossary (M2)
   }
 
 buildCtx :: Module Resolved -> Ctx
@@ -144,6 +161,7 @@ buildCtx mod' =
        , ctxTopByU   = Map.fromList [ (td.tdU, td) | td <- tops ]
        , ctxAssumes  = collectAssumes mod'
        , ctxTypeDesc = buildTypeDescMap mod'
+       , ctxGloss    = collectGlossary mod'
        }
 
 collectEnums :: Module Resolved -> (Map Unique EnumInfo, Map Unique ConInfo)
@@ -196,7 +214,7 @@ collectTopDecides (MkModule _ _ section) = goSection section
  where
   goSection (MkSection _ _ _ decls) = decls >>= goDecl
   goDecl = \case
-    Decide _ d ->
+    Decide topAnn d ->
       let (ps, b) = decideFunShape d
           nm      = resolvedToText (decideName d)
       in [ MkTopDecide
@@ -206,9 +224,116 @@ collectTopDecides (MkModule _ _ section) = goSection section
              , tdParams   = ps
              , tdBody     = b
              , tdExported = isExportedDecide d
+             , tdAnns     = decideAnns topAnn d
              } ]
     Section _ sub -> goSection sub
     _ -> []
+
+-- ---------------------------------------------------------------------------
+-- @\@ref@ citations and the @\@desc@ glossary (M2)
+-- ---------------------------------------------------------------------------
+
+-- | Read a definition's citation and gloss.
+--
+-- A @\@ref@ written above a top-level definition attaches to the /TopDecl/
+-- node (@Decide ann d@), and one written above a @WHERE@ binding attaches to
+-- the @LocalDecide ann d@ node — not to the inner @MkDecide@ — so both annos
+-- are consulted, outer first, exactly as the DMN lowerer does. A node's anno
+-- can hold at most one ref and the nearest preceding one wins
+-- (@ResolveAnnotation.hs:1047-1061@), which is why each definition is read from
+-- its /own/ node and never from a neighbour's.
+--
+-- The gloss is read from the inner @MkDecide@, where 'attachLeadingDesc' puts
+-- it.
+decideAnns :: Anno -> Decide Resolved -> DefAnns
+decideAnns outerAnn (MkDecide innerAnn _ _ _) = MkDefAnns
+  { defRef  = listToMaybe (mapMaybe citationText (refsOf [outerAnn, innerAnn]))
+  , defDesc = plainDescOf innerAnn
+  }
+
+refsOf :: [Anno] -> [Text]
+refsOf anns = [ getRef r | ann <- anns, Just r <- [ann ^. annRef] ]
+
+-- | The user-facing text of a @\@ref@, with L4's own syntax removed.
+--
+-- The payload of a @\@ref X@ line INCLUDES the herald: @getRef@ hands back
+-- @\"\@ref X\"@ verbatim (unlike @getDesc@, which strips). The inline form
+-- @\<\<X\>\>@ hands back @\"\<\<X\>\>\"@, delimiters and all. Neither spelling
+-- is prose, and neither may reach a user-facing screen.
+citationText :: Text -> Maybe Text
+citationText raw =
+  let afterHerald = Text.strip (fromMaybe stripped (Text.stripPrefix "@ref" stripped))
+      stripped    = Text.strip raw
+      unwrapped   = case Text.stripPrefix "<<" afterHerald of
+        Just inner -> Text.strip (fromMaybe inner (Text.stripSuffix ">>" inner))
+        Nothing    -> afterHerald
+  in if Text.null unwrapped then Nothing else Just unwrapped
+
+-- | A /plain/ @\@desc@: the @\@export@\/@\@default@ marker rides in the same
+-- annotation slot ('L4.Export.parseDescText' consumes the keyword), and that
+-- text is the interview's own title prose — already on every verdict screen —
+-- rather than the definition of a term.
+plainDescOf :: Anno -> Maybe Text
+plainDescOf ann = do
+  d <- ann ^. annDesc
+  let parsed = parseDescText (getDesc d)
+  guard (not parsed.flags.isExport)
+  guard (not (Text.null parsed.description))
+  pure parsed.description
+
+-- | The @auto terms:@ glossary: every L4 /defined term/ in the module that
+-- carries a plain @\@desc@ — each @DECLARE@d type, and each named definition,
+-- top-level or @WHERE@-bound — in declaration order, first spelling wins.
+--
+-- It is a glossary of the /source/, not of the emitted blocks: docassemble's
+-- auto-term regex only fires where the phrase actually occurs in prose, so an
+-- entry for a term the interview never mentions is inert, and dropping the
+-- unreachable ones would make the glossary depend on which export was compiled.
+--
+-- Record fields and @GIVEN@ parameters are deliberately absent: their @\@desc@
+-- already lands on the question that asks them, as @help:@.
+collectGlossary :: Module Resolved -> [(Text, Text)]
+collectGlossary (MkModule _ _ section) = dedupOnTerm (goSection section)
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Declare _ (MkDeclare ann _ (MkAppForm _ nm _ _) _) ->
+      [ (resolvedToText nm, t) | Just t <- [plainDescOf ann] ]
+    Decide _ d    -> decideGloss d
+    Section _ sub -> goSection sub
+    _             -> []
+  decideGloss d@(MkDecide ann _ _ body) =
+    [ (resolvedToText (decideName d), t) | Just t <- [plainDescOf ann] ]
+      <> bodyGloss body
+  bodyGloss = \case
+    Where _ b ds -> bodyGloss b <> concatMap localGloss ds
+    LetIn _ ds b -> concatMap localGloss ds <> bodyGloss b
+    _            -> []
+  localGloss = \case
+    LocalDecide _ d -> decideGloss d
+    LocalAssume _ _ -> []
+
+-- | Docassemble lower-cases and whitespace-collapses every @auto terms@ key
+-- (@parse.py:2905@), so two L4 names differing only in case would collide into
+-- one YAML mapping entry: the first spelling wins, deterministically.
+dedupOnTerm :: [(Text, Text)] -> [(Text, Text)]
+dedupOnTerm = go Set.empty
+ where
+  go _ [] = []
+  go seen ((term, defn) : rest)
+    | key `Set.member` seen = go seen rest
+    | otherwise             = (term, defn) : go (Set.insert key seen) rest
+   where
+    key = Text.toLower (Text.unwords (Text.words term))
+
+-- | Citations attached to an /expression/ rather than to a definition. Those
+-- are the refs this backend cannot carry: an expression is not a @code:@ block,
+-- so there is nothing to hang an @explain()@ call on. Reported, not dropped in
+-- silence.
+exprRefs :: Expr Resolved -> [Text]
+exprRefs =
+  foldMapOf (cosmosOf (gplate @(Expr Resolved))) \e ->
+    mapMaybe citationText (refsOf [getAnno e])
 
 collectAssumes :: Module Resolved -> Map Unique (Assume Resolved)
 collectAssumes (MkModule _ _ section) = Map.fromList (goSection section)
@@ -360,17 +485,31 @@ lowerModule mod' =
                -- collision (two L4 names sanitising to one variable) is
                -- reported as such, not as an internal id collision.
                checkNameCollisions blocks0
-               blocks <- dedupById blocks0
-               let inertFound = any exprHasInert allBodies
+               blocks1 <- dedupById blocks0
+               -- M2: a verdict screen renders `logic_explanation()` exactly
+               -- when something in the module actually calls `explain()`.
+               -- Deciding it here, over the finished list, is the only place
+               -- that can see the helper blocks as well as the export's own.
+               let cited = any (\case DACodeBlock c -> isJust c.cCite; _ -> False) blocks1
+                   blocks =
+                     [ case b of
+                         DAScreenBlock s -> DAScreenBlock s { sCites = cited }
+                         other           -> other
+                     | b <- blocks1 ]
+                   inertFound = any exprHasInert allBodies
+                   droppedRefs = nubOrd (concatMap exprRefs allBodies)
                    report = MkFidelityReport
                      { target = "docassemble"
-                     , notes  = skipNotes <> moduleNotes (moduleSource mod') inertFound blocks
+                     , notes  = skipNotes
+                                  <> moduleNotes (moduleSource mod') inertFound blocks
+                                  <> refNotes (moduleSource mod') droppedRefs
                      }
                Right
                  ( MkDAPackage
                      { pkgSource = moduleSource mod'
                      , pkgTitle  = moduleTitleOf mod'
                      , pkgBlocks = blocks
+                     , pkgGloss  = ctx.ctxGloss
                      , pkgPlan   = Nothing
                      }
                  , report
@@ -441,6 +580,21 @@ moduleNotes src inertFound blocks =
   maybeStrs  = [ q.qVar | q <- questions, q.qControl == CtlTextOptional ]
   anyNumeric = any (\q -> q.qControl == CtlNumber) questions
             || any (bodyHasNumeric . (.cBody)) codes
+
+-- | M2: a @\@ref@ that sits on an /expression/ has no @code:@ block to hang an
+-- @explain()@ call on, so its citation never reaches a screen. Reported rather
+-- than dropped in silence — put the citation on the definition instead.
+refNotes :: Text -> [Text] -> [FidelityNote]
+refNotes src dropped =
+  [ MkFidelityNote
+      { code = "DA-REF-EXPR", severity = Advisory, element = src, range = Nothing
+      , message = "these @ref citations are attached to an expression rather than to a \
+                  \definition, so no `code:` block carries them: "
+                    <> Text.intercalate "; " dropped
+      , lost = "the citation does not reach the verdict screen — move the @ref onto the \
+               \DECIDE or WHERE binding it justifies"
+      }
+  | not (null dropped) ]
 
 bodyHasNumeric :: DACodeBody -> Bool
 bodyHasNumeric = \case
@@ -522,7 +676,7 @@ lowerHelperTop _ctx env td = hardLF td.tdL4 do
   let env1 = env { envInlineStack = [td.tdU] }
   (env2, pcs, inner) <- processBindings env1 td.tdSan td.tdBody
   cb <- lowerTopBody env2 inner
-  pure (map pcToCode pcs <> [mkCode td.tdSan (Just td.tdL4) cb])
+  pure (map pcToCode pcs <> [mkCode td.tdAnns.defRef td.tdSan (Just td.tdL4) cb])
 
 -- ---------------------------------------------------------------------------
 -- Exported decisions
@@ -556,6 +710,10 @@ lowerExport ctx baseEnv ef =
   MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes _ _) body0 =
     ef.exportDecide
   goalSan = pyIdent fnL4
+  -- An export's own `@ref` attaches to the TopDecl node, which
+  -- 'ExportedFunction' does not carry, so it is read back off the module scan.
+  exportCite =
+    maybe Nothing (.tdAnns.defRef) (Map.lookup (getUnique fnRes) ctx.ctxTopByU)
 
   -- The default export drives the interview: skipping it would leave the
   -- interview without an endpoint, so a blocked default is a hard error.
@@ -601,9 +759,13 @@ lowerExport ctx baseEnv ef =
             evC = goalSan <> "_screen_complies"
             evI = goalSan <> "_screen_in_breach"
             evN = goalSan <> "_screen_not_applicable"
+            -- The rule's own citation rides on the SCOPE block: the rule
+            -- fired — it was decided whether it applies — as soon as scope is
+            -- known, and on the NotApplicable path the requirement block never
+            -- runs at all.
             codes =
-              [ mkCode scopeV (Just (fnL4 <> " — scope"))       sb
-              , mkCode reqV   (Just (fnL4 <> " — requirement")) qb
+              [ mkCode exportCite scopeV (Just (fnL4 <> " — scope"))       sb
+              , mkCode Nothing    reqV   (Just (fnL4 <> " — requirement")) qb
               ]
         pure $ if ef.exportIsDefault
           then ( codes
@@ -620,7 +782,7 @@ lowerExport ctx baseEnv ef =
             gb <- lowerTopBody envB inner
             let evH = goalSan <> "_screen_holds"
                 evF = goalSan <> "_screen_fails"
-                codes = [mkCode goalSan (Just fnL4) gb]
+                codes = [mkCode exportCite goalSan (Just fnL4) gb]
             pure $ if ef.exportIsDefault
               then ( codes
                    , Just (DABoolDriver ("driver_" <> goalSan) fnL4 goalSan evH evF)
@@ -633,7 +795,7 @@ lowerExport ctx baseEnv ef =
         | otherwise -> do
             gb <- lowerTopBody envB inner
             let evR = goalSan <> "_screen_result"
-                codes = [mkCode goalSan (Just fnL4) gb]
+                codes = [mkCode exportCite goalSan (Just fnL4) gb]
             pure $ if ef.exportIsDefault
               then ( codes
                    , Just (DAValueDriver ("driver_" <> goalSan) fnL4 goalSan evR)
@@ -654,6 +816,10 @@ mkScreen :: Text -> Text -> Maybe Text -> Text -> Text -> Maybe Text -> DAScreen
 mkScreen ev goalL4 dsc verdict explain showVar = MkDAScreen
   { sId = "ev_" <> ev, sEvent = ev, sGoalL4 = goalL4
   , sDesc = dsc, sVerdict = verdict, sExplain = explain, sShowVar = showVar
+  -- Flipped once, in 'lowerModule', when the finished block list is known to
+  -- carry at least one citation: a screen cannot see the helper blocks from
+  -- here, and a module with no `@ref` keeps its v1 screen byte for byte.
+  , sCites = False
   }
 
 -- ---------------------------------------------------------------------------
@@ -710,7 +876,8 @@ lowerRecordFields ctx env visited path rs = do
         (subCodes, subQs) <- lowerRecordFields ctx env (ru : visited) attrVar rs'
         let initCode = MkDACode
               { cId = "c_" <> attrVar, cVar = attrVar
-              , cL4 = Just f.fsL4, cBody = DAInstantiate "DAObject", cDeps = [] }
+              , cL4 = Just f.fsL4, cBody = DAInstantiate "DAObject", cDeps = []
+              , cCite = Nothing }
         pure (initCode : subCodes, subQs)
       _ -> do
         ctl  <- controlOf kind f.fsL4
@@ -808,10 +975,12 @@ data PendingCode = MkPendingCode
   { pcVar  :: !Text
   , pcL4   :: !Text
   , pcBody :: !DACodeBody
+  , pcCite :: !(Maybe Text)   -- ^ this binding's own @\@ref@ citation (M2)
   }
 
 data BindEntry
-  = BindVar !Unique !Text !Text !(Expr Resolved)      -- ^ unique, L4 name, variable, body
+  = BindVar !Unique !Text !Text !DefAnns !(Expr Resolved)
+    -- ^ unique, L4 name, variable, its own annotations, body
   | BindFun !Unique !Text ![Unique] !(Expr Resolved)  -- ^ unique, L4 name, params, body
 
 -- | Peel @WHERE@/@LET@ layers off the top of a definition body. Every
@@ -833,35 +1002,35 @@ processBindings env prefix expr0 = case expr0 of
     pure (env2, pcs <> morePcs, inner')
 
   classifyDecl = \case
-    LocalDecide _ d ->
+    LocalDecide localAnn d ->
       let (ps, b) = decideFunShape d
           nm      = resolvedToText (decideName d)
           u       = getUnique (decideName d)
       in Right $ if null ps
-           then BindVar u nm (prefix <> "_" <> pyIdent nm) b
+           then BindVar u nm (prefix <> "_" <> pyIdent nm) (decideAnns localAnn d) b
            else BindFun u nm (map getUnique ps) b
     LocalAssume _ a ->
       Left (LFFatal ("local ASSUME `" <> assumeName a
                       <> "` in WHERE is not supported in v1 — declare it at module level or pass it as a GIVEN"))
 
   extendEnv envAcc = \case
-    BindVar u _ var _  -> envAcc { envVars = Map.insert u var envAcc.envVars }
-    BindFun u _ ps b   -> envAcc { envFuns = Map.insert u (MkInlineFun u ps b) envAcc.envFuns }
+    BindVar u _ var _ _ -> envAcc { envVars = Map.insert u var envAcc.envVars }
+    BindFun u _ ps b    -> envAcc { envFuns = Map.insert u (MkInlineFun u ps b) envAcc.envFuns }
 
   lowerBinding env1 = \case
     BindFun {} -> Right []  -- inlined at each application site (R3)
-    BindVar _ nm var b -> do
+    BindVar _ nm var anns b -> do
       (env2, subPcs, innerB) <- processBindings env1 var b
       cb <- lowerTopBody env2 innerB
-      pure (subPcs <> [MkPendingCode var nm cb])
+      pure (subPcs <> [MkPendingCode var nm cb anns.defRef])
 
 pcToCode :: PendingCode -> DACode
-pcToCode pc = mkCode pc.pcVar (Just pc.pcL4) pc.pcBody
+pcToCode pc = mkCode pc.pcCite pc.pcVar (Just pc.pcL4) pc.pcBody
 
-mkCode :: Text -> Maybe Text -> DACodeBody -> DACode
-mkCode var mL4 cb = MkDACode
+mkCode :: Maybe Text -> Text -> Maybe Text -> DACodeBody -> DACode
+mkCode cite var mL4 cb = MkDACode
   { cId = "c_" <> var, cVar = var, cL4 = mL4
-  , cBody = cb, cDeps = nubOrd (bodyVars cb) }
+  , cBody = cb, cDeps = nubOrd (bodyVars cb), cCite = cite }
 
 bodyVars :: DACodeBody -> [Text]
 bodyVars = \case

@@ -28,6 +28,8 @@
 --      @initial:@; every directive block carries @question:@.
 module L4.Docassemble.Emit
   ( renderPackage
+  , renderPackageTree
+  , packageSlug
   , escapeL4
   , emitterKeyVocabulary
   , daRecognisedKeys
@@ -35,6 +37,7 @@ module L4.Docassemble.Emit
   ) where
 
 import Base
+import Data.Char (isAlphaNum, isAscii, toLower)
 import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -42,10 +45,27 @@ import qualified Data.Text as Text
 import L4.Docassemble.IR
 
 renderPackage :: DAPackage -> Text
-renderPackage pkg =
-  Text.unlines (intercalate ["---"] (firstBlock : featuresBlocks <> map blockLines pkg.pkgBlocks))
+renderPackage = renderInterview []
+
+-- | The interview, optionally preceded by extra top-level blocks the caller
+-- supplies (M2 uses this for the package tree's @modules:@ block, which must
+-- NOT appear in the bare artifact: a bare YAML has no package for @.l4runtime@
+-- to resolve against, and @from … import *@ of a missing module aborts
+-- assembly).
+renderInterview :: [[Text]] -> DAPackage -> Text
+renderInterview extraBlocks pkg =
+  Text.unlines
+    ( intercalate ["---"]
+        ( firstBlock
+            : extraBlocks
+           <> glossaryBlocks
+           <> featuresBlocks
+           <> map blockLines pkg.pkgBlocks ) )
  where
   firstBlock = headerLines pkg <> metadataLines pkg
+  glossaryBlocks
+    | null pkg.pkgGloss = []
+    | otherwise         = [glossaryLines pkg.pkgGloss]
   -- R9.10: emit interview-scale guards when the generated graph could
   -- plausibly approach docassemble's defaults of 500 (parse.py:7942).
   featuresBlocks
@@ -77,6 +97,28 @@ metadataLines pkg =
   [ "metadata:"
   , "  title: " <> yamlStr (escapeL4 pkg.pkgTitle)
   ]
+
+-- | The @auto terms:@ glossary (M2). Docassemble reads @auto terms@ ONLY from a
+-- block that carries no @question@ key —
+-- @if \'auto terms\' in data and \'question\' not in data@,
+-- @parse.py:2878@ at 1b6678384 — so a glossary emitted inside a question block
+-- is silently ignored. This block therefore stands alone.
+--
+-- Docassemble lower-cases and whitespace-collapses each key
+-- (@parse.py:2905-2907@) and compiles it into a case-insensitive
+-- @(?i){?\\b(term)\\b}?@ that auto-links the phrase wherever it appears in
+-- prose, so the L4 term survives as the user-facing vocabulary. Both halves go
+-- through 'escapeL4': each is handed to a 'TextObject' at parse time
+-- (@parse.py:2906,2908@), and an unclosed @\<%@ in a @\@desc@ would otherwise
+-- fail the whole interview before any question is asked.
+glossaryLines :: [(Text, Text)] -> [Text]
+glossaryLines entries =
+     [ "id: auto_terms_main"
+     , "auto terms:"
+     ]
+  <> [ "  " <> yamlStr (escapeL4 term) <> ": " <> yamlStr (escapeL4 defn)
+     | (term, defn) <- entries
+     ]
 
 blockLines :: DABlock -> [Text]
 blockLines = \case
@@ -148,13 +190,30 @@ codeLines c =
      ]
  where
   commentL = [ "# L4: `" <> escapeL4 l4 <> "`" | Just l4 <- [c.cL4] ]
-  pyBody = case c.cBody of
+  pyBody = assignment <> citeLines
+  assignment = case c.cBody of
     DAAssign e -> [ c.cVar <> " = " <> renderPyExpr e ]
     DAIfChain arms d -> chainLines c.cVar arms d
     DAInstantiate cls ->
       -- instanceName passed explicitly: docassemble otherwise sniffs the
       -- caller's bytecode to recover it, which generated code defeats (R2).
       [ c.cVar <> " = " <> cls <> "(" <> pyStr c.cVar <> ")" ]
+  -- M2. `explain` is a docassemble.base.util function, auto-exec'd into every
+  -- interview dict unless a `modules:` block names `docassemble.base.util`
+  -- itself (parse.py:2765-2767, 8523-8524), which this emitter never does — so
+  -- no import is needed. It append-if-absents to
+  -- `_internal['explanations']['default']` (util.py:13227), which
+  -- `logic_explanation()` reads back (util.py:13259).
+  --
+  -- The call sits AFTER the assignment on purpose: a code block whose
+  -- assignment raises on an undefined input has decided nothing, and
+  -- docassemble re-runs the whole block once the input arrives. Citing before
+  -- the assignment would record a rule that had not yet fired.
+  --
+  -- The citation is a Python string literal, not Mako: `code:` blocks are
+  -- compiled and exec'd (parse.py:3706), never Mako-rendered, so a citation
+  -- beginning with `%` or carrying a literal `${ … }` rides through verbatim.
+  citeLines = [ "explain(" <> pyStr cite <> ")" | Just cite <- [c.cCite] ]
   depsLines
     | null c.cDeps = []
     | otherwise    = "depends on:" : [ "  - " <> dep | dep <- c.cDeps ]
@@ -236,6 +295,24 @@ screenLines s =
        maybe "" (\d -> escapeL4 d <> "\n\n") s.sDesc
     <> s.sExplain
     <> maybe "" (\v -> "\n\n**${ " <> v <> " }**") s.sShowVar
+    <> citationSection
+  -- M2. The docassemble house pattern, copied from the canonical exhibit
+  -- `docassemble_demo/…/examples/explain.yml` at 1b6678384: a Mako `% for`
+  -- over `logic_explanation()`. The control line is legal here because
+  -- 'blockScalar' indents every line by exactly two spaces and YAML strips
+  -- that indentation, so Mako sees `% for` in column 1.
+  --
+  -- Rendering rather than inlining is also what makes the R9.1 escaping claim
+  -- honest for citations: the citation text is interpolated into the output
+  -- stream at render time and is never re-read as Mako, so a `%`-leading or
+  -- `${ … }`-bearing citation reaches the screen verbatim.
+  citationSection
+    | s.sCites =
+        "\n\nWhy this answer — the rules that actually decided it:\n\n\
+        \% for citation in logic_explanation():\n\
+        \* ${ citation }\n\
+        \% endfor"
+    | otherwise = ""
 
 -- ---------------------------------------------------------------------------
 -- Escaping (R9.1) and scalar rendering
@@ -384,6 +461,193 @@ tshow :: Show a => a -> Text
 tshow = Text.pack . show
 
 -- ---------------------------------------------------------------------------
+-- The installable package tree (R11, M2)
+-- ---------------------------------------------------------------------------
+
+-- | The directory (and Python module) name of the generated package, minus the
+-- @l4@ prefix: the source file's stem, lower-cased and reduced to ASCII
+-- alphanumerics.
+--
+-- Both obvious sources for this string are unusable, and both were measured:
+-- @DAPackage.pkgSource@ is a percent-encoded URI segment (@2024 Café Rules
+-- v2.1.l4@ arrives as @2024%20Caf%C3%A9%20Rules%20v2.1.l4@) and the lowerer's
+-- @pyIdent@ keeps non-ASCII letters (@café münze 2024@ sanitises to
+-- @café_münze_2024@). Neither is a usable on-disk Python package name, so the
+-- slug is taken from the file's own basename and hard-filtered here.
+--
+-- Total: an all-punctuation stem yields @module@, and the result is capped so
+-- a pathological filename cannot produce a pathological directory name.
+packageSlug :: Text -> Text
+packageSlug base =
+  let stem    = fromMaybe base (Text.stripSuffix ".l4" base)
+      reduced = Text.filter (\c -> isAscii c && isAlphaNum c) (Text.map toLower stem)
+  in if Text.null reduced then "module" else Text.take 48 reduced
+
+-- | Lay out the PEP 420 package tree for a lowered interview.
+--
+-- The exemplar is @docassemble_demo/@ at the 1.10.7 pin: @pyproject.toml@ with
+-- @[tool.setuptools.packages.find] where = [\".\"]@, a @MANIFEST.in@ that
+-- @graft@s the data directory, an @__init__.py@ inside the generated package —
+-- and none at @docassemble/@, because setuptools' pyproject path defaults to
+-- PEP 420 namespace finding
+-- (@git ls-tree -r 1b6678384 docassemble_demo/ | grep -c
+-- \'docassemble_demo/docassemble/__init__.py\'@ ⇒ 0).
+--
+-- The first argument is the source file's basename as the user spelled it
+-- (@citations.l4@), which is the provenance recorded in the generated files;
+-- the on-disk copy is renamed to @\<slug\>.l4@ so no space or non-ASCII
+-- character rides into a Python package.
+renderPackageTree :: Text -> DAPackage -> DAPackageTree
+renderPackageTree srcBase pkg = MkDAPackageTree
+  { ptDistName   = distName
+  , ptFiles =
+      [ MkDAFile ["pyproject.toml"] (Text.unlines (pyprojectLines srcBase distName inner))
+      , MkDAFile ["MANIFEST.in"]    (Text.unlines (manifestLines inner fidelityName))
+      , MkDAFile (inner <> ["__init__.py"]) (Text.unlines initLines)
+      , MkDAFile (inner <> ["l4runtime.py"])
+          (Text.unlines (runtimeLines srcBase distName slug))
+      , MkDAFile (inner <> ["data", "questions", slug <> ".yml"])
+          (renderInterview [modulesLines] pkg)
+      ]
+  , ptSourceCopy = inner <> ["data", "sources", slug <> ".l4"]
+  -- The fidelity report sits at the package root under the `-o FILE` sidecar
+  -- convention (same stem, `.fidelity.txt`) rather than inside `data/`:
+  -- `data/sources` holds the encoding, and the report is documentation OF the
+  -- compilation, not interview data. `MANIFEST.in` includes it so it ships.
+  , ptFidelity   = [fidelityName]
+  }
+ where
+  slug         = packageSlug srcBase
+  distName     = "docassemble.l4" <> slug
+  inner        = ["docassemble", "l4" <> slug]
+  fidelityName = slug <> ".fidelity.txt"
+
+-- | R11: the runtime module is a /sibling/ of @data\/@, loaded as
+-- @.l4runtime@. The leading dot is package-name concatenation, one level only:
+-- docassemble execs @from \<question.package\>.l4runtime import *@
+-- (@parse.py:8569-8573@ at 1b6678384).
+--
+-- This block is emitted into the packaged interview ONLY. Naming
+-- @docassemble.base.util@ or @docassemble.base.legal@ here would suppress the
+-- automatic @from docassemble.base.util import *@ (@parse.py:2765-2767@ read
+-- at @:8523@) and take @explain@, @DAObject@ and every other builtin with it —
+-- which is why the module list holds exactly one relative name.
+modulesLines :: [Text]
+modulesLines =
+  [ "id: modules_main"
+  , "modules:"
+  , "  - .l4runtime"
+  ]
+
+pyprojectLines :: Text -> Text -> [Text] -> [Text]
+pyprojectLines srcBase distName inner =
+  [ "# Generated by `l4 docassemble --package` from `" <> srcBase <> "`."
+  , "# Do not edit by hand; regenerate from the L4 source instead."
+  , "# Shape: the modern PEP 420 package, exemplar docassemble_demo/pyproject.toml"
+  , "# at docassemble 1.10.7 (checkout commit 1b6678384)."
+  , ""
+  , "[build-system]"
+  , "requires = [\"setuptools >= 61.0\"]"
+  , "build-backend = \"setuptools.build_meta\""
+  , ""
+  , "[project]"
+  , "name = " <> tomlStr distName
+  , "version = \"0.0.1\""
+  , "description = " <> tomlStr ("docassemble interview compiled from the L4 module `" <> srcBase <> "`")
+  -- PEP 639 wants an SPDX expression, and docassemble has required one of
+  -- Playground packages since 1.8.0. This package carries the USER's rules,
+  -- whose licence the compiler cannot know, so it emits a LicenseRef- custom
+  -- identifier — valid SPDX, and unmistakably a placeholder — rather than
+  -- asserting a licence over someone else's law.
+  , "# Replace this with the SPDX expression that governs your own rules."
+  , "license = \"LicenseRef-UNSPECIFIED\""
+  , "requires-python = \">= 3.12\"   # docassemble_base/pyproject.toml:14 at 1b6678384"
+  , "dependencies = ["
+  , "  \"docassemble.base >= 1.10.0\","
+  , "]"
+  , ""
+  , "[tool.setuptools.packages.find]"
+  , "where = [\".\"]"
+  , "# No docassemble/__init__.py is emitted: with this pyproject shape"
+  , "# setuptools uses PEP 420 namespace finding, and a namespace __init__.py"
+  , "# would shadow the installed docassemble.base."
+  , "# Generated package directory: " <> Text.intercalate "/" inner
+  ]
+
+manifestLines :: [Text] -> Text -> [Text]
+manifestLines inner fidelityName =
+  [ "# Generated by `l4 docassemble --package`; do not edit by hand."
+  , "graft " <> Text.intercalate "/" inner <> "/data"
+  , "include " <> fidelityName
+  , "recursive-exclude * __pycache__"
+  , "recursive-exclude * *.py[co]"
+  ]
+
+-- | Copied in shape from @docassemble_demo/docassemble/demo/__init__.py@ at
+-- 1b6678384, whose entire contents are the comment and the version.
+initLines :: [Text]
+initLines =
+  [ "# do not pre-load"
+  , "__version__ = \"0.0.1\""
+  ]
+
+-- | The generated runtime module. It deliberately defines no interview
+-- variable and no helper the emitted @code:@ blocks call: the bare artifact and
+-- the packaged artifact must mean the same thing, so anything the interview
+-- /needs/ would have to work bare too. What it does carry is provenance the
+-- interview can show about itself, under an explicit @__all__@ so
+-- @modules:@' @import *@ cannot collide with an interview variable.
+runtimeLines :: Text -> Text -> Text -> [Text]
+runtimeLines srcBase distName slug =
+  [ "\"\"\"Runtime module for " <> distName <> ", generated by `l4 docassemble --package`."
+  , ""
+  , "Loaded by the interview's `modules:` block as `.l4runtime`, which"
+  , "docassemble execs as `from " <> distName <> ".l4runtime import *`"
+  , "(parse.py:8569-8573 at 1b6678384)."
+  , ""
+  , "Do not edit by hand; regenerate from the L4 source instead."
+  , "\"\"\""
+  , ""
+  , "import os"
+  , ""
+  , "__all__ = ["
+  , "    'L4_SOURCE_NAME',"
+  , "    'L4_PACKAGE_NAME',"
+  , "    'L4_GENERATOR',"
+  , "    'L4_DOCASSEMBLE_PIN',"
+  , "    'l4_source_path',"
+  , "    'l4_source_text',"
+  , "]"
+  , ""
+  , "#: the L4 source file this interview was compiled from, as the author spelled it"
+  , "L4_SOURCE_NAME = " <> pyStr srcBase
+  , "L4_PACKAGE_NAME = " <> pyStr distName
+  , "L4_GENERATOR = 'l4 docassemble --package'"
+  , "L4_DOCASSEMBLE_PIN = '1.10.7'"
+  , ""
+  , ""
+  , "def l4_source_path():"
+  , "    \"\"\"Absolute path of the embedded L4 source (provenance travels with the package).\"\"\""
+  , "    return os.path.join(os.path.dirname(os.path.abspath(__file__)),"
+  , "                        'data', 'sources', " <> pyStr (slug <> ".l4") <> ")"
+  , ""
+  , ""
+  , "def l4_source_text():"
+  , "    \"\"\"The embedded L4 source, verbatim.\"\"\""
+  , "    with open(l4_source_path(), encoding='utf-8') as handle:"
+  , "        return handle.read()"
+  ]
+
+-- | A TOML basic string.
+tomlStr :: Text -> Text
+tomlStr t = "\"" <> Text.concatMap esc t <> "\""
+ where
+  esc '"'  = "\\\""
+  esc '\\' = "\\\\"
+  esc '\n' = "\\n"
+  esc ch   = Text.singleton ch
+
+-- ---------------------------------------------------------------------------
 -- Vocabulary self-validation (R9.5)
 -- ---------------------------------------------------------------------------
 
@@ -395,8 +659,9 @@ tshow = Text.pack . show
 emitterKeyVocabulary :: [Text]
 emitterKeyVocabulary =
   -- top-level block keys
-  [ "code", "depends on", "event", "features", "fields", "id", "mandatory"
-  , "metadata", "objects", "question", "sets", "subquestion"
+  [ "auto terms", "code", "depends on", "event", "features", "fields", "id"
+  , "mandatory", "metadata", "modules", "objects", "question", "sets"
+  , "subquestion"
   -- field modifiers
   , "choices", "datatype", "default", "help", "required"
   ]
