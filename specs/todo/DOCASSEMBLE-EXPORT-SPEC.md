@@ -1,13 +1,18 @@
 # L4 → Docassemble: interview export and transpiler spec
 
-_Status: **M1 implemented.** Designed 2026-08-16 on branch `mengwong/docassemble-bridge`;
-M1 (the static core, §10) landed the same day on branch `mengwong/docassemble-backend`: the
-`L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core plus the `l4 docassemble` CLI verb in
-jl4, mirroring the shipped OpenFisca backend. Verified by the golden + refusal tests under
-`describe "l4 docassemble"` in `jl4/tests-cli/Main.hs`, and by the R10 headless round-trip: all
-eleven `#EVAL` cases of the four examples under `jl4/examples/docassemble/` ran green against
-`docassemble.base` 1.10.7 (checkout `1b6678384`) in-process. M2 (installable package, `@ref`
-citations), M3 (embedded plan) and M4 (breadth) remain unimplemented._
+_Status: **M1 implemented, review-repaired.** Designed 2026-08-16 on branch
+`mengwong/docassemble-bridge`; M1 (the static core, §10) landed the same day on branch
+`mengwong/docassemble-backend`: the `L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core
+plus the `l4 docassemble` CLI verb in jl4, mirroring the shipped OpenFisca backend. A same-day
+review pass repaired five executed-and-confirmed defects (DAObject-namespace attribute
+shadowing; ASSUME/seam-guard reference collection missing inlined-function bodies; the dead
+computed-field pathway; `WHEN JUST TRUE` mis-read as a binder; non-self-triggering Mako
+escapes) — the repair notes live in the §8 sections they belong to. Verified by the golden +
+refusal tests under `describe "l4 docassemble"` in `jl4/tests-cli/Main.hs`, and by the R10
+headless round-trip: all sixteen fixture cases of the six examples under
+`jl4/examples/docassemble/` ran green against `docassemble.base` 1.10.7 (checkout `1b6678384`)
+in-process. M2 (installable package, `@ref` citations), M3 (embedded plan) and M4 (breadth)
+remain unimplemented._
 
 **One-line summary.** Docassemble discovers evaluation order at runtime by backchaining on
 undefined variables — the same "what do we still need to ask?" question L4's query planner
@@ -224,7 +229,7 @@ recognise the same program.
 | `@export` `DECIDE`/`MEANS` (boolean or numeric goal)     | goal variable defined by a `code:` block; the default function drives the single `mandatory` block                                                                                                           | clean                                |
 | `GIVEN p IS A <Record>`                                  | `objects:` instance of a generated `DAObject` subclass                                                                                                                                                       | clean, R2                            |
 | stored record field                                      | one `question:` block per field (`generic object` style), label = backticked L4 name, help = `@desc`                                                                                                         | clean, R2                            |
-| computed (`MEANS`) record field                          | `code:` block on the attribute                                                                                                                                                                               | clean                                |
+| computed (`MEANS`) record field                          | inlined at each projection site — desugar strips `MEANS` fields pre-typecheck into synthesized selector decides, so there is no field left to hang an attribute `code:` block on (M2 may restore one), §8.2  | clean (inlined), R2                  |
 | `WHERE`/`LET` binding, zero-`GIVEN`                      | one namespaced `code:` block each                                                                                                                                                                            | clean, R3                            |
 | `WHERE` binding with `GIVEN`s (local function)           | Python function in the generated module, called from `code:` blocks                                                                                                                                          | clean, R3                            |
 | non-exported top-level `DECIDE` reachable from an export | `code:` block (no `@export` needed for helpers, unlike OpenFisca's cross-entity contract)                                                                                                                    | clean, R3                            |
@@ -376,6 +381,30 @@ narrowed form: the R10 harness shows per-field demand-driven asking — the `def
 promo-code question is never asked on the short-circuited path, and the seam example's
 requirement questions are never asked on the NotApplicable path.
 
+**Repair notes (2026-08-16 review pass).** Two more mechanical contracts, both found by
+executed probes:
+
+1. **Generated attribute names must stay out of the `DAObject` namespace.** An attribute whose
+   sanitised name matches a DAObject method or `__init__`-set instance attribute is _never
+   sought_: normal lookup finds the pre-existing (truthy) member, `__getattr__` never raises,
+   docassemble never backchains to the emitted question, and the bound method rides into the
+   boolean expression as `True` — a silent wrong verdict, executed with a field named
+   `alternative` (live legal vocabulary: suitable alternative accommodation). The lowering
+   suffixes such names (`alternative` → `alternative_`; label unchanged) against a vendored
+   83-name set, `dir(DAObject) ∪ vars(DAObject('x'))` probed at the 1.10.7 pin
+   (`daObjectReserved`, `Lower.hs`). `pyReserved` guards only top-level names; attribute
+   positions need this set.
+2. **Computed (`MEANS`) fields lower by inlining, not by attribute `code:` blocks.** The
+   desugarer (`Desugar.hs` `desugarComputedFields`) strips `MEANS` fields out of the
+   `RecordDecl` _before_ type checking and synthesizes a top-level selector decide
+   (`f _self MEANS …`) per field, so in a `Module Resolved` the record has no computed fields
+   left — the originally-planned per-field `code:` block pathway was dead code, and a
+   projection onto a computed field refused with the false diagnostic "record has no field".
+   The repair inlines the synthesized selector at each projection site (it is a parameterized
+   top decide, so the R3 inlining machinery applies, recursion guard included). The proposal's
+   "each computed field yields a `code:` block" is narrowed accordingly for M1; M2's module
+   emission is the natural point to revisit a named attribute block.
+
 ### 8.3 R3 — survival: every reachable decision becomes a named `code:` block
 
 **Evidence.** `Where` bindings are full `Decide`s (`Syntax.hs:257,452-454`) **[E]**. OpenFisca
@@ -397,6 +426,19 @@ the verdict screen: the L4 structure survives at runtime, not just in the source
 **Cost.** Name length; a prefix scheme that must stay deterministic across recompiles (ties
 into R9's `id:` stability). **What would close it:** the rodents golden showing five `code:`
 blocks whose names and labels round-trip the five `WHERE` bindings.
+
+**Repair note (2026-08-16 review pass).** Reachability must be computed over the closure of
+_all_ reachable top-level bodies — including parameterized decides, which survive by inlining
+rather than as blocks of their own. M1 as first landed collected references from export bodies
+plus zero-parameter helper bodies only, with two executed consequences: an `ASSUME` referenced
+only through an inlined function got no question block (the emitted code referenced `base_rate`,
+nothing defined it, and assembly raised `DAErrorMissingVariable` at runtime with no
+compile-time diagnostic), and the R4 dangling-seam-goal guard (§8.4) missed a reference that
+travelled through an inlined function, emitting the exact dangle it exists to refuse. One fix
+serves both: `allRefs` is now the union over export bodies plus every reachable top-decide
+body (`Lower.hs` `reachBodies`), and reference collection also walks projection heads so
+computed-field selectors (§8.2) count as callees. Pinned by `assume-via-fn.l4` (golden +
+round-trip) and `not-ok/seam-ref-via-fn.l4`.
 
 ### 8.4 R4 — the verdict seam: never emit `NOT scope OR requirement` as the driver
 
@@ -478,11 +520,21 @@ grammar, per the `descKeyword` convention **[E]**.
 Three server-side coercion facts bound this ruling (all **[E via survey]**, in
 `docassemble_webapp/.../interview/views.py:1334-1470`): `currency` coerces through `float()` —
 never emit it for exact-decimal money semantics; an _empty_ integer submits as `0` and an empty
-number as `0.0`, never `None`; an empty date submits as `''`. Choice keys arrive as the verbatim
-strings written (`parse.py:7661-7713`), but a choice list whose keys are _all_ YAML booleans is
-silently retyped boolean (`parse.py:7725-7756`) — emit type-homogeneous string choices. And a
-`default:` without `datatype:` infers the field's type from the default's Python type
-(`parse.py:4107-4108`) — always emit both together.
+number as `0.0`, never `None`; an empty date submits as `''`. Choice keys are parsed into
+`TextObject`s (`parse.py:7661-7713`) and **Mako-rendered at assemble time**
+(`parse.py:6213/6230`, `item['key'].text(user_dict)`); the value the browser posts — and the
+interview stores — is the _rendered_ key. (A 2026-08-16 correction: this spec originally said
+choice keys "arrive as the verbatim strings written", reading the parse-time site only; the
+render site governs the stored value. Consequence: `escapeL4`-escaped choice values and the
+raw-constructor-name `==` comparisons in emitted code agree by construction, because every
+escape renders back to the verbatim text — probed end-to-end with a `${`-bearing constructor
+name, whose rendered choice value came back as the raw name and drove the right `CONSIDER`
+arm.) A choice list whose keys' _original texts_ are all YAML booleans is silently retyped
+boolean (`parse.py:7725-7756`, testing `original_text`) — emit type-homogeneous string
+choices. And a `default:` without `datatype:` infers the field's type from the default's
+Python type (`parse.py:4107-4108`) — always emit both together; `default:` values are
+`TextObject`s too (`parse.py:4096-4098`), so the same escape-then-render round-trip keeps
+them equal to the rendered choice values.
 
 **What would close it:** the enum golden plus an R10 run where a `CONSIDER` over a 3-way enum
 asks one radio question and takes the right arm.
@@ -515,6 +567,15 @@ expressions lower only where the source pattern-matches on presence; else refuse
 **What would close it:** goldens for the boolean and string cases exercising present and
 absent paths under R10, and one not-ok fixture for `MAYBE NUMBER`.
 
+**Repair note (2026-08-16 review pass).** The presence match accepts a `JUST` payload pattern
+only when it is a _binder_. Post-typecheck a binder is always `PatVar` (the scope checker
+rewrites out-of-scope nullary `PatApp`s to `PatVar`, `TypeCheck.hs` `inferPattern`), so a
+nullary `PatApp` payload can only be a genuine constructor pattern — `WHEN JUST TRUE` — which
+is a match on the payload _value_ that presence erasure cannot express. M1 as first landed
+matched `PatApp _ v []` as if it were a binder, silently degrading `WHEN JUST TRUE` to a mere
+presence test (`is None`), reporting TRUE for `JUST FALSE`. Now refused by name; pinned by
+`not-ok/just-payload-pattern.l4`.
+
 ### 8.9 R9 — emission hygiene (the silent-YAML defence)
 
 Bundled because they are all "docassemble will not tell you" facts, each verified at the
@@ -525,9 +586,15 @@ cited line:
 2. **Explicit `sets:`** on code blocks whose definitions docassemble's AST scan might misread;
    never rely on inference for generated code.
 3. **`depends on:`** on every derived block (stale-value trap, §2).
-4. **`id:`** on every block, deterministic from the sanitised variable name in v1, switching to
-   the UUIDv5 atom identity in M3 so ids are stable across recompiles _and_ joinable to the
-   plan.
+4. **`id:`** on every block, deterministic from the sanitised variable name in v1 — the
+   variable name rides into the id _verbatim_ (dots included; docassemble ids are free-form
+   strings), so distinct variables can never collide on id — switching to the UUIDv5 atom
+   identity in M3 so ids are stable across recompiles _and_ joinable to the plan. One
+   documented exception (2026-08-16, proven by the round-trip harness): a `metadata:` block
+   admits ONLY `metadata` and `comment` keys — any other key, `id:` included, is a hard
+   `DASourceError` ("A metadata directive cannot be mixed with other directives",
+   `parse.py:2748-2751`) — so the metadata block alone carries no id. Objects and features
+   blocks do.
 5. **Self-validation:** Emit only from a fixed whitelist of block keys and field modifiers,
    vendored as a table in `Emit.hs` with the docassemble version it was read from; a golden
    test asserts the emitter's key vocabulary is a subset of the vendored list. No runtime
@@ -552,12 +619,25 @@ cited line:
 **What would close it:** review of the whitelist against the pinned docassemble version in the
 R10 harness, plus one not-ok fixture per hygiene rule where feasible.
 
-**Implementation note (2026-08-16, M1).** One mechanism fact, probed the hard way against the
-vendored `docassemble_mako` at the 1.10.7 pin: **backslash is not a Mako escape** — `\${ x }`
-still evaluates `x` (and renders a stray `\`). The literal spelling that works is the Mako
-expression `${'${'}`, which is what `escapeL4` emits for every `${` in L4-derived prose; the
-`defaults.l4` example's deliberately Mako-hostile `@desc` pins this in both the golden and the
-round-trip. Line-leading `%` → `%%` works as expected.
+**Implementation note (2026-08-16, M1; corrected same day by the review pass).** Mechanism
+facts probed the hard way against the vendored `docassemble_mako` at the 1.10.7 pin:
+**backslash is not a Mako escape** — `\${ x }` still evaluates `x` (and renders a stray `\`).
+And the governing invariant, which M1's first escape missed: **docassemble only Mako-compiles
+a string when `match_mako` fires** (`parse.py:135`: `<%|\${|% if|% for|% while|##`), so an
+escape sequence is only an escape when the string gets compiled — every escape must therefore
+be _self-triggering_ and render back to exactly the original text. The original `%` → `%%`
+doubling violated this: `%%` renders as `%` only when something _else_ in the string triggers
+compilation, and otherwise reaches the user verbatim as `%%` (the shipped `defaults.yml` case
+rendered correctly only because its `@desc` also contains `${`). Likewise unescaped `<%` was
+worse than a prose bug: an unclosed `<%` in any `@desc` fails the _whole interview_ at parse
+time (`SyntaxException`), and a closed `<%x%>` span is silently deleted from the prose.
+`escapeL4` now rewrites every Mako-significant span to the Mako expression that prints it —
+`${` → `${'${'}`, `<%` → `${'<%'}`, `</%` → `${'</%'}`, line-leading `[ \t]*%` → `${'%'}`
+(the vendored control-line regex admits leading blanks), line-leading `##` → `${'##'}` (a
+compiled line-leading `##` is a Mako comment and the line would vanish) — each of which
+contains `${` and so triggers compilation of any string it appears in; a bare `%>` with no
+opening tag renders as plain text and needs no escape. All probed against the vendored
+`docassemble_mako`, and pinned by the `defaults.l4` golden + round-trip.
 
 ### 8.10 R10 — validation harness: headless `docassemble.base`, proven by probe, never a dependency
 
