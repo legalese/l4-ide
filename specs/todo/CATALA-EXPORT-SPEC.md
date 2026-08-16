@@ -12,7 +12,13 @@ round-trips (L4 `1000` = Catala `1,000.0`) and a 7-point Mode A/B agreement grid
 citation repairs from an independent re-verification of all 18 [E] claims (none refuted in
 substance); (c) new facts from a full-repo sweep — the implicitly-imported stdlib, the attribute
 inventory, the JSON test mode — which amend R7, strengthen R3/R8, and add R11; (d) corpus
-fragment-fit measurements (§10.1). No ruling flipped from the first draft; all remain PROPOSED._
+fragment-fit measurements (§10.1). No ruling flipped from the first draft; all remained PROPOSED
+until sign-off._
+
+_Rulings signed off, 2026-08-16 (same day): all eleven ANSWERED — R1–R3, R5–R11 as proposed; R4
+reversed to Mode-B-primary with a hardened equivalence gate (§8.4). Implementation of P1/P2
+commences on branch `mengwong/catala-backend`; this spec remains the owning document for the
+rulings._
 
 **One-line summary.** Just as an `@export`-annotated `DECIDE`/`MEANS` over a subject record is
 exactly an OpenFisca variable, it is exactly a Catala scope; L4's helper functions are exactly
@@ -35,23 +41,24 @@ way when P4 needs it.
 
 ## 0. Ruling status
 
-| ruling | state        | detail                                               |
-| ------ | ------------ | ---------------------------------------------------- |
-| R1     | **PROPOSED** | unit of emission: scopes vs toplevels, §8.1          |
-| R2     | **PROPOSED** | `NUMBER` → `integer`/`decimal`/`money`, §8.2         |
-| R3     | **PROPOSED** | date arithmetic: `YMD` vs lenient `Date`, §8.3       |
-| R4     | **PROPOSED** | Mode A (boolean) vs Mode B (exceptions), §8.4        |
-| R5     | **PROPOSED** | higher-order fragment = combinator absorption §8.5   |
-| R6     | **PROPOSED** | recursion: reject, do not synthesise folds, §8.6     |
-| R7     | **PROPOSED** | test emission and the round-trip oracle, §8.7        |
-| R8     | **PROPOSED** | literate envelope from inert style, §8.8             |
-| R9     | **PROPOSED** | validation harness, never a build dep, §8.9          |
-| R10    | **PROPOSED** | `TYPICALLY` → `context`, §8.10                       |
-| R11    | **PROPOSED** | opaque strings tolerated, computed strings out §8.11 |
+| ruling | state        | detail                                                |
+| ------ | ------------ | ----------------------------------------------------- |
+| R1     | **ANSWERED** | as proposed: scopes for `@export`, toplevels, §8.1    |
+| R2     | **ANSWERED** | as proposed: `decimal`; `money` never inferred, §8.2  |
+| R3     | **ANSWERED** | as proposed: `YMD` native, `Date` emitted, §8.3       |
+| R4     | **ANSWERED** | **REVERSED**: Mode B primary, hardened gate, §8.4     |
+| R5     | **ANSWERED** | as proposed: combinator absorption only, §8.5         |
+| R6     | **ANSWERED** | as proposed: reject recursion, no synthesis, §8.6     |
+| R7     | **ANSWERED** | as proposed: L4 oracle, JSON expected blocks, §8.7    |
+| R8     | **ANSWERED** | as proposed: literate envelope from inert style §8.8  |
+| R9     | **ANSWERED** | as proposed: harness never a build dep, §8.9          |
+| R10    | **ANSWERED** | as proposed: `TYPICALLY` → `context`, §8.10           |
+| R11    | **ANSWERED** | as proposed: opaque strings elided with warning §8.11 |
 
-No ruling is ANSWERED yet; all eleven await sign-off. Each carries its evidence, its cost, and the
-case against it in §8, per house style. (R9's first _deliverable_ — a pinned local toolchain — is
-done, but the ruling it serves, harness-never-a-build-dep, still wants sign-off.)
+All eleven rulings were **ANSWERED by Meng on 2026-08-16**: R1–R3 and R5–R11 as proposed; R4
+reversed — Mode B (exception-ladder emission) is the primary rendering, with the equivalence gate
+hardened rather than the mode flagged off (§8.4 records the reversal and what it changes in §10's
+sequencing). Each ruling retains its evidence, cost, and the case against in §8, per house style.
 
 ## 1. Purpose, direction, precedent
 
@@ -565,6 +572,8 @@ decide.
 
 ### 8.1 R1 — unit of emission: scopes for `@export`, toplevels for helpers
 
+**ANSWERED 2026-08-16 — as proposed.**
+
 **Evidence.** Catala tooling (interpret `-s`, `json_schema`, `api_web`, `explain`, proof) is
 scope-keyed **[E]** (§2); toplevel declarations are default-free plain functions **[E]** (§4.2).
 **Proposal.** One scope per `@export` decision (inputs = subject-record fields flattened one
@@ -580,6 +589,8 @@ emitted modules deduplicate into a common emitted module.
 
 ### 8.2 R2 — `NUMBER` lowers to `decimal`; `integer` only where forced; `money` never inferred
 
+**ANSWERED 2026-08-16 — as proposed.**
+
 **Evidence.** §4.5 **[E]**. **Proposal.** As titled; coercions inserted at integer-demanding
 positions; emit a lowering _note_ (comment) at each coercion. **Cost.** Emitted arithmetic reads
 `decimal`-heavy; counts surface as `decimal of (number of …)`. **Against.** Type-inferring an
@@ -590,6 +601,8 @@ changes values (§4.5). **Not decided.** The future money-annotation surface and
 `@desc` conventions and `currency.l4`.
 
 ### 8.3 R3 — dates: native ops for `YMD`-style code, emitted day-arithmetic for lenient `Date`
+
+**ANSWERED 2026-08-16 — as proposed.**
 
 **Evidence.** The three-way divergence measured in §4.6 **[E]**: Feb 31 ↦ refusal (`YMD`) /
 Mar 3 (`Date`) / abort-or-Feb 28-or-Mar 1 (Catala). **Proposal.** Map `YMD`-constructed
@@ -605,7 +618,23 @@ impossible` — it is first-class, message-carrying, and legal exactly where ref
 arms, whole bodies; §2.1) — not to an `optional` result, which would infect every downstream
 type. The stdlib `Date` module supplies most of the helper surface §4.6 describes.
 
-### 8.4 R4 — Mode A default; Mode B (`--idiomatic-exceptions`) behind a flag, gated on proof
+### 8.4 R4 — Mode B primary, Mode A as reference rendering; equivalence gate hardened
+
+**ANSWERED 2026-08-16 — REVERSED from the proposal below.** Meng ruled: "Mode B, with extra
+testing to harden." What this decides: Mode B (`UNLESS` → `exception`, `BRANCH` → label ladder)
+is the **primary emission**; Mode A survives as the **reference rendering** — the comparator the
+equivalence harness checks Mode B against, and the automatic per-construct fallback wherever an
+equivalence check cannot be established (fallbacks are warned, never silent). The "extra
+testing": the gate is not relaxed by the reversal, it is strengthened and made standing —
+(a) exhaustive truth-table enumeration for boolean-domain rewrites; (b) boundary-grid `AgreeAt`
+comparison scopes plus a `catala proof` pass (NoEmptyError/NoOverlappingExceptions) for the rest,
+generalising the executed Appendix B instance; (c) every emitted module **carries its equivalence
+test scopes**, so the check re-runs under the R9 harness on every validation, not once at
+development time. An escape flag (`--boolean-only`) selects all-Mode-A output for consumers that
+want it. The original proposal is retained below for the record; its "Against" paragraph is the
+half Meng adopted.
+
+_The proposal as originally drafted:_
 
 **Evidence.** §4.4's truth-table argument; §4.11's VC-content argument **[E]**. **Proposal.**
 v1 ships Mode A (pure boolean/if-else emission — always total, semantics-identical by
@@ -621,6 +650,8 @@ semantic rewrite in a legal transpiler is the one bug class this project exists 
 
 ### 8.5 R5 — higher-order code survives only by combinator absorption
 
+**ANSWERED 2026-08-16 — as proposed.**
+
 **Evidence.** Catala function arguments are data-only; no lambdas **[E]** (§2); every L4 prelude
 combinator has a Catala binder-form counterpart **[E]** (§4.7). **Proposal.** Recognise
 applications of the known prelude combinators with literal-lambda (`GIVEN … YIELD`) or
@@ -633,6 +664,8 @@ overrides (Catala supports it **[E]**; no L4 corpus demands it yet).
 
 ### 8.6 R6 — recursion is rejected; no automatic fold synthesis
 
+**ANSWERED 2026-08-16 — as proposed.**
+
 **Evidence.** Catala rejects all recursion and recursive types **[E]** (§2). **Proposal.**
 Reject, with a diagnostic that names the cycle and suggests the fold/combinator rewrite; do not
 attempt automatic synthesis. **Cost.** The `CONSIDER … FOLLOWED BY`-style recursive idiom in
@@ -643,6 +676,8 @@ a trust boundary this spec declines to cross in v1. **Not decided.** A lint ("th
 fold-shaped") that could ship earlier than any rewrite.
 
 ### 8.7 R7 — tests: one `#[test]` scope per `#EVAL`/`#ASSERT`, L4 evaluator as oracle
+
+**ANSWERED 2026-08-16 — as proposed.**
 
 **Evidence.** Catala's test population is `#[test]`-keyed; expected outputs live in
 ` ```catala-test-cli ` blocks maintained by `clerk test --reset` **[E]** (§2); OpenFisca's
@@ -661,6 +696,8 @@ sides).
 
 ### 8.8 R8 — the literate envelope is emitted from inert scaffolding and `§` structure
 
+**ANSWERED 2026-08-16 — as proposed.**
+
 **Evidence.** §4.9 **[E]**. **Proposal.** `§`/`§§` → `#`/`##` headings; inert scaffolding lines
 and `@ref` citations → law-text prose immediately preceding the corresponding fence; modules
 lacking any scaffolding emit minimal headings only. **Cost.** Emitted prose duplicates content
@@ -671,6 +708,8 @@ this bridge produces. **Not decided.** `@ref-src` URL → Catala heading `@p.NN`
 syntax alignment.
 
 ### 8.9 R9 — validation harness: optional-when-present, never a dependency
+
+**ANSWERED 2026-08-16 — as proposed.**
 
 **Evidence.** The repo's standing rule that optional external evidence must not become a build
 dependency (the `validate-dmn.mjs` posture toward dmnmd); no OCaml toolchain exists on the
@@ -693,6 +732,8 @@ golden practice.
 
 ### 8.10 R10 — `TYPICALLY` on an exported decision's parameter becomes `context`
 
+**ANSWERED 2026-08-16 — as proposed.**
+
 **Evidence.** `TYPICALLY` is landed metadata: literal-only, type-checked
 (`TypeCheck.hs:1268-1306`, `27cd4770` **[E]**); Catala `context` gives caller-overridable
 defaults with exception priority **[E]** (§4.4). **Proposal.** A `TYPICALLY v` on a `GIVEN`
@@ -707,6 +748,8 @@ emitted `json_schema` _want_ the defaults. **Not decided.** Whether L4's own sem
 follow (that is `TYPICALLY-DEFAULTS-SPEC.md`'s question, not this spec's).
 
 ### 8.11 R11 — uninspected strings are dropped with a warning; string computation is rejected
+
+**ANSWERED 2026-08-16 — as proposed.**
 
 **Evidence.** Corpus measurement (§10.1) **[E]**: the seed corpus's STRING population is the
 OpenFisca `period IS A STRING` plumbing convention (5 of 10 files) plus opaque identity fields
@@ -730,7 +773,8 @@ that wants to reconstruct the full record shape.
 Reverse-direction transpilation (§5.2); deontic, temporal, effect/ledger layers (§5.1); money
 inference (R2); string support (§4.8); French/Polish dialects (`.catala_en` only — dialect is a
 pure lexer skin **[E]**, so this costs nothing semantically); external Text modules;
-fold synthesis (R6); Mode B beyond its flag (R4); any change to L4 language semantics.
+fold synthesis (R6); any change to L4 language semantics. (An earlier draft listed "Mode B
+beyond its flag" here; R4's reversal makes Mode B the primary emission — see §8.4.)
 
 ## 10. Acceptance and sequencing
 
@@ -744,10 +788,11 @@ typecheck` green under R9 harness. Exit: every emitted golden typechecks. De-ris
 - **P3 — literate weave.** R8 envelope on an inert-style statute (British Nationality Act or
   Housing Act grounds are the natural corpus candidates); `catala latex --wrap` renders. Exit: a
   woven PDF whose prose is the statute and whose code is the transpiled L4.
-- **P4 — proof demo.** Mode B behind its flag on one corpus with genuine provisos; Z3 discharges
+- **P4 — proof demo.** Mode B on one corpus with genuine provisos; Z3 discharges
   NoEmptyError/NoOverlappingExceptions. Exit: a machine-checked no-conflicting-provisos claim.
-  De-risked by review: the plugin path runs (§4.11); what remains is the corpus and the
-  equivalence gate.
+  De-risked by review: the plugin path runs (§4.11); what remains is the corpus.
+  (R4's reversal pulls Mode B and its hardened equivalence gate into P1/P2 — emission and its
+  equivalence scopes ship together, so P4 narrows to the real-proviso corpus demonstration.)
 
 ### 10.1 Corpus fragment-fit, measured 2026-08-16 **[E]**
 
