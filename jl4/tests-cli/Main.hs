@@ -44,6 +44,8 @@ import System.Process
   )
 import Test.Hspec
 
+import qualified L4.Docassemble.Emit as DAEmit
+
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
 ----------------------------------------------------------------------------
@@ -2383,5 +2385,59 @@ spec bin = do
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["openfisca", errorFixture]
+
+  describe "l4 docassemble" $ do
+    it "compiles the WHERE-heavy rodents example to its golden interview (R3 survival)" $
+      expectGolden bin ["docassemble", "examples/docassemble/rodents-and-vermin.l4"]
+                       "examples/docassemble/expected/rodents-and-vermin.yml"
+
+    it "compiles the top-level IMPLIES seam example (R4 verdict driver)" $
+      expectGolden bin ["docassemble", "examples/docassemble/seam.l4"]
+                       "examples/docassemble/expected/seam.yml"
+
+    it "compiles a 3-way enum CONSIDER to a radio question + elif chain (R6)" $
+      expectGolden bin ["docassemble", "examples/docassemble/enum-triage.l4"]
+                       "examples/docassemble/expected/enum-triage.yml"
+
+    it "compiles TYPICALLY prefills + MAYBE optionality with Mako-hostile @desc (R7/R8/R9)" $
+      expectGolden bin ["docassemble", "examples/docassemble/defaults.l4"]
+                       "examples/docassemble/expected/defaults.yml"
+
+    it "drives the seam scope-first, never as the classical short-circuit (R4)" $ do
+      Output code sout _ <- runL4 bin ["docassemble", "examples/docassemble/seam.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("if notice_rule_satisfied_scope:" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("not notice_rule_satisfied_scope or" `isInfixOf`))
+
+    it "refuses a deontic body by name (Regulative, Blocking)" $ do
+      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/deontic-body.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" `isInfixOf`)
+
+    it "refuses MAYBE NUMBER by name (R8: an empty number submits as 0)" $ do
+      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/maybe-number.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("MAYBE NUMBER is refused in v1 (R8)" `isInfixOf`)
+
+    it "refuses a post-sanitisation name collision, naming both originals" $ do
+      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/name-collision.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("name collision: `t.notice_period`" `isInfixOf`)
+      serr `shouldSatisfy` ("L4 `notice period`" `isInfixOf`)
+      serr `shouldSatisfy` ("L4 `notice_period`" `isInfixOf`)
+
+    it "refuses a function value passed as data, by the function's own name (R3)" $ do
+      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/higher-order.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("higher-order use of function `is positive`" `isInfixOf`)
+
+    it "gates on advisory fidelity notes with --fail-on=advisory" $
+      expectFail bin ["docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
+
+    it "emits only block keys docassemble 1.10.7 recognises (R9.5 vocabulary)" $
+      DAEmit.emitterVocabularyViolations `shouldBe` []
+
+    it "fails on a file that does not typecheck" $
+      expectFail bin ["docassemble", errorFixture]
   where
     for_ xs f = mapM_ f xs
