@@ -1,0 +1,73 @@
+-- Defaults and optionality: TYPICALLY -> `default:` prefill (R7, Advisory)
+-- and MAYBE erased to optionality (R8):
+--   MAYBE BOOLEAN -> yesnomaybe   (None IS NOTHING — exact, no loss)
+--   MAYBE STRING  -> required: False, with '' read back as NOTHING (Advisory)
+--
+-- The @desc on `promotional code used` is deliberately Mako-hostile: it
+-- BEGINS with a % (a Mako control line if emitted at start of line) and
+-- contains a literal ${ ... } (a Mako expression), so the emitter's R9.1
+-- escaping is exercised by this corpus, not assumed.
+
+DECLARE Purchase
+    HAS
+      @desc Whether the contract was concluded without the simultaneous physical presence of trader and consumer
+      `was concluded at a distance` IS A BOOLEAN TYPICALLY TRUE
+      @desc Whether the consumer expressly waived the cooling-off period; unanswered if the trader never asked
+      `consumer confirmed waiver`   IS A MAYBE BOOLEAN
+      @desc % off is shown at checkout as ${ discount_percent }; enter the code itself, or leave blank if none was used
+      `promotional code used`       IS A MAYBE STRING
+
+@export Whether the consumer may still cancel the purchase during the cooling-off period
+GIVEN p IS A Purchase @desc The purchase under assessment
+GIVETH A BOOLEAN
+DECIDE `the consumer may cancel` p IF
+        p's `was concluded at a distance`
+    AND NOT `the consumer waived the right`
+    AND NOT `the purchase was marked final sale`
+ WHERE
+    `the consumer waived the right` MEANS
+        CONSIDER p's `consumer confirmed waiver`
+        WHEN JUST w  THEN w
+        WHEN NOTHING THEN FALSE
+
+    `the purchase was marked final sale` MEANS
+        CONSIDER p's `promotional code used`
+        WHEN JUST c  THEN c EQUALS "FINAL-SALE"
+        WHEN NOTHING THEN FALSE
+
+-- Absent path for both MAYBE fields: no waiver ever asked, no promo code.
+#EVAL `the consumer may cancel` OF
+        Purchase
+        WITH
+            `was concluded at a distance` IS TRUE
+            `consumer confirmed waiver`   IS NOTHING
+            `promotional code used`       IS NOTHING
+-- TRUE
+
+-- Present path for the MAYBE BOOLEAN: an express waiver defeats cancellation.
+-- (Short-circuit: the promo-code question must never be asked on this path.)
+#EVAL `the consumer may cancel` OF
+        Purchase
+        WITH
+            `was concluded at a distance` IS TRUE
+            `consumer confirmed waiver`   IS JUST TRUE
+            `promotional code used`       IS NOTHING
+-- FALSE
+
+-- Present path for the MAYBE STRING, decisive: a FINAL-SALE code defeats it.
+#EVAL `the consumer may cancel` OF
+        Purchase
+        WITH
+            `was concluded at a distance` IS TRUE
+            `consumer confirmed waiver`   IS JUST FALSE
+            `promotional code used`       IS JUST "FINAL-SALE"
+-- FALSE
+
+-- Present path for the MAYBE STRING, non-decisive: an ordinary code changes nothing.
+#EVAL `the consumer may cancel` OF
+        Purchase
+        WITH
+            `was concluded at a distance` IS TRUE
+            `consumer confirmed waiver`   IS JUST FALSE
+            `promotional code used`       IS JUST "SPRING10"
+-- TRUE

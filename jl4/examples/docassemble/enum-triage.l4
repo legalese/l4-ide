@@ -1,0 +1,25 @@
+-- A 3-way IS ONE OF enum triaged by CONSIDER with OTHERWISE (R6):
+-- the enum rides into docassemble as a `datatype: radio` question whose
+-- choice values are the constructor names as strings, and the CONSIDER
+-- arms compile to == string comparisons. The OTHERWISE arm covers the
+-- constructor no WHEN names (Trivial).
+
+DECLARE Severity IS ONE OF Critical, Reportable, Trivial
+
+DECLARE Incident
+    HAS
+      @desc Triage class assigned to the personal-data breach
+      `assessed severity` IS A Severity
+
+@export Days within which the regulator must be notified of a personal-data breach
+GIVEN inc IS AN Incident @desc The incident being triaged
+GIVETH A NUMBER
+DECIDE `notification deadline in days` inc IS
+    CONSIDER inc's `assessed severity`
+    WHEN Critical   THEN 3
+    WHEN Reportable THEN 30
+    OTHERWISE 0
+
+#EVAL `notification deadline in days` (Incident WITH `assessed severity` IS Critical)    -- 3
+#EVAL `notification deadline in days` (Incident WITH `assessed severity` IS Reportable)  -- 30
+#EVAL `notification deadline in days` (Incident WITH `assessed severity` IS Trivial)     -- 0 (via OTHERWISE)
