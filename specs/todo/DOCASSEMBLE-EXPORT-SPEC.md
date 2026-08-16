@@ -1,6 +1,6 @@
 # L4 → Docassemble: interview export and transpiler spec
 
-_Status: **M1 implemented, review-repaired.** Designed 2026-08-16 on branch
+_Status: **M1 and M2 implemented, M1 review-repaired.** Designed 2026-08-16 on branch
 `mengwong/docassemble-bridge`; M1 (the static core, §10) landed the same day on branch
 `mengwong/docassemble-backend`: the `L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core
 plus the `l4 docassemble` CLI verb in jl4, mirroring the shipped OpenFisca backend. A same-day
@@ -11,8 +11,21 @@ escapes) — the repair notes live in the §8 sections they belong to. Verified 
 refusal tests under `describe "l4 docassemble"` in `jl4/tests-cli/Main.hs`, and by the R10
 headless round-trip: all sixteen fixture cases of the six examples under
 `jl4/examples/docassemble/` ran green against `docassemble.base` 1.10.7 (checkout `1b6678384`)
-in-process. M2 (installable package, `@ref` citations), M3 (embedded plan) and M4 (breadth)
-remain unimplemented._
+in-process._
+
+_**M2 landed 2026-08-17** on branch `mengwong/docassemble-m2`, test-first: the acceptance tests
+were written red first (commit `178b4946`, 15 failing cases) and the implementation made them
+pass. It ships `--package DIR` (the PEP 420 tree, R11), `data/sources` provenance as a byte
+copy, the generated runtime module loaded via `modules:`, `@ref` citations carried through
+`explain()`/`logic_explanation()` onto verdict screens, and the `auto terms:` glossary. It also
+carries one language repair the glossary needed: a `@desc` on a `WHERE`/`LET` binding used to be
+dropped silently (§3). Verified by 33 cases under the three `describe "l4 docassemble…"` blocks
+and by the R10 harness run on all seven examples, each driven from BOTH the bare YAML and a real
+`--package` tree with the per-case `(goal, verdict, citations)` triple asserted equal — see
+`jl4/examples/docassemble/README.md` for the transcript. The `--package` clobber policy, the
+fidelity report's placement in the tree, and the reversal of R4's `clear_explanations()`
+sentence are recorded as implementation notes in §8.11, §8.11 and §8.4. **M3 (embedded plan) and
+M4 (breadth) remain unimplemented.**_
 
 **One-line summary.** Docassemble discovers evaluation order at runtime by backchaining on
 undefined variables — the same "what do we still need to ask?" question L4's query planner
@@ -195,6 +208,29 @@ All **[E]**. The selection layer is `L4.Export`:
   (`L4/OpenFisca/Lower.hs:446-455`): first word is the tag, remainder is payload. This backend
   reserves the tag `docassemble` for per-declaration overrides (§8.6) rather than inventing new
   annotation syntax.
+- **`@ref` reaches `Module Resolved`, but on the node above the one you expect.** A `@ref`
+  written above a top-level definition attaches to the **TopDecl** `Decide ann d` node, not to
+  the inner `MkDecide`; above a `WHERE` binding it attaches to `LocalDecide ann d`
+  (`l4 ast` on `citations.l4`, three `LocalDecide` annos each carrying a `MkRef`) **[E]**. A
+  node's `Anno` holds at most one ref and the nearest preceding one wins, every other becoming a
+  `RefNotAttached` warning (`ResolveAnnotation.hs:1047-1061`) **[E]** — which is why each block's
+  citation must be read from its _own_ node. The payload text **includes the herald**: `getRef`
+  hands back `"@ref X"` verbatim (unlike `getDesc`, which strips), and the inline form hands back
+  `"<<X>>"`, delimiters and all **[E]**. `@ref-src` and `@ref-map` are dead in the AST
+  (`Parser.hs:246-252` maps `refAdditionalP` to `Just ()`); the LSP hover reads `@ref-map` off the
+  raw token stream instead **[E]**.
+- **A `@desc` on a `WHERE`/`LET` binding used to be dropped silently — repaired 2026-08-17.**
+  `instance HasDesc (Expr n)` was `pure`, so the desc pass never descended into an expression,
+  and a `WHERE` binding lives inside `Where Anno (Expr n) [LocalDecl n]`. The _ref_ pass already
+  descended there, so the two disagreed: the `@ref` above a binding attached, the `@desc` on the
+  next line reached no node at all and raised no warning (`l4 ast citations.l4 | grep -c 'desc =
+Just'` ⇒ 6, none of them the three annotated `MEANS` bindings; `l4 check` ⇒ "Check succeeded")
+  **[E]**. `ResolveAnnotation.hs` now traverses `Where`/`LetIn` into `LocalDecl`, in source
+  order. Behaviour change worth knowing: such a desc used to stay pending and could be claimed by
+  a _later_ top-level declaration (`descPrecedesNode` admits any preceding desc within 8 columns
+  of slack); it is now claimed by the binding it was written above. Measured blast radius:
+  `cabal test jl4-test` ⇒ 2568 examples, 0 failures **[E]**. The `auto terms:` glossary is the
+  first consumer that needs a binding's own gloss.
 - Post-resolution expressions arrive with infix operators desugared to builtin applications
   (`__PLUS__`, `__AND__`, …; `L4/Desugar.hs:145-147`); `IfThenElse`/`MultiWayIf`/`Consider`/
   `Proj`/`Lit`/`Percent`/`Where`/`LetIn` survive as constructors; a bare variable is a nullary
@@ -244,7 +280,9 @@ recognise the same program.
 | `MAYBE OF T`                                             | optional field, erased as in `FunctionSchema.hs:147-148`                                                                                                                                                     | R8, Advisory                         |
 | `TYPICALLY`                                              | `default:` prefill                                                                                                                                                                                           | R7, Advisory                         |
 | `@desc` on decide/param/type                             | `question:` text, field `help:`                                                                                                                                                                              | clean                                |
-| `@ref` citations                                         | `explain()` calls in emitted rule blocks; `logic_explanation()` on verdict screens; `auto terms:` glossary for defined terms                                                                                 | clean, M2                            |
+| `@ref` on a `DECIDE` or `WHERE` binding                  | `explain()` in that rule's own `code:` block; `logic_explanation()` on every verdict screen                                                                                                                  | clean, M2 (shipped)                  |
+| `@ref` on an expression                                  | nothing — an expression is not a `code:` block, so there is nothing to hang the call on                                                                                                                      | **Advisory** `DA-REF-EXPR`           |
+| plain `@desc` on a `DECLARE` or a named definition       | one `auto terms:` glossary entry, keyed on the L4 term                                                                                                                                                       | clean, M2 (shipped)                  |
 | `#EVAL`/`#ASSERT` fixtures                               | round-trip oracle inputs (R10); **not emitted** into the interview, per the DMN R0 precedent                                                                                                                 | n/a                                  |
 | `LIST OF`                                                | `DAList` gathering driven by `complete_attribute` (one pivot variable per element record; sub-questions arrive by short-circuit demand); `elements=[…]` for computed lists; `list collect:` for bounded ones | M4                                   |
 | deontic (`PARTY MUST … HENCE/LEST`)                      | none; docassemble multi-user roles/actions are a plausible future mapping, not attempted                                                                                                                     | **Blocking** note                    |
@@ -381,6 +419,27 @@ narrowed form: the R10 harness shows per-field demand-driven asking — the `def
 promo-code question is never asked on the short-circuited path, and the seam example's
 requirement questions are never asked on the NotApplicable path.
 
+**Implementation note (2026-08-17, M2): the `generic object` layer is DEFERRED to M4, and this
+is measured, not assumed.** M2 was asked to settle by experiment whether the generic layer is
+safe to adopt now. Two things were executed against `docassemble.base` 1.10.7 in the R10 harness:
+
+1. **Adding it changes nothing.** A `generic object: DAObject` question defining
+   `x.amount_raised_in_12_months` was appended to the emitted `citations.yml`, beside the
+   specific-instance question that already defines `o.amount_raised_in_12_months`, and the
+   interview was driven from both. The same three questions fire, by the same block ids, in the
+   same order, to the same goal — `askfor`'s candidate sort is non-generic-first
+   (`parse.py:9092`), so the specific question wins every time. The probe is
+   `probe_generic_object.py`, run by hand like the rest of the R10 harness.
+2. **It has nothing to fall back _for_.** A generic question is a fallback for _other instances_
+   of the class, and a v1 interview has none: every emitted interview instantiates at most one
+   object (`objects:` blocks in the seven committed goldens hold 1, 1, 1, 1, 1, 1 and 0 entries).
+
+So adopting it _in addition_ is provably inert, and adopting it _instead_ would rewrite all six
+M1 byte goldens for no behavioural gain. It becomes meaningful at M4, when `LIST OF` → `DAList`
+gathering creates the second instance; that is where it belongs. Until then R2's "each stored
+field yields one `generic object` question block" stays narrowed to the specific-instance form
+M1 landed.
+
 **Repair notes (2026-08-16 review pass).** Two more mechanical contracts, both found by
 executed probes:
 
@@ -476,6 +535,32 @@ semantics — noted, not depended on).
 goldens. **What would close it:** an R10 transcript of a seam example where answering the
 requirement questions first is impossible because scope is asked first, and a NotApplicable
 run that never asks a requirement question.
+
+**Implementation note (2026-08-17, M2). The `clear_explanations()` sentence above is REVERSED:
+the driver must not call it.** The proposal copied that from docassemble's own exhibit
+(`docassemble_demo/…/examples/explain.yml`), where every `explain()` call lives _inside_ the
+mandatory block and so re-runs on every pass. Here they live in separate `code:` blocks, which
+docassemble caches once their variable is defined, while the mandatory driver re-runs on every
+assemble pass — so the clear wipes what the rule blocks recorded and never lets them run again.
+
+Executed: adding exactly that one line to the emitted `citations.yml` and re-running the R10
+harness gives
+
+```
+[exempt (all three rules fire)] offering_exempt = True; verdict-screen citations are [],
+expected exactly ['17 CFR 227.100(a)(1) — offering maximum', ...]  *** MISMATCH ***
+```
+
+with the rendered screen carrying the "Why this answer" heading and nothing under it. Without
+the line the same harness run is green, on both cases and both artifact shapes. So M2 emits no
+`clear_explanations()`; session-scoped accumulation is the correct behaviour here, and
+`explain()` dedupes by string (`util.py:13239`) so a re-run block cannot double-cite.
+
+**Implementation note (2026-08-17, M2): where a seam export's own `@ref` goes.** A seam lowers
+to two `code:` blocks and the citation must not be duplicated across them. It rides on the
+**scope** block: the rule fired — it was decided whether it applies — as soon as scope is known,
+and on the `NotApplicable` path the requirement block never runs at all, so a citation placed
+there would go unrecorded on the very path where the rule most needs to explain itself.
 
 ### 8.5 R5 — question order: native backchaining v1; embedded compiled plan M3
 
@@ -639,6 +724,41 @@ contains `${` and so triggers compilation of any string it appears in; a bare `%
 opening tag renders as plain text and needs no escape. All probed against the vendored
 `docassemble_mako`, and pinned by the `defaults.l4` golden + round-trip.
 
+**Implementation note (2026-08-17, M2): three additions to the hygiene rules, one caveat.**
+
+1. **The emitter's declared vocabulary gains `modules` and `auto terms`** (R9.5). Both were
+   already in the vendored `daRecognisedKeys` whitelist, so `emitterVocabularyViolations` would
+   have kept returning `[]` while silently ceasing to describe what the emitter writes; a test
+   now asserts both are declared, not merely permitted.
+2. **`id:` is legal on both new blocks, and both carry one** (R9.4). The `metadata:` exception
+   is metadata-specific: `parse.py:2748-2751` rejects a foreign key only inside the `metadata`
+   branch, while `id` is handled generically at `:2555-2561`. Proven by construction — the R10
+   harness parses the emitted interview, and an illegal key is a hard `DASourceError`.
+3. **Citations are escaped by _position_, not by one rule.** A citation inside a `code:` block is
+   a Python string literal and gets Python escaping, because `code:` is compiled and exec'd
+   (`parse.py:3706`) and never Mako-rendered — so the deliberately hostile third citation in
+   `citations.l4`, which begins with `%` and carries a literal `${ … }`, needs no Mako escape
+   there. On the verdict screen it is not in the text at all: it is _interpolated at render time_
+   through `${ citation }` inside a `% for` over `logic_explanation()`, and Mako does not re-read
+   its own output. That is why the round-trip harness asserts the escaping claim on the
+   **rendered** screen — an assertion on the emitted YAML cannot tell "escaped" from
+   "interpolated later".
+
+   The `auto terms:` glossary is the one place a `@desc` still goes through `escapeL4`: both
+   halves of every entry are handed to a `TextObject` at parse time (`parse.py:2906,2908`), so an
+   unclosed `<%` would fail the whole interview before any question is asked. Caveat, stated
+   because it is a real infidelity: docassemble stores the **raw** YAML value as the definition
+   (`parse.py:2908`) and shows it in a tooltip without Mako, so a hostile `@desc` reaches that
+   tooltip in its escaped spelling (`${'${'}` rather than `${`). No corpus `@desc` is affected
+   today; the alternative is a parse-time crash.
+
+**Known cosmetic consequence, not yet measured.** `auto terms` compiles a case-insensitive
+`\b(term)\b` over _all_ prose (`parse.py:2894`), and an emitted question's label IS the L4 term
+name — so a glossary keyed on that name will auto-link a question's own label to its own
+definition, duplicating the `help:` that already carries the same text. Detecting it needs
+rendered-HTML inspection of a question screen, which the R10 harness does not do; it is a display
+nuisance, not a semantic one.
+
 ### 8.10 R10 — validation harness: headless `docassemble.base`, proven by probe, never a dependency
 
 **Evidence — executed, this session.** `docassemble_base` from the checkout installs clean into
@@ -715,6 +835,53 @@ change forces one); Playground project names must not start with a digit.
 
 **What would close it:** v1 sign-off; M2 gated on the R10 harness existing to consume it.
 
+**Implementation note (2026-08-17, M2): `--package DIR` landed, with six decisions this ruling
+did not make.** The tree is exactly the shape proposed above; the harness now drives a real
+`--package` tree and agrees with the bare YAML case by case, which closes the gate. What follows
+is what implementation had to decide.
+
+1. **`--package` refuses `--output`, by name.** They are two artifact shapes, a directory and a
+   file, and `-o` is already overloaded house-wide (FILE in eight verbs, DIR in `l4 trace`), so
+   honouring one and silently ignoring the other is the failure mode with no precedent to lean
+   on. The refusal happens before the file is read, so neither artifact appears. Message:
+   `--package cannot be combined with --output`.
+2. **Clobber: regenerate freely, overwrite nothing else.** An existing tree that this command
+   wrote is overwritten without ceremony — regenerating in place is the normal workflow — but a
+   directory holding anything else is refused with a named diagnostic and nothing is written.
+   "A tree this command wrote" is decided by the generator marker on the first line of
+   `pyproject.toml`, which nothing else in this repo emits. The reason to refuse at all: a
+   docassemble package is a thing people edit and `dainstall --watch`, so silently overwriting a
+   hand-written `pyproject.toml` is a data loss no golden can see. **Known limitation:**
+   regeneration writes but never deletes, so a file left by an earlier layout survives in the
+   tree; `rm -rf` the directory when the generated shape itself changes.
+3. **The package name is `l4<slug>`, `<slug>` lowercase ASCII alphanumerics of the source file's
+   own basename.** Both obvious sources are unusable and both were measured: `pkgSource` is a
+   percent-encoded URI segment (`2024 Café Rules v2.1.l4` arrives as
+   `2024%20Caf%C3%A9%20Rules%20v2.1.l4`) and `pyIdent` keeps non-ASCII letters (`café münze 2024`
+   sanitises to `café_münze_2024`). The slug is total (an all-punctuation stem yields `module`)
+   and capped at 48 characters. The interview and the embedded source are renamed to
+   `<slug>.yml` / `<slug>.l4` for the same reason; the author's spelling survives in the
+   generated file headers and in `l4runtime.L4_SOURCE_NAME`.
+4. **The fidelity report goes to `<slug>.fidelity.txt` at the package root**, under the same-stem
+   convention `-o FILE` already uses, and `MANIFEST.in` `include`s it so it ships. Not inside
+   `data/`: `data/sources` holds the encoding, and the report is documentation _of_ the
+   compilation, not interview data.
+5. **`license = "LicenseRef-UNSPECIFIED"`.** PEP 639 wants an SPDX expression and docassemble has
+   required one of Playground packages since 1.8.0, but the package carries the _user's_ rules,
+   whose licence this compiler cannot know. A `LicenseRef-` custom identifier is valid SPDX and
+   unmistakably a placeholder; the emitted comment says to replace it.
+6. **`l4runtime.py` deliberately defines nothing the interview calls.** The bare and packaged
+   artifacts must _mean_ the same thing — the harness asserts exactly that, per case — so
+   anything the interview needed would have to work bare too. What it carries instead is
+   provenance the interview can show about itself (`L4_SOURCE_NAME`, `l4_source_text()`, …) under
+   an explicit `__all__`, so `modules:`' `import *` cannot collide with an interview variable.
+   M3's compiled plan is what fills it. Correspondingly the `modules:` block is emitted into the
+   **packaged** interview only: a bare YAML has no package for `.l4runtime` to resolve against,
+   and `from … import *` of a missing module aborts assembly. The list holds exactly one relative
+   name — naming `docassemble.base.util` or `docassemble.base.legal` sets `imports_util`
+   (`parse.py:2765-2767`) and suppresses the automatic `from docassemble.base.util import *` at
+   `:8523`, which would take `explain`, `DAObject` and every other builtin with it.
+
 ## 9. Verification plan
 
 1. **Goldens** (regression only, stated as such): `expectGolden` blocks per example;
@@ -740,10 +907,12 @@ change forces one); Playground project names must not start with a digit.
   strings, dates-as-comparisons, nullary enums, records (nested), `WHERE` survival, seam
   verdict. First examples: `rodents-and-vermin.l4` (annotated copy), one seam example, one enum
   example.
-- **M2 — the loop closed.** `--package` (PEP 420 shape, R11), `data/sources` provenance, R10
-  harness green, `@ref` citations via `explain()`/`logic_explanation()` on verdict screens plus
-  `auto terms:` glossary entries for L4 defined terms, push recipe (`dainstall`/API) in the
-  README.
+- **M2 — the loop closed. SHIPPED 2026-08-17.** `--package` (PEP 420 shape, R11), `data/sources`
+  provenance, R10 harness green on all seven examples from both artifact shapes, `@ref` citations
+  via `explain()`/`logic_explanation()` on verdict screens plus `auto terms:` glossary entries
+  for L4 defined terms, push recipe (`dainstall`/API) in the README. Deferred out of M2 and named
+  where they belong: the `generic object` question layer (§8.2, to M4, measured inert in v1) and
+  the embedded plan (M3, `DAPackage.pkgPlan` still `Nothing`).
 - **M3 — the differentiator.** `--plan`: embedded `CompiledDecisionQuery` + Python port of
   `queryDecision`/`verdictOf`, UUIDv5 `id:`s, info-gain ordering, measured against declaration
   order on a real corpus. Requires the R1 packaging move and the `vizExprToBoolExpr` lift.
