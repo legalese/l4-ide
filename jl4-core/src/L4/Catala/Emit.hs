@@ -167,12 +167,18 @@ clauseLines var cl =
     Nothing -> []
     Just c  -> [ ind 2 <> "under condition", ind 3 <> renderCatExpr c ]
 
-  conseqLines = case cl.clConseq of
-    ConsFulfilled    -> [ ind 2 <> "consequence fulfilled" ]
-    ConsNotFulfilled -> [ ind 2 <> "consequence not fulfilled" ]
-    ConsEquals e
-      | isJust cl.clCondition -> [ ind 2 <> "consequence equals", ind 3 <> renderCatExpr e ]
-      | otherwise             -> [ ind 2 <> "equals", ind 3 <> renderCatExpr e ]
+  -- Catala's @consequence@ keyword belongs to the /condition/ clause
+  -- (@condition_consequence := UNDER_CONDITION expr CONSEQUENCE@,
+  -- @compiler\/surface\/parser.mly:597@), so an unconditional rule or definition
+  -- must not write it: it is @rule v fulfilled@, not
+  -- @rule v consequence fulfilled@.
+  conseqLines = case (cl.clConseq, isJust cl.clCondition) of
+    (ConsFulfilled,    True)  -> [ ind 2 <> "consequence fulfilled" ]
+    (ConsFulfilled,    False) -> [ ind 2 <> "fulfilled" ]
+    (ConsNotFulfilled, True)  -> [ ind 2 <> "consequence not fulfilled" ]
+    (ConsNotFulfilled, False) -> [ ind 2 <> "not fulfilled" ]
+    (ConsEquals e,     True)  -> [ ind 2 <> "consequence equals", ind 3 <> renderCatExpr e ]
+    (ConsEquals e,     False) -> [ ind 2 <> "equals", ind 3 <> renderCatExpr e ]
 
 kindPrefix :: CatClauseKind -> Text
 kindPrefix = \case
@@ -180,6 +186,7 @@ kindPrefix = \case
   ClLabel l            -> "label " <> l <> " "
   ClException Nothing  -> "exception "
   ClException (Just l) -> "exception " <> l <> " "
+  ClLabelExc l m       -> "label " <> l <> " exception " <> m <> " "
 
 -- ---------------------------------------------------------------------------
 -- Types

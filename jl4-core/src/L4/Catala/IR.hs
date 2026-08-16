@@ -229,10 +229,16 @@ data CatClause = CatClause
   }
   deriving stock (Eq, Show, Generic)
 
+-- | Catala's grammar admits a label /and/ an exception target on one clause
+-- (@label = ioption(label) ; except = ioption(exception_to) ; RULE@,
+-- @compiler\/surface\/parser.mly:608-614@), and an n-rung priority ladder needs
+-- exactly that: every rung but the highest-priority one is both an exception to
+-- the rung below it and the label the rung above it points at.
 data CatClauseKind
   = ClPlain                     -- ^ no label
   | ClLabel     !Text           -- ^ @label L …@
   | ClException !(Maybe Text)   -- ^ @exception [L] …@
+  | ClLabelExc  !Text !Text     -- ^ @label L exception M …@
   deriving stock (Eq, Show, Generic)
 
 -- | @consequence fulfilled@ \/ @consequence not fulfilled@ (a @rule@), or

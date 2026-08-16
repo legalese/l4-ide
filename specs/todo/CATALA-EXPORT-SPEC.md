@@ -1,9 +1,15 @@
 # L4 → Catala: expressive-domain overlap and transpiler spec
 
-_Status: **design, not yet implemented.** Written 2026-08-16 on branch `mengwong/catala-bridge`.
-Nothing exists under `jl4-core/src/L4/Catala/`; there is no `catala` subcommand in `jl4/app/Main.hs`.
-What would make the present tense true: an `L4.Catala.{IR,Lower,Emit}` module triple plus a CLI verb,
-mirroring the shipped OpenFisca backend (`jl4-core/src/L4/OpenFisca/`, `jl4/app/L4/Cli/OpenFisca.hs`)._
+_Status: **partly implemented.** Written 2026-08-16 on branch `mengwong/catala-bridge`; implementation
+proceeds on `mengwong/catala-backend`. What exists as of 2026-08-16 (read out of the tree, not planned):
+`jl4-core/src/L4/Catala/{IR,Lower,Emit}.hs` and the `l4 catala FILE [-o FILE] [--boolean-only]`
+subcommand in `jl4/app/L4/Cli/Catala.hs`, wired in `jl4/app/Main.hs`. Lowering covers the §6 fragment
+(records, enums, `MAYBE`, lists, `CONSIDER`/`BRANCH`/`IF`/`WHERE`, prelude combinators, R10
+`TYPICALLY`, R11 elision, R3's `YMD` subset), rejects the rest with batched `LowerError`s, and builds
+both R4 renderings. **Not yet built:** the R7 `#EVAL` → `#[test]` test scopes, the R8 literate weave,
+the R4 equivalence scopes (so every rule still emits in Mode A with a recorded fallback reason), R3's
+emitted day-granular helper for the lenient `Date` constructor, and the R9 `etc/validate-catala.mjs`
+harness. §10's P1/P2/P3/P4 remain the sequencing._
 
 _Review round, 2026-08-16 (same day, second session). What review changed: (a) a working
 `catala`/`clerk` 1.2.1 toolchain now exists on this machine, built from the cited checkout commit,
@@ -809,6 +815,22 @@ The P3 literate-weave candidate is therefore **BNA**: near-total fragment fit, s
 already inline, and its `YMD` usage exercises R3's native-ops path rather than the emitted
 helper. `scale.l4`'s structural recursion is the one seed-corpus casualty of R6 — its rewrite
 target is `combine all … initially` over the bracket list, which is also the cleaner L4.
+
+### 10.2 Authoring facts found while implementing P1 **[E]** (2026-08-16)
+
+Two annotation-attachment behaviours that the L4 listings in this spec do not reflect. Neither is a
+backend bug; both change how a source file has to be written before `l4 catala` sees the export.
+
+- **`@export` must sit above `GIVEN`.** Appendix A writes it between `GIVETH` and `DECIDE`; in that
+  position the annotation does not attach and `L4.Export.getExportedFunctions` does not report the
+  decision at all. Appendix A's listing therefore does not round-trip as written — move the `@export`
+  line above `GIVEN` (the unit fixture in `jl4-core/test/CatalaLowerSpec.hs` does).
+- **`@nonexhaustive` and `@export` must share one annotation, spelled `@export nonexhaustive`.**
+  `parseDescText` consumes both keywords from a single description string
+  (`jl4-core/src/L4/Export.hs`, `consumeKeywords`), but two separate `@…` lines occupy the same
+  `annDesc` slot and the later one wins — so `@export` on its own line followed by `@nonexhaustive`
+  loses the export, and the reverse order loses the partiality flag. §4.3's `impossible`-arm path is
+  reachable only through the combined spelling.
 
 ## Appendix A — worked example **[E]** (executed 2026-08-16)
 

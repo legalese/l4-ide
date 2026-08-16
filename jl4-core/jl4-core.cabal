@@ -206,6 +206,7 @@ test-suite jl4-core-test
     BulletParserSpec
     UUID5Spec
     ExportValidationSpec
+    CatalaLowerSpec
     NumberLiteralSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
