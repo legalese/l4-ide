@@ -71,11 +71,11 @@ States: **SHIPPED** (in-tree, tested), **SPEC** (design PR open), **IN FLIGHT** 
 
 ### 2.1 Execution
 
-| target      | state                                                                                                       | owning artifact                                                                                          |
-| ----------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| OpenFisca   | **SHIPPED** v1 + executed round-trips **[E]**                                                               | `jl4-core/src/L4/OpenFisca/{IR,Lower,Emit}.hs`; `l4 openfisca`; `jl4/examples/openfisca/L4-OPENFISCA.md` |
-| Catala      | **SPEC** — draft PR #260, R1–R11; catala 1.2.1 toolchain built; worked examples executed both sides **[E]** | `specs/todo/CATALA-EXPORT-SPEC.md`, branch `mengwong/catala-bridge`                                      |
-| MLIR / WASM | **SHIPPED** in-tree (parity ledger) **[E]**                                                                 | `jl4-mlir/`                                                                                              |
+| target      | state                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | owning artifact                                                                                          |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| OpenFisca   | **SHIPPED** v1 + executed round-trips **[E]**                                                                                                                                                                                                                                                                                                                                                                                                                               | `jl4-core/src/L4/OpenFisca/{IR,Lower,Emit}.hs`; `l4 openfisca`; `jl4/examples/openfisca/L4-OPENFISCA.md` |
+| Catala      | **IMPL DONE (draft)** — spec PR #260 ready for review, R1–R11 ANSWERED by Meng 2026-08-16 (R4 REVERSED to Mode-B-primary with a hardened equivalence gate, `219281c2`); implementation PR #266 stacked on it (+7137 lines: `L4.Catala.{IR,Lower,Emit,Equivalence}` + `l4 catala`, full §6 fragment, R9 harness incl. catala-proof). Validated vs real catala 1.2.1: typecheck+proof ×8 emitted files, `clerk test` 64/64, `jl4-test` 2568/0. Merge #260 before #266 **[E]** | PRs #260 + #266                                                                                          |
+| MLIR / WASM | **SHIPPED** in-tree (parity ledger) **[E]**                                                                                                                                                                                                                                                                                                                                                                                                                                 | `jl4-mlir/`                                                                                              |
 
 OpenFisca is the only backend in any family that consumes the **temporal** layer today (dated
 `formula_YYYY_MM` overrides lowered from year-guarded `BRANCH`) **[E]**. Catala is the only one
@@ -233,7 +233,14 @@ independently in at least two of: the OpenFisca doc §6, CATALA-EXPORT-SPEC §7/
   already consumed by DMN's FIRST↔proof-gated-UNIQUE duality with `OTHERWISE` →
   `defaultOutputEntry` (`jl4-core/src/L4/Dmn/Lower.hs:1203,20` **[E]**); Catala's Mode A/B gate
   (PR #260 R4) and #258's "the two readings must agree" are the same seam. Surfaced by the
-  catala-bridge session from DMN's implementation, 2026-08-16.
+  catala-bridge session from DMN's implementation, 2026-08-16. Executed at scale in that bridge's adversarial review: 24 findings, 0 refuted — including `OTHERWISE`-reordering and elision-vs-record-equality, both instances of shape compiled away without a proof.
+- **I8 — Evaluation order is part of the contract.** L4's `AND`/`OR`/`IMPLIES` are lazy; a
+  target with strict connectives turns guard-then-use idioms into runtime aborts if lowered
+  naively. Re-encode short-circuit connectives as `if`/`then`/`else` in strict targets, and where
+  the target evaluates branches eagerly regardless (Catala's default calculus evaluates every
+  ladder rung), any rung whose condition can raise must veto the idiomatic form and force the
+  conservative encoding (the Catala bridge's "strictness veto", PR #266). Any strict-boolean
+  backend — including our own direct C-family emitters — inherits this hazard class.
 
 ## 5. The exportable core (P3)
 
@@ -292,7 +299,7 @@ sign-off from both sides' specs in their next revision.
   read as portfolio-universal.
 - **S3 — Z3, two routes.** Direct SMT lowering (verification spec Phase 1) vs. Z3 via Catala's
   proof plugin over emitted code (PR #260 §4.11, P4). **Both stand** — they prove different
-  things (L4-level properties vs. emitted-artifact properties); any claim must cite its route.
+  things (L4-level properties vs. emitted-artifact properties); any claim must cite its route. Disclosed-open (Catala spec §8.4): the standing equivalence grid verifies a re-derived rendering, not the emitted text itself; closing that gap needs solver-derived witnesses over the emitted artifact — future work on this seam's emitted-artifact route.
 - **S4 — prose, two producers.** Logical English (#258, a surface over the Prolog image) vs.
   TNR/NLG round-trip (branch `nlg-roundtrip`). Different fidelity contracts (executable surface
   vs. drafting prose); both stand; cross-cite.
@@ -317,9 +324,10 @@ sign-off from both sides' specs in their next revision.
   function for the backend-registration seam already on the backlog
   (extension/plug-in architecture), and the seam PR goes first.
 - **Assigned merge order (provisional, 2026-08-16; hardens when P5 is signed off):**
-  implementation PRs merge in readiness order — currently **DocAssemble M1** (the only
-  implementation in flight) → **Catala P1** (spec awaiting sign-off, implementation not yet
-  launched) → **Blawx** (gated on #258-R0 or its private-subset contingency, plus tier-2 infra).
+  implementation PRs merge in readiness order — **DocAssemble** (#264 spec → #265 impl) →
+  **Catala** (#260 spec → #266 impl) → **Blawx** (gated on #258-R0 or its private-subset
+  contingency, plus tier-2 infra). Both finished implementations are stacked on their spec
+  PRs; merge each spec first so the implementation enters the queue spec-free.
   Later arrivals rebase over earlier merges. If a third implementation PR is open while two are
   queued, the backend-registration seam goes first and all three rebase onto it.
 - **Dependency-direction constraint** (from the DocAssemble spec's M3): `jl4-query-plan` depends
