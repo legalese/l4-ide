@@ -116,11 +116,11 @@ tier, and any "LegalRuleML support" claim is about a file format, never a runnin
 
 ### 2.3 Interaction
 
-| target      | state                                                                                                                                                                                                                                                                                                     | owning artifact                                                   |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| DocAssemble | **SPEC signed off + IMPL in flight** — R1–R11 ANSWERED by Meng 2026-08-16 (spec §0, `313d2544`), draft PR #264; M1 implementation workflow running on `mengwong/docassemble-backend` (implement ∥ author-examples → integrate → ruling-lens verify); headless-runner harness proven by experiment **[E]** | `specs/todo/DOCASSEMBLE-EXPORT-SPEC.md`, PR #264                  |
-| Blawx       | **SPEC** — draft PR #261, R1–R14, direction L4 ⇄ Blawx; tier-1 s(CASP) execution of the worked example green (exact-rational division measured), tier-2 dockerized app round-trip queued **[E]**                                                                                                          | `specs/todo/BLAWX-EXPORT-SPEC.md`, branch `mengwong/blawx-bridge` |
-| web wizards | **SHIPPED** (Housing Act, Reg CF; question-ordering PR #94 v1, #110 v2 priors)                                                                                                                                                                                                                            | in-tree                                                           |
+| target      | state                                                                                                                                                                                                                                                                                                                                                                                                                               | owning artifact                                                   |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| DocAssemble | **IMPL DONE (draft)** — spec PR #264 (R1–R11 ANSWERED by Meng 2026-08-16, `313d2544`); implementation PR #265 stacked on it: build clean, 12 new `l4-cli-test` cases pass, headless round-trips vs docassemble.base 1.10.7 all match the `#EVAL` oracle, adversarial review fixed 5 bugs; seam footprint landed exactly as the §8 ledger forecasts. Merge #264 before #265 so the implementation enters the queue spec-free **[E]** | PRs #264 + #265                                                   |
+| Blawx       | **SPEC** — draft PR #261, R1–R14, direction L4 ⇄ Blawx; tier-1 s(CASP) execution of the worked example green (exact-rational division measured), tier-2 dockerized app round-trip queued **[E]**                                                                                                                                                                                                                                    | `specs/todo/BLAWX-EXPORT-SPEC.md`, branch `mengwong/blawx-bridge` |
+| web wizards | **SHIPPED** (Housing Act, Reg CF; question-ordering PR #94 v1, #110 v2 priors)                                                                                                                                                                                                                                                                                                                                                      | in-tree                                                           |
 
 DocAssemble is the designated consumer of three L4 assets no other bridge can use: `STRING`
 (rejected/elided by Catala, absent from Catala's type system), landed metadata-only `TYPICALLY`
@@ -217,7 +217,11 @@ independently in at least two of: the OpenFisca doc §6, CATALA-EXPORT-SPEC §7/
   (the `etc/validate-dmn.mjs` posture, now also `catala`'s per PR #260 R9).
 - **I5 — Naming.** Specs are `specs/todo/<TARGET>-EXPORT-SPEC.md` (family specs live in
   `specs/proposals/`); identifier mangling folds Unicode (DMN R3 precedent) and documents the
-  target's lexical-class mapping in the target spec.
+  target's lexical-class mapping in the target spec. Mangling must also route around the
+  **target's reserved-identifier namespace, vendored as a set** — the measured hazard: any
+  emitted attribute whose sanitised name collides with one of docassemble's 83 `DAObject` method
+  names (probed live) is silently pre-satisfied by a truthy bound method, wrong verdict, no
+  diagnostic (PR #265 adversarial-review finding). Every bridge owes its target the same probe.
 - **I6 — Spec form.** Status header in the present tense with a date; `[E]`/`[U]` evidence marks;
   rulings `R1..Rn` with the measurement → ruling → cost → case-against → not-decided template; a
   ruling-status table at §0.
