@@ -1,0 +1,1332 @@
+-- | Lower a typechecked L4 module to the docassemble 'DAPackage' IR.
+--
+-- v1 scope (DOCASSEMBLE-EXPORT-SPEC.md §6): @\@export@-annotated
+-- @DECIDE@/@MEANS@ whose parameters are records of primitives (BOOLEAN,
+-- NUMBER, STRING, DATE, nullary-constructor enums, nested records) and bare
+-- primitives; bodies drawn from the constitutive expression layer. Survival
+-- rules:
+--
+--   * R2 — a record-typed parameter becomes an @objects:@ @DAObject@ instance
+--     and /one question per stored field/, so docassemble's backchaining only
+--     ever asks the fields the goal's evaluation demands. Labels carry the L4
+--     field name verbatim.
+--   * R3 — every zero-@GIVEN@ @WHERE@ binding and every reachable top-level
+--     @DECIDE@ becomes one named @code:@ block, so the L4 structure survives
+--     at runtime. Function-valued bindings that are directly applied are
+--     beta-reduced at lower time (v1 emits no Python module); un-inlinable
+--     higher-order uses are refused by name.
+--   * R4 — an exported boolean decision whose body is a top-level
+--     @IMPLIES@ is split into scope + requirement variables and a scope-first
+--     driver; the classical @not scope or requirement@ is never emitted as
+--     the goal. /Nested/ implications read classically.
+--
+-- Deontic, ledger and IO constructs are refused with a named diagnostic and a
+-- 'FidelityNote' ('Blocking'); Rational→float, @TYPICALLY@ prefills and
+-- @MAYBE STRING@ erasure are declared 'Advisory' (spec §5).
+module L4.Docassemble.Lower
+  ( lowerModule
+  , LowerError (..)
+  , renderLowerError
+  ) where
+
+import Base
+import Control.Applicative ((<|>))
+import Data.Char (isAlphaNum, isDigit, toLower)
+import Data.Either (partitionEithers)
+import qualified Data.Map.Strict as Map
+import Data.Monoid (Any (..))
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+
+import Optics ((^.), cosmosOf, foldMapOf, gplate)
+
+import L4.Docassemble.IR
+import L4.Export (ExportedFunction (..), TypeDescMap, buildTypeDescMap, getExportedFunctions, isExportedDecide)
+import L4.Interchange.Fidelity
+  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..))
+import L4.Syntax
+import L4.TypeCheck.Environment
+  (booleanUnique, dateUnique, justUnique, maybeUnique, nothingUnique, numberUnique, stringUnique)
+
+-- | A reason a module (or one of its decisions) could not be compiled.
+data LowerError = MkLowerError
+  { errFn  :: !Text  -- ^ the offending decision (empty = module-level)
+  , errMsg :: !Text
+  }
+  deriving stock (Eq, Show)
+
+renderLowerError :: LowerError -> Text
+renderLowerError e
+  | Text.null e.errFn = e.errMsg
+  | otherwise         = "in `" <> e.errFn <> "`: " <> e.errMsg
+
+-- | An internal lowering failure. 'LFBlocked' marks constructs the target has
+-- no form for at all (deontic, ledger, IO): at the boundary of a /non-default/
+-- export it becomes a 'Blocking' 'FidelityNote' and the export is skipped;
+-- anywhere else (helpers, the default export) it hardens into a 'LowerError',
+-- because a skipped definition that something surviving depends on would leave
+-- a variable no block defines — a silently broken interview.
+data LF
+  = LFFatal !Text
+  | LFBlocked !Text !Text !Text  -- ^ note code, message, what is lost
+  deriving stock (Eq, Show)
+
+lfMessage :: LF -> Text
+lfMessage = \case
+  LFFatal m       -> m
+  LFBlocked _ m _ -> m
+
+-- ---------------------------------------------------------------------------
+-- Module context (scanned once)
+-- ---------------------------------------------------------------------------
+
+data EnumInfo = MkEnumInfo
+  { eiName :: !Text
+  , eiCons :: ![(Text, Int)]  -- ^ (constructor L4 name, payload arity)
+  }
+
+data ConInfo = MkConInfo
+  { ciName  :: !Text
+  , ciArity :: !Int
+  }
+
+data FieldSpec = MkFieldSpec
+  { fsU        :: !Unique
+  , fsL4       :: !Text
+  , fsSan      :: !Text
+  , fsTy       :: !(Type' Resolved)
+  , fsDesc     :: !(Maybe Text)
+  , fsDefault  :: !(Maybe (Expr Resolved))
+  , fsComputed :: !(Maybe (Expr Resolved))
+  }
+
+data RecordSpec = MkRecordSpec
+  { rsName   :: !Text
+  , rsFields :: ![FieldSpec]
+  }
+
+data TopDecide = MkTopDecide
+  { tdU        :: !Unique
+  , tdL4       :: !Text
+  , tdSan      :: !Text
+  , tdParams   :: ![Resolved]
+  , tdBody     :: !(Expr Resolved)
+  , tdExported :: !Bool
+  }
+
+data Ctx = MkCtx
+  { ctxEnums    :: !(Map Unique EnumInfo)          -- ^ keyed by enum /type/ unique
+  , ctxEnumCons :: !(Map Unique ConInfo)           -- ^ keyed by constructor unique
+  , ctxRecords  :: !(Map Unique RecordSpec)        -- ^ keyed by record /type/ unique
+  , ctxTop      :: ![TopDecide]                    -- ^ declaration order
+  , ctxTopByU   :: !(Map Unique TopDecide)
+  , ctxAssumes  :: !(Map Unique (Assume Resolved))
+  , ctxTypeDesc :: !TypeDescMap
+  }
+
+buildCtx :: Module Resolved -> Ctx
+buildCtx mod' =
+  let (enums, enumCons) = collectEnums mod'
+      tops = collectTopDecides mod'
+  in MkCtx
+       { ctxEnums    = enums
+       , ctxEnumCons = enumCons
+       , ctxRecords  = collectRecords mod'
+       , ctxTop      = tops
+       , ctxTopByU   = Map.fromList [ (td.tdU, td) | td <- tops ]
+       , ctxAssumes  = collectAssumes mod'
+       , ctxTypeDesc = buildTypeDescMap mod'
+       }
+
+collectEnums :: Module Resolved -> (Map Unique EnumInfo, Map Unique ConInfo)
+collectEnums (MkModule _ _ section) =
+  ( Map.fromList [ (u, ei) | (u, ei, _) <- defs ]
+  , Map.fromList (concat [ cs | (_, _, cs) <- defs ])
+  )
+ where
+  defs = goSection section
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) ->
+      let members = [ (resolvedToText c, length cargs) | MkConDecl _ c cargs <- conDecls ]
+          cons    = [ (getUnique c, MkConInfo (resolvedToText c) (length cargs))
+                    | MkConDecl _ c cargs <- conDecls ]
+      in [(getUnique tyRes, MkEnumInfo (resolvedToText tyRes) members, cons)]
+    Section _ sub -> goSection sub
+    _ -> []
+
+collectRecords :: Module Resolved -> Map Unique RecordSpec
+collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ recRes _ _) (RecordDecl _ _ fields)) ->
+      [ ( getUnique recRes
+        , MkRecordSpec
+            { rsName   = resolvedToText recRes
+            , rsFields =
+                [ MkFieldSpec
+                    { fsU        = getUnique fRes
+                    , fsL4       = resolvedToText fRes
+                    , fsSan      = pyIdent (resolvedToText fRes)
+                    , fsTy       = fTy
+                    , fsDesc     = getDesc <$> (fAnn ^. annDesc)
+                    , fsDefault  = mDflt
+                    , fsComputed = mMeans
+                    }
+                | MkTypedName fAnn fRes fTy mDflt mMeans <- fields
+                ]
+            }
+        )
+      ]
+    Section _ sub -> goSection sub
+    _ -> []
+
+collectTopDecides :: Module Resolved -> [TopDecide]
+collectTopDecides (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Decide _ d ->
+      let (ps, b) = decideFunShape d
+          nm      = resolvedToText (decideName d)
+      in [ MkTopDecide
+             { tdU        = getUnique (decideName d)
+             , tdL4       = nm
+             , tdSan      = pyIdent nm
+             , tdParams   = ps
+             , tdBody     = b
+             , tdExported = isExportedDecide d
+             } ]
+    Section _ sub -> goSection sub
+    _ -> []
+
+collectAssumes :: Module Resolved -> Map Unique (Assume Resolved)
+collectAssumes (MkModule _ _ section) = Map.fromList (goSection section)
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Assume _ a@(MkAssume _ _ (MkAppForm _ nmRes _ _) _ _) -> [(getUnique nmRes, a)]
+    Section _ sub -> goSection sub
+    _ -> []
+
+-- | A decision's parameters and its effective body. The @GIVEN@ signature is
+-- authoritative when present (the app-form arguments are references to the
+-- same bindings); a parameterless definition whose body is a @GIVEN … YIELD@
+-- lambda (e.g. the eta-expanded @`not covered if` MEANS GIVEN x YIELD x@ in
+-- rodentsAndVermin) is unwrapped into a function.
+decideFunShape :: Decide Resolved -> ([Resolved], Expr Resolved)
+decideFunShape (MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ _ appArgs _) body0) =
+  let ps0 = if null givens then appArgs else map givenName givens
+  in case (ps0, body0) of
+       ([], Lam _ (MkGivenSig _ lps) lbody) -> (map givenName lps, lbody)
+       _                                    -> (ps0, body0)
+
+-- ---------------------------------------------------------------------------
+-- The lowering environment
+-- ---------------------------------------------------------------------------
+
+data InlineFun = MkInlineFun
+  { ifU      :: !Unique
+  , ifParams :: ![Unique]
+  , ifBody   :: !(Expr Resolved)
+  }
+
+data Env = MkEnv
+  { envVars        :: !(Map Unique Text)            -- ^ reference → interview variable / attribute path
+  , envRecVars     :: !(Map Unique (Text, Unique))  -- ^ record-typed vars → (path, record type unique)
+  , envMaybeVars   :: !(Map Unique MaybeRepr)       -- ^ MAYBE-typed scalar inputs → erased representation (R8)
+  , envFuns        :: !(Map Unique InlineFun)       -- ^ function-valued bindings, inlined at application
+  , envEnumCons    :: !(Map Unique ConInfo)
+  , envRecords     :: !(Map Unique RecordSpec)
+  , envInlineStack :: ![Unique]                     -- ^ inlining in progress (recursion guard)
+  }
+
+-- | How an erased @MAYBE@ input represents @NOTHING@ at interview runtime
+-- (R8): @yesnomaybe@ stores it as Python @None@; an optional text field
+-- submits it as @''@.
+data MaybeRepr = ReprNone | ReprEmpty
+  deriving stock (Eq, Show)
+
+maybeReprOfTy :: Type' Resolved -> Maybe MaybeRepr
+maybeReprOfTy = \case
+  TyApp _ n [TyApp _ m []]
+    | getUnique n == maybeUnique && getUnique m == booleanUnique -> Just ReprNone
+    | getUnique n == maybeUnique && getUnique m == stringUnique  -> Just ReprEmpty
+  _ -> Nothing
+
+mkBaseEnv :: Ctx -> Env
+mkBaseEnv ctx = MkEnv
+  { envVars =
+      Map.union
+        (Map.fromList [ (td.tdU, td.tdSan) | td <- ctx.ctxTop, null td.tdParams ])
+        (Map.fromList [ (u, pyIdent (assumeName a)) | (u, a) <- Map.toList ctx.ctxAssumes ])
+  , envRecVars     = Map.empty
+  , envMaybeVars   = Map.fromList
+      [ (u, mr)
+      | (u, MkAssume _ _ _ (Just ty) _) <- Map.toList ctx.ctxAssumes
+      , Just mr <- [maybeReprOfTy ty]
+      ]
+  , envFuns        = Map.fromList
+      [ (td.tdU, MkInlineFun td.tdU (map getUnique td.tdParams) td.tdBody)
+      | td <- ctx.ctxTop, not (null td.tdParams)
+      ]
+  , envEnumCons    = ctx.ctxEnumCons
+  , envRecords     = ctx.ctxRecords
+  , envInlineStack = []
+  }
+
+-- ---------------------------------------------------------------------------
+-- Entry point
+-- ---------------------------------------------------------------------------
+
+lowerModule :: Module Resolved -> Either [LowerError] (DAPackage, FidelityReport)
+lowerModule mod' =
+  case getExportedFunctions mod' of
+    [] -> Left [MkLowerError "" "no @export-annotated DECIDE found to compile to docassemble"]
+    efs ->
+      let ctx     = buildCtx mod'
+          baseEnv = mkBaseEnv ctx
+
+          exportBodies = [ b | ef <- efs, let MkDecide _ _ _ b = ef.exportDecide ]
+          rootRefs     = Set.unions (map collectRefs exportBodies)
+          reach        = closureRefs ctx rootRefs
+          helpers      = [ td | td <- ctx.ctxTop
+                              , td.tdU `Set.member` reach
+                              , not td.tdExported
+                              , null td.tdParams ]
+          allBodies    = exportBodies <> map (.tdBody) helpers
+          allRefs      = Set.unions (map collectRefs allBodies)
+          assumeUs     = allRefs `Set.intersection` Map.keysSet ctx.ctxAssumes
+
+          -- A seam export's goal is deliberately never emitted as a variable
+          -- (R4), so another decision referencing it would dangle.
+          seamRefErrs =
+            [ MkLowerError ef.exportName
+                "this seam-shaped export (top-level IMPLIES) is referenced by another \
+                \decision; its goal variable is deliberately not emitted (R4), so the \
+                \reference would dangle — restructure or un-export it"
+            | ef <- efs
+            , isSeamShaped ef
+            , getUnique (decideName ef.exportDecide) `Set.member` allRefs
+            ]
+
+          assumeList = sortOn assumeName
+            [ a | (u, a) <- Map.toList ctx.ctxAssumes, u `Set.member` assumeUs ]
+          (aErrs, assumeQs) = partitionEithers (map (lowerAssumeQ ctx) assumeList)
+
+          (hErrs, helperCodes) = partitionEithers (map (lowerHelperTop ctx baseEnv) helpers)
+
+          (eErrs, eOuts) = partitionEithers (map (lowerExport ctx baseEnv) efs)
+          (skipNotes, units) = partitionEithers eOuts
+
+          allErrs = seamRefErrs <> aErrs <> hErrs <> eErrs
+      in if not (null allErrs)
+           then Left allErrs
+           else if null units
+             then Left [ MkLowerError "" $
+                           "no exported decision could be emitted — every export was refused: "
+                             <> Text.intercalate "; " [ n.message | n <- skipNotes ] ]
+             else do
+               let objectsEntries = nubOrd (concatMap (.euObjects) units)
+                   blocks0 =
+                        [ DAObjectsBlock objectsEntries | not (null objectsEntries) ]
+                     <> map DACodeBlock (concatMap (.euAttrCodes) units)
+                     <> map DAQuestionBlock (concatMap (.euQuestions) units)
+                     <> map DAQuestionBlock assumeQs
+                     <> map DACodeBlock (concat helperCodes)
+                     <> map DACodeBlock (concatMap (.euCodes) units)
+                     <> [ DADriverBlock d | u <- units, Just d <- [u.euDriver] ]
+                     <> map DAScreenBlock (concatMap (.euScreens) units)
+               -- Name collisions are checked before id dedup so a user-facing
+               -- collision (two L4 names sanitising to one variable) is
+               -- reported as such, not as an internal id collision.
+               checkNameCollisions blocks0
+               blocks <- dedupById blocks0
+               let inertFound = any exprHasInert allBodies
+                   report = MkFidelityReport
+                     { target = "docassemble"
+                     , notes  = skipNotes <> moduleNotes (moduleSource mod') inertFound blocks
+                     }
+               Right
+                 ( MkDAPackage
+                     { pkgSource = moduleSource mod'
+                     , pkgTitle  = moduleTitleOf mod'
+                     , pkgBlocks = blocks
+                     , pkgPlan   = Nothing
+                     }
+                 , report
+                 )
+
+-- | A top-level implication is necessarily boolean, so the seam fires when
+-- the declared GIVETH is BOOLEAN /or/ absent.
+isSeamShaped :: ExportedFunction -> Bool
+isSeamShaped ef =
+  let MkDecide _ (MkTypeSig _ _ mGiveth) _ body0 = ef.exportDecide
+      seamOK = case mGiveth of
+        Just (MkGivethSig _ t) -> isBoolTy t
+        Nothing                -> True
+  in seamOK && case peelWhere body0 of
+       App _ r [_, _] -> resolvedToText r == "__IMPLIES__"
+       _              -> False
+
+peelWhere :: Expr Resolved -> Expr Resolved
+peelWhere = \case
+  Where _ e _ -> peelWhere e
+  LetIn _ _ e -> peelWhere e
+  other       -> other
+
+isBoolTy :: Type' Resolved -> Bool
+isBoolTy = \case
+  TyApp _ n [] -> getUnique n == booleanUnique
+  _            -> False
+
+-- ---------------------------------------------------------------------------
+-- Per-module advisory notes (R6 float, R7 TYPICALLY, R8 MAYBE STRING, Inert)
+-- ---------------------------------------------------------------------------
+
+moduleNotes :: Text -> Bool -> [DABlock] -> [FidelityNote]
+moduleNotes src inertFound blocks =
+     [ MkFidelityNote
+         { code = "DA-FLOAT", severity = Advisory, element = src, range = Nothing
+         , message = "NUMBER is emitted as docassemble `datatype: number` and Python \
+                     \float arithmetic; L4 evaluates numbers as exact Rationals"
+         , lost = "exact decimal arithmetic — do not rely on exact equality of computed sums"
+         }
+     | anyNumeric ]
+  <> [ MkFidelityNote
+         { code = "DA-TYPICALLY", severity = Advisory, element = src, range = Nothing
+         , message = "TYPICALLY defaults prefill these fields (the user still submits \
+                     \the screen, so the entering value is user-confirmed): "
+                       <> Text.intercalate ", " prefilled
+         , lost = "L4's evaluator would have asked with no prefill; a prefilled widget biases the answer"
+         }
+     | not (null prefilled) ]
+  <> [ MkFidelityNote
+         { code = "DA-MAYBE-STRING", severity = Advisory, element = src, range = Nothing
+         , message = "MAYBE STRING fields are optional text inputs; an empty submission \
+                     \is read as NOTHING: " <> Text.intercalate ", " maybeStrs
+         , lost = "a deliberately empty answer is indistinguishable from an absent one"
+         }
+     | not (null maybeStrs) ]
+  <> [ MkFidelityNote
+         { code = "DA-INERT", severity = Advisory, element = src, range = Nothing
+         , message = "inert prose scaffolding was lowered to its boolean identity \
+                     \(True in AND context, False in OR context)"
+         , lost = "the scaffolding prose itself; it does not appear in the interview"
+         }
+     | inertFound ]
+ where
+  questions  = [ q | DAQuestionBlock q <- blocks ]
+  codes      = [ c | DACodeBlock c <- blocks ]
+  prefilled  = [ q.qVar | q <- questions, isJust q.qDefault ]
+  maybeStrs  = [ q.qVar | q <- questions, q.qControl == CtlTextOptional ]
+  anyNumeric = any (\q -> q.qControl == CtlNumber) questions
+            || any (bodyHasNumeric . (.cBody)) codes
+
+bodyHasNumeric :: DACodeBody -> Bool
+bodyHasNumeric = \case
+  DAAssign e        -> exprHasNumeric e
+  DAIfChain arms d  -> any (\(c, v) -> exprHasNumeric c || exprHasNumeric v) arms || exprHasNumeric d
+  DAInstantiate _   -> False
+
+exprHasNumeric :: DAExpr -> Bool
+exprHasNumeric = \case
+  DANum _      -> True
+  DABin {}     -> True
+  DACmp _ a b  -> exprHasNumeric a || exprHasNumeric b
+  DAAnd a b    -> exprHasNumeric a || exprHasNumeric b
+  DAOr a b     -> exprHasNumeric a || exprHasNumeric b
+  DANot a      -> exprHasNumeric a
+  DACond c t e -> exprHasNumeric c || exprHasNumeric t || exprHasNumeric e
+  DAIsNone a   -> exprHasNumeric a
+  _            -> False
+
+exprHasInert :: Expr Resolved -> Bool
+exprHasInert =
+  getAny . foldMapOf (cosmosOf (gplate @(Expr Resolved))) \case
+    Inert {} -> Any True
+    _        -> Any False
+
+-- ---------------------------------------------------------------------------
+-- Reachability
+-- ---------------------------------------------------------------------------
+
+-- | Every identifier an expression references, as plain variable or applied
+-- function (the 'L4.Export.collectReferencedUniques' pattern).
+collectRefs :: Expr Resolved -> Set Unique
+collectRefs =
+  foldMapOf (cosmosOf (gplate @(Expr Resolved))) \case
+    App _ r _ -> Set.singleton (getUnique r)
+    _         -> Set.empty
+
+closureRefs :: Ctx -> Set Unique -> Set Unique
+closureRefs ctx = go Set.empty . Set.toList
+ where
+  go seen [] = seen
+  go seen (u : us)
+    | u `Set.member` seen = go seen us
+    | Just td <- Map.lookup u ctx.ctxTopByU =
+        go (Set.insert u seen) (Set.toList (collectRefs td.tdBody) <> us)
+    | otherwise = go seen us
+
+-- ---------------------------------------------------------------------------
+-- Assume questions and helper decides
+-- ---------------------------------------------------------------------------
+
+lowerAssumeQ :: Ctx -> Assume Resolved -> Either LowerError DAQuestion
+lowerAssumeQ ctx a@(MkAssume ann _ _ mTy mTypically) = hardLF nm do
+  ty   <- maybe (Left (LFFatal "ASSUME has no declared type; docassemble needs one to pick a datatype")) Right mTy
+  kind <- classifyTy ctx ty
+  case kind of
+    PRecord _ _ -> Left (LFFatal "record-typed ASSUME is not supported in v1 — pass it as a GIVEN parameter instead")
+    _ -> do
+      ctl  <- controlOf kind nm
+      dflt <- traverse (lowerDefaultLit ctx) mTypically
+      let dsc = (getDesc <$> (ann ^. annDesc)) <|> typeDescOf ctx ty
+      pure (mkQuestion (pyIdent nm) nm dsc ctl dflt)
+ where
+  nm = assumeName a
+
+assumeName :: Assume Resolved -> Text
+assumeName (MkAssume _ _ (MkAppForm _ r _ _) _ _) = resolvedToText r
+
+-- | A reachable zero-parameter top-level DECIDE becomes one unprefixed
+-- @code:@ block (R3). A blocked construct here hardens into an error: a
+-- surviving export depends on this definition.
+lowerHelperTop :: Ctx -> Env -> TopDecide -> Either LowerError [DACode]
+lowerHelperTop _ctx env td = hardLF td.tdL4 do
+  let env1 = env { envInlineStack = [td.tdU] }
+  (env2, pcs, inner) <- processBindings env1 td.tdSan td.tdBody
+  cb <- lowerTopBody env2 inner
+  pure (map pcToCode pcs <> [mkCode td.tdSan (Just td.tdL4) cb])
+
+-- ---------------------------------------------------------------------------
+-- Exported decisions
+-- ---------------------------------------------------------------------------
+
+data ExpUnit = MkExpUnit
+  { euObjects   :: ![(Text, Text)]
+  , euAttrCodes :: ![DACode]      -- ^ nested-record instantiations + computed fields
+  , euQuestions :: ![DAQuestion]
+  , euCodes     :: ![DACode]      -- ^ WHERE bindings, goal/scope/requirement
+  , euDriver    :: !(Maybe DADriver)
+  , euScreens   :: ![DAScreen]
+  }
+
+data ParamArt = MkParamArt
+  { paObject     :: !(Maybe (Text, Text))
+  , paCodes      :: ![DACode]
+  , paQuestions  :: ![DAQuestion]
+  , paVarEntry   :: !(Maybe (Unique, Text))
+  , paRecEntry   :: !(Maybe (Unique, (Text, Unique)))
+  , paMaybeEntry :: !(Maybe (Unique, MaybeRepr))
+  }
+
+lowerExport
+  :: Ctx -> Env -> ExportedFunction
+  -> Either LowerError (Either FidelityNote ExpUnit)
+lowerExport ctx baseEnv ef =
+  convert (run ())
+ where
+  fnL4 = ef.exportName
+  MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes _ _) body0 =
+    ef.exportDecide
+  goalSan = pyIdent fnL4
+
+  -- The default export drives the interview: skipping it would leave the
+  -- interview without an endpoint, so a blocked default is a hard error.
+  convert = \case
+    Right unit -> Right (Right unit)
+    Left (LFFatal m) -> Left (MkLowerError fnL4 m)
+    Left (LFBlocked cd m lostTxt)
+      | ef.exportIsDefault ->
+          Left (MkLowerError fnL4 (m <> " (and this is the default export, which must drive the interview)"))
+      | otherwise ->
+          Right (Left MkFidelityNote
+            { code = cd, severity = Blocking, element = fnL4
+            , range = Nothing, message = m, lost = lostTxt })
+
+  run () = do
+    paramArts <- traverse (lowerParam ctx baseEnv) givens
+    let envP = baseEnv
+          { envVars = Map.union
+              (Map.fromList (mapMaybe (.paVarEntry) paramArts)) baseEnv.envVars
+          , envRecVars = Map.union
+              (Map.fromList (mapMaybe (.paRecEntry) paramArts)) baseEnv.envRecVars
+          , envMaybeVars = Map.union
+              (Map.fromList (mapMaybe (.paMaybeEntry) paramArts)) baseEnv.envMaybeVars
+          , envInlineStack = [getUnique fnRes]
+          }
+    (envB, pendings, inner) <- processBindings envP goalSan body0
+    let retTy    = (\(MkGivethSig _ t) -> t) <$> mGiveth
+        boolGoal = maybe False isBoolTy retTy
+        whereCodes = map pcToCode pendings
+        dsc = if Text.null ef.exportDescription then Nothing else Just ef.exportDescription
+    (goalCodes, mDriver, screens) <- case inner of
+      -- R4: the verdict seam. Scope and requirement are separate seekable
+      -- variables; the driver is scope-first; the classical short-circuit is
+      -- never the goal. A top-level implication is necessarily boolean, so
+      -- the seam also fires when the GIVETH is absent.
+      App _ r [scopeE, reqE]
+        | maybe True isBoolTy retTy, resolvedToText r == "__IMPLIES__" -> do
+        sb <- lowerTopBody envB scopeE
+        qb <- lowerTopBody envB reqE
+        let scopeV   = goalSan <> "_scope"
+            reqV     = goalSan <> "_requirement"
+            verdictV = goalSan <> "_verdict"
+            evC = goalSan <> "_screen_complies"
+            evI = goalSan <> "_screen_in_breach"
+            evN = goalSan <> "_screen_not_applicable"
+            codes =
+              [ mkCode scopeV (Just (fnL4 <> " — scope"))       sb
+              , mkCode reqV   (Just (fnL4 <> " — requirement")) qb
+              ]
+        pure $ if ef.exportIsDefault
+          then ( codes
+               , Just (DASeamDriver ("driver_" <> goalSan) fnL4 scopeV reqV verdictV evC evI evN)
+               , [ mkScreen evC fnL4 dsc "Complies"
+                     "This rule applies to the situation described, and its requirement is satisfied." Nothing
+                 , mkScreen evI fnL4 dsc "InBreach"
+                     "This rule applies to the situation described, and its requirement is NOT satisfied." Nothing
+                 , mkScreen evN fnL4 dsc "NotApplicable"
+                     "This rule does not apply to the situation described; its requirement was never asked." Nothing
+                 ] )
+          else (codes, Nothing, [])
+      _ | boolGoal -> do
+            gb <- lowerTopBody envB inner
+            let evH = goalSan <> "_screen_holds"
+                evF = goalSan <> "_screen_fails"
+                codes = [mkCode goalSan (Just fnL4) gb]
+            pure $ if ef.exportIsDefault
+              then ( codes
+                   , Just (DABoolDriver ("driver_" <> goalSan) fnL4 goalSan evH evF)
+                   , [ mkScreen evH fnL4 dsc "Holds"
+                         "On the answers given, this decision evaluates TRUE." Nothing
+                     , mkScreen evF fnL4 dsc "Fails"
+                         "On the answers given, this decision evaluates FALSE." Nothing
+                     ] )
+              else (codes, Nothing, [])
+        | otherwise -> do
+            gb <- lowerTopBody envB inner
+            let evR = goalSan <> "_screen_result"
+                codes = [mkCode goalSan (Just fnL4) gb]
+            pure $ if ef.exportIsDefault
+              then ( codes
+                   , Just (DAValueDriver ("driver_" <> goalSan) fnL4 goalSan evR)
+                   , [ mkScreen evR fnL4 dsc "Result"
+                         "On the answers given, the value of this decision is:" (Just goalSan) ]
+                   )
+              else (codes, Nothing, [])
+    pure MkExpUnit
+      { euObjects   = mapMaybe (.paObject) paramArts
+      , euAttrCodes = concatMap (.paCodes) paramArts
+      , euQuestions = concatMap (.paQuestions) paramArts
+      , euCodes     = whereCodes <> goalCodes
+      , euDriver    = mDriver
+      , euScreens   = screens
+      }
+
+mkScreen :: Text -> Text -> Maybe Text -> Text -> Text -> Maybe Text -> DAScreen
+mkScreen ev goalL4 dsc verdict explain showVar = MkDAScreen
+  { sId = "ev_" <> ev, sEvent = ev, sGoalL4 = goalL4
+  , sDesc = dsc, sVerdict = verdict, sExplain = explain, sShowVar = showVar
+  }
+
+-- ---------------------------------------------------------------------------
+-- Parameters and record fields (R2)
+-- ---------------------------------------------------------------------------
+
+lowerParam :: Ctx -> Env -> OptionallyTypedName Resolved -> Either LF ParamArt
+lowerParam ctx env (MkOptionallyTypedName ann r mTy mTypically) = do
+  ty   <- maybe (Left (LFFatal ("parameter `" <> l4 <> "` has no declared type"))) Right mTy
+  kind <- classifyTy ctx ty
+  case kind of
+    PRecord ru rs -> do
+      when (isJust mTypically) $
+        Left (LFFatal ("TYPICALLY on record parameter `" <> l4 <> "` is not supported"))
+      (attrCodes, qs) <- lowerRecordFields ctx env [ru] var rs
+      pure MkParamArt
+        { paObject = Just (var, "DAObject"), paCodes = attrCodes, paQuestions = qs
+        , paVarEntry = Nothing, paRecEntry = Just (u, (var, ru))
+        , paMaybeEntry = Nothing }
+    _ -> do
+      ctl  <- controlOf kind l4
+      dflt <- traverse (lowerDefaultLit ctx) mTypically
+      let dsc = (getDesc <$> (ann ^. annDesc)) <|> typeDescOf ctx ty
+      pure MkParamArt
+        { paObject = Nothing, paCodes = []
+        , paQuestions = [mkQuestion var l4 dsc ctl dflt]
+        , paVarEntry = Just (u, var), paRecEntry = Nothing
+        , paMaybeEntry = (u,) <$> maybeReprOfTy ty }
+ where
+  l4  = resolvedToText r
+  var = pyIdent l4
+  u   = getUnique r
+
+-- | One question per stored field, a @code:@ block per computed field, a
+-- @DAObject@ instantiation plus recursion per nested record field.
+lowerRecordFields
+  :: Ctx -> Env -> [Unique] -> Text -> RecordSpec
+  -> Either LF ([DACode], [DAQuestion])
+lowerRecordFields ctx env visited path rs = do
+  parts <- traverse fieldArt rs.rsFields
+  pure (concatMap fst parts, concatMap snd parts)
+ where
+  recTyU f = case f.fsTy of
+    TyApp _ n _ | Map.member (getUnique n) ctx.ctxRecords -> Just (getUnique n)
+    _ -> Nothing
+
+  -- Sibling fields are in scope for computed (MEANS) fields.
+  sibEnv = env
+    { envVars = Map.union
+        (Map.fromList
+           [ (f.fsU, path <> "." <> f.fsSan) | f <- rs.rsFields, isNothing (recTyU f) ])
+        env.envVars
+    , envRecVars = Map.union
+        (Map.fromList
+           [ (f.fsU, (path <> "." <> f.fsSan, ru))
+           | f <- rs.rsFields, Just ru <- [recTyU f] ])
+        env.envRecVars
+    }
+
+  fieldArt f = do
+    let attrVar = path <> "." <> f.fsSan
+    case f.fsComputed of
+      Just meansE -> do
+        (envW, pcs, innerE) <- processBindings sibEnv (underscored attrVar) meansE
+        cb <- lowerTopBody envW innerE
+        pure (map pcToCode pcs <> [mkCode attrVar (Just f.fsL4) cb], [])
+      Nothing -> do
+        kind <- classifyTy ctx f.fsTy
+        case kind of
+          PRecord ru rs' -> do
+            when (ru `elem` visited) $
+              Left (LFFatal ("recursive record nesting via field `" <> f.fsL4 <> "`"))
+            when (isJust f.fsDefault) $
+              Left (LFFatal ("TYPICALLY on record-typed field `" <> f.fsL4 <> "` is not supported"))
+            (subCodes, subQs) <- lowerRecordFields ctx env (ru : visited) attrVar rs'
+            let initCode = MkDACode
+                  { cId = "c_" <> underscored attrVar, cVar = attrVar
+                  , cL4 = Just f.fsL4, cBody = DAInstantiate "DAObject", cDeps = [] }
+            pure (initCode : subCodes, subQs)
+          _ -> do
+            ctl  <- controlOf kind f.fsL4
+            dflt <- traverse (lowerDefaultLit ctx) f.fsDefault
+            let dsc = f.fsDesc <|> typeDescOf ctx f.fsTy
+            pure ([], [mkQuestion attrVar f.fsL4 dsc ctl dflt])
+
+mkQuestion :: Text -> Text -> Maybe Text -> DAFieldControl -> Maybe DAExpr -> DAQuestion
+mkQuestion var l4 dsc ctl dflt = MkDAQuestion
+  { qId = "q_" <> underscored var, qVar = var, qLabel = l4, qText = l4
+  , qHelp = dsc, qControl = ctl, qDefault = dflt }
+
+-- ---------------------------------------------------------------------------
+-- Type classification (R6, R8)
+-- ---------------------------------------------------------------------------
+
+data ParamKind
+  = PBool | PNumber | PString | PDate
+  | PMaybeBool | PMaybeString
+  | PEnum EnumInfo
+  | PRecord Unique RecordSpec
+
+classifyTy :: Ctx -> Type' Resolved -> Either LF ParamKind
+classifyTy ctx = \case
+  TyApp _ n []
+    | getUnique n == booleanUnique -> Right PBool
+    | getUnique n == numberUnique  -> Right PNumber
+    | getUnique n == stringUnique  -> Right PString
+    | getUnique n == dateUnique    -> Right PDate
+    | Just ei <- Map.lookup (getUnique n) ctx.ctxEnums   -> Right (PEnum ei)
+    | Just rs <- Map.lookup (getUnique n) ctx.ctxRecords -> Right (PRecord (getUnique n) rs)
+    | otherwise -> Left (LFFatal ("unsupported type `" <> resolvedToText n <> "` for a docassemble input (v1: BOOLEAN, NUMBER, STRING, DATE, nullary enums, records of these)"))
+  TyApp _ n [inner]
+    | getUnique n == maybeUnique -> do
+        innerKind <- classifyTy ctx inner
+        case innerKind of
+          PBool   -> Right PMaybeBool
+          PString -> Right PMaybeString
+          PNumber -> Left (LFFatal "MAYBE NUMBER is refused in v1 (R8): an unanswered docassemble number submits as 0, so absence would be indistinguishable from a real answer (M4: paired is-known question)")
+          PDate   -> Left (LFFatal "MAYBE DATE is refused in v1 (R8): an unanswered docassemble date submits as '', so absence would be indistinguishable from a real answer (M4: paired is-known question)")
+          _       -> Left (LFFatal "unsupported MAYBE payload for a docassemble input (v1: MAYBE BOOLEAN and MAYBE STRING only)")
+  Fun {}    -> Left (LFFatal "a function-typed value cannot be a docassemble input")
+  ty        -> Left (LFFatal ("unsupported type shape for a docassemble input: " <> typeHead ty))
+ where
+  typeHead :: Type' Resolved -> Text
+  typeHead = \case
+    Type {}   -> "TYPE"
+    TyApp _ n args -> resolvedToText n <> (if null args then "" else " OF …")
+    Fun {}    -> "FUNCTION"
+    Forall {} -> "FORALL"
+    InfVar {} -> "inference variable"
+
+controlOf :: ParamKind -> Text -> Either LF DAFieldControl
+controlOf kind l4 = case kind of
+  PBool        -> Right CtlYesNoRadio
+  PNumber      -> Right CtlNumber
+  PString      -> Right CtlText
+  PDate        -> Right CtlDate
+  PMaybeBool   -> Right CtlYesNoMaybe
+  PMaybeString -> Right CtlTextOptional
+  PEnum ei     ->
+    case [ cn | (cn, ar) <- ei.eiCons, ar > 0 ] of
+      []        -> Right (CtlRadio (map fst ei.eiCons))
+      (bad : _) -> Left (LFFatal ("enum `" <> ei.eiName <> "` has payload constructor `" <> bad
+                                   <> "`; payload constructors are refused in v1 (M4: `show if` follow-ups)"))
+  PRecord _ _  -> Left (LFFatal ("internal: record-typed `" <> l4 <> "` reached scalar-control classification"))
+
+typeDescOf :: Ctx -> Type' Resolved -> Maybe Text
+typeDescOf ctx = \case
+  TyApp _ n _ -> Map.lookup (getUnique n) ctx.ctxTypeDesc
+  _           -> Nothing
+
+-- | @TYPICALLY@ defaults must be literals (R7): numeric, string, boolean, or
+-- a nullary enum constructor.
+lowerDefaultLit :: Ctx -> Expr Resolved -> Either LF DAExpr
+lowerDefaultLit ctx = \case
+  Lit _ (NumericLit _ v) -> Right (DANum v)
+  Lit _ (StringLit _ t)  -> Right (DAStrLit t)
+  App _ r []
+    | Just b <- boolLit (resolvedToText r) -> Right (DABoolLit b)
+    | Just ci <- Map.lookup (getUnique r) ctx.ctxEnumCons
+    , ci.ciArity == 0 -> Right (DAStrLit ci.ciName)
+  _ -> Left (LFFatal "unsupported TYPICALLY default — v1 accepts literals and nullary enum constructors only")
+
+-- ---------------------------------------------------------------------------
+-- WHERE / LET bindings (R3)
+-- ---------------------------------------------------------------------------
+
+data PendingCode = MkPendingCode
+  { pcVar  :: !Text
+  , pcL4   :: !Text
+  , pcBody :: !DACodeBody
+  }
+
+data BindEntry
+  = BindVar !Unique !Text !Text !(Expr Resolved)      -- ^ unique, L4 name, variable, body
+  | BindFun !Unique !Text ![Unique] !(Expr Resolved)  -- ^ unique, L4 name, params, body
+
+-- | Peel @WHERE@/@LET@ layers off the top of a definition body. Every
+-- zero-parameter binding becomes one @code:@ block named
+-- @\<prefix\>_\<binding\>@; function-valued bindings are registered for
+-- inline application. All binding names enter scope before any body is
+-- lowered, so bindings may reference each other in either order.
+processBindings :: Env -> Text -> Expr Resolved -> Either LF (Env, [PendingCode], Expr Resolved)
+processBindings env prefix expr0 = case expr0 of
+  Where _ inner decls -> withDecls decls inner
+  LetIn _ decls inner -> withDecls decls inner
+  other               -> Right (env, [], other)
+ where
+  withDecls decls inner = do
+    entries <- traverse classifyDecl decls
+    let env1 = foldl' extendEnv env entries
+    pcs <- concat <$> traverse (lowerBinding env1) entries
+    (env2, morePcs, inner') <- processBindings env1 prefix inner
+    pure (env2, pcs <> morePcs, inner')
+
+  classifyDecl = \case
+    LocalDecide _ d ->
+      let (ps, b) = decideFunShape d
+          nm      = resolvedToText (decideName d)
+          u       = getUnique (decideName d)
+      in Right $ if null ps
+           then BindVar u nm (prefix <> "_" <> pyIdent nm) b
+           else BindFun u nm (map getUnique ps) b
+    LocalAssume _ a ->
+      Left (LFFatal ("local ASSUME `" <> assumeName a
+                      <> "` in WHERE is not supported in v1 — declare it at module level or pass it as a GIVEN"))
+
+  extendEnv envAcc = \case
+    BindVar u _ var _  -> envAcc { envVars = Map.insert u var envAcc.envVars }
+    BindFun u _ ps b   -> envAcc { envFuns = Map.insert u (MkInlineFun u ps b) envAcc.envFuns }
+
+  lowerBinding env1 = \case
+    BindFun {} -> Right []  -- inlined at each application site (R3)
+    BindVar _ nm var b -> do
+      (env2, subPcs, innerB) <- processBindings env1 var b
+      cb <- lowerTopBody env2 innerB
+      pure (subPcs <> [MkPendingCode var nm cb])
+
+pcToCode :: PendingCode -> DACode
+pcToCode pc = mkCode pc.pcVar (Just pc.pcL4) pc.pcBody
+
+mkCode :: Text -> Maybe Text -> DACodeBody -> DACode
+mkCode var mL4 cb = MkDACode
+  { cId = "c_" <> underscored var, cVar = var, cL4 = mL4
+  , cBody = cb, cDeps = nubOrd (bodyVars cb) }
+
+bodyVars :: DACodeBody -> [Text]
+bodyVars = \case
+  DAAssign e       -> exprVars e
+  DAIfChain arms d -> concatMap (\(c, v) -> exprVars c <> exprVars v) arms <> exprVars d
+  DAInstantiate _  -> []
+
+exprVars :: DAExpr -> [Text]
+exprVars = \case
+  DAVar v      -> [v]
+  DABin _ a b  -> exprVars a <> exprVars b
+  DACmp _ a b  -> exprVars a <> exprVars b
+  DAAnd a b    -> exprVars a <> exprVars b
+  DAOr a b     -> exprVars a <> exprVars b
+  DANot a      -> exprVars a
+  DACond c t e -> exprVars c <> exprVars t <> exprVars e
+  DAIsNone a   -> exprVars a
+  _            -> []
+
+-- ---------------------------------------------------------------------------
+-- Bodies and expressions
+-- ---------------------------------------------------------------------------
+
+-- | The body of one @code:@ block. A top-level @CONSIDER@/@BRANCH@/@IF@
+-- renders as an if/elif/else chain (R6); nested ones become Python
+-- conditional expressions.
+lowerTopBody :: Env -> Expr Resolved -> Either LF DACodeBody
+lowerTopBody env e0 = case e0 of
+  Consider _ scrut branches -> do
+    (arms, d) <- considerArms env scrut branches
+    pure (DAIfChain arms d)
+  MultiWayIf _ guards oth -> do
+    (arms, d) <- multiWayArms env guards oth
+    pure (DAIfChain arms d)
+  IfThenElse _ c t el ->
+    (\c' t' e' -> DAIfChain [(c', t')] e')
+      <$> lowerExpr env c <*> lowerExpr env t <*> lowerExpr env el
+  _ -> DAAssign <$> lowerExpr env e0
+
+considerArms
+  :: Env -> Expr Resolved -> [Branch Resolved]
+  -> Either LF ([(DAExpr, DAExpr)], DAExpr)
+considerArms env scrut branches
+  | Just repr <- scrutMaybeRepr env scrut = maybeArms env repr scrut branches
+  | otherwise = do
+      scrutE <- lowerExpr env scrut
+      let whens  = [ (con, b) | MkBranch _ (When _ (PatApp _ con [])) b <- branches ]
+          others = [ b | MkBranch _ (Otherwise _) b <- branches ]
+      when (length whens + length others /= length branches) $
+        Left (LFFatal "only nullary enum-constructor WHEN patterns (plus OTHERWISE) are supported in v1")
+      d <- case others of
+        (d0 : _) -> lowerExpr env d0
+        []       -> Left (LFFatal "CONSIDER without an OTHERWISE cannot be compiled to docassemble (R6: the ==/elif chain needs a default arm)")
+      arms <- for whens \(con, b) -> do
+        cond <- enumTest env scrutE con
+        v    <- lowerExpr env b
+        pure (cond, v)
+      pure (arms, d)
+
+-- | The erased representation of a @MAYBE@ scrutinee, when there is one: a
+-- bare @MAYBE@-typed parameter/ASSUME, or a projection whose field is
+-- @MAYBE BOOLEAN@/@MAYBE STRING@ (R8).
+scrutMaybeRepr :: Env -> Expr Resolved -> Maybe MaybeRepr
+scrutMaybeRepr env = \case
+  App _ r []     -> Map.lookup (getUnique r) env.envMaybeVars
+  Proj _ inner f -> do
+    (_, spec) <- resolvePath env inner
+    fld <- find (\fs -> fs.fsL4 == resolvedToText f) spec.rsFields
+    maybeReprOfTy fld.fsTy
+  _ -> Nothing
+
+-- | R8: a @CONSIDER@ over a @MAYBE@ input pattern-matches on /presence/. v1
+-- accepts exactly one @WHEN JUST x@ arm plus one absence arm (@WHEN NOTHING@
+-- or @OTHERWISE@). The absence test is the input's erased runtime
+-- representation — @is None@ for @MAYBE BOOLEAN@ (@yesnomaybe@), @== ''@ for
+-- @MAYBE STRING@ — and the @JUST@-bound variable reads the input itself.
+maybeArms
+  :: Env -> MaybeRepr -> Expr Resolved -> [Branch Resolved]
+  -> Either LF ([(DAExpr, DAExpr)], DAExpr)
+maybeArms env repr scrut branches = do
+  scrutE <- lowerExpr env scrut
+  scrutV <- case scrutE of
+    DAVar v -> Right v
+    _       -> Left (LFFatal "presence match (JUST/NOTHING) is supported only directly on a MAYBE input (R8)")
+  let justs    = [ (pv, b) | MkBranch _ (When _ (PatApp _ con [pv])) b <- branches
+                           , getUnique con == justUnique ]
+      nothings = [ b | MkBranch _ (When _ (PatApp _ con [])) b <- branches
+                     , getUnique con == nothingUnique ]
+      others   = [ b | MkBranch _ (Otherwise _) b <- branches ]
+  case (justs, nothings <> others) of
+    ([(pv, jb)], [nb]) | length branches == 2 -> do
+      ju <- case pv of
+        PatVar _ v    -> Right (getUnique v)
+        PatApp _ v [] -> Right (getUnique v)
+        _             -> Left (LFFatal "the JUST pattern must bind a plain variable (v1)")
+      bodyJ <- lowerExpr env { envVars = Map.insert ju scrutV env.envVars } jb
+      bodyN <- lowerExpr env nb
+      let absent = case repr of
+            ReprNone  -> DAIsNone scrutE
+            ReprEmpty -> DACmp DAEq scrutE (DAStrLit "")
+      pure ([(absent, bodyN)], bodyJ)
+    _ -> Left (LFFatal "CONSIDER over a MAYBE value must have exactly one `WHEN JUST x` arm and one absence arm (`WHEN NOTHING` or OTHERWISE) (R8)")
+
+enumTest :: Env -> DAExpr -> Resolved -> Either LF DAExpr
+enumTest env scrutE con =
+  case Map.lookup (getUnique con) env.envEnumCons of
+    Just ci
+      | ci.ciArity == 0 -> Right (DACmp DAEq scrutE (DAStrLit ci.ciName))
+      | otherwise -> Left (LFFatal ("CONSIDER: constructor `" <> ci.ciName <> "` carries a payload; payload patterns are refused in v1"))
+    Nothing -> Left (LFFatal ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor (only enum CONSIDER is supported in v1)"))
+
+multiWayArms
+  :: Env -> [GuardedExpr Resolved] -> Expr Resolved
+  -> Either LF ([(DAExpr, DAExpr)], DAExpr)
+multiWayArms env guards oth = do
+  d    <- lowerExpr env oth
+  arms <- for guards \(MkGuardedExpr _ c b) ->
+    (,) <$> lowerExpr env c <*> lowerExpr env b
+  pure (arms, d)
+
+lowerExpr :: Env -> Expr Resolved -> Either LF DAExpr
+lowerExpr env = go
+ where
+  go = \case
+    And _ a b       -> DAAnd <$> go a <*> go b
+    Or _ a b        -> DAOr <$> go a <*> go b
+    Not _ a         -> DANot <$> go a
+    -- A *nested* implication reads classically (R4); only the top-level
+    -- implication of an exported boolean decision is the seam, and that is
+    -- intercepted in 'lowerExport' before this function ever sees it.
+    Implies _ a b   -> (\x y -> DAOr (DANot x) y) <$> go a <*> go b
+    Equals _ a b    -> DACmp DAEq  <$> go a <*> go b
+    Leq _ a b       -> DACmp DALeq <$> go a <*> go b
+    Geq _ a b       -> DACmp DAGeq <$> go a <*> go b
+    Lt _ a b        -> DACmp DALt  <$> go a <*> go b
+    Gt _ a b        -> DACmp DAGt  <$> go a <*> go b
+    Plus _ a b      -> DABin DAAdd <$> go a <*> go b
+    Minus _ a b     -> DABin DASub <$> go a <*> go b
+    Times _ a b     -> DABin DAMul <$> go a <*> go b
+    DividedBy _ a b -> DABin DADiv <$> go a <*> go b
+    Modulo _ a b    -> DABin DAMod <$> go a <*> go b
+    IfThenElse _ c t e -> DACond <$> go c <*> go t <*> go e
+    Percent _ a     -> (\x -> DABin DADiv x (DANum 100)) <$> go a
+    Lit _ (NumericLit _ v) -> Right (DANum v)
+    Lit _ (StringLit _ t)  -> Right (DAStrLit t)
+    Proj _ inner f  -> lowerProj env inner f
+    App _ r args    -> lowerApp env go r args
+    Consider _ scrut branches -> do
+      (arms, d) <- considerArms env scrut branches
+      pure (foldr (\(c, v) acc -> DACond c v acc) d arms)
+    MultiWayIf _ guards oth -> do
+      (arms, d) <- multiWayArms env guards oth
+      pure (foldr (\(c, v) acc -> DACond c v acc) d arms)
+    -- Inert prose scaffolding evaluates to the identity of its containing
+    -- boolean operator, exactly as the L4 evaluator treats it; an Advisory
+    -- note is raised per module ('moduleNotes').
+    Inert _ _ ictx -> Right (DABoolLit (inertIdentity ictx))
+    other -> Left (refuse other)
+
+  inertIdentity = \case
+    InertCtxAnd  -> True
+    InertCtxOr   -> False
+    InertCtxNone -> True
+
+-- | @p's field@ (possibly nested) resolves to a dotted attribute path on a
+-- record-typed variable; docassemble seeks each attribute independently.
+lowerProj :: Env -> Expr Resolved -> Resolved -> Either LF DAExpr
+lowerProj env inner f =
+  case resolvePath env inner of
+    Just (path, spec) ->
+      case find (\fs -> fs.fsL4 == resolvedToText f) spec.rsFields of
+        Just fld -> Right (DAVar (path <> "." <> fld.fsSan))
+        Nothing  -> Left (LFFatal ("record `" <> spec.rsName <> "` has no field `" <> resolvedToText f <> "`"))
+    Nothing -> Left (LFFatal "only projection off a record-typed parameter (or a nested record field of one) is supported in v1")
+
+resolvePath :: Env -> Expr Resolved -> Maybe (Text, RecordSpec)
+resolvePath env = \case
+  App _ r [] -> do
+    (path, ru) <- Map.lookup (getUnique r) env.envRecVars
+    spec <- Map.lookup ru env.envRecords
+    pure (path, spec)
+  Proj _ inner f -> do
+    (path, spec) <- resolvePath env inner
+    fld <- find (\fs -> fs.fsL4 == resolvedToText f) spec.rsFields
+    ru <- case fld.fsTy of
+      TyApp _ n _ | Map.member (getUnique n) env.envRecords -> Just (getUnique n)
+      _ -> Nothing
+    spec' <- Map.lookup ru env.envRecords
+    pure (path <> "." <> fld.fsSan, spec')
+  _ -> Nothing
+
+lowerApp
+  :: Env -> (Expr Resolved -> Either LF DAExpr) -> Resolved -> [Expr Resolved]
+  -> Either LF DAExpr
+lowerApp env go r args = case args of
+  []
+    | Just b <- boolLit nm -> Right (DABoolLit b)
+    | Just v <- Map.lookup u env.envVars -> Right (DAVar v)
+    | Just (path, _) <- Map.lookup u env.envRecVars -> Right (DAVar path)
+    | Just ci <- Map.lookup u env.envEnumCons ->
+        if ci.ciArity == 0
+          then Right (DAStrLit ci.ciName)
+          else Left (LFFatal ("enum constructor `" <> nm <> "` carries a payload; payload constructors are refused in v1 (M4: `show if` follow-ups)"))
+    | Map.member u env.envFuns ->
+        Left (LFFatal ("higher-order use of function `" <> nm <> "` — only direct application can be inlined (v1 emits no Python module); refused by name (R3)"))
+    | nm == "NOTHING" ->
+        Left (LFFatal "`NOTHING` in a body: v1 supports MAYBE only as presence-erased inputs (R8), not as produced values")
+    | otherwise ->
+        Left (LFFatal ("unbound reference `" <> nm <> "` (recursion, prelude functions, and unsupported builtins are not available in v1)"))
+  _ -> case builtinOp nm of
+    Just mk -> traverse go args >>= mk
+    Nothing
+      | nm == "JUST" ->
+          Left (LFFatal "`JUST` in a body: v1 supports MAYBE only as presence-erased inputs (R8), not as produced values")
+      | Just ci <- Map.lookup u env.envEnumCons ->
+          Left (LFFatal ("construction of enum payload `" <> ci.ciName <> "` is refused in v1 (M4: `show if` follow-ups)"))
+      | Just f <- Map.lookup u env.envFuns -> inlineApply env f nm args
+      | Map.member u env.envVars ->
+          Left (LFFatal ("`" <> nm <> "` is not a function but is applied to arguments"))
+      | otherwise ->
+          Left (LFFatal ("cannot compile call to `" <> nm <> "` — v1 supports calls to in-module decisions and directly-applied WHERE bindings only"))
+ where
+  u  = getUnique r
+  nm = resolvedToText r
+
+-- | Beta-reduce a directly-applied function-valued binding at lower time
+-- (R3): substitute the argument expressions for the parameters and lower the
+-- result. The identity lambda @`not covered if` MEANS GIVEN x YIELD x@ in
+-- rodentsAndVermin is the canonical case. Recursion cannot be inlined and is
+-- refused by name.
+inlineApply :: Env -> InlineFun -> Text -> [Expr Resolved] -> Either LF DAExpr
+inlineApply env f nm args
+  | length args /= length f.ifParams =
+      Left (LFFatal ("`" <> nm <> "` applied to " <> tshow (length args)
+                      <> " argument(s); it takes " <> tshow (length f.ifParams)))
+  | f.ifU `elem` env.envInlineStack =
+      Left (LFFatal ("recursive call to `" <> nm <> "` cannot be inlined (v1 emits no Python module)"))
+    -- A function value passed as data (rather than a directly-applied
+    -- callee) has no docassemble variable it could become: refuse by the
+    -- function's own name (R3), before substitution renames it to the
+    -- parameter it would have bound.
+  | (badNm : _) <- [ resolvedToText r
+                   | App _ r [] <- args, Map.member (getUnique r) env.envFuns ] =
+      Left (LFFatal ("higher-order use of function `" <> badNm <> "` — it is passed as an \
+                     \argument to `" <> nm <> "`, and only direct application can be \
+                     \inlined (v1 emits no Python module); refused by name (R3)"))
+  | otherwise =
+      let sub   = Map.fromList (zip f.ifParams args)
+          body' = substituteExpr sub f.ifBody
+      in lowerExpr env { envInlineStack = f.ifU : env.envInlineStack } body'
+
+-- | Substitute expressions for nullary references to the given uniques.
+-- Uniques are globally unique, so there is no capture to avoid.
+substituteExpr :: Map Unique (Expr Resolved) -> Expr Resolved -> Expr Resolved
+substituteExpr sub = go
+ where
+  go e = case e of
+    App _ r [] | Just repl <- Map.lookup (getUnique r) sub -> repl
+    _ -> over (gplate @(Expr Resolved)) go e
+
+-- | The builtin operators L4 desugars infix syntax into (post-typecheck,
+-- @a AND b@ arrives as @App __AND__ [a, b]@).
+builtinOp :: Text -> Maybe ([DAExpr] -> Either LF DAExpr)
+builtinOp nm = case nm of
+  "__PLUS__"    -> Just (bin DAAdd)
+  "__MINUS__"   -> Just (bin DASub)
+  "__TIMES__"   -> Just (bin DAMul)
+  "__DIVIDE__"  -> Just (bin DADiv)
+  "__MODULO__"  -> Just (bin DAMod)
+  "__EQUALS__"  -> Just (cmp DAEq)
+  "__LEQ__"     -> Just (cmp DALeq)
+  "__GEQ__"     -> Just (cmp DAGeq)
+  "__LT__"      -> Just (cmp DALt)
+  "__GT__"      -> Just (cmp DAGt)
+  "__AND__"     -> Just (logic2 DAAnd)
+  "__OR__"      -> Just (logic2 DAOr)
+  "__NOT__"     -> Just notOp
+  "__IMPLIES__" -> Just impliesOp   -- nested: a ⇒ b ≡ (¬a) ∨ b, classical (R4)
+  _             -> Nothing
+ where
+  bin op    = \case [a, b] -> Right (DABin op a b); xs -> arity 2 xs
+  cmp op    = \case [a, b] -> Right (DACmp op a b); xs -> arity 2 xs
+  logic2 f  = \case [a, b] -> Right (f a b);        xs -> arity 2 xs
+  notOp     = \case [a]    -> Right (DANot a);      xs -> arity 1 xs
+  impliesOp = \case [a, b] -> Right (DAOr (DANot a) b); xs -> arity 2 xs
+  arity :: Int -> [DAExpr] -> Either LF DAExpr
+  arity n xs = Left (LFFatal ("operator `" <> nm <> "` expected " <> tshow n
+                               <> " argument(s), got " <> tshow (length xs)))
+
+boolLit :: Text -> Maybe Bool
+boolLit t = case Text.toLower t of
+  "true"  -> Just True
+  "false" -> Just False
+  _       -> Nothing
+
+-- | The refusal table (spec §5): deontic/ledger/IO constructs are 'Blocking'
+-- — the target has no form for them at all; shape restrictions of the v1
+-- fragment are plain errors.
+refuse :: Expr Resolved -> LF
+refuse = \case
+  Regulative {} -> LFBlocked "DA-DEONTIC"
+    "deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form"
+    "the obligation layer: breach, HENCE/LEST continuations and deadlines cannot ride in a single-user interview (v1 non-goal; docassemble roles are a plausible M-later mapping)"
+  Event {} -> LFBlocked "DA-DEONTIC"
+    "EVENT has no docassemble form"
+    "the event/trace layer of the deontic machine"
+  Breach {} -> LFBlocked "DA-DEONTIC"
+    "BREACH has no docassemble form"
+    "the breach verdict of the deontic machine"
+  RAnd {} -> LFBlocked "DA-DEONTIC"
+    "regulative AND has no docassemble form"
+    "deontic composition"
+  ROr {} -> LFBlocked "DA-DEONTIC"
+    "regulative OR has no docassemble form"
+    "deontic composition"
+  Fetch {} -> LFBlocked "DA-IO"
+    "FETCH has no docassemble form in v1"
+    "outbound HTTP at interview runtime (docassemble's DAWeb exists but is deliberately unused, spec §4)"
+  Post {} -> LFBlocked "DA-IO"
+    "POST has no docassemble form in v1"
+    "outbound HTTP at interview runtime"
+  Env {} -> LFBlocked "DA-IO"
+    "environment lookup has no docassemble form"
+    "server-side environment access"
+  Record {} -> LFBlocked "DA-LEDGER"
+    "RECORD/COMMIT/ATTEST ledger write has no docassemble form"
+    "the state-as-a-ledger layer"
+  ReadCell {} -> LFBlocked "DA-LEDGER"
+    "RECALL ledger read has no docassemble form"
+    "the state-as-a-ledger layer"
+  Lam {}      -> LFFatal "lambda outside a directly-applied WHERE binding cannot be emitted (v1 emits no Python module)"
+  List {}     -> LFFatal "list literal — LIST OF is a later milestone (M4: DAList gathering)"
+  Cons {}     -> LFFatal "list cons — LIST OF is a later milestone (M4)"
+  Concat {}   -> LFFatal "string concatenation is not supported in v1"
+  AsString {} -> LFFatal "string coercion is not supported in v1"
+  AppNamed {} -> LFFatal "named-argument application is not supported in v1"
+  Where {}    -> LFFatal "WHERE in expression position — WHERE is supported at the top of a definition body (R3), not nested inside an expression (v1)"
+  LetIn {}    -> LFFatal "LET in expression position — supported at the top of a definition body only (v1)"
+  _           -> LFFatal "unsupported construct for docassemble"
+
+-- ---------------------------------------------------------------------------
+-- Package hygiene: block ids and name collisions (R9)
+-- ---------------------------------------------------------------------------
+
+blockId :: DABlock -> Maybe Text
+blockId = \case
+  DAObjectsBlock _  -> Just "objects_main"
+  DAQuestionBlock q -> Just q.qId
+  DACodeBlock c     -> Just c.cId
+  DADriverBlock d   -> Just (driverId d)
+  DAScreenBlock s   -> Just s.sId
+
+driverId :: DADriver -> Text
+driverId = \case
+  DASeamDriver i _ _ _ _ _ _ _ -> i
+  DABoolDriver i _ _ _ _       -> i
+  DAValueDriver i _ _ _        -> i
+
+-- | The same question or code block reached from two exports (a shared
+-- parameter) is emitted once; two /different/ blocks claiming one id is an
+-- internal error surfaced rather than silently shadowed.
+dedupById :: [DABlock] -> Either [LowerError] [DABlock]
+dedupById = go Map.empty
+ where
+  go _ [] = Right []
+  go seen (b : bs) = case blockId b of
+    Just bid
+      | Just prev <- Map.lookup bid seen ->
+          if prev == b
+            then go seen bs
+            else Left [MkLowerError "" ("internal id collision: two different blocks share id `" <> bid <> "`")]
+      | otherwise -> (b :) <$> go (Map.insert bid b seen) bs
+    Nothing -> (b :) <$> go seen bs
+
+-- | Docassemble variable names are a single global namespace: distinct L4
+-- definitions that sanitise to the same name — or one name defined both by a
+-- question and by a code block — would silently conflate (the OpenFisca
+-- 'checkCollisions' discipline).
+checkNameCollisions :: [DABlock] -> Either [LowerError] ()
+checkNameCollisions blocks =
+  case bad of
+    []      -> Right ()
+    (e : _) -> Left [e]
+ where
+  entries = concatMap entryOf blocks
+  entryOf = \case
+    DAQuestionBlock q -> [(q.qVar, ("question", q.qLabel))]
+    DACodeBlock c     -> [(c.cVar, ("code", fromMaybe c.cVar c.cL4))]
+    DAScreenBlock s   -> [(s.sEvent, ("event", s.sEvent))]
+    DAObjectsBlock es -> [ (v, ("object", v)) | (v, _) <- es ]
+    DADriverBlock d   -> case d of
+      DASeamDriver _ _ _ _ verdictV _ _ _ -> [(verdictV, ("code", verdictV))]
+      _                                   -> []
+  byName = Map.fromListWith (<>) [ (v, [meta]) | (v, meta) <- entries ]
+  bad =
+    [ MkLowerError ""
+        ( "name collision: `" <> v <> "` is produced by "
+            <> Text.intercalate " and "
+                 (nubOrd [ role <> " (L4 `" <> l4 <> "`)" | (role, l4) <- metas ])
+            <> " — distinct definitions sharing one docassemble variable are unsafe; rename one" )
+    | (v, metas) <- Map.toList byName
+    , length (nubOrd metas) > 1
+    ]
+
+-- ---------------------------------------------------------------------------
+-- Names
+-- ---------------------------------------------------------------------------
+
+decideName :: Decide Resolved -> Resolved
+decideName (MkDecide _ _ (MkAppForm _ r _ _) _) = r
+
+givenName :: OptionallyTypedName Resolved -> Resolved
+givenName (MkOptionallyTypedName _ r _ _) = r
+
+resolvedToText :: Resolved -> Text
+resolvedToText = rawNameToText . rawName . getActual
+
+-- | A stable provenance string: the source file's basename.
+moduleSource :: Module Resolved -> Text
+moduleSource (MkModule _ uri _) =
+  let t = getUri (fromNormalizedUri uri)
+  in case reverse (Text.splitOn "/" t) of
+       (base : _) | not (Text.null base) -> base
+       _                                 -> t
+
+moduleTitleOf :: Module Resolved -> Text
+moduleTitleOf mod' =
+  let base = moduleSource mod'
+  in fromMaybe base (Text.stripSuffix ".l4" base)
+
+underscored :: Text -> Text
+underscored = Text.replace "." "_"
+
+-- | Sanitise an L4 name into a snake_case interview variable. Total and
+-- deterministic (the OpenFisca @pyIdent@ discipline) so definitions and
+-- references stay in sync; collision-checked afterwards.
+pyIdent :: Text -> Text
+pyIdent raw =
+  let cleaned = Text.map (\c -> if isIdentChar c then toLower c else ' ') raw
+      parts   = Text.words cleaned
+      joined  = Text.intercalate "_" parts
+  in keywordSafe (ensureNonDigit (if Text.null joined then "v" else joined))
+ where
+  isIdentChar c = isAlphaNum c || c == '_'
+  ensureNonDigit t = case Text.uncons t of
+    Just (h, _) | isDigit h -> "v_" <> t
+    _                       -> t
+  keywordSafe t
+    | t `Set.member` pyReserved = t <> "_"
+    | otherwise                 = t
+
+-- | Python keywords plus docassemble's own reserved interview names (@x@,
+-- @i@, @j@, @k@ are claimed by generic-object and iterator machinery; the
+-- rest are special interview variables) — a sanitised L4 name must shadow
+-- none of them, so such names get a @_@ suffix.
+pyReserved :: Set Text
+pyReserved = Set.fromList
+  [ "and","as","assert","async","await","break","class","continue","def","del"
+  , "elif","else","except","false","finally","for","from","global","if","import"
+  , "in","is","lambda","nonlocal","none","not","or","pass","raise","return","true"
+  , "try","while","with","yield","match","case"
+  -- docassemble reserved interview names:
+  , "x","i","j","k","item","row_item","row_index","url_args","nav","role"
+  , "role_needed","user","session","device_local","user_local","session_local"
+  , "allow_cron","multi_user","menu_items","speak_text","track_location"
+  , "incoming_email","daobject"
+  ]
+
+tshow :: Show a => a -> Text
+tshow = Text.pack . show
+
+hardLF :: Text -> Either LF a -> Either LowerError a
+hardLF fn = \case
+  Left lf -> Left (MkLowerError fn (lfMessage lf))
+  Right a -> Right a
