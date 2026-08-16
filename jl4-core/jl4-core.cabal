@@ -117,6 +117,7 @@ library
     L4.Catala.IR
     L4.Catala.Lower
     L4.Catala.Emit
+    L4.Catala.Equivalence
     L4.Citations
     L4.Desugar
     L4.Diagnostic

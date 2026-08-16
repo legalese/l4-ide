@@ -16,6 +16,7 @@ module CatalaLowerSpec (spec) where
 
 import Test.Hspec
 
+import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -78,6 +79,18 @@ enums m = [ e | DEnum e <- decls m ]
 scopeDecls :: CatModule -> [CatScopeDecl]
 scopeDecls m = [ s | DScope s <- decls m ]
 
+-- | Declarations that came from the L4 source, as opposed to the ones the
+-- harness generates for itself: the R4 equivalence apparatus and the R7 test
+-- scopes. The fragment tests below are about the source, so they filter.
+generatedName :: Text -> Bool
+generatedName n = "Eqv" `Text.isInfixOf` n || "Test" `Text.isPrefixOf` n
+
+sourceStructs :: CatModule -> [CatStruct]
+sourceStructs m = [ s | s <- structs m, not (generatedName s.stName) ]
+
+sourceScopeDecls :: CatModule -> [CatScopeDecl]
+sourceScopeDecls m = [ s | s <- scopeDecls m, not (generatedName s.sdName) ]
+
 scopeBodies :: CatModule -> [CatScopeBody]
 scopeBodies m = [ b | ItemScope b <- items m ]
 
@@ -130,6 +143,8 @@ appendixA = Text.unlines
   , "`benefit amount` a MEANS"
   , "    IF `eligible for benefit` a THEN 1000 PLUS bonus ELSE 0"
   , "    WHERE bonus MEANS IF a's isVeteran THEN 250 ELSE 0"
+  , ""
+  , "#EVAL `benefit amount` (Applicant WITH age IS 70, income IS 50000, isVeteran IS FALSE)"
   ]
 
 -- ---------------------------------------------------------------------------
@@ -141,13 +156,13 @@ spec = do
   describe "Appendix A (the spec's worked example)" $ do
     it "emits one structure whose NUMBER fields become decimals (R2)" $ do
       m <- lowerOk appendixA
-      map (.stName) (structs m) `shouldBe` ["Applicant"]
-      map (\s -> map (\f -> (f.fdName, f.fdType)) s.stFields) (structs m)
+      map (.stName) (sourceStructs m) `shouldBe` ["Applicant"]
+      map (\s -> map (\f -> (f.fdName, f.fdType)) s.stFields) (sourceStructs m)
         `shouldBe` [[("age", TDecimal), ("income", TDecimal), ("is_veteran", TBool)]]
 
     it "emits one scope per @export decision, with the record passed whole (R1a)" $ do
       m <- lowerOk appendixA
-      map (.sdName) (scopeDecls m) `shouldBe` ["EligibleForBenefit", "BenefitAmount"]
+      map (.sdName) (sourceScopeDecls m) `shouldBe` ["EligibleForBenefit", "BenefitAmount"]
       let d = scopeDecl "EligibleForBenefit" m
       map (\v -> (v.svName, v.svKind, v.svShape)) d.sdVars
         `shouldBe` [ ("a", VarInput, ShContent (TNamed "Applicant"))
@@ -165,7 +180,7 @@ spec = do
       map (.clConseq) r.rdModeA `shouldBe` [ConsFulfilled]
       map (.clKind) r.rdModeA `shouldBe` [ClPlain]
 
-    it "derives the UNLESS proviso ladder as Mode B (R4, §4.4)" $ do
+    it "emits the UNLESS proviso as a Mode B ladder (R4, §4.4)" $ do
       m <- lowerOk appendixA
       let r = ruleOf "eligible_for_benefit" (scopeBody "EligibleForBenefit" m)
       case r.rdModeB of
@@ -183,12 +198,38 @@ spec = do
                        , Just (EBin BGt (EProj (EVar "a") "income") (ELit (LDec 100000)))
                        ]
 
-    it "keeps Mode A as the emitted rendering until the §8.4 gate exists" $ do
+    it "makes the ladder the emitted rendering, with no fallback note (R4)" $ do
       m <- lowerOk appendixA
       let r = ruleOf "eligible_for_benefit" (scopeBody "EligibleForBenefit" m)
-      r.rdEmitted `shouldBe` ModeA
-      emittedClauses r `shouldBe` r.rdModeA
-      r.rdFallback `shouldSatisfy` maybe False (Text.isInfixOf "equivalence")
+      r.rdEmitted `shouldBe` ModeB
+      emittedClauses r `shouldBe` fromMaybe [] r.rdModeB
+      r.rdFallback `shouldBe` Nothing
+      -- and it carries the descriptor the equivalence harness needs
+      fmap (.eqKind) r.rdEqv `shouldBe` Just (EqvProviso 1)
+      fmap (length . (.eqAtoms)) r.rdEqv `shouldBe` Just 2
+
+    it "carries the equivalence apparatus that re-checks the ladder (§8.4)" $ do
+      m <- lowerOk appendixA
+      map (.sdName) (scopeDecls m) `shouldSatisfy`
+        \ns -> all (`elem` ns) [ "EligibleForBenefitEqvModeA", "EligibleForBenefitEqvModeB"
+                               , "EligibleForBenefitEqvAgree", "EligibleForBenefitEqvGrid" ]
+      -- the grid is a #[test] scope, so `clerk test` runs it on every validation
+      [ s.sdIsTest | s <- scopeDecls m, s.sdName == "EligibleForBenefitEqvGrid" ]
+        `shouldBe` [True]
+      -- 2 atoms ⇒ 4 rows, enumerated exhaustively rather than sampled
+      let grid = ruleOf "all_agree" (scopeBody "EligibleForBenefitEqvGrid" m)
+      case map (.clConseq) grid.rdModeA of
+        [ConsEquals (EForAll _ (EList rows) _)] -> length rows `shouldBe` 4
+        other -> expectationFailure ("unexpected grid shape: " <> show other)
+
+    it "wraps the #EVAL directive in a #[test] scope with an unfilled block (R7)" $ do
+      m <- lowerOk appendixA
+      [ s.sdIsTest | s <- scopeDecls m, s.sdName == "Test1" ] `shouldBe` [True]
+      -- the expected value is the CLI's job: only it has the evaluator, and the
+      -- oracle must be L4 rather than `clerk test --reset`
+      [ (t.tcCommand, t.tcOutput, isJust t.tcBinding)
+        | SegTestCli t <- m.modSegments, "Test1" `Text.isInfixOf` t.tcCommand ]
+        `shouldBe` [("catala test-scope Test1 --disable-warnings -F json", [], True)]
 
     it "compiles a WHERE helper to `let … in` and a cross-decision call to a scope call" $ do
       m <- lowerOk appendixA
@@ -349,13 +390,13 @@ spec = do
         Just cs -> do
           map (.clKind) cs `shouldBe`
             [ ClLabel "band_r0"
-            , ClLabelExc "band_r1" "band_r0"
-            , ClException (Just "band_r1")
+            , ClLabelExc "band_r1" "band_r2"
+            , ClLabelExc "band_r2" "band_r0"
             ]
           map (.clConseq) cs `shouldBe`
             [ ConsEquals (ELit (LDec 1))    -- the OTHERWISE is the base
-            , ConsEquals (ELit (LDec 3))    -- first arm: highest priority, applied last
-            , ConsEquals (ELit (LDec 2))
+            , ConsEquals (ELit (LDec 3))    -- arm 1: outranks arm 2
+            , ConsEquals (ELit (LDec 2))    -- arm 2: outranks the base
             ]
 
     it "maps a literal YMD to a date literal and an out-of-range one to `impossible` (R3)" $ do
@@ -495,6 +536,82 @@ spec = do
       lower "GIVETH A NUMBER\n`x` MEANS 1\n"
         `shouldBe` Left ["no @export-annotated DECIDE found to compile to Catala"]
 
+  -- The bug this pins was found by the emitted equivalence grid itself, not by
+  -- reading the code: on a rate table whose guards nest, the first version made
+  -- arm i an exception to arm i-1, which reverses the cascade and silently
+  -- returns the WIDEST matching band. `clerk test` reported all_agree = false.
+  describe "R4: the arm ladder reproduces L4's first-match order" $ do
+    let bands = Text.unlines
+          [ "@export"
+          , "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "`band` n MEANS"
+          , "  BRANCH"
+          , "    IF n GREATER THAN 100 THEN 40"
+          , "    IF n GREATER THAN  50 THEN 25"
+          , "    OTHERWISE                  10"
+          ]
+
+    it "makes arm 1 an exception to arm 2, and the last arm one to the base" $ do
+      m <- lowerOk bands
+      let r = ruleOf "band" (scopeBody "Band" m)
+      r.rdEmitted `shouldBe` ModeB
+      map (.clKind) (emittedClauses r)
+        `shouldBe` [ ClLabel "band_r0"                     -- the OTHERWISE, lowest priority
+                   , ClLabelExc "band_r1" "band_r2"        -- arm 1 outranks arm 2
+                   , ClLabelExc "band_r2" "band_r0"        -- arm 2 outranks the base
+                   ]
+
+    it "records the rewrite as a value cascade the grid can enumerate" $ do
+      m <- lowerOk bands
+      let r = ruleOf "band" (scopeBody "Band" m)
+      fmap (.eqKind) r.rdEqv `shouldBe` Just (EqvArmsValue 2)
+
+  describe "R8: the literate weave" $ do
+    let statute = Text.unlines
+          [ "§ `Winter allowance`"
+          , ""
+          , "§§ `Section 1`"
+          , ""
+          , "@ref s1(1)"
+          , "@export Whether the household qualifies."
+          , "GIVEN h IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `qualifies` IF"
+          , "        \"A household qualifies for the allowance if\""
+          , "    AND h"
+          ]
+
+    it "turns § headers into Markdown headings, nested by depth" $ do
+      m <- lowerOk statute
+      let prose = concat [ ls | SegProse ls <- m.modSegments ]
+      prose `shouldSatisfy` elem "## Winter allowance"
+      prose `shouldSatisfy` elem "### Section 1"
+      prose `shouldSatisfy` elem "#### `qualifies`"
+
+    it "carries inert scaffolding across as the law text above the fence" $ do
+      m <- lowerOk statute
+      concat [ ls | SegProse ls <- m.modSegments ]
+        `shouldSatisfy` elem "A household qualifies for the allowance if"
+
+    it "renders a @ref citation, with the annotation keyword stripped" $ do
+      m <- lowerOk statute
+      concat [ ls | SegProse ls <- m.modSegments ] `shouldSatisfy` elem "*Source: s1(1).*"
+
+    it "puts an @export description on the scope as #[description]" $ do
+      m <- lowerOk statute
+      (scopeDecl "Qualifies" m).sdDesc `shouldBe` Just "Whether the household qualifies."
+
+    it "defuses prose that would otherwise be read as Catala syntax" $ do
+      -- A line starting with `>` is a Catala DIRECTIVE, not a blockquote:
+      -- catala 1.2.1 rejects the file with "Unclosed block or missing newline".
+      let m = CatModule
+            { modName = "T", modSource = "t.l4", modWarnings = []
+            , modSegments = [ SegProse ["> quoted statute text", "a ``` fence"] ]
+            }
+      renderModule m `shouldSatisfy` Text.isInfixOf "\\> quoted statute text"
+      renderModule m `shouldNotSatisfy` Text.isInfixOf "```"
+
   describe "provenance" $ do
     it "names the module after the source file's basename" $ do
       m <- lowerOk appendixA
@@ -543,6 +660,7 @@ spec = do
                                 (Just (ELit (LBool True))) ConsFulfilled
                             ]
                         , rdModeB = Nothing, rdEmitted = ModeA, rdFallback = Nothing
+                        , rdEqv = Nothing
                         } ]) ]
                 ]
             }

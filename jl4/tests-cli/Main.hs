@@ -2383,5 +2383,57 @@ spec bin = do
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["openfisca", errorFixture]
+
+  -- `l4 catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
+  -- run through the real toolchain — `catala typecheck` and `clerk test`
+  -- against catala 1.2.1 — so the goldens are not merely "what the emitter
+  -- currently prints"; see examples/catala/README.md.
+  describe "l4 catala" $ do
+    it "compiles the spec's Appendix A example to its golden Catala module" $
+      expectGolden bin ["catala", "examples/catala/benefit.l4"]
+                       "examples/catala/expected/benefit.catala_en"
+
+    it "compiles a nested-guard rate table (the ladder-direction exhibit)" $
+      expectGolden bin ["catala", "examples/catala/bands.l4"]
+                       "examples/catala/expected/bands.catala_en"
+
+    it "compiles the literate weave: § headings, inert law text, @ref, enums" $
+      expectGolden bin ["catala", "examples/catala/statute.l4"]
+                       "examples/catala/expected/statute.catala_en"
+
+    -- R4: the exception ladder is the PRIMARY emission, and it never ships
+    -- without the apparatus that re-checks it.
+    it "emits Mode B ladders together with their equivalence grid" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("label rate_band_r1 exception rate_band_r2" `isInfixOf`)
+      sout `shouldSatisfy` ("#[test] declaration scope RateBandEqvGrid:" `isInfixOf`)
+      sout `shouldSatisfy` ("{\"all_agree\":true}" `isInfixOf`)
+
+    -- R7: the expected values come from L4's evaluator, not from
+    -- `clerk test --reset`. 0.25 is L4's answer for a 60000 income, and Catala
+    -- prints exact rationals in JSON, so it has to appear as 1/4.
+    it "fills test blocks with values L4 computed, as exact rationals" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("$ catala test-scope Test1 --disable-warnings -F json" `isInfixOf`)
+      sout `shouldSatisfy` ("{\"result\":\"1/4\"}" `isInfixOf`)
+      sout `shouldSatisfy` ("{\"result\":\"2/5\"}" `isInfixOf`)
+
+    it "--boolean-only drops the ladders and the grids that check them" $ do
+      Output code sout _ <- runL4 bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
+      sout `shouldNotSatisfy` ("label rate_band_r1" `isInfixOf`)
+      sout `shouldSatisfy` ("--boolean-only" `isInfixOf`)
+
+    -- Two field names that mangle to one Catala identifier would silently
+    -- conflate in Catala's flat per-structure namespace; the OpenFisca fixture
+    -- has the same shape and serves both backends.
+    it "rejects a name collision (distinct L4 names → same Catala identifier)" $
+      expectFail bin ["catala", "examples/openfisca/not-ok/name-collision.l4"]
+
+    it "fails on a file that does not typecheck" $
+      expectFail bin ["catala", errorFixture]
   where
     for_ xs f = mapM_ f xs

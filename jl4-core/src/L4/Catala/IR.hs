@@ -43,6 +43,14 @@ module L4.Catala.IR
   , CatClauseKind (..)
   , CatConseq (..)
   , emittedClauses
+    -- * Ladder construction (shared by the lowering and the equivalence harness)
+  , provisoLadder
+  , armLadder
+    -- * The equivalence descriptor (R4's standing gate)
+  , CatEqv (..)
+  , CatEqvKind (..)
+  , eqvAtomCount
+  , eqvRowLimit
     -- * Tests
   , CatTest (..)
   , CatTestCli (..)
@@ -67,6 +75,8 @@ import Data.Char (isAlphaNum, isAscii, isDigit, isUpper, toLower, toUpper)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+
+import L4.Parser.SrcSpan (SrcRange)
 
 -- ---------------------------------------------------------------------------
 -- Modules
@@ -209,6 +219,10 @@ data CatRuleDef = CatRuleDef
   , rdModeB    :: !(Maybe [CatClause])
   , rdEmitted  :: !CatMode
   , rdFallback :: !(Maybe Text)
+  , rdEqv      :: !(Maybe CatEqv)
+    -- ^ the propositional shape of the Mode B rewrite, from which
+    -- 'L4.Catala.Equivalence' builds the module's standing equivalence scopes.
+    -- Present exactly when @rdEmitted = 'ModeB'@.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -250,6 +264,112 @@ data CatConseq
   deriving stock (Eq, Show, Generic)
 
 -- ---------------------------------------------------------------------------
+-- Ladder construction
+-- ---------------------------------------------------------------------------
+--
+-- Both builders live here rather than in the lowering because the equivalence
+-- harness has to build the /same/ ladders over abstract atoms: a check that
+-- reconstructed the ladder by a second, independent code path would be checking
+-- the wrong thing.
+
+-- | @base@ holds unless a proviso fires. Provisos are chained rather than made
+-- siblings: two sibling exceptions to one label that fire together is Catala's
+-- @Conflict@ error, and @c AND NOT d1 AND NOT d2@ has no such failure mode.
+provisoLadder :: Text -> CatExpr -> [CatExpr] -> [CatClause]
+provisoLadder var base provisos =
+  CatClause (ClLabel (lbl 0)) (Just base) ConsFulfilled : rungs
+ where
+  n     = length provisos
+  lbl :: Int -> Text
+  lbl i = var <> "_p" <> Text.pack (show i)
+  rungs =
+    [ CatClause kind (Just p) ConsNotFulfilled
+    | (i, p) <- zip [1 :: Int ..] provisos
+    , let kind | i == n    = ClException (Just (lbl (i - 1)))
+               | otherwise = ClLabelExc (lbl i) (lbl (i - 1))
+    ]
+
+-- | An n-arm first-match cascade as a priority ladder.
+--
+-- L4 takes the /first/ matching arm, so arm 1 must outrank arm 2, which must
+-- outrank arm 3, …, and every arm must outrank the unconditional base. In
+-- Catala @exception L@ means "this rule wins over the rule labelled @L@", so
+-- the chain runs upwards from the base: the last arm is an exception to the
+-- base, and arm @i@ is an exception to arm @i+1@.
+--
+-- The obvious reading of the previous sentence is the wrong way round, and the
+-- first version of this function got it wrong: it made arm @i@ an exception to
+-- arm @i-1@, which reverses the cascade. On non-overlapping guards nothing
+-- shows; on a rate table where each band's guard implies the next
+-- (@income > 100000@ implies @income > 50000@) it silently picks the /widest/
+-- matching band. The equivalence grid this backend now ships (R4, §8.4) is what
+-- caught it — @all_agree = false@ on a three-band table — which is precisely
+-- the class of bug an unchecked semantic rewrite in a legal transpiler exists
+-- to prevent.
+armLadder :: Text -> CatVarShape -> [(CatExpr, CatExpr)] -> CatExpr -> Maybe [CatClause]
+armLadder var shape arms dflt = case shape of
+  ShContent _ -> Just (base (ConsEquals dflt) : [ rung i c (ConsEquals v) | (i, (c, v)) <- indexed ])
+  ShCondition -> do
+    d  <- boolConseq dflt
+    ks <- traverse (boolConseq . snd) arms
+    pure (base d : [ rung i c k | ((i, (c, _)), k) <- zip indexed ks ])
+ where
+  n       = length arms
+  indexed = zip [1 :: Int ..] arms
+  lbl :: Int -> Text
+  lbl i   = var <> "_r" <> Text.pack (show i)
+  base    = CatClause (ClLabel (lbl 0)) Nothing
+  rung i c = CatClause (ClLabelExc (lbl i) (if i == n then lbl 0 else lbl (i + 1)))
+                       (Just c)
+  -- A `condition`-shaped variable can only be `fulfilled`/`not fulfilled`, so a
+  -- ladder over it exists only when every arm value is a literal.
+  boolConseq = \case
+    ELit (LBool True)  -> Just ConsFulfilled
+    ELit (LBool False) -> Just ConsNotFulfilled
+    _                  -> Nothing
+
+-- ---------------------------------------------------------------------------
+-- The equivalence descriptor (R4, §8.4)
+-- ---------------------------------------------------------------------------
+
+-- | What a Mode B rewrite did, propositionally.
+--
+-- Mode A and Mode B are built from the /same/ atomic conditions; whether they
+-- agree is therefore a question about the ladder's control flow alone, not
+-- about the atoms' contents. That is what makes an exhaustive check affordable:
+-- 'eqAtoms' are the atoms as they appear in the emitted rule (kept only so the
+-- generated prose can name them), and the harness re-runs both renderings over
+-- every one of the @2^n@ truth assignments to them.
+data CatEqv = CatEqv
+  { eqKind  :: !CatEqvKind
+  , eqAtoms :: ![CatExpr]
+  }
+  deriving stock (Eq, Show, Generic)
+
+data CatEqvKind
+  = EqvProviso !Int
+    -- ^ a @condition@ rewritten as base-plus-@n@-provisos; @n+1@ atoms
+    -- (the base's condition first, then each proviso).
+  | EqvArmsCond ![Bool] !Bool
+    -- ^ an @n@-arm first-match cascade over a @condition@: each arm's literal
+    -- boolean consequence, then the default's. @n@ atoms.
+  | EqvArmsValue !Int
+    -- ^ an @n@-arm first-match cascade over a @content@ variable. @n@ atoms;
+    -- the arms' values are checked through pairwise-distinct witnesses, because
+    -- the rewrite is uniform in the consequence type.
+  deriving stock (Eq, Show, Generic)
+
+-- | How many independent booleans the truth table ranges over.
+eqvAtomCount :: CatEqv -> Int
+eqvAtomCount = length . (.eqAtoms)
+
+-- | The largest truth table the emitter will write out (@2^8 = 256@ rows). A
+-- rewrite with more atoms than this falls back to Mode A rather than shipping
+-- an unchecked ladder or a megabyte of grid.
+eqvRowLimit :: Int
+eqvRowLimit = 8
+
+-- ---------------------------------------------------------------------------
 -- Tests (R7)
 -- ---------------------------------------------------------------------------
 
@@ -264,9 +384,17 @@ data CatTest = CatTest
   deriving stock (Eq, Show, Generic)
 
 -- | A @```catala-test-cli@ block: the command line and its expected output.
+--
+-- @tcBinding@ is the source range of the L4 directive whose value the block
+-- expects. The lowering leaves @tcOutput@ empty for a bound block and the CLI
+-- fills it from L4's own evaluator, so the oracle is L4 and never
+-- @clerk test --reset@ (R7, §8.7). An unbound block (@tcBinding = Nothing@)
+-- carries its expectation already — the equivalence grids, whose expected
+-- answer is @true@ by construction.
 data CatTestCli = CatTestCli
   { tcCommand :: !Text     -- ^ e.g. @catala test-scope Test1 -F json@
   , tcOutput  :: ![Text]
+  , tcBinding :: !(Maybe SrcRange)
   }
   deriving stock (Eq, Show, Generic)
 

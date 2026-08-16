@@ -24,13 +24,23 @@
 --
 -- Both renderings of every rule are constructed (R4, §8.4): the Mode A
 -- boolean\/if-else reference rendering always, and the Mode B exception ladder
--- wherever one is derivable. Which one is /emitted/ is a separate question, and
--- this module answers it conservatively: @rdEmitted@ stays 'ModeA' and
--- @rdFallback@ names the reason, because §8.4's gate requires each emitted
--- module to carry machine-checked equivalence scopes and this pass does not yet
--- emit them. Flipping the default belongs to the phase that adds those scopes.
+-- wherever one is derivable. Mode B is the /emitted/ rendering wherever the
+-- module can also carry the machine-checked equivalence scopes §8.4's gate
+-- demands ('L4.Catala.Equivalence' builds them); where it cannot — no ladder
+-- shape, or more atomic conditions than the exhaustive grid's cap — the rule
+-- falls back to Mode A, @rdFallback@ names the reason, and the reason is
+-- written both into the artifact and onto the CLI's stderr. Fallbacks are
+-- warned, never silent.
+--
+-- The emitted file is a literate weave (R8, §8.8): L4 @§@ headers become
+-- Markdown headings, inert scaffolding and @\@ref@ citations become the law
+-- text sitting immediately before the fence they annotate, and @\@desc@ becomes
+-- a @#[description]@ attribute on the declaration.
 module L4.Catala.Lower
   ( lowerModule
+  , lowerModuleWith
+  , LowerOptions (..)
+  , defaultLowerOptions
   , LowerError (..)
   , renderLowerError
   ) where
@@ -42,14 +52,15 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 
-import Optics ((^.))
+import Optics (cosmosOf, gplate, toListOf, (^.))
 
 import L4.Annotation (getAnno, rangeOf)
+import L4.Catala.Equivalence (EqvUnit (..), equivalenceUnit)
 import L4.Catala.IR
 import L4.Export
   ( ExportedFunction (..), ParsedDesc (..), getExportedFunctions
   , isNonexhaustiveDecide, parseDescText )
-import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..), prettySrcRange)
 import L4.Syntax
 import qualified L4.TypeCheck.Environment as TC
 
@@ -129,11 +140,13 @@ data RecField = RecField
   , rfL4     :: !Text
   , rfUnique :: !Unique
   , rfStatus :: !FieldStatus
+  , rfDesc   :: !(Maybe Text)
   }
 
 data RecordInfo = RecordInfo
   { riName   :: !Text
   , riL4     :: !Text
+  , riDesc   :: !(Maybe Text)
   , riFields :: ![RecField]
   }
 
@@ -153,6 +166,7 @@ data DecideInfo = DecideInfo
   , diBody    :: !(Expr Resolved)
   , diNonexh  :: !Bool
   , diDesc    :: !(Maybe Text)
+  , diRef     :: !(Maybe Text)
   , diRange   :: !(Maybe SrcRange)
   }
 
@@ -197,6 +211,7 @@ data Ctx = Ctx
   , cxElided   :: !(Map Unique Text)          -- ^ elided string values → why
   , cxDecides  :: !(Map Unique DecideInfo)
   , cxNonexh   :: !Bool                       -- ^ the enclosing decision carries @\@nonexhaustive@
+  , cxBoolOnly :: !Bool                       -- ^ @--boolean-only@: never emit a ladder (§8.4)
   }
 
 -- | The name Catala's @optional of@ enumeration answers to in 'cxCases'.
@@ -207,13 +222,29 @@ maybeEnum = "#optional"
 -- Entry point
 -- ---------------------------------------------------------------------------
 
-lowerModule :: Module Resolved -> Either [LowerError] CatModule
-lowerModule mod' = case getExportedFunctions mod' of
-  []  -> Left [LowerError "" Nothing "no @export-annotated DECIDE found to compile to Catala"]
-  efs -> runV (buildModule mod' efs)
+-- | Knobs the CLI exposes.
+newtype LowerOptions = LowerOptions
+  { loBooleanOnly :: Bool
+    -- ^ §8.4's escape flag: emit only the Mode A boolean rendering, and with it
+    -- no exception ladders and none of the equivalence apparatus that exists to
+    -- check them. The ladders are still /derived/ (so the fallback notes stay
+    -- accurate); they are simply not what the artifact says.
+  }
+  deriving stock (Eq, Show)
 
-buildModule :: Module Resolved -> [ExportedFunction] -> V CatModule
-buildModule mod' efs =
+defaultLowerOptions :: LowerOptions
+defaultLowerOptions = LowerOptions { loBooleanOnly = False }
+
+lowerModule :: Module Resolved -> Either [LowerError] CatModule
+lowerModule = lowerModuleWith defaultLowerOptions
+
+lowerModuleWith :: LowerOptions -> Module Resolved -> Either [LowerError] CatModule
+lowerModuleWith opts mod' = case getExportedFunctions mod' of
+  []  -> Left [LowerError "" Nothing "no @export-annotated DECIDE found to compile to Catala"]
+  efs -> runV (buildModule opts mod' efs)
+
+buildModule :: LowerOptions -> Module Resolved -> [ExportedFunction] -> V CatModule
+buildModule opts mod' efs =
   recursionErrors decides reach *> (collectEnums mod' `vThen` assemble)
  where
   decides   = collectDecides mod'
@@ -263,8 +294,8 @@ buildModule mod' efs =
     [ CatStruct
         { stName   = ri.riName
         , stL4     = ri.riL4
-        , stDesc   = Nothing
-        , stFields = [ CatField f.rfName f.rfL4 t Nothing
+        , stDesc   = ri.riDesc
+        , stFields = [ CatField f.rfName f.rfL4 t f.rfDesc
                      | f <- ri.riFields, FEmitted t <- [f.rfStatus] ]
         }
     | ri <- dedupOn (.riL4) (Map.elems records)
@@ -284,6 +315,11 @@ buildModule mod' efs =
         FUnsupported m  -> ["was not emitted: " <> m]
     ]
 
+  sectionPaths = Map.fromList
+    [ (getUnique fnRes, path)
+    | (path, Decide _ (MkDecide _ _ (MkAppForm _ fnRes _ _) _)) <- topDeclsWithPath mod'
+    ]
+
   assemble enums =
     let ctx = Ctx
           { cxVars     = Map.empty
@@ -300,25 +336,36 @@ buildModule mod' efs =
           , cxElided   = elided
           , cxDecides  = decides
           , cxNonexh   = False
+          , cxBoolOnly = opts.loBooleanOnly
           }
-    in (\lowered tops -> CatModule
-          { modName     = catUpper (dropExt (moduleSource mod'))
-          , modSource   = moduleSource mod'
-          , modWarnings =
-              nub (fieldNotes <> Map.elems elided <> concat [ ns | (_, _, ns) <- lowered ])
-          , modSegments =
-              [ SegMetadata
-                  (  map DStruct structs
-                  <> map DEnum enums
-                  <> [ DScope d | (d, _, _) <- lowered ] )
-              , SegCode
-                  (  map (ItemDecl . DTopdef) tops
-                  <> [ ItemScope b | (_, b, _) <- lowered ] )
-              ]
-          })
-       <$> vList [ lowerExport ctx assumes assumeUse decides ef | ef <- efs ]
+        modTitle = catUpper (dropExt (moduleSource mod'))
+    in (\lowered tops ->
+          let (tests, testNotes) = collectTests ctx decides mod'
+              eqvs               = concatMap eqvUnitsOf lowered
+              notes = nub (  fieldNotes
+                          <> Map.elems elided
+                          <> concatMap (.lsNotes) lowered
+                          <> testNotes )
+          in CatModule
+               { modName     = modTitle
+               , modSource   = moduleSource mod'
+               , modWarnings = notes
+               , modSegments = weave modTitle (moduleSource mod') notes structs enums
+                                     tops lowered eqvs tests
+               })
+       <$> vList [ lowerExport ctx assumes assumeUse decides sectionPaths ef | ef <- efs ]
        <*> vList [ lowerHelper ctx di | di <- helpers ]
-       <*  collisionCheck structs enums sigs hsigs
+       <*  collisionCheck structs enums sigs hsigs generatedNames
+
+  -- The names the equivalence harness (R4) and the test emitter (R7) will claim.
+  -- They are predictable from the export list, so they can join the collision
+  -- check before anything is lowered.
+  generatedNames =
+       [ ( catUpper ef.exportName <> "Eqv" <> sfx
+         , "<generated equivalence scope for `" <> ef.exportName <> "`>" )
+       | ef <- efs, sfx <- ["Row", "ModeA", "ModeB", "Agree", "Grid"] ]
+    <> [ ("Test" <> tshow i, "<generated #EVAL test scope " <> tshow i <> ">")
+       | i <- [1 .. length [ () | Directive _ _ <- topDecls mod' ]] ]
 
 elisionNote :: Text -> Text -> Text
 elisionNote fn p =
@@ -332,6 +379,218 @@ paramsOf elided = \case
     [ (catIdent (givenText g), not (Map.member (getUnique (givenName g)) elided))
     | g <- di.diGivens
     ]
+
+-- ---------------------------------------------------------------------------
+-- The literate weave (R8, §8.8)
+-- ---------------------------------------------------------------------------
+
+-- | Lay the emitted module out as a literate document.
+--
+-- One @catala-metadata@ fence carries every public declaration (Catala resolves
+-- declarations and definitions independently of file order, checked against the
+-- real toolchain), and the rest of the file alternates law text with the code
+-- it governs: a decision's @§@ section becomes a Markdown heading, its inert
+-- scaffolding and @\@ref@ citation become the prose immediately above its
+-- fence, and each Mode B rewrite's equivalence apparatus follows the rule it
+-- checks.
+weave
+  :: Text -> Text -> [Text]
+  -> [CatStruct] -> [CatEnum] -> [CatTopdef]
+  -> [LoweredScope] -> [(Text, EqvUnit)] -> [TestUnit]
+  -> [CatSegment]
+weave title source notes structs enums tops lowered eqvs tests =
+     [ SegProse header ]
+  <> [ SegProse noteBlock | not (null notes) ]
+  <> [ SegMetadata metadata ]
+  <> [ SegCode (map (ItemDecl . DTopdef) tops) | not (null tops) ]
+  <> concat (snd (mapAccumL scopeSegments [] lowered))
+  <> testSegments
+ where
+  header =
+    [ "# " <> title
+    , ""
+    , "Generated by `l4 catala` from `" <> source <> "`."
+    , "Do not edit by hand; regenerate from the L4 source instead."
+    ]
+
+  noteBlock =
+    "Notes from the lowering — divergences between this artifact and its L4 source"
+    : "are disclosed here rather than left to be discovered (R10, R11, §8.4):"
+    : ""
+    : [ "- " <> n | n <- notes ]
+
+  metadata =
+       map DStruct structs
+    <> map DEnum enums
+    <> [ DScope ls.lsDecl | ls <- lowered ]
+    <> concat [ eu.euDecls | (_, eu) <- eqvs ]
+    <> [ DScope t.tuDecl | t <- tests ]
+
+  -- Emit a heading for each newly entered § level, then the decision itself.
+  scopeSegments prev ls =
+    let shared    = length (takeWhile id (zipWith (==) prev ls.lsPath))
+        newHeads  = [ heading (i + 2) s
+                    | (i, s) <- drop shared (zip [0 :: Int ..] ls.lsPath) ]
+        lvl = length ls.lsPath + 2
+        body =
+             [ SegProse (trimTrailingBlanks
+                          (  heading lvl ("`" <> ls.lsL4 <> "`")
+                          <> [ "" ]
+                          <> maybe [] (\d -> [d]) ls.lsDesc
+                          <> ls.lsLaw ))
+             , SegCode [ItemScope ls.lsBody]
+             ]
+        eqvBlocks = concat
+          [ [ SegProse eu.euProse, SegCode eu.euItems, SegTestCli eu.euTest ]
+          | (owner, eu) <- eqvs, owner == ls.lsBody.sbName
+          ]
+    in (ls.lsPath, [ SegProse h | h <- newHeads ] <> body <> eqvBlocks)
+
+  heading n t = [ Text.replicate n "#" <> " " <> t ]
+
+  trimTrailingBlanks = reverse . dropWhile Text.null . reverse
+
+  testSegments
+    | null tests = []
+    | otherwise =
+           [ SegProse
+               [ "## Tests"
+               , ""
+               , "One scope per `#EVAL` / `#ASSERT` directive in the L4 source, with the"
+               , "arguments the directive supplied. The expected values below were computed"
+               , "by L4's own evaluator, so `clerk test` compares the two languages rather"
+               , "than comparing Catala with itself (R7, §8.7)."
+               ] ]
+        <> concat [ [ SegCode [ItemScope t.tuBody], SegTestCli t.tuCli ] | t <- tests ]
+
+-- | The law text that annotates a decision: its inert scaffolding, in source
+-- order, followed by its @\@ref@ citation.
+lawText :: DecideInfo -> [Text]
+lawText di = case body <> citation of
+  [] -> []
+  ls -> ls
+ where
+  body = case inertTexts di.diBody of
+    [] -> []
+    ts -> "" : ts <> [""]
+  citation = case di.diRef of
+    Nothing -> []
+    Just r  -> ["", "*Source: " <> r <> ".*"]
+
+-- | Inert scaffolding, in source order. @Inert@ nodes carry the verbatim
+-- statute text an isomorphic L4 encoding keeps beside its logic; the Catala
+-- weave is where that text belongs on the far side (§4.9).
+inertTexts :: Expr Resolved -> [Text]
+inertTexts e =
+  [ t
+  | (_, t) <- sortOn fst
+      [ (rangeStart (rangeOf x), Text.strip txt)
+      | x <- toListOf (cosmosOf (gplate @(Expr Resolved))) e
+      , Inert _ txt _ <- [x]
+      , not (Text.null (Text.strip txt))
+      ]
+  ]
+ where
+  rangeStart :: Maybe SrcRange -> Maybe (Int, Int)
+  rangeStart = fmap (\r -> (r.start.line, r.start.column))
+
+-- ---------------------------------------------------------------------------
+-- The equivalence apparatus (R4, §8.4)
+-- ---------------------------------------------------------------------------
+
+-- | Every Mode B rewrite in one scope, paired with the scope that owns it.
+eqvUnitsOf :: LoweredScope -> [(Text, EqvUnit)]
+eqvUnitsOf ls =
+  [ (ls.lsBody.sbName, eu)
+  | (i, rd) <- zip [0 :: Int ..] ls.lsBody.sbRules
+  , Just eqv <- [rd.rdEqv]
+  , eu <- maybeToList (equivalenceUnit (base i) (human i) eqv)
+  ]
+ where
+  base i  = ls.lsBody.sbName <> "Eqv" <> (if i == 0 then "" else tshow i)
+  human i = ls.lsL4 <> (if i == 0 then "" else " / " <> ruleVar i)
+  ruleVar i = maybe "" (.rdVar) (listToMaybe (drop i ls.lsBody.sbRules))
+
+-- ---------------------------------------------------------------------------
+-- Tests (R7, §8.7)
+-- ---------------------------------------------------------------------------
+
+-- | One @#[test]@ scope wrapping one L4 directive.
+data TestUnit = TestUnit
+  { tuDecl :: !CatScopeDecl
+  , tuBody :: !CatScopeBody
+  , tuCli  :: !CatTestCli
+  }
+
+-- | Turn each @#EVAL@ / @#ASSERT@ over an exported decision into a @#[test]@
+-- scope with the directive's literal arguments.
+--
+-- A directive that does not lower — one that reads an @ASSUME@d input, or whose
+-- head is not a decision this module exports — is skipped with a note rather
+-- than failing the emission: a module's testability is not a precondition for
+-- its compilation.
+collectTests :: Ctx -> Map Unique DecideInfo -> Module Resolved -> ([TestUnit], [Text])
+collectTests ctx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mod' ] [] []
+ where
+  go _ [] us ns = (reverse us, reverse ns)
+  go i (d : ds) us ns = case plan i d of
+    Right u        -> go (i + 1) ds (u : us) ns
+    Left Nothing   -> go i ds us ns
+    Left (Just n)  -> go i ds us (n : ns)
+
+  plan i d = case d of
+    LazyEval ann e      -> build i (rangeOf ann) e (resultType e)
+    LazyEvalTrace ann e -> build i (rangeOf ann) e (resultType e)
+    Assert ann e        -> build i (rangeOf ann) e (Just TBool)
+    Check {}            -> Left Nothing
+    Contract {}         -> Left (Just contractNote)
+
+  contractNote =
+    "a `#TRACE`/contract directive has no Catala counterpart (Catala models no deontic layer, \
+    \§5.1), so no test scope was emitted for it"
+
+  build i rng e mty = case mty of
+    Nothing -> Left (Just (skipNote i "its result type could not be determined — a test scope \
+                                      \wraps a call to an @export decision (§8.7)"))
+    Just ty -> case runV (lowerExpr ctx e) of
+      Left errs -> Left (Just (skipNote i (Text.intercalate "; " [ x.errMsg | x <- errs ])))
+      Right ce  -> Right TestUnit
+        { tuDecl = CatScopeDecl
+            { sdName   = name
+            , sdL4     = name
+            , sdDesc   = Just ("Test " <> tshow i <> ", from the L4 directive at "
+                               <> maybe "an unknown position" prettySrcRange rng <> ".")
+            , sdIsTest = True
+            , sdVars   = [ CatScopeVar "result" "result" VarOutput (ShContent ty) Nothing ]
+            }
+        , tuBody = CatScopeBody name
+            [ CatRuleDef
+                { rdVar = "result"
+                , rdModeA = [CatClause ClPlain Nothing (ConsEquals ce)]
+                , rdModeB = Nothing, rdEmitted = ModeA
+                , rdFallback = Nothing, rdEqv = Nothing
+                } ]
+        -- See 'L4.Catala.Equivalence' for why @--disable-warnings@ is here.
+        , tuCli = CatTestCli ("catala test-scope " <> name <> " --disable-warnings -F json") [] rng
+        }
+     where
+      name = "Test" <> tshow i
+
+  skipNote i why =
+    "directive " <> tshow i <> " did not become a Catala `#[test]` scope: " <> why
+
+  -- The declared result type of the decision the directive calls. Everything
+  -- else is out of R7's shape ("the test scope wraps the scope under test").
+  resultType e = do
+    r <- case e of
+      App _ r' _        -> Just r'
+      AppNamed _ r' _ _ -> Just r'
+      _                 -> Nothing
+    di <- Map.lookup (getUnique r) decides
+    t  <- di.diGiveth
+    case runV (lowerType ctx di.diRange t) of
+      Right ty -> Just ty
+      Left _   -> Nothing
 
 -- ---------------------------------------------------------------------------
 -- Reachability, recursion (R6), and ASSUME propagation
@@ -406,8 +665,9 @@ assumeClosure decides assumes elided exportUs = fixpoint initial
 -- keeps capitalised names (structures, enumerations, scopes) in one namespace
 -- and lowercase toplevels in another, and each structure's fields in their own.
 collisionCheck
-  :: [CatStruct] -> [CatEnum] -> Map Unique ScopeSig -> Map Unique HelperSig -> V ()
-collisionCheck structs enums sigs hsigs = case clashes of
+  :: [CatStruct] -> [CatEnum] -> Map Unique ScopeSig -> Map Unique HelperSig
+  -> [(Text, Text)] -> V ()
+collisionCheck structs enums sigs hsigs generated = case clashes of
   [] -> pure ()
   cs -> vBad cs
  where
@@ -415,7 +675,8 @@ collisionCheck structs enums sigs hsigs = case clashes of
        report "capitalised (structure / enumeration / scope)"
          (  [ (s.stName, s.stL4) | s <- structs ]
          <> [ (e.enName, e.enL4) | e <- enums ]
-         <> [ (sg.ssScope, sg.ssL4) | sg <- Map.elems sigs ] )
+         <> [ (sg.ssScope, sg.ssL4) | sg <- Map.elems sigs ]
+         <> generated )
     <> report "toplevel helper" [ (h.hsName, h.hsL4) | h <- Map.elems hsigs ]
     <> concat [ report ("field of structure `" <> s.stName <> "`")
                   [ (f.fdName, f.fdL4) | f <- s.stFields ]
@@ -432,23 +693,40 @@ collisionCheck structs enums sigs hsigs = case clashes of
 -- Exported decisions → scopes (R1)
 -- ---------------------------------------------------------------------------
 
+-- | An exported decision's emitted scope, plus everything the literate weave
+-- needs to place it: the L4 name, the @§@ section path it sits under, and the
+-- law text that annotates it (R8).
+data LoweredScope = LoweredScope
+  { lsDecl  :: !CatScopeDecl
+  , lsBody  :: !CatScopeBody
+  , lsNotes :: ![Text]
+  , lsL4    :: !Text
+  , lsDesc  :: !(Maybe Text)
+  , lsPath  :: ![Text]
+  , lsLaw   :: ![Text]
+  }
+
 lowerExport
   :: Ctx
   -> Map Unique AssumeInfo
   -> Map Unique [Unique]
   -> Map Unique DecideInfo
+  -> Map Unique [Text]
   -> ExportedFunction
-  -> V (CatScopeDecl, CatScopeBody, [Text])
-lowerExport ctx assumes assumeUse decides ef =
-  case Map.lookup (getUnique (decideName ef.exportDecide)) decides of
+  -> V LoweredScope
+lowerExport ctx assumes assumeUse decides paths ef =
+  case Map.lookup u decides of
     Nothing -> vBad [LowerError ef.exportName Nothing
                       "exported decision not found among this module's top-level DECIDEs"]
-    Just di -> vIn di.diName (lowerExportDi ctx assumes assumeUse di ef)
+    Just di -> vIn di.diName (lowerExportDi ctx assumes assumeUse di ef path)
+ where
+  u    = getUnique (decideName ef.exportDecide)
+  path = Map.findWithDefault [] u paths
 
 lowerExportDi
   :: Ctx -> Map Unique AssumeInfo -> Map Unique [Unique] -> DecideInfo -> ExportedFunction
-  -> V (CatScopeDecl, CatScopeBody, [Text])
-lowerExportDi outer assumes assumeUse di ef =
+  -> [Text] -> V LoweredScope
+lowerExportDi outer assumes assumeUse di ef path =
   vList (map checkGivenShape di.diGivens) *> retType `vThen` build
  where
   assumeUs = Map.findWithDefault [] di.diUnique assumeUse
@@ -474,18 +752,24 @@ lowerExportDi outer assumes assumeUse di ef =
   build retTy =
     let outShape = case retTy of TBool -> ShCondition; t -> ShContent t
         outName  = catIdent di.diName
-    in (\inputs assumeInputs defaults mainRule ->
-          ( CatScopeDecl
+        desc     = if Text.null ef.exportDescription then di.diDesc
+                     else Just ef.exportDescription
+    in (\inputs assumeInputs defaults mainRule -> LoweredScope
+          { lsDecl = CatScopeDecl
               { sdName   = catUpper di.diName
               , sdL4     = di.diName
-              , sdDesc   = if Text.null ef.exportDescription then di.diDesc
-                             else Just ef.exportDescription
+              , sdDesc   = desc
               , sdIsTest = False
               , sdVars   = concat inputs <> assumeInputs <>
                   [ CatScopeVar outName di.diName VarOutput outShape Nothing ]
               }
-          , CatScopeBody (catUpper di.diName) (catMaybes defaults <> [mainRule])
-          , modeNotes di.diName mainRule ))
+          , lsBody  = CatScopeBody (catUpper di.diName) (catMaybes defaults <> [mainRule])
+          , lsNotes = modeNotes di.diName mainRule
+          , lsL4    = di.diName
+          , lsDesc  = desc
+          , lsPath  = path
+          , lsLaw   = lawText di
+          })
        <$> vList (map scopeInput di.diGivens)
        <*> vList (map assumeInput assumeVs)
        <*> vList (map typicallyDefault di.diGivens)
@@ -521,17 +805,23 @@ lowerExportDi outer assumes assumeUse di ef =
   -- Catala's default calculus gives the caller's value exception priority.
   typicallyDefault g = case givenTypically g of
     Nothing -> pure Nothing
-    Just d  -> (\e -> Just (CatRuleDef (catIdent (givenText g))
-                              [CatClause ClPlain Nothing (ConsEquals e)] Nothing ModeA Nothing))
+    Just d  -> (\e -> Just CatRuleDef
+                        { rdVar      = catIdent (givenText g)
+                        , rdModeA    = [CatClause ClPlain Nothing (ConsEquals e)]
+                        , rdModeB    = Nothing
+                        , rdEmitted  = ModeA
+                        , rdFallback = Nothing
+                        , rdEqv      = Nothing
+                        })
                <$> lowerExpr bodyCtx d
 
+-- | A fallback from the primary (Mode B) rendering is reported; the ordinary
+-- case — a ladder that carries its equivalence grid — is not noise worth
+-- printing (§8.4: fallbacks are warned, never silent).
 modeNotes :: Text -> CatRuleDef -> [Text]
-modeNotes fn rd = case (rd.rdEmitted, rd.rdModeB) of
-  (ModeA, Just _) ->
-    [ "`" <> fn <> "`: a Mode B exception ladder was derived but is not the emitted rendering — "
-      <> "§8.4's gate wants the module to carry machine-checked equivalence scopes, and this pass "
-      <> "does not yet emit them." ]
-  _ -> []
+modeNotes fn rd = case (rd.rdEmitted, rd.rdModeB, rd.rdFallback) of
+  (ModeA, Just _, Just why) -> [ "`" <> fn <> "`: " <> why ]
+  _                         -> []
 
 -- ---------------------------------------------------------------------------
 -- Non-exported reachable helpers → private toplevels (R1)
@@ -573,18 +863,39 @@ lowerHelper outer di = vIn di.diName $ case di.diGiveth of
 -- Rules: Mode A always, Mode B where derivable (R4)
 -- ---------------------------------------------------------------------------
 
+-- | R4: the exception ladder is the primary rendering wherever the module can
+-- also carry the equivalence apparatus that re-checks it. Where it cannot, the
+-- boolean reference rendering is emitted and the reason is recorded — as a
+-- comment in the artifact and as a warning on stderr.
 lowerRule :: Ctx -> Text -> CatVarShape -> Expr Resolved -> V CatRuleDef
 lowerRule ctx var shape body =
-  (\modeA modeB -> CatRuleDef
-      { rdVar      = var
-      , rdModeA    = modeA
-      , rdModeB    = modeB
-      , rdEmitted  = ModeA
-      , rdFallback = Just (case modeB of
-          Just _  -> "Mode A reference rendering; the derived Mode B ladder awaits §8.4's \
-                     \machine-checked equivalence scopes"
-          Nothing -> "no exception ladder is derivable for this rule's shape")
-      })
+  (\modeA modeB -> case modeB of
+      Nothing -> CatRuleDef
+        { rdVar = var, rdModeA = modeA, rdModeB = Nothing
+        , rdEmitted = ModeA, rdEqv = Nothing
+        , rdFallback = Just "no exception ladder is derivable for this rule's shape"
+        }
+      Just (clauses, _) | ctx.cxBoolOnly -> CatRuleDef
+        { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
+        , rdEmitted = ModeA, rdEqv = Nothing
+        , rdFallback = Just "--boolean-only: the Mode A reference rendering was requested"
+        }
+      Just (clauses, eqv)
+        | n <- eqvAtomCount eqv, n > 0, n <= eqvRowLimit -> CatRuleDef
+            { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
+            , rdEmitted = ModeB, rdFallback = Nothing, rdEqv = Just eqv
+            }
+        | otherwise -> CatRuleDef
+            { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
+            , rdEmitted = ModeA, rdEqv = Nothing
+            , rdFallback = Just
+                ( "an exception ladder was derived, but it ranges over "
+                <> tshow (eqvAtomCount eqv) <> " atomic conditions and §8.4's standing "
+                <> "equivalence check enumerates them exhaustively (cap: " <> tshow eqvRowLimit
+                <> "). An unchecked ladder is the one thing R4 will not ship, so the boolean "
+                <> "reference rendering is emitted instead." )
+            }
+  )
   <$> plainClauses
   <*> modeBClauses ctx var shape body
  where
@@ -608,17 +919,27 @@ lowerRule ctx var shape body =
 --   * a @CONSIDER@ over literals is the same thing with equality guards.
 --
 -- Anything else yields 'Nothing', and the rule is emitted in Mode A.
-modeBClauses :: Ctx -> Text -> CatVarShape -> Expr Resolved -> V (Maybe [CatClause])
+modeBClauses :: Ctx -> Text -> CatVarShape -> Expr Resolved -> V (Maybe ([CatClause], CatEqv))
 modeBClauses ctx var shape body = case shape of
   ShCondition
     | Just (base, provisos) <- peelProvisos body ->
-        (\b ps -> Just (provisoLadder var b ps))
+        (\b ps -> Just (provisoLadder var b ps, CatEqv (EqvProviso (length ps)) (b : ps)))
           <$> lowerExpr ctx base <*> vList (map (lowerExpr ctx) provisos)
   _ | Just (arms, dflt) <- cascadeArms body ->
-        (\as d -> armLadder var shape as d)
+        (\as d -> (,) <$> armLadder var shape as d <*> eqvOf as d)
           <$> vList [ (,) <$> lowerExpr ctx c <*> lowerExpr ctx v | (c, v) <- arms ]
           <*> lowerExpr ctx dflt
   _ -> pure Nothing
+ where
+  eqvOf as d = case shape of
+    ShContent _ -> Just (CatEqv (EqvArmsValue (length as)) (map fst as))
+    ShCondition -> do
+      d' <- boolOf d
+      ks <- traverse (boolOf . snd) as
+      pure (CatEqv (EqvArmsCond ks d') (map fst as))
+  boolOf = \case
+    ELit (LBool b) -> Just b
+    _              -> Nothing
 
 -- | @c AND NOT d1 AND NOT d2 …@ → @(c, [d1, d2, …])@, or 'Nothing' when there is
 -- no trailing negated conjunct to make a proviso out of.
@@ -664,49 +985,6 @@ litConsiderArms (Consider ann scrut branches)
   whens  = [ (l, b) | MkBranch _ (When _ (PatLit _ l)) b <- branches ]
   others = [ b      | MkBranch _ (Otherwise _)         b <- branches ]
 litConsiderArms _ = Nothing
-
--- | @base@ holds unless a proviso fires. Provisos are chained rather than made
--- siblings: two sibling exceptions to one label that fire together is Catala's
--- @Conflict@ error, and @c AND NOT d1 AND NOT d2@ has no such failure mode.
-provisoLadder :: Text -> CatExpr -> [CatExpr] -> [CatClause]
-provisoLadder var base provisos =
-  CatClause (ClLabel (lbl 0)) (Just base) ConsFulfilled : rungs
- where
-  n     = length provisos
-  lbl :: Int -> Text
-  lbl i = var <> "_p" <> tshow i
-  rungs =
-    [ CatClause kind (Just p) ConsNotFulfilled
-    | (i, p) <- zip [1 :: Int ..] provisos
-    , let kind | i == n    = ClException (Just (lbl (i - 1)))
-               | otherwise = ClLabelExc (lbl i) (lbl (i - 1))
-    ]
-
--- | An n-arm first-match cascade as a priority ladder. Arm 1 has the highest
--- priority, so it is an exception to arm 2, which is an exception to arm 3, …,
--- and the last arm is an exception to the unconditional base.
-armLadder :: Text -> CatVarShape -> [(CatExpr, CatExpr)] -> CatExpr -> Maybe [CatClause]
-armLadder var shape arms dflt = case shape of
-  ShContent _ -> Just (base (ConsEquals dflt) : [ rung i c (ConsEquals v) | (i, (c, v)) <- indexed ])
-  ShCondition -> do
-    d  <- boolConseq dflt
-    ks <- traverse (boolConseq . snd) arms
-    pure (base d : [ rung i c k | ((i, (c, _)), k) <- zip indexed ks ])
- where
-  n       = length arms
-  indexed = zip [1 :: Int ..] arms
-  lbl :: Int -> Text
-  lbl i   = var <> "_r" <> tshow i
-  base    = CatClause (ClLabel (lbl 0)) Nothing
-  rung i c = CatClause (if i == n then ClException (Just (lbl (i - 1)))
-                                  else ClLabelExc (lbl i) (lbl (i - 1)))
-                       (Just c)
-  -- A `condition`-shaped variable can only be `fulfilled`/`not fulfilled`, so a
-  -- ladder over it exists only when every arm value is a literal.
-  boolConseq = \case
-    ELit (LBool True)  -> Just ConsFulfilled
-    ELit (LBool False) -> Just ConsNotFulfilled
-    _                  -> Nothing
 
 -- ---------------------------------------------------------------------------
 -- Types (R2, R11)
@@ -1239,11 +1517,20 @@ unsupported e = "this construct is outside the v1 Catala fragment (§6): " <> ca
 -- ---------------------------------------------------------------------------
 
 topDecls :: Module Resolved -> [TopDecl Resolved]
-topDecls (MkModule _ _ section) = goSection section
+topDecls = map snd . topDeclsWithPath
+
+-- | Every top-level declaration, paired with the titles of the @§@ sections
+-- enclosing it, outermost first. R8 turns that path into Markdown headings.
+topDeclsWithPath :: Module Resolved -> [([Text], TopDecl Resolved)]
+topDeclsWithPath (MkModule _ _ section) = goSection [] section
  where
-  goSection (MkSection _ _ _ ds) = ds >>= \d -> case d of
-    Section _ sub -> goSection sub
-    other         -> [other]
+  goSection path (MkSection _ mname _ ds) =
+    let path' = case Text.strip . resolvedToText <$> mname of
+          Just t | not (Text.null t) -> path <> [t]
+          _                          -> path
+    in ds >>= \d -> case d of
+         Section _ sub -> goSection path' sub
+         other         -> [(path', other)]
 
 -- | Every type declared in the module, keyed by unique.
 collectTypeNames :: Module Resolved -> Map Unique Text
@@ -1257,16 +1544,18 @@ collectTypeNames mod' = Map.fromList
 collectRecords :: Module Resolved -> Map Unique RecordInfo
 collectRecords mod' = Map.fromList $ concat
   [ (getUnique tyRes, ri) : [ (getUnique c, ri) | c <- maybeToList mCon ]
-  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (RecordDecl _ mCon fields)) <- topDecls mod'
+  | Declare _ d@(MkDeclare _ _ (MkAppForm _ tyRes _ _) (RecordDecl _ mCon fields)) <- topDecls mod'
   , let ri = RecordInfo
                { riName   = catUpper (resolvedToText tyRes)
                , riL4     = resolvedToText tyRes
+               , riDesc   = descOfDeclare d
                , riFields = map fieldOf fields
                }
   ]
  where
-  fieldOf (MkTypedName _ fRes ty _ mMeans) =
-    RecField (catIdent (resolvedToText fRes)) (resolvedToText fRes) (getUnique fRes) (statusOf ty mMeans)
+  fieldOf tn@(MkTypedName _ fRes ty _ mMeans) =
+    RecField (catIdent (resolvedToText fRes)) (resolvedToText fRes) (getUnique fRes)
+             (statusOf ty mMeans) (descOfAnno (getAnno tn))
   statusOf ty mMeans
     | isJust mMeans   = FElidedComputed
     | isStringType ty = FElidedString
@@ -1315,10 +1604,14 @@ collectDecides mod' = Map.fromList
         , diBody    = body
         , diNonexh  = isNonexhaustiveDecide d
         , diDesc    = descOfDecide d
+          -- A leading @ref attaches to whichever node the resolver reached
+          -- first, which for a DECIDE is the enclosing 'TopDecl' rather than
+          -- the 'Decide' itself; check both, as 'L4.Dmn.Lower' does.
+        , diRef     = refOfAnno tdAnn <|> refOfAnno (getAnno d)
         , diRange   = rangeOf d
         } )
-  | Decide _ d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth)
-                          (MkAppForm _ fnRes appArgs _) body) <- topDecls mod'
+  | Decide tdAnn d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth)
+                              (MkAppForm _ fnRes appArgs _) body) <- topDecls mod'
   ]
 
 collectAssumes :: Module Resolved -> Map Unique AssumeInfo
@@ -1335,16 +1628,29 @@ collectAssumes mod' = Map.fromList
 
 -- | The @\@desc@ text of a declaration, with the leading flag keywords stripped.
 descOfDeclare :: Declare Resolved -> Maybe Text
-descOfDeclare d = case getAnno d ^. annDesc of
+descOfDeclare = descOfAnno . getAnno
+
+descOfDecide :: Decide Resolved -> Maybe Text
+descOfDecide = descOfAnno . getAnno
+
+descOfAnno :: Anno -> Maybe Text
+descOfAnno a = case a ^. annDesc of
   Nothing   -> Nothing
   Just desc -> let ParsedDesc _ t = parseDescText (getDesc desc)
                in if Text.null t then Nothing else Just t
 
-descOfDecide :: Decide Resolved -> Maybe Text
-descOfDecide d = case getAnno d ^. annDesc of
-  Nothing   -> Nothing
-  Just desc -> let ParsedDesc _ t = parseDescText (getDesc desc)
-               in if Text.null t then Nothing else Just t
+-- | The @\@ref@ citation attached to a declaration, if any (R8).
+refOfAnno :: Anno -> Maybe Text
+refOfAnno a = case a ^. annRef of
+  Nothing -> Nothing
+  Just r  -> let t = stripKeyword (Text.strip (getRef r))
+             in if Text.null t then Nothing else Just t
+ where
+  -- 'getRef' keeps the annotation keyword the citation was written with.
+  stripKeyword t = case [ rest | k <- ["@ref-src", "@ref-map", "@ref"]
+                               , Just rest <- [Text.stripPrefix k t] ] of
+    (rest : _) -> Text.strip rest
+    []         -> t
 
 -- | A stable provenance string: the source file's basename, so emitted output
 -- does not depend on the invocation path.
