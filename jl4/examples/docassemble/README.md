@@ -16,9 +16,11 @@ implementation made them pass. It ships `--package DIR`, the `.l4` source
 embedded byte-identically under `data/sources`, the generated runtime module
 loaded through `modules:`, `@ref` citations carried by `explain()` and rendered
 by `logic_explanation()` on every verdict screen, and the `auto terms:`
-glossary. The seven `expected/` goldens are committed and pinned by the
-`l4 docassemble` cases in `jl4/tests-cli/Main.hs` (33 cases across three
-`describe` blocks), and every example below was run green against
+glossary. An adversarial review pass the same day repaired what survived
+refutation, and corrected what it found to be false (see "What the review pass
+changed"). The seven `expected/` goldens are committed and
+pinned by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs` (41 cases across
+four `describe` blocks), and every example below was run green against
 `docassemble.base` 1.10.7 (local checkout, commit `1b6678384`) from **both**
 artifact shapes — see "Prove it runs in real docassemble". M3 (the embedded
 query plan) and M4 (`LIST OF`, payload constructors, date arithmetic, document
@@ -95,7 +97,13 @@ recognise the same program.
   `defaults.l4` applies to `@desc`, applied to `@ref`. Each rule's citation
   lands in its own `code:` block, so the verdict screen names exactly the
   rules that fired; the `DECLARE`d type and the three `MEANS` bindings become
-  the `auto terms:` glossary.
+  the `auto terms:` glossary. A **fourth** `@ref` sits on the exported
+  `DECIDE` itself, and it is what makes the emitted **order** observable: the
+  emitter puts `explain()` after the assignment in every `code:` block, and the
+  goal's assignment is what pulls on the sub-rules, so the goal completes last
+  and cites last. On the three sub-rules alone that placement is unobservable —
+  moving every `explain()` above its assignment left the round-trip harness
+  fully green until this citation existed.
 - `roundtrip_check.py` — drives the emitted interview headlessly in real
   `docassemble.base` and asserts the verdict/goal equals the L4 `#EVAL`
   oracle (fixture table in the file; one case per #EVAL). For the `citations`
@@ -158,10 +166,18 @@ Things worth knowing:
   keeps non-ASCII letters (`café_münze_2024`).
 - `--package` and `-o` are refused together, by name: they are two different
   artifact shapes.
-- Regenerating over a tree this command wrote is fine and silent. A directory
-  holding anything else is refused — a package is a thing people edit. Note
-  that regeneration writes but never deletes, so `rm -rf` the directory if the
-  generated shape itself has changed.
+- Regenerating over a tree this command wrote is fine. A directory holding
+  anything else is refused — a package is a thing people edit. Regeneration
+  **replaces** the generated content rather than adding to it: the
+  `docassemble/` subtree and any root-level `*.fidelity.txt` are removed first,
+  and everything else you put in the directory (a README, a LICENSE, a
+  `tests/`) is left alone. It did not always: writing without deleting meant
+  that regenerating after the `.l4` was **renamed** left the whole previous
+  inner package behind, `[tool.setuptools.packages.find] where = ["."]` found
+  both, and the built wheel shipped an importable second package the
+  distribution does not own, with no data file behind its `l4_source_text()`.
+  The slug follows the source basename by design, so a rename is the designed
+  trigger, not an exotic one.
 - `pyproject.toml` carries `license = "LicenseRef-UNSPECIFIED"`. The package
   holds *your* rules, whose licence this compiler cannot know; replace it with
   the SPDX expression that governs them before publishing.
@@ -185,10 +201,13 @@ Both artifacts carry the interview and the embedded `.l4`; neither contains a
 Two routes. Neither is exercised by any test here: they need a running server,
 and per the repo topology rule this corpus never depends on one.
 
-**1. `dainstall`** — the developer loop, from the separate `docassemble-cli`
-distribution (`pip install docassemble-cli`; it is *not* part of the
-docassemble monorepo, so nothing in the 1.10.7 checkout pins its behaviour).
-Point it at the generated directory:
+**1. `dainstall`** — the developer loop, from the separate **`docassemblecli`**
+distribution (`pip install docassemblecli`; it is *not* part of the docassemble
+monorepo, so nothing in the 1.10.7 checkout pins its behaviour). The name has no
+hyphen and PEP 503 does not collapse the two — `docassemble-cli` normalises to
+itself, and `https://pypi.org/simple/docassemble-cli/` is a 404 while
+`.../docassemblecli/` is a 200, so the hyphenated spelling cannot install the
+tool the next lines invoke. Point it at the generated directory:
 
 ```sh
 l4 docassemble myrules.l4 --package /tmp/myrulespkg
@@ -333,16 +352,21 @@ in full:
   [exempt (all three rules fire)] offering_exempt = True;
       citations ['17 CFR 227.100(a)(1) — offering maximum',
                  '17 CFR 227.100(a)(3) — sales through one intermediary only',
-                 '% of the proceeds retained is set out at ${ fee_schedule } — 17 CFR 227.300(a)'];
-      screen cites all three  OK
+                 '% of the proceeds retained is set out at ${ fee_schedule } — 17 CFR 227.300(a)',
+                 '17 CFR 227.100 — the crowdfunding exemption'];
+      screen cites all four  OK
   [cap exceeded (rules 2 and 3 short-circuited away)] offering_exempt = False;
-      citations ['17 CFR 227.100(a)(1) — offering maximum']; screen cites it  OK
+      citations ['17 CFR 227.100(a)(1) — offering maximum',
+                 '17 CFR 227.100 — the crowdfunding exemption']; screen cites both  OK
 ```
 
-The third citation is the one that matters: it begins with `%` and carries a
-literal `${ … }`, and it arrives on the **rendered** screen verbatim. That is
-only provable after Mako has run, which is why the assertion lives in the
-harness and not in a YAML golden.
+Two things in that transcript are asserted rather than observed. The third
+citation begins with `%` and carries a literal `${ … }`, and it arrives on the
+**rendered** screen verbatim — only provable after Mako has run, which is why
+the assertion lives in the harness and not in a YAML golden. And the citation
+list is asserted as an **ordered** list: order is completion order, so the
+goal's own `@ref` (the fourth) comes last, after the sub-rules its assignment
+pulled on. Swap any `explain()` above its assignment and this run turns red.
 
 ## M2 acceptance tests — written RED first, now GREEN
 
@@ -352,22 +376,37 @@ contract M2 had to meet, and they now pass; what follows is what each block
 pins, so a later change knows what it is breaking._
 
 - `jl4/tests-cli/Main.hs`, `describe "l4 docassemble --package (M2/R11: …)"`
-  — nine shape assertions over the written tree (PEP 420 shape including the
-  namespace `__init__.py` that must be **absent**, `pyproject.toml`,
+  — fourteen shape assertions over the written tree (PEP 420 shape including
+  the namespace `__init__.py` that must be **absent**, `pyproject.toml`,
   `MANIFEST.in`, byte-identical `data/sources` provenance, the `modules:`
   wiring, no empty directories, determinism, the `--package`/`--output`
-  refusal, and a hostile-filename slug).
+  refusal, and a hostile-filename slug — plus, from the review pass, the
+  fidelity report's placement and bytes, the `MANIFEST.in` line that ships it,
+  `l4runtime.py`'s provenance API, the `# do not pre-load` marker, and
+  regeneration replacing a previous run rather than accumulating beside it).
 - `jl4/tests-cli/Main.hs`, `describe "l4 docassemble citations (M2: …)"` —
-  six assertions over the emitted interview (per-rule `explain()` with that
-  rule's own citation and **not** its neighbour's, `logic_explanation()` on
-  every verdict screen, one `auto terms:` block carrying the L4 defined
-  terms, herald/delimiter stripping, Mako escaping, and the emitter's own
-  key vocabulary), plus the `expected/citations.yml` byte golden that the RED
-  phase deferred to the implementation and the GREEN phase supplied.
+  eight assertions over the emitted interview (per-rule `explain()` with that
+  rule's own citation and **not** its neighbour's, the goal block carrying the
+  exported `DECIDE`'s own `@ref`, `explain()` sitting **after** the assignment
+  in every block, `logic_explanation()` on every verdict screen, one
+  `auto terms:` block carrying the L4 defined terms, herald/delimiter
+  stripping, Mako escaping, and the emitter's own key vocabulary split into
+  block keys and field modifiers), plus the `expected/citations.yml` byte
+  golden that the RED phase deferred to the implementation and the GREEN phase
+  supplied.
+- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble (M2 repairs: …)"` — the
+  two losses that used to be silent (`DA-GLOSS-REGEX`, `DA-GLOSS-COLLIDE`) and
+  the one that used to change the answer (an L4 name landing on a name
+  `modules:` star-imports).
+- `jl4/tests-cli/Main.hs`, `describe "@desc attachment to WHERE/LET bindings"`
+  — the parser repair M2 depends on, which no corpus golden can see: none of
+  evaluation, exactprint, nlg or schema shows which node owns a `@desc`, so
+  the oracles are the `auto terms:` glossary (which keys every entry by its
+  owner) and `l4 ast` (for a nested binding the glossary cannot reach).
 - `roundtrip_check.py`'s `citations` example — the claim that makes the
   milestone worth having: on the `cap exceeded` path the verdict screen cites
-  `17 CFR 227.100(a)(1)` **and nothing else**, because the other two rules
-  were short-circuited away and decided nothing.
+  `17 CFR 227.100(a)(1)` and the goal's own `@ref` **and nothing else**,
+  because the other two rules were short-circuited away and decided nothing.
 
 What stayed green throughout, deliberately: the six M1 `expected/*.yml`
 goldens are **byte-identical** after M2, because the `auto terms:` block, the
@@ -375,6 +414,58 @@ goldens are **byte-identical** after M2, because the `auto terms:` block, the
 only when the module actually carries the annotation they come from — and none
 of the six does. Same for the six `.fidelity.txt` sidecars, the `not-ok/`
 refusals, and the six round-trip examples.
+
+## What the review pass changed (2026-08-17)
+
+Five adversarial lenses attacked the milestone and an independent skeptic tried
+to refute each finding. What survived, and what was done about it:
+
+**Answers that were wrong.** An L4 name that sanitises onto a name the generated
+runtime module exports (`l4_source_path`, `l4_source_text`) was clobbered by
+`modules:`' `import *` — truthy, so the **packaged** artifact asked no question
+and returned the opposite verdict to the bare one, while the report said
+"(nothing lost)". `__all__` bounds *which* names arrive; it does nothing to stop
+an interview variable from being one of them. Those names are now reserved, in
+both artifact shapes.
+
+**Losses that were silent.** Two shapes of L4 defined term cannot become an
+`auto terms:` key at all, and both now come back as fidelity notes rather than
+as `(nothing lost)`: a term carrying a regex metacharacter (`DA-GLOSS-REGEX` —
+docassemble interpolates the key straight into a regex with no `re.escape`, so
+`s 12(1` made the whole interview unloadable while every L4 command reported
+success), and a term that folds onto an earlier one under docassemble's
+lower-case/whitespace-collapse key normalisation (`DA-GLOSS-COLLIDE` — what the
+loser costs is its whole definition, not merely its spelling).
+
+**Corrections to this file and the spec.** The `dainstall` distribution is
+`docassemblecli`, not `docassemble-cli`. And the "known cosmetic consequence"
+both documents used to describe — that a question's own label would auto-link to
+its own definition — **cannot happen**: glossary keys come from `DECLARE`d types
+and named definitions, questions are emitted for record fields and `GIVEN`
+parameters, and `collectGlossary` excludes exactly those, so the two sets are
+disjoint by construction. Measured with docassemble's own compiled regexes over
+`expected/citations.yml`, no `q_*` block matches any glossary term. What does
+happen is over-linking on the **verdict screen**: the term `offering` (from
+`DECLARE Offering`) matches inside `offering exempt: Holds`, where the word is
+part of the decision's name rather than a reference to the record type.
+
+**Known, not fixed: the explanation list is session-scoped.** `explain()`
+appends to `_internal['explanations']` and nothing in an emitted interview ever
+clears it. On the forward drive every example is green, and that is the flow the
+milestone claims. But docassemble's `invalidate_dependencies` deletes invalidated
+*variables* and never touches the explanation history (`parse.py:8014-8060` at
+`1b6678384`), so two flows go stale, both measured: `POST /api/session` with
+`delete_variables` re-decides the goal correctly while the verdict screen keeps
+citing rules that were short-circuited away, and two exported decisions driven in
+one session share one list. Two flows that were suspected and **cleared**: the
+plain back button rolls the whole `user_dict` back, explanation history included
+(`fetch_previous_user_dict`), and the API's plain `set_session_variables` never
+invalidates at all, because it writes the value before capturing `old_values`.
+Adding `clear_explanations()` to the driver does not fix it and makes it worse:
+the rule blocks are cached once their variable is defined, so the clear wipes
+what they recorded and never lets them run again (measured; see spec §8.4). The
+repair is a design change, not a patch, and it belongs with M4's `review:`
+block, which is the surface that makes re-answering ordinary.
 
 ## The #EVAL expectation table (mirrored in `roundtrip_check.py`)
 
@@ -396,5 +487,5 @@ refusals, and the six round-trip examples.
 | computed-and-shadow | below minimum | salary 2000 (alternative pruned) | FALSE | = False, no alternative question asked |
 | assume-via-fn | over | amount 60, base rate 50 | (hand-computed) TRUE | `over_threshold` = True |
 | assume-via-fn | under | amount 30, base rate 50 | (hand-computed) FALSE | = False |
-| citations | exempt | raised 1 000 000, one intermediary T, registered T | TRUE | `offering_exempt` = True; screen cites all three rules, in order |
-| citations | cap exceeded | raised 9 000 000 (only fixture supplied) | FALSE | = False, no rule-2/3 question asked; screen cites `17 CFR 227.100(a)(1)` and nothing else |
+| citations | exempt | raised 1 000 000, one intermediary T, registered T | TRUE | `offering_exempt` = True; screen cites all three sub-rules then the goal's own `@ref`, in that order |
+| citations | cap exceeded | raised 9 000 000 (only fixture supplied) | FALSE | = False, no rule-2/3 question asked; screen cites `17 CFR 227.100(a)(1)` then the goal's `@ref`, and nothing else |

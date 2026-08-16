@@ -74,6 +74,7 @@ id: c_offering_exempt
 code: |
   # L4: `offering exempt`
   offering_exempt = (offering_exempt_within_the_annual_cap and (offering_exempt_sold_through_a_single_intermediary and offering_exempt_the_intermediary_is_registered))
+  explain('17 CFR 227.100 — the crowdfunding exemption')
 depends on:
   - offering_exempt_within_the_annual_cap
   - offering_exempt_sold_through_a_single_intermediary

@@ -720,15 +720,105 @@ instance HasDesc (Aka n) where
 -- unreachable to every consumer. The docassemble backend's @auto terms:@
 -- glossary is the first of those consumers.
 --
--- Only the two binding forms are traversed, and in source order (a @WHERE@\'s
--- body precedes its declarations, a @LET@\'s declarations precede its body), so
--- a desc is always claimed by the nearest following declaration, exactly as at
--- top level.
+-- The descent is /structural and exhaustive/, mirroring 'HasRef' @(Expr n)@,
+-- and always in source order — a @WHERE@\'s body precedes its declarations, a
+-- @LET@\'s declarations precede its body — so a desc is always claimed by the
+-- nearest following declaration, exactly as at top level. Exhaustiveness is the
+-- point, and it is enforced by @-Wincomplete-patterns@: the first version of
+-- this instance handled only @Where@ and @LetIn@ at the top of a body and ended
+-- @other -> pure other@, so a @LET@ nested inside (say) an @IF@ arm still
+-- dropped its binding's @desc@ silently, with @l4 check@ reporting success.
+--
+-- No node below an 'Expr' calls 'attachLeadingDesc' except the declarations
+-- reached through 'LocalDecl', so this recursion consumes nothing it did not
+-- consume before; the only behaviour it changes is that a desc written above a
+-- nested binding now reaches that binding.
 instance HasDesc (Expr n) where
   addDesc = \ case
-    Where ann body decls -> Where ann <$> addDesc body <*> traverse addDesc decls
-    LetIn ann decls body -> LetIn ann <$> traverse addDesc decls <*> addDesc body
-    other                -> pure other
+    And        ann e1 e2 -> And        ann <$> addDesc e1 <*> addDesc e2
+    Or         ann e1 e2 -> Or         ann <$> addDesc e1 <*> addDesc e2
+    RAnd       ann e1 e2 -> RAnd       ann <$> addDesc e1 <*> addDesc e2
+    ROr        ann e1 e2 -> ROr        ann <$> addDesc e1 <*> addDesc e2
+    Implies    ann e1 e2 -> Implies    ann <$> addDesc e1 <*> addDesc e2
+    Equals     ann e1 e2 -> Equals     ann <$> addDesc e1 <*> addDesc e2
+    Plus       ann e1 e2 -> Plus       ann <$> addDesc e1 <*> addDesc e2
+    Minus      ann e1 e2 -> Minus      ann <$> addDesc e1 <*> addDesc e2
+    Times      ann e1 e2 -> Times      ann <$> addDesc e1 <*> addDesc e2
+    DividedBy  ann e1 e2 -> DividedBy  ann <$> addDesc e1 <*> addDesc e2
+    Modulo     ann e1 e2 -> Modulo     ann <$> addDesc e1 <*> addDesc e2
+    Cons       ann e1 e2 -> Cons       ann <$> addDesc e1 <*> addDesc e2
+    Leq        ann e1 e2 -> Leq        ann <$> addDesc e1 <*> addDesc e2
+    Geq        ann e1 e2 -> Geq        ann <$> addDesc e1 <*> addDesc e2
+    Lt         ann e1 e2 -> Lt         ann <$> addDesc e1 <*> addDesc e2
+    Gt         ann e1 e2 -> Gt         ann <$> addDesc e1 <*> addDesc e2
+    Not        ann e     -> Not        ann <$> addDesc e
+    Proj       ann e n   -> (\e' -> Proj ann e' n) <$> addDesc e
+    Lam        ann sig b -> Lam        ann sig <$> addDesc b
+    App        ann n es  -> App        ann n <$> traverse addDesc es
+    AppNamed   ann n es o -> (\es' -> AppNamed ann n es' o) <$> traverse addDesc es
+    IfThenElse ann c t e -> IfThenElse ann <$> addDesc c <*> addDesc t <*> addDesc e
+    MultiWayIf ann gs e  -> MultiWayIf ann <$> traverse addDesc gs <*> addDesc e
+    Regulative ann d     -> Regulative ann <$> addDesc d
+    Consider   ann e bs  -> Consider   ann <$> addDesc e <*> traverse addDesc bs
+    Lit        ann lit   -> pure (Lit ann lit)
+    Percent    ann e     -> Percent    ann <$> addDesc e
+    List       ann es    -> List       ann <$> traverse addDesc es
+    Where      ann b ds  -> Where      ann <$> addDesc b <*> traverse addDesc ds
+    LetIn      ann ds b  -> LetIn      ann <$> traverse addDesc ds <*> addDesc b
+    Event      ann e     -> Event      ann <$> addDesc e
+    Fetch      ann e     -> Fetch      ann <$> addDesc e
+    Env        ann e     -> Env        ann <$> addDesc e
+    Post       ann u h b -> Post       ann <$> addDesc u <*> addDesc h <*> addDesc b
+    Record     ann mp c v off mh ->
+      Record ann <$> traverse addDesc mp <*> addDesc c <*> addDesc v
+             <*> pure off <*> traverse addDesc mh
+    ReadCell   ann mp off mode c ->
+      (\mp' c' -> ReadCell ann mp' off mode c')
+        <$> traverse addDesc mp <*> addDesc c
+    Concat     ann es    -> Concat     ann <$> traverse addDesc es
+    AsString   ann e     -> AsString   ann <$> addDesc e
+    Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
+    Inert      ann t c   -> pure (Inert ann t c)
+
+instance HasDesc (GuardedExpr n) where
+  addDesc (MkGuardedExpr ann g r) = MkGuardedExpr ann <$> addDesc g <*> addDesc r
+
+instance HasDesc (Branch n) where
+  addDesc (MkBranch ann lhs e) = MkBranch ann <$> addDesc lhs <*> addDesc e
+
+instance HasDesc (BranchLhs n) where
+  addDesc = \ case
+    When      ann p -> When ann <$> addDesc p
+    Otherwise ann   -> pure (Otherwise ann)
+
+instance HasDesc (Pattern n) where
+  addDesc = \ case
+    PatVar  ann n     -> pure (PatVar ann n)
+    PatApp  ann n ps  -> PatApp ann n <$> traverse addDesc ps
+    PatCons ann h t   -> PatCons ann <$> addDesc h <*> addDesc t
+    PatExpr ann e     -> PatExpr ann <$> addDesc e
+    PatLit  ann lit   -> pure (PatLit ann lit)
+
+instance HasDesc (NamedExpr n) where
+  addDesc (MkNamedExpr ann n e) = MkNamedExpr ann n <$> addDesc e
+
+instance HasDesc (Deonton n) where
+  addDesc (MkDeonton ann party act due hence lest) =
+    MkDeonton ann
+      <$> addDesc party
+      <*> addDesc act
+      <*> traverse addDesc due
+      <*> traverse addDesc hence
+      <*> traverse addDesc lest
+
+instance HasDesc (RAction n) where
+  addDesc (MkAction ann modal act provided) =
+    MkAction ann modal <$> addDesc act <*> traverse addDesc provided
+
+instance HasDesc (Event n) where
+  addDesc (MkEvent ann party act timestamp atFirst) =
+    (\party' act' timestamp' -> MkEvent ann party' act' timestamp' atFirst)
+      <$> addDesc party <*> addDesc act <*> addDesc timestamp
 
 instance HasDesc (LocalDecl n) where
   addDesc = \ case

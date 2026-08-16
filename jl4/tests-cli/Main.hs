@@ -484,10 +484,18 @@ daBareExamples =
   , "defaults", "computed-and-shadow", "assume-via-fn", "citations"
   ]
 
--- | The three citations carried by @citations.l4@, herald-stripped: L4's own
+-- | Fixtures for the docassemble repair cases, which are CLI shape probes
+-- rather than corpus exhibits and so live beside the other @tests-cli@
+-- fixtures, not in @examples/docassemble/@.
+daGlossLossSource, daRuntimeCollisionSource, descAttachmentFixture :: FilePath
+daGlossLossSource        = fixtureDir </> "docassemble-glossary-losses.l4"
+daRuntimeCollisionSource = fixtureDir </> "docassemble-runtime-collision.l4"
+descAttachmentFixture    = fixtureDir </> "desc-attachment.l4"
+
+-- | The four citations carried by @citations.l4@, herald-stripped: L4's own
 -- @\@ref @ prefix and the inline @\<\< \>\>@ delimiters are L4 syntax and must
 -- never reach a user-facing docassemble screen.
-daCite1, daCite2, daCite3Tail :: String
+daCite1, daCite2, daCite3Tail, daCiteGoal :: String
 daCite1 = "17 CFR 227.100(a)(1) — offering maximum"
 daCite2 = "17 CFR 227.100(a)(3) — sales through one intermediary only"
 -- The third citation begins with @%@ and contains a literal @${ … }@, so its
@@ -495,6 +503,14 @@ daCite2 = "17 CFR 227.100(a)(3) — sales through one intermediary only"
 -- stable tail is asserted verbatim, and the hostile halves get their own
 -- assertions (see the R9 escaping example).
 daCite3Tail = "17 CFR 227.300(a)"
+-- The fourth rides on the EXPORTED decide, and therefore on the goal @code:@
+-- block. It is what makes the emitted ORDER observable: the emitter puts
+-- @explain()@ after the assignment, and the goal's assignment is what pulls on
+-- the sub-rules, so the goal completes last and its citation prints last. On
+-- the three sub-rules alone the placement is unobservable — moving every
+-- @explain()@ above its assignment left the round-trip harness fully green
+-- until this citation existed.
+daCiteGoal = "17 CFR 227.100 — the crowdfunding exemption"
 
 -- | The generated Python package directory inside a @--package@ tree for
 -- @citations.l4@: @docassemble/l4citations@ (R11: @docassemble.l4\<slug\>@).
@@ -593,6 +609,30 @@ shouldNotContain' what haystack needle =
   when (needle `isInfixOf` haystack) $
     expectationFailure $
       what ++ " unexpectedly contains " ++ show needle ++ "\n--- got ---\n" ++ haystack
+
+-- | How many (possibly overlapping) times a needle occurs in a haystack.
+countInfix :: String -> String -> Int
+countInfix needle = go
+ where
+  go [] = 0
+  go s@(_ : rest) = (if needle `isPrefixOf` s then 1 else 0) + go rest
+
+-- | Assert that @a@ occurs before @b@ inside @haystack@, and that both occur.
+-- The half of an ordering claim a pair of @shouldContain'@s cannot make.
+shouldPrecede :: String -> String -> String -> String -> IO ()
+shouldPrecede what haystack a b =
+  case (findSub a, findSub b) of
+    (Just i, Just j)
+      | i < j     -> pure ()
+      | otherwise -> expectationFailure $
+          what ++ ": expected " ++ show a ++ " to come before " ++ show b
+              ++ ", but it does not\n--- got ---\n" ++ haystack
+    _ -> expectationFailure $
+      what ++ ": expected both " ++ show a ++ " and " ++ show b
+          ++ " to occur\n--- got ---\n" ++ haystack
+ where
+  findSub n = findIndex (n `isPrefixOf`) (tails' haystack)
+  tails' s = s : case s of { [] -> []; (_ : r) -> tails' r }
 
 -- Import-cycle fixtures (entry points of small multi-file rings) and a clean
 -- multi-file import used as a guard against the cycle check over-firing.
@@ -1082,6 +1122,54 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- The dumper uses pretty-simple; any module will start with "MkModule".
       sout `shouldSatisfy` ("MkModule" `isInfixOf`)
+
+  ----------------------------------------------------------------------------
+  -- @desc attachment (L4.Parser.ResolveAnnotation)
+  --
+  -- `instance HasDesc (Expr n)` was `pure`, so a @desc written above a WHERE
+  -- binding reached no node at all; its first repair descended only into a
+  -- WHERE/LET at the top of a body, so one nested inside another expression
+  -- still vanished. In EVERY failing case `l4 check` reported success and the
+  -- annotation was simply gone, which is why these are asserted rather than
+  -- assumed. Neither property is visible in a jl4-test corpus golden — none of
+  -- evaluation, exactprint, nlg or schema shows which node owns a desc — so
+  -- the oracles here are the two surfaces that do show it.
+  ----------------------------------------------------------------------------
+  describe "@desc attachment to WHERE/LET bindings" $ do
+    it "gives a WHERE binding's @desc to that binding, not to a later top-level decl" $ do
+      -- The glossary is the ownership oracle: `auto terms:` keys every entry by
+      -- the name of the definition that owns the gloss. `descPrecedesNode`
+      -- admits any preceding desc within 8 columns of slack, so "the NEXT
+      -- top-level declaration claims it" is the behaviour this replaced, not a
+      -- hypothetical — and the fixture's next declaration deliberately carries
+      -- no @desc of its own, so a mis-attachment would show up as its key.
+      Output code sout serr <- runL4 bin ["docassemble", descAttachmentFixture]
+      unless (code == ExitSuccess) $
+        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
+      case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
+        [glossary] -> do
+          shouldContain'    "the glossary" glossary
+            "\"title is clean\": \"BINDINGGLOSS the title is free of encumbrance\""
+          shouldNotContain' "the glossary" glossary "claim window in days"
+        other -> expectationFailure $
+          "expected exactly one `auto terms:` block, found " ++ show (length other)
+
+    it "gives a LET binding nested inside another expression its own @desc" $ do
+      -- `l4 ast` is the oracle here, because the glossary cannot see this one:
+      -- `collectGlossary` walks only a WHERE/LET at the TOP of a decide body.
+      -- The AST prints an annotation's desc payload once per node that owns it
+      -- and once per raw `TDesc` token, so "owned" is exactly "occurs somewhere
+      -- other than inside a TDesc". Unattached, that count is 0 — which is the
+      -- state this fixture was written against.
+      Output code sout _ <- runL4 bin ["ast", descAttachmentFixture]
+      code `shouldBe` ExitSuccess
+      for_ ["NESTEDGLOSS", "BINDINGGLOSS"] \gloss -> do
+        let owned = countInfix gloss sout - countInfix ("TDesc \" " ++ gloss) sout
+        unless (owned >= 1) $
+          expectationFailure $
+            show gloss ++ " reaches no node's `desc`: it occurs "
+            ++ show (countInfix gloss sout) ++ " times in the AST, all of them as a "
+            ++ "raw TDesc token, so the annotation was dropped silently"
 
   describe "l4 trace" $ do
     it "refuses --format png without --output-dir" $ do
@@ -2653,6 +2741,9 @@ spec bin = do
       let wanted =
             [ "pyproject.toml"
             , "MANIFEST.in"
+            -- R11 decision 4: the fidelity report is part of the shape, at the
+            -- package root under the same-stem convention `-o FILE` uses.
+            , "citations.fidelity.txt"
             , daPkgInner </> "__init__.py"
             , daPkgInner </> "l4runtime.py"
             , daPkgInner </> "data" </> "questions" </> "citations.yml"
@@ -2684,19 +2775,138 @@ spec bin = do
       let has = shouldContain' "pyproject.toml" toml
       has "docassemble.l4citations"
       has "license = \""            -- PEP 639 SPDX expression, string form
-      has "requires-python"
-      has "3.12"                    -- R11: `requires-python >= 3.12`
+      -- R11: `requires-python >= 3.12` (docassemble_base/pyproject.toml:14 at
+      -- 1b6678384). Asserted as ONE substring: `has "requires-python"` and
+      -- `has "3.12"` as two independent whole-file checks would be satisfied by
+      -- a floor of ">= 3.9" beside any other mention of 3.12 — a comment, a
+      -- classifier, a dependency pin — which is not the claim R11 makes.
+      has "requires-python = \">= 3.12\""
       has "[tool.setuptools.packages.find]"
       has "where = [\".\"]"
       has "docassemble.base"        -- an installable package depends on the runtime
       removePathForcibly dir
 
-    it "writes a MANIFEST.in grafting the data directory" $ do
+    it "writes a MANIFEST.in grafting the data directory and shipping the report" $ do
       tmp <- getTemporaryDirectory
       let dir = tmp </> "l4-da-pkg-manifest"
       _ <- expectPackage bin daCitationsSource dir
       manifest <- readUtf8 (dir </> "MANIFEST.in")
       shouldContain' "MANIFEST.in" manifest ("graft " ++ (daPkgInner </> "data"))
+      -- MANIFEST.in governs the sdist, and a root-level file is not package
+      -- data, so without this line R11 decision 4's "and MANIFEST.in includes
+      -- it so it ships" is false and nothing would notice.
+      shouldContain' "MANIFEST.in" manifest "include citations.fidelity.txt"
+      removePathForcibly dir
+
+    it "writes the same fidelity report the bare -o run writes, at the package root" $ do
+      -- R11 decision 4 places the report at the package root rather than under
+      -- data/. Its CONTENT is pinned for the bare `-o` path by the
+      -- daBareExamples golden loop above; this asserts the --package copy is
+      -- the same bytes, so the two placements cannot drift.
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-da-pkg-fidelity"
+      _ <- expectPackage bin daCitationsSource dir
+      got  <- readUtf8 (dir </> "citations.fidelity.txt")
+      want <- readUtf8 (daExampleDir </> "expected" </> "citations.fidelity.txt")
+      unless (got == want) $
+        expectationFailure $
+          "the packaged fidelity report differs from the committed golden"
+          ++ "\n--- got ---\n" ++ got ++ "\n--- golden ---\n" ++ want
+      removePathForcibly dir
+
+    it "writes an l4runtime.py carrying the provenance API its __all__ promises" $ do
+      -- Existence was asserted; content was not, and the module is the whole
+      -- reason `modules:` exists in the packaged interview (R11 decision 6).
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-da-pkg-runtime"
+      _ <- expectPackage bin daCitationsSource dir
+      rt <- readUtf8 (dir </> daPkgInner </> "l4runtime.py")
+      let has = shouldContain' "l4runtime.py" rt
+      has "__all__"
+      -- The author's spelling of the source file survives here even though the
+      -- on-disk copy is renamed to <slug>.l4 (R11 decision 3).
+      has "L4_SOURCE_NAME = 'citations.l4'"
+      has "L4_PACKAGE_NAME = 'docassemble.l4citations'"
+      has "def l4_source_path():"
+      has "def l4_source_text():"
+      -- It must define nothing the interview CALLS: the bare and packaged
+      -- artifacts have to mean the same thing, so anything the interview needed
+      -- would have to work bare too, where there is no runtime module at all.
+      yml <- readUtf8 (dir </> daPkgInner </> "data" </> "questions" </> "citations.yml")
+      for_ ["l4_source_path(", "l4_source_text(", "L4_SOURCE_NAME"] \name ->
+        shouldNotContain' "the packaged interview" yml name
+      removePathForcibly dir
+
+    it "writes an __init__.py that opts the package out of docassemble's pre-load scan" $ do
+      -- `# do not pre-load` is not decoration: docassemble's package scanner
+      -- breaks out of the file on exactly that prefix
+      -- (docassemble_webapp/.../packages/helpers.py:63 at 1b6678384), which is
+      -- what keeps a generated package from being imported at server start.
+      -- It is also byte-for-byte the shape of docassemble_demo's own __init__.
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-da-pkg-init"
+      _ <- expectPackage bin daCitationsSource dir
+      ini <- readUtf8 (dir </> daPkgInner </> "__init__.py")
+      unless ("# do not pre-load" `isPrefixOf` ini) $
+        expectationFailure $
+          "the generated __init__.py does not open with `# do not pre-load`, so "
+          ++ "docassemble's pre-load scan would keep reading it\n--- got ---\n" ++ ini
+      removePathForcibly dir
+
+    it "replaces a previous run rather than accumulating beside it" $ do
+      -- Writing without deleting meant that regenerating after the .l4 was
+      -- RENAMED left the whole previous inner package in the tree, and
+      -- `[tool.setuptools.packages.find] where = ["."]` then found both: a
+      -- wheel declaring itself docassemble.l4beta shipped an importable
+      -- docassemble.l4alpha whose l4_source_text() had no data file behind it.
+      -- The slug follows the source basename by design, so a rename is the
+      -- designed trigger, and the command reported success throughout.
+      tmp <- getTemporaryDirectory
+      let srcDir = tmp </> "l4-da-regen-src"
+          dir    = tmp </> "l4-da-regen"
+          alpha  = srcDir </> "alpha.l4"
+          beta   = srcDir </> "beta.l4"
+      removePathForcibly srcDir
+      removePathForcibly dir
+      createDirectoryIfMissing True srcDir
+      copyFile daCitationsSource alpha
+      copyFile daCitationsSource beta
+      _ <- expectPackage bin alpha dir
+      -- expectPackage clears the directory first, so regenerate by hand.
+      Output code _ serr <- runL4 bin ["docassemble", beta, "--package", dir]
+      unless (code == ExitSuccess) $
+        expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
+      files <- treeFiles dir
+      let stale = [ f | f <- files, "l4alpha" `isInfixOf` f ]
+      unless (null stale) $
+        expectationFailure $
+          "regenerating after a rename left the previous package in the tree: "
+          ++ show stale ++ "\n--- tree ---\n" ++ unlines files
+      unless ((("docassemble" </> "l4beta") </> "l4runtime.py") `elem` files) $
+        expectationFailure $
+          "the regenerated package is missing\n--- tree ---\n" ++ unlines files
+      unless ("beta.fidelity.txt" `elem` files) $
+        expectationFailure $
+          "the regenerated fidelity report is missing\n--- tree ---\n" ++ unlines files
+      unless ("alpha.fidelity.txt" `notElem` files) $
+        expectationFailure $
+          "the previous run's fidelity report survived regeneration\n--- tree ---\n"
+          ++ unlines files
+      removePathForcibly srcDir
+      removePathForcibly dir
+
+    it "leaves a file the user put in their own package directory alone" $ do
+      -- The prune above must not become a licence to delete: guardClobber
+      -- establishes that we WROTE this tree, not that we own every file in it.
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-da-regen-keep"
+      _ <- expectPackage bin daCitationsSource dir
+      writeFile (dir </> "NOTES.md") "hand-written, not ours\n"
+      Output code _ serr <- runL4 bin ["docassemble", daCitationsSource, "--package", dir]
+      unless (code == ExitSuccess) $
+        expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
+      kept <- readUtf8 (dir </> "NOTES.md")
+      kept `shouldBe` "hand-written, not ours\n"
       removePathForcibly dir
 
     it "embeds the .l4 source byte-identically under data/sources (that is what provenance means)" $ do
@@ -2843,10 +3053,12 @@ spec bin = do
       shouldContain'    "the `within the annual cap` code block" cap "explain("
       shouldContain'    "the `within the annual cap` code block" cap daCite1
       -- A node's Anno carries at most one Ref and the NEAREST preceding ref
-      -- wins (ResolveAnnotation.hs:1047-1061), so "picked up the neighbour's
-      -- citation" is a real failure mode and gets its own assertion.
+      -- wins (`attachRef` in ResolveAnnotation.hs), so "picked up the
+      -- neighbour's citation" is a real failure mode and gets its own
+      -- assertion.
       shouldNotContain' "the `within the annual cap` code block" cap daCite2
       shouldNotContain' "the `within the annual cap` code block" cap daCite3Tail
+      shouldNotContain' "the `within the annual cap` code block" cap daCiteGoal
 
       -- Rule 2: the inline `<< >>` ref form.
       via <- blockWithId sout "c_offering_exempt_sold_through_a_single_intermediary"
@@ -2854,6 +3066,7 @@ spec bin = do
       shouldContain'    "the `sold through a single intermediary` code block" via daCite2
       shouldNotContain' "the `sold through a single intermediary` code block" via daCite1
       shouldNotContain' "the `sold through a single intermediary` code block" via daCite3Tail
+      shouldNotContain' "the `sold through a single intermediary` code block" via daCiteGoal
 
       -- Rule 3: the Mako-hostile ref.
       reg <- blockWithId sout "c_offering_exempt_the_intermediary_is_registered"
@@ -2861,12 +3074,34 @@ spec bin = do
       shouldContain'    "the `the intermediary is registered` code block" reg daCite3Tail
       shouldNotContain' "the `the intermediary is registered` code block" reg daCite1
       shouldNotContain' "the `the intermediary is registered` code block" reg daCite2
+      shouldNotContain' "the `the intermediary is registered` code block" reg daCiteGoal
 
-      -- The goal carries NO @ref of its own, so it must cite nothing: an
-      -- explain() here would mean the lowerer read a ref off a neighbouring
-      -- node's Anno.
+      -- The exported DECIDE carries a @ref of its own, which attaches to the
+      -- TopDecl node rather than the inner MkDecide and rides onto the GOAL
+      -- code block. That path was implemented but exercised by no fixture
+      -- until this one; it is also the only place the emitted ORDER is
+      -- observable (see `daCiteGoal`).
       goal <- blockWithId sout "c_offering_exempt"
-      shouldNotContain' "the `offering exempt` goal code block" goal "explain("
+      shouldContain'    "the `offering exempt` goal code block" goal "explain("
+      shouldContain'    "the `offering exempt` goal code block" goal daCiteGoal
+      shouldNotContain' "the `offering exempt` goal code block" goal daCite1
+      shouldNotContain' "the `offering exempt` goal code block" goal daCite2
+      shouldNotContain' "the `offering exempt` goal code block" goal daCite3Tail
+      -- The design rule the citation list depends on, asserted as a claim: the
+      -- explain() call sits AFTER the assignment, because a block whose
+      -- assignment raises on an undefined input has decided nothing and
+      -- docassemble re-runs it once the input arrives. Cite first and the goal
+      -- records itself before the rules it pulls on — measured, and caught by
+      -- the round-trip harness's ordered citation list only because the goal
+      -- carries a @ref at all.
+      for_ [ ("c_offering_exempt_within_the_annual_cap", daCite1)
+           , ("c_offering_exempt_sold_through_a_single_intermediary", daCite2)
+           , ("c_offering_exempt_the_intermediary_is_registered", daCite3Tail)
+           , ("c_offering_exempt", daCiteGoal)
+           ] \(bid, cite) -> do
+        blk <- blockWithId sout bid
+        shouldPrecede ("the " ++ bid ++ " code block") blk " = " "explain('"
+        shouldContain' ("the " ++ bid ++ " code block") blk cite
 
     it "renders logic_explanation() on every verdict screen" $ do
       Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
@@ -2955,5 +3190,91 @@ spec bin = do
       let declared = map T.unpack DAEmit.emitterKeyVocabulary
           missing  = [k | k <- ["auto terms", "modules"], k `notElem` declared]
       missing `shouldBe` []
+
+    it "keeps block keys and field modifiers in separate vocabularies (R9.5)" $ do
+      -- `daRecognisedKeys` is parse.py:1947, the whitelist docassemble applies
+      -- to TOP-LEVEL BLOCK KEYS only (parse.py:1946-1948 iterates the block
+      -- dict under `if self.interview.debug`); field modifiers are read in a
+      -- different place entirely. Checking the two lists together against one
+      -- whitelist gave false assurance in both directions: `mandatory` and
+      -- `subquestion` are members and yet break a field
+      -- (`Syntax error: field label 'mandatory' overwrites previous label`,
+      -- measured against 1.10.7), while real modifiers like `show if` are not
+      -- members at all. Docassemble has no field-modifier whitelist to vendor,
+      -- so the repair is to stop pretending it does.
+      let blockKeys = map T.unpack DAEmit.emitterBlockKeys
+          modifiers = map T.unpack DAEmit.emitterFieldModifiers
+      DAEmit.emitterVocabularyViolations `shouldBe` []
+      [k | k <- modifiers, k `elem` blockKeys] `shouldBe` []
+      sort (blockKeys ++ modifiers) `shouldBe` sort (map T.unpack DAEmit.emitterKeyVocabulary)
+
+  ----------------------------------------------------------------------------
+  -- M2 repair cases: losses that used to be silent, and one that used to
+  -- change the answer.
+  ----------------------------------------------------------------------------
+  describe "l4 docassemble (M2 repairs: declared losses and reserved names)" $ do
+    it "declares both ways an `auto terms:` entry cannot survive, and drops them" $ do
+      Output code sout serr <- runL4 bin ["docassemble", daGlossLossSource]
+      unless (code == ExitSuccess) $
+        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
+
+      -- (1) A regex metacharacter in the term. Docassemble interpolates an
+      -- `auto terms` key straight into a regex with no re.escape
+      -- (parse.py:2908 at 1b6678384): a balanced `(...)` becomes a capture
+      -- group whose pattern no longer matches its own term, and an unbalanced
+      -- one raises re.error while the Interview is constructed, so the emitted
+      -- interview cannot be LOADED at all — while `l4 check` and
+      -- `l4 docassemble` both report success and the report said
+      -- "(nothing lost)".
+      shouldContain'    "stderr" serr "DA-GLOSS-REGEX"
+      shouldContain'    "stderr" serr "s 12(1)"
+      shouldNotContain' "the emitted interview" sout "REGEXDROPPEDGLOSS"
+
+      -- (2) Two terms folding onto one key. What that costs is not a duplicate
+      -- key but the loser's whole definition.
+      shouldContain'    "stderr" serr "DA-GLOSS-COLLIDE"
+      shouldContain'    "stderr" serr "folds onto"
+      shouldNotContain' "the emitted interview" sout "COLLIDEDROPPEDGLOSS"
+
+      -- What survives: the winner, deterministically the first spelling.
+      case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
+        [glossary] -> do
+          shouldContain'    "the glossary" glossary
+            "\"Notice\": \"A formal notice served under the Act\""
+          shouldNotContain' "the glossary" glossary "s 12(1)"
+        other -> expectationFailure $
+          "expected exactly one `auto terms:` block, found " ++ show (length other)
+
+    it "reserves the generated runtime module's names, in both artifact shapes" $ do
+      -- `modules: [.l4runtime]` is exec'd as `from <pkg>.l4runtime import *`
+      -- (parse.py:8572 at 1b6678384) into the interview dict on every assemble
+      -- pass. `__all__` bounds WHICH names arrive; it does nothing to stop an
+      -- interview variable from being one of them, and the loser is the
+      -- interview's — so the packaged artifact asked no question and returned
+      -- the opposite verdict to the bare one (R11 decision 6 says the two
+      -- shapes must mean the same thing). The bare artifact reserves the name
+      -- too, so the shapes cannot disagree about a variable's NAME either.
+      Output code sout serr <- runL4 bin ["docassemble", daRuntimeCollisionSource]
+      unless (code == ExitSuccess) $
+        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
+      shouldContain' "the emitted interview" sout "l4_source_text_ = d.filed_on_time"
+      case [ ln | ln <- lines sout, "l4_source_text " `isInfixOf` (ln ++ " ") ] of
+        [] -> pure ()
+        bad -> expectationFailure $
+          "an interview variable is spelled exactly like a name the runtime "
+          ++ "module star-imports: " ++ show bad
+
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-da-pkg-reserved"
+      _ <- expectPackage bin daRuntimeCollisionSource dir
+      files <- treeFiles dir
+      case [ f | f <- files, ("data" </> "questions") `isInfixOf` f ] of
+        [ymlPath] -> do
+          yml <- readUtf8 (dir </> ymlPath)
+          shouldContain' "the packaged interview" yml "l4_source_text_ = d.filed_on_time"
+          shouldContain' "the packaged interview" yml ".l4runtime"
+        other -> expectationFailure $
+          "expected exactly one interview under data/questions, got " ++ show other
+      removePathForcibly dir
   where
     for_ xs f = mapM_ f xs

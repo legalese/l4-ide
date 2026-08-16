@@ -19,13 +19,33 @@
 --     terms — the `DECLARE`d type and each `MEANS`-bound sub-decision —
 --     defined by their `@desc` text.
 --
+-- The claim above is bounded to the FORWARD drive, which is the only flow M2
+-- emits UI for. `explain()` appends to a session-scoped list that nothing
+-- clears, and docassemble's `invalidate_dependencies` deletes invalidated
+-- VARIABLES without touching that list (parse.py:8014-8060 at 1b6678384) — so a
+-- flow that re-defines an already-answered variable (today: `POST /api/session`
+-- with `delete_variables`) re-decides the goal correctly and leaves this screen
+-- citing rules that were short-circuited away. Adding `clear_explanations()`
+-- makes it worse, not better; the repair is a design change and belongs with
+-- M4's `review:` block. Recorded in full at DOCASSEMBLE-EXPORT-SPEC.md §8.4.
+--
+-- The exported decision carries a `@ref` of its own, and it is the reason the
+-- expected citation lists below are asserted AS ORDERED LISTS. Order is
+-- COMPLETION order, not declaration order: `explain()` is emitted AFTER the
+-- assignment in each `code:` block, because a block whose assignment raises on
+-- an undefined input has decided nothing and docassemble re-runs it once the
+-- input arrives — citing first would record a rule that had not fired. The goal
+-- block's assignment is what pulls on the sub-rules, so it completes LAST and
+-- its citation prints last. Move any `explain()` above its assignment and only
+-- this file's top-level `@ref` notices, which is why it is here.
+--
 -- The two #EVALs below are the round-trip oracle AND the citation oracle:
---   * the "exempt" case fires all three rules, so all three citations appear,
---     in declaration order;
+--   * the "exempt" case fires all three sub-rules, so all three citations
+--     appear, in source order, followed by the goal's own;
 --   * the "cap exceeded" case fires only the first, so ONLY the first
---     citation may appear — the other two rules were never reached, and a
---     verdict screen that cites them would be citing law that did not decide
---     anything.
+--     sub-rule's citation may appear (followed by the goal's) — the other two
+--     rules were never reached, and a verdict screen that cites them would be
+--     citing law that did not decide anything.
 
 @desc A securities offering made in reliance on the crowdfunding exemption
 DECLARE Offering
@@ -37,6 +57,7 @@ DECLARE Offering
       @desc Whether that intermediary is registered with the Commission as a funding portal
       `intermediary is registered`    IS A BOOLEAN
 
+@ref 17 CFR 227.100 — the crowdfunding exemption
 @export Whether this offering qualifies for the crowdfunding exemption
 GIVEN o IS AN Offering @desc The offering under assessment
 GIVETH A BOOLEAN

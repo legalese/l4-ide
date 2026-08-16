@@ -199,6 +199,13 @@ CITE_ONE_INTERMEDIARY = "17 CFR 227.100(a)(3) — sales through one intermediary
 # rendered screen VERBATIM -- that is the R9.1 escaping claim, and rendering is
 # the only place it can honestly be proven.
 CITE_REGISTERED = "% of the proceeds retained is set out at ${ fee_schedule } — 17 CFR 227.300(a)"
+# The @ref on the EXPORTED decide, not on a WHERE binding. It is what makes the
+# ordering of "explanations" load-bearing: the emitter puts `explain()` AFTER
+# the assignment in every code block, and the goal block's assignment is what
+# pulls on the sub-rules, so the goal completes LAST and its citation is last.
+# Move any explain() above its assignment and this entry -- and only this entry
+# -- changes position, which is what the assertion is here to catch.
+CITE_EXEMPTION = "17 CFR 227.100 — the crowdfunding exemption"
 
 EXAMPLES = {
     "rodents-and-vermin": {
@@ -397,8 +404,10 @@ EXAMPLES = {
                 },
                 "goal": True,
                 "verdict": "Holds",
-                "explanations": [CITE_CAP, CITE_ONE_INTERMEDIARY, CITE_REGISTERED],
-                "screen_contains": [CITE_CAP, CITE_ONE_INTERMEDIARY, CITE_REGISTERED],
+                "explanations": [CITE_CAP, CITE_ONE_INTERMEDIARY, CITE_REGISTERED,
+                                 CITE_EXEMPTION],
+                "screen_contains": [CITE_CAP, CITE_ONE_INTERMEDIARY, CITE_REGISTERED,
+                                    CITE_EXEMPTION],
             },
             {
                 # Deliberately cap-only, the same device the seam example's
@@ -411,8 +420,8 @@ EXAMPLES = {
                 },
                 "goal": False,
                 "verdict": "Fails",
-                "explanations": [CITE_CAP],
-                "screen_contains": [CITE_CAP],
+                "explanations": [CITE_CAP, CITE_EXEMPTION],
+                "screen_contains": [CITE_CAP, CITE_EXEMPTION],
                 "screen_omits": [CITE_ONE_INTERMEDIARY, CITE_REGISTERED],
             },
         ],

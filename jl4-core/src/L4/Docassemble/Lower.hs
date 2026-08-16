@@ -147,12 +147,14 @@ data Ctx = MkCtx
   , ctxAssumes  :: !(Map Unique (Assume Resolved))
   , ctxTypeDesc :: !TypeDescMap
   , ctxGloss    :: ![(Text, Text)]                 -- ^ the @auto terms:@ glossary (M2)
+  , ctxGlossOut :: ![GlossDrop]                    -- ^ glossary entries docassemble cannot carry
   }
 
 buildCtx :: Module Resolved -> Ctx
 buildCtx mod' =
   let (enums, enumCons) = collectEnums mod'
       tops = collectTopDecides mod'
+      (gloss, glossOut) = collectGlossary mod'
   in MkCtx
        { ctxEnums    = enums
        , ctxEnumCons = enumCons
@@ -161,7 +163,8 @@ buildCtx mod' =
        , ctxTopByU   = Map.fromList [ (td.tdU, td) | td <- tops ]
        , ctxAssumes  = collectAssumes mod'
        , ctxTypeDesc = buildTypeDescMap mod'
-       , ctxGloss    = collectGlossary mod'
+       , ctxGloss    = gloss
+       , ctxGlossOut = glossOut
        }
 
 collectEnums :: Module Resolved -> (Map Unique EnumInfo, Map Unique ConInfo)
@@ -239,8 +242,9 @@ collectTopDecides (MkModule _ _ section) = goSection section
 -- node (@Decide ann d@), and one written above a @WHERE@ binding attaches to
 -- the @LocalDecide ann d@ node — not to the inner @MkDecide@ — so both annos
 -- are consulted, outer first, exactly as the DMN lowerer does. A node's anno
--- can hold at most one ref and the nearest preceding one wins
--- (@ResolveAnnotation.hs:1047-1061@), which is why each definition is read from
+-- can hold at most one ref and the nearest preceding one wins, every other
+-- becoming a @RefNotAttached@ warning (@attachRef@,
+-- @ResolveAnnotation.hs:1162-1172@) — which is why each definition is read from
 -- its /own/ node and never from a neighbour's.
 --
 -- The gloss is read from the inner @MkDecide@, where 'attachLeadingDesc' puts
@@ -281,9 +285,20 @@ plainDescOf ann = do
   guard (not (Text.null parsed.description))
   pure parsed.description
 
+-- | A glossary entry the emitter could not carry, and why. Both reasons are
+-- properties of docassemble's @auto terms@ key space, not of the L4 source.
+data GlossDrop
+  = GlossRegexMeta !Text
+    -- ^ the term carries a regular-expression metacharacter
+  | GlossKeyCollision !Text !Text
+    -- ^ (dropped term, the earlier term whose folded key it collides with)
+  deriving stock (Eq, Show)
+
 -- | The @auto terms:@ glossary: every L4 /defined term/ in the module that
 -- carries a plain @\@desc@ — each @DECLARE@d type, and each named definition,
--- top-level or @WHERE@-bound — in declaration order, first spelling wins.
+-- top-level or @WHERE@-bound — in declaration order, first spelling wins,
+-- paired with the entries that had to be dropped ('GlossDrop', declared in the
+-- fidelity report by 'glossNotes' — never in silence).
 --
 -- It is a glossary of the /source/, not of the emitted blocks: docassemble's
 -- auto-term regex only fires where the phrase actually occurs in prose, so an
@@ -292,8 +307,11 @@ plainDescOf ann = do
 --
 -- Record fields and @GIVEN@ parameters are deliberately absent: their @\@desc@
 -- already lands on the question that asks them, as @help:@.
-collectGlossary :: Module Resolved -> [(Text, Text)]
-collectGlossary (MkModule _ _ section) = dedupOnTerm (goSection section)
+collectGlossary :: Module Resolved -> ([(Text, Text)], [GlossDrop])
+collectGlossary (MkModule _ _ section) =
+  let (regexSafe, regexBad) = partitionRegexSafe (goSection section)
+      (kept, collided)      = dedupOnTerm regexSafe
+  in (kept, regexBad <> collided)
  where
   goSection (MkSection _ _ _ decls) = decls >>= goDecl
   goDecl = \case
@@ -316,15 +334,67 @@ collectGlossary (MkModule _ _ section) = dedupOnTerm (goSection section)
 -- | Docassemble lower-cases and whitespace-collapses every @auto terms@ key
 -- (@parse.py:2905@), so two L4 names differing only in case would collide into
 -- one YAML mapping entry: the first spelling wins, deterministically.
-dedupOnTerm :: [(Text, Text)] -> [(Text, Text)]
-dedupOnTerm = go Set.empty
+--
+-- What that costs is not a duplicate key but a whole @\@desc@: the loser's
+-- definition never reaches the artifact at all. The loss is unavoidable — one
+-- of the two must go in either ordering, and the compiled regex is
+-- @IGNORECASE@ anyway, so two case-variant entries could never gloss distinctly
+-- — but it must not be silent, so the losers come back for 'glossNotes'.
+dedupOnTerm :: [(Text, Text)] -> ([(Text, Text)], [GlossDrop])
+dedupOnTerm = go Map.empty
  where
-  go _ [] = []
+  go _ [] = ([], [])
   go seen ((term, defn) : rest)
-    | key `Set.member` seen = go seen rest
-    | otherwise             = (term, defn) : go (Set.insert key seen) rest
+    | Just winner <- Map.lookup key seen =
+        let (kept, dropped) = go seen rest
+        in (kept, GlossKeyCollision term winner : dropped)
+    | otherwise =
+        let (kept, dropped) = go (Map.insert key term seen) rest
+        in ((term, defn) : kept, dropped)
    where
-    key = Text.toLower (Text.unwords (Text.words term))
+    key = foldKey term
+
+-- | Docassemble's own @auto terms@ key normalisation, @parse.py:2905@ at
+-- @1b6678384@: @re.sub(r'\\s+', ' ', term.lower())@.
+foldKey :: Text -> Text
+foldKey = Text.toLower . Text.unwords . Text.words
+
+-- | Split glossary entries into those docassemble can compile into a working
+-- auto-term, and those it cannot.
+--
+-- Docassemble interpolates the key straight into a regular expression with
+-- @%@-formatting and NO @re.escape@ — @re.compile(r"(?i){?\\b(%s)\\b}?" %
+-- re.sub(r'\\s', r'\\\\s+', lower_term))@, @parse.py:2908@ at @1b6678384@;
+-- @re.escape@ appears nowhere in that file. So a metacharacter in an L4 name is
+-- not text:
+--
+--   * an unbalanced @(@ or @[@ raises @re.error@ while the @Interview@ is being
+--     constructed, so the emitted interview cannot be loaded /at all/ — and
+--     @l4 check@ and @l4 docassemble@ both report success;
+--   * a balanced @(…)@ compiles to a capture group, so the pattern no longer
+--     matches the term that named it: the entry is dead, and the phrase it does
+--     match (parentheses stripped) occurs nowhere.
+--
+-- Escaping the key is not the repair: docassemble stores the key verbatim as
+-- the dictionary key and looks the definition back up by the /matched/ text
+-- (@add_terms@, @filter\/html.py:686-703@), so an escaped key renders the
+-- literal @[[term]]@ marker instead of a tooltip. Dropping the entry and
+-- declaring the loss is the only faithful option — statutory names like
+-- @a British citizen by virtue of subsection (1)@ are exactly the shape that
+-- trips it.
+partitionRegexSafe :: [(Text, Text)] -> ([(Text, Text)], [GlossDrop])
+partitionRegexSafe entries =
+  ( [ e | e@(term, _) <- entries, not (hasRegexMeta term) ]
+  , [ GlossRegexMeta term | (term, _) <- entries, hasRegexMeta term ]
+  )
+
+-- | Every character Python's @re@ treats as syntax outside a character class.
+-- @re.VERBOSE@ is not set at @parse.py:2908@, so @#@ and whitespace are inert.
+hasRegexMeta :: Text -> Bool
+hasRegexMeta = Text.any (`Set.member` regexMetaChars)
+
+regexMetaChars :: Set Char
+regexMetaChars = Set.fromList ".^$*+?{}[]\\|()"
 
 -- | Citations attached to an /expression/ rather than to a definition. Those
 -- are the refs this backend cannot carry: an expression is not a @code:@ block,
@@ -503,6 +573,7 @@ lowerModule mod' =
                      , notes  = skipNotes
                                   <> moduleNotes (moduleSource mod') inertFound blocks
                                   <> refNotes (moduleSource mod') droppedRefs
+                                  <> glossNotes (moduleSource mod') ctx.ctxGlossOut
                      }
                Right
                  ( MkDAPackage
@@ -595,6 +666,40 @@ refNotes src dropped =
                \DECIDE or WHERE binding it justifies"
       }
   | not (null dropped) ]
+
+-- | M2: @auto terms:@ entries docassemble's key space cannot carry. Both are
+-- 'Lossy' rather than 'Advisory' by the §5 axis — the interview is emitted and
+-- decides the same way, but a @\@desc@ the source wrote is gone from the
+-- artifact, which is exactly \"expressed, but something the source said is
+-- gone\". A silent @(nothing lost)@ over a dropped definition is the failure
+-- this note exists to prevent.
+glossNotes :: Text -> [GlossDrop] -> [FidelityNote]
+glossNotes src drops =
+     [ MkFidelityNote
+         { code = "DA-GLOSS-REGEX", severity = Lossy, element = src, range = Nothing
+         , message = "these L4 defined terms carry a regular-expression metacharacter, \
+                     \and docassemble interpolates an `auto terms` key straight into a \
+                     \regex with no re.escape (parse.py:2908 at 1b6678384), so the entry \
+                     \would either fail to compile — taking the whole interview with it \
+                     \— or compile to a pattern that no longer matches its own term: "
+                       <> Text.intercalate "; " metaTerms
+         , lost = "the glossary tooltip for these terms; rename the term, or move the \
+                  \gloss onto a field or parameter, where it lands as `help:` instead"
+         }
+     | not (null metaTerms) ]
+  <> [ MkFidelityNote
+         { code = "DA-GLOSS-COLLIDE", severity = Lossy, element = src, range = Nothing
+         , message = "docassemble lower-cases and whitespace-collapses every `auto terms` \
+                     \key (parse.py:2905 at 1b6678384), so these L4 defined terms fold \
+                     \onto an earlier term's key and the FIRST spelling wins: "
+                       <> Text.intercalate "; " collisions
+         , lost = "the later term's whole definition, not merely its spelling — its \
+                  \@desc does not reach the interview at all"
+         }
+     | not (null collisions) ]
+ where
+  metaTerms  = [ t | GlossRegexMeta t <- drops ]
+  collisions = [ "`" <> t <> "` (folds onto `" <> w <> "`)" | GlossKeyCollision t w <- drops ]
 
 bodyHasNumeric :: DACodeBody -> Bool
 bodyHasNumeric = \case
@@ -1500,8 +1605,25 @@ pyIdent raw =
 -- @i@, @j@, @k@ are claimed by generic-object and iterator machinery; the
 -- rest are special interview variables) — a sanitised L4 name must shadow
 -- none of them, so such names get a @_@ suffix.
+--
+-- The last group is M2's: the generated @l4runtime.py@ is loaded through
+-- @modules: [.l4runtime]@, which docassemble execs as
+-- @from \<pkg\>.l4runtime import *@ (@parse.py:8572@ at @1b6678384@), binding
+-- every name in that module's 'runtimeExports' into the interview dict on
+-- /every assemble pass/. An @__all__@ bounds which names are imported; it does
+-- nothing to stop an interview variable from BEING one of them. Without this
+-- group an @\@export@ spelled @L4 source text@ lowered to a goal variable
+-- @l4_source_text@ that the star-import then clobbered with a function object
+-- — truthy, so the packaged artifact asked no question at all and returned the
+-- opposite verdict to the bare one, breaking the invariant (R11 decision 6)
+-- that the two artifact shapes must mean the same thing, while the fidelity
+-- report said @(nothing lost)@. The names are taken from 'runtimeExports' so
+-- the two modules cannot drift apart, filtered to the ones 'pyIdent' can
+-- actually produce (it lower-cases, and Python is case-sensitive). Reserving
+-- them for the bare artifact too is deliberate: the two shapes must not
+-- disagree about a variable's name either.
 pyReserved :: Set Text
-pyReserved = Set.fromList
+pyReserved = Set.fromList $
   [ "and","as","assert","async","await","break","class","continue","def","del"
   , "elif","else","except","false","finally","for","from","global","if","import"
   , "in","is","lambda","nonlocal","none","not","or","pass","raise","return","true"
@@ -1512,6 +1634,7 @@ pyReserved = Set.fromList
   , "allow_cron","multi_user","menu_items","speak_text","track_location"
   , "incoming_email","daobject"
   ]
+  <> [ n | n <- runtimeExports, Text.toLower n == n ]
 
 -- | Sanitise an L4 record-field name into a @DAObject@ attribute. On top of
 -- 'pyIdent', names that land in the DAObject class/instance namespace get a

@@ -27,6 +27,7 @@ module L4.Docassemble.IR
   , DACmpOp (..)
   , DAFile (..)
   , DAPackageTree (..)
+  , runtimeExports
   ) where
 
 import Base
@@ -192,3 +193,28 @@ data DAPackageTree = MkDAPackageTree
   , ptFidelity   :: ![Text]    -- ^ where to write the fidelity report
   }
   deriving stock (Eq, Show, Generic)
+
+-- | The @__all__@ of the generated @l4runtime.py@ (R11, M2), declared here
+-- because /two/ modules must agree on it and neither may drift.
+--
+-- 'L4.Docassemble.Emit' writes it into the module. 'L4.Docassemble.Lower'
+-- reserves the names an L4 identifier could actually land on, because
+-- @modules: [.l4runtime]@ is exec'd as @from \<pkg\>.l4runtime import *@
+-- (@parse.py:8572@ at @1b6678384@) into the interview dict on every assemble
+-- pass: a star-import cannot collide with an interview variable only in the
+-- sense that @__all__@ bounds /which/ names arrive — it does nothing to stop an
+-- interview variable from being one of them, and the loser is the interview's.
+--
+-- Only the lower-case entries are reachable from L4: 'L4.Docassemble.Lower's
+-- @pyIdent@ lower-cases, and Python names are case-sensitive, so no L4 name can
+-- sanitise onto @L4_SOURCE_NAME@. That filter is applied where the names are
+-- reserved, not here — this list is the module's contract, verbatim.
+runtimeExports :: [Text]
+runtimeExports =
+  [ "L4_SOURCE_NAME"
+  , "L4_PACKAGE_NAME"
+  , "L4_GENERATOR"
+  , "L4_DOCASSEMBLE_PIN"
+  , "l4_source_path"
+  , "l4_source_text"
+  ]
