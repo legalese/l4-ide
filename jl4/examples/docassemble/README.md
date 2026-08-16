@@ -6,10 +6,12 @@ headless harness below) runs unmodified. Design and rulings R1–R11:
 `specs/todo/DOCASSEMBLE-EXPORT-SPEC.md`.
 
 _Status: corpus, backend, goldens and harness all landed 2026-08-16 on branch
-`mengwong/docassemble-backend`. The `expected/` goldens are committed and
-pinned by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs`; all eleven
-round-trip cases below were run green against `docassemble.base` 1.10.7
-(local checkout, commit `1b6678384`) in the venv recipe of this README._
+`mengwong/docassemble-backend`; the same day a review pass repaired five
+defects and added the `computed-and-shadow` / `assume-via-fn` exhibits. The
+`expected/` goldens are committed and pinned by the `l4 docassemble` cases in
+`jl4/tests-cli/Main.hs`; all sixteen round-trip cases below were run green
+against `docassemble.base` 1.10.7 (local checkout, commit `1b6678384`) in the
+venv recipe of this README._
 
 The organising principle: **as much as possible of an L4 encoding survives, by
 name and by structure.** An L4 reader and a docassemble reader should
@@ -46,6 +48,14 @@ recognise the same program.
   present and absent paths (the R7/R8 golden). Its `promotional code used`
   `@desc` deliberately begins with `%` and contains a literal `${ ... }`, so
   the R9 Mako escaping is exercised by the corpus, not assumed.
+- `computed-and-shadow.l4` — a stored field named `alternative` (a DAObject
+  method name, so it must sanitise to `alternative_` or the interview
+  silently returns a wrong verdict) plus a computed (`MEANS`) field, which
+  survives by inlining its desugar-synthesized selector (R2 repairs golden).
+- `assume-via-fn.l4` — an `ASSUME` referenced only through an inlined
+  parameterized `DECIDE`; its question block must still be emitted (R3
+  repair golden). No `#EVAL`: `ASSUME` is uninterpreted, so the round-trip
+  expectations for this one example are hand-computed in the fixture table.
 - `expected/*.yml` (+ `*.fidelity.txt` sidecars) — committed golden output,
   pinned byte-exact by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs`.
 - `not-ok/` — fixtures the backend must REFUSE, each with a named diagnostic:
@@ -57,6 +67,11 @@ recognise the same program.
     to one Python identifier: `checkCollisions` rejection.
   - `higher-order.l4` — function-valued `WHERE` binding passed as an
     argument, not directly applied: un-inlinable, refused by name.
+  - `seam-ref-via-fn.l4` — a seam-shaped export referenced by another
+    decision *through an inlined function*: the R4 dangling-goal guard must
+    see references that travel through inlined bodies.
+  - `just-payload-pattern.l4` — `WHEN JUST TRUE`: a payload-value match, not
+    a binder; the R8 presence erasure cannot express it, refused by name.
 - `roundtrip_check.py` — drives the emitted interview headlessly in real
   `docassemble.base` and asserts the verdict/goal equals the L4 `#EVAL`
   oracle (fixture table in the file; one case per #EVAL).
@@ -68,6 +83,8 @@ cabal run l4 -- docassemble jl4/examples/docassemble/rodents-and-vermin.l4 -o jl
 cabal run l4 -- docassemble jl4/examples/docassemble/seam.l4               -o jl4/examples/docassemble/expected/seam.yml
 cabal run l4 -- docassemble jl4/examples/docassemble/enum-triage.l4        -o jl4/examples/docassemble/expected/enum-triage.yml
 cabal run l4 -- docassemble jl4/examples/docassemble/defaults.l4           -o jl4/examples/docassemble/expected/defaults.yml
+cabal run l4 -- docassemble jl4/examples/docassemble/computed-and-shadow.l4 -o jl4/examples/docassemble/expected/computed-and-shadow.yml
+cabal run l4 -- docassemble jl4/examples/docassemble/assume-via-fn.l4      -o jl4/examples/docassemble/expected/assume-via-fn.yml
 ```
 
 (With an installed binary: `l4 docassemble X.l4 -o expected/X.yml`.)
@@ -149,3 +166,8 @@ build dependency.
 | defaults | waiver present | distance T, waiver `True` (promo pruned) | FALSE | = False |
 | defaults | FINAL-SALE code | distance T, waiver `False`, promo `"FINAL-SALE"` | FALSE | = False |
 | defaults | ordinary code | distance T, waiver `False`, promo `"SPRING10"` | TRUE | = True |
+| computed-and-shadow | lawful | salary 3500, alternative F | TRUE | `offer_lawful` = True (the shadow detector) |
+| computed-and-shadow | alternative defeats | salary 3500, alternative T | FALSE | = False |
+| computed-and-shadow | below minimum | salary 2000 (alternative pruned) | FALSE | = False, no alternative question asked |
+| assume-via-fn | over | amount 60, base rate 50 | (hand-computed) TRUE | `over_threshold` = True |
+| assume-via-fn | under | amount 30, base rate 50 | (hand-computed) FALSE | = False |

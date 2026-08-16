@@ -2403,6 +2403,14 @@ spec bin = do
       expectGolden bin ["docassemble", "examples/docassemble/defaults.l4"]
                        "examples/docassemble/expected/defaults.yml"
 
+    it "keeps attributes out of the DAObject namespace + inlines a computed field (R2)" $
+      expectGolden bin ["docassemble", "examples/docassemble/computed-and-shadow.l4"]
+                       "examples/docassemble/expected/computed-and-shadow.yml"
+
+    it "emits a question for an ASSUME referenced only through an inlined function (R3)" $
+      expectGolden bin ["docassemble", "examples/docassemble/assume-via-fn.l4"]
+                       "examples/docassemble/expected/assume-via-fn.yml"
+
     it "drives the seam scope-first, never as the classical short-circuit (R4)" $ do
       Output code sout _ <- runL4 bin ["docassemble", "examples/docassemble/seam.l4"]
       code `shouldBe` ExitSuccess
@@ -2430,6 +2438,16 @@ spec bin = do
       Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/higher-order.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("higher-order use of function `is positive`" `isInfixOf`)
+
+    it "refuses a seam-goal reference that travels through an inlined function (R4 guard)" $ do
+      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("seam-shaped export (top-level IMPLIES) is referenced by another decision" `isInfixOf`)
+
+    it "refuses `WHEN JUST TRUE` — a payload-value match, not a binder (R8)" $ do
+      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/just-payload-pattern.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("matching on the payload value" `isInfixOf`)
 
     it "gates on advisory fidelity notes with --fail-on=advisory" $
       expectFail bin ["docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]

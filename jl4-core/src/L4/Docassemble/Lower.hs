@@ -9,7 +9,10 @@
 --   * R2 — a record-typed parameter becomes an @objects:@ @DAObject@ instance
 --     and /one question per stored field/, so docassemble's backchaining only
 --     ever asks the fields the goal's evaluation demands. Labels carry the L4
---     field name verbatim.
+--     field name verbatim. Sanitised field names are kept out of the
+--     @DAObject@ class namespace ('attrIdent'): an attribute that shadows a
+--     DAObject method is never sought, and the bound method rides into the
+--     expression as a truthy value — a silent wrong verdict.
 --   * R3 — every zero-@GIVEN@ @WHERE@ binding and every reachable top-level
 --     @DECIDE@ becomes one named @code:@ block, so the L4 structure survives
 --     at runtime. Function-valued bindings that are directly applied are
@@ -90,6 +93,12 @@ data ConInfo = MkConInfo
   , ciArity :: !Int
   }
 
+-- | A /stored/ record field. Computed (@MEANS@) fields never appear here:
+-- 'L4.Desugar.desugarComputedFields' strips them out of the @RecordDecl@
+-- before type checking and synthesizes a top-level selector @DECIDE@
+-- (@f _self MEANS …@) per field, so in a @Module Resolved@ every remaining
+-- field is stored. Projections onto computed fields reach the selector via
+-- 'lowerProj''s 'envFuns' fallback and are inlined.
 data FieldSpec = MkFieldSpec
   { fsU        :: !Unique
   , fsL4       :: !Text
@@ -97,7 +106,6 @@ data FieldSpec = MkFieldSpec
   , fsTy       :: !(Type' Resolved)
   , fsDesc     :: !(Maybe Text)
   , fsDefault  :: !(Maybe (Expr Resolved))
-  , fsComputed :: !(Maybe (Expr Resolved))
   }
 
 data RecordSpec = MkRecordSpec
@@ -168,13 +176,14 @@ collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
                 [ MkFieldSpec
                     { fsU        = getUnique fRes
                     , fsL4       = resolvedToText fRes
-                    , fsSan      = pyIdent (resolvedToText fRes)
+                    , fsSan      = attrIdent (resolvedToText fRes)
                     , fsTy       = fTy
                     , fsDesc     = getDesc <$> (fAnn ^. annDesc)
                     , fsDefault  = mDflt
-                    , fsComputed = mMeans
                     }
-                | MkTypedName fAnn fRes fTy mDflt mMeans <- fields
+                -- the 5th MkTypedName field (computed/MEANS) is always
+                -- Nothing post-desugar; see the FieldSpec haddock
+                | MkTypedName fAnn fRes fTy mDflt _ <- fields
                 ]
             }
         )
@@ -295,8 +304,17 @@ lowerModule mod' =
                               , td.tdU `Set.member` reach
                               , not td.tdExported
                               , null td.tdParams ]
-          allBodies    = exportBodies <> map (.tdBody) helpers
-          allRefs      = Set.unions (map collectRefs allBodies)
+          -- Every reachable top-level body — including parameterized decides,
+          -- which survive by INLINING rather than as their own blocks. Their
+          -- references still reach the emitted code, so they must count when
+          -- deciding which ASSUME questions to emit and which seam goals are
+          -- referenced: collecting only export + zero-param-helper bodies
+          -- (the pre-repair behaviour) silently dropped an ASSUME question
+          -- referenced only through an inlined function, and let a dangling
+          -- seam-goal reference through the seamRefErrs guard below.
+          reachBodies  = [ td.tdBody | td <- ctx.ctxTop, td.tdU `Set.member` reach ]
+          allBodies    = exportBodies <> reachBodies
+          allRefs      = Set.unions (rootRefs : map collectRefs reachBodies)
           assumeUs     = allRefs `Set.intersection` Map.keysSet ctx.ctxAssumes
 
           -- A seam export's goal is deliberately never emitted as a variable
@@ -452,13 +470,18 @@ exprHasInert =
 -- Reachability
 -- ---------------------------------------------------------------------------
 
--- | Every identifier an expression references, as plain variable or applied
--- function (the 'L4.Export.collectReferencedUniques' pattern).
+-- | Every identifier an expression references, as plain variable, applied
+-- function (the 'L4.Export.collectReferencedUniques' pattern), or projected
+-- field. Projection heads matter because a computed (@MEANS@) record field
+-- arrives as @Proj@ whose field name resolves to the desugar-synthesized
+-- selector decide — a top-level function that must be walked for
+-- reachability like any other callee.
 collectRefs :: Expr Resolved -> Set Unique
 collectRefs =
   foldMapOf (cosmosOf (gplate @(Expr Resolved))) \case
-    App _ r _ -> Set.singleton (getUnique r)
-    _         -> Set.empty
+    App _ r _  -> Set.singleton (getUnique r)
+    Proj _ _ f -> Set.singleton (getUnique f)
+    _          -> Set.empty
 
 closureRefs :: Ctx -> Set Unique -> Set Unique
 closureRefs ctx = go Set.empty . Set.toList
@@ -664,8 +687,10 @@ lowerParam ctx env (MkOptionallyTypedName ann r mTy mTypically) = do
   var = pyIdent l4
   u   = getUnique r
 
--- | One question per stored field, a @code:@ block per computed field, a
--- @DAObject@ instantiation plus recursion per nested record field.
+-- | One question per stored field, a @DAObject@ instantiation plus recursion
+-- per nested record field. Computed (@MEANS@) fields never reach this
+-- function: desugar strips them from the record and synthesizes selector
+-- decides, which are inlined at each projection site ('lowerProj').
 lowerRecordFields
   :: Ctx -> Env -> [Unique] -> Text -> RecordSpec
   -> Either LF ([DACode], [DAQuestion])
@@ -673,52 +698,34 @@ lowerRecordFields ctx env visited path rs = do
   parts <- traverse fieldArt rs.rsFields
   pure (concatMap fst parts, concatMap snd parts)
  where
-  recTyU f = case f.fsTy of
-    TyApp _ n _ | Map.member (getUnique n) ctx.ctxRecords -> Just (getUnique n)
-    _ -> Nothing
-
-  -- Sibling fields are in scope for computed (MEANS) fields.
-  sibEnv = env
-    { envVars = Map.union
-        (Map.fromList
-           [ (f.fsU, path <> "." <> f.fsSan) | f <- rs.rsFields, isNothing (recTyU f) ])
-        env.envVars
-    , envRecVars = Map.union
-        (Map.fromList
-           [ (f.fsU, (path <> "." <> f.fsSan, ru))
-           | f <- rs.rsFields, Just ru <- [recTyU f] ])
-        env.envRecVars
-    }
-
   fieldArt f = do
     let attrVar = path <> "." <> f.fsSan
-    case f.fsComputed of
-      Just meansE -> do
-        (envW, pcs, innerE) <- processBindings sibEnv (underscored attrVar) meansE
-        cb <- lowerTopBody envW innerE
-        pure (map pcToCode pcs <> [mkCode attrVar (Just f.fsL4) cb], [])
-      Nothing -> do
-        kind <- classifyTy ctx f.fsTy
-        case kind of
-          PRecord ru rs' -> do
-            when (ru `elem` visited) $
-              Left (LFFatal ("recursive record nesting via field `" <> f.fsL4 <> "`"))
-            when (isJust f.fsDefault) $
-              Left (LFFatal ("TYPICALLY on record-typed field `" <> f.fsL4 <> "` is not supported"))
-            (subCodes, subQs) <- lowerRecordFields ctx env (ru : visited) attrVar rs'
-            let initCode = MkDACode
-                  { cId = "c_" <> underscored attrVar, cVar = attrVar
-                  , cL4 = Just f.fsL4, cBody = DAInstantiate "DAObject", cDeps = [] }
-            pure (initCode : subCodes, subQs)
-          _ -> do
-            ctl  <- controlOf kind f.fsL4
-            dflt <- traverse (lowerDefaultLit ctx) f.fsDefault
-            let dsc = f.fsDesc <|> typeDescOf ctx f.fsTy
-            pure ([], [mkQuestion attrVar f.fsL4 dsc ctl dflt])
+    kind <- classifyTy ctx f.fsTy
+    case kind of
+      PRecord ru rs' -> do
+        when (ru `elem` visited) $
+          Left (LFFatal ("recursive record nesting via field `" <> f.fsL4 <> "`"))
+        when (isJust f.fsDefault) $
+          Left (LFFatal ("TYPICALLY on record-typed field `" <> f.fsL4 <> "` is not supported"))
+        (subCodes, subQs) <- lowerRecordFields ctx env (ru : visited) attrVar rs'
+        let initCode = MkDACode
+              { cId = "c_" <> attrVar, cVar = attrVar
+              , cL4 = Just f.fsL4, cBody = DAInstantiate "DAObject", cDeps = [] }
+        pure (initCode : subCodes, subQs)
+      _ -> do
+        ctl  <- controlOf kind f.fsL4
+        dflt <- traverse (lowerDefaultLit ctx) f.fsDefault
+        let dsc = f.fsDesc <|> typeDescOf ctx f.fsTy
+        pure ([], [mkQuestion attrVar f.fsL4 dsc ctl dflt])
 
+-- | Block ids are @q_@/@c_@ plus the docassemble variable name /verbatim/
+-- (dots included — docassemble ids are free-form strings), so distinct
+-- variables can never collide on id: collapsing @.@ and @_@ together used to
+-- refuse a valid program (attribute path @p.foo_bar@ vs scalar @p_foo_bar@)
+-- with a misleading "internal id collision".
 mkQuestion :: Text -> Text -> Maybe Text -> DAFieldControl -> Maybe DAExpr -> DAQuestion
 mkQuestion var l4 dsc ctl dflt = MkDAQuestion
-  { qId = "q_" <> underscored var, qVar = var, qLabel = l4, qText = l4
+  { qId = "q_" <> var, qVar = var, qLabel = l4, qText = l4
   , qHelp = dsc, qControl = ctl, qDefault = dflt }
 
 -- ---------------------------------------------------------------------------
@@ -853,7 +860,7 @@ pcToCode pc = mkCode pc.pcVar (Just pc.pcL4) pc.pcBody
 
 mkCode :: Text -> Maybe Text -> DACodeBody -> DACode
 mkCode var mL4 cb = MkDACode
-  { cId = "c_" <> underscored var, cVar = var, cL4 = mL4
+  { cId = "c_" <> var, cVar = var, cL4 = mL4
   , cBody = cb, cDeps = nubOrd (bodyVars cb) }
 
 bodyVars :: DACodeBody -> [Text]
@@ -946,10 +953,15 @@ maybeArms env repr scrut branches = do
       others   = [ b | MkBranch _ (Otherwise _) b <- branches ]
   case (justs, nothings <> others) of
     ([(pv, jb)], [nb]) | length branches == 2 -> do
+      -- Post-typecheck a binder is always PatVar (the scope checker rewrites
+      -- out-of-scope nullary PatApps to PatVar, TypeCheck.hs inferPattern),
+      -- so a PatApp payload here is a genuine constructor pattern — e.g.
+      -- `WHEN JUST TRUE` — which is a match on the payload VALUE, not a
+      -- binder. Treating it as a binder silently degraded the match to a
+      -- mere presence test (a wrong verdict); it is refused instead.
       ju <- case pv of
-        PatVar _ v    -> Right (getUnique v)
-        PatApp _ v [] -> Right (getUnique v)
-        _             -> Left (LFFatal "the JUST pattern must bind a plain variable (v1)")
+        PatVar _ v -> Right (getUnique v)
+        _          -> Left (LFFatal "the JUST pattern must bind a plain variable (v1); matching on the payload value (e.g. `WHEN JUST TRUE`) is not supported — bind a variable and compare it in the arm body")
       bodyJ <- lowerExpr env { envVars = Map.insert ju scrutV env.envVars } jb
       bodyN <- lowerExpr env nb
       let absent = case repr of
@@ -1021,13 +1033,25 @@ lowerExpr env = go
 
 -- | @p's field@ (possibly nested) resolves to a dotted attribute path on a
 -- record-typed variable; docassemble seeks each attribute independently.
+--
+-- A /computed/ (@MEANS@) field is not in 'rsFields' at all: desugar stripped
+-- it from the record and synthesized a top-level selector decide
+-- (@f _self MEANS …@) that the type checker resolved this projection's field
+-- name to. That selector is a parameterized top decide, hence in 'envFuns',
+-- and the projection lowers by inlining it applied to the record — sibling
+-- references inside the @MEANS@ body are @Proj@s on @_self@ and resolve
+-- against the same record path after substitution.
 lowerProj :: Env -> Expr Resolved -> Resolved -> Either LF DAExpr
 lowerProj env inner f =
   case resolvePath env inner of
     Just (path, spec) ->
       case find (\fs -> fs.fsL4 == resolvedToText f) spec.rsFields of
         Just fld -> Right (DAVar (path <> "." <> fld.fsSan))
-        Nothing  -> Left (LFFatal ("record `" <> spec.rsName <> "` has no field `" <> resolvedToText f <> "`"))
+        Nothing
+          | Just selector <- Map.lookup (getUnique f) env.envFuns ->
+              inlineApply env selector (resolvedToText f) [inner]
+          | otherwise ->
+              Left (LFFatal ("record `" <> spec.rsName <> "` has no field `" <> resolvedToText f <> "`"))
     Nothing -> Left (LFFatal "only projection off a record-typed parameter (or a nested record field of one) is supported in v1")
 
 resolvePath :: Env -> Expr Resolved -> Maybe (Text, RecordSpec)
@@ -1285,9 +1309,6 @@ moduleTitleOf mod' =
   let base = moduleSource mod'
   in fromMaybe base (Text.stripSuffix ".l4" base)
 
-underscored :: Text -> Text
-underscored = Text.replace "." "_"
-
 -- | Sanitise an L4 name into a snake_case interview variable. Total and
 -- deterministic (the OpenFisca @pyIdent@ discipline) so definitions and
 -- references stay in sync; collision-checked afterwards.
@@ -1321,6 +1342,48 @@ pyReserved = Set.fromList
   , "role_needed","user","session","device_local","user_local","session_local"
   , "allow_cron","multi_user","menu_items","speak_text","track_location"
   , "incoming_email","daobject"
+  ]
+
+-- | Sanitise an L4 record-field name into a @DAObject@ attribute. On top of
+-- 'pyIdent', names that land in the DAObject class/instance namespace get a
+-- @_@ suffix: normal Python attribute lookup finds the pre-existing (truthy)
+-- method or instance attribute, @__getattr__@ never raises, docassemble
+-- never backchains to the emitted question, and the method object rides into
+-- the expression as @True@ — a silent wrong verdict. @pyReserved@ guards
+-- only top-level variable names; attribute positions need this set instead.
+attrIdent :: Text -> Text
+attrIdent raw =
+  let t = pyIdent raw
+  in if t `Set.member` daObjectReserved then t <> "_" else t
+
+-- | The @DAObject@ namespace, vendored from docassemble 1.10.7 (checkout
+-- @1b6678384@): @dir(DAObject) | vars(DAObject('x'))@, probed 2026-08-16 in
+-- this repo's round-trip venv (spec R10). Every entry is an attribute that
+-- normal lookup finds on a fresh instance, so a generated attribute may
+-- shadow none of them. Local evidence, never a build dep (spec §8.10).
+daObjectReserved :: Set Text
+daObjectReserved = Set.fromList
+  [ "__class__","__delattr__","__dict__","__dir__","__doc__","__eq__"
+  , "__format__","__ge__","__getattr__","__getattribute__","__getstate__"
+  , "__gt__","__hash__","__init__","__init_subclass__","__le__","__lt__"
+  , "__module__","__ne__","__new__","__reduce__","__reduce_ex__","__repr__"
+  , "__setattr__","__sizeof__","__str__","__subclasshook__","__weakref__"
+  , "_map_info","_mark_as_gathered_recursively","_reset_gathered_recursively"
+  , "_set_instance_name_for_function","_set_instance_name_for_method"
+  , "_set_instance_name_recursively"
+  , "alternative","as_serializable","attr","attrList","attr_name"
+  , "attribute_defined","copy_deep","copy_shallow","delattr","did_question"
+  , "did_verb","do_question","does_verb","fix_instance_name"
+  , "get_peer_relation","get_point_of_view","get_relation","getattr_fresh"
+  , "has_nonrandom_instance_name","have_question","init","initializeAttribute"
+  , "initialize_attribute","instanceName","invalidate_attr","is_are_you"
+  , "is_peer_relation","is_relation","is_user","itself","object_name"
+  , "object_possessive","possessive","pronoun","pronoun_objective"
+  , "pronoun_or_name","pronoun_possessive","pronoun_subjective"
+  , "raise_undefined_attribute_error","reInitializeAttribute"
+  , "reinitialize_attribute","set_instance_name","set_peer_relationship"
+  , "set_random_instance_name","set_relationship","subjective_pronoun_or_name"
+  , "using","were_question","yourself_or_name"
   ]
 
 tshow :: Show a => a -> Text

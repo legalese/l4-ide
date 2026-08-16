@@ -5,7 +5,8 @@ and assert the verdict/goal equals the L4 #EVAL oracle.
 Usage (inside the docassemble venv -- recipe in README.md):
     python roundtrip_check.py <emitted.yml> <example-name> [--quiet]
 
-<example-name> is one of: rodents-and-vermin, seam, enum-triage, defaults.
+<example-name> is one of: rodents-and-vermin, seam, enum-triage, defaults,
+computed-and-shadow, assume-via-fn.
 Each example carries one fixture case per #EVAL in its .l4 source; the drive
 loop assembles, reads the pending question's field variable names, writes the
 fixture's answer for each into the interview's user_dict, and re-assembles,
@@ -277,6 +278,47 @@ EXAMPLES = {
                 "goal": True,
                 "verdict": "Holds",
             },
+        ],
+    },
+    "computed-and-shadow": {
+        # Review repairs, 2026-08-16. The `alternative` field sanitises to
+        # `alternative_` (DAObject-namespace exclusion): before the repair
+        # the interview never asked it and the bound method rode in truthy,
+        # so the 'lawful' case below flagged the silent wrong verdict. The
+        # goal expression also inlines the computed (MEANS) field
+        # `meets the minimum`.
+        "goal_candidates": ["offer_lawful", "interview_goal"],
+        "verdict_candidates": ["verdict", "offer_lawful_verdict"],
+        "cases": [
+            {"label": "lawful",
+             "fixtures": {"salary_offered": 3500, "alternative": False},
+             "goal": True, "verdict": "Holds"},
+            {"label": "alternative accommodation defeats",
+             "fixtures": {"salary_offered": 3500, "alternative": True},
+             "goal": False, "verdict": "Fails"},
+            {   # short-circuit prunes the alternative question entirely:
+                # no fixture for it, so being asked would fail the run
+                "label": "below minimum (alternative pruned)",
+                "fixtures": {"salary_offered": 2000},
+                "goal": False, "verdict": "Fails"},
+        ],
+    },
+    "assume-via-fn": {
+        # Review repair, 2026-08-16: `base rate` is an ASSUME referenced only
+        # through the inlined `adjusted` function; before the repair its
+        # question block was never emitted and assembly raised
+        # DAErrorMissingVariable. ASSUME modules do not evaluate, so these
+        # expectations are hand-computed (amount + base rate > 100), not
+        # #EVAL-copied.
+        "goal_candidates": ["over_threshold", "interview_goal"],
+        "verdict_candidates": ["verdict", "over_threshold_verdict"],
+        "cases": [
+            {"label": "over (60 + 50 = 110 > 100)",
+             "fixtures": {"amount": 60, "base_rate": 50},
+             "goal": True, "verdict": "Holds"},
+            {"label": "under (30 + 50 = 80 <= 100)",
+             "fixtures": {"amount": 30, "base_rate": 50},
+             "goal": False, "verdict": "Fails"},
         ],
     },
 }

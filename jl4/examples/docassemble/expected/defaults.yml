@@ -5,10 +5,11 @@
 metadata:
   title: "defaults"
 ---
+id: objects_main
 objects:
   - p: DAObject
 ---
-id: q_p_was_concluded_at_a_distance
+id: q_p.was_concluded_at_a_distance
 question: |
   was concluded at a distance
 fields:
@@ -17,7 +18,7 @@ fields:
     default: True
     help: "Whether the contract was concluded without the simultaneous physical presence of trader and consumer"
 ---
-id: q_p_consumer_confirmed_waiver
+id: q_p.consumer_confirmed_waiver
 question: |
   consumer confirmed waiver
 fields:
@@ -25,14 +26,14 @@ fields:
     datatype: yesnomaybe
     help: "Whether the consumer expressly waived the cooling-off period; unanswered if the trader never asked"
 ---
-id: q_p_promotional_code_used
+id: q_p.promotional_code_used
 question: |
   promotional code used
 fields:
   - "promotional code used": p.promotional_code_used
     datatype: text
     required: False
-    help: "%% off is shown at checkout as ${'${'} discount_percent }; enter the code itself, or leave blank if none was used"
+    help: "${'%'} off is shown at checkout as ${'${'} discount_percent }; enter the code itself, or leave blank if none was used"
 ---
 id: c_the_consumer_may_cancel_the_consumer_waived_the_right
 code: |

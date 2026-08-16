@@ -7,8 +7,10 @@
 -- Emission hygiene (spec R9), all enforced by construction in this module:
 --
 --   1. Every L4-derived string passes through the one escape function
---      'escapeL4' (Mako @${@ and line-leading @%@), and inline YAML scalars
---      are additionally double-quoted via 'yamlStr'.
+--      'escapeL4' (Mako @${@, @<%@, @</%@, line-leading @%@ and @##@ — every
+--      escape is itself a Mako compile trigger, so the escaped text renders
+--      identically whether or not docassemble compiles it), and inline YAML
+--      scalars are additionally double-quoted via 'yamlStr'.
 --   2. Prose lands only inside block scalars whose every line is indented two
 --      spaces ('blockScalar'), so no generated line can ever match
 --      docassemble's block-splitting regex @^--- *$@ (@parse.py:138@).
@@ -48,7 +50,8 @@ renderPackage pkg =
   -- plausibly approach docassemble's defaults of 500 (parse.py:7942).
   featuresBlocks
     | length pkg.pkgBlocks > 200 =
-        [ [ "features:"
+        [ [ "id: features_main"
+          , "features:"
           , "  loop limit: " <> tshow guardLimit
           , "  recursion limit: " <> tshow guardLimit
           ] ]
@@ -63,6 +66,12 @@ headerLines pkg =
   , "# (docassemble_base/docassemble/base/parse.py:1947 at commit 1b6678384)."
   ]
 
+-- | The one documented exception to R9.4's "@id:@ on every block": a
+-- @metadata:@ block admits ONLY @metadata@ and @comment@ keys — any other
+-- key, @id:@ included, is a hard @DASourceError@ ("A metadata directive
+-- cannot be mixed with other directives", @parse.py:2748-2751@ at 1.10.7,
+-- re-proven by the round-trip harness when an id was tried). Objects and
+-- features blocks carry ids; metadata cannot.
 metadataLines :: DAPackage -> [Text]
 metadataLines pkg =
   [ "metadata:"
@@ -72,7 +81,8 @@ metadataLines pkg =
 blockLines :: DABlock -> [Text]
 blockLines = \case
   DAObjectsBlock entries ->
-    "objects:" : [ "  - " <> var <> ": " <> cls | (var, cls) <- entries ]
+    "id: objects_main"
+      : "objects:" : [ "  - " <> var <> ": " <> cls | (var, cls) <- entries ]
   DAQuestionBlock q -> questionLines q
   DACodeBlock c     -> codeLines c
   DADriverBlock d   -> driverLines d
@@ -232,22 +242,52 @@ screenLines s =
 -- ---------------------------------------------------------------------------
 
 -- | THE escape function: every L4-derived string passes through here before
--- reaching any Mako-rendered position. @${@ becomes @${'${'}@ — the Mako
--- expression that renders a literal @${@; a backslash (@\\${@) is NOT an
--- escape in the vendored @docassemble_mako@ and still evaluates the
--- expression (probed against 1.10.7 in this repo's round-trip venv). A
--- line-leading @%@ is doubled (the control-line escape, which does render
--- a literal @%@). YAML-significant leaders are neutralised by context:
--- inline scalars go through 'yamlStr' (double-quoted), prose goes through
--- 'blockScalar' (every line indented).
+-- reaching any Mako-rendered position.
+--
+-- The invariant is /render-identity under both fates/: docassemble only
+-- Mako-compiles a string when @match_mako@ fires (@parse.py:135@:
+-- @<%|\\${|% if|% for|% while|##@ — a @TextObject@ without a match keeps the
+-- text verbatim), so every escape sequence must itself be a compile trigger
+-- and must render back to exactly the original text. Each Mako-significant
+-- span is therefore rewritten to the Mako expression that prints it —
+-- @${'…'}@ contains @${@, so an escaped string always compiles, and a string
+-- we did not touch renders verbatim uncompiled:
+--
+--   * @${@   → @${'${'}@   (a backslash is NOT an escape in the vendored
+--     @docassemble_mako@ — @\\${ x }@ still evaluates @x@; probed at 1.10.7);
+--   * @<%@   → @${'<%'}@   (an unclosed @<%@ otherwise fails the WHOLE
+--     interview at parse time, and a closed @<%x%>@ span is silently
+--     swallowed; a bare @%>@ with no opening tag renders as plain text);
+--   * @</%@  → @${'</%'}@  (a closing tag without an opening tag is a
+--     @SyntaxException@ under compilation);
+--   * line-leading @[ \\t]*%@ → @${'%'}@ for the @%@ (the vendored
+--     control-line regex admits leading blanks; the former @%%@ doubling
+--     only rendered as @%@ when something ELSE triggered compilation, and
+--     otherwise reached the user verbatim as @%%@);
+--   * line-leading @[ \\t]*##@ → @${'##'}@ (a compiled line-leading @##@ is
+--     a Mako comment: the line would vanish from the prose).
+--
+-- YAML-significant leaders are neutralised by context: inline scalars go
+-- through 'yamlStr' (double-quoted), prose goes through 'blockScalar' (every
+-- line indented).
 escapeL4 :: Text -> Text
 escapeL4 t =
   Text.intercalate "\n"
-    (map guardLine (Text.splitOn "\n" (Text.replace "${" "${'${'}" t)))
+    (map guardLine (Text.splitOn "\n" spans))
  where
-  guardLine ln
-    | "%" `Text.isPrefixOf` ln = "%" <> ln
-    | otherwise                = ln
+  -- Order matters only in that the replacements must not rescan each
+  -- other's output; none of the inserted texts contains a later pattern.
+  spans =
+      Text.replace "</%" "${'</%'}"
+    . Text.replace "<%"  "${'<%'}"
+    . Text.replace "${"  "${'${'}"
+    $ t
+  guardLine ln =
+    let (ws, rest) = Text.span (\c -> c == ' ' || c == '\t') ln
+    in case () of
+         _ | Just rest' <- Text.stripPrefix "##" rest -> ws <> "${'##'}" <> rest'
+           | Just rest' <- Text.stripPrefix "%" rest  -> ws <> "${'%'}" <> rest'
+           | otherwise                                -> ln
 
 -- | A double-quoted YAML scalar: nothing inside can be misread as YAML
 -- syntax, a boolean, or a block-structure leader.

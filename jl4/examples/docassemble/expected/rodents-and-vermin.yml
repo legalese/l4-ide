@@ -5,73 +5,74 @@
 metadata:
   title: "rodents-and-vermin"
 ---
+id: objects_main
 objects:
   - i_: DAObject
 ---
-id: q_i__loss_or_damage_caused_by_rodents
+id: q_i_.loss_or_damage_caused_by_rodents
 question: |
   Loss or Damage.caused by rodents
 fields:
   - "Loss or Damage.caused by rodents": i_.loss_or_damage_caused_by_rodents
     datatype: yesnoradio
 ---
-id: q_i__loss_or_damage_caused_by_insects
+id: q_i_.loss_or_damage_caused_by_insects
 question: |
   Loss or Damage.caused by insects
 fields:
   - "Loss or Damage.caused by insects": i_.loss_or_damage_caused_by_insects
     datatype: yesnoradio
 ---
-id: q_i__loss_or_damage_caused_by_vermin
+id: q_i_.loss_or_damage_caused_by_vermin
 question: |
   Loss or Damage.caused by vermin
 fields:
   - "Loss or Damage.caused by vermin": i_.loss_or_damage_caused_by_vermin
     datatype: yesnoradio
 ---
-id: q_i__loss_or_damage_caused_by_birds
+id: q_i_.loss_or_damage_caused_by_birds
 question: |
   Loss or Damage.caused by birds
 fields:
   - "Loss or Damage.caused by birds": i_.loss_or_damage_caused_by_birds
     datatype: yesnoradio
 ---
-id: q_i__loss_or_damage_to_contents
+id: q_i_.loss_or_damage_to_contents
 question: |
   Loss or Damage.to Contents
 fields:
   - "Loss or Damage.to Contents": i_.loss_or_damage_to_contents
     datatype: yesnoradio
 ---
-id: q_i__any_other_exclusion_applies
+id: q_i_.any_other_exclusion_applies
 question: |
   any other exclusion applies
 fields:
   - "any other exclusion applies": i_.any_other_exclusion_applies
     datatype: yesnoradio
 ---
-id: q_i__a_household_appliance
+id: q_i_.a_household_appliance
 question: |
   a household appliance
 fields:
   - "a household appliance": i_.a_household_appliance
     datatype: yesnoradio
 ---
-id: q_i__a_swimming_pool
+id: q_i_.a_swimming_pool
 question: |
   a swimming pool
 fields:
   - "a swimming pool": i_.a_swimming_pool
     datatype: yesnoradio
 ---
-id: q_i__a_plumbing_heating_or_air_conditioning_system
+id: q_i_.a_plumbing_heating_or_air_conditioning_system
 question: |
   a plumbing, heating, or air conditioning system
 fields:
   - "a plumbing, heating, or air conditioning system": i_.a_plumbing_heating_or_air_conditioning_system
     datatype: yesnoradio
 ---
-id: q_i__loss_or_damage_ensuing_covered_loss
+id: q_i_.loss_or_damage_ensuing_covered_loss
 question: |
   Loss or Damage.ensuing covered loss
 fields:

@@ -5,10 +5,11 @@
 metadata:
   title: "enum-triage"
 ---
+id: objects_main
 objects:
   - inc: DAObject
 ---
-id: q_inc_assessed_severity
+id: q_inc.assessed_severity
 question: |
   assessed severity
 fields:

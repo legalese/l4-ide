@@ -5,10 +5,11 @@
 metadata:
   title: "seam"
 ---
+id: objects_main
 objects:
   - t: DAObject
 ---
-id: q_t_is_a_residential_tenancy
+id: q_t.is_a_residential_tenancy
 question: |
   is a residential tenancy
 fields:
@@ -16,7 +17,7 @@ fields:
     datatype: yesnoradio
     help: "Whether the letting is of a dwelling occupied as a home"
 ---
-id: q_t_written_notice_was_given
+id: q_t.written_notice_was_given
 question: |
   written notice was given
 fields:
@@ -24,7 +25,7 @@ fields:
     datatype: yesnoradio
     help: "Whether the landlord served notice to quit in writing"
 ---
-id: q_t_months_of_notice_given
+id: q_t.months_of_notice_given
 question: |
   months of notice given
 fields:

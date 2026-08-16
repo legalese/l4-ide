@@ -1,0 +1,19 @@
+-- `WHEN JUST TRUE` is a match on the payload VALUE, not a binder:
+-- post-typecheck a binder is always PatVar (out-of-scope nullary PatApps are
+-- rewritten by the scope checker), so a nullary PatApp payload can only be a
+-- genuine constructor pattern. The R8 presence-erasure lowering cannot
+-- express it (it would silently degrade to a mere presence test — the
+-- pre-repair emitter compiled this to `p.waiver is None`, reporting TRUE for
+-- JUST FALSE), so it must be refused by name.
+
+DECLARE Purchase
+  HAS
+    waiver IS A MAYBE BOOLEAN
+
+@export whether the buyer waived
+GIVEN p IS A Purchase
+GIVETH A BOOLEAN
+DECIDE waived p IF
+    CONSIDER p's waiver
+    WHEN JUST TRUE THEN TRUE
+    OTHERWISE FALSE

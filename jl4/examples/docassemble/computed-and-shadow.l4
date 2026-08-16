@@ -1,0 +1,54 @@
+-- Two review repairs pinned by this corpus (2026-08-16):
+--
+-- 1. The stored field `alternative` collides with a DAObject method name
+--    (`suitable alternative accommodation` is live legal vocabulary — see
+--    the Housing Act Sch.2 corpus). The emitter must keep generated
+--    attributes out of the DAObject class/instance namespace (here it emits
+--    `o.alternative_`): plain `o.alternative` finds the truthy bound method,
+--    __getattr__ never raises, docassemble never backchains to the question,
+--    and the interview returns a silent wrong verdict.
+--
+-- 2. The computed (MEANS) field `meets the minimum` is stripped from the
+--    record by the desugarer, which synthesizes a top-level selector decide
+--    in its place; the projection onto it must inline that selector — the
+--    pre-repair emitter refused with the false diagnostic
+--    "record `Offer` has no field `meets the minimum`".
+
+DECLARE Offer
+    HAS
+      @desc Whether suitable alternative accommodation is on offer
+      `alternative`       IS A BOOLEAN
+      @desc Annual salary offered, in dollars
+      `salary offered`    IS A NUMBER
+      `meets the minimum` IS A BOOLEAN MEANS `salary offered` AT LEAST 3000
+
+@export Whether the offer is lawful
+GIVEN o IS AN Offer
+GIVETH A BOOLEAN
+DECIDE `offer lawful` o IF
+    o's `meets the minimum` AND NOT o's `alternative`
+
+-- The method-shadow detector: with the pre-repair emission, `alternative`
+-- is never asked and rides in truthy, forcing the goal FALSE — so this
+-- TRUE case catches the shadow.
+#EVAL `offer lawful` OF
+        Offer
+        WITH
+            `alternative`    IS FALSE
+            `salary offered` IS 3500
+-- TRUE
+
+#EVAL `offer lawful` OF
+        Offer
+        WITH
+            `alternative`    IS TRUE
+            `salary offered` IS 3500
+-- FALSE
+
+-- Below the minimum: short-circuit prunes the `alternative` question.
+#EVAL `offer lawful` OF
+        Offer
+        WITH
+            `alternative`    IS FALSE
+            `salary offered` IS 2000
+-- FALSE
