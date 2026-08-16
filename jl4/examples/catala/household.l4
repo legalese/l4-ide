@@ -1,0 +1,28 @@
+-- A port of `jl4/examples/openfisca/household.l4` — a group entity and a
+-- `LIST OF` aggregation, compiled by a second backend.
+--
+-- Two R11 elisions here, not one: the `period` parameter (as in flat-tax) and
+-- `Person`'s `name` field, which is stored and never read. Catala has no
+-- string type at all, so both are dropped and both are disclosed. `sum` over a
+-- `map` is absorbed by R5 into Catala's `Decimal.sum of (map each … among …)`.
+
+IMPORT prelude
+
+DECLARE Person HAS
+    name   IS A STRING
+    salary IS A NUMBER
+
+DECLARE Household HAS
+    members IS A LIST OF Person
+
+@export Total monthly income of a household (sum of member salaries)
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`household income` h period MEANS
+  sum (map (GIVEN m YIELD m's salary) (h's members))
+
+#EVAL `household income`
+        (Household WITH members IS LIST (Person WITH name IS "A", salary IS 1000),
+                                        (Person WITH name IS "B", salary IS 1500))
+        "2026-01"   -- expect 2500

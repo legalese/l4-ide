@@ -2401,6 +2401,43 @@ spec bin = do
       expectGolden bin ["catala", "examples/catala/statute.l4"]
                        "examples/catala/expected/statute.catala_en"
 
+    -- The two OpenFisca seed-corpus ports named in the spec's P1 exit
+    -- criterion (§10). Both compile unchanged from their OpenFisca originals;
+    -- what makes them Catala-clean is R11's elision of the `period` plumbing
+    -- string (and, in household, of `Person.name`).
+    it "compiles the flat-tax port, eliding the OpenFisca period string (R11)" $
+      expectGolden bin ["catala", "examples/catala/flat-tax.l4"]
+                       "examples/catala/expected/flat-tax.catala_en"
+
+    it "compiles the household port: group entity, LIST OF, absorbed sum (R5)" $
+      expectGolden bin ["catala", "examples/catala/household.l4"]
+                       "examples/catala/expected/household.catala_en"
+
+    it "compiles CONSIDER-on-enum plus TYPICALLY → context (R10)" $
+      expectGolden bin ["catala", "examples/catala/tariff.l4"]
+                       "examples/catala/expected/tariff.catala_en"
+
+    -- R11's disclosure obligation is the point of these two, not the text: a
+    -- narrower emitted record than its L4 source is a shape divergence a
+    -- reader must be told about, so it goes in the notes block, not just on
+    -- stderr.
+    it "discloses every R11 elision in the emitted document's notes block" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/household.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("field `name` of `Person` is a STRING" `isInfixOf`)
+      sout `shouldSatisfy` ("parameter `period` of `household income` is a STRING" `isInfixOf`)
+
+    -- R10's cost, disclosed: the emitted scope is MORE PERMISSIVE than its
+    -- source, because Catala lets a caller omit a `context` variable and L4
+    -- does not let a caller omit anything.
+    it "emits TYPICALLY as `context` + an in-scope default, and says so" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("context cap content decimal" `isInfixOf`)
+      sout `shouldSatisfy` ("A Catala caller may omit it; an L4 caller may not." `isInfixOf`)
+      sout `shouldSatisfy`
+        ("match a.class with pattern -- Domestic : 0.2" `isInfixOf`)
+
     -- R4: the exception ladder is the PRIMARY emission, and it never ships
     -- without the apparatus that re-checks it.
     it "emits Mode B ladders together with their equivalence grid" $ do

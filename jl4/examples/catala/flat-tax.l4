@@ -1,0 +1,18 @@
+-- A port of `jl4/examples/openfisca/flat-tax.l4` — the same L4, compiled by a
+-- second backend. Nothing had to change: the `period IS A STRING` parameter
+-- that OpenFisca needs is never inspected, so R11 elides it from the emitted
+-- Catala signature and says so in the document's notes block.
+--
+-- The original is kept where it is (the OpenFisca goldens pin it); this copy
+-- exists so the Catala exhibit directory is self-contained.
+
+DECLARE Person
+    HAS salary IS A NUMBER
+
+@export Flat tax on salary
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`flat tax on salary` p period MEANS (p's salary) * 0.25
+
+#EVAL `flat tax on salary` (Person WITH salary IS 2000) "2026-01"  -- expect 500.0

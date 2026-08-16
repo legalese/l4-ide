@@ -1,0 +1,39 @@
+-- CONSIDER-on-enum and TYPICALLY, in one exhibit.
+--
+-- `unit rate` scrutinises an enumeration, which Catala renders as a `match`
+-- over an `enumeration` (§4.3). `tariff payable` carries a `TYPICALLY` on one
+-- of its GIVEN parameters, which R10 lowers to a Catala `context` variable
+-- plus an in-scope `definition` of the default — so a Catala caller may omit
+-- the cap where an L4 caller must still supply it. That divergence is
+-- disclosed in the emitted document's notes block.
+
+IMPORT prelude
+
+DECLARE `Customer class` IS ONE OF
+    domestic
+    commercial
+    industrial
+
+DECLARE Account HAS
+    class     IS A `Customer class`
+    unitsUsed IS A NUMBER
+
+@export The per-unit rate for an account's customer class.
+GIVEN a IS AN Account
+GIVETH A NUMBER
+`unit rate` a MEANS
+    CONSIDER a's class
+      WHEN domestic   THEN 0.20
+      WHEN commercial THEN 0.35
+      WHEN industrial THEN 0.50
+
+@export Tariff payable on metered consumption, capped.
+GIVEN a   IS AN Account
+      cap IS A NUMBER TYPICALLY 500
+GIVETH A NUMBER
+`tariff payable` a cap MEANS
+    min cap (a's unitsUsed TIMES `unit rate` a)
+
+#EVAL `tariff payable` (Account WITH class IS commercial, unitsUsed IS 1000) 500
+#EVAL `tariff payable` (Account WITH class IS domestic, unitsUsed IS 100) 500
+#EVAL `unit rate` (Account WITH class IS industrial, unitsUsed IS 0)

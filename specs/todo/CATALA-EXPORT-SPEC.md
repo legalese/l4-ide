@@ -10,13 +10,16 @@ subset) and rejects the rest with batched `LowerError`s. **R4 is live:** the exc
 primary emission, and every module that ships one also ships the equivalence apparatus that
 re-checks it. **R7 is live:** each `#EVAL`/`#ASSERT` becomes a `#[test]` scope whose expected block
 the CLI fills from L4's own evaluator. **R8 is live:** `§` headings, inert scaffolding, `@ref`
-citations and `@desc` become the literate weave. Three exhibits under `jl4/examples/catala/` carry
-committed goldens, and all three have been run through catala 1.2.1 — `catala typecheck` green,
-`clerk test` 22/22 green, `catala proof` green on the nested-guard one. **Not yet built:** R3's
-emitted day-granular helper for the lenient `Date` constructor, the R9 `etc/validate-catala.mjs`
-harness, `SET OF` emulation (§4.7), and lambda-lifting of `WHERE` bindings (so a rule whose ladder
-shape hides under a `WHERE` — Appendix A's `benefit amount` — still emits in Mode A). §10's
-P1/P2/P3/P4 remain the sequencing; P1 and P2 are met on the exhibit corpus._
+citations and `@desc` become the literate weave. **R9 is live:** `etc/validate-catala.mjs` runs
+`catala typecheck` + `clerk test` over the committed goldens and skips with one line when no
+toolchain is present. Six exhibits under `jl4/examples/catala/` carry committed goldens — including
+the OpenFisca `flat-tax`/`household` ports that P1's exit criterion names — and all six have been
+run through catala 1.2.1: `catala typecheck` green ×6, `clerk test` 32/32 green, `catala proof`
+green on the nested-guard one. **Not yet built:** R3's emitted day-granular helper for the lenient
+`Date` constructor, `SET OF` emulation (§4.7), and lambda-lifting of `WHERE` bindings (so a rule
+whose ladder shape hides under a `WHERE` — Appendix A's `benefit amount` — still emits in Mode A).
+§10's P1/P2/P3/P4 remain the sequencing; **P1 and P2 are met** on the exhibit corpus, P3 is met in
+form (`statute.l4`) but not on a real statute, and P4 is untouched._
 
 _Review round, 2026-08-16 (same day, second session). What review changed: (a) a working
 `catala`/`clerk` 1.2.1 toolchain now exists on this machine, built from the cited checkout commit,
@@ -754,9 +757,27 @@ the pin meaningful: syntax breaks only on major versions (§2.1). **Cost.** Loca
 runs without the binary prove less; reviewers must know the tier they're seeing. **Against.**
 Vendoring a catala binary in CI as _required_ would catch more — and would couple our merge
 queue to a foreign toolchain's availability, which §1.2-style precedent forbids. **Not
-decided.** Whether the golden corpus stores emitted `.catala_en` files (reviewable diffs) or
-regenerates them per-run (no drift); proposal leans stored-goldens, matching `l4 openfisca`
-golden practice.
+decided.** ~~Whether the golden corpus stores emitted `.catala_en` files (reviewable diffs) or
+regenerates them per-run (no drift)~~ — settled by the implementation below: **stored goldens**,
+matching `l4 openfisca` golden practice, with `jl4/tests-cli/Main.hs` pinning them so drift is a
+test failure rather than something the optional harness has to notice.
+
+**Landed 2026-08-16 — `etc/validate-catala.mjs` **[E]**.** Discovery order is
+`CATALA_EXE`/`CLERK_EXE` → PATH → `opam exec --switch=$CATALA_OPAM_SWITCH` (default switch
+`catala`), which is what makes it run unattended on this machine, where the binaries are in an opam
+switch and not on PATH. Two layers, and the second is the one that matters: `catala typecheck` per
+file, then a single `clerk test` over the directory, re-running every `#[test]` scope against the
+L4-computed expected blocks (R7) and the Mode A/B grids (R4) — §10.3 is the standing argument for
+why typecheck alone would not have caught the bug that mattered. Behaviours verified both ways:
+with the toolchain (`node etc/validate-catala.mjs` → typecheck ×6 + `clerk test` 32/32, exit 0),
+with PATH stripped (one `skipped: no catala toolchain …` line, exit 0), and on a deliberately
+ill-typed file (per-file diagnostic, `clerk test` not run, exit 1).
+
+One implementation note that is not obvious: a module's `> Module Name` must equal the capitalised
+basename of the **file it is in**, but the goldens are named after their L4 sources
+(`flat-tax.catala_en` declares `Module FlatTax`). The harness therefore stages each golden into a
+scratch directory under the name Catala wants — which is also where `clerk start` writes its
+`clerk.toml` and `_build`, so the repo is never written to.
 
 ### 8.10 R10 — `TYPICALLY` on an exported decision's parameter becomes `context`
 
@@ -905,6 +926,30 @@ emitted text in `jl4/tests-cli/Main.hs`, and the executed grid in
   _before_ the scope it calls, and a toplevel `declaration … equals` may sit in a plain `catala`
   fence rather than the metadata one. Both checked; this is what lets R8 weave code fence by fence
   in the law's order rather than the dependency graph's.
+
+### 10.5 What validation found **[E]** (2026-08-16)
+
+The exhibit corpus went from three files to six: the OpenFisca `flat-tax` and `household` ports
+P1's exit criterion names, plus `tariff.l4` for `CONSIDER`-on-enumeration and R10. Toolchain
+result on the whole set: `catala typecheck` green ×6, `clerk test` **32/32**.
+
+Two things worth recording.
+
+- **The ports needed no edits.** `l4 catala jl4/examples/openfisca/flat-tax.l4` and the household
+  file compile straight from the OpenFisca sources, unchanged — the same L4 file feeds both
+  backends, and what makes it Catala-clean is R11's elision of the `period` plumbing string (and,
+  in household, of `Person.name`) rather than any authoring change. That is the strongest available
+  evidence for R11's "measurement shows rejecting all strings would reject half the seed corpus"
+  argument: the half it would have rejected is exactly the half that turns out to need nothing.
+  The copies under `jl4/examples/catala/` exist only so that directory is self-contained.
+
+- **R10's disclosure was specified and not emitted.** §8.10's Cost paragraph says the
+  `context`-versus-`input` divergence "is disclosed in the emitted doc header", and the weave's
+  note block even cites `(R10, R11, §8.4)` — but nothing on the R10 path ever produced a note, so
+  the only disclosures ever printed were R11's. Found by writing the first exhibit that actually
+  carries a `TYPICALLY`. Fixed in `Lower.lowerExportDi` (`typicallyNotes`), pinned by a CLI test.
+  The general shape is worth noting: a header that lists the rules it covers is not evidence that
+  each of them fires.
 
 ## Appendix A — worked example **[E]** (executed 2026-08-16)
 

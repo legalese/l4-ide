@@ -764,7 +764,7 @@ lowerExportDi outer assumes assumeUse di ef path =
                   [ CatScopeVar outName di.diName VarOutput outShape Nothing ]
               }
           , lsBody  = CatScopeBody (catUpper di.diName) (catMaybes defaults <> [mainRule])
-          , lsNotes = modeNotes di.diName mainRule
+          , lsNotes = modeNotes di.diName mainRule <> typicallyNotes
           , lsL4    = di.diName
           , lsDesc  = desc
           , lsPath  = path
@@ -800,6 +800,19 @@ lowerExportDi outer assumes assumeUse di ef path =
                       ("ASSUME `" <> ai.aiL4 <> "` has no declared type")]
     Just t  -> (\ty -> CatScopeVar ai.aiName ai.aiL4 VarInput (ShContent ty) Nothing)
                <$> lowerType outer ai.aiRange t
+
+  -- R10's disclosed cost (§8.10): the emitted scope is more permissive than its
+  -- source. An L4 caller must pass the argument — `TYPICALLY` is inert metadata
+  -- there — while a Catala caller may omit it and take the default. The note
+  -- block is where that divergence is disclosed, so it has to reach `lsNotes`.
+  typicallyNotes =
+    [ "parameter `" <> givenText g <> "` of `" <> di.diName <> "` carries a TYPICALLY, so it is "
+      <> "emitted as a Catala `context` variable with an in-scope default (R10). A Catala caller "
+      <> "may omit it; an L4 caller may not."
+    | g <- di.diGivens
+    , isJust (givenTypically g)
+    , not (Map.member (getUnique (givenName g)) outer.cxElided)
+    ]
 
   -- R10: the scope defines the TYPICALLY value; the caller may override it, and
   -- Catala's default calculus gives the caller's value exception priority.
