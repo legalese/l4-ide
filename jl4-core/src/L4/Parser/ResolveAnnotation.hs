@@ -712,8 +712,28 @@ instance HasDesc (AppForm n) where
 instance HasDesc (Aka n) where
   addDesc (MkAka ann names) = pure (MkAka ann names)
 
+-- | Expressions carry no description of their own, but a @WHERE@\/@LET@ layer
+-- carries /declarations/, and a declaration is exactly the thing a @\@desc@
+-- describes. Before this descent a @\@desc@ written above a @WHERE@ binding was
+-- silently dropped — the ref pass already descended here ('addRef' below has
+-- 'LocalDecl' cases), the desc pass did not — so the binding's own gloss was
+-- unreachable to every consumer. The docassemble backend's @auto terms:@
+-- glossary is the first of those consumers.
+--
+-- Only the two binding forms are traversed, and in source order (a @WHERE@\'s
+-- body precedes its declarations, a @LET@\'s declarations precede its body), so
+-- a desc is always claimed by the nearest following declaration, exactly as at
+-- top level.
 instance HasDesc (Expr n) where
-  addDesc = pure
+  addDesc = \ case
+    Where ann body decls -> Where ann <$> addDesc body <*> traverse addDesc decls
+    LetIn ann decls body -> LetIn ann <$> traverse addDesc decls <*> addDesc body
+    other                -> pure other
+
+instance HasDesc (LocalDecl n) where
+  addDesc = \ case
+    LocalDecide ann decide -> LocalDecide ann <$> addDesc decide
+    LocalAssume ann assume -> LocalAssume ann <$> addDesc assume
 
 takeMatchingDescs :: (DescWithSpan -> Bool) -> State DescS [DescWithSpan]
 takeMatchingDescs predicate = do
