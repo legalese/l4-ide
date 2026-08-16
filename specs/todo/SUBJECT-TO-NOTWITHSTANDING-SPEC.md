@@ -3,6 +3,28 @@
 > - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (`jl4-core/src/L4/Lexer.hs:230-299`) and appear nowhere in core; no priority-graph or defeater machinery.
 > - Only `UNLESS` exists as a keyword (`Lexer.hs:298`) but without the defeasibility semantics §6.1 proposes. "Next Steps" remain unstarted.
 
+> **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
+> battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
+> now serve as existence proofs for the
+> semantics this spec proposes, surfaced by the transpiler bridges:
+>
+> - **Catala's `label`/`exception` DAG** over default terms — formalised in F\*, with sibling
+>   exceptions conflicting unless prioritised; Catala's own compiler flattens the priority
+>   structure into total option-typed code, which is the piggyback route for any Catala→L4
+>   import. See `CATALA-EXPORT-SPEC.md` §5.2 (draft PR #260).
+> - **Blawx's defeat triples** (`overrules`/`blawx_defeated` over s(CASP)) — override structure
+>   survives as data naming which section defeats which, i.e. exception relations without burden
+>   attribution. See `BLAWX-EXPORT-SPEC.md` §1.1/§5.2 (draft PR #261).
+> - **LegalRuleML's `Override`/`OverrideStatement` with the `StrictStrength`/`DefeasibleStrength`/`Defeater`
+>   trio** (OASIS Standard, Core v1.0 §4.2.1, 2021-08-30) — the same strict/defeasible/defeater
+>   design §5.2 below describes via Prakken & Sartor, ratified as an international standard with
+>   an XML surface syntax and worked through lex specialis/superior/posterior. This proposal is
+>   not inventing a mechanism; it is adopting the standardized one. See
+>   `specs/research/LEGALRULEML-RESEARCH.md` §B(v).
+>
+> Consolidated here by the portfolio session per the one-file-one-editor convention
+> (`specs/proposals/BACKEND-PORTFOLIO-SPEC.md` §8) while three bridge sessions were live.
+
 # SUBJECT TO / DESPITE / NOTWITHSTANDING: Taxonomic Analysis and Specification
 
 **Status:** Draft
