@@ -116,11 +116,11 @@ tier, and any "LegalRuleML support" claim is about a file format, never a runnin
 
 ### 2.3 Interaction
 
-| target      | state                                                                                                                                                                                                                                                 | owning artifact                                                               |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| DocAssemble | **SPEC** — committed `09ac99f8`, R1–R11; the headless-runner harness is proven by experiment (docassemble.base 1.10.7 full interview loop in a plain Python venv via a pluggy plugin; probe + transcript in `specs/todo/docassemble-export/`) **[E]** | `specs/todo/DOCASSEMBLE-EXPORT-SPEC.md`, branch `mengwong/docassemble-bridge` |
-| Blawx       | **SPEC** — draft PR #261, R1–R14, direction L4 ⇄ Blawx; tier-1 s(CASP) execution of the worked example green (exact-rational division measured), tier-2 dockerized app round-trip queued **[E]**                                                      | `specs/todo/BLAWX-EXPORT-SPEC.md`, branch `mengwong/blawx-bridge`             |
-| web wizards | **SHIPPED** (Housing Act, Reg CF; question-ordering PR #94 v1, #110 v2 priors)                                                                                                                                                                        | in-tree                                                                       |
+| target      | state                                                                                                                                                                                                                                                                                                     | owning artifact                                                   |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| DocAssemble | **SPEC signed off + IMPL in flight** — R1–R11 ANSWERED by Meng 2026-08-16 (spec §0, `313d2544`), draft PR #264; M1 implementation workflow running on `mengwong/docassemble-backend` (implement ∥ author-examples → integrate → ruling-lens verify); headless-runner harness proven by experiment **[E]** | `specs/todo/DOCASSEMBLE-EXPORT-SPEC.md`, PR #264                  |
+| Blawx       | **SPEC** — draft PR #261, R1–R14, direction L4 ⇄ Blawx; tier-1 s(CASP) execution of the worked example green (exact-rational division measured), tier-2 dockerized app round-trip queued **[E]**                                                                                                          | `specs/todo/BLAWX-EXPORT-SPEC.md`, branch `mengwong/blawx-bridge` |
+| web wizards | **SHIPPED** (Housing Act, Reg CF; question-ordering PR #94 v1, #110 v2 priors)                                                                                                                                                                                                                            | in-tree                                                           |
 
 DocAssemble is the designated consumer of three L4 assets no other bridge can use: `STRING`
 (rejected/elided by Catala, absent from Catala's type system), landed metadata-only `TYPICALLY`
@@ -307,6 +307,12 @@ sign-off from both sides' specs in their next revision.
   SEQUENTIAL merge queue with rebases. If a third lands in the same window, that is the forcing
   function for the backend-registration seam already on the backlog
   (extension/plug-in architecture), and the seam PR goes first.
+- **Assigned merge order (provisional, 2026-08-16; hardens when P5 is signed off):**
+  implementation PRs merge in readiness order — currently **DocAssemble M1** (the only
+  implementation in flight) → **Catala P1** (spec awaiting sign-off, implementation not yet
+  launched) → **Blawx** (gated on #258-R0 or its private-subset contingency, plus tier-2 infra).
+  Later arrivals rebase over earlier merges. If a third implementation PR is open while two are
+  queued, the backend-registration seam goes first and all three rebase onto it.
 - **Dependency-direction constraint** (from the DocAssemble spec's M3): `jl4-query-plan` depends
   on `jl4-core`, so a backend in `jl4-core` cannot import the compiled question plan — backends
   wanting it compose in `jl4/app` (the `jl4-wasm` precedent). Bridges consuming question ordering
