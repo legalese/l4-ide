@@ -1,0 +1,21 @@
+-- Review repair pinned by this corpus (2026-08-16): a module-level ASSUME
+-- referenced ONLY from inside an inlined parameterized DECIDE must still
+-- survive as a question block. Before the repair, the emitted code resolved
+-- `base rate` to a variable while no block defined it: `l4 docassemble`
+-- exited 0 and the interview died at runtime with DAErrorMissingVariable —
+-- no compile-time diagnostic anywhere.
+--
+-- No #EVAL oracle here: ASSUME is uninterpreted, so this module type-checks
+-- but does not evaluate. The round-trip fixtures in roundtrip_check.py carry
+-- hand-computed expectations instead (amount 60 + base rate 50 = 110 > 100).
+
+ASSUME `base rate` IS A NUMBER
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `adjusted` x IS x PLUS `base rate`
+
+@export Whether the amount exceeds the adjusted threshold
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `over threshold` amount IF `adjusted` amount GREATER THAN 100

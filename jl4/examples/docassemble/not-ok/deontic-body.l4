@@ -1,0 +1,23 @@
+-- REFUSED: `Regulative` (Blocking).
+-- The exported decision's body is a regulative rule (PARTY/MUST/WITHIN/
+-- HENCE/LEST). Docassemble has no deontic runtime in v1 (spec §5, §11):
+-- the lowering must refuse the `Regulative{}` constructor by name and
+-- record a Blocking FidelityNote — never emit an interview that silently
+-- drops the obligation.
+-- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+
+DECLARE Actor IS ONE OF Landlord, Tenant
+
+DECLARE Action IS ONE OF
+    `serve notice`
+    `vacate premises`
+
+@export The landlord's obligation to serve notice before seeking possession
+GIVEN `days allowed` IS A NUMBER @desc How many days the landlord has to serve notice
+GIVETH A DEONTIC Actor Action
+DECIDE `notice obligation` IS
+    PARTY Landlord
+    MUST  `serve notice`
+    WITHIN `days allowed`
+    HENCE FULFILLED
+    LEST  BREACH BY Landlord BECAUSE "possession sought without notice"

@@ -1,0 +1,62 @@
+-- The R4 verdict seam: a scope-IMPLIES-requirement rule.
+--
+-- If the tenancy is a residential tenancy, the landlord must have given
+-- written notice of at least two months. The docassemble backend must NOT
+-- lower the top-level IMPLIES to the classical `not scope or requirement`
+-- driver: it must emit scope and requirement as separate seekable
+-- variables, ask the scope question first, and report a verdict, so that
+-- "the rule never reached you" (NotApplicable) is distinguishable from
+-- "you complied" (Complies) — both of which are TRUE to the classical
+-- #EVALs below.
+
+DECLARE Tenancy
+    HAS
+      @desc Whether the letting is of a dwelling occupied as a home
+      `is a residential tenancy` IS A BOOLEAN
+      @desc Whether the landlord served notice to quit in writing
+      `written notice was given` IS A BOOLEAN
+      @desc Length of the notice period served, in whole months
+      `months of notice given`   IS A NUMBER
+
+@export Whether the landlord notice rule is satisfied for this tenancy
+GIVEN t IS A Tenancy @desc The tenancy under assessment
+GIVETH A BOOLEAN
+DECIDE `notice rule satisfied` t IF
+    `the rule applies` IMPLIES `the notice requirement is met`
+ WHERE
+    `the rule applies` MEANS
+        t's `is a residential tenancy`
+
+    `the notice requirement is met` MEANS
+            t's `written notice was given`
+        AND t's `months of notice given` AT LEAST 2
+
+-- Complies: residential, written notice, three months.
+#EVAL `notice rule satisfied` OF
+        Tenancy
+        WITH
+            `is a residential tenancy` IS TRUE
+            `written notice was given` IS TRUE
+            `months of notice given`   IS 3
+-- TRUE  (docassemble verdict: Complies)
+
+-- InBreach: residential, written notice, but only one month.
+#EVAL `notice rule satisfied` OF
+        Tenancy
+        WITH
+            `is a residential tenancy` IS TRUE
+            `written notice was given` IS TRUE
+            `months of notice given`   IS 1
+-- FALSE  (docassemble verdict: InBreach)
+
+-- NotApplicable: not a residential tenancy; classically vacuous TRUE.
+-- In the emitted interview NO requirement question may be asked on this
+-- path — the roundtrip fixture for this case deliberately carries only
+-- the scope answer, so any requirement question fails the harness.
+#EVAL `notice rule satisfied` OF
+        Tenancy
+        WITH
+            `is a residential tenancy` IS FALSE
+            `written notice was given` IS FALSE
+            `months of notice given`   IS 0
+-- TRUE  (docassemble verdict: NotApplicable)

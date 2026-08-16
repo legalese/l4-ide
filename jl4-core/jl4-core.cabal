@@ -123,6 +123,9 @@ library
     L4.Dmn.Lower
     L4.Dmn.Emit
     L4.Dmn.Markdown
+    L4.Docassemble.IR
+    L4.Docassemble.Lower
+    L4.Docassemble.Emit
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON
