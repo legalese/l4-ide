@@ -19,26 +19,27 @@
 --     terms — the `DECLARE`d type and each `MEANS`-bound sub-decision —
 --     defined by their `@desc` text.
 --
--- The claim above is bounded to the FORWARD drive, which is the only flow M2
--- emits UI for. `explain()` appends to a session-scoped list that nothing
--- clears, and docassemble's `invalidate_dependencies` deletes invalidated
--- VARIABLES without touching that list (parse.py:8014-8060 at 1b6678384) — so a
--- flow that re-defines an already-answered variable (today: `POST /api/session`
--- with `delete_variables`) re-decides the goal correctly and leaves this screen
--- citing rules that were short-circuited away. Adding `clear_explanations()`
--- makes it worse, not better; the repair is a design change and belongs with
--- M4's `review:` block. Recorded in full at DOCASSEMBLE-EXPORT-SPEC.md §8.4.
+-- HISTORY, because this file is where the defect was tracked. At M2 the claim
+-- above was bounded to the FORWARD drive: `explain()` appends to a
+-- session-scoped list that nothing cleared, and `invalidate_dependencies`
+-- deletes invalidated VARIABLES without touching that list (parse.py:8014-8060
+-- at 1b6678384), so a flow that re-defined an already-answered variable left
+-- this screen citing rules that had been short-circuited away. The M4 RED phase
+-- measured it as WORSE than that: on the undefine-and-re-ask path the VERDICT
+-- itself went stale — with the cap answer corrected from 9,000,000 to 1,000 the
+-- goal stayed FALSE — and no single flag repaired it (`depends on:` did not
+-- rescue it; `reconsider: True` alone made the citations accumulate
+-- contradictory rules; `initial: True` + `clear_explanations()` alone emptied
+-- them).
 --
--- CORRECTION, 2026-08-17 (M4 RED phase): on the undefine-and-re-ask path — the
--- path a review-block Edit takes — the sentence above understates it. The
--- VERDICT itself goes stale, not merely the citations: with the cap answer
--- corrected from 9,000,000 to 1,000 the goal stays FALSE and the citations stay
--- unchanged (executed). `depends on:` does not rescue it, `reconsider: True`
--- alone makes the citations accumulate contradictory rules, and
--- `initial: True` + `clear_explanations()` alone empties them. Two repair
--- designs were verified and M4 owns choosing one. The fourth case in
--- `roundtrip_check.py`'s `citations` example asserts the repaired behaviour as
--- a claim, and is RED.
+-- REPAIRED at M4 (2026-08-17), and the fourth #EVAL-less case in
+-- `roundtrip_check.py`'s fixture table asserts it: change the answer and the
+-- goal, the verdict and the citations are what they would have been had the new
+-- answer been given first. Two emitted things carry the repair, and neither is
+-- visible in this source — see DOCASSEMBLE-EXPORT-SPEC.md §8.4: `reconsider:
+-- True` on every derived block, and a citation-reset sentinel that the
+-- mandatory driver references BEFORE the goal, so the explanation list is
+-- emptied once per assemble pass, before any rule re-explains into it.
 --
 -- The exported decision carries a `@ref` of its own, and it is the reason the
 -- expected citation lists below are asserted AS ORDERED LISTS. Order is

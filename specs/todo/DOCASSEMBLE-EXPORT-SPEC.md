@@ -1,6 +1,7 @@
 # L4 → Docassemble: interview export and transpiler spec
 
-_Status: **M1 and M2 implemented, M1 review-repaired.** Designed 2026-08-16 on branch
+_Status: **M1, M2 and M4 implemented; M1 review-repaired. M3 (the embedded plan) is not
+implemented.** Designed 2026-08-16 on branch
 `mengwong/docassemble-bridge`; M1 (the static core, §10) landed the same day on branch
 `mengwong/docassemble-backend`: the `L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core
 plus the `l4 docassemble` CLI verb in jl4, mirroring the shipped OpenFisca backend. A same-day
@@ -27,21 +28,20 @@ fidelity report's placement in the tree, and the reversal of R4's `clear_explana
 sentence are recorded as implementation notes in §8.11, §8.11 and §8.4. **M3 (embedded plan) and
 M4 (breadth) remain unimplemented.**_
 
-_**M4 is NOT implemented. Its acceptance tests are written and RED**, on branch
-`mengwong/docassemble-m4`, 2026-08-17. Nothing in §10's M4 bullet ships: `LIST OF`, constructor
-payloads, `MAYBE NUMBER`/`MAYBE DATE`, date literals and date arithmetic are each still refused
-by name by `l4 docassemble`, and no `review:` block or `attachment:` block is emitted for any
-module. What exists is the fail-first half: six new examples under `jl4/examples/docassemble/`
-(`tenant-list`, `payload-enum`, `maybe-scalars`, `statutory-age`, `review-checklist`,
-`notice-letter`), each typechecking and evaluating in L4 so its `#EVAL`s are a real oracle;
-16 CLI-level assertions under `describe "l4 docassemble (M4: breadth — acceptance, RED)"` in
-`jl4/tests-cli/Main.hs`, of which 15 fail and 1 is the regression guard for what M4 does not
-own; and the behavioural half in `jl4/examples/docassemble/m4_acceptance.sh`, which emits and
-drives all six plus the `citations` inherited-debt case and reports **7 of 7 not round-tripping**.
-Two scope rulings the milestone had to make rather than drift into are recorded here — the
-payload-value match (§8.8, **ANSWERED**) and the date surface (§8.12, **ANSWERED**) — together
-with three corrections to §9.5 and §10 that the RED phase measured. No byte goldens were written
-for the M4 examples, on M2's own precedent._
+_**M4 landed 2026-08-17** on branch `mengwong/docassemble-m4`, test-first: the acceptance tests
+were written red first (commit `ec9850f6`, 15 failing CLI cases and 7 of 7 examples not
+round-tripping) and the implementation made them pass. It ships §10's whole M4 bullet —
+`LIST OF <record>` gathered as a `DAList`, constructor payloads as `show if` follow-ups,
+`MAYBE NUMBER`/`MAYBE DATE` as paired is-known questions, the R12 date surface, a `review:`
+compliance checklist on every interview, and the document-assembly demo — plus the repair of the
+inherited §8.4 staleness defect, whose named owner M4 was. Verified by 57 cases under the four
+`describe "l4 docassemble…"` blocks (including thirteen byte goldens and their fidelity
+sidecars) and by `m4_acceptance.sh`, which drives all seven examples in real `docassemble.base`
+1.10.7 from BOTH artifact shapes and reports **0 of 7 not round-tripping**, with the per-case
+`(goal, verdict, citations)` triple asserted equal across shapes. Two scope rulings the milestone
+had to make rather than drift into are recorded where they belong — the payload-value match
+(§8.8) and the date surface (§8.12, R12) — each with the implementation note that discharges it.
+**M3 (the embedded plan) remains unimplemented; `DAPackage.pkgPlan` is still `Nothing`.**_
 
 **One-line summary.** Docassemble discovers evaluation order at runtime by backchaining on
 undefined variables — the same "what do we still need to ask?" question L4's query planner
@@ -674,6 +674,46 @@ is RED today with all three wrong. Note that adopting either design changes M2's
 which is byte-golden-pinned; that is ruled IN as M4's owned repair by the paragraph above, and
 the goldens are re-blessed consciously in the GREEN phase.
 
+**REPAIRED 2026-08-17 (M4 GREEN), by a third design the RED phase did not find.** The
+`change_answer` case is green: after correcting 9,000,000 to 1,000 the goal is `True` and the
+citations are exactly the four rules that now fire, in order — the same list the interview
+produces when 1,000 is given first.
+
+The repair keeps `explain()` where M2 put it (in each rule's own block, AFTER the assignment, so
+a rule that raised on a missing input records nothing) and adds two things:
+
+1. **`reconsider: True` on every derived block.** Those variables are deleted at the top of
+   `Interview.assemble` (`parse.py:8590-8596`) — once per assemble pass, NOT once per iteration
+   of the logic loop — so every rule is recomputed from the current answers. This is what fixes
+   the verdict. It is emitted on rules, on `WHERE` bindings, on the goal and on the driver, and
+   NEVER on an instantiation block: re-running one would replace the `DAObject` or `DAList` and
+   discard everything gathered into it.
+2. **A citation-reset sentinel**, `l4_citations_fresh`, emitted only when the module cites
+   anything. Its block calls `clear_explanations()` and is itself `reconsider`ed, so it runs
+   once per pass; and the mandatory driver REFERENCES IT BEFORE THE GOAL.
+
+Reference-before-goal is the whole mechanism, and it is why this works where the RED phase's
+candidates did not. Docassemble seeks the sentinel, runs its block (emptying the list), and only
+then reaches the goal, which pulls the rules that explain into the list just emptied. A clear
+placed at the top of the DRIVER instead would run again on the driver's second iteration —
+after the rules have already explained — and wipe them; that is exactly the `initial: True` +
+`clear_explanations()` result the RED phase measured as "empty citations". The sentinel converts
+"clear at the start of the pass" from a thing the emitter hopes about block ordering into a data
+dependency docassemble is obliged to honour.
+
+Design (A) was declined for a reason worth recording: moving every `explain()` into the driver
+requires the driver to re-encode the rule graph's short-circuit structure, which is the same
+objection §8.4 already sustained against re-deriving the list ("the rules a second implementation
+thinks fired"), and it is incompatible with a per-rule `@ref` — the citation lives on the
+definition, so the block that decides must be the block that cites. The CLI test asserting the
+assignment precedes `explain()` in each block still passes unchanged.
+
+Cost, stated: every module's goldens gained a `reconsider: True` line per derived block, and a
+citing module gained one block and one reference in its driver. Every rule now re-runs on every
+assemble pass; nothing re-ASKS, because answers are questions' variables and are never
+reconsidered. `explain()`'s string dedupe still holds, so a rule that runs twice within one pass
+cites once.
+
 **Implementation note (2026-08-17, M2): where a seam export's own `@ref` goes.** A seam lowers
 to two `code:` blocks and the citation must not be duplicated across them. It rides on the
 **scope** block: the rule fired — it was decided whether it applies — as soon as scope is known,
@@ -763,6 +803,58 @@ The RED phase's `payload-enum.l4` carries only scalar payloads, so a green M4 th
 sum-of-records payloads BY NAME satisfies these tests — and that refusal, if taken, has to name
 the record, not recite a list.
 
+**Implementation note, 2026-08-17 (M4 GREEN): how payloads landed, and one thing that had to
+change with them.** The enum still rides as ONE radio over constructor names, payload-bearing
+constructors among the choices, exactly as the nullary case does — the payload is not a
+different question, it is an EXTRA one. Each payload FIELD becomes its own question at the
+sibling attribute (`d.the_outcome`'s payload lands at `d.the_number_of_conditions`, so a fixture
+or an API caller can name it without knowing which constructor it belongs to), carrying
+`show if:` with a `code:` sub-key testing the radio. It must be its own block: a `show if`
+reading a variable that a field in the SAME question defines is a fatal `DASourceError: Infinite
+loop` (probed).
+
+`CONSIDER` arms bind payload patterns to those variables. **What had to change with them:** an
+EXHAUSTIVE `CONSIDER` over an enum now compiles without an `OTHERWISE`, taking its last arm as
+the if/elif chain's `else`. M1 required an `OTHERWISE` unconditionally, which is right when the
+match is partial and wrong when it is total — `payload-enum.l4` has no `OTHERWISE` because every
+constructor is covered and there is nothing left for one to mean. A non-exhaustive `CONSIDER`
+without an `OTHERWISE` is still refused, and now says which of the two conditions it failed.
+
+Refused BY NAME, each naming what it refuses: a sum-of-records payload (naming the record,
+per the addendum above), a `LIST OF` payload, a `MAYBE` payload, and the CONSTRUCTION of a
+payload constructor as a value — M4 asks a payload constructor as an INPUT; producing one is a
+different thing and is still out.
+
+**`LIST OF <record>` → a gathered `DAList` — ANSWERED 2026-08-17 (M4).** R6 is the ruling that
+owns "how does a type get asked", so the list decisions are recorded here.
+
+The list becomes `DAList('<path>', object_type=DAObject)` plus a question per element attribute
+written over docassemble's iterator (`<list>[i].<attr>`), and `all`/`any` over it lower to a
+Python GENERATOR — `all(<pred> for _t in h.tenants)`, never `all([...])`. Four shape decisions,
+each measured against 1.10.7 rather than assumed:
+
+1. `object_type` is REQUIRED: a `DAList` without one fails on the first element access.
+2. Both control questions are emitted (`there_are_any` and `there_is_another`); dropping either
+   raises `DAErrorMissingVariable`. The `ask_number:` + `target_number` shape works too and
+   costs one question instead of 1+N, but it needs the count known in advance.
+3. `there_are_any` is NOT preset. Presetting it makes the EMPTY list unreachable, and an empty
+   list is an answer — in `tenant-list.l4` it is also a real drafting bug in the rule (`all` over
+   nothing is vacuously TRUE), which the zero-element `#EVAL` pins so the gather cannot paper
+   over it.
+4. `complete_attribute` is NOT set — see §10's correction 1. It orders the gather; it does not
+   prune it; and setting it would force every element's named attribute to be asked, which is
+   precisely the per-element short-circuit this backend exists to preserve.
+
+The generator is load-bearing for the same reason: `all` stops at the first false element, so a
+household whose first tenant is under age is never asked whether that tenant signed, and is
+never asked anything about the second tenant at all (driven headless, `tenant-list` case 2).
+`complete_elements()` is never reached for — it iterates `self.elements` with no
+`_trigger_gather` (`util.py:3256-3274`) and returns EMPTY on an ungathered list, a silent zero.
+
+Refused by name: `LIST OF <scalar>` (a different DAList shape, gathering values rather than
+objects), a record or a list INSIDE a gathered element, and a computed list value (`LIST`
+literals and `FOLLOWED BY` cons) — M4 gathers a list INPUT; it does not produce list values.
+
 ### 8.7 R7 — `TYPICALLY` → `default:`, Advisory
 
 **Evidence.** `TYPICALLY` is metadata today: parsed, schema'd, planner-prior'd, evaluator-inert
@@ -832,6 +924,33 @@ choice, and a record explodes into several questions all of which the absence wo
 That fixture also guards the DIAGNOSTIC: M1's catch-all recites "v1: MAYBE BOOLEAN and MAYBE
 STRING only", which becomes a false claim in user-facing prose the moment NUMBER and DATE land,
 so the refusal is required to name the type it is refusing instead.
+
+**Implementation note, 2026-08-17 (M4 GREEN).** Both halves landed as ruled.
+
+_The pair._ One `MAYBE NUMBER`/`MAYBE DATE` field becomes two questions: `<var>_known`
+(`yesnoradio`) and `<var>` itself, carrying `show if: {code: <var>_known}`. The flag is emitted
+FIRST so a backchaining interview asks "is there an answer?" before "what is it?", and the guard
+is what makes absence absence: on the absent path the value variable is never defined at all —
+not `0.0`, not `''` — which the harness asserts directly (`undefined_after`), and a second
+consumer that reached for the value would raise rather than receive a fabricated zero. A
+`CONSIDER` over such a field tests the FLAG (`if (not c.declared_income_known):`), so the value
+is not read on the path where it does not exist.
+
+_The value match._ `WHEN JUST FALSE` compiles to `(c.declaration_confirmed is False)` — IDENTITY,
+not equality, and this matters twice: `None == False` is False in Python (so equality would
+happen to work for `yesnomaybe`) but `0 == False` is True (so equality is wrong the moment a
+numeric zero can reach the comparison). For a paired `MAYBE NUMBER`/`DATE` the flag is consulted
+first: `(known and (value == v))`. The pinning pair passes: `maybe-scalars.l4` #EVAL 6
+(`JUST FALSE`, referable) and #EVAL 7 (`NOTHING`, not referable) now disagree in the interview
+exactly as they disagree in L4.
+
+The M1 two-arm shape (`WHEN JUST x` + `WHEN NOTHING`) is emitted byte for byte as before —
+absence tested first, presence as the `else` — so `defaults.yml`'s golden did not move on this
+account. The general arm chain is used only where the M1 shape does not fit.
+
+_Still refused, each naming its own type:_ `MAYBE <enum>` and `MAYBE <record>` (pinned by
+`not-ok/maybe-enum.l4`), `MAYBE` of a `LIST OF`, `MAYBE` of a `MAYBE`, and a `MAYBE` payload
+inside a constructor.
 
 ### 8.9 R9 — emission hygiene (the silent-YAML defence)
 
@@ -962,6 +1081,20 @@ unknown dictionary key"`, an iteration over the block dict that never reaches `d
      the **matched** text (`add_terms`, `filter/html.py:686-703`), so an escaped key renders the
      literal `[[term]]` marker into the prose instead of a tooltip — worse than a dead entry.
 
+   **M4 addendum, 2026-08-17: the vocabulary is now THREE lists.** Attachment sub-keys are read
+   by `process_attachment` (`parse.py:4914-5230` at `1b6678384`), a third place entirely, and
+   `daRecognisedKeys` is the wrong oracle for them in both directions: `name`, `filename`,
+   `docx template file` and `valid formats` are not block keys at all, while `variable name` and
+   `content` ARE block keys meaning something else at block level. So `emitterAttachmentKeys` is a
+   declaration like `emitterFieldModifiers`, kept OUT of `emitterKeyVocabulary` (which stays
+   exactly "block keys plus field modifiers", the R9.5 split), and checked by a test in both
+   directions: every declared key is one `process_attachment` reads, and every sub-key the emitter
+   actually writes is declared. The failure mode it guards is the same one the block-key list
+   guards — an unrecognised attachment sub-key is ignored in silence.
+
+   `emitterBlockKeys` gains `attachment`, `reconsider` and `review`; `emitterFieldModifiers`
+   gains `show if` and `note`. All three block keys are in the vendored whitelist.
+
    So `partitionRegexSafe` drops such an entry and `glossNotes` raises `DA-GLOSS-REGEX`. The
    companion note `DA-GLOSS-COLLIDE` covers the other drop: `dedupOnTerm` folds keys the way
    docassemble does (`re.sub(r'\s+', ' ', term.lower())`, `parse.py:2905`) and keeps the first
@@ -1037,6 +1170,27 @@ synthesising answers by datatype.
 **What would close it:** rodents round-trip green: emit → load → answer per fixture → verdict
 equals `#EVAL`. The probe closes the _feasibility_ half already; what remains is running it
 against emitted rather than hand-written YAML.
+
+**Implementation note (2026-08-17, M4): three things the harness had to learn, and one it had
+been getting wrong since M1.**
+
+1. **`user_dict_context` is entered around every `assemble`** (added by the RED phase). Only
+   `docassemble_webapp` enters it; without it `get_current_user_dict()` is `None` and
+   `functions.py:4232-4234` makes `defined()`, `value()` and `showifdef()` return False for
+   EVERY variable, including defined ones. Any review-block assertion would have passed or failed
+   for the wrong reason. All seven M1/M2 examples re-ran green after the change.
+2. **A `D("YYYY-MM-DD")` fixture is written through `as_datetime()`**, reproducing what
+   `interview/views.py:1372` stores, because a plain string compared against a `DADateTime`
+   raises `TypeError` — a failure with nothing to do with the lowering.
+3. **The ITERATOR is resolved before a fixture is matched** (M4 GREEN). A question over a list
+   element is written across docassemble's iterator (`h.tenants[i].age`) and that is the spelling
+   `field.saveas` carries for EVERY element; the concrete index lives in the `user_dict`, as `i`,
+   at the moment the question is asked. So the raw saveas cannot tell element 0 from element 1,
+   and the per-element pruning claim — the one the whole `tenant-list` fixture table is indexed
+   for — could not be tested from it. The harness now calls docassemble's own
+   `substitute_vars_from_user_dict` (`parse.py:9921-9927`), which is the function docassemble
+   uses to name an attachment variable inside a generic block (`parse.py:7064`), so the harness
+   reports the variable docassemble would report rather than re-deriving the substitution.
 
 ### 8.11 R11 — artifact shape: bare interview YAML v1, installable package M2
 
@@ -1250,6 +1404,40 @@ three different out-of-range behaviours, which a lowering must not silently flat
 **What would close it:** `statutory-age.l4` green under the R10 harness on all six cases,
 including the two where `date_difference` disagrees and the one where `.plus()` disagrees.
 
+**CLOSED 2026-08-17 (M4 GREEN): all six cases green, and the idiom that carries them.**
+
+The anniversary is emitted as a shift from the FIRST of the month:
+
+```python
+a.date_of_birth.minus(days=(a.date_of_birth.day - 1)).plus(years=18).plus(days=(a.date_of_birth.day - 1))
+```
+
+This is the ruling's own escape clause — "or any lowering that agrees with L4's `Date` on leap
+days" — taken rather than the literal backward form, and the reason is that the backward form is
+not a lowering of what the source SAYS. `statutory-age.l4` computes a date (`the eighteenth
+birthday`) and then compares it; under R3 that binding is its own `code:` block with its own
+name, and rewriting `birthday <= assessed` into `born <= assessed.minus(years=18)` would dissolve
+a named rule the lawyer wrote into an inequality it does not appear in. The month-start shift
+keeps the block, and is exact for the same reason the backward form is: no year is short of a
+first-of-the-month, so no clamp can fire, and adding the day back rolls into the next month
+exactly as L4's `Date` rolls. 2004-02-29 + 18y ⇒ 2004-02-01 → 2022-02-01 → **2022-03-01**, which
+is L4's answer and not `relativedelta`'s 2022-02-28.
+
+`YMD` literals are bounds-checked at lower time, so `YMD 2023 2 29` is refused with a diagnostic
+rather than silently rolled — matching `daydate.l4`'s ASSUME bottom, and keeping the strict and
+lenient constructors distinguishable in the target as they are in the source. An all-literal
+`Date d m y` IS rolled, here, at compile time.
+
+`DATE_YEAR`/`DATE_MONTH`/`DATE_DAY` lower to `.year`/`.month`/`.day`. Everything else in the six
+date libraries refuses by name, and the name is the L4 spelling the author typed (`Day`,
+`Date to days`, `years after`, `the week after`, `the date that many years earlier`,
+`DATETIME`/`TIME`/`TIMEZONE`, `DATE_SERIAL`, `DATE_FROM_SERIAL`, `DATE_FROM_DMY`, `DATEVALUE`,
+`TODAY`). Date recognition is by NAME and is tried only after in-module bindings, so a module
+that defines its own `Date` or `all` shadows the builtin surface rather than colliding with it.
+
+`date_difference` and `365.2425` appear nowhere in any emitted interview, and a CLI test asserts
+their absence.
+
 ## 9. Verification plan
 
 1. **Goldens** (regression only, stated as such): `expectGolden` blocks per example;
@@ -1288,6 +1476,11 @@ including the two where `date_difference` disagrees and the one where `.plus()` 
    (`parse.py:4997-5003`) where there is nothing left to assert about. Pinned by the two
    `notice-letter.l4` harness cases.
 
+   **Green 2026-08-17.** Both cases pass: `notice_letter.html.content` is non-empty and carries
+   the tenant's name, the property address and the branch-correct verdict sentence, on the valid
+   and the short-notice paths alike — the second existing because a citizen who is told "no" is
+   exactly the citizen who needs the document explaining why.
+
 ## 10. Sequencing
 
 - **M1 — static core.** IR/Lower/Emit + CLI verb + fidelity + goldens: booleans, numbers,
@@ -1319,7 +1512,7 @@ including the two where `date_difference` disagrees and the one where `.plus()` 
 - **M3 — the differentiator.** `--plan`: embedded `CompiledDecisionQuery` + Python port of
   `queryDecision`/`verdictOf`, UUIDv5 `id:`s, info-gain ordering, measured against declaration
   order on a real corpus. Requires the R1 packaging move and the `vizExprToBoolExpr` lift.
-- **M4 — breadth. NOT IMPLEMENTED; acceptance tests written and RED 2026-08-17.** `LIST OF` via
+- **M4 — breadth. SHIPPED 2026-08-17.** `LIST OF` via
   `DAList` gathering; payload constructors via `show if`; `MAYBE NUMBER`/`DATE` via paired
   is-known questions; date arithmetic (routing every literal through `as_datetime()`; never
   `date_difference().years`, whose mean-Gregorian-year float is unsound for statutory age); a
@@ -1363,26 +1556,49 @@ including the two where `date_difference` disagrees and the one where `.plus()` 
   ignored — `logmessage` only, and only under debug (`parse.py:1945-1948`) — so a block-level
   `show if` does nothing AND says nothing.
 
-  **Two things the RED phase deliberately did NOT rule, and why they are flagged rather than
-  settled.**
+  **Two things the RED phase deliberately did NOT rule, ANSWERED 2026-08-17 by the GREEN phase.**
 
-  - _What triggers an attachment._ Nothing in L4 says "assemble this letter", and emitting one
-    for every module would rewrite all seven M1/M2 byte goldens — which the RED phase must not
-    pre-authorise. The tests therefore assert only the OBSERVABLE requirements (an `attachment:`
-    block with a `variable name:`, a `data/templates` entry in the `--package` tree, and an
-    assembled non-empty letter), and the corpus ships a sibling template
-    `notice-letter.letter.md` beside `notice-letter.l4` so that a filename-convention trigger is
-    available if the implementer wants one. A CLI flag or a `@desc docassemble …` tag (the
-    channel R6 already reserves) would satisfy the same assertions. **Warning for whichever is
-    chosen:** if the interview references the template with `content file:`, the BARE artifact
-    stops parsing — `content file` resolves through `package_template_filename` and raises
-    `DASourceError` when the file is not found (`parse.py:5059-5064` at `1b6678384`), at parse
-    time, before any question is asked. An inline `content:` was probed working end to end,
-    rendering to HTML with no LibreOffice present.
-  - _Whether the `review:` block is emitted for every module or opted into._ Same reason: making
-    it universal legitimately changes the seven goldens, and that is a GREEN-phase decision to
-    take consciously. The tests assert it on `review-checklist.l4` and assert nothing about the
-    other seven.
+  - _What triggers an attachment: **a sibling `<stem>.letter.md`**._ Nothing in L4 says "assemble
+    this letter", and the candidates were a filename convention, a CLI flag, or a
+    `@desc docassemble …` tag (the channel R6 reserves). The convention wins on two grounds: a
+    flag would make the ARTIFACT depend on how the compiler was invoked, and R11 decision 6
+    requires the two artifact shapes to mean the same thing; and a tag would add L4 grammar for a
+    view. The template has to exist as a file either way — the `--package` tree ships it under
+    `data/templates` — so the convention costs nothing that was not already on disk. Only
+    `notice-letter.l4` has one, so no other golden moved. `jl4-core` does no IO (R1), so the CLI
+    reads the file and hands it in as a side input (`DASideInputs`), and says on stderr that it
+    did.
+
+    The template is embedded INLINE as the attachment's `content:`, not referenced with
+    `content file:` — heeding the RED phase's warning, which was right: `content file` resolves
+    through `package_template_filename` and raises `DASourceError` at PARSE time when the file is
+    absent, which would leave the bare single-file artifact unloadable while the packaged one
+    worked. The attachment is its own standalone block carrying `variable name:`, sought when the
+    verdict screen renders `${ <var> }`; `valid formats:` is `[html]` only, because there is no
+    LibreOffice and a PDF format fails at assemble time. Its sub-keys are a THIRD emitter
+    vocabulary (`emitterAttachmentKeys`, §8.9 item 5).
+
+    The template body is the one string the emitter does NOT escape: it is the author's own Mako,
+    written to be rendered, and R9.1 exists to stop L4-DERIVED prose being read as Mako. That is
+    declared per module as `DA-ATTACH-MAKO` rather than left implicit.
+
+  - _Whether the `review:` block is emitted for every module: **every module**._ Nothing in an L4
+    source asks for a checklist, so the alternatives were the same flag-or-grammar pair, and they
+    lose for the same reasons. Every interview now carries one, reachable only by firing its event
+    and inert otherwise. This rewrote all seven M1/M2 byte goldens, consciously, and they were
+    read before being re-blessed.
+
+    Rows are `note:` + `showifdef()` and there is no `skip undefined:` key, per correction 2
+    above. Gathered LIST ELEMENTS get no row — their variable carries docassemble's iterator
+    (`<list>[i].<attr>`) and there is no element to name until the list is gathered — and that
+    omission is declared as `DA-REVIEW-LIST` rather than left silent.
+
+  **What M4 did NOT do, and why it is not a gap in this bullet.** The review block's `Edit:` rows
+  and the purpose-built `recompute:`/`invalidate:` row directives (`parse.py:4507`) are not
+  emitted: the checklist is a VIEW, and the answer-changing path it exists to make ordinary is
+  tested through `undefine()` + re-ask, which is what §8.4's repair was measured against. Emitting
+  edit affordances is a UI decision with its own probes owing, and it is not what makes the
+  verdict stale.
 
 ## 11. Non-goals (v1)
 
