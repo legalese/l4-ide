@@ -46,6 +46,15 @@
 > instrument. The thread is picked up in ch. 6, where A.3 returns as a **dominator** exhibit.
 > **D16** (§4.3) adds a debt register, because the ch. 1 miss found in the second review was a
 > promise nobody was tracking, and D15 opens two more.
+>
+> **Fourth review, 2026-08-13.** **D17** (§4.1.2), from Meng: the authorial `MUST` — what the
+> drafter wrote — is the **intensional** attempt at deontics, while the dominator `MUST` is the
+> **extensional**, Bad Man reading. That resolves the §4.2 hazard properly (ch. 1 may quote a
+> `MUST` because a reported speech act is not a primitive), gives Bounded Deontics a name for the
+> boundary it claims, and supplies a third name for the Hart/Holmes fault line that costs the
+> reader no jurisprudence. **D16 is amended** (§4.3) after Meng's observation that the register is
+> "technically incorrect but pedagogically valuable — skillful means": debts come in two kinds, and
+> provisional teachings must be **retracted in the text**, not quietly outgrown.
 
 ---
 
@@ -197,7 +206,7 @@ is a reading aid, not a set of Parts — the unit is the chapter.
 | **4**    | Every person who                       | Predicate logic; quantifier scope; ∀∃ as the shape of good law                                                         | `DECLARE`, records, enums, `GIVEN`/`GIVETH`, `CONSIDER` exhaustiveness, the empty-set trap        | Real rules have exceptions                                   | British Nationality Act (CACM 1986)                        |
 | **5**    | Unless, notwithstanding, provided that | Defeasibility; non-monotonicity; burdens; **absence of a fact ≠ falsity of a fact**                                    | Layered defeat; override graphs; `MAYBE`; the burden-of-proof monad                               | Nothing yet tells anyone to _do_ anything                    | Jersey charity test (defeater on a defeater); PROLEG lease |
 | _acts_   |                                        |                                                                                                                        |                                                                                                   |                                                              |                                                            |
-| **6**    | **Must do** (may do, must not do)      | Deontics — **derived** from action, goal and consequence; the must-be/must-do stack                                    | `PARTY`/`MUST`/`HENCE`/`LEST`; the dominator `MUST`                                               | Obligations have clocks; clocks collide                      | **A.3 again**, as a dominator; marriage ⇐ the ceremony     |
+| **6**    | **Must do** (may do, must not do)      | Deontics — **derived**, not declared; the authorial vs dominator `MUST`; the must-be/must-do stack                     | `PARTY`/`MUST`/`HENCE`/`LEST`; the dominator `MUST`                                               | Obligations have clocks; clocks collide                      | **A.3 again**, as a dominator; marriage ⇐ the ceremony     |
 | **7**    | **Time, twice**                        | Two clocks: deadlines _inside_ a rule; versions _over_ it. Traces, concurrency, races                                  | `WITHIN`; `#TRACE`; the LTS; the three time axes and rule-version pinning                         | Now you have a rule base worth asking                        | the PDPA race; a statute amended mid-facts                 |
 | _asking_ |                                        |                                                                                                                        |                                                                                                   |                                                              |                                                            |
 | **8**    | Asking the rules questions             | Deduction, **abduction**, induction — and which of the three we refuse                                                 | The relational reading; abductive planning; the ROBDD interview                                   | An answer can't show you it is wrong                         | the eligibility interview                                  |
@@ -328,6 +337,92 @@ chapter should say so in as many words.
 force go?_ and _this state is the residue of acts_ — and it should hang them explicitly rather than
 leave the reader to notice the gap. See §4.3.
 
+#### 4.1.2 Two MUSTs: the authorial and the dominator (D17)
+
+§4.2's finding 1 raised a hazard and answered it weakly. The hazard: the course opens with
+`PARTY … MUST` and the book cannot, because leading with a declared obligation makes obligation
+**primitive**, which is what **D11** refuses. The answer recorded there was "display it, don't
+analyse it" — true, but it reads as a stall.
+
+**D17 — there are two MUSTs, they are different objects, and naming the difference is what lets
+the first one appear on page one** (Meng, 2026-08-13):
+
+|               | **The authorial `MUST`**                           | **The dominator `MUST`**                                        |
+| ------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| What it is    | what the drafter **wrote**; a reported speech act  | what the transition system **entails**: on every path to a goal |
+| Semantically  | **intensional** — an attitude toward a proposition | **extensional** — a property computed over the set of paths     |
+| Point of view | the participant's; Hart's internal                 | the observer's; Holmes's Bad Man                                |
+| Answers       | "what was demanded of me?"                         | "what actually happens if I don't?"                             |
+| In the book   | ch. 1, displayed and named                         | ch. 6, derived                                                  |
+
+The book is then **about the relation between them**, which is a far better thing for ch. 1 to
+promise than a deferred feature. And no primitive is smuggled in: quoting a drafter's `MUST` is
+not a claim about deontic logic, any more than quoting "the accused believed X" commits you to a
+theory of belief.
+
+**The substitutivity test makes this an argument rather than a metaphor.** An intensional context
+is one where co-referring terms cannot be swapped without changing truth. So: are "an obligation
+to φ, sanction \$10" and "a permission to ¬φ, priced \$10" the same object? **Extensionally, yes** —
+same states, same transitions, same payoffs; the dominator analysis cannot tell them apart.
+**Behaviourally, no** — which is exactly what Gneezy & Rustichini measured when the daycare fine
+_increased_ late pickups. That is a **failure of substitutivity in a deontic context**, and it is
+the hallmark of intensionality. The fine-is-a-price literature stops being an anecdote about
+motivation and becomes a semantic diagnosis.
+
+**This gives the Bounded Deontics facet a name for its own contribution.** That paper concedes the
+reduction (Anderson 1958) and claims **the boundary** — the zone where the reduction is faithful
+versus where it breaks. D17 says what the boundary _is_: **the reduction is extensional, and what
+it loses is intensional residue.** Every listed breakdown case is of that kind — Hart's internal
+point of view, Kant's categorical imperative, motivation crowding-out. Worth carrying back into
+[`../bounded-deontics/`](../bounded-deontics/), not just forward into the book.
+
+**Three names for one fault line.** Hart's internal/external, Holmes's participant/Bad Man, and
+intension/extension are the same seam described by jurisprudence, by legal realism and by
+semantics. The book should lead with the **semantic** one, because it is the only one of the three
+that costs the reader no jurisprudence to understand — and then reveal that they have already met
+Hart and Holmes without being introduced.
+
+**The corroboration, in this tree.** The cut is not being invented for the book:
+`specs/todo/IN-RELIANCE-ON-SPEC.md` already reasons in exactly these terms, observing that an
+evidentiary-burden divergence is invisible to a diff oracle "by _construction_, because it lives in
+intension (what is demanded) while the oracle compares extension (what is answered)."
+
+##### The king example, and the trap in it
+
+Meng's illustration — _"the king is dead, long live the king"_ — is the classic intensionality
+case: the same description denotes two different men, because "the king" is an **individual
+concept** (a function from a time to a person), not an individual. `[verify: Frege 1892 for
+sense/reference; Montague's PTQ 1973 "the temperature is ninety and rising" is the standard
+parallel.]` And the added layer is the point: read the succession as an **assassination** and the
+sentence acquires a moral shading that is not in its literal content. That shading exists only in a
+moral reading — which is precisely the distance between the authorial "you must" and the Bad Man's
+"must I, though?"
+
+Two notes before this reaches a chapter.
+
+**Use the legal version, which is stronger.** "The king is dead, long live the king" is not merely
+a nice semantics example; in English constitutional law it _is_ a doctrine — the demise of the
+Crown, _rex nunquam moritur_, the Crown as a corporation sole `[verify: Blackstone; Maitland on the
+corporation sole]`. So the book gets an intensionality example **from inside law**, which is worth
+much more than one borrowed from philosophy of language. And it generalises immediately: "the
+Minister", "the Commissioner", "the registered proprietor", "the holder for the time being" are all
+individual concepts, and modelling one as an individual gives wrong answers the moment the office
+changes hands.
+**Open, and cheap to settle:** does our own corpus get this right? The Jersey Charities encoding
+has an `office of Commissioner` and a "for the time being" construction; nobody has checked whether
+they are modelled as roles or as persons. If they are persons, this is a finding, and it belongs to
+ch. 4 (types and entities) as a caution rather than to ch. 1 as an aside.
+
+**Keep the two vocabularies apart, or the chapter will confuse its reader.** Meng's phrasing pairs
+_denotative_ with the authorial must and _connotative_ with the Bad Man's. That is the **semiotic**
+sense — denotation as literal surface meaning, connotation as the moral and cultural overtone
+`[verify: Hjelmslev/Barthes]` — and it is exactly right in that register. But in **logic**,
+"denotation" is reference, which pairs with _extension_, i.e. the opposite side of D17's table. Two
+respectable traditions, opposite pairings, one page. **The book uses intension/extension for the
+technical claim and reserves denotation/connotation for the literary reading, and says so where
+both appear.** An unflagged slide between them would be, fittingly, an ambiguity of exactly the
+kind ch. 2 convicts drafters of.
+
 **Four arguments for before rather than after:**
 
 1. **It needs nothing from ch. 4.** The conditional is propositional. A.3's atoms are Booleans about
@@ -404,9 +499,11 @@ what, and what has no home — and explicitly _not_ as a template.
    [`logic-not-flowcharts.md`](../../doc/concepts/language-design/logic-not-flowcharts.md) spends
    a thousand lines distinguishing. **Mitigation, adopted: ch. 1 shows both forms on its first
    pages** — a rule that classifies and a rule that commands — names the _must be_ / _must do_ axis,
-   and defers the second explicitly. Cheap, and it plants the book's spine where the reader can see
-   it. This does not make obligation primitive: it is displayed, not analysed, and ch. 6 still
-   derives it.
+   and defers the second explicitly. **Superseded in part by D17 (§4.1.2)**, which gives this a
+   reason rather than a stall: what ch. 1 displays is the **authorial** `MUST`, a reported speech
+   act, which is a different object from the **dominator** `MUST` ch. 6 derives. Quoting a drafter's
+   "must" no more makes obligation primitive than quoting "the accused believed X" commits you to a
+   theory of belief.
 2. **A real gap: `MAYBE` and the absence of a fact.** Module 4 teaches optional values as a type
    feature; the book had nowhere to put them. They belong in **ch. 5**, and not as a type feature:
    the absence of a fact is not the falsity of a fact, which is _non liquet_, the burden of proof,
@@ -455,7 +552,7 @@ an unlisted one.**
 | -------------------------------------------------------------- | -------- | ------ | ------------------------------------------------------------------------------------------- |
 | The major premise has a **version and an amendment history**   | ch. 1    | ch. 7  | The miss that motivated this register; rule-effective time (§4.2)                           |
 | A decision is **checkable by someone other than its maker**    | ch. 1    | ch. 11 | The politics, planted in ch. 1 and grown up in the coda                                     |
-| The rule that **commands** rather than classifies              | ch. 1    | ch. 6  | Displayed on ch. 1's opening pages, not analysed (§4.2, finding 1)                          |
+| The **authorial `MUST`**, displayed and named but unanalysed   | ch. 1    | ch. 6  | D17; ch. 6 derives the dominator `MUST` and marks the boundary between them                 |
 | The ambiguity was **avoidable**, and the waste is measurable   | ch. 2    | ch. 10 | The avoidable-ambiguity tax; ch. 2 asserts it, only the determinacy material can measure it |
 | **Where did the force go?** — the ambient "thou shalt comply"  | ch. 3    | ch. 6  | D15; the window returns as the dominator exhibit                                            |
 | A **status is the residue of acts** (married ⇐ said the words) | ch. 3    | ch. 6  | D15; the must-be/must-do stack, and why the two are not a partition                         |
@@ -470,6 +567,50 @@ Two disciplines fall out, and both are cheap:
 - **An unpaid debt at the end of the arc is a missing chapter**, and should be argued for on that
   footing rather than smuggled in. That is precisely the shape of the open question about
   version-time in §4.2's finding 3.
+
+#### D16, amended — two kinds of debt, and the one that must be retracted
+
+Meng, 2026-08-13: the register "may be technically incorrect but pedagogically valuable, as an
+illustration of what the Buddhists call **skillful means**" — _upāya_, the provisional teaching
+that is not ultimately true but carries the student to where the truth can be received; the raft
+abandoned at the far bank, the carts promised to get the children out of the burning house
+`[verify: Alagaddūpama Sutta for the raft; Lotus Sutra ch. 3 for the burning house]`.
+
+That is the right frame, and it exposes that the table above conflates two different obligations:
+
+- **A deferral.** "You will meet this later." Nothing said so far is false; the reader simply does
+  not yet have the machinery. Ch. 1's version-and-amendment-history debt is one of these.
+- **A provisional teaching** — a _lie-to-children_, in Pratchett's phrase. What the chapter said is
+  **not true as stated**, and was said anyway because it is true enough to build on and the honest
+  version is unlearnable at that point. Ch. 3's "the deontic force is ambient" is one of these: it
+  is a serviceable half-truth that ch. 6 has to take back and replace.
+
+The second kind is the dangerous one, and it carries an extra rule:
+
+> **Provisional teachings are permitted, must be registered, and must be _retracted in the text_
+> where they are paid** — "in chapter 3 I said the force was ambient; that was true enough to get
+> the encoding written, and here is where it stops being true." A debt that is quietly outgrown
+> leaves the reader holding a false belief they acquired **from us**.
+
+For this book that is not fastidiousness, it is **self-consistency**. A book whose thesis is that
+formalisation makes hidden commitments explicit cannot itself run on unmarked simplifications; §8's
+anti-goals would convict it. The register therefore gains a **kind** column when it is next
+touched, and the retraction is part of the paying chapter's draft, not a footnote.
+
+Two resonances worth carrying into the prose rather than leaving here:
+
+- **D3 was already doing this.** "Each logic enters as the repair of a named failure of the last"
+  is a ladder of provisional teachings — propositional logic is not _wrong_ in ch. 3, it is
+  insufficient by ch. 5 — and the spine's honesty comes precisely from the failures being _named_
+  rather than quietly outgrown. D16-amended is the same discipline applied to promises instead of
+  to logics. The book's structure was upāya before anyone said so.
+- **Law runs on skillful means too, and calls them legal fictions.** "The king never dies" is
+  false and institutionally indispensable (§4.1.2); a deeming provision — _X shall be deemed to be
+  Y_ — is a technically-incorrect statement with full legal effect. So the book's own pedagogy and
+  its subject matter share a structure, and that is a genuine first-principles observation rather
+  than a flourish: **formalising law means deciding which fictions to encode as true, and a
+  formalism that cannot hold a fiction cannot hold the law.** Where that lands is open — ch. 4 with
+  types and entities, or ch. 3 beside the constitutive reading — but it should not be lost.
 
 ---
 
