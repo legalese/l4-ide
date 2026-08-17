@@ -473,28 +473,25 @@ daCitationsSource :: FilePath
 daCitationsSource = daExampleDir </> "citations.l4"
 
 -- | Every example with a committed @.yml@ and @.fidelity.txt@ golden under
--- @examples/docassemble/expected/@: the six from M1, plus @citations@, whose
--- golden the RED phase deliberately left unwritten (\"writing a golden before
--- the feature exists would force the implementer to match formatting choices I
--- have no basis to decide\") and the GREEN phase supplies now that the M2 shape
--- is settled.
+-- @examples/docassemble/expected/@: the six from M1, @citations@ from M2, and
+-- the six M4 examples. Each RED phase deliberately left its own goldens
+-- unwritten (\"writing a golden before the feature exists would force the
+-- implementer to match formatting choices I have no basis to decide\") and each
+-- GREEN phase supplied them once the shape was settled.
 daBareExamples :: [String]
 daBareExamples =
   [ "rodents-and-vermin", "seam", "enum-triage"
   , "defaults", "computed-and-shadow", "assume-via-fn", "citations"
+  , "tenant-list", "payload-enum", "maybe-scalars", "statutory-age"
+  , "review-checklist", "notice-letter"
   ]
 
--- | The M4 examples (spec §10: breadth). None carries a committed byte
--- golden, deliberately and on M2's own precedent — its RED phase recorded
--- that \"writing a golden before the feature exists would force the
--- implementer to match formatting choices I have no basis to decide\" — so
--- every M4 assertion below is about SHAPE (which keys, which guards, which
--- idiom) or about BEHAVIOUR (through the R10 harness). The goldens land with
--- the feature, in the GREEN phase.
+-- | The M4 examples (spec §10: breadth). The assertions below are about SHAPE
+-- (which keys, which guards, which idiom) or about BEHAVIOUR (through the R10
+-- harness); the byte goldens the GREEN phase added pin the FORMATTING, which
+-- shape assertions cannot.
 --
--- Each file typechecks and evaluates in L4 today (its @#EVAL@s are the
--- oracle); what none of them can do today is compile to an interview, because
--- M1 refused every one of these constructs BY NAME.
+-- Each file typechecks and evaluates in L4 (its @#EVAL@s are the oracle).
 daListSource, daPayloadSource, daMaybeSource, daDateSource,
   daReviewSource, daLetterSource, daLetterTemplate :: FilePath
 daListSource     = daExampleDir </> "tenant-list.l4"
@@ -3714,6 +3711,49 @@ spec bin = do
     -- (stdout, and again through `-o` with its fidelity sidecar), and the four
     -- refusals below are the ones M4 does not own.
     ------------------------------------------------------------------------
+    ------------------------------------------------------------------------
+    -- H. added by the GREEN phase, which the RED phase asked for by name
+    ------------------------------------------------------------------------
+    it "declares the attachment sub-keys it writes, as a THIRD vocabulary (F/R9.5)" $ do
+      -- The RED phase could only hard-code the oracle inside its own test,
+      -- because `emitterAttachmentKeys` did not exist and adding it would have
+      -- been a compile error rather than a red assertion. It exists now, so the
+      -- emitter's declaration of what it writes inside an `attachment:` is
+      -- checked in both directions: every declared key is one
+      -- `process_attachment` reads (parse.py:4914-5230 at 1b6678384), and every
+      -- key the emitter actually emits is declared.
+      let readByProcessAttachment =
+            [ "name", "filename", "description", "variable name"
+            , "valid formats", "content", "content file", "raw"
+            , "docx template file", "pdf template file", "fields"
+            , "metadata", "editable", "skip undefined", "language"
+            , "redact", "template file", "rtf template file"
+            , "docx reference file", "update references", "usedefs"
+            , "initial yaml", "additional yaml", "checkbox export value"
+            , "decimal places" ]
+          declared = map T.unpack DAEmit.emitterAttachmentKeys
+      [k | k <- declared, k `notElem` readByProcessAttachment] `shouldBe` []
+      -- and it is NOT folded into the block-key/field-modifier split, because
+      -- an attachment sub-key is neither.
+      [ k | k <- declared
+          , k `elem` map T.unpack DAEmit.emitterKeyVocabulary ] `shouldBe` []
+
+      out <- daEmit bin daLetterSource
+      let subKeys b = [ takeWhile (/= ':') (drop 2 ln)
+                      | ln <- lines b, "  " `isPrefixOf` ln
+                      , not ("   " `isPrefixOf` ln), ':' `elem` ln ]
+      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
+        [] -> expectationFailure "no attachment block was emitted at all"
+        blocks -> for_ blocks \b ->
+          [ k | k <- subKeys b, not (null k), k `notElem` declared ] `shouldBe` []
+
+    it "compiles each M4 example to its golden interview" $
+      for_ [ daListSource, daPayloadSource, daMaybeSource, daDateSource
+           , daReviewSource, daLetterSource ] \src -> do
+        let stem = takeWhile (/= '.') (drop (length daExampleDir + 1) src)
+        expectGolden bin ["docassemble", src]
+          (daExampleDir </> "expected" </> (stem ++ ".yml"))
+
     it "leaves the four refusals M4 does not own refusing, by their own names (G)" $
       for_ daStillRefused \(fixture, diagnostic) -> do
         Output code _ serr <-

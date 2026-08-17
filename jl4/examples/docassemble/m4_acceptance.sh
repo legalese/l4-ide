@@ -45,8 +45,21 @@ for stem in $EXAMPLES; do
     fails=$((fails + 1))
     continue
   fi
+  # Both artifact shapes, every example: R11 decision 6 says packaging must not
+  # change the meaning of the interview, and the harness's `--also` compares
+  # them case by case. The RED phase left this untested for the M4 constructs;
+  # it is exactly where a `content file:` template reference (which raises at
+  # PARSE time when the file is absent) would break the BARE artifact while the
+  # packaged one still worked.
+  if ! "$L4" docassemble "$src" --package "$OUT/pkg-$stem" \
+       >"$OUT/$stem.pkg.log" 2>&1; then
+    echo "   PACKAGE FAILED:"
+    sed 's/^/   | /' "$OUT/$stem.pkg.log"
+    fails=$((fails + 1))
+    continue
+  fi
   if "$PY" "$ROOT/jl4/examples/docassemble/roundtrip_check.py" \
-       "$OUT/$stem.yml" "$stem" --quiet; then
+       "$OUT/$stem.yml" "$stem" "--also=$OUT/pkg-$stem" --quiet; then
     echo "   ROUND-TRIP OK"
   else
     fails=$((fails + 1))
@@ -59,9 +72,11 @@ done
 echo "═══════════════════════════════════════════════════════════════════"
 echo "── citations (M2 inherited debt: a changed answer)"
 if "$L4" docassemble "$ROOT/jl4/examples/docassemble/citations.l4" \
-     -o "$OUT/citations.yml" >/dev/null 2>&1; then
+     -o "$OUT/citations.yml" >/dev/null 2>&1 \
+   && "$L4" docassemble "$ROOT/jl4/examples/docassemble/citations.l4" \
+     --package "$OUT/pkg-citations" >/dev/null 2>&1; then
   if "$PY" "$ROOT/jl4/examples/docassemble/roundtrip_check.py" \
-       "$OUT/citations.yml" citations --quiet; then
+       "$OUT/citations.yml" citations "--also=$OUT/pkg-citations" --quiet; then
     echo "   ROUND-TRIP OK"
   else
     fails=$((fails + 1))

@@ -1,0 +1,7 @@
+fidelity report — docassemble
+  [DA-FLOAT] advisory — notice-letter.l4
+      NUMBER is emitted as docassemble `datatype: number` and Python float arithmetic; L4 evaluates numbers as exact Rationals
+      lost: exact decimal arithmetic — do not rely on exact equality of computed sums
+  [DA-ATTACH-MAKO] advisory — notice-letter.l4
+      `notice-letter.letter.md` is embedded in the interview as the attachment's `content:` and is rendered as Mako, VERBATIM — it is the author's own template, so R9.1's escaping (which exists to stop L4-derived prose being read as Mako) deliberately does not apply to it
+      lost: nothing of the L4 module; but a defect in the template is the author's to find, and a template that renders to nothing produces an EMPTY letter without raising or logging anything

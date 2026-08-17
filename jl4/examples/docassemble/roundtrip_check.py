@@ -179,6 +179,11 @@ try:
 except ImportError:  # pragma: no cover - older layouts re-export it in parse
     from_safeid = getattr(parse, "from_safeid", None)
 
+# docassemble's own iterator resolver: `h.tenants[i].age` + the user_dict's
+# current `i` -> `h.tenants[0].age` (parse.py:9921-9927 at 1b6678384).
+substitute_vars_from_user_dict = getattr(
+    parse, "substitute_vars_from_user_dict", None)
+
 # ---------------------------------------------------------------------------
 # Fixture tables: one case per #EVAL in the corresponding .l4 file. Keys are
 # the sanitised L4 field names (matched prefix-insensitively against whatever
@@ -988,13 +993,29 @@ def lookup(fixtures_fuzzed, varname):
     return None, None
 
 
-def field_variables(status):
-    """The variable names the pending question's fields would define."""
+def field_variables(status, user_dict=None):
+    """The variable names the pending question's fields would define.
+
+    A question that asks a LIST ELEMENT's attribute is written over
+    docassemble's iterator -- `h.tenants[i].age` -- and that is the spelling
+    `field.saveas` carries, for every element: the concrete index lives in the
+    user_dict, as `i`, at the moment the question is asked. So the raw saveas
+    cannot distinguish element 0 from element 1, and a per-element claim
+    ("the minor was never asked whether they signed") cannot be tested from it.
+
+    docassemble resolves exactly this itself, with
+    `substitute_vars_from_user_dict` (parse.py:9921-9927 at 1b6678384), which is
+    what it uses to name an attachment variable inside a generic block
+    (parse.py:7064). Reusing that function -- rather than re-deriving the
+    substitution here -- keeps the harness reporting the variable docassemble
+    would report.
+    """
     names = []
     try:
         fields = status.get_field_list()
     except Exception:
         fields = getattr(status.question, "fields", []) or []
+    is_generic = bool(getattr(getattr(status, "question", None), "is_generic", False))
     for field in fields:
         saveas = getattr(field, "saveas", None)
         if saveas is None:
@@ -1005,7 +1026,13 @@ def field_variables(status):
                 decoded = from_safeid(saveas)
             except Exception:
                 decoded = None
-        names.append(decoded if decoded is not None else str(saveas))
+        name = decoded if decoded is not None else str(saveas)
+        if user_dict is not None and substitute_vars_from_user_dict is not None:
+            try:
+                name = substitute_vars_from_user_dict(name, user_dict, is_generic=is_generic)
+            except Exception:
+                pass
+        names.append(name)
     return names
 
 
@@ -1250,7 +1277,7 @@ def drive_case(interview, current_info, case, user_dict=None, fixtures=None,
         with user_dict_context(user_dict):
             interview.assemble(user_dict, status)
         qtype = getattr(status.question, "question_type", None)
-        asked = field_variables(status)
+        asked = field_variables(status, user_dict)
         transcript.append((step, qtype, asked))
         if not asked:
             # deadend / event verdict screen / any fieldless terminal
@@ -1529,14 +1556,21 @@ def check_case(interview, current_info, example, case, yaml_text=""):
             fixtures=after["fixtures"], gather_cfg=example.get("gather"),
             gather_n=case.get("gather_n"), transcript=transcript)
         _, goal2 = find_variable(user_dict, example["goal_candidates"])
-        _, verdict2 = find_variable(user_dict, example["verdict_candidates"])
+        verdict2_name, verdict2 = find_variable(user_dict, example["verdict_candidates"])
         cites2 = explanations_of(user_dict)
         if "goal" in after and not values_equal(goal2, after["goal"]):
             problems.append(
                 f"after the answer was changed the goal is {goal2!r}, expected "
                 f"{after['goal']!r} -- the verdict went STALE, not merely the "
                 f"citations")
-        if after.get("verdict") is not None and verdict2 != after["verdict"]:
+        # Guarded on the verdict variable EXISTING, exactly as the forward
+        # check above is: only a seam-lowered export emits one (R4), and
+        # `citations.l4`'s goal is a plain boolean, so `DABoolDriver` emits no
+        # verdict variable at all. Without the guard this asserted a variable
+        # the design deliberately does not produce, and reported it as the
+        # staleness defect.
+        if (after.get("verdict") is not None and verdict2_name is not None
+                and verdict2 != after["verdict"]):
             problems.append(
                 f"after the answer was changed the verdict is {verdict2!r}, "
                 f"expected {after['verdict']!r}")
