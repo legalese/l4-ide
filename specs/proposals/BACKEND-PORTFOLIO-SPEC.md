@@ -241,6 +241,13 @@ independently in at least two of: the OpenFisca doc §6, CATALA-EXPORT-SPEC §7/
   ladder rung), any rung whose condition can raise must veto the idiomatic form and force the
   conservative encoding (the Catala bridge's "strictness veto", PR #266). Any strict-boolean
   backend — including our own direct C-family emitters — inherits this hazard class.
+- **I9 — No algebraic rewrite without the algebra.** Printers, normalisers and optimisers may
+  only apply rewrites the domain's laws actually license. Date addition is non-commutative AND
+  non-associative (Monat, ESOP 2024 — who rejected SMT for dates for this reason), so any
+  reassociation or reordering of date expressions in any backend or printer is a miscompile.
+  This repo has already paid for the boolean cousin of this bug: `prettyConj` dropped a bracket
+  and silently changed evaluated answers while every structural test stayed green (l4-ide
+  CLAUDE.md §3.2.1). Rewrite passes over non-free algebras carry the burden of proof.
 
 ## 5. The exportable core (P3)
 
@@ -300,6 +307,17 @@ sign-off from both sides' specs in their next revision.
 - **S3 — Z3, two routes.** Direct SMT lowering (verification spec Phase 1) vs. Z3 via Catala's
   proof plugin over emitted code (PR #260 §4.11, P4). **Both stand** — they prove different
   things (L4-level properties vs. emitted-artifact properties); any claim must cite its route. Disclosed-open (Catala spec §8.4): the standing equivalence grid verifies a re-derived rendering, not the emitted text itself; closing that gap needs solver-derived witnesses over the emitted artifact — future work on this seam's emitted-artifact route.
+  Updated 2026-08-17 from the catala-bridge session's solver-landscape review (commissioned by
+  Meng): the route-2 ceiling is now hard fact — catala-proof's VC kinds are exactly
+  `NoEmptyError | NoOverlappingExceptions` and scope assertions enter as _hypotheses_
+  (`conditions.ml:278`, `conditions.mli:36` @ `d37aca74`, independently corroborated), so user
+  invariants are unprovable on route 2, period. Route 1 has a PROPOSED shape — un-ruled, not a
+  commitment: `l4 prove`, reusing `L4.Catala.Lower`'s fragment classification, emitting SMT-LIB2
+  text to a z3 subprocess (no Haskell dependency; `NUMBER`→`Real` is faithful since values are
+  exact rationals), flagship application proving Mode A ≡ Mode B to close CATALA-EXPORT-SPEC
+  §8.4's witness gap. Footnote technologies: CUTECat (ESOP 2025) checks assertions as _goals_ via
+  concolic execution, but is an unmerged fork pinned to Catala 0.10.0 with lists and month/year
+  dates silently falling back to concrete; DateSAT is the candidate date-encoding fix.
 - **S4 — prose, two producers.** Logical English (#258, a surface over the Prolog image) vs.
   TNR/NLG round-trip (branch `nlg-roundtrip`). Different fidelity contracts (executable surface
   vs. drafting prose); both stand; cross-cite.
