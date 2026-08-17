@@ -22,7 +22,11 @@ module L4.Docassemble.IR
   , DACodeBody (..)
   , DADriver (..)
   , DAScreen (..)
+  , DAReview (..)
+  , DAReviewRow (..)
+  , DAAttachment (..)
   , DAExpr (..)
+  , DAQuantOp (..)
   , DABinOp (..)
   , DACmpOp (..)
   , DAFile (..)
@@ -49,6 +53,31 @@ data DAExpr
   | DACond    !DAExpr !DAExpr !DAExpr   -- ^ @<then> if <cond> else <else>@
   | DAIsNone  !DAExpr          -- ^ @<e> is None@ — the MAYBE BOOLEAN absence
                                --   test (R8: @yesnomaybe@ stores NOTHING as None)
+  | DAIsBool  !DAExpr !Bool
+    -- ^ M4: @\<e\> is True@ \/ @\<e\> is False@ — the payload-VALUE match on a
+    -- @MAYBE BOOLEAN@ (@WHEN JUST FALSE@, R8 scope ruling). Identity, not
+    -- equality: @yesnomaybe@ stores the three states as @True@\/@False@\/@None@
+    -- and @None == False@ is False in Python but @0 == False@ is True, so @is@
+    -- is the comparison that cannot be fooled by a numeric zero.
+  | DADateLit !Text
+    -- ^ M4 (R12): a date literal, ISO @YYYY-MM-DD@, emitted as
+    -- @as_datetime('…')@. A submitted @datatype: date@ answer enters the
+    -- interview as @as_datetime(\<submitted string\>)@
+    -- (@interview\/views.py:1372@ at @1b6678384@), i.e. a tz-aware
+    -- @DADateTime@; a bare string compared against one raises @TypeError@.
+  | DAAttr    !DAExpr !Text    -- ^ @\<e\>.name@ — @DATE_YEAR@\/@_MONTH@\/@_DAY@
+  | DAMethod  !DAExpr !Text ![(Text, DAExpr)]
+    -- ^ @\<e\>.name(kw=v, …)@ — the @DADateTime.plus@\/@.minus@ calendar
+    -- arithmetic (R12).
+  | DAQuant   !DAQuantOp !Text !DAExpr !DAExpr
+    -- ^ M4: @all(\<body\> for \<var\> in \<list\>)@ \/ @any(…)@ over a gathered
+    -- @DAList@. A GENERATOR expression, never a list comprehension: the
+    -- generator is lazy, so @all@ stops at the first false element and the
+    -- elements after it are never read — which is what keeps per-element
+    -- question pruning alive inside a gather.
+  deriving stock (Eq, Show, Generic)
+
+data DAQuantOp = DAAll | DAAny
   deriving stock (Eq, Show, Generic)
 
 data DABinOp = DAAdd | DASub | DAMul | DADiv | DAMod
@@ -69,6 +98,12 @@ data DACodeBody
     -- ^ @var = <Class>('var')@ — a nested-record attribute object, with the
     -- instance name passed explicitly (R2's mechanical contract: docassemble
     -- otherwise sniffs the caller's bytecode to recover it).
+  | DAInstantiateList !Text
+    -- ^ M4: @var = DAList('var', object_type=\<Class\>)@ — a @LIST OF\<record\>@
+    -- input. @object_type@ is load-bearing, not decoration: a @DAList@ with no
+    -- @object_type@ fails on the first element access (ablation-probed against
+    -- 1.10.7). @there_are_any@ is deliberately NOT preset, because presetting it
+    -- makes the empty list unreachable and the empty list is a real answer.
   deriving stock (Eq, Show, Generic)
 
 -- | How a single-field question renders its input widget (R6/R8).
@@ -93,6 +128,15 @@ data DAQuestion = MkDAQuestion
   , qHelp    :: !(Maybe Text)         -- ^ field/type @desc@, if any
   , qControl :: !DAFieldControl
   , qDefault :: !(Maybe DAExpr)       -- ^ TYPICALLY → @default:@ (R7); literals only
+  , qShowIf  :: !(Maybe DAExpr)
+    -- ^ M4: a server-side @show if:@ guard, rendered with its @code:@ sub-key.
+    -- The @{variable:, is:}@ spelling is browser-side JavaScript only
+    -- (@parse.py:3998-4002@ sets @show_if_var@\/@show_if_val@ and no
+    -- @showif_code@), so the engine shows every field and an API or headless
+    -- drive DEFINES them all; only the code form leaves a hidden field
+    -- genuinely undefined (@parse.py:6316-6325@ sets @extras['ok'][n] = False@).
+    -- Two things ride on it: the constructor payload that was not chosen
+    -- (R6) and the value half of a @MAYBE NUMBER@\/@DATE@ pair (R8).
   }
   deriving stock (Eq, Show, Generic)
 
@@ -109,6 +153,13 @@ data DACode = MkDACode
     -- assignment, so a rule that raised on a missing input — and therefore
     -- decided nothing yet — records nothing. Because CPython short-circuits,
     -- the accumulated list is exactly the rules that fired, in order.
+  , cFresh :: !Bool
+    -- ^ M4 (spec §8.4): emit @reconsider: True@, so the block is re-run from
+    -- the current answers on every assemble pass instead of surviving as a
+    -- cached value. Without it, changing an earlier answer leaves the VERDICT
+    -- stale, not merely its citations (measured). True for every derived value;
+    -- FALSE for an object instantiation, where re-running would replace the
+    -- @DAObject@\/@DAList@ and throw away everything gathered into it.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -140,6 +191,60 @@ data DAScreen = MkDAScreen
     -- ^ M2: render the accumulated @\@ref@ citations through
     -- @logic_explanation()@. False when the module emitted no @explain(…)@ at
     -- all, so a module without citations keeps its v1 screen byte for byte.
+  , sAttach  :: !Bool
+    -- ^ M4: assemble the module's letter on this screen ('pkgAttach'). The
+    -- document is attached to the VERDICT screens, because a citizen who is
+    -- told \"no\" is exactly the citizen who needs the document explaining why.
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | M4: the compliance-checklist view (spec §10). One passive row per emitted
+-- question, whether or not the interview ever asked it — which is the half a
+-- plain answer summary cannot do, because a backchaining interview leaves the
+-- short-circuited questions with no answer to summarise.
+--
+-- Reached by firing 'rvEvent' as an action; a review block is unreachable
+-- otherwise (probed: without the action the interview simply ends).
+data DAReview = MkDAReview
+  { rvId    :: !Text
+  , rvEvent :: !Text
+  , rvTitle :: !Text            -- ^ generated prose (ASCII, not L4-derived)
+  , rvRows  :: ![DAReviewRow]
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | One checklist row: the L4 label, and the variable whose answer it shows.
+--
+-- Emitted as a @note:@ carrying @showifdef(\<var\>, \<marker\>)@. That is the
+-- only recipe that renders a row for a NEVER-ASKED variable: a note row has no
+-- @saveas@ to evaluate, so it renders whether or not the variable exists.
+-- @skip undefined: False@ does not do this — it FORCE-ASKS every undefined row
+-- (@parse.py:5876-5904@), and the default silently drops them into a debug log
+-- line (both measured).
+data DAReviewRow = MkDAReviewRow
+  { rrLabel :: !Text            -- ^ the L4 name, verbatim (escaped at emit)
+  , rrVar   :: !Text
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | M4: the assembled document (spec §10's document-assembly demo).
+--
+-- 'atVar' is not tidiness: without @variable name:@ docassemble files the
+-- document under @_internal['docvar'][n]@ (@parse.py:4997-5003@) and there is
+-- nothing left to assert about — and the failure this defends against is not an
+-- exception but a SUCCESSFUL EMPTY RENDER, which raises nothing and logs
+-- nothing.
+data DAAttachment = MkDAAttachment
+  { atVar     :: !Text   -- ^ @variable name:@ — the DAFileCollection
+  , atName    :: !Text   -- ^ @name:@, generated prose
+  , atFile    :: !Text   -- ^ @filename:@, no extension
+  , atSource  :: !Text   -- ^ the template file's basename, for provenance
+  , atContent :: !Text
+    -- ^ the template body, VERBATIM. This is the one string the emitter does
+    -- not put through 'L4.Docassemble.Emit.escapeL4': it is the author's own
+    -- Mako, written to be rendered, not L4-derived prose being quoted into a
+    -- Mako-rendered position (R9.1 governs the latter). Indentation still keeps
+    -- it clear of the @^--- *$@ block splitter.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -152,6 +257,7 @@ data DABlock
   | DACodeBlock !DACode
   | DADriverBlock !DADriver
   | DAScreenBlock !DAScreen
+  | DAReviewBlock !DAReview
   deriving stock (Eq, Show, Generic)
 
 data DAPackage = MkDAPackage
@@ -162,6 +268,18 @@ data DAPackage = MkDAPackage
     -- ^ M2: the @auto terms:@ glossary — (L4 defined term, its @\@desc@), in
     -- declaration order. Empty for a module that defines no glossed term, and
     -- the block is then not emitted at all.
+  , pkgAttach :: !(Maybe DAAttachment)
+    -- ^ M4: the letter this module assembles, if the author put a template
+    -- beside the @.l4@. Held once here and rendered into each screen whose
+    -- 'sAttach' is set, so the @--package@ tree can also ship the template
+    -- under @data\/templates@.
+  , pkgFresh  :: !(Maybe Text)
+    -- ^ M4 (spec §8.4): the citation-reset sentinel variable, present exactly
+    -- when some block carries a citation. Its block calls
+    -- @clear_explanations()@ and is @reconsider@ed, so it runs once per
+    -- assemble; the driver references it BEFORE the goal, which is what makes
+    -- the accumulated list the rules that fired /this/ time rather than a
+    -- session-long log.
   , pkgPlan   :: !(Maybe Text)
     -- ^ reserved slot for M3's embedded compiled decision query (spec R1
     -- cost: the IR anticipates M3 so M3 does not rework Emit). Always

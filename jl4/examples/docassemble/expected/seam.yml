@@ -34,6 +34,7 @@ fields:
     help: "Length of the notice period served, in whole months"
 ---
 id: c_notice_rule_satisfied_the_rule_applies
+reconsider: True
 code: |
   # L4: `the rule applies`
   notice_rule_satisfied_the_rule_applies = t.is_a_residential_tenancy
@@ -43,6 +44,7 @@ sets:
   - notice_rule_satisfied_the_rule_applies
 ---
 id: c_notice_rule_satisfied_the_notice_requirement_is_met
+reconsider: True
 code: |
   # L4: `the notice requirement is met`
   notice_rule_satisfied_the_notice_requirement_is_met = (t.written_notice_was_given and (t.months_of_notice_given >= 2))
@@ -53,6 +55,7 @@ sets:
   - notice_rule_satisfied_the_notice_requirement_is_met
 ---
 id: c_notice_rule_satisfied_scope
+reconsider: True
 code: |
   # L4: `notice rule satisfied — scope`
   notice_rule_satisfied_scope = notice_rule_satisfied_the_rule_applies
@@ -62,6 +65,7 @@ sets:
   - notice_rule_satisfied_scope
 ---
 id: c_notice_rule_satisfied_requirement
+reconsider: True
 code: |
   # L4: `notice rule satisfied — requirement`
   notice_rule_satisfied_requirement = notice_rule_satisfied_the_notice_requirement_is_met
@@ -72,6 +76,7 @@ sets:
 ---
 id: driver_notice_rule_satisfied
 mandatory: True
+reconsider: True
 code: |
   # verdict driver for @export `notice rule satisfied` — scope-first (R4).
   # Never `not scope or requirement`: NotApplicable is not Complies.
@@ -114,3 +119,15 @@ subquestion: |
   Whether the landlord notice rule is satisfied for this tenancy
 
   This rule does not apply to the situation described; its requirement was never asked.
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      is a residential tenancy: ${ showifdef('t.is_a_residential_tenancy', '**not asked**') }
+  - note: |
+      written notice was given: ${ showifdef('t.written_notice_was_given', '**not asked**') }
+  - note: |
+      months of notice given: ${ showifdef('t.months_of_notice_given', '**not asked**') }

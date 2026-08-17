@@ -26,6 +26,7 @@ fields:
     help: "Annual salary offered, in dollars"
 ---
 id: c_offer_lawful
+reconsider: True
 code: |
   # L4: `offer lawful`
   offer_lawful = ((o.salary_offered >= 3000) and (not o.alternative_))
@@ -37,6 +38,7 @@ sets:
 ---
 id: driver_offer_lawful
 mandatory: True
+reconsider: True
 code: |
   # driver for @export `offer lawful`
   if offer_lawful:
@@ -61,3 +63,13 @@ subquestion: |
   Whether the offer is lawful
 
   On the answers given, this decision evaluates FALSE.
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      alternative: ${ showifdef('o.alternative_', '**not asked**') }
+  - note: |
+      salary offered: ${ showifdef('o.salary_offered', '**not asked**') }

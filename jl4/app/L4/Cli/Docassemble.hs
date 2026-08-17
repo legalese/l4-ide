@@ -33,7 +33,8 @@ import System.Directory
   ( copyFile, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, listDirectory
   , removePathForcibly )
 import System.Exit (exitFailure, exitSuccess)
-import System.FilePath (joinPath, replaceExtension, takeDirectory, takeFileName, (</>))
+import System.FilePath
+  (dropExtension, joinPath, replaceExtension, takeDirectory, takeFileName, (</>))
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
@@ -41,7 +42,7 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Docassemble.Emit (renderPackage, renderPackageTree)
 import L4.Docassemble.IR (DAFile (..), DAPackage, DAPackageTree (..))
-import L4.Docassemble.Lower (lowerModule, renderLowerError)
+import L4.Docassemble.Lower (DASideInputs (..), lowerModule, renderLowerError)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
 
@@ -148,7 +149,8 @@ docassembleCmd opts = do
       -- Surface non-fatal diagnostics, but proceed: a clean type-check is the
       -- precondition that matters for lowering (the `l4 openfisca` posture).
       putDiagnostics errs
-      case lowerModule tc.module' of
+      side <- readSideInputs opts.daFile
+      case lowerModule side tc.module' of
         Left lerrs -> do
           putDiagnostics
             ( "l4 docassemble: cannot compile this module to a docassemble interview:"
@@ -168,6 +170,34 @@ docassembleCmd opts = do
                 Nothing -> Text.putStr out
               tripped <- reportFidelity opts (fidelitySibling <$> opts.daOutput) report
               if tripped then exitFailure else exitSuccess
+
+----------------------------------------------------------------------------
+-- Side inputs (M4)
+----------------------------------------------------------------------------
+
+-- | Read what the lowering cannot read for itself. @jl4-core@ does no IO (R1),
+-- so the one file that lives beside the @.l4@ is opened here.
+--
+-- THE DOCUMENT-ASSEMBLY TRIGGER (spec §10). A sibling @\<stem\>.letter.md@ means
+-- \"assemble this letter on the verdict screen\". A filename convention was
+-- chosen over a CLI flag (which would make the artifact depend on how it was
+-- invoked, and the two artifact shapes must agree) and over a new annotation
+-- (new L4 grammar for a view). The file has to exist either way — the
+-- @--package@ tree ships it under @data\/templates@ — so the convention costs
+-- nothing that was not already on disk.
+readSideInputs :: FilePath -> IO DASideInputs
+readSideInputs src = do
+  let tmpl = dropExtension src <> ".letter.md"
+  haveTmpl <- doesFileExist tmpl
+  letter <- if haveTmpl
+    then do
+      body <- TextIO.readFile tmpl
+      hPutStrLn stderr $
+        "l4 docassemble: assembling the letter from " <> tmpl
+          <> " (a sibling `.letter.md` is the document-assembly trigger)"
+      pure (Just (Text.pack (takeFileName tmpl), body))
+    else pure Nothing
+  pure MkDASideInputs { siLetter = letter }
 
 ----------------------------------------------------------------------------
 -- The installable package tree (R11, M2)
