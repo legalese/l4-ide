@@ -63,6 +63,7 @@ recognise the same program.
 | `MAYBE <enum>`/`MAYBE <record>`               | **refused**, naming the enum or record (`not-ok/maybe-enum.l4`) (R8) |
 | `WHEN JUST <value>` (payload-value match)     | `(<var> is False)` — identity, not a presence test (R8, M4; spec §8.8) |
 | `LIST OF <record>` (input)                    | `DAList(object_type=DAObject)` + two gather questions + one question per element attribute; `all`/`any` → a Python generator, so pruning survives per element (M4, §8.6) |
+| `all`/`any` predicate                         | a lambda written out at the call site, or the NAME of a one-parameter decision — both inlined into the generator (M4) |
 | constructor payloads (scalar)                 | one follow-up question per payload field, gated `show if: {code: <enum> == '<ctor>'}` (R6, M4) |
 | date literals, `n` years later                | `as_datetime('YYYY-MM-DD')`; the anniversary shifts from the first of the month, agreeing with L4's rolling `Date` on leap days — never `date_difference().years` (R12, §8.12) |
 | deontic / temporal / ledger constructs        | **refused**, `L4.Interchange.Fidelity` notes (spec §5)                 |
@@ -169,6 +170,14 @@ recognise the same program.
     letter, which is the point: an attachment EXTENDS the interview's question
     set. The hazard it defends against is not an exception but a successful
     empty render.
+- A test outside this directory, worth knowing about: `l4 docassemble` on
+  `jl4/examples/legal/charities-cleanroom/charity-test.l4` — 700 lines of the
+  Jersey charities encoding, not written for this backend — now emits, because
+  its `Entity.purposes` is a `LIST OF Purpose` and ONE such field anywhere in a
+  reachable record used to refuse the whole module. It is also the only place
+  the eta-reduced predicate and the nested-quantifier variable are exercised.
+  (`regcf-denovo.l4` still does not emit, and its blocker is not lists: it is
+  `RULES EFFECTIVE DATE`, the temporal axis.)
 - `m4_acceptance.sh` — emits and drives every M4 example plus the `citations`
   inherited-debt case in one command, from BOTH artifact shapes (bare YAML and
   a real `--package` tree), printing any refusal verbatim. Usage from the repo

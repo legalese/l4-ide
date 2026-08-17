@@ -3747,6 +3747,28 @@ spec bin = do
         blocks -> for_ blocks \b ->
           [ k | k <- subKeys b, not (null k), k `notElem` declared ] `shouldBe` []
 
+    it "unlocks the REAL corpus file that motivated `LIST OF` (A)" $ do
+      -- The RED phase listed this as untested and said why it matters: "a green
+      -- M4 could pass every test I wrote and still leave both files locked
+      -- out", because ONE `LIST OF` field anywhere in a reachable record used
+      -- to refuse the whole module. `charity-test.l4` is a 700-line Jersey
+      -- charities encoding whose `Entity.purposes` is a `LIST OF Purpose`, and
+      -- it is not a fixture written for this backend — which is the point.
+      --
+      -- It also pins the ETA-REDUCED predicate: the corpus writes
+      -- `any \`the purpose is a charitable purpose\` (entity's purposes)`, a
+      -- one-parameter decision passed by name rather than a lambda written out
+      -- at the call site. No example under examples/docassemble/ does that.
+      out <- daEmit bin "examples/legal/charities-cleanroom/charity-test.l4"
+      shouldContain' "the charities interview" out "DAList"
+      shouldContain' "the charities interview" out "object_type"
+      shouldContain' "the charities interview" out "for _purpose in entity.purposes"
+      -- Nested quantifiers must not share a generator variable: Python scopes
+      -- one to its own comprehension, so an inner binder that sanitised onto an
+      -- outer one would make the outer's element unreachable from the inner
+      -- body. This file nests `any` inside `all` over the same list.
+      shouldContain' "the charities interview" out "for _purpose_2 in entity.purposes"
+
     it "compiles each M4 example to its golden interview" $
       for_ [ daListSource, daPayloadSource, daMaybeSource, daDateSource
            , daReviewSource, daLetterSource ] \src -> do

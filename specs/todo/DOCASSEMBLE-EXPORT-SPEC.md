@@ -851,9 +851,24 @@ never asked anything about the second tenant at all (driven headless, `tenant-li
 `complete_elements()` is never reached for — it iterates `self.elements` with no
 `_trigger_gather` (`util.py:3256-3274`) and returns EMPTY on an ungathered list, a silent zero.
 
+The predicate may be a lambda written out at the call site OR the NAME of a one-parameter
+decision (`any \`the purpose is a charitable purpose\` (entity's purposes)`), which is how the
+corpus actually writes it; the eta-reduced form inlines the same way, with the generator variable
+standing in for the argument. Nested quantifiers get distinct generator variables: Python scopes
+one to its own comprehension, so two binders sanitising onto one name would make the outer
+element unreachable from the inner body.
+
 Refused by name: `LIST OF <scalar>` (a different DAList shape, gathering values rather than
 objects), a record or a list INSIDE a gathered element, and a computed list value (`LIST`
 literals and `FOLLOWED BY` cons) — M4 gathers a list INPUT; it does not produce list values.
+
+**Measured against the two corpus files that motivated this, 2026-08-17.**
+`jl4/examples/legal/charities-cleanroom/charity-test.l4` — 700 lines of the Jersey charities
+encoding, whose `Entity.purposes` is a `LIST OF Purpose` — **now compiles**, and a CLI test pins
+it, because one `LIST OF` field anywhere in a reachable record used to refuse the whole module
+regardless of whether the goal read it. `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` still
+does not, and its blocker is not lists: it is `RULES EFFECTIVE DATE`, the temporal rule-version
+axis, which no milestone of this backend has claimed.
 
 ### 8.7 R7 — `TYPICALLY` → `default:`, Advisory
 

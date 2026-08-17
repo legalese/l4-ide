@@ -450,7 +450,10 @@ decideFunShape (MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ _ 
 
 data InlineFun = MkInlineFun
   { ifU      :: !Unique
-  , ifParams :: ![Unique]
+  , ifParams :: ![Resolved]
+    -- ^ the parameter BINDERS, not merely their uniques: a quantifier that is
+    -- handed an eta-reduced predicate (@any \`the purpose is charitable\` xs@)
+    -- names its generator variable after the parameter it is binding.
   , ifBody   :: !(Expr Resolved)
   }
 
@@ -497,7 +500,7 @@ mkBaseEnv ctx = MkEnv
       , Just mr <- [maybeReprAt (pyIdent (assumeName a)) ty]
       ]
   , envFuns        = Map.fromList
-      [ (td.tdU, MkInlineFun td.tdU (map getUnique td.tdParams) td.tdBody)
+      [ (td.tdU, MkInlineFun td.tdU td.tdParams td.tdBody)
       | td <- ctx.ctxTop, not (null td.tdParams)
       ]
   , envEnumCons    = ctx.ctxEnumCons
@@ -1417,7 +1420,7 @@ data PendingCode = MkPendingCode
 data BindEntry
   = BindVar !Unique !Text !Text !DefAnns !(Expr Resolved)
     -- ^ unique, L4 name, variable, its own annotations, body
-  | BindFun !Unique !Text ![Unique] !(Expr Resolved)  -- ^ unique, L4 name, params, body
+  | BindFun !Unique !Text ![Resolved] !(Expr Resolved)  -- ^ unique, L4 name, params, body
 
 -- | Peel @WHERE@/@LET@ layers off the top of a definition body. Every
 -- zero-parameter binding becomes one @code:@ block named
@@ -1444,7 +1447,7 @@ processBindings env prefix expr0 = case expr0 of
           u       = getUnique (decideName d)
       in Right $ if null ps
            then BindVar u nm (prefix <> "_" <> pyIdent nm) (decideAnns localAnn d) b
-           else BindFun u nm (map getUnique ps) b
+           else BindFun u nm ps b
     LocalAssume _ a ->
       Left (LFFatal ("local ASSUME `" <> assumeName a
                       <> "` in WHERE is not supported in v1 — declare it at module level or pass it as a GIVEN"))
@@ -1856,22 +1859,59 @@ quantOp = \case
 -- @self.elements@ with no @_trigger_gather@ and silently returns nothing at all
 -- on an ungathered list (@util.py:3256-3274@).
 lowerQuant :: Env -> DAQuantOp -> Expr Resolved -> Expr Resolved -> Either LF DAExpr
-lowerQuant env op lam lst = do
-  (path, ru) <- case resolveList env lst of
-    Just pr -> Right pr
-    Nothing -> Left (LFFatal "`all`/`any` are supported over a `LIST OF <record>` INPUT (a GIVEN \
-                             \parameter or a record field of one); a computed list has no gathered \
-                             \DAList to quantify over")
+lowerQuant env op lam lst =
   case lam of
-    Lam _ (MkGivenSig _ [p]) body -> do
-      let binder  = getUnique (givenName p)
-          elemVar = "_" <> pyIdent (resolvedToText (givenName p))
-          env'    = env { envRecVars = Map.insert binder (elemVar, ru) env.envRecVars }
-      body' <- lowerExpr env' body
-      pure (DAQuant op elemVar (DAVar path) body')
-    _ -> Left (LFFatal "`all`/`any` expect a lambda written out at the call site — \
-                       \`all (GIVEN x YIELD <pred>) <list>` — because the predicate is inlined into \
-                       \the generator expression")
+    -- The lambda written out at the call site.
+    Lam _ (MkGivenSig _ [p]) body ->
+      quantOver (givenName p) body env.envInlineStack
+    -- An ETA-REDUCED predicate: `any `the purpose is a charitable purpose`
+    -- (entity's purposes)`, which is how the corpus actually writes it. The
+    -- function's own parameter is the binder, and its body is inlined at the
+    -- element exactly as a lambda's would be — the same beta-reduction R3
+    -- already does for a direct application, with the generator variable
+    -- standing in for the argument.
+    App _ r []
+      | Just f <- Map.lookup (getUnique r) env.envFuns
+      , [p] <- f.ifParams ->
+          if f.ifU `elem` env.envInlineStack
+            then Left (LFFatal ("recursive predicate `" <> resolvedToText r
+                                 <> "` cannot be inlined into a generator expression"))
+            else quantOver p f.ifBody (f.ifU : env.envInlineStack)
+    _ -> Left (LFFatal "`all`/`any` expect a one-argument predicate — a lambda written out at \
+                       \the call site (`all (GIVEN x YIELD <pred>) <list>`) or the name of a \
+                       \one-parameter decision — because the predicate is inlined into the \
+                       \generator expression")
+ where
+  quantOver p body stack = do
+    (path, ru) <- case resolveList env lst of
+      Just pr -> Right pr
+      Nothing -> Left (LFFatal "`all`/`any` are supported over a `LIST OF <record>` INPUT (a GIVEN \
+                               \parameter or a record field of one); a computed list has no \
+                               \gathered DAList to quantify over")
+    let elemVar = freshElemVar env ("_" <> pyIdent (resolvedToText p))
+        env'    = env { envRecVars = Map.insert (getUnique p) (elemVar, ru) env.envRecVars
+                      , envInlineStack = stack }
+    body' <- lowerExpr env' body
+    pure (DAQuant op elemVar (DAVar path) body')
+
+-- | A generator variable that shadows nothing already in scope.
+--
+-- Python scopes a generator's variable to the generator, so a NESTED quantifier
+-- whose binder sanitises to the same name would shadow the outer one — which is
+-- right when the L4 binders are the same name (L4 shadows too) and WRONG when
+-- two different L4 names sanitise together, because then the inner body's
+-- reference to the outer binder would silently read the inner element instead.
+-- Disambiguating by suffix costs nothing in the common case: `_t` stays `_t`.
+freshElemVar :: Env -> Text -> Text
+freshElemVar env base = go base (2 :: Int)
+ where
+  go cand n
+    | cand `Set.notMember` taken = cand
+    | otherwise                  = go (base <> "_" <> tshow n) (n + 1)
+  taken = Set.fromList $
+       Map.elems env.envVars
+    <> map fst (Map.elems env.envRecVars)
+    <> map fst (Map.elems env.envListVars)
 
 -- | Resolve a list-valued expression to (the DAList's variable path, the
 -- element record's type unique).
@@ -2040,7 +2080,7 @@ inlineApply env f nm args
                      \argument to `" <> nm <> "`, and only direct application can be \
                      \inlined (v1 emits no Python module); refused by name (R3)"))
   | otherwise =
-      let sub   = Map.fromList (zip f.ifParams args)
+      let sub   = Map.fromList (zip (map getUnique f.ifParams) args)
           body' = substituteExpr sub f.ifBody
       in lowerExpr env { envInlineStack = f.ifU : env.envInlineStack } body'
 
