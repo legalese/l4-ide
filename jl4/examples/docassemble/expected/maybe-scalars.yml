@@ -10,6 +10,8 @@ objects:
   - c: DAObject
 ---
 id: q_c.declared_income_known
+undefine:
+  - c.declared_income
 question: |
   declared income — is there an answer?
 fields:
@@ -29,6 +31,8 @@ fields:
         c.declared_income_known
 ---
 id: q_c.date_last_worked_known
+undefine:
+  - c.date_last_worked
 question: |
   date last worked — is there an answer?
 fields:

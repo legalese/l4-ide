@@ -137,6 +137,21 @@ data DAQuestion = MkDAQuestion
     -- genuinely undefined (@parse.py:6316-6325@ sets @extras['ok'][n] = False@).
     -- Two things ride on it: the constructor payload that was not chosen
     -- (R6) and the value half of a @MAYBE NUMBER@\/@DATE@ pair (R8).
+  , qUndefine :: ![Text]
+    -- ^ M4 (repaired 2026-08-17, spec §8.4): variables this question's answer
+    -- GATES, cleared whenever it is asked. @show if:@ decides whether a gated
+    -- question is asked; it does not decide whether an already-given ANSWER
+    -- survives, and an answer variable is never invalidated when its guard is
+    -- withdrawn — @reconsider:@ deletes DERIVED variables only. So after a
+    -- review-block Edit changed @d.the_outcome@ from
+    -- @granted subject to conditions@ to @refused@, @d.the_number_of_conditions@
+    -- stayed defined at its old value: the compliance checklist reported a
+    -- payload the chosen constructor does not carry, and an attachment
+    -- interpolating it would print it into the letter. @undefine:@ fires in
+    -- @ask@ (@parse.py:5389-5390@ at @1b6678384@) and is a no-op on a variable
+    -- that is not defined (@functions.undefine@, \"If a variable is not
+    -- defined, this function does nothing\"), so it costs nothing on the
+    -- forward drive and clears exactly the stale answers on a re-ask.
   }
   deriving stock (Eq, Show, Generic)
 

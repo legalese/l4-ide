@@ -10,6 +10,9 @@ objects:
   - d: DAObject
 ---
 id: q_d.the_outcome
+undefine:
+  - d.the_number_of_conditions
+  - d.the_stated_ground_of_refusal
 question: |
   the outcome
 fields:

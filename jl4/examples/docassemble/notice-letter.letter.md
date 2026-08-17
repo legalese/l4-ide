@@ -1,10 +1,10 @@
+  To: ${ n.the_tenant_name }
+
+  Property: ${ n.the_property_address }
+
+  From: ${ n.the_landlord_name }
+
 **NOTICE TO QUIT — ASSESSMENT**
-
-To: ${ n.the_tenant_name }
-
-Property: ${ n.the_property_address }
-
-From: ${ n.the_landlord_name }
 
 Notice period served: ${ n.months_of_notice_given } month(s).
 

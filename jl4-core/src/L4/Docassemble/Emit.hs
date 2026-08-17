@@ -177,9 +177,14 @@ blockLines pkg = \case
 
 questionLines :: DAQuestion -> [Text]
 questionLines q =
-     [ "id: " <> q.qId
-     , "question: |"
-     ]
+     [ "id: " <> q.qId ]
+  -- M4 (spec §8.4): clear the answers this one gates, so re-answering it cannot
+  -- leave a payload behind that the new answer does not carry. Block level, and
+  -- it has to be: `undefine` is one of the 169 block keys at parse.py:1947, and
+  -- it fires in `ask` before the question is rendered.
+  <> [ ln | not (null q.qUndefine)
+          , ln <- "undefine:" : [ "  - " <> v | v <- q.qUndefine ] ]
+  <> [ "question: |" ]
   <> blockScalar (escapeL4 q.qText)
   <> [ "fields:"
      , "  - " <> yamlStr (escapeL4 q.qLabel) <> ": " <> q.qVar
@@ -438,9 +443,22 @@ screenLines mAttach s =
 --
 -- @valid formats: [html]@ and nothing else: the harness venv has @docx@ and
 -- @docxtpl@ but no LibreOffice, so a PDF format would fail at assemble time.
+--
+-- @reconsider: True@ (repaired 2026-08-17, spec §8.4): an attachment is
+-- assembled only when the variable it names is SOUGHT (@parse.py:9513-9530@),
+-- and a variable that is already defined is never sought — so without this the
+-- letter is computed once and then survives every later answer. Measured on
+-- @notice-letter.l4@: change the notice period from three months to one and the
+-- verdict screen reads @…_screen_fails@ while the letter it carries still says
+-- \"Notice period served: 3 month(s)\" and \"the notice is valid\". A
+-- non-flipping edit is stale in the same way — correcting the tenant's name
+-- leaves the letter addressed to the old one. §8.4's original repair put
+-- @reconsider: True@ on the derived CODE blocks and stopped there; the document
+-- is derived too, and it is the artifact a reader would carry out of the room.
 attachmentLines :: DAAttachment -> [Text]
 attachmentLines a =
      [ "id: attachment_" <> a.atVar
+     , "reconsider: True"
      , "attachment:"
      , "  name: " <> yamlStr (escapeL4 a.atName)
      , "  filename: " <> yamlStr a.atFile
@@ -451,7 +469,22 @@ attachmentLines a =
      , "  variable name: " <> a.atVar
      , "  valid formats:"
      , "    - html"
-     , "  content: |"
+     -- The `2` is an explicit YAML INDENTATION INDICATOR, and it is load-bearing
+     -- (repaired 2026-08-17). Without it a block scalar takes its indentation
+     -- from its own first non-empty line, so a template whose first line carries
+     -- ANY leading whitespace — one space is enough, as is a whitespace-only
+     -- first line — sets the block indent above 4, and the first following line
+     -- at exactly 4 terminates the scalar early. The parser then meets template
+     -- prose where an `attachment:` sub-key must be and the WHOLE interview
+     -- fails to load, in both artifact shapes, while `l4 docassemble` exits 0.
+     -- Measured against real 1.10.7: `parse.Interview` raises `DASourceError`
+     -- from parse.py:8352-8360, so not one question survives. An indented
+     -- address block is the most idiomatic way to open a letter, and this is the
+     -- one string the emitter deliberately does not sanitise, so the indicator
+     -- is what makes "verbatim" true. `2` and not `4`: the indicator is an
+     -- offset from the PARENT node's indentation, and the `attachment:` mapping
+     -- sits at 2.
+     , "  content: |2"
      ]
   -- Verbatim, and indented four spaces: it is the author's own Mako, written to
   -- be rendered (R9.1 escapes L4-derived prose, which this is not). The indent

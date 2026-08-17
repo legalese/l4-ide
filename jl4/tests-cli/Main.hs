@@ -518,10 +518,23 @@ daStillRefused =
     , "seam-shaped export (top-level IMPLIES) is referenced by another decision" )
   ]
 
+-- | The @not-ok/@ fixtures the 2026-08-17 repair pass ADDED, each pinning a
+-- refusal that replaced a silently wrong emission. Kept apart from
+-- 'daStillRefused', which is the out-of-scope set: these two are M4's own, and
+-- both are required to be reported in L4 terms rather than as an internal id
+-- collision.
+daM4Refused :: [(FilePath, String)]
+daM4Refused =
+  [ ( "maybe-empty-string.l4"
+    , "`WHEN JUST \"\"` on a MAYBE STRING is refused" )
+  , ( "payload-name-collision.l4"
+    , "name collision: `d.the_reason` is produced by two different question blocks" )
+  ]
+
 -- | Emit an M4 example, reporting the refusal VERBATIM when it is still
--- refused. The wording matters: until M4 lands, every one of these exits 1
--- with prose naming the milestone that owes the answer, and that is the
--- honest RED signal — not a broken test.
+-- refused. Written fail-first, when every one of these exited 1 with prose
+-- naming the milestone that owed the answer; they all emit now, and the
+-- verbatim stderr is what makes a REGRESSION legible rather than merely red.
 daEmit :: FilePath -> FilePath -> IO String
 daEmit bin src = do
   Output code sout serr <- runL4 bin ["docassemble", src]
@@ -549,8 +562,15 @@ shouldContainAny what haystack needles =
 -- rather than corpus exhibits and so live beside the other @tests-cli@
 -- fixtures, not in @examples/docassemble/@.
 daGlossLossSource, daRuntimeCollisionSource, descAttachmentFixture :: FilePath
+daGlobalShadowSource, daGatheredMaybeSource :: FilePath
 daGlossLossSource        = fixtureDir </> "docassemble-glossary-losses.l4"
 daRuntimeCollisionSource = fixtureDir </> "docassemble-runtime-collision.l4"
+-- The other two thirds of the same namespace hazard (repair pass, 2026-08-17):
+-- Python's builtins and `docassemble.base.util`'s star-import.
+daGlobalShadowSource     = fixtureDir </> "docassemble-global-shadow.l4"
+-- A paired `MAYBE NUMBER` inside a gathered element: the one place the
+-- changed-answer repair does NOT reach, declared rather than silent.
+daGatheredMaybeSource    = fixtureDir </> "docassemble-gathered-maybe.l4"
 descAttachmentFixture    = fixtureDir </> "desc-attachment.l4"
 
 -- | The four citations carried by @citations.l4@, herald-stripped: L4's own
@@ -3338,14 +3358,16 @@ spec bin = do
   ----------------------------------------------------------------------------
   -- M4 (spec §10): breadth. ACCEPTANCE TESTS, WRITTEN FAIL-FIRST.
   --
-  -- Every test in this block is RED at the commit that introduces it, and each
-  -- is red for a reason the tool states in words. M1 refused each of these
-  -- constructs BY NAME, so the failure is `l4 docassemble` exiting 1 with
-  -- prose naming the milestone that owes the answer — not a missing symbol,
-  -- not a typo, not a compile error. `daEmit` prints that stderr verbatim.
+  -- Every test in this block was RED at the commit that introduced it, and each
+  -- was red for a reason the tool stated in words: M1 refused each of these
+  -- constructs BY NAME, so the failure was `l4 docassemble` exiting 1 with
+  -- prose naming the milestone that owed the answer — not a missing symbol,
+  -- not a typo, not a compile error. `daEmit` still prints that stderr verbatim,
+  -- which is what makes a regression legible. The block is GREEN as of
+  -- 2026-08-17, together with `m4_acceptance.sh`, its behavioural half.
   --
-  -- Three of these tests would still be red after a naive implementation, and
-  -- that is deliberate; they are the ones worth having:
+  -- Three of these tests would still have been red after a naive
+  -- implementation, and that is deliberate; they are the ones worth having:
   --
   --   * the leap-day case in "computes statutory age calendar-exactly", where
   --     dateutil's `relativedelta` CLAMPS and L4's `Date` ROLLS FORWARD.
@@ -3355,16 +3377,16 @@ spec bin = do
   --     `born.plus(years=18) <= assessed` disagrees on 9, all of them
   --     leap-day births; `born <= assessed.minus(years=18)` disagrees on
   --     NONE. The forward form is the wrong one against this oracle.
-  --   * "still refuses MAYBE of an enum", which is red not because the
-  --     refusal is missing but because the refusal's PROSE will be a false
-  --     claim the moment MAYBE NUMBER and MAYBE DATE land.
+  --   * "still refuses MAYBE of an enum", which was red not because the
+  --     refusal was missing but because the refusal's PROSE became a false
+  --     claim the moment MAYBE NUMBER and MAYBE DATE landed.
   --   * the `show if:` spelling, where the `{variable:, is:}` form parses,
   --     renders, and is browser-side JavaScript only — it defines every field
   --     under an API drive and cannot encode a constructor payload at all.
   --
   -- No M4 example carries a byte golden here. See `daListSource` for why.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble (M4: breadth — acceptance, RED)" $ do
+  describe "l4 docassemble (M4: breadth — acceptance)" $ do
 
     ------------------------------------------------------------------------
     -- A. `LIST OF` via DAList gathering
@@ -3785,5 +3807,160 @@ spec bin = do
             fixture ++ " no longer refuses (exit " ++ show code
             ++ "); M4 does not own this refusal"
         shouldContain' (fixture ++ " refusal") serr diagnostic
+
+    ------------------------------------------------------------------------
+    -- I. the repair pass (2026-08-17). Five adversarial lenses attacked M4
+    -- and an independent skeptic tried to refute each finding; these pin the
+    -- five that survived AND changed behaviour. Each one names the measured
+    -- failure, not just the shape it wants.
+    ------------------------------------------------------------------------
+    it "splices the letter template under an explicit indentation indicator (I/F)" $ do
+      -- A YAML block scalar with no indentation indicator takes its
+      -- indentation from its own FIRST non-empty line. The emitter indents
+      -- every template line by a flat four spaces, so a template opening on any
+      -- leading whitespace — ONE space is enough, and so is a whitespace-only
+      -- first line — set the block indent above four, and the first following
+      -- line at exactly four TERMINATED the scalar. The parser then met
+      -- template prose where an `attachment:` sub-key must be. Measured against
+      -- real docassemble 1.10.7: `parse.Interview` raises `DASourceError` from
+      -- parse.py:8352-8360, so the whole interview is unloadable — every
+      -- question, in BOTH artifact shapes — while `l4 docassemble` exits 0.
+      --
+      -- `|2`, not `|4`: the indicator is an offset from the PARENT node's
+      -- indentation and the `attachment:` mapping sits at two.
+      --
+      -- `notice-letter.letter.md` opens on an indented address block precisely
+      -- so the shipped corpus carries the trigger; strip the `2` from the
+      -- emitted YAML and the harness cannot even load the interview.
+      out <- daEmit bin daLetterSource
+      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
+        [] -> expectationFailure "no attachment block was emitted at all"
+        blocks -> for_ blocks \b -> do
+          shouldContain'    "the attachment block" b "content: |2"
+          shouldNotContain' "the attachment block" b "content: |\n"
+      -- and the template really does open indented, or the assertion above is
+      -- pinning a shape nothing exercises.
+      tpl <- readUtf8 daLetterTemplate
+      case dropWhile null (lines tpl) of
+        (firstLine : _) | " " `isPrefixOf` firstLine -> pure ()
+        other -> expectationFailure $
+          daLetterTemplate ++ " no longer opens on an indented line, so the "
+          ++ "block-scalar indicator above is no longer exercised by anything: "
+          ++ show (take 1 other)
+
+    it "re-assembles the letter when an earlier answer changes (I/F, §8.4)" $ do
+      -- §8.4's repair put `reconsider: True` on the derived CODE blocks and
+      -- stopped there. An attachment is derived too, and docassemble assembles
+      -- one only when the variable it names is SOUGHT (parse.py:9513-9530 at
+      -- 1b6678384) — a variable that is already defined is never sought. So the
+      -- letter was computed once and outlived every later answer: measured on
+      -- this example, changing the notice period from three months to one left
+      -- the verdict screen reading `..._screen_fails` above a letter still
+      -- saying "Notice period served: 3 month(s)" and "the notice is valid".
+      -- A non-flipping edit was stale the same way.
+      out <- daEmit bin daLetterSource
+      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
+        [] -> expectationFailure "no attachment block was emitted at all"
+        blocks -> for_ blocks \b ->
+          shouldContain' "the attachment block" b "reconsider: True"
+
+    it "clears a gated answer when the answer that gates it is re-asked (I/B/C, §8.4)" $ do
+      -- `show if:` decides whether a gated question is ASKED. It does not
+      -- decide whether an answer already given SURVIVES its gate being
+      -- withdrawn, and `reconsider:` deletes derived variables only — so after
+      -- a review-block Edit the compliance checklist reported, on one screen,
+      -- "the outcome: refused" beside "the number of conditions: 9", and
+      -- `refused` carries no `the number of conditions` in L4 at all. The
+      -- paired MAYBE had the same shape: "is there an answer?: False" beside
+      -- "declared income: 2500". `undefine:` fires in `ask` (parse.py:5389) and
+      -- is a documented no-op on a variable that is not defined, so it costs
+      -- nothing forward and clears exactly the stale answers on a re-ask.
+      payload <- daEmit bin daPayloadSource
+      case [ b | b <- yamlBlocks payload, "q_d.the_outcome" `isInfixOf` b ] of
+        [] -> expectationFailure "no question block for the enum discriminator"
+        blocks -> for_ blocks \b -> do
+          shouldContain' "the discriminator question" b "undefine:"
+          shouldContain' "the discriminator question" b "d.the_number_of_conditions"
+          shouldContain' "the discriminator question" b "d.the_stated_ground_of_refusal"
+      -- and the payload follow-ups must NOT undefine anything: they gate
+      -- nothing, and clearing on every ask would erase the answer being given.
+      case [ b | b <- yamlBlocks payload
+               , "q_d.the_number_of_conditions" `isInfixOf` b ] of
+        [] -> expectationFailure "no question block for the payload follow-up"
+        blocks -> for_ blocks \b ->
+          shouldNotContain' "the payload follow-up question" b "undefine:"
+
+      maybes <- daEmit bin daMaybeSource
+      case [ b | b <- yamlBlocks maybes
+               , "q_c.declared_income_known" `isInfixOf` b ] of
+        [] -> expectationFailure "no question block for the is-known flag"
+        blocks -> for_ blocks \b -> do
+          shouldContain' "the is-known question" b "undefine:"
+          shouldContain' "the is-known question" b "c.declared_income"
+
+    it "reserves the interview's builtin and util namespaces too (I/R11)" $ do
+      -- M2 closed ONE THIRD of this hazard — the `l4runtime` star-import — and
+      -- left the two larger thirds open. A goal variable whose name already
+      -- resolves is never sought, because docassemble backchains only on
+      -- NameError; it resolves to a function object, which is truthy, so the
+      -- driver takes the "holds" branch, NO QUESTION IS ASKED, and the fidelity
+      -- report says `(nothing lost)`. Measured against real 1.10.7 on an
+      -- `@export` named `All`: `screen='All: Holds'`, `questions asked=[]`,
+      -- against an L4 `#EVAL` of FALSE. `Today` is worse — it is in the
+      -- user_dict for real, via `from docassemble.base.util import *`
+      -- (parse.py:131, exec'd at :8523-8524), which the emitter deliberately
+      -- does not suppress.
+      Output code sout serr <- runL4 bin ["docassemble", daGlobalShadowSource]
+      unless (code == ExitSuccess) $
+        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
+      shouldContain' "the emitted interview" sout "all_ = f.the_box_was_ticked"
+      shouldContain' "the emitted interview" sout "today_ = f.the_box_was_ticked"
+      let bare = [ ln | ln <- lines sout
+                 , any (`isInfixOf` (ln ++ " "))
+                       ["all = f.", "today = f.", "if all:", "if today:"] ]
+      unless (null bare) $
+        expectationFailure $
+          "an interview variable is spelled exactly like a name already bound "
+          ++ "in the interview's top-level namespace: " ++ show bare
+
+    it "declares, rather than mis-emits, the gather it cannot clear (I/§8.4)" $ do
+      -- `ask` runs `substitute_vars` over `reconsider:` and NOT over `undefine:`
+      -- (parse.py:5389 beside :5392 at 1b6678384), so an element question's
+      -- `<list>[i].<attr>` spelling would reach `undefine()` with the iterator
+      -- unresolved. The emitter therefore emits none there — and says so, which
+      -- is the difference between a bounded repair and a silent one.
+      Output code sout serr <- runL4 bin ["docassemble", daGatheredMaybeSource]
+      unless (code == ExitSuccess) $
+        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
+      -- the guard IS emitted on the element's value question …
+      shouldContain'    "the emitted interview" sout
+        "h.claimants[i].declared_income_known"
+      -- … and no `undefine:` reaches it.
+      shouldNotContain' "the emitted interview" sout "undefine:"
+      -- The omission is declared, per module, naming the gated variable.
+      tmp <- getTemporaryDirectory
+      let ymlPath = tmp </> "l4-da-gathered-maybe.yml"
+          repPath = tmp </> "l4-da-gathered-maybe.fidelity.txt"
+      Output code2 _ serr2 <-
+        runL4 bin ["docassemble", daGatheredMaybeSource, "-o", ymlPath]
+      unless (code2 == ExitSuccess) $
+        expectationFailure ("emit -o failed\n--- stderr ---\n" ++ serr2)
+      report <- readUtf8 repPath
+      shouldContain' "the fidelity report" report "DA-UNDEFINE-LIST"
+      shouldContain' "the fidelity report" report "h.claimants[i].declared_income"
+      removePathForcibly ymlPath
+      removePathForcibly repPath
+
+    it "refuses M4's own two new collisions, by their own names (I)" $
+      for_ daM4Refused \(fixture, diagnostic) -> do
+        Output code _ serr <-
+          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
+        unless (code == ExitFailure 1) $
+          expectationFailure $
+            fixture ++ " no longer refuses (exit " ++ show code ++ ")"
+        shouldContain' (fixture ++ " refusal") serr diagnostic
+        -- Not the internal-error message: a user-authored condition must be
+        -- reported in L4 terms, naming what to rename.
+        shouldNotContain' (fixture ++ " refusal") serr "internal id collision"
   where
     for_ xs f = mapM_ f xs

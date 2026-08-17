@@ -20,8 +20,19 @@
 -- The recipe that does work, probed against 1.10.7: `note:` rows carrying
 -- `showifdef('<var>', '<not asked>')`. A note row has no `saveas` to evaluate,
 -- so it always renders, giving one row per L4 input including the never-asked
--- ones; pair each with an `Edit:` row gated on `show if: defined('<var>')` so
--- the edit affordance appears only where there is an answer to edit.
+-- ones. That is the whole of what M4 emits.
+--
+-- NOT `Edit:` rows. This paragraph used to end "pair each with an `Edit:` row
+-- gated on `show if: defined('<var>')` so the edit affordance appears only
+-- where there is an answer to edit". That probe result is real, but the GREEN
+-- phase then declined to emit `Edit:` rows at all (spec §10, "What M4 did NOT
+-- do"): the checklist is a VIEW, and the answer-changing path it exists to make
+-- ordinary is tested through `undefine()` + re-ask, which is what §8.4's repair
+-- was measured against. Emitting edit affordances is a UI decision with its own
+-- probes owing. Every one of the thirteen committed goldens has zero `Edit:`
+-- rows; the sentence was retracted here on 2026-08-17 so this file, which is
+-- what a reader opens to understand the review block, stops describing a shape
+-- the emitter does not produce.
 
 DECLARE Filing
     HAS

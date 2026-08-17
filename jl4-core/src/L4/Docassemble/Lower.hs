@@ -624,6 +624,7 @@ lowerModule side mod' =
                                   <> refNotes (moduleSource mod') droppedRefs
                                   <> glossNotes (moduleSource mod') ctx.ctxGlossOut
                                   <> reviewNotes (moduleSource mod') blocks
+                                  <> undefineNotes (moduleSource mod') blocks
                                   <> attachNotes (moduleSource mod') attach
                      }
                Right
@@ -639,13 +640,23 @@ lowerModule side mod' =
                  , report
                  )
 
--- | M4 (spec §10): the compliance-checklist view, emitted for EVERY module.
+-- | M4 (spec §10): the compliance-checklist view, emitted for every module that
+-- asks at least one question.
 --
 -- Universal rather than opted into, and that is a decision rather than an
 -- oversight: nothing in an L4 source says \"give me a checklist\", so the
 -- alternatives were a CLI flag (which would make the artifact depend on how it
 -- was invoked) or a new annotation (new grammar for a view). Every interview
--- gets one, reachable by firing its event and inert otherwise.
+-- with an input to list gets one, reachable by firing its event and inert
+-- otherwise.
+--
+-- The one exception is the @null rows@ guard below, and it is exact rather than
+-- a hedge: a module with no non-element question at all emits no block, because
+-- an empty @review:@ sequence is malformed. A module whose only inputs are
+-- gathered list elements still gets one, since @there_are_any@ and
+-- @there_is_another@ are non-element questions. (This haddock and spec §10 both
+-- read \"every module\" until 2026-08-17 — three lines above the guard that
+-- contradicted them.)
 --
 -- List ELEMENT questions are left out: their variable carries docassemble's
 -- iterator (@\<list\>[i].\<attr\>@), which has no meaning outside the gather, so
@@ -702,6 +713,31 @@ reviewNotes src blocks =
   | not (null elemVars) ]
  where
   elemVars = [ q.qVar | DAQuestionBlock q <- blocks, isElementVar q.qVar ]
+
+-- | M4 (spec §8.4): the changed-answer repair does not reach INSIDE a gather,
+-- and says so. A guarded question's gate is cleared by @undefine:@ on the
+-- question that gates it, but @ask@ runs @substitute_vars@ over @reconsider:@
+-- and not over @undefine:@ (@parse.py:5389@ beside @:5392@ at @1b6678384@), so
+-- a @\<list\>[i].\<attr\>@ spelling would reach @undefine()@ with the iterator
+-- unresolved. Rather than emit a name docassemble cannot resolve, the emitter
+-- emits nothing there and declares it.
+undefineNotes :: Text -> [DABlock] -> [FidelityNote]
+undefineNotes src blocks =
+  [ MkFidelityNote
+      { code = "DA-UNDEFINE-LIST", severity = Advisory, element = src, range = Nothing
+      , message = "these gathered list attributes are asked only under a guard, and \
+                  \changing the answer that guards one does not clear it, because \
+                  \docassemble does not resolve an element's iterator in an `undefine:` \
+                  \list: "
+                    <> Text.intercalate ", " gatedElemVars
+      , lost = "changed-answer hygiene inside a gather; the verdict is still recomputed \
+               \from the current answers, but a value whose guard has been withdrawn \
+               \stays defined at the answer it was given"
+      }
+  | not (null gatedElemVars) ]
+ where
+  gatedElemVars =
+    nubOrd [ q.qVar | DAQuestionBlock q <- blocks, isElementVar q.qVar, isJust q.qShowIf ]
 
 -- | M4: the letter template is the author's Mako and rides verbatim.
 attachNotes :: Text -> Maybe DAAttachment -> [FidelityNote]
@@ -1180,12 +1216,14 @@ listArts ctx var l4 dsc rs = do
     { qId = "q_" <> var <> ".there_are_any", qVar = var <> ".there_are_any"
     , qLabel = l4 <> " — is there at least one?"
     , qText  = l4 <> " — is there at least one?"
-    , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing, qShowIf = Nothing }
+    , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing, qShowIf = Nothing
+    , qUndefine = [] }
   moreQ = MkDAQuestion
     { qId = "q_" <> var <> ".there_is_another", qVar = var <> ".there_is_another"
     , qLabel = l4 <> " — is there another one?"
     , qText  = l4 <> " — is there another one?"
-    , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing, qShowIf = Nothing }
+    , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing, qShowIf = Nothing
+    , qUndefine = [] }
   -- `[i]` is docassemble's own iterator spelling: the question is generic over
   -- the index, and the engine substitutes the concrete element when it seeks
   -- `<list>[0].<attr>`.
@@ -1212,10 +1250,15 @@ scalarArts
   -> Either LF ([DACode], [DAQuestion])
 scalarArts ctx var l4 dsc kind dflt = do
   ctl <- controlOf kind l4
+  extra <- payloadQs kind
   let valueQ = MkDAQuestion
         { qId = "q_" <> var, qVar = var, qLabel = l4, qText = l4
-        , qHelp = dsc, qControl = ctl, qDefault = dflt, qShowIf = guardOf kind }
-  extra <- payloadQs kind
+        , qHelp = dsc, qControl = ctl, qDefault = dflt, qShowIf = guardOf kind
+        -- Re-answering the discriminator clears every constructor's payload
+        -- (spec §8.4). Not only the payloads of the constructor being left:
+        -- which constructor is being left is not knowable here, and the ones
+        -- the new answer needs are re-asked immediately.
+        , qUndefine = gatedBy [ q.qVar | q <- extra ] }
   pure ([], knownQ kind <> [valueQ] <> extra)
  where
   -- R8. The flag comes FIRST so a backchaining interview asks "is there an
@@ -1228,8 +1271,21 @@ scalarArts ctx var l4 dsc kind dflt = do
             , qLabel = l4 <> " — is there an answer?"
             , qText  = l4 <> " — is there an answer?"
             , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing
-            , qShowIf = Nothing } ]
+            , qShowIf = Nothing
+            -- Re-answering "is there an answer?" clears the value it gates: a
+            -- flag flipped back to False must not leave the old amount behind
+            -- for the checklist to report beside it (spec §8.4).
+            , qUndefine = gatedBy [var] } ]
     _ -> []
+  -- Element questions are left out, exactly as 'reviewOf' leaves them out and
+  -- for the same reason: their variable carries docassemble's `[i]` iterator,
+  -- and `ask` does NOT run `substitute_vars` over `undefine:` the way it does
+  -- over `reconsider:` (parse.py:5389 beside :5392 at 1b6678384), so the
+  -- iterator would reach `undefine()` unresolved. Declared, not silent —
+  -- 'undefineNotes' says so per module.
+  gatedBy vs
+    | isElementVar var = []
+    | otherwise        = vs
   guardOf k
     | isPairedMaybe k = Just (DAVar (knownVar var))
     | otherwise       = Nothing
@@ -1261,7 +1317,8 @@ scalarArts ctx var l4 dsc kind dflt = do
           , qLabel = f.fsL4, qText = f.fsL4
           , qHelp = f.fsDesc <|> typeDescOf ctx f.fsTy
           , qControl = fctl, qDefault = Nothing
-          , qShowIf = Just (DACmp DAEq (DAVar var) (DAStrLit ci.ciName)) }
+          , qShowIf = Just (DACmp DAEq (DAVar var) (DAStrLit ci.ciName))
+          , qUndefine = [] }
 
 -- | The two @MAYBE@ payloads whose absence a widget cannot express, and which
 -- therefore ride as a PAIR of questions (R8): an unanswered number submits as
@@ -1299,7 +1356,8 @@ payloadVar enumVar fieldSan =
 mkQuestion :: Text -> Text -> Maybe Text -> DAFieldControl -> Maybe DAExpr -> DAQuestion
 mkQuestion var l4 dsc ctl dflt = MkDAQuestion
   { qId = "q_" <> var, qVar = var, qLabel = l4, qText = l4
-  , qHelp = dsc, qControl = ctl, qDefault = dflt, qShowIf = Nothing }
+  , qHelp = dsc, qControl = ctl, qDefault = dflt, qShowIf = Nothing
+  , qUndefine = [] }
 
 -- ---------------------------------------------------------------------------
 -- Type classification (R6, R8)
@@ -1675,6 +1733,19 @@ maybeArms env repr scrut branches = do
 -- numeric zero. For a paired @MAYBE NUMBER@\/@DATE@ the flag has to be
 -- consulted first, because the value variable does not exist on the absent path
 -- and reading it would raise.
+--
+-- @ReprEmpty@ — a @MAYBE STRING@, whose absence encoding IS @== \'\'@ — has one
+-- payload value it cannot express, and it is refused rather than lowered
+-- (narrowed 2026-08-17; spec §8.8). @WHEN JUST \"\"@ would compile to exactly
+-- the absence test, so two distinct L4 answers (@NOTHING@ and @JUST \"\"@)
+-- would become one Python expression; worse, this module's own
+-- @DA-MAYBE-STRING@ advisory declares that an empty submission READS AS
+-- @NOTHING@, so the one interview state the test can reach is the state where
+-- L4 says @FALSE@ — the emitted answer is inverted, not merely conflated.
+-- §8.8's ruling admits payload-value matches on the condition that
+-- \"@WHEN JUST \<value\>@ must NOT compile to a presence test\"; this is the
+-- one literal for which that cannot be honoured, so it refuses by name.
+-- Every non-empty string literal is unaffected.
 payloadValueTest :: MaybeRepr -> DAExpr -> Pattern Resolved -> Either LF DAExpr
 payloadValueTest repr scrutE pv = do
   lit <- case pv of
@@ -1687,9 +1758,16 @@ payloadValueTest repr scrutE pv = do
   let test = case lit of
         Left b  -> DAIsBool scrutE b
         Right e -> DACmp DAEq scrutE e
-  pure $ case repr of
-    ReprFlag flg -> DAAnd (DAVar flg) test
-    _            -> test
+  case (repr, lit) of
+    (ReprEmpty, Right (DAStrLit "")) ->
+      Left (LFFatal "`WHEN JUST \"\"` on a MAYBE STRING is refused: an optional text answer \
+                    \encodes NOTHING as the empty string, so this arm and the `WHEN NOTHING` \
+                    \arm would compile to the same test and the interview could not tell a \
+                    \positively blank answer from no answer at all (spec §8.8). Match a \
+                    \non-empty literal, or bind the payload (`WHEN JUST x`) and test it in \
+                    \the arm body")
+    (ReprFlag flg, _) -> pure (DAAnd (DAVar flg) test)
+    _                 -> pure test
 
 -- | The arm test: the radio answer is the constructor's L4 name, verbatim, for
 -- a payload-bearing constructor exactly as for a nullary one (R6). What the
@@ -2215,13 +2293,32 @@ dedupById = go Map.empty
 -- definitions that sanitise to the same name — or one name defined both by a
 -- question and by a code block — would silently conflate (the OpenFisca
 -- 'checkCollisions' discipline).
+--
+-- TWO collisions, not one (the second repaired 2026-08-17).
+--
+--   * TWO L4 NAMES, ONE VARIABLE — @notice period@ beside @notice_period@. Two
+--     different (role, L4 name) pairs claim one variable, and the message names
+--     both originals.
+--   * ONE L4 NAME, TWO DEFINITIONS. M4 hoists a constructor payload to a
+--     SIBLING attribute of the record that holds the enum ('payloadVar'), so a
+--     payload field named @the number of conditions@ collides with a record
+--     field of that name, and two constructors that each carry a @reason@
+--     collide with each other. Both pairs carry an IDENTICAL
+--     @(\"question\", label)@ meta, so the first check's @nubOrd@ folded them
+--     to one entry and said nothing; 'dedupById' then refused with
+--     @internal id collision@ — a message this module's own comment calls
+--     misleading, which names a block id and neither L4 definition. Comparing
+--     the BLOCKS rather than their metas is what tells \"the same question
+--     reached from two exports\" (legitimately emitted once, and equal) from
+--     \"two different questions\" (here, differing in their @show if@ guard).
 checkNameCollisions :: [(Text, (Text, Text))] -> [DABlock] -> Either [LowerError] ()
 checkNameCollisions extra blocks =
   case bad of
     []      -> Right ()
     (e : _) -> Left [e]
  where
-  entries = extra <> concatMap entryOf blocks
+  entries = [ (v, (meta, Nothing)) | (v, meta) <- extra ]
+         <> [ (v, (meta, Just b))  | b <- blocks, (v, meta) <- entryOf b ]
   entryOf = \case
     DAQuestionBlock q -> [(q.qVar, ("question", q.qLabel))]
     DACodeBlock c     -> [(c.cVar, ("code", fromMaybe c.cVar c.cL4))]
@@ -2231,16 +2328,34 @@ checkNameCollisions extra blocks =
     DADriverBlock d   -> case d of
       DASeamDriver _ _ _ _ verdictV _ _ _ -> [(verdictV, ("code", verdictV))]
       _                                   -> []
-  byName = Map.fromListWith (<>) [ (v, [meta]) | (v, meta) <- entries ]
-  bad =
-    [ MkLowerError ""
-        ( "name collision: `" <> v <> "` is produced by "
-            <> Text.intercalate " and "
-                 (nubOrd [ role <> " (L4 `" <> l4 <> "`)" | (role, l4) <- metas ])
-            <> " — distinct definitions sharing one docassemble variable are unsafe; rename one" )
-    | (v, metas) <- Map.toList byName
-    , length (nubOrd metas) > 1
-    ]
+  byName = Map.fromListWith (<>) [ (v, [e]) | (v, e) <- entries ]
+  bad = concat [ collisionsFor v es | (v, es) <- Map.toList byName ]
+
+  collisionsFor v es
+    | length (nubOrd metas) > 1 =
+        [ MkLowerError ""
+            ( "name collision: `" <> v <> "` is produced by "
+                <> Text.intercalate " and "
+                     (nubOrd [ role <> " (L4 `" <> l4 <> "`)" | (role, l4) <- metas ])
+                <> " — distinct definitions sharing one docassemble variable are unsafe; rename one" ) ]
+    | (role, l4) : _ <- metas, length (nub blocksHere) > 1 =
+        [ MkLowerError ""
+            ( "name collision: `" <> v <> "` is produced by two different "
+                <> role <> " blocks that both come from the L4 name `" <> l4 <> "`"
+                <> hint role
+                <> "; rename one" ) ]
+    | otherwise = []
+   where
+    metas      = map fst es
+    blocksHere = [ b | (_, Just b) <- es ]
+    -- The payload hoist is the only way to reach this today, and saying so is
+    -- the difference between a diagnostic and a puzzle.
+    hint "question" =
+      " — a constructor payload becomes a sibling attribute of the record that \
+      \holds the enum, so a payload field collides with a record field of the \
+      \same name, and two constructors carrying the same payload field name \
+      \collide with each other"
+    hint _ = " — distinct definitions sharing one docassemble variable are unsafe"
 
 -- ---------------------------------------------------------------------------
 -- Names
@@ -2307,6 +2422,12 @@ pyIdent raw =
 -- actually produce (it lower-cases, and Python is case-sensitive). Reserving
 -- them for the bare artifact too is deliberate: the two shapes must not
 -- disagree about a variable's name either.
+--
+-- 'daGlobalNamespace' is the rest of that same hazard, added 2026-08-17: the
+-- @l4runtime@ star-import is one of THREE things already bound in the
+-- interview's top-level namespace, and the two larger ones — Python's builtins
+-- and @docassemble.base.util@ — were left open. See its own haddock for the
+-- measurement.
 pyReserved :: Set Text
 pyReserved = Set.fromList $
   [ "and","as","assert","async","await","break","class","continue","def","del"
@@ -2324,6 +2445,120 @@ pyReserved = Set.fromList $
   , "l4_citations_fresh"
   ]
   <> [ n | n <- runtimeExports, Text.toLower n == n ]
+  <> Set.toList daGlobalNamespace
+
+-- | The rest of the interview's TOP-LEVEL namespace, vendored from docassemble
+-- 1.10.7 (checkout @1b6678384@), and the hole this closes is the same one the
+-- 'pyReserved' docstring above narrates having been bitten by once: a goal or
+-- rule variable whose name ALREADY RESOLVES is never sought, because
+-- docassemble backchains only on @NameError@. It resolves to a function object,
+-- which is truthy, so the driver takes the \"holds\" branch, NO QUESTION IS
+-- ASKED AT ALL, and the fidelity report says @(nothing lost)@. M2 closed the
+-- @l4runtime@ half of that namespace and left the two larger halves open.
+--
+-- Both halves measured, 2026-08-17, by driving real @docassemble.base@ 1.10.7:
+-- an @\@export@ named @All@ lowers to @all@, and the emitted interview answers
+-- @Holds@ against an L4 @#EVAL@ of @FALSE@ with @questions asked=[]@. The same
+-- for @Today@, @Value@, @Message@, @Word@ and @Currency@ — those five come from
+-- the second half, so they are in the user_dict for real rather than reached
+-- through @__builtins__@.
+--
+--   * PYTHON BUILTINS. The driver's @if all:@ execs in the user_dict, whose
+--     @__builtins__@ Python injects automatically; @'all' in user_dict@ is
+--     False while @eval('all', user_dict)@ returns the built-in. @defined()@
+--     agrees, for the same reason: it is @try: eval(var, {}); return True@
+--     (@functions.py@ at the pin), and an empty globals dict is auto-populated
+--     with @__builtins__@ too.
+--   * @docassemble.base.util@. @parse.py:131@ compiles
+--     @from docassemble.base.util import *@ and @Interview.assemble@ execs it
+--     into the user_dict on every pass unless the interview sets
+--     @imports_util@ (@parse.py:8523-8524@, @8643-8647@, @9055-9057@). The
+--     emitter deliberately keeps @docassemble.base.util@ out of @modules:@
+--     (spec §8.11) precisely so that auto-import still happens, so this is not
+--     avoidable by emitting differently.
+--
+-- Filtered to the names @pyIdent@ can actually produce: it lower-cases, so
+-- @DAObject@, @Person@, @ValueError@ and the rest of the CamelCase surface is
+-- unreachable and is not vendored. Regenerate with:
+--
+-- > python -c 'import builtins,re;d={};exec("from docassemble.base.util import *",d);\
+-- >   p=re.compile(r"^[a-z0-9_]+$");\
+-- >   print(sorted({n for n in set(d)|set(dir(builtins)) if not n.startswith("_") and p.match(n)}))'
+--
+-- Local evidence, never a build dep (spec §8.10) — the same discipline as
+-- 'daObjectReserved', which vendors the ATTRIBUTE namespace this one's
+-- top-level counterpart leaves alone.
+daGlobalNamespace :: Set Text
+daGlobalNamespace = Set.fromList
+  [ "abs", "action_argument", "action_arguments", "action_button_html"
+  , "action_menu_item", "add_separators", "aiter", "all"
+  , "all_variables", "alpha", "anext", "any", "as_datetime", "ascii"
+  , "assemble_docx", "background_action", "background_error_action"
+  , "background_response", "background_response_action", "bin", "bold"
+  , "bool", "breakpoint", "bytearray", "bytes", "callable"
+  , "capitalize", "chain", "chat_partners_available", "chr"
+  , "classmethod", "clear_explanations", "comma_and_list"
+  , "comma_list", "command", "compile", "complex", "copyright"
+  , "countries_list", "country_name", "create_session", "create_user"
+  , "credits", "currency", "currency_symbol", "current_context"
+  , "current_datetime", "date_difference", "date_interval", "day_of"
+  , "decode_name", "define", "defined", "delattr", "delete_record"
+  , "device", "dict", "dir", "dispatch", "divmod", "docx_concatenate"
+  , "dow_of", "encode_name", "enumerate", "eval", "exec", "exit"
+  , "explain", "filter", "fix_punctuation", "float", "force_ask"
+  , "force_gather", "forget_result_of", "format", "format_date"
+  , "format_datetime", "format_time", "from_b64_json", "frozenset"
+  , "get_chat_log", "get_config", "get_country"
+  , "get_default_timezone", "get_dialect", "get_emails", "get_info"
+  , "get_language", "get_locale", "get_progress", "get_question_data"
+  , "get_session_variables", "get_sms_session", "get_status"
+  , "get_user_info", "get_user_list", "get_user_secret", "get_voice"
+  , "getattr", "globals", "go_back_in_session", "hasattr", "hash"
+  , "help", "hex", "id", "include_docx_template", "indefinite_article"
+  , "indent", "initiate_sms_session", "input", "int", "interface"
+  , "interview_email", "interview_list", "interview_menu"
+  , "interview_url", "interview_url_action"
+  , "interview_url_action_as_qr", "interview_url_as_qr", "invalidate"
+  , "invite_user", "isinstance", "iso_country", "issubclass", "italic"
+  , "item_label", "iter", "json", "json_response"
+  , "language_from_browser", "language_name", "last_access_days"
+  , "last_access_delta", "last_access_hours", "last_access_minutes"
+  , "last_access_time", "len", "license", "list", "locals"
+  , "location_known", "location_returned", "log", "logic_explanation"
+  , "manage_privileges", "map", "map_of", "mark_task_as_performed"
+  , "max", "memoryview", "message", "min", "month_of", "name_suffix"
+  , "need", "next", "nice_number", "noun_plural", "noun_singular"
+  , "noyes", "object", "objects_from_file", "ocr_file"
+  , "ocr_file_in_background", "oct", "open", "ord", "ordinal"
+  , "ordinal_number", "overlay_pdf", "path_and_mimetype"
+  , "pdf_concatenate", "period_list", "phone_number_formatted"
+  , "phone_number_in_e164", "phone_number_is_valid"
+  , "phone_number_part", "plain", "pow", "prevent_going_back", "print"
+  , "process_action", "property", "qr_code", "quantity_noun", "quit"
+  , "quote_paragraphs", "range", "raw", "re", "re_run_logic"
+  , "read_qr", "read_records", "reconsider", "redact", "referring_url"
+  , "repr", "response", "retrieve_stashed_data", "returning_user"
+  , "reversed", "roman", "round", "run_action_in_session"
+  , "run_python_module", "selections", "send_email", "send_fax"
+  , "send_sms", "server_capabilities", "session_tags", "set"
+  , "set_country", "set_info", "set_language", "set_live_help_status"
+  , "set_locale", "set_parts", "set_progress", "set_save_status"
+  , "set_session_variables", "set_status", "set_task_counter"
+  , "set_title", "set_user_info", "set_variables", "setattr", "showif"
+  , "showifdef", "single_paragraph", "single_to_double_newlines"
+  , "slice", "sorted", "space_to_underscore", "split", "start_time"
+  , "stash_data", "state_name", "states_list", "static_image"
+  , "staticmethod", "store_variables_snapshot", "str"
+  , "subdivision_type", "sum", "super", "task_not_yet_performed"
+  , "task_performed", "terminate_sms_session", "times_task_performed"
+  , "timezone_list", "title_case", "today", "transform_json_variables"
+  , "tuple", "type", "undefine", "update_locale", "update_terms"
+  , "url_action", "url_ask", "url_of", "us", "user_has_privilege"
+  , "user_info", "user_lat_lon", "user_logged_in", "user_privileges"
+  , "validation_error", "value", "variables_as_json", "vars"
+  , "verb_past", "verb_present", "verbatim", "word", "write_record"
+  , "year_of", "yesno", "zip", "zip_file"
+  ]
 
 -- | Sanitise an L4 record-field name into a @DAObject@ attribute. On top of
 -- 'pyIdent', names that land in the DAObject class/instance namespace get a

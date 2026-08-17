@@ -31,6 +31,26 @@
 -- way to have one is `variable name:` on the attachment — without it
 -- docassemble stores the document under `_internal['docvar'][n]`
 -- (parse.py:4997-5003) and there is nothing to assert about.
+--
+-- WHY THE TEMPLATE OPENS WITH AN INDENTED ADDRESS BLOCK. That is deliberate,
+-- and it is the fixture for a repair (2026-08-17). The template is spliced into
+-- a YAML block scalar, and a block scalar with no explicit indentation
+-- indicator takes its indentation from its own first non-empty line — so a
+-- template opening on ANY leading whitespace used to make the emitted YAML
+-- unparseable, in both artifact shapes, with `l4 docassemble` exiting 0. Not
+-- just the letter: `parse.Interview` raises `DASourceError` and NOT ONE
+-- QUESTION survives. `content: |2` is the fix, and this template is what proves
+-- it — strip the `2` from the emitted YAML and real docassemble 1.10.7 refuses
+-- to load the interview at all.
+--
+-- THE OTHER REPAIR THIS FILE PINS. The letter used to go stale. An attachment
+-- is assembled only when the variable it names is SOUGHT, and a variable that
+-- is already defined is never sought, so changing an answer left the verdict
+-- screen reading "fails" above a letter still saying the notice was valid.
+-- `reconsider: True` on the attachment block is the fix; `roundtrip_check.py`'s
+-- third case is what proves it, by re-checking the assembled CONTENT after the
+-- edit. No screen assertion could: `${ notice_letter }` renders headless to the
+-- literal 'None'.
 
 DECLARE Notice
     HAS

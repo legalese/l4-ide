@@ -4,9 +4,11 @@
 #
 # This is the BEHAVIOURAL half of the M4 acceptance suite. The other half —
 # what the emitted YAML must SAY — is `cabal test l4-cli-test -m "M4: breadth"`.
-# Neither passes until M4 lands; five of the six examples do not even emit,
-# and this script prints each refusal verbatim so that the redness is legible
-# rather than merely red.
+# Both are GREEN as of 2026-08-17: this script drives all seven examples from
+# both artifact shapes and reports "0 of 7 did not round-trip". It was written
+# fail-first, when five of the six examples of the day did not even emit, and it
+# still prints each refusal verbatim — so if an example ever stops emitting, the
+# reason is legible rather than merely red.
 #
 # Usage, from the repo root:
 #     jl4/examples/docassemble/m4_acceptance.sh <path-to-l4> <path-to-python>

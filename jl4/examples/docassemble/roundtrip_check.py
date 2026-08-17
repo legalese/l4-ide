@@ -266,9 +266,21 @@ class D:
 #   "change_answer"    {var: new value} re-driven after the first terminal
 #                      screen, the way a review-block Edit changes an answer
 #                      (undefine + re-ask). Paired with "after", which carries
-#                      goal/verdict/explanations for the re-drive. This is the
+#                      goal/verdict/explanations/screen_omits AND its own
+#                      "post_conditions" for the re-drive. This is the
 #                      M2 inherited defect (spec §8.4), whose named owner is M4.
+#                      "after"."post_conditions" is the half that catches a
+#                      STALE DOCUMENT: an attachment is assembled only when its
+#                      variable is sought, a defined variable is never sought,
+#                      and `${ <var> }` renders headless to 'None' — so no
+#                      screen assertion can see the letter go stale.
 #   "review_unanswered"  how many review rows must carry a never-asked marker.
+#   "review_omits"     substrings the rendered checklist rows must NOT carry.
+#                      Written for the §8.4 gate-withdrawn claim: a payload or a
+#                      paired value whose gate has been changed away must not
+#                      still be reported. The review block is fired LAST, after
+#                      "change_answer", so on a case that changes an answer
+#                      these are the rows after the edit.
 #
 # and these per-example keys:
 #
@@ -619,9 +631,22 @@ EXAMPLES = {
         # B. Constructor payloads via `show if`. Two claims per case: the
         # follow-up for the constructor that was NOT chosen is never asked,
         # and it is left genuinely UNDEFINED afterwards -- not '', not 0.
-        # Only the `{code: …}` spelling of `show if` does that; the
-        # `{variable:, is:}` spelling is browser-side JavaScript and would
-        # define every field on this drive.
+        #
+        # WHAT `undefined_after` HERE ACTUALLY PINS, corrected 2026-08-17. It
+        # pins the emitted `code:` block's SHORT-CIRCUIT -- the unchosen
+        # constructor's payload is never read, so it is never sought, so it
+        # never gets defined. It does NOT discriminate the `show if:` spelling.
+        # This comment used to claim it did ("Only the `{code: …}` spelling does
+        # that; the `{variable:, is:}` spelling ... would define every field on
+        # this drive"), and that is false of this fixture, measured both ways:
+        # rewriting both guards to `{variable:, is:}` passes unchanged, and so
+        # does deleting every `show if:` outright. The reason is structural --
+        # this harness reads `status.get_field_list()`, which never consults
+        # `extras['ok']`, the map `showif_code` writes -- so a hidden field
+        # would be answered by the drive whatever the spelling. The spelling is
+        # a real docassemble fact and it IS pinned, in the two places that can
+        # pin it: `jl4/tests-cli/Main.hs` asserts the emitted sub-key, and the
+        # byte golden fixes the bytes.
         "goal_candidates": ["an_appeal_lies", "interview_goal"],
         "verdict_candidates": ["verdict", "an_appeal_lies_verdict"],
         "cases": [
@@ -687,7 +712,43 @@ EXAMPLES = {
                     ["d.the_number_of_conditions", "the_number_of_conditions"],
                 ],
             },
+            {
+                # THE GATE-WITHDRAWN CLAIM (spec §8.4). `show if:` decides
+                # whether the payload is ASKED; before the repair it did not
+                # decide whether an answer already given survived the
+                # discriminator being changed. Measured pre-repair, the
+                # checklist read:
+                #     the outcome: refused
+                #     the number of conditions: 9
+                # and `refused` carries no `the number of conditions` in L4 at
+                # all. The verdict was right throughout -- Python short-circuits
+                # on the discriminator -- so nothing else in the harness could
+                # see it, and an attachment interpolating the payload would have
+                # printed it into the letter.
+                "label": "conditional(9) -> refused: the payload does not survive",
+                "fixtures": {
+                    "the_outcome": "granted subject to conditions",
+                    "the_number_of_conditions": 9,
+                },
+                "goal": True,
+                "verdict": "Holds",
+                "change_answer": ["the_outcome"],
+                "after": {
+                    "fixtures": {
+                        "the_outcome": "refused",
+                        "the_stated_ground_of_refusal": "the premises are unsuitable",
+                    },
+                    "goal": True,
+                },
+                "review_unanswered": 1,
+                "review_omits": ["the number of conditions: 9"],
+            },
         ],
+        "review": {
+            "labels": ["the outcome", "the number of conditions",
+                       "the stated ground of refusal"],
+            "markers": ["not asked"],
+        },
     },
 
     "maybe-scalars": {
@@ -819,7 +880,46 @@ EXAMPLES = {
                 "goal": False,
                 "verdict": "Fails",
             },
+            {
+                # The paired half of the same §8.4 claim. Pre-repair the
+                # checklist said, on one screen:
+                #     declared income - is there an answer?: False
+                #     declared income: 2500
+                # The flag is consulted first, so the verdict never read the
+                # orphaned value; the CHECKLIST did.
+                "label": "8. income known -> unknown: the value does not survive",
+                "fixtures": {
+                    "declared_income_known": True,
+                    "declared_income_is_known": True,
+                    "has_declared_income": True,
+                    "declared_income": 2500,
+                    "date_last_worked_known": False,
+                    "date_last_worked_is_known": False,
+                    "has_date_last_worked": False,
+                    "declaration_confirmed": True,
+                },
+                "goal": True,
+                "verdict": "Holds",
+                "change_answer": ["declared_income_known"],
+                "after": {
+                    "fixtures": {
+                        "declared_income_known": False,
+                        "declared_income_is_known": False,
+                        "has_declared_income": False,
+                        "date_last_worked_known": False,
+                        "date_last_worked_is_known": False,
+                        "has_date_last_worked": False,
+                        "declaration_confirmed": True,
+                    },
+                    "goal": True,
+                },
+                "review_omits": ["declared income: 2500"],
+            },
         ],
+        "review": {
+            "labels": ["declared income", "date last worked"],
+            "markers": ["not asked"],
+        },
     },
 
     "statutory-age": {
@@ -950,6 +1050,53 @@ EXAMPLES = {
                     "contains": ["A. Tenant", "does not take effect"],
                     "omits": ["the notice is valid"],
                 }],
+            },
+            {
+                # M4 owns the §8.4 changed-answer defect, and the ASSEMBLED
+                # DOCUMENT is where it landed hardest: measured before the
+                # repair, the verdict screen read `..._screen_fails` while the
+                # letter on that same screen still said "Notice period served:
+                # 3 month(s)" and "the notice is valid". Both edits are driven
+                # at once, because they fail differently: the notice period
+                # FLIPS the verdict, and the tenant name changes nothing the
+                # rule reads, so a letter that tracked only the verdict would
+                # still be addressed to the wrong person.
+                "label": "the letter follows a changed answer, not just the verdict",
+                "fixtures": {
+                    "the_landlord_name": "Marbury Estates Ltd",
+                    "the_tenant_name": "A. Tenant",
+                    "the_property_address": "14 Chancery Lane, Flat B",
+                    "is_a_residential_tenancy": True,
+                    "written_notice_was_given": True,
+                    "months_of_notice_given": 3,
+                },
+                "goal": True,
+                "verdict": "Holds",
+                "post_conditions": [{
+                    "expr": "notice_letter.html.content",
+                    "nonempty": True,
+                    "contains": ["A. Tenant", "3 month(s)", "the notice is valid"],
+                }],
+                "change_answer": ["months_of_notice_given", "the_tenant_name"],
+                "after": {
+                    "fixtures": {
+                        "the_landlord_name": "Marbury Estates Ltd",
+                        "the_tenant_name": "B. Occupier",
+                        "the_property_address": "14 Chancery Lane, Flat B",
+                        "is_a_residential_tenancy": True,
+                        "written_notice_was_given": True,
+                        "months_of_notice_given": 1,
+                    },
+                    "goal": False,
+                    "post_conditions": [{
+                        "expr": "notice_letter.html.content",
+                        "nonempty": True,
+                        "contains": ["B. Occupier", "1 month(s)",
+                                     "does not take effect"],
+                        "omits": ["A. Tenant", "3 month(s)",
+                                  "the notice is valid"],
+                    }],
+                },
             },
         ],
     },
@@ -1270,10 +1417,14 @@ def drive_case(interview, current_info, case, user_dict=None, fixtures=None,
     for step in range(len(fixtures_fuzzed) + MAX_EXTRA_STEPS + 4 * (gather_n or 0)):
         status = parse.InterviewStatus(current_info=current_info)
         # user_dict_context is what docassemble_webapp enters around assemble;
-        # without it get_current_user_dict() is None and functions.py:4234
-        # makes defined()/value()/showifdef() return False for EVERY variable,
-        # including defined ones -- which would silently break any review-block
-        # assertion (measured).
+        # without it get_current_user_dict() is None and _inspect_user_dict
+        # takes its failure path (functions.py:4232-4237 at 1b6678384) for EVERY
+        # variable, including defined ones. showifdef() then returns its
+        # `alternative` -- '' by default -- so every review row would render
+        # blank and any review-block assertion would be silently vacuous.
+        # (defined() returns False, the only is_predicate() caller; value() is
+        # not is_pure(), so it reaches force_ask_nameerror and RAISES
+        # DANameError. All three executed.)
         with user_dict_context(user_dict):
             interview.assemble(user_dict, status)
         qtype = getattr(status.question, "question_type", None)
@@ -1383,6 +1534,54 @@ def review_rows(status):
     return rows
 
 
+def check_post_conditions(user_dict, posts, problems, checked, when=""):
+    """Assert on values the SCREEN cannot show -- an assembled document above
+    all. Called twice per case that changes an answer: once on the forward
+    drive, once after the edit. The second call is not decoration. An
+    attachment is assembled only when the variable it names is SOUGHT
+    (parse.py:9513-9530 at 1b6678384) and a variable that is already defined is
+    never sought, so before `reconsider: True` reached the attachment block the
+    letter was computed once and then outlived every later answer -- the verdict
+    screen read `..._screen_fails` while the letter it carried still said the
+    notice was valid. Nothing on the screen can catch that: `${ notice_letter }`
+    renders headless to the literal 'None', so `screen_omits` is blind to it and
+    only the content itself is evidence.
+    """
+    prefix = "after the answer was changed, " if when else ""
+    for post in posts:
+        expr = post["expr"]
+        try:
+            with user_dict_context(user_dict):
+                value = eval(expr, user_dict)
+        except Exception as exc:
+            problems.append(
+                f"{prefix}post-condition {expr!r} could not be evaluated "
+                f"({type(exc).__name__}: {exc}) -- if this is a document, it "
+                f"most likely has no `variable name:` and was filed under "
+                f"_internal['docvar'][n] where nothing can assert about it")
+            continue
+        text = "" if value is None else str(value)
+        if post.get("nonempty") and not text.strip():
+            problems.append(
+                f"{prefix}post-condition {expr!r} evaluated to empty. This is "
+                f"the document-assembly failure that is genuinely silent: the "
+                f"interview completed, the variable is a healthy object, and "
+                f"the letter is blank")
+        for needle in post.get("contains", []):
+            if needle in text:
+                checked.append(f"{when}{expr} carries {needle!r}")
+            else:
+                problems.append(
+                    f"{prefix}post-condition {expr!r} does not carry "
+                    f"{needle!r}; got {text[:400]!r}")
+        for needle in post.get("omits", []):
+            if needle in text:
+                problems.append(
+                    f"{prefix}post-condition {expr!r} carries {needle!r}, "
+                    f"which belongs to the other branch of the letter -- a "
+                    f"document that survived the answer it was derived from")
+
+
 def check_case(interview, current_info, example, case, yaml_text=""):
     user_dict, status, transcript = drive_case(
         interview, current_info, case,
@@ -1469,68 +1668,8 @@ def check_case(interview, current_info, example, case, yaml_text=""):
 
     # M4/F: the attachment hazard. A SUCCESSFUL EMPTY RENDER raises nothing and
     # logs nothing, so the only defence is a post-condition on the content.
-    for post in case.get("post_conditions", []):
-        expr = post["expr"]
-        try:
-            with user_dict_context(user_dict):
-                value = eval(expr, user_dict)
-        except Exception as exc:
-            problems.append(
-                f"post-condition {expr!r} could not be evaluated "
-                f"({type(exc).__name__}: {exc}) -- if this is a document, it "
-                f"most likely has no `variable name:` and was filed under "
-                f"_internal['docvar'][n] where nothing can assert about it")
-            continue
-        text = "" if value is None else str(value)
-        if post.get("nonempty") and not text.strip():
-            problems.append(
-                f"post-condition {expr!r} evaluated to empty. This is the "
-                f"document-assembly failure that is genuinely silent: the "
-                f"interview completed, the variable is a healthy object, and "
-                f"the letter is blank")
-        for needle in post.get("contains", []):
-            if needle in text:
-                checked.append(f"{expr} carries {needle!r}")
-            else:
-                problems.append(
-                    f"post-condition {expr!r} does not carry {needle!r}; got "
-                    f"{text[:400]!r}")
-        for needle in post.get("omits", []):
-            if needle in text:
-                problems.append(
-                    f"post-condition {expr!r} carries {needle!r}, which "
-                    f"belongs to the other branch of the letter")
-
-    # M4/E: the compliance checklist. Reached by firing the review block's own
-    # event; a row per L4 input, and a never-asked marker on exactly the rows
-    # the short-circuit pruned away.
-    review_cfg = example.get("review")
-    if review_cfg is not None:
-        event = review_event_name(yaml_text)
-        if event is None:
-            problems.append(
-                "no `review:` block carrying an `event:` was emitted, so there "
-                "is no compliance-checklist view to reach")
-        else:
-            rstatus = fire_event(interview, current_info, user_dict, event)
-            rows = review_rows(rstatus)
-            blob = "\n".join(rows)
-            missing = [lbl for lbl in review_cfg["labels"] if lbl not in blob]
-            if missing:
-                problems.append(
-                    f"the review screen has no row for {missing!r}; a checklist "
-                    f"that lists only the questions that were asked says "
-                    f"nothing about the ones the law never reached")
-            marked = sum(1 for row in rows
-                         if any(m in row.lower() for m in review_cfg["markers"]))
-            want = case.get("review_unanswered")
-            if want is not None and marked != want:
-                problems.append(
-                    f"{marked} review rows are marked as never asked, expected "
-                    f"{want}; markers accepted are {review_cfg['markers']!r} "
-                    f"and the rows were {rows!r}")
-            elif want is not None:
-                checked.append(f"review: {len(rows)} rows, {marked} never asked")
+    check_post_conditions(user_dict, case.get("post_conditions", []),
+                          problems, checked)
 
     # M4/E, inherited from M2 (spec §8.4): change an earlier answer the way a
     # review-block Edit does -- undefine and re-ask -- and the verdict AND the
@@ -1580,6 +1719,11 @@ def check_case(interview, current_info, example, case, yaml_text=""):
                 f"{cites2!r}, expected exactly {after['explanations']!r} -- a "
                 f"citation to a rule that no longer fires is a citation to law "
                 f"that does not apply")
+        # The DOCUMENT after the edit. §8.4's repair reached the derived code
+        # blocks and stopped there; the assembled letter is derived too, and it
+        # is the artifact a reader would carry out of the room.
+        check_post_conditions(user_dict, after.get("post_conditions", []),
+                              problems, checked, when="after edit: ")
         if not [p for p in problems if "after the answer" in p]:
             checked.append(f"after edit: goal={goal2!r} cites={len(cites2)}")
         rendered2 = rendered_screen(status2)
@@ -1588,6 +1732,59 @@ def check_case(interview, current_info, example, case, yaml_text=""):
                 problems.append(
                     f"after the answer was changed the screen still cites "
                     f"{needle!r}")
+
+    # M4/E: the compliance checklist. Reached by firing the review block's own
+    # event; a row per L4 input, and a never-asked marker on exactly the rows
+    # the short-circuit pruned away.
+    #
+    # LAST, and after `change_answer` on purpose. Firing the review event parks
+    # the session on the review screen, so a re-drive that followed it would
+    # assemble straight back into that screen and ask nothing at all (measured:
+    # the transcript's re-drive step comes back empty and the goal is never
+    # recomputed). It also means that on a case that changes an answer, the rows
+    # asserted here are the rows AFTER the edit -- which is the state a review
+    # screen is actually for, and the state in which a gated answer whose gate
+    # has been withdrawn would still be reported.
+    review_cfg = example.get("review")
+    if review_cfg is not None:
+        event = review_event_name(yaml_text)
+        if event is None:
+            problems.append(
+                "no `review:` block carrying an `event:` was emitted, so there "
+                "is no compliance-checklist view to reach")
+        else:
+            rstatus = fire_event(interview, current_info, user_dict, event)
+            rows = review_rows(rstatus)
+            blob = "\n".join(rows)
+            missing = [lbl for lbl in review_cfg["labels"] if lbl not in blob]
+            if missing:
+                problems.append(
+                    f"the review screen has no row for {missing!r}; a checklist "
+                    f"that lists only the questions that were asked says "
+                    f"nothing about the ones the law never reached")
+            marked = sum(1 for row in rows
+                         if any(m in row.lower() for m in review_cfg["markers"]))
+            want = case.get("review_unanswered")
+            if want is not None and marked != want:
+                problems.append(
+                    f"{marked} review rows are marked as never asked, expected "
+                    f"{want}; markers accepted are {review_cfg['markers']!r} "
+                    f"and the rows were {rows!r}")
+            elif want is not None:
+                checked.append(f"review: {len(rows)} rows, {marked} never asked")
+            for needle in case.get("review_omits", []):
+                if needle in blob:
+                    problems.append(
+                        f"the review checklist still reports {needle!r}. A "
+                        f"`show if:` decides whether a gated question is ASKED; "
+                        f"it does not decide whether an answer already given "
+                        f"survives its gate being withdrawn. The checklist is "
+                        f"the artifact whose declared purpose is to state what "
+                        f"the interview holds, so reporting a payload the "
+                        f"chosen constructor does not carry -- or a value beside "
+                        f"an is-known flag that says there is none -- is a false "
+                        f"claim, and an attachment interpolating it would print "
+                        f"it into the letter (spec §8.4)")
 
     unused = sorted(set(fuzz(k) for k in case["fixtures"])
                     - {fuzz(v.split('.')[-1]) for _, _, asked in transcript for v in asked}

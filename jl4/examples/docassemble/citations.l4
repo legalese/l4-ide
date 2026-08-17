@@ -34,12 +34,23 @@
 --
 -- REPAIRED at M4 (2026-08-17), and the fourth #EVAL-less case in
 -- `roundtrip_check.py`'s fixture table asserts it: change the answer and the
--- goal, the verdict and the citations are what they would have been had the new
--- answer been given first. Two emitted things carry the repair, and neither is
--- visible in this source — see DOCASSEMBLE-EXPORT-SPEC.md §8.4: `reconsider:
--- True` on every derived block, and a citation-reset sentinel that the
--- mandatory driver references BEFORE the goal, so the explanation list is
--- emptied once per assemble pass, before any rule re-explains into it.
+-- GOAL and the CITATIONS are what they would have been had the new answer been
+-- given first. Not the verdict: this export's goal is a plain boolean, so R4
+-- lowers it through `DABoolDriver`, which emits no verdict variable at all —
+-- `expected/citations.yml` contains the string `verdict` zero times, and the
+-- harness's verdict assertions are guarded on one existing, so they are inert
+-- here in both directions. (The fixture schema carries `verdict_candidates` and
+-- per-case `verdict` on twelve of thirteen examples that produce none; it is a
+-- uniform polymorphic schema, and a lowering that started emitting one under a
+-- name outside the candidate list still fails loudly through the harness's
+-- "neither a goal variable nor a verdict variable is defined" backstop. The
+-- sentence above said "the goal, the verdict and the citations" until
+-- 2026-08-17; the claim was true of nothing this file emits.) Two emitted
+-- things carry the repair, and neither is visible in this source — see
+-- DOCASSEMBLE-EXPORT-SPEC.md §8.4: `reconsider: True` on every derived block,
+-- and a citation-reset sentinel that the mandatory driver references BEFORE the
+-- goal, so the explanation list is emptied once per assemble pass, before any
+-- rule re-explains into it.
 --
 -- The exported decision carries a `@ref` of its own, and it is the reason the
 -- expected citation lists below are asserted AS ORDERED LISTS. Order is

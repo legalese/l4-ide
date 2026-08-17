@@ -17,10 +17,13 @@ embedded byte-identically under `data/sources`, the generated runtime module
 loaded through `modules:`, `@ref` citations carried by `explain()` and rendered
 by `logic_explanation()` on every verdict screen, and the `auto terms:`
 glossary. An adversarial review pass the same day repaired what survived
-refutation, and corrected what it found to be false (see "What the review pass
-changed"). The seven `expected/` goldens are committed and
-pinned by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs` (41 cases across
-four `describe` blocks), and every example below was run green against
+refutation, and corrected what it found to be false (see "What the M2 review
+pass changed"). The seven `expected/` goldens are committed and
+pinned by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs` (39 cases across
+the four M2-era `describe` blocks — 41 when M2 landed; M4's RED phase retired
+two of them, `refuses MAYBE NUMBER by name` and ``refuses `WHEN JUST TRUE` ``,
+because M4 makes both constructs work), and every example below was run green
+against
 `docassemble.base` 1.10.7 (local checkout, commit `1b6678384`) from **both**
 artifact shapes — see "Prove it runs in real docassemble"._
 
@@ -32,7 +35,8 @@ pass. Six new examples are in this directory — `tenant-list`, `payload-enum`,
 with a committed `expected/` golden, and each driven in real docassemble.
 `./m4_acceptance.sh <l4 binary> <venv python>` now reports **0 of 7 not
 round-tripping**, driving every example from BOTH artifact shapes; the emission
-half is `cabal test l4-cli-test --test-options='-m "docassemble"'`, 57 cases.
+half is `cabal test l4-cli-test --test-options='-m "docassemble"'`, 64 cases
+across five `describe` blocks (39 M2-era + 25 M4).
 What shipped: `LIST OF <record>` gathered as a `DAList`, constructor payloads as
 `show if` follow-ups, `MAYBE NUMBER`/`MAYBE DATE` as paired is-known questions,
 the R12 date surface, a `review:` compliance checklist on EVERY interview, and
@@ -73,7 +77,7 @@ recognise the same program.
 | `@ref` on an expression                       | **nothing** — no `code:` block to hang it on; `DA-REF-EXPR` advisory   |
 | the rules that actually fired                 | `logic_explanation()` on every verdict screen (M2)                     |
 | `#EVAL`                                       | round-trip oracle input (R10); **not emitted** into the interview      |
-| every emitted question                        | one `note:` row in a `review:` compliance checklist, marked `**not asked**` when the law never reached it (M4, §10) |
+| every emitted question EXCEPT a gathered list element | one `note:` row in a `review:` compliance checklist, marked `**not asked**` when the law never reached it (M4, §10). A `<list>[i].<attr>` question gets no row — its variable carries docassemble's iterator and there is no element to name until the list is gathered — declared as `DA-REVIEW-LIST`, and visible in `expected/tenant-list.yml`, whose five questions produce two rows |
 | a sibling `<stem>.letter.md`                  | an `attachment:` with `variable name:`, assembled on the verdict screen (M4, §10) |
 
 ## Files
@@ -375,9 +379,15 @@ all already handled inside `roundtrip_check.py`):
 6. **never import `docassemble.base.interview_cache`** — its `get_index`
    hits `get_server_redis` unconditionally.
 7. **`user_dict_context(user_dict)` around every `assemble`** — only
-   `docassemble_webapp` enters it, and without it `defined()`, `value()` and
-   `showifdef()` return `False` for every variable, defined ones included
-   (`functions.py:4232-4234`). Added at M4, for the review block.
+   `docassemble_webapp` enters it, and without it `get_current_user_dict()` is
+   `None`, so `_inspect_user_dict` takes its failure path
+   (`functions.py:4232-4237` at `1b6678384`) for EVERY variable, defined ones
+   included. The three callers fail differently, which matters when debugging:
+   `defined()` returns `False` (it is the only `is_predicate()` caller),
+   `showifdef()` returns its `alternative` — `''` by default, so a review row
+   renders blank rather than "not asked" — and `value()` is not `is_pure()`, so
+   it falls through to `force_ask_nameerror` and RAISES `DANameError`. All three
+   executed. Added at M4, for the review block.
 8. **a review block is reached by firing its `event:`** through
    `current_info['action']`; without one the interview simply ends. That is not
    in tension with item 5 — the key must be absent by default, and present
@@ -461,11 +471,18 @@ against a `DADateTime` for a reason unrelated to the lowering.
 
 **Two harness DEFECTS were repaired to make this possible.** First: `assemble` is now
 wrapped in `user_dict_context(user_dict)`, which only `docassemble_webapp`
-enters. Without it `get_current_user_dict()` is `None` and
-`functions.py:4234` makes `defined()`, `value()` and `showifdef()` return
-`False` for EVERY variable, including defined ones — which would have made any
-review-block assertion silently vacuous. All seven M1/M2 examples were re-run
-after the change and stayed green.
+enters. Without it `get_current_user_dict()` is `None`, so
+`_inspect_user_dict` takes its failure path (`functions.py:4232-4237` at
+`1b6678384`) for EVERY variable, defined ones included — `showifdef()` returns
+its `alternative`, `''` by default, which would have made any review-block
+assertion silently vacuous. All seven M1/M2 examples were re-run after the
+change and stayed green. _(This paragraph and spec §8.10 item 1 both used to say
+all three of `defined()`, `value()` and `showifdef()` "return False". Corrected
+2026-08-17, executed: only `defined()` does — it is the sole `is_predicate()`
+caller; `showifdef()` returns the alternative, and `value()` is not `is_pure()`
+so it reaches `force_ask_nameerror` and RAISES `DANameError`. The repair was
+right; the stated mechanism was not, and a reader debugging on it would hunt for
+a silent `False` where an exception is thrown.)_
 
 Second: the `change_answer` case's VERDICT assertion was unguarded, while the
 forward assertion twenty lines above it skips when no verdict variable exists.
@@ -553,8 +570,8 @@ _Same discipline again: the tests landed first (commit `ec9850f6`, 15 failing
 CLI cases and 7 of 7 examples not round-tripping) and the implementation was
 written against them._
 
-- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble (M4: breadth …)"` —
-  eighteen assertions, one or two per §10 clause: the `DAList` and its
+- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble (M4: breadth — acceptance)"`
+  — twenty-five assertions, one or two per §10 clause: the `DAList` and its
   `object_type`, a gather-control question, a per-element question and a goal
   that QUANTIFIES; the per-element predicate keeping its short-circuit and the
   lowering never reaching for `complete_elements()`; every `show if:` carrying
@@ -569,8 +586,12 @@ written against them._
   and no `skip undefined: False`; an `attachment:` with `variable name:`, no
   `pdf`, and a verdict screen that references it; the attachment sub-key
   vocabulary; a `data/templates` entry in the `--package` tree; six byte
-  goldens; and (G), the regression guard for the four refusals M4 does **not**
-  own.
+  goldens; the real corpus file (`charity-test.l4`) that motivated `LIST OF`;
+  and (G), the regression guard for the four refusals M4 does **not** own. Five
+  more were added by the 2026-08-17 repair pass, under (I) — the block-scalar
+  indentation indicator, `reconsider:` on the attachment, `undefine:` on a
+  gating question, the declared `DA-UNDEFINE-LIST` narrowing inside a gather,
+  the builtin/`util` namespace reservation, and M4's own two new refusals.
 - `m4_acceptance.sh` — the behavioural half, all seven examples from both
   artifact shapes. Its claims are the ones that cannot be read off the YAML:
   per-element pruning inside a gather, an unchosen payload left UNDEFINED
@@ -591,7 +612,64 @@ seven M1/M2 goldens, which were re-read before being re-blessed:
    §8.4 repair: without it, changing an earlier answer left the VERDICT stale,
    not merely its citations.
 
-## What the review pass changed (2026-08-17)
+## What the M4 repair pass changed (2026-08-17)
+
+Five adversarial lenses attacked the landed M4 milestone and an independent
+skeptic tried to refute each finding. Five survivors changed behaviour:
+
+**A letter template that opened on leading whitespace emitted YAML nothing could
+load.** The template is spliced into a `content: |` block scalar, and a block
+scalar with no indentation indicator takes its indentation from its own first
+non-empty line — so one leading space set the block indent above the emitter's
+flat four, and the next line at four terminated the scalar. `parse.Interview`
+then raises `DASourceError`: not one question survives, in **both** artifact
+shapes, while `l4 docassemble` exits 0. Now `content: |2`, and
+`notice-letter.letter.md` opens on an indented address block so the corpus
+carries the trigger.
+
+**The assembled letter went stale after a changed answer.** §8.4's repair put
+`reconsider: True` on derived *code* blocks; an attachment is derived too, and
+docassemble assembles one only when its variable is sought — which never happens
+to a variable that is already defined. Measured: the verdict screen read
+`..._screen_fails` above a letter still saying "3 month(s)" and "the notice is
+valid". No screen assertion could see it, because `${ notice_letter }` renders
+headless to the literal `None`; the harness now re-checks the assembled CONTENT
+after the edit.
+
+**A gated ANSWER outlived its gate.** `show if:` decides whether a question is
+asked, not whether an answer survives its gate being withdrawn. After an Edit
+changed the outcome from `granted subject to conditions` to `refused`, the
+compliance checklist reported "the outcome: refused" beside "the number of
+conditions: 9", and `refused` carries no such field in L4. The verdict was right
+throughout — the discriminator is read first and Python short-circuits — so only
+the checklist lied, and only until the letter above started re-rendering. The
+gating question now carries `undefine:`.
+
+**`WHEN JUST ""` on a `MAYBE STRING` compiled to the absence test** — the one
+thing §8.8's ruling says a payload-value match must not do, because a `MAYBE
+STRING`'s NOTHING encoding *is* the empty string. Now refused by name
+(`not-ok/maybe-empty-string.l4`); every non-empty literal is unaffected.
+
+**An L4 name landing on a Python builtin or a `docassemble.base.util` export was
+never sought.** Same failure as the `l4runtime` collision M2 fixed, on the two
+larger populations M2 left open: the name already resolves, to a truthy function
+object, so the driver takes the "holds" branch with **zero questions asked** and
+the report says "(nothing lost)". Measured on `All`, `Today`, `Value`,
+`Message`, `Word`, `Currency`. 282 names are now reserved. Inherited, not
+introduced by M4.
+
+One diagnostic improved: a constructor payload colliding with a record field (or
+with another constructor's payload of the same name) was reported as an
+`internal id collision` naming a block id, because both blocks carry the same
+(role, L4 name) pair — it is one L4 name used twice, not two names sanitising
+together. It now reports as a name collision and says why the hoist collides.
+
+The documentary findings — three RED-phase labels left in the present tense,
+four wrong test counts, a wrong `functions.py` mechanism repeated in three
+files, an over-general mapping-table row, and two retracted claims that outlived
+their retraction — were corrected at source.
+
+## What the M2 review pass changed (2026-08-17)
 
 Five adversarial lenses attacked the milestone and an independent skeptic tried
 to refute each finding. What survived, and what was done about it:
@@ -720,3 +798,6 @@ exactly the four rules that now fire, in order.
 | notice-letter | valid notice | residential T, written T, 3 months | TRUE | `the_notice_to_quit_is_valid` = True; `notice_letter.html.content` non-empty, carries the tenant, the address and "the notice is valid" |
 | notice-letter | short notice | residential T, written T, 1 month | FALSE | = False; the letter is still assembled, and says "does not take effect" |
 | citations | changed answer | 9 000 000, then corrected to 1 000 | TRUE | after the edit: goal `True`, and exactly the four rules that now fire, in order (§8.4) |
+| notice-letter | changed answer | 3 months / "A. Tenant", then 1 month / "B. Occupier" | FALSE | after the edit: goal `False`, and the LETTER says "1 month(s)", "B. Occupier" and "does not take effect" — carrying none of the three strings it carried before (§8.4, repair pass) |
+| payload-enum | changed answer | `granted subject to conditions` n=9, then `refused` | TRUE | after the edit: the checklist marks `the number of conditions` **not asked** and no longer reports `9` — the payload does not outlive its constructor (§8.4, repair pass) |
+| maybe-scalars | 8. changed answer | income known 2 500, then not known | TRUE | after the edit: the checklist no longer reports `declared income: 2500` beside an is-known flag of `False` (§8.4, repair pass) |

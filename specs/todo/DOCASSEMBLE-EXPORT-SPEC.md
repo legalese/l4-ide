@@ -25,8 +25,10 @@ and by the R10 harness run on all seven examples, each driven from BOTH the bare
 `--package` tree with the per-case `(goal, verdict, citations)` triple asserted equal — see
 `jl4/examples/docassemble/README.md` for the transcript. The `--package` clobber policy, the
 fidelity report's placement in the tree, and the reversal of R4's `clear_explanations()`
-sentence are recorded as implementation notes in §8.11, §8.11 and §8.4. **M3 (embedded plan) and
-M4 (breadth) remain unimplemented.**_
+sentence are recorded as implementation notes in §8.11, §8.11 and §8.4. (This paragraph
+originally ended by asserting that M3 and M4 remained unimplemented. M4 landed the next
+paragraph down on 2026-08-17; that sentence was retracted in the repair pass the same day, at the
+same time as the identical sentence in the README.)_
 
 _**M4 landed 2026-08-17** on branch `mengwong/docassemble-m4`, test-first: the acceptance tests
 were written red first (commit `ec9850f6`, 15 failing CLI cases and 7 of 7 examples not
@@ -34,7 +36,7 @@ round-tripping) and the implementation made them pass. It ships §10's whole M4 
 `LIST OF <record>` gathered as a `DAList`, constructor payloads as `show if` follow-ups,
 `MAYBE NUMBER`/`MAYBE DATE` as paired is-known questions, the R12 date surface, a `review:`
 compliance checklist on every interview, and the document-assembly demo — plus the repair of the
-inherited §8.4 staleness defect, whose named owner M4 was. Verified by 57 cases under the four
+inherited §8.4 staleness defect, whose named owner M4 was. Verified by 64 cases under the five
 `describe "l4 docassemble…"` blocks (including thirteen byte goldens and their fidelity
 sidecars) and by `m4_acceptance.sh`, which drives all seven examples in real `docassemble.base`
 1.10.7 from BOTH artifact shapes and reports **0 of 7 not round-tripping**, with the per-case
@@ -42,6 +44,19 @@ sidecars) and by `m4_acceptance.sh`, which drives all seven examples in real `do
 had to make rather than drift into are recorded where they belong — the payload-value match
 (§8.8) and the date surface (§8.12, R12) — each with the implementation note that discharges it.
 **M3 (the embedded plan) remains unimplemented; `DAPackage.pkgPlan` is still `Nothing`.**_
+
+_**M4 repair pass, 2026-08-17.** Five adversarial lenses attacked the landed milestone and an
+independent skeptic tried to refute each finding. Five that survived changed behaviour and are
+recorded as implementation notes under the rulings that own them: the attachment goes stale
+after a changed answer and a gated ANSWER outlives its gate (both §8.4); a letter template
+opening on leading whitespace emitted YAML no parser could load (§10, the attachment bullet);
+`WHEN JUST ""` on a `MAYBE STRING` compiled to the absence test and is now refused by name
+(§8.8); an L4 name landing on Python's builtins or on `docassemble.base.util` was never sought
+and returned a silent wrong verdict with no question asked (§8.11); and a constructor payload
+colliding with a record field was reported as an `internal id collision` rather than by name
+(§8.11). The documentary findings — three RED-phase labels left in the present tense, four wrong
+test counts, a wrong `functions.py` mechanism, an over-general README mapping row, and two
+retracted claims that outlived their retraction — were corrected at source in the same pass._
 
 **One-line summary.** Docassemble discovers evaluation order at runtime by backchaining on
 undefined variables — the same "what do we still need to ask?" question L4's query planner
@@ -720,6 +735,63 @@ to two `code:` blocks and the citation must not be duplicated across them. It ri
 and on the `NotApplicable` path the requirement block never runs at all, so a citation placed
 there would go unrecorded on the very path where the rule most needs to explain itself.
 
+**Implementation note (2026-08-17, M4 repair pass): the repair above reached the derived
+_variables_ and stopped at the edge of the two things a reader actually leaves with.** Both were
+found by adversarial review of the landed milestone, both were measured, and both are fixed.
+
+1. **The assembled DOCUMENT went stale.** `reconsider: True` was emitted on rule, `WHERE`, goal
+   and driver blocks, and on nothing else. An attachment is derived too, and docassemble
+   assembles one only when the variable it names is SOUGHT (`parse.py:9513-9530` at
+   `1b6678384`); a variable that is already defined is never sought. So `notice_letter` was
+   computed once and outlived every later answer. Measured on `notice-letter.l4`, changing the
+   notice period from three months to one by the `undefine()`-and-re-ask route this section's
+   repair was measured against: the verdict screen renders
+   `ev_the_notice_to_quit_is_valid_screen_fails` while the letter on that same screen still says
+   "Notice period served: 3 month(s)" and "Assessment: the notice is valid." A non-flipping edit
+   is stale the same way — correcting the tenant's name leaves the letter addressed to the old
+   one. The fix is `reconsider: True` on the attachment block, and it is verified by a
+   `change_answer` case whose `after` block re-checks `notice_letter.html.content`. No SCREEN
+   assertion could have caught it: `${ notice_letter }` renders headless to the literal `None`,
+   so the stale text never reaches the rendered screen at all.
+
+2. **A gated ANSWER outlived its gate.** `show if:` decides whether a gated question is ASKED. It
+   does not decide whether an answer already given survives its gate being withdrawn, and
+   `reconsider:` deletes derived variables only — an answer variable is never invalidated. So
+   after an Edit changed `d.the_outcome` from `granted subject to conditions` to `refused`, the
+   compliance checklist reported, on one screen:
+
+   ```
+   the outcome: refused
+   the number of conditions: 9
+   ```
+
+   and `refused` carries no `the number of conditions` in L4 at all. The paired `MAYBE` has the
+   same shape: "declared income — is there an answer?: **False**" beside "declared income:
+   **2500**". The VERDICT was correct throughout — every emitted shape reads the discriminator
+   first and Python short-circuits — which is why nothing else in the harness could see it; but
+   the `review:` block's declared purpose is to state what the interview holds, and with repair
+   (1) in place an attachment interpolating such a payload would now print it into the letter.
+
+   The fix is `undefine:` on the question that GATES, listing every variable it gates: the enum
+   discriminator undefines every constructor's payload, and the is-known flag undefines its
+   value. `undefine` fires in `ask` (`parse.py:5389-5390`) and is a documented no-op on a
+   variable that is not defined, so it costs nothing on the forward drive. Gating by
+   `show if:` was NOT reused here: a review row carrying `show if:` is DROPPED when its guard is
+   false (`parse.py:5875-5905`), which would delete the row instead of marking it — the opposite
+   of "a checklist that lists only the questions that were asked says nothing about the ones the
+   law never reached".
+
+   **Narrowed inside a gather, and declared.** `ask` runs `substitute_vars` over `reconsider:`
+   and not over `undefine:` (`parse.py:5389` beside `:5392`), so a `<list>[i].<attr>` spelling
+   would reach `undefine()` with the iterator unresolved. The emitter therefore emits no
+   `undefine:` on an element question and says so per module, as `DA-UNDEFINE-LIST`.
+
+   One harness consequence worth recording: firing the review event parks the session on the
+   review screen, so a re-drive that followed it assembles straight back into that screen and
+   asks nothing (measured — the re-drive's transcript step comes back empty and the goal is never
+   recomputed). `roundtrip_check.py` therefore fires the review block LAST, after
+   `change_answer`, which is also the state a review screen is for.
+
 ### 8.5 R5 — question order: native backchaining v1; embedded compiled plan M3
 
 **Evidence.** Docassemble's order = block/operand order — a `code:` block is plain `exec`
@@ -967,6 +1039,31 @@ _Still refused, each naming its own type:_ `MAYBE <enum>` and `MAYBE <record>` (
 `not-ok/maybe-enum.l4`), `MAYBE` of a `LIST OF`, `MAYBE` of a `MAYBE`, and a `MAYBE` payload
 inside a constructor.
 
+**Implementation note (2026-08-17, M4 repair pass): the ruling above admits ONE literal it cannot
+honour, and that literal is now refused by name.** The ruling's stated cost is that
+"`WHEN JUST <value>` must NOT compile to a presence test". Three representations carry a `MAYBE`,
+and the shipped `payloadValueTest` handled two of them by name — `yesnomaybe` (identity) and the
+paired flag (flag consulted first) — and let the third fall through to a bare equality. That
+third is `MAYBE STRING`, which rides as a plain optional text field and whose absence encoding
+_is_ `<var> == ''`. So `WHEN JUST ""` compiled to exactly the absence test: two distinct L4
+answers, one Python expression. Measured — `l4 run` gives `NOTHING → FALSE` and `JUST "" → TRUE`,
+while the emitted `c_needs_review` block was byte-identical to the one a `WHEN NOTHING` module
+produced.
+
+Worse than conflation, which is why it refuses rather than warns: this module's own
+`DA-MAYBE-STRING` advisory declares the erasure direction — "an empty submission is read as
+NOTHING" — so the only interview state the test can reach is the state L4 calls `NOTHING`. The
+emitted answer was INVERTED on the one input that reaches it, not merely ambiguous. Written as a
+single `CONSIDER` carrying both arms it produced a provably dead `elif` with a byte-identical
+guard, collapsing three L4 outcomes to two.
+
+The narrowing is exactly one pattern: `PatLit (StringLit "")` under the `MAYBE STRING`
+representation. Every non-empty string literal lowers correctly (`c.the_stated_reason ==
+'lost my job'`), as does binding the payload and testing it in the arm body, and the diagnostic
+says both. Pinned by `not-ok/maybe-empty-string.l4`. Making it WORK instead would mean promoting
+`MAYBE STRING` to the paired is-known representation — a second question on every optional text
+field, in every module, to buy one degenerate literal — which is a worse trade than refusing it.
+
 ### 8.9 R9 — emission hygiene (the silent-YAML defence)
 
 Bundled because they are all "docassemble will not tell you" facts, each verified at the
@@ -1006,6 +1103,17 @@ cited line:
    eager — never route a lazily-needed variable through them.
 10. **Emit `features: loop limit` / `recursion limit`** scaled to the module when the emitted
     graph could plausibly approach the 500 defaults (`parse.py:7942-7943`).
+11. **Every block scalar carrying AUTHOR-supplied text carries an explicit indentation
+    indicator** (added 2026-08-17, M4 repair pass). Item 7 above indents generated prose to stay
+    clear of the `^--- *$` splitter, and a flat indent is sufficient for text the emitter itself
+    produced. It is not sufficient for text the emitter did not write: YAML infers a block
+    scalar's indentation from its own first non-empty line, so a letter template opening on ONE
+    leading space made the whole interview unloadable, in both artifact shapes, with
+    `l4 docassemble` exiting 0. The only such string today is the attachment's `content:`, which
+    is emitted as `content: |2` — see §10's attachment bullet for the measurement. `blockScalar`
+    has the same shape and is currently unreachable by the hazard, because an L4 string literal
+    cannot span lines and so no emitted prose can begin with an indented line; if that ever
+    changes, this rule is what it changes against.
 
 **What would close it:** review of the whitelist against the pinned docassemble version in the
 R10 harness, plus one not-ok fixture per hygiene rule where feasible.
@@ -1190,10 +1298,20 @@ against emitted rather than hand-written YAML.
 been getting wrong since M1.**
 
 1. **`user_dict_context` is entered around every `assemble`** (added by the RED phase). Only
-   `docassemble_webapp` enters it; without it `get_current_user_dict()` is `None` and
-   `functions.py:4232-4234` makes `defined()`, `value()` and `showifdef()` return False for
+   `docassemble_webapp` enters it; without it `get_current_user_dict()` is `None`, so
+   `_inspect_user_dict` takes its failure path (`functions.py:4232-4237` at `1b6678384`) for
    EVERY variable, including defined ones. Any review-block assertion would have passed or failed
    for the wrong reason. All seven M1/M2 examples re-ran green after the change.
+
+   _Corrected 2026-08-17 (repair pass): this item used to say that `defined()`, `value()` and
+   `showifdef()` all "return False". Only `defined()` does — the failure value is `False` for a
+   predicate caller and the caller's `alt` otherwise (`:4233`), and `DEFINED` is the sole
+   predicate. `showifdef()`
+   passes `alt=alternative`, default `''`, so it returns the empty string (which is what made the
+   review rows vacuous). `value()` uses `DefCaller.VALUE`, whose `is_pure()` is False, so `:4234`
+   falls through to `force_ask_nameerror` and RAISES `DANameError`. All three executed against the
+   1.10.7 venv. The repair was right; the mechanism as stated was not._
+
 2. **A `D("YYYY-MM-DD")` fixture is written through `as_datetime()`**, reproducing what
    `interview/views.py:1372` stores, because a plain string compared against a `DADateTime`
    raises `TypeError` — a failure with nothing to do with the lowering.
@@ -1342,12 +1460,59 @@ where = ["."]` then found both, and a wheel built from that tree — declaring i
    about a variable's name either. Fixture:
    `jl4/tests-cli/fixtures/docassemble-runtime-collision.l4`.
 
+   **Implementation note (2026-08-17, M4 repair pass): that repair closed ONE THIRD of the
+   namespace, and the other two thirds were the larger ones.** The failure mode above is not
+   specific to `l4runtime`; it is what happens to any top-level name that ALREADY RESOLVES, because
+   docassemble backchains only on `NameError`. Two more populations were live:
+
+   - **Python's builtins.** The driver's `if all:` execs in the user_dict, whose `__builtins__`
+     Python injects automatically. `'all' in user_dict` is `False` while
+     `eval('all', user_dict)` returns `<built-in function all>`, so nothing is ever sought;
+     `functions.defined()` agrees for the same reason (it is `try: eval(var, {}); return True`,
+     and an empty globals dict is auto-populated with `__builtins__` too). Measured on an
+     `@export` named `All` against real 1.10.7: `screen='All: Holds'`, `questions asked=[]`,
+     against an L4 `#EVAL` of `FALSE`, with a clean emit and a `(nothing lost)` report.
+   - **`docassemble.base.util`.** `parse.py:131` compiles
+     `from docassemble.base.util import *` and `Interview.assemble` execs it into the user_dict on
+     every pass unless the interview sets `imports_util` (`:8523-8524`, `:8643-8647`,
+     `:9055-9057`). This half is strictly worse than the builtins half — the name is in the
+     user_dict for real, so `reconsider:`'s deletion does not rescue it either — and the paragraph
+     immediately below is why it cannot be avoided by emitting differently: naming that module in
+     `modules:` is precisely what the emitter must NOT do. Measured on `Today`, `Value`,
+     `Message`, `Word` and `Currency`: all five, `screen='<Name>: Holds'`, `asked=[]`.
+
+   `daGlobalNamespace` vendors both, filtered to the 282 names `pyIdent` can produce (it
+   lower-cases, so the CamelCase surface — `DAObject`, `Person`, `ValueError` — is unreachable),
+   with the regeneration command in its haddock. Local evidence, never a build dep, the same
+   discipline as `daObjectReserved`. No name in the shipped corpus moved. Provenance is honest:
+   this was INHERITED, reproducible on a pre-M4-shaped boolean module, not introduced by M4 —
+   but M4 is the milestone that makes `all`/`any` names the emitter's own generated code calls.
+   Fixture: `jl4/tests-cli/fixtures/docassemble-global-shadow.l4`.
+
    M3's compiled plan is what fills the module. Correspondingly the `modules:` block is emitted into the
    **packaged** interview only: a bare YAML has no package for `.l4runtime` to resolve against,
    and `from … import *` of a missing module aborts assembly. The list holds exactly one relative
    name — naming `docassemble.base.util` or `docassemble.base.legal` sets `imports_util`
    (`parse.py:2765-2767`) and suppresses the automatic `from docassemble.base.util import *` at
    `:8523`, which would take `explain`, `DAObject` and every other builtin with it.
+
+7. **A user-facing name collision is reported in L4 terms, never as an `internal id collision`.**
+   The lowerer checks name collisions BEFORE id dedup precisely so that two L4 names sanitising
+   onto one docassemble variable are named as such. **Repaired 2026-08-17 (M4 repair pass):** M4's
+   payload hoisting opened a second collision class that walked straight past the check. A
+   constructor payload lands on a SIBLING attribute of the record that holds the enum, so a
+   payload field named `the reason` collides with a record field of that name, and two
+   constructors that each carry a `reason` collide with each other. Both pairs carry an
+   _identical_ `("question", <L4 label>)` meta — it is ONE L4 name used twice, not two names
+   sanitising together — so the check's `nubOrd` folded them to a single entry and passed, and
+   `dedupById` fired instead with an `internal id collision` naming the block id
+   `q_d.the_reason` — a message the code's own comment calls misleading and which names neither
+   definition to rename. No wrong answer ever shipped: it is a hard error either way. The fix
+   compares the BLOCKS rather than their metas, which is exactly what distinguishes "the same
+   question reached from two exports" (legitimately emitted once, and equal) from "two different
+   questions" (here, differing only in their `show if` guard), and the message names the payload
+   hoist so the drafter knows why an idiomatic ADT collided. Fixture:
+   `not-ok/payload-name-collision.l4`.
 
 ### 8.12 R12 — the M4 date surface: what lowers, what refuses, and which idiom
 
@@ -1555,8 +1720,12 @@ their absence.
      Neither is a compliance checklist; one interrogates the user about questions the law never
      reached, the other hides them. The recipe that works is `note:` rows carrying
      `showifdef('<var>', '<not asked>')`, which have no `saveas` to evaluate and therefore always
-     render, paired with `Edit:` rows gated on `show if: defined('<var>')` (**executed**). M4 is
-     accordingly required NOT to emit `skip undefined: False`, and `review-checklist.l4` pins it.
+     render. M4 is accordingly required NOT to emit `skip undefined: False`, and
+     `review-checklist.l4` pins it. _(This bullet used to continue "paired with `Edit:` rows gated
+     on `show if: defined('<var>')` (**executed**)". That probe result is real, but the GREEN
+     phase then declined to emit `Edit:` rows at all — see "What M4 did NOT do" at the end of this
+     section — and the sentence was retracted here in the 2026-08-17 repair pass so a top-down
+     reader stops carrying the Edit rows forward as part of the required recipe.)_
   3. _`.plus()` and `.minus()` are not interchangeable, and `.plus()` is the wrong one._ See R12
      (§8.12) for the measurement: against the L4 oracle, `.plus(years=n)` disagrees on every
      leap-day birth and `.minus(years=n)` on none of 27,028 comparisons.
@@ -1597,11 +1766,42 @@ their absence.
     written to be rendered, and R9.1 exists to stop L4-DERIVED prose being read as Mako. That is
     declared per module as `DA-ATTACH-MAKO` rather than left implicit.
 
-  - _Whether the `review:` block is emitted for every module: **every module**._ Nothing in an L4
-    source asks for a checklist, so the alternatives were the same flag-or-grammar pair, and they
-    lose for the same reasons. Every interview now carries one, reachable only by firing its event
-    and inert otherwise. This rewrote all seven M1/M2 byte goldens, consciously, and they were
-    read before being re-blessed.
+    **Implementation note (2026-08-17, M4 repair pass): "verbatim" needed an explicit YAML
+    indentation indicator, and without one the whole interview was unloadable.** The template is
+    spliced into a `content: |` block scalar with every non-empty line indented four spaces. A
+    YAML block scalar with no indentation indicator takes its indentation from its own FIRST
+    non-empty line — so a template opening on any leading whitespace set the block indent above
+    four, and the first following line at exactly four TERMINATED the scalar. The parser then met
+    template prose where an `attachment:` sub-key must be. Measured against real 1.10.7:
+    `parse.Interview` raises `DASourceError` from `parse.py:8352-8360`, so NOT ONE QUESTION
+    survives, in BOTH artifact shapes, while `l4 docassemble` exits 0 and emits only the routine
+    `DA-ATTACH-MAKO` advisory. One leading space is enough; so is a whitespace-only first line;
+    a leading TAB is no escape either, because `fix_tabs` (`parse.py:140`) rewrites tabs to two
+    spaces before the YAML is read. This defeats BOTH shapes, which is strictly worse than the
+    `content file:` alternative it was chosen over — that one at least left the packaged artifact
+    working. The uniform-indent case was silent rather than fatal: the leading indentation was
+    stripped, so a markdown indented code block in a legal template stopped being one.
+
+    The fix is `content: |2` — an explicit indentation indicator, `2` and not `4` because the
+    indicator is an offset from the PARENT node's indentation and the `attachment:` mapping sits
+    at two. It round-trips the template bytes exactly, including a leading whitespace-only line
+    and a bare `---` line (which the four-space indent still keeps clear of docassemble's
+    `^--- *$` splitter). `notice-letter.letter.md` now opens on an indented address block so the
+    shipped corpus carries the trigger: strip the `2` from the emitted YAML and the R10 harness
+    cannot load the interview at all.
+
+  - _Whether the `review:` block is emitted for every module: **every module that asks at least
+    one question**._ Nothing in an L4 source asks for a checklist, so the alternatives were the
+    same flag-or-grammar pair, and they lose for the same reasons. Every interview that has an
+    input to list carries one, reachable only by firing its event and inert otherwise. This
+    rewrote all seven M1/M2 byte goldens, consciously, and they were read before being re-blessed.
+
+    The exception is exact, not a hedge: a module with no non-element question at all — an
+    `@export` over no inputs, say — emits no `review_main` block, because an empty `review:`
+    sequence is malformed. A module whose ONLY inputs are gathered list elements still gets one,
+    since `there_are_any`/`there_is_another` are non-element questions (both measured). _(Both
+    this ruling and `reviewOf`'s own haddock read "every module" until the 2026-08-17 repair pass;
+    the guard that contradicts them was three lines below the haddock.)_
 
     Rows are `note:` + `showifdef()` and there is no `skip undefined:` key, per correction 2
     above. Gathered LIST ELEMENTS get no row — their variable carries docassemble's iterator
