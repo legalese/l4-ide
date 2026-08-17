@@ -1,0 +1,84 @@
+IMPORT prelude
+
+-- M4 (spec §10): `LIST OF` as a docassemble `DAList` gather.
+--
+-- The rule is a household eligibility test over a list the interview must
+-- GATHER: how many tenants there are is not known until the user says so, and
+-- each tenant carries its own questions.
+--
+-- Two claims ride on this file, and both are why the backend is worth having:
+--
+--   * PER-ELEMENT SHORT-CIRCUIT. `the tenant qualifies` is `age AT LEAST 18
+--     AND signed`, so for a tenant aged 17 the SIGNING question must never be
+--     asked — of that tenant. Docassemble prunes per element inside a gather
+--     (probed against 1.10.7), so this is a property the target can actually
+--     honour, not an aspiration.
+--   * CROSS-COMBINATOR SHORT-CIRCUIT. When `all …` is already FALSE the
+--     `any … has been evicted` conjunct decides nothing, so no eviction
+--     question may be asked at all.
+--
+-- The empty household is deliberate, not an oversight: `all` over no tenants
+-- is vacuously TRUE and `any` over no tenants is vacuously FALSE, so a
+-- household with no named tenant is "eligible". That is a real drafting bug in
+-- the rule as written, and the zero-element #EVAL pins it so the gather cannot
+-- quietly paper over it.
+
+DECLARE Tenant
+    HAS
+      @desc Age of this tenant, in whole years, at the start of the tenancy
+      age IS A NUMBER
+      @desc Whether this tenant signed the tenancy agreement
+      `signed the agreement` IS A BOOLEAN
+      @desc Whether this tenant has been evicted from a social tenancy before
+      `has been evicted` IS A BOOLEAN
+
+DECLARE Household
+    HAS
+      @desc Every tenant named on the tenancy agreement
+      tenants IS A LIST OF Tenant
+
+GIVEN t IS A Tenant @desc A tenant named on the agreement
+GIVETH A BOOLEAN
+DECIDE `the tenant qualifies` t IF
+        t's age AT LEAST 18
+    AND t's `signed the agreement`
+
+@export Whether the household qualifies for the tenancy
+GIVEN h IS A Household @desc The household applying for the tenancy
+GIVETH A BOOLEAN
+DECIDE `the household is eligible` h IF
+        all (GIVEN t YIELD `the tenant qualifies` t) (h's tenants)
+    AND NOT (any (GIVEN t YIELD t's `has been evicted`) (h's tenants))
+
+-- Two adult signatories, neither previously evicted.
+#EVAL `the household is eligible` OF
+        Household
+        WITH
+            tenants IS
+                LIST  (Tenant WITH age IS 30, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+-- TRUE
+
+-- The first tenant is a minor. `all` fails on element 0, so nothing about
+-- element 0's signature, nothing about element 1 at all, and nothing about
+-- eviction, decides anything.
+#EVAL `the household is eligible` OF
+        Household
+        WITH
+            tenants IS
+                LIST  (Tenant WITH age IS 17, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+-- FALSE
+
+-- Both adults and both signed, but the second has been evicted before.
+#EVAL `the household is eligible` OF
+        Household
+        WITH
+            tenants IS
+                LIST  (Tenant WITH age IS 30, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `has been evicted` IS TRUE)
+-- FALSE
+
+-- The empty household: vacuously eligible. See the header.
+#EVAL `the household is eligible` OF Household WITH tenants IS LIST
+-- TRUE

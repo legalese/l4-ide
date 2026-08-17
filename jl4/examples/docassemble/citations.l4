@@ -29,6 +29,17 @@
 -- makes it worse, not better; the repair is a design change and belongs with
 -- M4's `review:` block. Recorded in full at DOCASSEMBLE-EXPORT-SPEC.md §8.4.
 --
+-- CORRECTION, 2026-08-17 (M4 RED phase): on the undefine-and-re-ask path — the
+-- path a review-block Edit takes — the sentence above understates it. The
+-- VERDICT itself goes stale, not merely the citations: with the cap answer
+-- corrected from 9,000,000 to 1,000 the goal stays FALSE and the citations stay
+-- unchanged (executed). `depends on:` does not rescue it, `reconsider: True`
+-- alone makes the citations accumulate contradictory rules, and
+-- `initial: True` + `clear_explanations()` alone empties them. Two repair
+-- designs were verified and M4 owns choosing one. The fourth case in
+-- `roundtrip_check.py`'s `citations` example asserts the repaired behaviour as
+-- a claim, and is RED.
+--
 -- The exported decision carries a `@ref` of its own, and it is the reason the
 -- expected citation lists below are asserted AS ORDERED LISTS. Order is
 -- COMPLETION order, not declaration order: `explain()` is emitted AFTER the

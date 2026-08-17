@@ -26,6 +26,23 @@ artifact shapes — see "Prove it runs in real docassemble". M3 (the embedded
 query plan) and M4 (`LIST OF`, payload constructors, date arithmetic, document
 assembly) remain unimplemented._
 
+_**M4 is NOT implemented; its acceptance tests are written and RED**
+(2026-08-17, branch `mengwong/docassemble-m4`). Six new examples are in this
+directory — `tenant-list`, `payload-enum`, `maybe-scalars`, `statutory-age`,
+`review-checklist`, `notice-letter` — and each typechecks and evaluates in L4,
+so its `#EVAL`s are a real oracle; none has an `expected/` golden, because
+writing one before the feature exists would force the implementer to match
+formatting choices the RED phase has no basis to decide (M2 set that
+precedent). `l4 docassemble` refuses four of the six outright, by name;
+`review-checklist` and `notice-letter` emit but carry neither a `review:`
+block nor an `attachment:`. Run the behavioural half with
+`./m4_acceptance.sh <l4 binary> <venv python>` — today it reports **7 of 7 not
+round-tripping** and prints each refusal verbatim — and the emission half with
+`cabal test l4-cli-test --test-options='-m "M4: breadth"'`, today 15 red and 1
+green (the green one is (G), the regression guard for the four refusals M4 does
+not own). Two scope rulings the milestone had to make are recorded in the spec: the
+payload-value match (§8.8) and the date surface (§8.12, R12)._
+
 The organising principle: **as much as possible of an L4 encoding survives, by
 name and by structure.** An L4 reader and a docassemble reader should
 recognise the same program.
@@ -43,7 +60,12 @@ recognise the same program.
 | `TYPICALLY`                                   | `default:` prefill, Advisory note (R7)                                 |
 | `MAYBE BOOLEAN`                               | `yesnomaybe` — `None` IS `NOTHING`, exact (R8)                         |
 | `MAYBE STRING`                                | `required: False`, `''` read as `NOTHING`, Advisory (R8)               |
-| `MAYBE NUMBER`/`MAYBE DATE`                   | **refused** in v1 (empty number submits as `0`, not `None`) (R8)       |
+| `MAYBE NUMBER`/`MAYBE DATE`                   | **refused** today (empty number submits as `0`, not `None`); M4 pairs an is-known question with a `show if: {code:}`-guarded value — tests RED (R8) |
+| `MAYBE <enum>`/`MAYBE <record>`               | **refused**, and still refused after M4 (`not-ok/maybe-enum.l4`) (R8) |
+| `WHEN JUST <value>` (payload-value match)     | **refused** today; ruled IN at M4 under R8 — tests RED (spec §8.8)     |
+| `LIST OF` (input)                             | **refused** today; M4 gathers it as a `DAList` — tests RED (§10)       |
+| constructor payloads                          | **refused** today; M4 emits a `show if: {code:}` follow-up — tests RED |
+| date literals, date arithmetic                | **refused** today; M4 routes literals through `as_datetime()` and uses the calendar-exact idiom — tests RED (R12, spec §8.12) |
 | deontic / temporal / ledger constructs        | **refused**, `L4.Interchange.Fidelity` notes (spec §5)                 |
 | `@desc` on a field or parameter               | question text / field `help:`, Mako-escaped (R9)                       |
 | `@desc` on a `DECLARE` or a named definition  | one `auto terms:` glossary entry, keyed on the L4 term (M2)            |
@@ -78,8 +100,6 @@ recognise the same program.
 - `not-ok/` — fixtures the backend must REFUSE, each with a named diagnostic:
   - `deontic-body.l4` — regulative body (`PARTY`/`MUST`): `Regulative`,
     Blocking.
-  - `maybe-number.l4` — `MAYBE NUMBER` given: refused by name per R8 pending
-    the M4 paired is-known design.
   - `name-collision.l4` — `` `notice period` `` and `notice_period` sanitise
     to one Python identifier: `checkCollisions` rejection.
   - `higher-order.l4` — function-valued `WHERE` binding passed as an
@@ -87,8 +107,15 @@ recognise the same program.
   - `seam-ref-via-fn.l4` — a seam-shaped export referenced by another
     decision *through an inlined function*: the R4 dangling-goal guard must
     see references that travel through inlined bodies.
-  - `just-payload-pattern.l4` — `WHEN JUST TRUE`: a payload-value match, not
-    a binder; the R8 presence erasure cannot express it, refused by name.
+  - `maybe-enum.l4` — `MAYBE <enum>` (M4). The paired is-known design does
+    not reach it: an enum's value question is itself a radio, so its absent
+    path is a fourth choice rather than an empty submission. It also guards
+    the DIAGNOSTIC — M1's catch-all recites "v1: MAYBE BOOLEAN and MAYBE
+    STRING only", which becomes a false claim in user-facing prose the moment
+    NUMBER and DATE land, so the refusal must name the type it refuses.
+  - _Retired at M4:_ `maybe-number.l4` and `just-payload-pattern.l4` are gone.
+    Both were R8 refusals M4 flips, and both are now supported cases inside
+    `maybe-scalars.l4`.
 - `citations.l4` — the M2 example. Three sub-decisions, each carrying a
   statutory `@ref`, conjoined by `AND` so a FALSE first conjunct
   short-circuits the other two away. One ref uses the plain `@ref …` form, one
@@ -110,6 +137,38 @@ recognise the same program.
   example it additionally asserts the exact ordered citation list, the
   citations' presence in the **rendered** screen, and the parsed
   `auto terms:` glossary.
+- **The M4 examples (RED).** Each pins one clause of spec §10, and each is a
+  real rule with a real oracle, not a smoke test:
+  - `tenant-list.l4` — `LIST OF Tenant` gathered as a `DAList`. The claim is
+    not that a list can be gathered but that PRUNING SURVIVES GATHERING: a
+    tenant aged 17 must never be asked whether they signed. Four `#EVAL`s
+    including the empty household, which is vacuously eligible — a real
+    drafting bug in the rule, pinned so the gather cannot paper over it.
+  - `payload-enum.l4` — a licensing outcome with a `NUMBER` payload on one
+    constructor and a `STRING` payload on another. The follow-up for the
+    constructor that was not chosen must never be asked and must be left
+    genuinely undefined, which only `show if: {code: …}` achieves.
+  - `maybe-scalars.l4` — R8 in full: `MAYBE NUMBER`, `MAYBE DATE`,
+    `MAYBE BOOLEAN` and `WHEN JUST FALSE`. Its `#EVAL`s are PAIRED: read 2
+    against 3 (a declared income of zero against no declaration at all) and 6
+    against 7 (a disclaimed declaration against an unanswered one). Any
+    lowering that conflates absence with a default fails one of each pair.
+  - `statutory-age.l4` — date literals and calendar-exact arithmetic. Case 1
+    is where `date_difference(…).years` reports 17.99900 on the applicant's own
+    eighteenth birthday; case 3 is the leap-day divergence, where
+    `.plus(years=18)` clamps and L4's `Date` rolls forward. See spec §8.12.
+  - `review-checklist.l4` — a short-circuiting filing rule where three of four
+    inputs are never asked, and must still appear on the compliance checklist,
+    marked as never asked.
+  - `notice-letter.l4` + `notice-letter.letter.md` — the document-assembly
+    demo. Three of its six inputs decide nothing and exist only for the
+    letter, which is the point: an attachment EXTENDS the interview's question
+    set. The hazard it defends against is not an exception but a successful
+    empty render.
+- `m4_acceptance.sh` — emits and drives every M4 example plus the `citations`
+  inherited-debt case in one command, printing each refusal verbatim. Usage
+  from the repo root: `jl4/examples/docassemble/m4_acceptance.sh <l4> <python>`.
+  Exit status is the number of examples that did not round-trip.
 - `probe_generic_object.py` — the R2 experiment spec §8.2 cites when it defers
   the `generic object` question layer to M4: it drives the same interview with
   and without a generic layer and shows the specific-instance question wins
@@ -343,6 +402,36 @@ Run that way over all seven examples, 2026-08-17, against the 1.10.7 checkout
 == round-trip: citations ==           [yaml] (11 blocks)  [package] (12 blocks)  AGREEMENT OK  ROUND-TRIP OK
 ```
 
+**M4 additions to the fixture vocabulary (2026-08-17).** Five per-case keys and
+two per-example keys, each existing because an M4 claim cannot be stated with
+answer-comparison alone:
+
+| key                 | scope   | what it asserts                                                                                                    |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `undefined_after`   | case    | every listed spelling fails to evaluate at the end — a hidden or absent field is absent, not `''` and not `0`      |
+| `never_asked`       | case    | no asked variable name matches; for where a sibling list element's fixture would otherwise satisfy the lookup      |
+| `post_conditions`   | case    | an expression in the finished `user_dict` is non-empty and carries/omits given text — the empty-letter defence     |
+| `change_answer`     | case    | re-drives after `undefine()` + re-ask, asserting `after`'s goal/verdict/citations — the M2 inherited defect (§8.4) |
+| `review_unanswered` | case    | how many review rows carry a never-asked marker                                                                    |
+| `gather`            | example | answers a `DAList`'s control questions for `gather_n` elements, in whichever of the three probed shapes was emitted |
+| `review`            | example | the review block's expected row labels and the accepted "never asked" spellings                                    |
+
+Fixture keys may now be INDEXED (`tenants[0].age`) and are resolved
+longest-first, dropping one leading dotted component at a time — which is what
+makes the per-element pruning claim testable, since element 1's answer can be
+supplied without accidentally supplying element 0's. A `D("2024-06-01")`
+fixture is written through `as_datetime()`, reproducing what the web layer
+stores (`interview/views.py:1372`); a plain string would raise `TypeError`
+against a `DADateTime` for a reason unrelated to the lowering.
+
+**One harness DEFECT was repaired to make this possible.** `assemble` is now
+wrapped in `user_dict_context(user_dict)`, which only `docassemble_webapp`
+enters. Without it `get_current_user_dict()` is `None` and
+`functions.py:4234` makes `defined()`, `value()` and `showifdef()` return
+`False` for EVERY variable, including defined ones — which would have made any
+review-block assertion silently vacuous. All seven M1/M2 examples were re-run
+after the change and stayed green.
+
 The package tree is one block larger in every case: that is the `modules:`
 block, which is emitted into the packaged interview only. The `citations` run
 in full:
@@ -466,6 +555,22 @@ the rule blocks are cached once their variable is defined, so the clear wipes
 what they recorded and never lets them run again (measured; see spec §8.4). The
 repair is a design change, not a patch, and it belongs with M4's `review:`
 block, which is the surface that makes re-answering ordinary.
+
+**Correction, 2026-08-17 (M4 RED phase): it is worse than the paragraph above
+says, on the path a review Edit takes.** Re-measured with the answer changed by
+`undefine()` + re-ask rather than through the API, against the shape the backend
+actually emits: the **verdict itself goes stale**, not merely the citations —
+with the cap answer corrected from 9,000,000 to 1,000 the goal stays `False` and
+the citations stay unchanged. `depends on:` did not rescue it. Nor does any
+single flag: `reconsider: True` alone fixes the verdict but makes the citations
+*accumulate contradictory rules* ("maximum EXCEEDED" and "maximum satisfied"
+together), which is actively worse than nothing, and `initial: True` +
+`clear_explanations()` alone empties the list. What works is making the
+explaining atomic in one block — either moving every `explain()` into the
+mandatory driver behind a `clear_explanations()`, or dropping `explain()` and
+deriving `cite_*` variables. Both were verified; M4 owns choosing one. The
+fourth case of the `citations` example in `roundtrip_check.py` asserts the
+repaired behaviour as a claim and is RED.
 
 ## The #EVAL expectation table (mirrored in `roundtrip_check.py`)
 

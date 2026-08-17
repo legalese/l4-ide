@@ -484,6 +484,70 @@ daBareExamples =
   , "defaults", "computed-and-shadow", "assume-via-fn", "citations"
   ]
 
+-- | The M4 examples (spec §10: breadth). None carries a committed byte
+-- golden, deliberately and on M2's own precedent — its RED phase recorded
+-- that \"writing a golden before the feature exists would force the
+-- implementer to match formatting choices I have no basis to decide\" — so
+-- every M4 assertion below is about SHAPE (which keys, which guards, which
+-- idiom) or about BEHAVIOUR (through the R10 harness). The goldens land with
+-- the feature, in the GREEN phase.
+--
+-- Each file typechecks and evaluates in L4 today (its @#EVAL@s are the
+-- oracle); what none of them can do today is compile to an interview, because
+-- M1 refused every one of these constructs BY NAME.
+daListSource, daPayloadSource, daMaybeSource, daDateSource,
+  daReviewSource, daLetterSource, daLetterTemplate :: FilePath
+daListSource     = daExampleDir </> "tenant-list.l4"
+daPayloadSource  = daExampleDir </> "payload-enum.l4"
+daMaybeSource    = daExampleDir </> "maybe-scalars.l4"
+daDateSource     = daExampleDir </> "statutory-age.l4"
+daReviewSource   = daExampleDir </> "review-checklist.l4"
+daLetterSource   = daExampleDir </> "notice-letter.l4"
+daLetterTemplate = daExampleDir </> "notice-letter.letter.md"
+
+-- | The @not-ok/@ fixtures M4 does NOT own, paired with the diagnostic each
+-- must keep. M4 flips exactly two refusals (@maybe-number@ and
+-- @just-payload-pattern@, both folded into @maybe-scalars.l4@); these four are
+-- out of its scope and a change to any of them is a regression, not progress.
+daStillRefused :: [(FilePath, String)]
+daStillRefused =
+  [ ( "deontic-body.l4"
+    , "deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" )
+  , ( "name-collision.l4"
+    , "name collision: `t.notice_period`" )
+  , ( "higher-order.l4"
+    , "higher-order use of function `is positive`" )
+  , ( "seam-ref-via-fn.l4"
+    , "seam-shaped export (top-level IMPLIES) is referenced by another decision" )
+  ]
+
+-- | Emit an M4 example, reporting the refusal VERBATIM when it is still
+-- refused. The wording matters: until M4 lands, every one of these exits 1
+-- with prose naming the milestone that owes the answer, and that is the
+-- honest RED signal — not a broken test.
+daEmit :: FilePath -> FilePath -> IO String
+daEmit bin src = do
+  Output code sout serr <- runL4 bin ["docassemble", src]
+  case code of
+    ExitSuccess   -> pure sout
+    ExitFailure n -> do
+      expectationFailure $
+        "`l4 docassemble " ++ src ++ "` exited " ++ show n
+        ++ ": the M4 construct this example exists for is still refused."
+        ++ "\n--- stderr ---\n" ++ serr
+      pure ""
+
+-- | Assert at least one of several spellings is present. Used where more than
+-- one emission is defensible and the RED phase declines to pick — the gather
+-- control questions, for instance, where a @target_number@ shape and a
+-- @there_are_any@ + @there_is_another@ shape were both probed working.
+shouldContainAny :: String -> String -> [String] -> IO ()
+shouldContainAny what haystack needles =
+  unless (any (`isInfixOf` haystack) needles) $
+    expectationFailure $
+      what ++ " contains none of " ++ show needles
+      ++ "\n--- got ---\n" ++ haystack
+
 -- | Fixtures for the docassemble repair cases, which are CLI shape probes
 -- rather than corpus exhibits and so live beside the other @tests-cli@
 -- fixtures, not in @examples/docassemble/@.
@@ -2657,10 +2721,12 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" `isInfixOf`)
 
-    it "refuses MAYBE NUMBER by name (R8: an empty number submits as 0)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/maybe-number.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("MAYBE NUMBER is refused in v1 (R8)" `isInfixOf`)
+    -- M4 flips the two R8 refusals M1 shipped: `not-ok/maybe-number.l4` and
+    -- `not-ok/just-payload-pattern.l4` are now `../maybe-scalars.l4`, a
+    -- SUPPORTED example, and their assertions moved to the M4 describe block
+    -- below. What is left refusing is `MAYBE <enum>` — see
+    -- "still refuses MAYBE of an enum" there, which also pins the diagnostic
+    -- against the false claim M4 would otherwise leave behind.
 
     it "refuses a post-sanitisation name collision, naming both originals" $ do
       Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/name-collision.l4"]
@@ -2678,11 +2744,6 @@ spec bin = do
       Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("seam-shaped export (top-level IMPLIES) is referenced by another decision" `isInfixOf`)
-
-    it "refuses `WHEN JUST TRUE` — a payload-value match, not a binder (R8)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/just-payload-pattern.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("matching on the payload value" `isInfixOf`)
 
     it "gates on advisory fidelity notes with --fail-on=advisory" $
       expectFail bin ["docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
@@ -3276,5 +3337,391 @@ spec bin = do
         other -> expectationFailure $
           "expected exactly one interview under data/questions, got " ++ show other
       removePathForcibly dir
+
+  ----------------------------------------------------------------------------
+  -- M4 (spec §10): breadth. ACCEPTANCE TESTS, WRITTEN FAIL-FIRST.
+  --
+  -- Every test in this block is RED at the commit that introduces it, and each
+  -- is red for a reason the tool states in words. M1 refused each of these
+  -- constructs BY NAME, so the failure is `l4 docassemble` exiting 1 with
+  -- prose naming the milestone that owes the answer — not a missing symbol,
+  -- not a typo, not a compile error. `daEmit` prints that stderr verbatim.
+  --
+  -- Three of these tests would still be red after a naive implementation, and
+  -- that is deliberate; they are the ones worth having:
+  --
+  --   * the leap-day case in "computes statutory age calendar-exactly", where
+  --     dateutil's `relativedelta` CLAMPS and L4's `Date` ROLLS FORWARD.
+  --     Measured over 27,028 comparisons (every birth date 1970-01-01 to
+  --     2006-12-31, tested on the L4 majority date and the day before):
+  --     `date_difference(...).years >= 18` disagrees with L4 on 6,629;
+  --     `born.plus(years=18) <= assessed` disagrees on 9, all of them
+  --     leap-day births; `born <= assessed.minus(years=18)` disagrees on
+  --     NONE. The forward form is the wrong one against this oracle.
+  --   * "still refuses MAYBE of an enum", which is red not because the
+  --     refusal is missing but because the refusal's PROSE will be a false
+  --     claim the moment MAYBE NUMBER and MAYBE DATE land.
+  --   * the `show if:` spelling, where the `{variable:, is:}` form parses,
+  --     renders, and is browser-side JavaScript only — it defines every field
+  --     under an API drive and cannot encode a constructor payload at all.
+  --
+  -- No M4 example carries a byte golden here. See `daListSource` for why.
+  ----------------------------------------------------------------------------
+  describe "l4 docassemble (M4: breadth — acceptance, RED)" $ do
+
+    ------------------------------------------------------------------------
+    -- A. `LIST OF` via DAList gathering
+    ------------------------------------------------------------------------
+    it "gathers a LIST OF input as a DAList with a per-element question (A)" $ do
+      out <- daEmit bin daListSource
+
+      -- The list must ride as a DAList with an element class. `object_type`
+      -- is not decoration: a `DAList.using(complete_attribute=…)` with no
+      -- object_type fails on the first element access (ablation-probed
+      -- against 1.10.7, variant G).
+      shouldContain' "the emitted interview" out "DAList"
+      shouldContain' "the emitted interview" out "object_type"
+
+      -- Gather control. Two shapes were probed working and the RED phase
+      -- declines to choose: `there_are_any` + `there_is_another` (dropping
+      -- EITHER raises DAErrorMissingVariable), or `ask_number` +
+      -- `target_number`, which replaces both with a single count question.
+      shouldContainAny "the emitted interview" out
+        ["there_is_another", "target_number"]
+
+      -- A per-element question. Element attributes are reached either through
+      -- a `generic object:` block or through explicitly indexed assignments;
+      -- a bare `tenants.age` raises DAAttributeError (probed).
+      shouldContainAny "the emitted interview" out
+        ["generic object:", "[i]", "for _i in"]
+
+      -- The goal quantifies over the gathered list rather than over a fixed
+      -- number of fields. `all` and `any` are the whole list-consumption
+      -- surface the docassemble-relevant corpus uses.
+      shouldContainAny "the goal code" out ["all(", "any("]
+
+    it "asks a list element's later attribute only when the earlier one leaves it open (A)" $ do
+      -- The property the backend sells, at the level where it is provable
+      -- from the emission: `the tenant qualifies` is `age AT LEAST 18 AND
+      -- signed`, so the signing test must be guarded by the age test WITHIN
+      -- one element. Docassemble prunes per element inside a gather (probed:
+      -- element 0 aged 17 never had its `has_lease` asked), so a lowering
+      -- that evaluates both attributes eagerly — say by building a list of
+      -- booleans first — throws that away silently.
+      out <- daEmit bin daListSource
+      shouldContainAny "the per-element predicate" out
+        [ "age >= 18 and", "(x.age >= 18) and", "age >= 18) and" ]
+      -- and it must not have been flattened into an eager per-element list
+      shouldNotContain' "the emitted interview" out "complete_elements()"
+
+    ------------------------------------------------------------------------
+    -- B. constructor payloads via `show if`
+    ------------------------------------------------------------------------
+    it "emits a payload follow-up gated by a SERVER-SIDE `show if` (B)" $ do
+      out <- daEmit bin daPayloadSource
+
+      -- The enum still rides as a radio over constructor-name strings (R6),
+      -- with the payload-bearing constructors among the choices.
+      shouldContain' "the emitted interview" out "datatype: radio"
+      shouldContain' "the emitted interview" out "granted subject to conditions"
+      shouldContain' "the emitted interview" out "refused"
+
+      -- Each payload becomes its own follow-up field of its own datatype.
+      shouldContain' "the emitted interview" out "the_number_of_conditions"
+      shouldContain' "the emitted interview" out "the_stated_ground_of_refusal"
+
+      -- THE CORRECTNESS PIVOT. `show if:` must carry a `code:` sub-key. The
+      -- `{variable:, is:}` spelling sets show_if_var/show_if_val and no
+      -- showif_code (parse.py:3998-4002 at 1b6678384): it is browser-side
+      -- JavaScript, the engine shows every field, and a headless or API drive
+      -- DEFINES them all. Only the code form leaves a hidden field genuinely
+      -- undefined (parse.py:6316-6325 evals showif_code and sets
+      -- extras['ok'][n] = False at 6320/6324).
+      shouldContain' "the emitted interview" out "show if:"
+      case [ b | b <- yamlBlocks out, "show if:" `isInfixOf` b ] of
+        [] -> expectationFailure "no block carries a `show if:` at all"
+        blocks -> for_ blocks \b -> do
+          shouldContain'    "the `show if:` block" b "code:"
+          shouldNotContain' "the `show if:` block" b "is: "
+
+      -- `show if` is FIELD-level only. It is not among the 169 block keys at
+      -- parse.py:1947, and an unknown block key is silently ignored — only a
+      -- logmessage, and only under debug (parse.py:1945-1948). A block-level
+      -- `show if` therefore does nothing AND says nothing.
+      for_ (yamlBlocks out) \b ->
+        shouldNotContain' "a block" b "\nshow if:"
+
+    it "keeps the constructor radio in its own, earlier question (B)" $ do
+      -- HAZARD H1, probed: a `show if: {code: …}` reading a variable that a
+      -- field in the SAME question defines is fatal —
+      -- `DASourceError: Infinite loop: <var> already looked for`, on every
+      -- choice. The radio must be a separate, earlier block.
+      out <- daEmit bin daPayloadSource
+      for_ (yamlBlocks out) \b ->
+        when ("show if:" `isInfixOf` b && "the_outcome" `isInfixOf` b) $
+          shouldNotContain' "the payload follow-up block" b "datatype: radio"
+
+    ------------------------------------------------------------------------
+    -- C. MAYBE NUMBER / MAYBE DATE via paired is-known questions
+    ------------------------------------------------------------------------
+    it "pairs each MAYBE NUMBER/DATE with an is-known question (C)" $ do
+      out <- daEmit bin daMaybeSource
+
+      -- One L4 field, two docassemble questions: the flag and the value.
+      shouldContain' "the emitted interview" out "declared_income"
+      shouldContain' "the emitted interview" out "date_last_worked"
+      shouldContainAny "the emitted interview" out
+        ["declared_income_known", "declared_income_is_known", "has_declared_income"]
+      shouldContainAny "the emitted interview" out
+        ["date_last_worked_known", "date_last_worked_is_known", "has_date_last_worked"]
+
+      -- The value questions keep their own datatypes.
+      shouldContain' "the emitted interview" out "datatype: number"
+      shouldContain' "the emitted interview" out "datatype: date"
+
+      -- And each MAYBE value field is guarded, server-side, by its flag.
+      -- Without the guard a second consumer reading the value on the absence
+      -- path makes docassemble ask the value question anyway, and a blank
+      -- submission arrives as 0.0 — a fabricated answer, silently (probed).
+      --
+      -- Scoped to the two MAYBE fields on purpose. `the qualifying date` is a
+      -- PLAIN `DATE` in the same record and must NOT be guarded; requiring a
+      -- `show if:` on every date question would demand a defect.
+      for_ ["declared_income", "date_last_worked"] \field ->
+        case [ b | b <- yamlBlocks out
+                 , field `isInfixOf` b
+                 , "datatype: number" `isInfixOf` b || "datatype: date" `isInfixOf` b ] of
+          [] -> expectationFailure $
+            "no value question was emitted for the MAYBE field " ++ show field
+          blocks -> for_ blocks \b -> do
+            shouldContain' ("the " ++ field ++ " value question") b "show if:"
+            shouldContain' ("the " ++ field ++ " value question") b "code:"
+      -- and the plain DATE in the same record keeps its unguarded question
+      case [ b | b <- yamlBlocks out, "the_qualifying_date" `isInfixOf` b
+               , "datatype: date" `isInfixOf` b ] of
+        [] -> expectationFailure "the plain DATE field lost its question"
+        (b : _) -> shouldNotContain' "the plain DATE question" b "show if:"
+
+    it "reads absence as absence, never as 0 or '' (C)" $ do
+      -- What R8 was afraid of, asserted on the emitted code rather than on
+      -- the widget: the goal must consult the is-known flag, not merely the
+      -- value. `#EVAL` 2 (a real declared income of ZERO) and `#EVAL` 3 (no
+      -- declaration at all) disagree in L4; any lowering that reads only the
+      -- number cannot tell them apart.
+      out <- daEmit bin daMaybeSource
+      let goalBlocks = [ b | b <- yamlBlocks out, "the_claim_must_be_referred" `isInfixOf` b ]
+      when (null goalBlocks) $
+        expectationFailure "no code block sets the goal"
+      shouldContainAny "the emitted rule code" (concat goalBlocks)
+        ["_known", "_is_known", "has_declared_income"]
+
+    it "lowers `WHEN JUST FALSE` as a payload-VALUE match, not a presence test (C)" $ do
+      -- Scope ruling: a match on a MAYBE's payload value is IN M4, under R8.
+      -- M1 refused it by name, and before that repair it compiled to
+      -- `is None`, reporting TRUE for the unanswered case — which is the
+      -- opposite answer. The emitted code must compare the VALUE.
+      out <- daEmit bin daMaybeSource
+      shouldContainAny "the disclaimer rule" out
+        [ "declaration_confirmed is False"
+        , "declaration_confirmed == False"
+        , "declaration_confirmed) is False" ]
+
+    it "still refuses MAYBE of an enum, and names the enum (C)" $ do
+      -- The refusal survives M4 (see the fixture's own header for why). What
+      -- must NOT survive is M1's wording: "v1: MAYBE BOOLEAN and MAYBE STRING
+      -- only" becomes a false claim in user-facing prose the moment NUMBER
+      -- and DATE land, which is precisely the drift CLAUDE.md warns about. So
+      -- the diagnostic is required to name what it is refusing.
+      Output code _ serr <-
+        runL4 bin ["docassemble", "examples/docassemble/not-ok/maybe-enum.l4"]
+      code `shouldBe` ExitFailure 1
+      shouldContain' "the refusal" serr "MAYBE"
+      shouldContain' "the refusal" serr "Severity"
+      shouldNotContain' "the refusal" serr "MAYBE BOOLEAN and MAYBE STRING only"
+
+    ------------------------------------------------------------------------
+    -- D. date literals and calendar-exact date arithmetic
+    ------------------------------------------------------------------------
+    it "routes every date literal through as_datetime() (D)" $ do
+      -- A `datatype: date` answer enters the interview as
+      -- `as_datetime(<submitted string>)` (webapp interview/views.py:1372 at
+      -- 1b6678384), i.e. a tz-aware DADateTime. A bare string literal
+      -- compared against one raises TypeError — executed:
+      -- `as_datetime('2016-05-16') >= '2015-01-01'` is a TypeError, not a
+      -- comparison. The failure is loud; it is also certain.
+      out <- daEmit bin daDateSource
+      shouldContain' "the emitted interview" out "as_datetime("
+      shouldContain' "the emitted interview" out "2015-04-01"
+      case [ ln | ln <- lines out, "2015-04-01" `isInfixOf` ln ] of
+        [] -> expectationFailure "the commencement literal is not emitted at all"
+        lns -> for_ lns \ln ->
+          shouldContain' "the line carrying the date literal" ln "as_datetime("
+
+    it "computes statutory age calendar-exactly, never via date_difference (D)" $ do
+      -- `date_difference(...).years` is
+      -- `(delta.days + delta.seconds/86400.0) / 365.2425` — elapsed days over
+      -- the MEAN GREGORIAN YEAR, as a float (dates.py:482 at 1b6678384). It
+      -- reports 17.99900 on the applicant's own eighteenth birthday. Measured
+      -- over every birth date from 1970-01-01 to 2006-12-31 it disagrees with
+      -- the L4 oracle on 6,629 of 27,028 comparisons. It must not appear.
+      out <- daEmit bin daDateSource
+      shouldNotContain' "the emitted interview" out "date_difference"
+      shouldNotContain' "the emitted interview" out "365.2425"
+      -- and the calendar-exact idiom must be there instead
+      shouldContainAny "the emitted interview" out
+        [".minus(years=", ".plus(years=", "relativedelta(years="]
+
+    ------------------------------------------------------------------------
+    -- E. the `review:` block as a compliance checklist
+    ------------------------------------------------------------------------
+    it "emits a review block listing every input, answered or not (E)" $ do
+      out <- daEmit bin daReviewSource
+      shouldContain' "the emitted interview" out "review:"
+      -- A review block is only reachable by firing its `event:`
+      -- (current_info['action'] = '<event>'); without one the interview simply
+      -- ends. Probed.
+      case [ b | b <- yamlBlocks out, "review:" `isInfixOf` b ] of
+        [] -> expectationFailure "no review block was emitted"
+        [rv] -> do
+          shouldContain' "the review block" rv "event:"
+          -- every L4 input gets a row, including the three that this rule's
+          -- short-circuit means are never asked
+          for_ [ "the_return_was_filed", "the_return_was_on_time"
+               , "the_fee_was_paid", "a_waiver_was_granted" ] $
+            shouldContain' "the review block" rv
+          -- The recipe that actually renders an unanswered row: a `note:`
+          -- carrying showifdef(). A note row has no saveas to evaluate, so it
+          -- renders whether or not the variable exists.
+          shouldContain' "the review block" rv "note:"
+          shouldContain' "the review block" rv "showifdef("
+        other -> expectationFailure $
+          "expected exactly one review block, found " ++ show (length other)
+
+    it "does NOT reach for `skip undefined: False`, which force-asks (E)" $ do
+      -- SPEC CORRECTION, measured. §10 called for a review block "with
+      -- `skip undefined: False`". That flag does not make a passive
+      -- checklist: it makes the review block FORCE-ASK every undefined
+      -- variable it lists — with the flag the row's eval is no longer wrapped
+      -- in try/except (parse.py:5876-5904 at 1b6678384), and the probe landed
+      -- on the field screen for the unasked variable instead of on a review
+      -- screen. The default (absent) is the opposite failure: an undefined row
+      -- is silently dropped into a debug log line. Neither is a checklist.
+      --
+      -- The review block is required to EXIST here as well as to lack the
+      -- flag, so this cannot pass vacuously on an interview that emits no
+      -- review block at all.
+      out <- daEmit bin daReviewSource
+      shouldContain'    "the emitted interview" out "review:"
+      shouldNotContain' "the emitted interview" out "skip undefined: False"
+
+    ------------------------------------------------------------------------
+    -- F. document assembly
+    ------------------------------------------------------------------------
+    it "assembles a letter from the verdict screen, under a `variable name:` (F)" $ do
+      out <- daEmit bin daLetterSource
+      shouldContain' "the emitted interview" out "attachment:"
+      -- WITHOUT `variable name:` docassemble files the document under
+      -- `_internal['docvar'][n]` (parse.py:4997-5003 at 1b6678384) and there
+      -- is nothing to assert about afterwards. The hazard this defends
+      -- against is not an exception — a raising body propagates and an
+      -- unaskable reference propagates, both probed — it is a SUCCESSFUL
+      -- EMPTY RENDER: interview completes, variable is a healthy
+      -- DAFileCollection, letter is blank, nothing raises and nothing logs.
+      shouldContain' "the emitted interview" out "variable name:"
+      -- Headless assembly is DOCX- and HTML-capable in the harness venv
+      -- (docx and docxtpl present) but there is no LibreOffice/soffice, so a
+      -- PDF format would fail at assemble time — and per parse.py:9521-9526
+      -- that failure inside a question block is swallowed into a log line.
+      -- Scoped to the attachment block: `pdf` is a broad needle and a bare
+      -- whole-file negative would be brittle rather than meaningful.
+      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
+        [] -> expectationFailure "no attachment block was emitted at all"
+        blocks -> for_ blocks \b -> do
+          shouldContain'    "the attachment block" b "valid formats:"
+          shouldNotContain' "the attachment block" b "pdf"
+
+      -- The verdict screen must actually reference the document, or it is
+      -- never assembled. Asserted on an `event:` block specifically: the
+      -- attachment block names the variable itself, so looking for the name
+      -- anywhere in the file would be satisfied by the declaration alone.
+      let verdictScreens = [ b | b <- yamlBlocks out, "event:" `isInfixOf` b ]
+      when (null verdictScreens) $
+        expectationFailure "no verdict screen (`event:` block) was emitted"
+      shouldContainAny "the verdict screens" (concat verdictScreens)
+        ["${ notice_letter }", "${notice_letter}", "notice_letter"]
+
+    it "keeps attachment sub-keys out of the BLOCK-key vocabulary (F/R9.5)" $ do
+      -- A third vocabulary. `variable name`, `filename`, `content`,
+      -- `valid formats` and `content file` are ATTACHMENT sub-keys, read by
+      -- process_attachment (parse.py:4914-5230 at 1b6678384); `name`,
+      -- `filename`, `docx template file` and `valid formats` are NOT among
+      -- the 169 block keys at parse.py:1947. Adding them to the emitter's
+      -- block-key list would break `emitterVocabularyViolations == []`, so
+      -- they need their own list with its own oracle — exactly the split M2
+      -- already made between block keys and field modifiers.
+      out <- daEmit bin daLetterSource
+      let known = [ "name", "filename", "description", "variable name"
+                  , "valid formats", "content", "content file", "raw"
+                  , "docx template file", "pdf template file", "fields"
+                  , "metadata", "editable", "skip undefined", "language"
+                  , "redact", "template file", "rtf template file"
+                  , "docx reference file", "update references", "usedefs"
+                  , "initial yaml", "additional yaml", "checkbox export value"
+                  , "decimal places" ]
+          subKeys b = [ takeWhile (/= ':') (drop 2 ln)
+                      | ln <- lines b, "  " `isPrefixOf` ln
+                      , not ("   " `isPrefixOf` ln), ':' `elem` ln ]
+      -- Required to EXIST as well as to be well-formed, so this cannot pass
+      -- vacuously on an interview that emits no attachment at all.
+      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
+        [] -> expectationFailure "no attachment block was emitted at all"
+        blocks -> for_ blocks \b ->
+          for_ (subKeys b) \k ->
+            unless (null k || k `elem` known) $
+              expectationFailure $
+                "the attachment block uses sub-key " ++ show k
+                ++ ", which process_attachment does not read (parse.py:4914-5230 "
+                ++ "at 1b6678384). It is not a block key either, so nothing will "
+                ++ "warn: an unrecognised attachment sub-key is silently ignored."
+                ++ "\n--- block ---\n" ++ b
+
+    it "ships the letter template in the package under data/templates (F/R11)" $ do
+      -- The `--package` tree already grafts `<inner>/data` in MANIFEST.in, so
+      -- a template dropped under data/templates ships automatically. Note for
+      -- the implementer: if the interview references it with `content file:`,
+      -- the BARE artifact stops parsing, because content file resolves
+      -- through package_template_filename and raises DASourceError when the
+      -- file is not found (parse.py:5059-5064 at 1b6678384) — at parse time,
+      -- before any question is asked.
+      haveTemplate <- doesFileExist daLetterTemplate
+      unless haveTemplate $
+        expectationFailure (daLetterTemplate ++ " is missing from the corpus")
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-da-pkg-letter"
+      files <- expectPackage bin daLetterSource dir
+      case [ f | f <- files, ("data" </> "templates") `isInfixOf` f ] of
+        [] -> expectationFailure $
+          "the --package tree ships no data/templates entry; files were "
+          ++ show files
+        _  -> pure ()
+      removePathForcibly dir
+
+    ------------------------------------------------------------------------
+    -- G. regression: the boundary of what M4 owns
+    --
+    -- GREEN today, and it must stay green. This block pre-authorises nothing:
+    -- the seven M1/M2 byte goldens are pinned where they already were
+    -- (stdout, and again through `-o` with its fidelity sidecar), and the four
+    -- refusals below are the ones M4 does not own.
+    ------------------------------------------------------------------------
+    it "leaves the four refusals M4 does not own refusing, by their own names (G)" $
+      for_ daStillRefused \(fixture, diagnostic) -> do
+        Output code _ serr <-
+          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
+        unless (code == ExitFailure 1) $
+          expectationFailure $
+            fixture ++ " no longer refuses (exit " ++ show code
+            ++ "); M4 does not own this refusal"
+        shouldContain' (fixture ++ " refusal") serr diagnostic
   where
     for_ xs f = mapM_ f xs

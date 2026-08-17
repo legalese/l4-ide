@@ -27,6 +27,22 @@ fidelity report's placement in the tree, and the reversal of R4's `clear_explana
 sentence are recorded as implementation notes in §8.11, §8.11 and §8.4. **M3 (embedded plan) and
 M4 (breadth) remain unimplemented.**_
 
+_**M4 is NOT implemented. Its acceptance tests are written and RED**, on branch
+`mengwong/docassemble-m4`, 2026-08-17. Nothing in §10's M4 bullet ships: `LIST OF`, constructor
+payloads, `MAYBE NUMBER`/`MAYBE DATE`, date literals and date arithmetic are each still refused
+by name by `l4 docassemble`, and no `review:` block or `attachment:` block is emitted for any
+module. What exists is the fail-first half: six new examples under `jl4/examples/docassemble/`
+(`tenant-list`, `payload-enum`, `maybe-scalars`, `statutory-age`, `review-checklist`,
+`notice-letter`), each typechecking and evaluating in L4 so its `#EVAL`s are a real oracle;
+16 CLI-level assertions under `describe "l4 docassemble (M4: breadth — acceptance, RED)"` in
+`jl4/tests-cli/Main.hs`, of which 15 fail and 1 is the regression guard for what M4 does not
+own; and the behavioural half in `jl4/examples/docassemble/m4_acceptance.sh`, which emits and
+drives all six plus the `citations` inherited-debt case and reports **7 of 7 not round-tripping**.
+Two scope rulings the milestone had to make rather than drift into are recorded here — the
+payload-value match (§8.8, **ANSWERED**) and the date surface (§8.12, **ANSWERED**) — together
+with three corrections to §9.5 and §10 that the RED phase measured. No byte goldens were written
+for the M4 examples, on M2's own precedent._
+
 **One-line summary.** Docassemble discovers evaluation order at runtime by backchaining on
 undefined variables — the same "what do we still need to ask?" question L4's query planner
 answers at compile time — so a transpiler emits _definitions, not sequence_, which is exactly the
@@ -70,6 +86,10 @@ golden pins it.
 | R9     | **ANSWERED** 2026-08-16 | emission hygiene: Mako escaping, `sets:`, `id:`, `depends on:`, self-validation, §8.9    |
 | R10    | **ANSWERED** 2026-08-16 | validation harness: headless docassemble.base, proven by probe, never a build dep, §8.10 |
 | R11    | **ANSWERED** 2026-08-16 | artifact shape: bare YAML v1, installable package M2, §8.11                              |
+| R12    | **ANSWERED** 2026-08-17 | the M4 date surface: what lowers, what refuses by name, which idiom, §8.12               |
+
+R12 was ANSWERED 2026-08-17 by the M4 RED phase, on the measurement recorded in §8.12; it did
+not exist on 2026-08-16 because §10's M4 bullet named an idiom without bounding a surface.
 
 All eleven ANSWERED 2026-08-16: signed off by Meng in session `xpile-docassemble` after a
 quiz-card review of the full roster; none contested. Each §8 section retains its evidence, its
@@ -292,35 +312,35 @@ The organising principle, per the commissioning instruction: **as much as possib
 encoding survives, by name and by structure.** An L4 reader and a docassemble reader should
 recognise the same program.
 
-| L4 construct                                             | docassemble target                                                                                                                                                                                           | survival                             |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| `@export` `DECIDE`/`MEANS` (boolean or numeric goal)     | goal variable defined by a `code:` block; the default function drives the single `mandatory` block                                                                                                           | clean                                |
-| `GIVEN p IS A <Record>`                                  | `objects:` instance of a generated `DAObject` subclass                                                                                                                                                       | clean, R2                            |
-| stored record field                                      | one `question:` block per field (`generic object` style), label = backticked L4 name, help = `@desc`                                                                                                         | clean, R2                            |
-| computed (`MEANS`) record field                          | inlined at each projection site — desugar strips `MEANS` fields pre-typecheck into synthesized selector decides, so there is no field left to hang an attribute `code:` block on (M2 may restore one), §8.2  | clean (inlined), R2                  |
-| `WHERE`/`LET` binding, zero-`GIVEN`                      | one namespaced `code:` block each                                                                                                                                                                            | clean, R3                            |
-| `WHERE` binding with `GIVEN`s (local function)           | Python function in the generated module, called from `code:` blocks                                                                                                                                          | clean, R3                            |
-| non-exported top-level `DECIDE` reachable from an export | `code:` block (no `@export` needed for helpers, unlike OpenFisca's cross-entity contract)                                                                                                                    | clean, R3                            |
-| `AND`/`OR`/`NOT`, comparisons, arithmetic                | Python operators, fully parenthesised; operand order preserved = question order                                                                                                                              | clean                                |
-| `IF…THEN…ELSE`, `BRANCH`, `CONSIDER` over enums          | Python conditionals / `if…elif…else` chains in `code:` blocks                                                                                                                                                | clean                                |
-| top-level `IMPLIES` in an exported decision (the seam)   | scope and requirement as separate variables; scope-first driver; six-valued verdict                                                                                                                          | R4 — the landmine                    |
-| `DECLARE … IS ONE OF` (nullary constructors)             | `datatype: radio` + `choices:`, values = constructor names as strings                                                                                                                                        | clean, R6                            |
-| constructors with payloads                               | deferred: `show if` follow-up fields                                                                                                                                                                         | M4                                   |
-| `STRING`                                                 | `datatype: text` — docassemble has strings (Catala does not)                                                                                                                                                 | clean                                |
-| `NUMBER` (exact `Rational`)                              | `datatype: number` (Python float) — same class of divergence as OpenFisca's float32, Advisory note                                                                                                           | R6                                   |
-| `DATE`, date comparisons                                 | `datatype: date` → tz-aware `DADateTime`; comparisons safe among docassemble-produced values; every emitted literal routed through `as_datetime()`                                                           | clean for comparisons; arithmetic M4 |
-| `MAYBE OF T`                                             | optional field, erased as in `FunctionSchema.hs:147-148`                                                                                                                                                     | R8, Advisory                         |
-| `TYPICALLY`                                              | `default:` prefill                                                                                                                                                                                           | R7, Advisory                         |
-| `@desc` on decide/param/type                             | `question:` text, field `help:`                                                                                                                                                                              | clean                                |
-| `@ref` on a `DECIDE` or `WHERE` binding                  | `explain()` in that rule's own `code:` block; `logic_explanation()` on every verdict screen                                                                                                                  | clean, M2 (shipped)                  |
-| `@ref` on an expression                                  | nothing — an expression is not a `code:` block, so there is nothing to hang the call on                                                                                                                      | **Advisory** `DA-REF-EXPR`           |
-| plain `@desc` on a `DECLARE` or a named definition       | one `auto terms:` glossary entry, keyed on the L4 term                                                                                                                                                       | clean, M2 (shipped)                  |
-| `#EVAL`/`#ASSERT` fixtures                               | round-trip oracle inputs (R10); **not emitted** into the interview, per the DMN R0 precedent                                                                                                                 | n/a                                  |
-| `LIST OF`                                                | `DAList` gathering driven by `complete_attribute` (one pivot variable per element record; sub-questions arrive by short-circuit demand); `elements=[…]` for computed lists; `list collect:` for bounded ones | M4                                   |
-| deontic (`PARTY MUST … HENCE/LEST`)                      | none; docassemble multi-user roles/actions are a plausible future mapping, not attempted                                                                                                                     | **Blocking** note                    |
-| temporal (`EVAL … UNDER RULES EFFECTIVE AT`, four pins)  | none                                                                                                                                                                                                         | **Lossy** note                       |
-| ledger (`RECORD`/`FETCH`/`ATTEST`)                       | none (docassemble's `DAWeb` exists for outbound HTTP, unused)                                                                                                                                                | **Blocking** note                    |
-| `Inert` prose scaffolding                                | Markdown in `subquestion`/section headers where attached; else dropped with Advisory note                                                                                                                    | partial                              |
+| L4 construct                                             | docassemble target                                                                                                                                                                                          | survival                             |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `@export` `DECIDE`/`MEANS` (boolean or numeric goal)     | goal variable defined by a `code:` block; the default function drives the single `mandatory` block                                                                                                          | clean                                |
+| `GIVEN p IS A <Record>`                                  | `objects:` instance of a generated `DAObject` subclass                                                                                                                                                      | clean, R2                            |
+| stored record field                                      | one `question:` block per field (`generic object` style), label = backticked L4 name, help = `@desc`                                                                                                        | clean, R2                            |
+| computed (`MEANS`) record field                          | inlined at each projection site — desugar strips `MEANS` fields pre-typecheck into synthesized selector decides, so there is no field left to hang an attribute `code:` block on (M2 may restore one), §8.2 | clean (inlined), R2                  |
+| `WHERE`/`LET` binding, zero-`GIVEN`                      | one namespaced `code:` block each                                                                                                                                                                           | clean, R3                            |
+| `WHERE` binding with `GIVEN`s (local function)           | Python function in the generated module, called from `code:` blocks                                                                                                                                         | clean, R3                            |
+| non-exported top-level `DECIDE` reachable from an export | `code:` block (no `@export` needed for helpers, unlike OpenFisca's cross-entity contract)                                                                                                                   | clean, R3                            |
+| `AND`/`OR`/`NOT`, comparisons, arithmetic                | Python operators, fully parenthesised; operand order preserved = question order                                                                                                                             | clean                                |
+| `IF…THEN…ELSE`, `BRANCH`, `CONSIDER` over enums          | Python conditionals / `if…elif…else` chains in `code:` blocks                                                                                                                                               | clean                                |
+| top-level `IMPLIES` in an exported decision (the seam)   | scope and requirement as separate variables; scope-first driver; six-valued verdict                                                                                                                         | R4 — the landmine                    |
+| `DECLARE … IS ONE OF` (nullary constructors)             | `datatype: radio` + `choices:`, values = constructor names as strings                                                                                                                                       | clean, R6                            |
+| constructors with payloads                               | deferred: `show if` follow-up fields                                                                                                                                                                        | M4                                   |
+| `STRING`                                                 | `datatype: text` — docassemble has strings (Catala does not)                                                                                                                                                | clean                                |
+| `NUMBER` (exact `Rational`)                              | `datatype: number` (Python float) — same class of divergence as OpenFisca's float32, Advisory note                                                                                                          | R6                                   |
+| `DATE`, date comparisons                                 | `datatype: date` → tz-aware `DADateTime`; comparisons safe among docassemble-produced values; every emitted literal routed through `as_datetime()`                                                          | clean for comparisons; arithmetic M4 |
+| `MAYBE OF T`                                             | optional field, erased as in `FunctionSchema.hs:147-148`                                                                                                                                                    | R8, Advisory                         |
+| `TYPICALLY`                                              | `default:` prefill                                                                                                                                                                                          | R7, Advisory                         |
+| `@desc` on decide/param/type                             | `question:` text, field `help:`                                                                                                                                                                             | clean                                |
+| `@ref` on a `DECIDE` or `WHERE` binding                  | `explain()` in that rule's own `code:` block; `logic_explanation()` on every verdict screen                                                                                                                 | clean, M2 (shipped)                  |
+| `@ref` on an expression                                  | nothing — an expression is not a `code:` block, so there is nothing to hang the call on                                                                                                                     | **Advisory** `DA-REF-EXPR`           |
+| plain `@desc` on a `DECLARE` or a named definition       | one `auto terms:` glossary entry, keyed on the L4 term                                                                                                                                                      | clean, M2 (shipped)                  |
+| `#EVAL`/`#ASSERT` fixtures                               | round-trip oracle inputs (R10); **not emitted** into the interview, per the DMN R0 precedent                                                                                                                | n/a                                  |
+| `LIST OF`                                                | `DAList` gathering: `object_type` plus either `there_are_any`+`there_is_another` or `ask_number`+`target_number`; `complete_attribute` orders, it does not prune (see §10, corr. 1)                         | M4                                   |
+| deontic (`PARTY MUST … HENCE/LEST`)                      | none; docassemble multi-user roles/actions are a plausible future mapping, not attempted                                                                                                                    | **Blocking** note                    |
+| temporal (`EVAL … UNDER RULES EFFECTIVE AT`, four pins)  | none                                                                                                                                                                                                        | **Lossy** note                       |
+| ledger (`RECORD`/`FETCH`/`ATTEST`)                       | none (docassemble's `DAWeb` exists for outbound HTTP, unused)                                                                                                                                               | **Blocking** note                    |
+| `Inert` prose scaffolding                                | Markdown in `subquestion`/section headers where attached; else dropped with Advisory note                                                                                                                   | partial                              |
 
 ## 5. What does not map, and how loss is declared
 
@@ -627,6 +647,33 @@ header. **M4 owns the repair**, because M4 is already specced (§10) to ship a `
 the surface that makes re-answering ordinary, and therefore the first release in which this is a
 plain-browser bug rather than an API-only one.
 
+**M4 RED phase, 2026-08-17: the defect is WORSE than bounded here, and no single flag repairs
+it.** Re-measured against the shape the backend actually emits — one `code:` block per rule, each
+with its own `explain()`, plus `depends on:`/`sets:` (`expected/citations.yml:42-84`) — with the
+answer changed the way a review-block Edit changes it (`undefine()` then re-ask):
+
+- **the VERDICT goes stale, not merely the citations.** With `amount` corrected from 9,000,000 to
+  1,000 the goal stays `False` and the citations stay unchanged (**executed**). The bound above
+  says "re-decides the goal correctly and leaves the verdict screen citing rules that were
+  short-circuited away"; that was measured through the API's `delete_variables` path, and it does
+  not hold on the undefine-and-re-ask path. `depends on:` did not rescue it.
+- **`reconsider: True` alone is actively worse than nothing**: it fixes the verdict but makes the
+  citations ACCUMULATE contradictory rules — "maximum EXCEEDED" and "maximum satisfied" together
+  (**executed**). `initial: True` + `clear_explanations()` alone empties the list to `[]`. Both
+  together give the right verdict and no citations at all.
+- **What does work — two designs, both verified (**executed**), and M4 picks neither here.** The
+  explaining must be ATOMIC IN ONE BLOCK. Either (A) move every `explain()` into the mandatory
+  driver with `clear_explanations()` as its first statement, `reconsider: True` on the driver and
+  the rule blocks; or (B) drop `explain()` and derive `cite_*` variables. Both yield the right
+  verdict and exactly the rules that fired, before and after a changed answer.
+
+The acceptance test states this as a CLAIM and not as a design: `roundtrip_check.py`'s
+`citations` example carries a `change_answer` case asserting that after the edit the goal, the
+verdict and the citations are what they would have been had the new answer been given first. It
+is RED today with all three wrong. Note that adopting either design changes M2's emission shape,
+which is byte-golden-pinned; that is ruled IN as M4's owned repair by the paragraph above, and
+the goldens are re-blessed consciously in the GREEN phase.
+
 **Implementation note (2026-08-17, M2): where a seam export's own `@ref` goes.** A seam lowers
 to two `code:` blocks and the citation must not be duplicated across them. It rides on the
 **scope** block: the rule fired — it was decided whether it applies — as soon as scope is known,
@@ -695,6 +742,27 @@ them equal to the rendered choice values.
 **What would close it:** the enum golden plus an R10 run where a `CONSIDER` over a 3-way enum
 asks one radio question and takes the right arm.
 
+**M4 addendum, 2026-08-17 (RED phase): what "payloads via `show if`" does and does not reach.**
+A census of the whole `.l4` corpus found 134 `IS ONE OF` declarations carrying 104 payload
+constructors, arity 1 dominating (77 single-field), with 56 SCALAR payload fields (32 `NUMBER`,
+24 `STRING`) against 31 non-scalar (records or enums), and zero `BOOLEAN` and zero `DATE`
+payloads. Most payload enums in the corpus are deontic action types (`Action`,
+`Contract Action`, `Loan Action`, …) which are Fidelity-Blocked as `DA-DEONTIC` and can never
+reach an interview at all. The real non-deontic targets are two idioms: the ESCAPE HATCH
+(`other purpose HAS the description IS A STRING`, `Suspended HAS the reason IS A STRING`) and
+SUM-OF-RECORDS (`Legal Entity`: `Individual HAS the person IS A Person` |
+`Corporation HAS the company IS A Company`).
+
+`show if` serves the SCALAR case exactly — one extra field per payload, gated on the radio — and
+`payload-enum.l4` is that case. It does **not** cleanly serve sum-of-records, because
+`objects:` instantiates unconditionally (`DAObjectsBlock` is a flat list of (variable, class)
+pairs, `IR.hs`/`Emit.hs`), so every constructor's record sub-tree would be instantiated and only
+the shown branch asked. **That is left OPEN, and deliberately not ruled here**: it is a design
+decision, not a mechanical extension of the scalar case, and the M4 corpus does not force it.
+The RED phase's `payload-enum.l4` carries only scalar payloads, so a green M4 that refuses
+sum-of-records payloads BY NAME satisfies these tests — and that refusal, if taken, has to name
+the record, not recite a list.
+
 ### 8.7 R7 — `TYPICALLY` → `default:`, Advisory
 
 **Evidence.** `TYPICALLY` is metadata today: parsed, schema'd, planner-prior'd, evaluator-inert
@@ -714,7 +782,10 @@ per-datatype-shaped — see the R6 coercion facts (`views.py:1334-1470`) **[E vi
 
 **Proposal, revised against the coercion facts in R6.** Blanket erasure is unsound for
 numerics and dates: an unanswered number submits as `0`/`0.0` and an unanswered date as `''`
-(`views.py:1396,1412,1374` **[E via survey]**), so "absent" is indistinguishable from a real
+(`views.py:1397-1398,1413-1414,1374` **[E via survey]**; **cite repaired 2026-08-17** — the
+number coercion is at 1413-1414, of which 1412 is the comma strip, and the integer coercion at
+1397-1398. R6's stated range `1334-1470` also MISSES a second coercion site at
+`views.py:1581-1587`), so "absent" is indistinguishable from a real
 answer. v1 therefore splits by type: `MAYBE BOOLEAN` → `yesnomaybe` (three-state; `None` _is_
 `NOTHING`, exact, no loss); `MAYBE STRING` → `required: False` with `''` read as `NOTHING`
 (Advisory note — a deliberately empty answer is conflated); `MAYBE NUMBER`/`MAYBE DATE` →
@@ -729,8 +800,38 @@ rewrites out-of-scope nullary `PatApp`s to `PatVar`, `TypeCheck.hs` `inferPatter
 nullary `PatApp` payload can only be a genuine constructor pattern — `WHEN JUST TRUE` — which
 is a match on the payload _value_ that presence erasure cannot express. M1 as first landed
 matched `PatApp _ v []` as if it were a binder, silently degrading `WHEN JUST TRUE` to a mere
-presence test (`is None`), reporting TRUE for `JUST FALSE`. Now refused by name; pinned by
-`not-ok/just-payload-pattern.l4`.
+presence test (`is None`), reporting TRUE for `JUST FALSE`. Refused by name at M1; ruled IN at
+M4 (immediately below), and `not-ok/just-payload-pattern.l4` accordingly retired into
+`maybe-scalars.l4`, where the same shape is now a supported case.
+
+**Scope ruling, ANSWERED 2026-08-17 (M4). A match on a `MAYBE`'s payload VALUE — `WHEN JUST
+TRUE`, `WHEN JUST FALSE`, `WHEN JUST 0` — is IN M4, under R8.** §10's M4 bullet named neither it
+nor its opposite: it lists "payload constructors via `show if`" and "`MAYBE NUMBER`/`DATE` via
+paired is-known questions", and a payload-value match is adjacent to both and named by neither.
+The milestone had to rule rather than drift.
+
+_Why in._ Three reasons, in increasing weight. (i) It is nearly free at both ends of the M4
+work: under the shipped `MAYBE BOOLEAN` representation the interview already stores exactly
+`True`/`False`/`None` (`datatype: yesnomaybe`, `expected/defaults.yml:26`) and the emitter
+already writes `is None`, so the value match is one more comparison; and under the paired
+is-known design it falls out as `known and value == v`. (ii) Refusing it while shipping the
+representation that makes it trivial would leave the tool refusing something it can plainly do,
+which is a worse diagnostic than refusing something it cannot. (iii) It is exactly the case that
+caught M1's real defect — the pre-repair emitter answered `JUST FALSE` as TRUE — so keeping it
+out of the corpus would remove the regression test for the one M1 bug that changed an answer.
+
+_What that costs._ `WHEN JUST <value>` must NOT compile to a presence test. The pinning case is
+`maybe-scalars.l4` #EVAL 6 against #EVAL 7: the declaration positively disclaimed (`JUST FALSE`,
+referable) against the declaration never answered (`NOTHING`, not referable). A presence
+lowering answers both TRUE.
+
+_What is still out._ `MAYBE <enum>` and `MAYBE <record>`, refused by name and pinned by
+`not-ok/maybe-enum.l4`. The paired is-known design does not reach them: the value question for an
+enum is itself a radio, so its absent path is not the widget's empty submission but a fourth
+choice, and a record explodes into several questions all of which the absence would have to gate.
+That fixture also guards the DIAGNOSTIC: M1's catch-all recites "v1: MAYBE BOOLEAN and MAYBE
+STRING only", which becomes a false claim in user-facing prose the moment NUMBER and DATE land,
+so the refusal is required to name the type it is refusing instead.
 
 ### 8.9 R9 — emission hygiene (the silent-YAML defence)
 
@@ -1079,6 +1180,76 @@ where = ["."]` then found both, and a wheel built from that tree — declaring i
    (`parse.py:2765-2767`) and suppresses the automatic `from docassemble.base.util import *` at
    `:8523`, which would take `explain`, `DAObject` and every other builtin with it.
 
+### 8.12 R12 — the M4 date surface: what lowers, what refuses, and which idiom
+
+**ANSWERED 2026-08-17 (M4 RED phase).** §10's M4 bullet names an idiom ("never
+`date_difference().years` … use calendar-exact `.plus()`/`.minus()`") but bounds no surface, and
+L4's date surface is far larger than the target's: six libraries (`datetime.l4`, `daydate.l4`,
+`date-compat.l4`, `excel-date.l4`, `time.l4`, `timezone.l4`) on top of a `DATE` builtin, with
+`Date` five-way overloaded and `Day` three-way. Carrying that is not the job. The job is to lower
+what the corpus needs and refuse the rest **by name**.
+
+**What lowers (the minimum the M4 corpus establishes).** A date LITERAL; a date COMPARISON; and
+"the same day-and-month, _n_ years later". That is the whole of `statutory-age.l4`, and it is the
+whole of what a statutory-age or limitation-period rule needs.
+
+**What is already sound and needed no ruling.** A comparison between two question-supplied dates
+works at M1: the webapp coerces every submitted `datatype: date` through `as_datetime()` before
+it enters the interview dict (`interview/views.py:1372` at `1b6678384` **[E]**), so both sides
+are `DADateTime`. The RED phase's premise that M1's date path was unsound is wrong and is
+corrected here; what is true is that **no M1 example exercised DATE at all** — zero `DATE` in
+`jl4/examples/docassemble/*.l4` before `statutory-age.l4` and `maybe-scalars.l4` — so the path
+had no golden, no harness coverage and no fidelity note.
+
+**The literal is the real gap, and it fails loudly.** `as_datetime('2016-05-16') >= '2015-01-01'`
+raises `TypeError` (**executed**). So a naive string literal is a crash, not a wrong answer —
+lower risk than feared, but a certainty the moment anyone writes a date literal.
+
+**Which idiom, measured — and §10's answer is wrong.** L4's `Date d m y` is the LENIENT,
+ROLLING constructor: `Date 29 2 2022` evaluates to `DATE OF 1, 3, 2022` (**executed**).
+`dateutil`'s `relativedelta`, which is what `DADateTime.plus`/`.minus` use, CLAMPS instead.
+Swept over every birth date from 1970-01-01 to 2006-12-31, each tested on the L4 majority date
+and the day before — 13,514 birth dates, 27,028 comparisons (**executed**):
+
+| Python idiom                       | disagreements with the L4 oracle | where                          |
+| ---------------------------------- | -------------------------------- | ------------------------------ |
+| `date_difference(…).years >= 18`   | 6,629 (24.5%)                    | on the birthday itself         |
+| `born.plus(years=18) <= assessed`  | 9 (0.03%)                        | leap-day births, tested 28 Feb |
+| `born <= assessed.minus(years=18)` | **0**                            | —                              |
+
+`date_difference(…).years` is `(delta.days + delta.seconds/86400.0) / 365.2425`
+(`dates.py:482` at `1b6678384` **[E]**) — elapsed days over the mean Gregorian year, as a float.
+It reports **17.99900** on the applicant's own eighteenth birthday, which is the one day the
+question is asked. §10 is right to forbid it.
+
+§10 is **wrong** to offer `.plus()` and `.minus()` as interchangeable. They are not: they differ
+on exactly the leap-day births, because `.plus()` clamps 2004-02-29 + 18y to 2022-02-28 while L4
+rolls it forward to 2022-03-01. Measured against L4 as the oracle — which is what the R10 harness
+compares against, and what the lawyer actually read — the BACKWARD form is the correct one and the
+forward form is wrong on 9 of 27,028. A prior recon pass recommended the forward form; it had
+assumed the clamping convention as ground truth rather than measuring against L4. **Ruling: emit
+the backward form**, `born <= assessed.minus(years=n)`, or any lowering that agrees with L4's
+`Date` on leap days; and if the implementer prefers the forward form, the leap-day case in
+`statutory-age.l4` (#EVAL 3, L4 answers FALSE) is what must be made to pass, not to be excluded.
+
+**What refuses by name, with a later-milestone marker.** `years after` (fractional years — the
+corpus has `n = 7.5` in `ceo-performance-award.l4`), `the week after`, `the date that many years
+earlier`, `DATETIME`/`TIME`/`TIMEZONE` and everything in `excel-date.l4`, `time.l4` and
+`timezone.l4`. Also refused, and separately: recursive cons-pattern functions over `LIST OF DATE`
+(they are gated by the existing recursion refusal, not by anything M4 changes).
+
+**Implementation note, not a ruling.** Recognise the small named entry set plus the builtins
+(`DATE_YEAR`/`DATE_MONTH`/`DATE_DAY`, `DATE_SERIAL`, `DATE_FROM_SERIAL`); do NOT try to inline
+`daydate.l4`. `Date` has five overloads bottoming out in `DATE_SERIAL`/`DATE_FROM_SERIAL`/
+`DATE_FROM_DMY`/`DATEVALUE`/`TODATETIME` plus an `ASSUME` bottom, and `YMD` is a bounds-checked
+wrapper whose refusal path is itself an `ASSUME`. Note also that the three constructors have
+three different out-of-range behaviours, which a lowering must not silently flatten:
+`Date 29 2 2022` rolls to 1 March, `DATE_FROM_DMY 29 2 2022` refuses ("produced an invalid date"),
+`YMD 2022 2 29` refuses through its `ASSUME` (**all three executed**).
+
+**What would close it:** `statutory-age.l4` green under the R10 harness on all six cases,
+including the two where `date_difference` disagrees and the one where `.plus()` disagrees.
+
 ## 9. Verification plan
 
 1. **Goldens** (regression only, stated as such): `expectGolden` blocks per example;
@@ -1095,8 +1266,27 @@ where = ["."]` then found both, and a wheel built from that tree — declaring i
 5. **Seeking-trace oracle**: with debug on, `InterviewStatus.get_history()` names which block
    fired for which variable in which order — the harness compares that against the L4
    evaluation trace, catching "right answer via the wrong rule", which answer-comparison alone
-   cannot. Attachment blocks get an explicit post-condition check, because a failed attachment
-   eval is swallowed into a log line (`parse.py:9523-9526`).
+   cannot. Attachment blocks get an explicit post-condition check.
+
+   **Correction, 2026-08-17 (M4 RED phase).** The reason this clause used to give — "because a
+   failed attachment eval is swallowed into a log line (`parse.py:9523-9526`)" — was mis-cited,
+   too broad, and named the wrong hazard.
+
+   The cite is `parse.py:9521-9526` (`try:` at 9521, `eval(missing_var, user_dict)` at 9522,
+   `except BaseException as err:` at 9524, `logmessage("Problem with attachments block: "…)` at
+   9525, `continue` at 9526); 9523 is a comment. The swallow is real at that site, but no
+   realistic defect could be made to take it: a raising body propagates `ZeroDivisionError` and
+   an unaskable reference propagates `DAErrorMissingVariable`, on BOTH the question-attached and
+   the standalone attachment paths (**executed**).
+
+   The hazard that IS silent is different and worse, and it is not an exception at all: a
+   **successful empty render**. The interview completes, the variable is a healthy
+   `DAFileCollection`, and the letter is blank. Nothing raises and nothing is logged. So the
+   post-condition must assert on the assembled CONTENT (`<var>.html.content` non-empty and
+   carrying the expected text), and `variable name:` is mandatory not for tidiness but because
+   without it docassemble files the document under `_internal['docvar'][n]`
+   (`parse.py:4997-5003`) where there is nothing left to assert about. Pinned by the two
+   `notice-letter.l4` harness cases.
 
 ## 10. Sequencing
 
@@ -1129,14 +1319,70 @@ where = ["."]` then found both, and a wheel built from that tree — declaring i
 - **M3 — the differentiator.** `--plan`: embedded `CompiledDecisionQuery` + Python port of
   `queryDecision`/`verdictOf`, UUIDv5 `id:`s, info-gain ordering, measured against declaration
   order on a real corpus. Requires the R1 packaging move and the `vizExprToBoolExpr` lift.
-- **M4 — breadth.** `LIST OF` via `DAList` gathering (`complete_attribute` as the per-element
-  pivot); payload constructors via `show if`; `MAYBE NUMBER`/`DATE` via paired is-known
-  questions; date arithmetic (routing every literal through `as_datetime()`; never
-  `date_difference().years`, whose mean-Gregorian-year float is unsound for statutory age —
-  use calendar-exact `.plus()`/`.minus()`); a `review:` block with `skip undefined: False` as
-  a compliance-checklist view; and the document-assembly demo (a verdict screen that also
-  assembles the letter, `variable name:` on every attachment) — the capability that justifies
-  the backend to the outside world.
+- **M4 — breadth. NOT IMPLEMENTED; acceptance tests written and RED 2026-08-17.** `LIST OF` via
+  `DAList` gathering; payload constructors via `show if`; `MAYBE NUMBER`/`DATE` via paired
+  is-known questions; date arithmetic (routing every literal through `as_datetime()`; never
+  `date_difference().years`, whose mean-Gregorian-year float is unsound for statutory age); a
+  `review:` block as a compliance-checklist view; and the document-assembly demo (a verdict
+  screen that also assembles the letter, `variable name:` on every attachment) — the capability
+  that justifies the backend to the outside world.
+
+  **Three corrections to this bullet, each measured by the RED phase against docassemble
+  1.10.7.** They are corrections, not re-scopings: every deliverable above stands.
+
+  1. _`complete_attribute` is not "the per-element pivot"._ It controls gather ORDERING, not
+     pruning. With it, gathering is element-major (finish element 0, then ask "another?");
+     without it, every `there_is_another` comes first and the attributes follow. Final values are
+     identical and per-element short-circuit pruning holds in BOTH (**executed**). Pruning is the
+     property worth having and it does not depend on this key. Separately, `object_type` IS
+     load-bearing — a `DAList.using(complete_attribute=…)` with no `object_type` fails on the
+     first element access — and so is having either both control questions
+     (`there_are_any` + `there_is_another`, dropping either raises `DAErrorMissingVariable`) or
+     `ask_number: True` + `target_number`, which replaces both with one count question.
+  2. _`skip undefined: False` does not make a checklist._ It makes the review block FORCE-ASK
+     every undefined variable it lists: with the flag, the row's eval is no longer wrapped in
+     try/except (`parse.py:5876-5904` at `1b6678384`), and the probe landed on a field screen for
+     the never-asked variable instead of on a review screen (**executed**). The default (flag
+     absent) is the opposite failure — an undefined row is SILENTLY DROPPED into a debug log line.
+     Neither is a compliance checklist; one interrogates the user about questions the law never
+     reached, the other hides them. The recipe that works is `note:` rows carrying
+     `showifdef('<var>', '<not asked>')`, which have no `saveas` to evaluate and therefore always
+     render, paired with `Edit:` rows gated on `show if: defined('<var>')` (**executed**). M4 is
+     accordingly required NOT to emit `skip undefined: False`, and `review-checklist.l4` pins it.
+  3. _`.plus()` and `.minus()` are not interchangeable, and `.plus()` is the wrong one._ See R12
+     (§8.12) for the measurement: against the L4 oracle, `.plus(years=n)` disagrees on every
+     leap-day birth and `.minus(years=n)` on none of 27,028 comparisons.
+
+  One thing this bullet did not say and should: `show if:` must be emitted in its `{code: …}`
+  spelling. The `{variable:, is:}` spelling is browser-side JavaScript only
+  (`parse.py:3998-4002` sets `show_if_var`/`show_if_val` and no `showif_code`), so the engine
+  shows every field and an API or headless drive DEFINES them all — it cannot encode a
+  constructor payload at all (**executed**). Only the code form leaves a hidden field genuinely
+  undefined (`parse.py:6316-6325` evals `showif_code` and sets `extras['ok'][n] = False` at 6320/6324). And `show if` is FIELD-level only:
+  it is not among the 169 block keys at `parse.py:1947`, and an unknown block key is silently
+  ignored — `logmessage` only, and only under debug (`parse.py:1945-1948`) — so a block-level
+  `show if` does nothing AND says nothing.
+
+  **Two things the RED phase deliberately did NOT rule, and why they are flagged rather than
+  settled.**
+
+  - _What triggers an attachment._ Nothing in L4 says "assemble this letter", and emitting one
+    for every module would rewrite all seven M1/M2 byte goldens — which the RED phase must not
+    pre-authorise. The tests therefore assert only the OBSERVABLE requirements (an `attachment:`
+    block with a `variable name:`, a `data/templates` entry in the `--package` tree, and an
+    assembled non-empty letter), and the corpus ships a sibling template
+    `notice-letter.letter.md` beside `notice-letter.l4` so that a filename-convention trigger is
+    available if the implementer wants one. A CLI flag or a `@desc docassemble …` tag (the
+    channel R6 already reserves) would satisfy the same assertions. **Warning for whichever is
+    chosen:** if the interview references the template with `content file:`, the BARE artifact
+    stops parsing — `content file` resolves through `package_template_filename` and raises
+    `DASourceError` when the file is not found (`parse.py:5059-5064` at `1b6678384`), at parse
+    time, before any question is asked. An inline `content:` was probed working end to end,
+    rendering to HTML with no LibreOffice present.
+  - _Whether the `review:` block is emitted for every module or opted into._ Same reason: making
+    it universal legitimately changes the seven goldens, and that is a GREEN-phase decision to
+    take consciously. The tests assert it on `review-checklist.l4` and assert nothing about the
+    other seven.
 
 ## 11. Non-goals (v1)
 
