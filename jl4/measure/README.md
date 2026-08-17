@@ -81,6 +81,37 @@ That corpus is the one the measurement was scoped to and it was fixed before any
 number existed. Adding files to it is a *new*, separately labelled run, not an
 extension of this one.
 
+### Reproducing it after the tree has moved (read this before re-running)
+
+**The committed artifacts reproduce bit-for-bit at the commit they were made at**
+— verified 2026-08-18 by re-running the command above in a worktree at
+`origin/unstable` (`afcef88f`): `diff -q` clean on both the CSV and the JSON.
+
+They do **not** reproduce on a branch where the corpus has changed, and the two
+globs above are why: `jl4/examples/docassemble/{,not-ok/}*.l4` expanded to 12
+files when this ran and expands to 20 on the M4 branch, because M4 added six
+examples and turned two refusal fixtures into supported constructs. Concretely,
+`not-ok/just-payload-pattern.l4` and `not-ok/maybe-number.l4` no longer exist.
+
+**This does not move the ruling**, and that was checked rather than assumed:
+neither deleted file contributes a single row to the 138-decision eligible set
+(both are refusals in the table; the only `not-ok/` file that reaches the
+eligible set is `seam-ref-via-fn.l4`, two rows, both exact ties at 1.5/1.5).
+No other measured file's content changed.
+
+Two practical warnings for whoever re-runs this:
+
+- **A glob is the wrong way to pin a corpus.** It reads as a fixed set and
+  silently is not. If you re-run, pass the 17 paths explicitly — they are the
+  distinct values of the `file` column in `data/m3-ordering.csv`, which is the
+  authoritative record of what was actually measured.
+- **The harness aborts on a missing input** with a bare
+  `openFile: does not exist` and a GHC backtrace, writing no CSV and no JSON, so
+  a moved corpus fails loudly but unhelpfully. It was also observed exiting the
+  same way on a corpus passed in a different argument order, with the named file
+  present on disk; that brittleness is not diagnosed. If you are re-running in
+  anger, check out the measurement commit rather than porting the corpus forward.
+
 Takes about three minutes. The run is deterministic: 247 of the 250
 ladder-accepted decisions are enumerated exhaustively over all `2^k` worlds, and
 the 3 that are not are sampled from `--seed` with the xorshift64\* written out in

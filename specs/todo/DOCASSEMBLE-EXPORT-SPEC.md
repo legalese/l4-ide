@@ -839,11 +839,22 @@ declaration order on the Reg CF or Housing corpus.
 #### ANSWERED 2026-08-18: the v1 half stands; **M3 is DECLINED, and the gate above is why**
 
 The gate was honoured rather than built through. The harness is committed at `jl4/measure/`
-(`M3Measure.hs`, `README.md`, raw results in `data/`) and re-running the documented command
-reproduces both artifacts bit-for-bit; the baseline is chained to real `docassemble.base` 1.10.7
-by `etc/m3-baseline-check.py`. The corpus (17 files: `legal/regcf/**`, `legal/charities-cleanroom/**`,
-`legal/bna/**`, `examples/docassemble/*.l4`) and the decision rule were **fixed in writing before
-any number existed**, and every decision is reported including ties, losses and ladder refusals.
+(`M3Measure.hs`, `README.md`, raw results in `data/`); the baseline is chained to real
+`docassemble.base` 1.10.7 by `etc/m3-baseline-check.py`. The corpus (17 files: `legal/regcf/**`,
+`legal/charities-cleanroom/**`, `legal/bna/**`, `examples/docassemble/*.l4`) and the decision rule
+were **fixed in writing before any number existed**, and every decision is reported including ties,
+losses and ladder refusals.
+
+Re-running the documented command reproduces both artifacts **bit-for-bit at the commit they were
+made at** — verified 2026-08-18 in a worktree at `origin/unstable` (`afcef88f`), `diff -q` clean on
+the CSV and the JSON. It does not reproduce on this branch, and the reason is worth recording
+rather than hiding: the corpus was pinned with a **glob**, which reads as a fixed set and is not
+one. `examples/docassemble/{,not-ok/}*.l4` matched 12 files then and matches 20 here, because M4
+added six examples and turned two refusal fixtures into supported constructs. Checked rather than
+assumed: neither deleted file (`not-ok/just-payload-pattern.l4`, `not-ok/maybe-number.l4`)
+contributes a single row to the 138-decision eligible set, and no other measured file's content
+changed — so the numbers below stand unaltered. `jl4/measure/README.md` carries the re-running
+instructions and the pin-the-paths-explicitly warning.
 
 589 top-level decisions; 339 refused by the ladder (all "can only visualize … a DECIDE that
 returns a boolean"); 250 measured, of which 31 have 0 atoms and 81 exactly 1, leaving **138 with
