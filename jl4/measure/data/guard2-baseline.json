@@ -1,0 +1,150 @@
+[
+  {
+    "example": "seam",
+    "emitted": true,
+    "worlds": 8,
+    "worldSpace": 8,
+    "worldsExhaustive": true,
+    "numberFallbacks": [],
+    "driverAtomOrder": [
+      "`the rule applies`",
+      "`the notice requirement is met`"
+    ],
+    "harnessDecision": "`notice rule satisfied`",
+    "harnessAtomOrder": [
+      "`the rule applies`",
+      "`the notice requirement is met`"
+    ],
+    "note": null,
+    "fieldMismatchCount": 0,
+    "fieldMismatches": [],
+    "atomMismatchCount": 0,
+    "atomMismatches": [],
+    "expansion": {
+      "atomsTotal": 12,
+      "fieldsTotal": 14,
+      "worldsCompared": 8
+    }
+  },
+  {
+    "example": "computed-and-shadow",
+    "emitted": true,
+    "worlds": 4,
+    "worldSpace": 4,
+    "worldsExhaustive": true,
+    "numberFallbacks": [],
+    "driverAtomOrder": [
+      "o.salary_offered >= 3000",
+      "o.alternative_"
+    ],
+    "harnessDecision": "`offer lawful`",
+    "harnessAtomOrder": [
+      "o's `meets the minimum`",
+      "o's alternative"
+    ],
+    "note": null,
+    "fieldMismatchCount": 0,
+    "fieldMismatches": [],
+    "atomMismatchCount": 0,
+    "atomMismatches": [],
+    "expansion": {
+      "atomsTotal": 6,
+      "fieldsTotal": 6,
+      "worldsCompared": 4
+    }
+  },
+  {
+    "example": "defaults",
+    "emitted": true,
+    "worlds": 18,
+    "worldSpace": 18,
+    "worldsExhaustive": true,
+    "numberFallbacks": [],
+    "driverAtomOrder": [
+      "p.was_concluded_at_a_distance",
+      "`the consumer waived the right`",
+      "`the purchase was marked final sale`"
+    ],
+    "harnessDecision": "`the consumer may cancel`",
+    "harnessAtomOrder": [
+      "p's `was concluded at a distance`",
+      "`the consumer waived the right`",
+      "`the purchase was marked final sale`"
+    ],
+    "note": null,
+    "fieldMismatchCount": 0,
+    "fieldMismatches": [],
+    "atomMismatchCount": 0,
+    "atomMismatches": [],
+    "expansion": {
+      "atomsTotal": 33,
+      "fieldsTotal": 33,
+      "worldsCompared": 18
+    }
+  },
+  {
+    "example": "rodents-and-vermin",
+    "emitted": true,
+    "worlds": 1024,
+    "worldSpace": 1024,
+    "worldsExhaustive": true,
+    "numberFallbacks": [],
+    "driverAtomOrder": [
+      "`loss or damage by animals`",
+      "`damage to contents and caused by birds`",
+      "`ensuing covered loss`",
+      "`exclusion apply`"
+    ],
+    "harnessDecision": "`insurance covered`",
+    "harnessAtomOrder": [
+      "`not covered if` OF `loss or damage by animals`",
+      "`damage to contents and caused by birds`",
+      "`ensuing covered loss`",
+      "`exclusion apply`"
+    ],
+    "note": null,
+    "fieldMismatchCount": 0,
+    "fieldMismatches": [],
+    "atomMismatchCount": 0,
+    "atomMismatches": [],
+    "expansion": {
+      "atomsTotal": 3040,
+      "fieldsTotal": 4692,
+      "worldsCompared": 1024
+    }
+  },
+  {
+    "example": "assume-via-fn",
+    "emitted": true,
+    "worlds": 4,
+    "worldSpace": 4,
+    "worldsExhaustive": true,
+    "numberFallbacks": [
+      "amount",
+      "base_rate"
+    ],
+    "driverAtomOrder": [
+      "amount + base_rate > 100"
+    ],
+    "harnessDecision": "`over threshold`",
+    "harnessAtomOrder": [
+      "(adjusted OF amount) GREATER THAN 100"
+    ],
+    "note": null,
+    "fieldMismatchCount": 0,
+    "fieldMismatches": [],
+    "atomMismatchCount": 0,
+    "atomMismatches": [],
+    "expansion": {
+      "atomsTotal": 4,
+      "fieldsTotal": 8,
+      "worldsCompared": 4
+    }
+  },
+  {
+    "example": "enum-triage",
+    "emitted": true,
+    "outOfScope": true,
+    "reason": "non-boolean decision: the driver has no boolean structure and the ladder refuses it"
+  }
+]
