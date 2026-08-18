@@ -126,7 +126,12 @@ real, not estimates.
   `date_difference(…).years` is elapsed days over 365.2425 as a **float** (docassemble
   `dates.py:482` at pin `1b6678384`): it returns 17.999 on the applicant's own eighteenth
   birthday — the one day the question is asked. Any target library exposing a `.years` on a
-  duration is guilty until measured (R-D10).
+  duration is guilty until measured (R-D10). The witness is executable, not prose:
+  `jl4/examples/docassemble/date_idiom_sweep.py` (PR #268, commit `46728d3f`) re-derives
+  all four figures against real docassemble.base and exits non-zero on drift; its oracle is
+  a Python model of L4's rolling `Date` — and because a model of an oracle is not an
+  oracle, `--emit-oracle-l4` writes 1096 `#EVAL`s over every date where a convention could
+  differ, checked by `l4 run`: 1096 TRUE, 0 FALSE. Re-run it before believing it.
 
 - **The shipped lowering is not the literal backward form.** `.plus()`/`.minus()` are not
   interchangeable (`.plus()` clamps 2004-02-29 + 18y to 2022-02-28 where L4 rolls to
@@ -140,8 +145,11 @@ real, not estimates.
   `jl4/examples/legal/ceo-performance-award.l4`. Calendar-exact anniversary arithmetic has
   no answer for half a year; the bridge refuses. Needs a ledger ruling (§5).
 - Refused by name in the bridge's v1, each a candidate ledger row: `Day`, `Date to days`,
-  `the week after`, `the date that many years earlier`, `DATE_SERIAL`, `DATE_FROM_SERIAL`,
-  `DATEVALUE`, `TODAY`, and all of `DATETIME`/`TIME`/`TIMEZONE`.
+  `the week after`, `the date that many years earlier`, `DATE_FROM_DMY`, `DATE_SERIAL`,
+  `DATE_FROM_SERIAL`, `DATEVALUE`, `TODAY`, and all of `DATETIME`/`TIME`/`TIMEZONE`.
+  (`DATE_FROM_DMY` appears both here and in the constructor bullet above — different layers:
+  that bullet describes the L4 evaluator's semantics, this list is what the docassemble
+  backend declines to lower.)
 - Component extraction is the easy case: `DATE_YEAR`/`DATE_MONTH`/`DATE_DAY` →
   `.year`/`.month`/`.day`, no convention hazard.
 - Process notes, generalised as R-D12/R-D13: date-builtin recognition is by name and tried
@@ -181,15 +189,20 @@ real, not estimates.
   commutative nor associative (F★-mechanised proof, §3.2). No printer, normaliser,
   optimiser, or DNF pass may merge, reorder, or split period additions. Binds
   `prettyLayout`, DMN/FEEL, OpenFisca, docassemble, and the relational middle-end alike —
-  already restated there as portfolio invariant I9 (`RELATIONAL-M1-BRIEF.md`).
+  already restated there as portfolio invariant I9 (`RELATIONAL-M1-BRIEF.md`). Scope note:
+  R-D8 governs _algebraic rewriting of L4 date expressions_, where non-associativity makes
+  equivalence unprovable in general; it does not forbid a _target-side lowering choice_
+  whose equivalence to L4's semantics has been measured (§3.7's first-of-month shift,
+  27,028 cases — R-D11's domain). Do not cite R-D8 to reject R-D11.
 - **R-D9 (constructor behaviours are three-way distinct).** `Date` rolls, `DATE_FROM_DMY`
   refuses, `YMD` refuses via `ASSUME` (§3.7). A backend maps each behaviour exactly or
   rejects the construct; mapping all three onto one target constructor silently picks a
   convention the source did not.
 - **R-D10 (fractional duration accessors are guilty until measured).** Never lower an
   age/anniversary comparison through a target's float-valued `.years`-style accessor;
-  witness: 24.5% disagreement with the L4 oracle, concentrated on the legally decisive day
-  (§3.7). Use calendar-exact anniversary forms and measure them.
+  witness: 24.5% disagreement with the L4 oracle, concentrated on the legally decisive day —
+  reproducible by `jl4/examples/docassemble/date_idiom_sweep.py` (§3.7), which exits
+  non-zero on drift. Use calendar-exact anniversary forms and measure them.
 - **R-D11 (prefer the equivalent lowering that keeps the source's named intermediate).**
   Where several lowerings are provably equivalent, choose the one in which the lawyer's
   named binding survives as a named unit in the target (§3.7's first-of-month anniversary
