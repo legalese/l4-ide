@@ -1,0 +1,63 @@
+{
+  "_comment": [
+    "The sg-succession subject sidecar: Singapore's succession trio, encoded as",
+    "ONE subject against one shared ontology. See NOTES.md for why that is not",
+    "three subjects, and for the two L4 traps this corpus paid for.",
+    "",
+    "THIS IS THE FIRST SUBJECT TO USE 'corpus.modules'. Before it, a descriptor",
+    "could name corpus.main plus an optional corpus.wizard and nothing else --",
+    "which cannot express an ontology module plus three statute modules plus a",
+    "case suite. The modules are listed IN DEPENDENCY ORDER: the domain module",
+    "declares the types the three Act modules import, sg-succession composes",
+    "them, and the case suite exercises the composition.",
+    "",
+    "'checks.min_dated_arms' is 0 ON PURPOSE. This corpus carries NO rule-version",
+    "axis: it states the law as at the source bundle's in-force date (18 Aug",
+    "2026) and has no 'RULES EFFECTIVE DATE' arms at all. A 0 floor makes",
+    "p3-check report the temporal-closure sub-check NOT CHECKED rather than",
+    "vacuously green over an empty matched set. Raise it the day the corpus gains",
+    "dated arms; never lower a floor to make a run pass.",
+    "",
+    "'checks.min_assertions' is 131 = the assertions_total that 'l4 run --json'",
+    "reports across the module set (sg-wills 39 + sg-paa 55 + cases 37). The",
+    "floor exists because 'no failed assertion' is satisfied vacuously by an",
+    "empty results[].",
+    "",
+    "'denovo' declares the three REGISTERS only, and deliberately declares",
+    "NEITHER 'modules' NOR 'surface_map'. SPEC.md section 8's diff oracle",
+    "compares a de novo encoding against a committed one; there is no prior",
+    "Singapore succession encoding, so there is nothing to diff, and a de novo",
+    "module that IS the corpus makes the comparison an identity (which the",
+    "resolver refuses). The registers are genuine P1/P2/P4 deposits regardless,",
+    "so 'go.sh run --milestone g2' validates them and p8-diff reports SKIPPED",
+    "with a named reason. See NOTES.md."
+  ],
+  "id": "sg-succession",
+  "display_name": "Singapore succession — Wills, Intestate Succession, Probate and Administration",
+  "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934 (Singapore)",
+  "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
+  "corpus": {
+    "main": "jl4/examples/legal/sg-succession/sg-succession.l4",
+    "modules": [
+      "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
+      "jl4/examples/legal/sg-succession/sg-wills.l4",
+      "jl4/examples/legal/sg-succession/sg-isa.l4",
+      "jl4/examples/legal/sg-succession/sg-paa.l4",
+      "jl4/examples/legal/sg-succession/sg-succession.l4",
+      "jl4/examples/legal/sg-succession/sg-succession-cases.l4"
+    ]
+  },
+  "checks": {
+    "min_dated_arms": 0,
+    "min_assertions": 178
+  },
+  "denovo": {
+    "bundle": "jl4/examples/legal/sg-succession/denovo/source-bundle.json",
+    "register": "jl4/examples/legal/sg-succession/denovo/external-modifications.json",
+    "fork_register": "jl4/examples/legal/sg-succession/denovo/fork-register.json"
+  },
+  "legs": {
+    "p7-lts": {},
+    "p7-akn": {}
+  }
+}

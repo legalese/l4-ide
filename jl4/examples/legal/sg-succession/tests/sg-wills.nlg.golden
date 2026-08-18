@@ -1,0 +1,62 @@
+`the will is formally valid` with `a properly executed will`
+not `the will is formally valid` with `a will made by a person under 21`
+not `the will is formally valid` with `a will attested by only one witness`
+not `the will is formally valid` with `a will whose two witnesses were not present at the same time`
+not `the will is formally valid` with `a will not in writing`
+not `the will is formally valid` with `a will the testator never signed`
+not `the will is formally valid` with `a will whose witnesses subscribed out of the testator's presence`
+`the will is made by a person under 21 years of age` with `a soldier's nuncupative will made under 21`
+`the will is formally valid` with `a soldier's nuncupative will made under 21`
+`the privileged will extends to real estate in` with `a modern death leaving a soldier's nuncupative will`
+not `the privileged will extends to real estate in` with `a 1930 death leaving a soldier's nuncupative will`
+`the will is formally valid` with `a will followed by the testator's marriage`
+`the will has been revoked` with `a will followed by the testator's marriage`
+not `the will has been revoked` with `a will expressed to be made in contemplation of that marriage`
+`the will has been revoked` with `a will the testator tore up`
+not `the will has been revoked` with `a properly executed will`
+not `revocation by presumption of an intention on the ground of an alteration in circumstances`
+not `the will has been revoked in` with `a modern death leaving no will at all`
+`the revoked will _ is revived by _` with `a will followed by the testator's marriage` and `TRUE`
+not `the revoked will _ is revived by _` with `a will followed by the testator's marriage` and `FALSE`
+not `the revoked will _ is revived by _` with `a properly executed will` and `TRUE`
+`the will _ is revoked, revival being _` with `a will followed by the testator's marriage` and `FALSE`
+not `the will _ is revoked, revival being _` with `a will followed by the testator's marriage` and `TRUE`
+`the will _ is revoked, revival being _` with `a will the testator tore up` and `FALSE`
+not `the will _ is revoked, revival being _` with `a will the testator tore up` and `TRUE`
+not `the will _ is revoked, revival being _` with `a properly executed will` and `FALSE`
+not `the will _ is revoked, revival being _` with `a properly executed will` and `TRUE`
+not `the gift where no attesting witness takes` 's `the gift is utterly null and void`
+not `the gift where one of three witnesses takes` 's `the gift is utterly null and void`
+`the gift where two of three witnesses take` 's `the gift is utterly null and void`
+`the gift where one of two witnesses takes` 's `the gift is utterly null and void`
+`the gift where one of two witnesses takes` 's `the will remains valid`
+`the gift where one of three witnesses takes, the testator dying in 1930` 's `the gift is utterly null and void`
+`the position on an ordinary will` 's `there is an operative will`
+not `the position where there was no will` 's `there is an operative will`
+not `the position on an under-21 will` 's `there is an operative will`
+`the position on a soldier's will` 's `there is an operative will`
+not `the position on a will revoked by marriage` 's `there is an operative will`
+`the position on a will revoked by marriage` 's `valid under sections 4, 6 and 27`
+`the position on a will revoked by marriage` 's `revoked under sections 13 to 15`
+`the position on a will revoked by marriage and afterwards revived` 's `there is an operative will`
+`the position on a will revoked by marriage and afterwards revived` 's `valid under sections 4, 6 and 27`
+`the position on a will revoked by marriage and afterwards revived` 's `revoked under sections 13 to 15`
+`the position on a will revoked by marriage and afterwards revived` 's `revived under section 17`
+`the position on a will revoked by marriage and afterwards revived` 's `the proportion of the estate the will disposes of` is equal to 1
+not `the position on a will revoked by marriage` 's `revived under section 17`
+`the position on a torn-up will afterwards revived` 's `there is an operative will`
+`the position on a torn-up will afterwards revived` 's `revoked under sections 13 to 15`
+`the position on a torn-up will afterwards revived` 's `revived under section 17`
+not `the position on an under-21 will said to have been revived` 's `there is an operative will`
+not `the position on an under-21 will said to have been revived` 's `revived under section 17`
+not `the position on an under-21 will said to have been revived` 's `valid under sections 4, 6 and 27`
+`the position on an ordinary will said to have been revived` 's `there is an operative will`
+not `the position on an ordinary will said to have been revived` 's `revoked under sections 13 to 15`
+not `the position on an ordinary will said to have been revived` 's `revived under section 17`
+`the position on an ordinary will said to have been revived` 's `the proportion of the estate the will disposes of` is equal to 1
+`the position on an ordinary will` 's `the proportion of the estate the will disposes of` is equal to 1
+`the position on a will revoked by marriage` 's `the proportion of the estate the will disposes of` is equal to 0
+`the position where there was no will` 's `the proportion of the estate the will disposes of` is equal to 0
+`the position on a torn-up will afterwards revived` 's `the proportion of the estate the will disposes of` is equal to 1
+not `the will is formally valid in` with `a modern death leaving no will at all`
+`the will is formally valid in` with `a modern death leaving a properly executed will`

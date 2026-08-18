@@ -718,6 +718,27 @@ the gate for the life of the run directory: `gate-verify.sh` was never called ag
 so the signed route's own content binding stopped applying too. The gate is now open only while a
 granting row records the digest of the corpus the run is actually using.
 
+A third hole was closed on 2026-08-18. "The sha256 of every corpus file" was rendered from
+`p0-preflight`'s `corpus_sha_*` metrics, and that stage recorded exactly two — the entry module
+and the wizard — which was the whole set only while an encoding was one module plus a wizard.
+Under `corpus.modules` an encoding is N modules, and modules 3..N appeared in **no** payload in
+**any** run state: the reviewer was never shown them, and no honest re-run could produce a
+document that committed to them. `p0-preflight` now records one metric per module
+(`etc/go/lib/corpus-metrics.mjs`), keyed by repo-relative path rather than basename because
+metrics are last-wins and two modules sharing a basename would otherwise collapse to one line;
+and it declares every module as an input, so an edit to any of them re-executes the stage instead
+of replaying it — a replayed receipt contributes no row, so the payload would otherwise keep
+describing the pre-edit corpus.
+
+**One residual, named rather than implied.** The payload's corpus section changes when
+`p0-preflight` re-executes, which an ordinary run does. A run resumed with `--only <a gated
+stage>` never reaches `p0-preflight` at all, so an edit made after the gate was granted moves the
+corpus digest — the grant correctly goes `stale` — but leaves the payload byte-identical, and the
+existing signature re-satisfies the gate over the new digest. This is older than `corpus.modules`
+and behaves the same way for a single-module subject. Closing it means the gate check refusing a
+`stale` grant whose payload cannot have seen the change, rather than handing it to
+`gate-verify.sh`; until that is built, `--only` past a granted gate is a route to be aware of.
+
 HG2 uses namespace `l4-go-gate-hg2`, so an HG1 signature cannot be replayed as an HG2 one.
 
 `gate-allowed-signers` **ships with no key.** Every gated stage refuses with exit 3 and an

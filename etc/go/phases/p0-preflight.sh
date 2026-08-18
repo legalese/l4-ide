@@ -8,7 +8,25 @@
 # nonsense rather than a finding.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_PINS"
+  # EVERY module of the encoding, not just the entry module and the wizard.
+  #
+  # Section 6 records one sha256 metric per module, and those metrics ARE the
+  # corpus section of the HG1 payload — gate-payload.mjs builds it from them and
+  # from nothing else. A REPLAYED p0-preflight contributes no row to that
+  # payload (replays are excluded by design, so that resuming a run does not
+  # invalidate a signature), which means the payload keeps the ORIGINAL
+  # receipt's metrics. So if an edit to a non-entry module did not change this
+  # stage's inputs digest, the stage would replay, the signed document would go
+  # on describing the pre-edit corpus, and the run would proceed over the
+  # post-edit one. Declaring the whole set is what makes the payload a function
+  # of the whole encoding.
+  #
+  # Same derivation as go.sh's g1 arm and as p3-check/p6-tests/p8-verify's
+  # direct-invocation fallback, deliberately: a narrower set here would
+  # under-declare the digest.
+  declare -a _INPUT_MODULES=()
+  read -ra _INPUT_MODULES <<<"${GO_S_CORPUS_MODULES:-${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  printf '%s\n' "${_INPUT_MODULES[@]}" "${BASH_SOURCE[0]}" "$GO_S_PINS"
   exit 0
 fi
 
@@ -87,12 +105,37 @@ EOF
 fi
 
 # --- 6. record ---------------------------------------------------------------
-CORPUS_SHA="$(node "$GO_LIB/digest.mjs" "$GO_S_CORPUS")"
-METRICS=(--metric "corpus_sha_$(basename "$GO_S_CORPUS")=$CORPUS_SHA")
-if [[ -n "${GO_S_WIZARD:-}" ]]; then
-  WIZARD_SHA="$(node "$GO_LIB/digest.mjs" "$GO_S_WIZARD")"
-  METRICS+=(--metric "corpus_sha_$(basename "$GO_S_WIZARD")=$WIZARD_SHA")
+# One sha256 metric PER MODULE of the encoding, keyed by repo-relative path.
+#
+# This is not bookkeeping. gate-payload.mjs builds the HG1 payload's `corpus
+# (sha256 of every file this gate blesses)` section from exactly these metrics,
+# so a module with no metric here is a module that appears nowhere in the
+# document a human signs: the reviewer is never shown it, and the signature has
+# no content binding to it. While a subject's encoding was one module plus a
+# wizard, recording those two was the whole set. `corpus.modules` makes an
+# N-module encoding ordinary — the ontology module plus three statute modules
+# plus a wizard — and recording two of five would have left the heading above a
+# false statement and modules 3..N unsignable.
+#
+# The keying (repo-relative path, not basename) and its cost are argued in
+# etc/go/lib/corpus-metrics.mjs, which is also where a selftest can measure the
+# coverage instead of trusting this comment.
+declare -a CORPUS_MODULES=()
+read -ra CORPUS_MODULES <<<"${GO_S_CORPUS_MODULES:-${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+if [[ ${#CORPUS_MODULES[@]} -eq 0 ]]; then
+  go_broken "no corpus module resolved: GO_S_CORPUS_MODULES and GO_S_CORPUS are both empty, so this receipt would record no corpus sha256 at all and the HG1 payload would commit to nothing"
 fi
+set +e
+CORPUS_METRICS="$(node "$GO_LIB/corpus-metrics.mjs" "${CORPUS_MODULES[@]}" 2>&1)"
+CM_EXIT=$?
+set -e
+if [[ $CM_EXIT -ne 0 ]]; then
+  go_broken "the per-module corpus sha256 metrics could not be derived, so the HG1 payload would under-describe the encoding: $CORPUS_METRICS"
+fi
+METRICS=()
+while IFS= read -r kv; do
+  [[ -n "$kv" ]] && METRICS+=(--metric "$kv")
+done <<<"$CORPUS_METRICS"
 # The rule-name discovery only applies to a subject whose sidecar pins
 # regulative rules; a purely constitutive corpus has none to discover.
 if node -e 'process.exit(require("'"$GO_S_PINS"'").regulative_rules ? 0 : 1)'; then

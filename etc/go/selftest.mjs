@@ -417,6 +417,45 @@ process.stdout.write("\n-- the gate payload --\n");
     "a receipt that executed DOES change the gate payload",
     payload() !== before,
   );
+
+  // A RE-EXECUTED p0-preflight restates the corpus; it does not add a second
+  // corpus. The receipts list below is an audit trail and names every
+  // execution, but the corpus section is a statement about the corpus and there
+  // is only one. Taking the union rendered a module twice — pre-edit digest and
+  // post-edit digest, nothing saying which was current — in the one document
+  // that has to be unambiguous. Rare while p0-preflight re-executed only on an
+  // edit to the entry module; routine since every module became one of its
+  // declared inputs.
+  append(
+    j,
+    base({
+      stage: "p0-preflight",
+      metrics: { "corpus_sha_fixture.l4": "sha256:bbb" },
+    }),
+  );
+  const reexecuted = payload();
+  const corpusOf = (p) =>
+    p
+      .split("corpus (sha256 of every file this gate blesses):\n")[1]
+      .split("\n\n")[0]
+      .split("\n")
+      .filter(Boolean);
+  check(
+    "a re-executed p0-preflight RESTATES the corpus rather than appending a second one",
+    corpusOf(reexecuted).length === 1,
+  );
+  check(
+    "…and what it states is the CURRENT digest, not the one it superseded",
+    corpusOf(reexecuted)[0].includes("sha256:bbb"),
+  );
+  check(
+    "…while the payload still changes, so a signature over the superseded corpus stops verifying",
+    reexecuted !== before,
+  );
+  check(
+    "…and the receipts list keeps naming every execution, both rows",
+    reexecuted.split("p0-preflight PASS ").length - 1 === 2,
+  );
 }
 
 // ------------------------------------------------- 3c. the gate-ordering check
@@ -601,6 +640,363 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
     "a descriptor with an unknown key is refused",
     r2.status === 2 && /unknown key 'surprise_key'/.test(r2.stderr),
   );
+}
+{
+  // ---- corpus.modules: an encoding of MORE THAN TWO modules (2026-08-18) ----
+  //
+  // A subject's encoding is not always one file plus a wizard: Singapore
+  // succession law is a shared ontology module, three statute modules and a
+  // wizard. `corpus.modules` declares the whole set; omitting it still means
+  // exactly what it always meant.
+  //
+  // Every refusal below has a positive sibling, because the schema's value is
+  // that it is CLOSED — and because two of them guard silent failures rather
+  // than loud ones. A set that omitted `corpus.main`, or a de novo module
+  // colliding with a module that is neither main nor the wizard, would produce
+  // no error at all under the pre-2026-08-18 checks: the first would drop the
+  // entry module out of the gate digest, and the second would make SPEC.md §8's
+  // acceptance diff a partial identity.
+  const REPO_ROOT = resolve(HERE, "../..");
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-corpusmodules-"));
+  const M = resolve(d, "modules");
+  mkdirSync(M, { recursive: true });
+  const mod = (n) => {
+    const p = resolve(M, n);
+    writeFileSync(p, `-- selftest stand-in module ${n}\n`);
+    return p;
+  };
+  const ONTOLOGY = mod("ontology.l4");
+  const WILLS = mod("wills.l4");
+  const INTESTATE = mod("intestate.l4");
+
+  // Each case is the FIXTURE subject's own descriptor with `corpus` mutated, so
+  // what is exercised is the corpus schema and nothing else; pins.json and
+  // known-defects.json are required by the resolver and copied verbatim.
+  const cm = resolve(d, "cm");
+  mkdirSync(cm, { recursive: true });
+  for (const f of ["pins.json", "known-defects.json"])
+    writeFileSync(
+      resolve(cm, f),
+      readFileSync(resolve(HERE, "subjects", FIXTURE_SUBJECT, f)),
+    );
+  const withCorpus = (mutate) => {
+    const desc = JSON.parse(
+      readFileSync(
+        resolve(HERE, "subjects", FIXTURE_SUBJECT, "subject.json"),
+        "utf8",
+      ),
+    );
+    desc.id = "cm";
+    mutate(desc);
+    writeFileSync(resolve(cm, "subject.json"), JSON.stringify(desc));
+    return spawnSync("node", [resolve(HERE, "lib/subject.mjs"), "cm"], {
+      encoding: "utf8",
+      env: { ...process.env, L4_GO_SUBJECTS_DIR: d },
+    });
+  };
+  const fixtureDesc = JSON.parse(
+    readFileSync(
+      resolve(HERE, "subjects", FIXTURE_SUBJECT, "subject.json"),
+      "utf8",
+    ),
+  );
+  const MAIN = resolve(REPO_ROOT, fixtureDesc.corpus.main);
+  const WIZARD = fixtureDesc.corpus.wizard
+    ? resolve(REPO_ROOT, fixtureDesc.corpus.wizard)
+    : "";
+  const FIVE = (desc) => {
+    desc.corpus.modules = [
+      ONTOLOGY,
+      desc.corpus.main,
+      WILLS,
+      INTESTATE,
+      desc.corpus.wizard,
+    ];
+  };
+
+  {
+    const r = withCorpus(FIVE);
+    check(
+      "corpus.modules resolves EVERY declared module into GO_S_CORPUS_MODULES, in declared (dependency) order",
+      r.status === 0 &&
+        r.stdout.includes(
+          `GO_S_CORPUS_MODULES='${ONTOLOGY} ${MAIN} ${WILLS} ${INTESTATE} ${WIZARD}'`,
+        ),
+    );
+    // The two old names are ROLE POINTERS into the set, not a second encoding
+    // of it: every single-module leg still reads them, so widening the schema
+    // must not have moved them.
+    check(
+      "GO_S_CORPUS and GO_S_WIZARD still name the entry module and the wizard, unchanged",
+      r.status === 0 &&
+        r.stdout.includes(`GO_S_CORPUS='${MAIN}'`) &&
+        r.stdout.includes(`GO_S_WIZARD='${WIZARD}'`),
+    );
+  }
+  {
+    const r = withCorpus((desc) => {
+      desc.corpus.modules = [ONTOLOGY, WILLS, INTESTATE, desc.corpus.wizard];
+    });
+    check(
+      "a corpus.modules set that omits corpus.main is refused, naming the entry module",
+      r.status === 2 &&
+        /does not contain corpus\.main/.test(r.stderr) &&
+        r.stderr.includes(MAIN),
+    );
+  }
+  {
+    const r = withCorpus((desc) => {
+      desc.corpus.modules = [desc.corpus.main, ONTOLOGY];
+    });
+    check(
+      "a declared corpus.wizard that is not a member of corpus.modules is refused — it would fall outside the gate digest",
+      r.status === 2 &&
+        /does not contain corpus\.wizard/.test(r.stderr) &&
+        r.stderr.includes(WIZARD),
+    );
+  }
+  {
+    const r = withCorpus((desc) => {
+      desc.corpus.modules = [
+        desc.corpus.main,
+        desc.corpus.wizard,
+        "jl4/examples/legal/no-such-statute.l4",
+      ];
+    });
+    check(
+      "a corpus module that does not exist is refused, naming the path (unlike a denovo module, a corpus module is committed)",
+      r.status === 2 &&
+        r.stderr.includes("jl4/examples/legal/no-such-statute.l4"),
+    );
+  }
+  {
+    const r = withCorpus((desc) => {
+      desc.corpus.modules = [
+        ONTOLOGY,
+        desc.corpus.main,
+        desc.corpus.wizard,
+        ONTOLOGY,
+      ];
+    });
+    check(
+      "a duplicated corpus module is refused — the set is also the digest's file list and the list the measurement stages iterate",
+      r.status === 2 &&
+        /duplicates/.test(r.stderr) &&
+        r.stderr.includes(ONTOLOGY),
+    );
+  }
+  {
+    const r = withCorpus((desc) => {
+      desc.corpus.modules = [
+        desc.corpus.main,
+        desc.corpus.wizard,
+        "jl4/examples/legal/two words.l4",
+      ];
+    });
+    check(
+      "a corpus module path containing whitespace is refused — GO_S_CORPUS_MODULES is space-separated",
+      r.status === 2 && /may not contain whitespace/.test(r.stderr),
+    );
+  }
+  {
+    const r = withCorpus((desc) => {
+      desc.corpus.modules = [];
+    });
+    check(
+      "an empty corpus.modules array is refused rather than read as 'no modules'",
+      r.status === 2 && /must be a non-empty array/.test(r.stderr),
+    );
+  }
+  {
+    const r = withCorpus(() => {});
+    check(
+      "a descriptor with NO corpus.modules resolves to exactly main + wizard, as before the key existed",
+      r.status === 0 &&
+        r.stdout.includes(`GO_S_CORPUS_MODULES='${MAIN} ${WIZARD}'`),
+    );
+  }
+  {
+    // SPEC.md §8's identity guard, at the new arity. This is the regression the
+    // widened schema could have introduced in silence: the old check named
+    // corpusMain and corpusWizard, so a de novo module colliding with the third
+    // or fourth corpus module would have been waved through and the acceptance
+    // diff would have been a partial identity with no error anywhere.
+    const r = withCorpus((desc) => {
+      FIVE(desc);
+      desc.denovo = { ...(desc.denovo ?? {}), modules: [WILLS] };
+    });
+    check(
+      "a denovo module colliding with a corpus module that is NEITHER main NOR the wizard is refused",
+      r.status === 2 && /also a corpus module/.test(r.stderr),
+    );
+  }
+  {
+    // BEHAVIOURAL, for the same reason the narrative-deposit check above is:
+    // a source-text assertion about go.sh would pass over a GO_CORPUS_FILES
+    // array that was built and then overwritten. So the driver is ASKED, via
+    // `plan`, for the digest it would bind a gate to.
+    withCorpus(FIVE);
+    const planOf = () =>
+      spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "plan",
+          "--milestone",
+          "g1",
+          "--subject",
+          "cm",
+        ],
+        { encoding: "utf8", env: { ...process.env, L4_GO_SUBJECTS_DIR: d } },
+      );
+    const before = planOf();
+    check(
+      "the g1 gate digest covers every declared corpus module, not just the entry module",
+      before.status === 0 &&
+        [ONTOLOGY, MAIN, WILLS, INTESTATE, WIZARD].every((m) =>
+          before.stdout.includes(m.replace(`${REPO_ROOT}/`, "")),
+        ),
+    );
+    check(
+      "the digest a gate binds to moves when a NON-entry corpus module is edited",
+      (() => {
+        const sha = (p) => /sha256:[0-9a-f]{64}/.exec(p.stdout)?.[0] ?? null;
+        const b = sha(before);
+        if (!b) return false;
+        writeFileSync(INTESTATE, "-- edited by the selftest\n");
+        const after = sha(planOf());
+        return !!after && after !== b;
+      })(),
+    );
+  }
+}
+{
+  // ---- the HG1 payload's corpus section covers EVERY module (2026-08-18) ----
+  //
+  // The gate digest moving (checked just above) is only half of a gate. The
+  // other half is the document a human READS AND SIGNS, and it is built from a
+  // different source: gate-payload.mjs renders p0-preflight's `corpus_sha_*`
+  // metrics and nothing else. So a module set can be digested correctly and
+  // still be signed blind — which is what happened. p0-preflight recorded two
+  // metrics (main, wizard) because for a one-module-plus-wizard encoding that
+  // WAS the set; under `corpus.modules` it left modules 3..N out of the signed
+  // document in every run state, so no honest re-run could produce a payload
+  // that committed to them and the reviewer was never shown them at all.
+  //
+  // Measured here at the seam, end to end — corpus-metrics -> receipt ->
+  // payload — because each of the three steps can drop a module on its own.
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-corpusmetrics-"));
+  const CM = resolve(HERE, "lib/corpus-metrics.mjs");
+  const mods = resolve(d, "mods");
+  // Two modules that SHARE A BASENAME in different directories: the shape
+  // `corpus.modules` makes ordinary, and the shape the old basename key
+  // collapsed. receipt.mjs's metricsFrom is last-wins, so a shared key does not
+  // fail — it silently keeps one of the two.
+  for (const sub of ["wills", "intestate"])
+    mkdirSync(resolve(mods, sub), { recursive: true });
+  const A = resolve(mods, "wills/rules.l4");
+  const B = resolve(mods, "intestate/rules.l4");
+  const C = resolve(mods, "ontology.l4");
+  writeFileSync(A, "-- wills\n");
+  writeFileSync(B, "-- intestate\n");
+  writeFileSync(C, "-- ontology\n");
+
+  const r = spawnSync("node", [CM, C, A, B], { encoding: "utf8" });
+  const lines = r.stdout.trim().split("\n").filter(Boolean);
+  check(
+    "corpus-metrics.mjs emits one corpus_sha metric per module, in the order given",
+    r.status === 0 &&
+      lines.length === 3 &&
+      lines.every((l) => /^corpus_sha_\S+=sha256:[0-9a-f]{64}$/.test(l)),
+  );
+  check(
+    "two modules sharing a basename in different directories get DISTINCT keys",
+    new Set(lines.map((l) => l.slice(0, l.indexOf("=")))).size === 3,
+  );
+  {
+    const r2 = spawnSync("node", [CM, resolve(d, "no-such-module.l4")], {
+      encoding: "utf8",
+    });
+    check(
+      "a corpus module that is not on disk is refused, naming the path — a missing one is a misconfiguration, not a status",
+      r2.status === 2 && r2.stderr.includes("no-such-module.l4"),
+    );
+  }
+  {
+    const r3 = spawnSync("node", [CM], { encoding: "utf8" });
+    check(
+      "corpus-metrics.mjs with NO modules is refused rather than emitting an empty corpus section",
+      r3.status === 2 && /empty set|no module paths/.test(r3.stderr),
+    );
+  }
+  {
+    // The round trip. This is the check that would have caught the defect: it
+    // asks the payload itself, through the only writer of the journal.
+    const run = resolve(d, "run");
+    mkdirSync(run, { recursive: true });
+    const receipt = resolve(HERE, "lib/receipt.mjs");
+    execFileSync("node", [
+      receipt,
+      "run-begin",
+      "--run",
+      run,
+      "--run-id",
+      "corpus-metrics-test",
+      "--milestone",
+      "g1",
+      "--subject",
+      "cm",
+      "--declared",
+      "p0-preflight",
+    ]);
+    execFileSync("node", [
+      receipt,
+      "stage-end",
+      "--run",
+      run,
+      "--stage",
+      "p0-preflight",
+      "--status",
+      "PASS",
+      "--oracle-cmd",
+      "(selftest stand-in for the CLI-surface check)",
+      "--oracle-exit",
+      "0",
+      "--oracle-class",
+      "structural",
+      "--artifact",
+      C,
+      ...lines.flatMap((l) => ["--metric", l]),
+    ]);
+    const payload = execFileSync(
+      "node",
+      [resolve(HERE, "lib/gate-payload.mjs"), "HG1", run],
+      { encoding: "utf8" },
+    );
+    const corpusLines = payload
+      .split("corpus (sha256 of every file this gate blesses):\n")[1]
+      .split("\n\n")[0]
+      .split("\n")
+      .filter(Boolean);
+    check(
+      "every module survives receipt.mjs into the payload's corpus section — none collapses",
+      corpusLines.length === 3,
+    );
+    check(
+      "the payload names each module by a path the reviewer can open, not by a bare basename",
+      [A, B, C].every((m) =>
+        corpusLines.some((l) => l.trim().startsWith(`${m} `)),
+      ),
+    );
+    check(
+      "editing a module the reviewer signed for changes the metric, and so the payload",
+      (() => {
+        writeFileSync(B, "-- intestate, edited\n");
+        const after = spawnSync("node", [CM, C, A, B], { encoding: "utf8" });
+        return after.status === 0 && after.stdout !== r.stdout;
+      })(),
+    );
+  }
 }
 
 // ------------------------------------------- 3e. the deposit-contract schemas

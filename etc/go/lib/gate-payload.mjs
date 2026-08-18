@@ -38,14 +38,28 @@ if (!begin) {
 const stageEnds = records.filter(
   (r) => r.kind === "stage_end" && !r.replayed_from,
 );
-const corpus = [];
-for (const r of stageEnds) {
-  if (r.stage !== "p0-preflight") continue;
-  for (const [k, v] of Object.entries(r.metrics || {})) {
-    if (k.startsWith("corpus_sha_"))
-      corpus.push([k.replace(/^corpus_sha_/, ""), v]);
-  }
-}
+// The corpus section is exactly p0-preflight's `corpus_sha_*` metrics — one per
+// module of the encoding, keyed by repo-relative path, written by
+// etc/go/lib/corpus-metrics.mjs. That is a CONTRACT, not an implementation
+// detail: a module p0-preflight does not record is a module this document never
+// mentions and the signature therefore does not cover. If you are adding a file
+// to what HG1 blesses, add it there, not here.
+//
+// The LAST executed p0-preflight wins, rather than the union of all of them.
+// The receipts list below is an audit trail and correctly names every execution;
+// this section is a STATEMENT ABOUT THE CORPUS, and there is only one corpus.
+// Taking the union rendered each module twice after any re-execution — once at
+// its pre-edit digest and once at its post-edit digest, with nothing saying
+// which was current — so the one document that has to be unambiguous became the
+// one that was not. That was latent while p0-preflight re-executed only on an
+// edit to the entry module, the wizard, the pin file or its own source; it
+// became routine on 2026-08-18, when every module of the encoding joined the
+// stage's declared inputs (which is what makes a non-entry module's edit
+// re-open the gate at all).
+const p0 = stageEnds.filter((r) => r.stage === "p0-preflight").at(-1);
+const corpus = Object.entries(p0?.metrics ?? {})
+  .filter(([k]) => k.startsWith("corpus_sha_"))
+  .map(([k, v]) => [k.replace(/^corpus_sha_/, ""), v]);
 
 const lines = [];
 lines.push(`l4-go gate payload`);

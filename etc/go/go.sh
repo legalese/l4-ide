@@ -225,10 +225,18 @@ SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT")" || exit 2
 eval "$SUBJECT_ENV"
 export "${!GO_S_@}"
 
-# The subject's corpus file set: main module, plus the wizard module when the
-# sidecar declares one. Used for the corpus digest that gates bind to.
-declare -a GO_CORPUS_FILES=("$GO_S_CORPUS")
-[[ -n "${GO_S_WIZARD:-}" ]] && GO_CORPUS_FILES+=("$GO_S_WIZARD")
+# The subject's corpus file set: EVERY module the sidecar declares, resolved by
+# subject.mjs into one space-separated list (corpus.modules, defaulting to
+# corpus.main plus the wizard module when no set is declared). Used for the
+# corpus digest that gates bind to — which is why it has to be the whole
+# encoding and not just the entry module: a digest over one module of four
+# would leave a granted HG1 open across an edit to the other three, and a gate
+# that does not re-open over the thing it gates is not a gate over that thing
+# (the same lesson the narrative deposit taught below, at a different scale).
+# Split the same way the g2 branch splits GO_S_DENOVO_MODULES.
+declare -a GO_CORPUS_FILES=()
+read -ra _CORPUS_MODULES <<<"${GO_S_CORPUS_MODULES:-$GO_S_CORPUS}"
+GO_CORPUS_FILES+=("${_CORPUS_MODULES[@]}")
 
 # At g2 the gate binds to the DE NOVO deposits instead, because that is what HG1
 # is being asked about. A waiver granted over the committed corpus says nothing
@@ -276,9 +284,11 @@ fi
 
 # --- the milestone-scoped module set (ONE list per run) ----------------------
 # p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
-# g1 the committed corpus (corpus.main + optional corpus.wizard), at g2 the
-# subject's declared de novo deposit (denovo.modules — possibly empty, which
-# those stages report as SKIPPED under the deposit contract). GO_MODULES_ORIGIN
+# g1 the committed corpus (corpus.modules — every module of the encoding, which
+# defaults to corpus.main plus the optional corpus.wizard when the sidecar
+# declares no set), at g2 the subject's declared de novo deposit
+# (denovo.modules — possibly empty, which those stages report as SKIPPED under
+# the deposit contract). GO_MODULES_ORIGIN
 # says which, so a stage selects the matching per-origin floor and never reads
 # a corpus floor over a deposit, or a deposit floor over the corpus.
 #
@@ -289,7 +299,11 @@ if [[ "$MILESTONE" == "g2" ]]; then
   GO_MODULES="${GO_S_DENOVO_MODULES:-}"
   GO_MODULES_ORIGIN="denovo"
 else
-  GO_MODULES="$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  # Symmetrical with the g2 line above: one space-separated list, already
+  # resolved and validated by subject.mjs. The `:-` arm is the pre-2026-08-18
+  # shape, kept so a sidecar resolved by an older subject.mjs — or a hand-set
+  # environment — still names a module set rather than none.
+  GO_MODULES="${GO_S_CORPUS_MODULES:-$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}}"
   GO_MODULES_ORIGIN="corpus"
 fi
 export GO_MODULES GO_MODULES_ORIGIN

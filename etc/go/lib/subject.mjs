@@ -111,7 +111,9 @@ function refuseUnknown(id) {
     `subject.mjs: subject '${id}' has no sidecar under ${SUBJECTS_DIR}.\n` +
       `  Available subject(s): ${avail.length ? avail.join(", ") : "(none)"}\n\n` +
       `  To add one: create etc/go/subjects/<id>/ with subject.json (id, display_name,\n` +
-      `  citation, source_url, corpus.main [+ optional corpus.wizard], checks, and a 'legs'\n` +
+      `  citation, source_url, corpus (main = the entry module; optional modules = every\n` +
+      `  module of the encoding, in dependency order, main among them; optional wizard\n` +
+      `  naming which of them is the wizard), checks, and a 'legs'\n` +
       `  object declaring exactly the projection legs the subject supports, each with its\n` +
       `  committed golden/cases paths, repo-root-relative, plus an optional 'denovo' object\n` +
       `  declaring where the G2 deposits live — bundle, register, fork_register, modules,\n` +
@@ -121,8 +123,8 @@ function refuseUnknown(id) {
       `  measured against that corpus), known-defects.json (measured negative controls,\n` +
       `  empty groups say why), and NOTES.md (free-prose idiosyncrasies; scripts never\n` +
       `  read it). The driver declares a milestone stage iff 'legs' has the entry, so a\n` +
-      `  subject with no wizard and no regulative rules simply omits those legs and the\n` +
-      `  milestone verdict stays honest. Any existing sidecar under etc/go/subjects/ is\n` +
+      `  subject whose module set carries no wizard, and no regulative rules, simply omits\n` +
+      `  those legs and the milestone verdict stays honest. Any existing sidecar under etc/go/subjects/ is\n` +
       `  a worked example.\n`,
   );
   process.exit(2);
@@ -185,13 +187,78 @@ export function loadSubject(id) {
 
   if (typeof desc.corpus !== "object" || desc.corpus === null)
     die(`subject.json: 'corpus' must be an object`);
-  checkKeys("corpus", desc.corpus, ["main", "wizard"]);
+  checkKeys("corpus", desc.corpus, ["main", "wizard", "modules"]);
   if (typeof desc.corpus.main !== "string")
     die(`subject.json: corpus.main is required`);
   const corpusMain = mustExist("corpus.main", desc.corpus.main);
   const corpusWizard = desc.corpus.wizard
     ? mustExist("corpus.wizard", desc.corpus.wizard)
     : "";
+
+  // --- the corpus module set ------------------------------------------------
+  //
+  // A subject's encoding is not always one file. Singapore succession law is a
+  // shared ontology module plus three statute modules (Wills, Intestate
+  // Succession, Probate and Administration) plus a wizard, and every one of
+  // them has to be checked, tested, verified and — above all — DIGESTED: the
+  // corpus digest is what a human gate binds to, so a digest over the entry
+  // module alone would leave a granted HG1 open across an edit to any of the
+  // others. That is a false signature, not a cosmetic gap.
+  //
+  // `corpus.modules` declares the whole set, IN DEPENDENCY ORDER (an ontology
+  // module before the statute modules that IMPORT it), and is validated exactly
+  // the way `denovo.modules` is below — with one deliberate difference: a
+  // corpus module must EXIST. A de novo module is an agent deposit whose
+  // absence is a stage's SKIPPED story; a corpus module is committed, so a
+  // missing one is a misconfiguration and says so, naming the path.
+  //
+  // `main` stays the ENTRY module — the one every single-artifact leg exports
+  // from — and `wizard` stays the ROLE POINTER p7-wizard renders. Both are
+  // therefore required to be MEMBERS of a declared set: a set that omits one of
+  // them is a misdeclaration rather than a shorthand, and it would silently
+  // drop that file out of the digest and out of GO_MODULES.
+  //
+  // Omitting `modules` resolves to exactly the historical set — main, plus the
+  // wizard when declared — so an existing sidecar keeps meaning precisely what
+  // it meant.
+  let corpusModules;
+  if (desc.corpus.modules === undefined) {
+    corpusModules = corpusWizard ? [corpusMain, corpusWizard] : [corpusMain];
+  } else {
+    if (!Array.isArray(desc.corpus.modules) || desc.corpus.modules.length === 0)
+      die(`corpus.modules must be a non-empty array of module paths`);
+    corpusModules = [];
+    const seenAt = new Map(); // absolute path -> the declared string that got there
+    for (const m of desc.corpus.modules) {
+      if (typeof m !== "string" || !m)
+        die(`corpus.modules: every entry must be a non-empty string`);
+      // The env transport is space-separated (GO_S_CORPUS_MODULES, exactly as
+      // GO_S_DENOVO_MODULES and GO_S_LEGS). A path with whitespace would split
+      // silently into two nonexistent paths, so it is refused here rather than
+      // mis-read there.
+      if (/\s/.test(m))
+        die(`corpus.modules['${m}']: a module path may not contain whitespace`);
+      const a = mustExist(`corpus.modules['${m}']`, m);
+      if (seenAt.has(a))
+        die(
+          `corpus.modules['${m}'] duplicates '${seenAt.get(a)}': both resolve to ${a}. The set is the gate digest's file list and the list p3-check/p6-tests/p8-verify iterate, so a repeat would double-count one module's assertions and findings`,
+        );
+      seenAt.set(a, m);
+      corpusModules.push(a);
+    }
+    if (!seenAt.has(corpusMain))
+      die(
+        `corpus.modules does not contain corpus.main ('${desc.corpus.main}' -> ${corpusMain}). main is the subject's ENTRY module — the one the single-artifact legs export from — so a module set that omits it is a misdeclaration, not a shorthand`,
+      );
+    if (corpusWizard && !seenAt.has(corpusWizard))
+      die(
+        `corpus.modules does not contain corpus.wizard ('${desc.corpus.wizard}' -> ${corpusWizard}). The wizard is a ROLE POINTER into the module set, not a module beside it: leaving it out would drop it from the gate digest, so editing it could not re-open HG1`,
+      );
+  }
+  // Membership set for the de novo identity guard below. Built once, from the
+  // resolved set, so that widening the schema cannot leave that guard testing a
+  // narrower list than the one the pipeline actually runs over.
+  const corpusModuleSet = new Set(corpusModules);
 
   if (typeof desc.checks !== "object" || desc.checks === null)
     die(`subject.json: 'checks' must be an object`);
@@ -329,8 +396,12 @@ export function loadSubject(id) {
         // SPEC.md §8: the de novo run re-derives the subject WITHOUT reading the
         // existing corpus, and the diff oracle compares the two. A `denovo`
         // module that IS a corpus module makes that comparison an identity and
-        // the G2 milestone a restatement of G1.
-        if (a === corpusMain || (corpusWizard && a === corpusWizard))
+        // the G2 milestone a restatement of G1. Tested against the WHOLE corpus
+        // module set, not against main/wizard: with an ontology module and three
+        // statute modules, a collision with any of the others is the same defect
+        // and would otherwise make the acceptance diff a partial identity with
+        // no error anywhere.
+        if (corpusModuleSet.has(a))
           die(
             `denovo.modules['${m}'] is also a corpus module. G2 re-derives the subject from source without reading the committed encoding (SPEC.md §8), so a de novo module that is the replay corpus makes the acceptance diff an identity`,
           );
@@ -451,6 +522,12 @@ export function loadSubject(id) {
       GO_S_DIR: dir,
       GO_S_CORPUS: corpusMain,
       GO_S_WIZARD: corpusWizard,
+      // The whole encoding, space-separated, in declared (dependency) order —
+      // same transport as GO_S_DENOVO_MODULES and GO_S_LEGS. GO_S_CORPUS and
+      // GO_S_WIZARD stay exactly what they were, the entry module and the
+      // wizard role pointer, so the single-module legs read the same value they
+      // always did.
+      GO_S_CORPUS_MODULES: corpusModules.join(" "),
       GO_S_PINS: pins,
       GO_S_KNOWN_DEFECTS: defects,
       GO_S_MIN_DATED_ARMS: String(desc.checks.min_dated_arms),

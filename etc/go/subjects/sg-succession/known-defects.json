@@ -1,0 +1,32 @@
+{
+  "_comment": [
+    "Measured defects used as NEGATIVE CONTROLS. House convention: a negative",
+    "control that stops reproducing is itself a finding, so a leg that expects a",
+    "defect and does not find it reports BROKEN telling you to delete the entry,",
+    "rather than quietly turning green.",
+    "",
+    "EVERY entry below was measured on the date it records. Nothing is predicted.",
+    "Groups with no measured entries are empty and say why.",
+    "",
+    "The two L4 LANGUAGE defects this corpus found (NOT binding looser than AND;",
+    "a mixfix name ending in a keyword being undefinable-in-practice) are NOT",
+    "recorded here. They are defects in the toolchain, not in this subject's",
+    "projections, and they are reported upstream instead; etc/check-not-precedence.mjs",
+    "is the standing guard against the first."
+  ],
+  "wizard": {
+    "measured_on": null,
+    "entries": [],
+    "why_empty": "No wizard module exists for this subject yet, so `render --format plan` has no export surface to measure."
+  },
+  "dmn": {
+    "measured_on": null,
+    "entries": [],
+    "why_empty": "The p7-dmn leg is not declared: no DMN golden, fidelity golden or cases file has been generated for this corpus, and recording unmeasured defects would be exactly the drift this orchestrator exists to prevent."
+  },
+  "mcp": {
+    "measured_on": null,
+    "entries": [],
+    "why_empty": "No jl4-service was reachable when this file was written, and the corpus carries no @export surface to deploy."
+  }
+}

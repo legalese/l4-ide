@@ -1,0 +1,335 @@
+<title>After a Death in Singapore</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Public+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+:root{
+  --paper:#FCFCFA; --raised:#FFFFFF; --ink:#17242B; --muted:#5A6870; --faint:#8A959B;
+  --rule:#DFDDD6; --rule-strong:#C7C4BB; --seal:#7A2E2E; --seal-soft:#F3E9E7;
+  --focus:#2F5D62;
+  --c-spouse:#3E6B70; --c-issue:#8C5A2B; --c-parents:#5B5188; --c-siblings:#4A6B45;
+  --c-grand:#7A5C74; --c-uncles:#6B6250; --c-state:#8A8A85;
+  --warn:#8A5A12; --warn-bg:#FAF2E4;
+  --shadow:0 1px 2px rgba(23,36,43,.05), 0 8px 24px -12px rgba(23,36,43,.18);
+  --maxw:1180px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12191D; --raised:#182127; --ink:#E7EAE9; --muted:#A2AFB5; --faint:#77858C;
+    --rule:#2A363C; --rule-strong:#3A4850; --seal:#D98C86; --seal-soft:#2A1D1D;
+    --focus:#7FB3B8;
+    --c-spouse:#6FA3A8; --c-issue:#C9915B; --c-parents:#9086C4; --c-siblings:#7FA678;
+    --c-grand:#B292AC; --c-uncles:#A2977E; --c-state:#9AA09E;
+    --warn:#E0B061; --warn-bg:#2A2417;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12191D; --raised:#182127; --ink:#E7EAE9; --muted:#A2AFB5; --faint:#77858C;
+  --rule:#2A363C; --rule-strong:#3A4850; --seal:#D98C86; --seal-soft:#2A1D1D;
+  --focus:#7FB3B8;
+  --c-spouse:#6FA3A8; --c-issue:#C9915B; --c-parents:#9086C4; --c-siblings:#7FA678;
+  --c-grand:#B292AC; --c-uncles:#A2977E; --c-state:#9AA09E;
+  --warn:#E0B061; --warn-bg:#2A2417;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:Spectral,Georgia,"Times New Roman",serif; font-weight:600; text-wrap:balance; margin:0}
+a{color:var(--seal)}
+
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+
+/* ---------- masthead ---------- */
+header{border-bottom:1px solid var(--rule); background:var(--raised)}
+.masthead{display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 20px; padding:26px 0 22px}
+h1{font-size:clamp(1.6rem,3.2vw,2.15rem); letter-spacing:-.01em}
+.sub{color:var(--muted); font-size:.94rem; max-width:62ch}
+.acts{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+.act{
+  font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; font-weight:600;
+  color:var(--muted); border:1px solid var(--rule-strong); border-radius:2px; padding:3px 8px;
+}
+
+/* ---------- layout ---------- */
+.cols{display:grid; grid-template-columns:300px minmax(0,1fr); gap:34px; padding:28px 0 64px; align-items:start}
+@media (max-width:900px){ .cols{grid-template-columns:1fr; gap:24px} }
+
+.railhead{
+  font-size:.72rem; letter-spacing:.09em; text-transform:uppercase; font-weight:700;
+  color:var(--faint); margin:0 0 10px; font-family:"Public Sans",sans-serif;
+}
+.rail{display:flex; flex-direction:column; gap:2px}
+.grp{margin-bottom:16px}
+.pick{
+  display:block; width:100%; text-align:left; cursor:pointer; font:inherit;
+  background:none; border:0; border-left:2px solid transparent; padding:8px 10px;
+  color:var(--ink); border-radius:0 3px 3px 0;
+}
+.pick:hover{background:var(--seal-soft)}
+.pick[aria-current="true"]{border-left-color:var(--seal); background:var(--seal-soft); font-weight:600}
+.pick:focus-visible{outline:2px solid var(--focus); outline-offset:-2px}
+.pick .nm{display:block; font-size:.92rem; line-height:1.35}
+.chips{display:flex; flex-wrap:wrap; gap:4px; margin-top:5px}
+.chip{font-size:.68rem; color:var(--muted); border:1px solid var(--rule); border-radius:2px; padding:1px 5px; white-space:nowrap}
+
+/* ---------- answer ---------- */
+.answer{display:flex; flex-direction:column; gap:26px; min-width:0}
+.card{background:var(--raised); border:1px solid var(--rule); border-radius:4px; box-shadow:var(--shadow)}
+.card>.pad{padding:20px 22px}
+.eyebrow{
+  font-size:.7rem; letter-spacing:.09em; text-transform:uppercase; font-weight:700; color:var(--faint);
+  margin:0 0 8px;
+}
+.lede{font-family:Spectral,Georgia,serif; font-size:1.14rem; line-height:1.5; margin:0}
+.govern{margin:14px 0 0; padding-top:14px; border-top:1px solid var(--rule); font-size:.9rem; color:var(--muted)}
+
+/* proportional bar */
+.bar{display:flex; height:34px; border-radius:3px; overflow:hidden; border:1px solid var(--rule-strong)}
+.bar span{display:block; min-width:2px}
+.legend{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:12px; font-size:.82rem; color:var(--muted)}
+.legend b{display:inline-flex; align-items:center; gap:6px; font-weight:500; color:var(--ink)}
+.sw{width:11px; height:11px; border-radius:2px; flex:none}
+
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%; border-collapse:collapse; font-size:.9rem}
+th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-size:.7rem; letter-spacing:.07em; text-transform:uppercase; color:var(--faint); font-weight:700; white-space:nowrap}
+td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tfoot td{border-top:2px solid var(--rule-strong); font-weight:700; font-variant-numeric:tabular-nums}
+.frac{font-variant-numeric:tabular-nums; color:var(--muted)}
+.who{display:flex; align-items:center; gap:8px; font-weight:500}
+.basis{display:block; font-size:.78rem; color:var(--faint); margin-top:2px; max-width:52ch}
+
+/* timeline */
+.tl{position:relative; margin:4px 0 0; padding:0; list-style:none}
+.tl::before{content:""; position:absolute; left:7px; top:6px; bottom:6px; width:2px; background:var(--rule-strong)}
+.tl li{position:relative; padding:0 0 18px 30px}
+.tl li:last-child{padding-bottom:0}
+.tl .dot{position:absolute; left:0; top:4px; width:16px; height:16px; border-radius:50%;
+  background:var(--raised); border:2px solid var(--seal)}
+.tl .when{font-size:.74rem; letter-spacing:.05em; text-transform:uppercase; font-weight:700; color:var(--seal)}
+.tl .what{margin:1px 0 0; font-size:.92rem}
+.tl .cite{display:block; font-size:.78rem; color:var(--faint); margin-top:3px; max-width:60ch}
+
+/* notes */
+.note{border-left:3px solid var(--warn); background:var(--warn-bg); padding:12px 16px; border-radius:0 3px 3px 0; font-size:.88rem}
+.note strong{color:var(--warn)}
+
+footer{border-top:1px solid var(--rule); color:var(--muted); font-size:.83rem; padding:22px 0 40px}
+footer p{margin:0 0 8px; max-width:78ch}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85em; background:var(--seal-soft); padding:1px 4px; border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+
+<header>
+  <div class="wrap masthead">
+    <div style="flex:1 1 340px">
+      <h1>After a Death in Singapore</h1>
+      <p class="sub">Who inherits when there is no will, what comes off the estate first, and how
+        long each step takes &mdash; worked out by running the statutes themselves.</p>
+    </div>
+    <div class="acts">
+      <span class="act">Wills Act 1838</span>
+      <span class="act">Intestate Succession Act 1967</span>
+      <span class="act">Probate &amp; Administration Act 1934</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap cols">
+  <nav class="rail" id="rail" aria-label="Choose a situation"></nav>
+  <div class="answer" id="answer"></div>
+</main>
+
+<footer class="wrap">
+  <p><strong>This is not legal advice.</strong> It is an executable encoding of three Singapore
+    Acts, current as at 18 August 2026, built to be checked rather than trusted. Every share and
+    every date below is computed by the encoding; nothing on this page is calculated in the
+    browser except the conversion of a share into dollars and cents.</p>
+  <p id="prov"></p>
+</footer>
+
+<script id="outcomes" type="application/json">{"generated_by":"jl4/examples/legal/sg-succession/app/build-scenarios.mjs","provenance":"Every value below is what the L4 encoding answered; nothing here is computed in JavaScript.","exactness_failures":[],"scenarios":[{"id":"spouse-only-house","label":"Spouse, no children — with a flat","story":"Married, no children, both parents gone. The HDB flat and the savings.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":1,"children":0,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Spouse","decimal":1,"basis":"ISA s 7 rule 1 -- spouse takes the whole estate","fraction":{"n":1,"d":1}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"spouse-only-nohouse","label":"Spouse, no children — no property","story":"Married, no children, no parents surviving. Savings only.","facts":{"house":false,"immovable":0,"movable":250000,"expenses":0,"debts":0,"spouses":1,"children":0,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":250000,"distributableEstate":250000,"shares":[{"taker":"Spouse","decimal":1,"basis":"ISA s 7 rule 1 -- spouse takes the whole estate","fraction":{"n":1,"d":1}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"spouse-two-kids-house","label":"Spouse and two children — with a flat","story":"The commonest shape: a surviving spouse and two adult children.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":1,"children":2,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Spouse","decimal":0.5,"basis":"ISA s 7 rule 2 -- spouse takes one-half","fraction":{"n":1,"d":2}},{"taker":"Child A","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":4}},{"taker":"Child B","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":4}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"spouse-one-kid-house","label":"Spouse and one child — with a flat","story":null,"facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":1,"children":1,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Spouse","decimal":0.5,"basis":"ISA s 7 rule 2 -- spouse takes one-half","fraction":{"n":1,"d":2}},{"taker":"Child A","decimal":0.5,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"spouse-parents-house","label":"Spouse and parents, no children","story":"No children, but both parents survive. Rule 4, not rule 1 — the case a precedence bug in the encoding got wrong.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":1,"children":0,"parents":2,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Spouse","decimal":0.5,"basis":"ISA s 7 rule 4 -- spouse takes one-half","fraction":{"n":1,"d":2}},{"taker":"Mother","decimal":0.25,"basis":"ISA s 7 rule 4 -- the parents take the other half","fraction":{"n":1,"d":4}},{"taker":"Father","decimal":0.25,"basis":"ISA s 7 rule 4 -- the parents take the other half","fraction":{"n":1,"d":4}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"kids-only-house","label":"Two children, no spouse","story":"Widowed or unmarried, two surviving children.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":2,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Child A","decimal":0.5,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":2}},{"taker":"Child B","decimal":0.5,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"three-kids","label":"Three children, no spouse","story":"A third each — and three thirds are exactly the whole estate.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":3,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Child A","decimal":0.3333333333333333,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":3}},{"taker":"Child B","decimal":0.3333333333333333,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":3}},{"taker":"Child C","decimal":0.3333333333333333,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":3}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"grandchildren-represent","label":"A child died first, leaving grandchildren","story":"One child survives; the other died before the parent, leaving two children of their own.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":2,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Child A","decimal":0.5,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":2}},{"taker":"Grandchild 1","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":4}},{"taker":"Grandchild 2","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":4}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"child-died-childless","label":"A child died first, leaving nobody","story":"An extinct line is not a share: the surviving child takes everything.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":2,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Child A","decimal":1,"basis":"ISA s 7 rule 3 -- issue take the whole estate per stirpes","fraction":{"n":1,"d":1}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"parents-only","label":"Parents only","story":"No spouse, no children. Both parents survive.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":0,"parents":2,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Mother","decimal":0.5,"basis":"ISA s 7 rule 5 -- the parents take the whole estate","fraction":{"n":1,"d":2}},{"taker":"Father","decimal":0.5,"basis":"ISA s 7 rule 5 -- the parents take the whole estate","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"siblings-only","label":"Brothers and sisters only","story":"No spouse, no children, no parents.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":0,"parents":0,"siblings":2,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Sister","decimal":0.5,"basis":"ISA s 7 rule 6 -- siblings take, children of deceased siblings by stocks","fraction":{"n":1,"d":2}},{"taker":"Brother","decimal":0.5,"basis":"ISA s 7 rule 6 -- siblings take, children of deceased siblings by stocks","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will and no close family. Someone interested in the estate — including a creditor — may apply for LETTERS OF ADMINISTRATION (PAA s 18(4)(c)). If nobody applies within 6 months of the death, the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"grandparents-only","label":"Grandparents only","story":null,"facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":0,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Grandmother","decimal":0.5,"basis":"ISA s 7 rule 7 -- the grandparents take in equal portions","fraction":{"n":1,"d":2}},{"taker":"Grandfather","decimal":0.5,"basis":"ISA s 7 rule 7 -- the grandparents take in equal portions","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will and no close family. Someone interested in the estate — including a creditor — may apply for LETTERS OF ADMINISTRATION (PAA s 18(4)(c)). If nobody applies within 6 months of the death, the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"uncles-aunts-only","label":"Uncles and aunts only","story":null,"facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":0,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"Uncle","decimal":0.5,"basis":"ISA s 7 rule 8 -- the uncles and aunts take in equal portions","fraction":{"n":1,"d":2}},{"taker":"Aunt","decimal":0.5,"basis":"ISA s 7 rule 8 -- the uncles and aunts take in equal portions","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will and no close family. Someone interested in the estate — including a creditor — may apply for LETTERS OF ADMINISTRATION (PAA s 18(4)(c)). If nobody applies within 6 months of the death, the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"nobody","label":"No relatives at all","story":"Rule 9: the estate goes to the Government as bona vacantia.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":0,"children":0,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"the Government","decimal":1,"basis":"ISA s 7 rule 9 -- bona vacantia, in default of rules 1 to 8","fraction":{"n":1,"d":1}}],"whatHappensNext":"There is no will and no close family. Someone interested in the estate — including a creditor — may apply for LETTERS OF ADMINISTRATION (PAA s 18(4)(c)). If nobody applies within 6 months of the death, the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"two-widows","label":"Two lawful widows and two children","story":"Section 8: the wives share between them the one share a single wife would have taken — it dilutes the wives, never the children.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":2,"children":2,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":1000000,"distributableEstate":1000000,"shares":[{"taker":"First wife","decimal":0.25,"basis":"ISA s 7 rule 2 -- spouse takes one-half","fraction":{"n":1,"d":4}},{"taker":"Second wife","decimal":0.25,"basis":"ISA s 7 rule 2 -- spouse takes one-half","fraction":{"n":1,"d":4}},{"taker":"Child A","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":4}},{"taker":"Child B","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":4}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"debts-eat-in","label":"Spouse and two children, with debts","story":"Section 5 distributes what is left AFTER the expenses of due administration. The shares are the same; the money is not.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":30000,"debts":400000,"spouses":1,"children":2,"parents":0,"siblings":0,"domiciled":true,"muslim":false},"governedByTheAct":true,"note":"ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.","distributes":570000,"distributableEstate":570000,"shares":[{"taker":"Spouse","decimal":0.5,"basis":"ISA s 7 rule 2 -- spouse takes one-half","fraction":{"n":1,"d":2}},{"taker":"Child A","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":4}},{"taker":"Child B","decimal":0.25,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":4}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"foreign-domicile","label":"Lived abroad, owned a Singapore flat","story":"Section 4 splits the estate: the flat is governed by this Act, the bank account by the law of the domicile.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":1,"children":1,"parents":0,"siblings":0,"domiciled":false,"muslim":false},"governedByTheAct":true,"note":"ISA s 4: the deceased was domiciled outside Singapore, so this Act regulates the Singapore IMMOVABLE property only. The movable property is regulated by the law of the domicile and is outside this encoding.","distributes":900000,"distributableEstate":1000000,"shares":[{"taker":"Spouse","decimal":0.5,"basis":"ISA s 7 rule 2 -- spouse takes one-half","fraction":{"n":1,"d":2}},{"taker":"Child A","decimal":0.5,"basis":"ISA s 7 rule 3 -- issue take one-half per stirpes","fraction":{"n":1,"d":2}}],"whatHappensNext":"There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a)).","governingAct":"The Intestate Succession Act 1967.","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]},{"id":"muslim-estate","label":"A Muslim estate","story":"Section 2 puts this outside the Act entirely. The tool refuses rather than answering.","facts":{"house":true,"immovable":900000,"movable":100000,"expenses":0,"debts":0,"spouses":1,"children":1,"parents":0,"siblings":0,"domiciled":true,"muslim":true},"governedByTheAct":false,"note":"ISA s 2: this Act does not apply to the estate of a Muslim. The estate is governed by Muslim law and the Administration of Muslim Law Act 1966; a faraid distribution is outside this encoding.","distributes":1000000,"distributableEstate":1000000,"shares":[],"whatHappensNext":"The estate is distributed under Muslim law. Apply to the Syariah Court for an inheritance certificate, then to the Family Justice Courts for letters of administration. The Intestate Succession Act does not apply (ISA s 2).","governingAct":"Muslim law and the Administration of Muslim Law Act 1966 — not the Intestate Succession Act 1967 (ISA s 2).","timeline":[{"date":"2026-01-15","event":"the death of the deceased","basis":"PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made."},{"date":"2026-07-15","event":"6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit","basis":"PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date."},{"date":"2026-07-15","event":"the grant is made","basis":"PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee."},{"date":"2026-08-15","event":"one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee","basis":"PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all."},{"date":"2027-01-15","event":"6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court","basis":"WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date."}]}],"assertions":131}</script>
+<script>
+const DATA = JSON.parse(document.getElementById("outcomes").textContent);
+const S = DATA.scenarios;
+
+const CLASS_OF = (basis) =>
+  /rule 1|rule 2|rule 4 -- spouse|section 8/.test(basis) ? "spouse"
+  : /rule 3/.test(basis) ? "issue"
+  : /parents/.test(basis) ? "parents"
+  : /rule 6/.test(basis) ? "siblings"
+  : /rule 7/.test(basis) ? "grand"
+  : /rule 8/.test(basis) ? "uncles"
+  : "state";
+const COLOR = { spouse:"--c-spouse", issue:"--c-issue", parents:"--c-parents",
+                siblings:"--c-siblings", grand:"--c-grand", uncles:"--c-uncles", state:"--c-state" };
+const cssvar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const money = (n) => "$" + n.toLocaleString("en-SG", {minimumFractionDigits:2, maximumFractionDigits:2});
+const pct = (x) => (x*100).toLocaleString("en-SG",{maximumFractionDigits:2}) + "%";
+
+// Allocate the estate in whole cents by largest remainder, so the column adds up
+// to the distributable amount EXACTLY. A share of one third is exactly one third
+// in the encoding; it is this conversion to money, not the law, that has to round.
+function allocate(total, shares){
+  const cents = Math.round(total*100);
+  const raw = shares.map(s => cents * (s.fraction ? s.fraction.n/s.fraction.d : s.decimal));
+  const base = raw.map(Math.floor);
+  let left = cents - base.reduce((a,b)=>a+b,0);
+  const order = raw.map((v,i)=>[v-base[i],i]).sort((a,b)=>b[0]-a[0]);
+  for(let k=0; k<left; k++) base[order[k % order.length][1]]++;
+  return base.map(c => c/100);
+}
+
+const GROUPS = [
+  ["A spouse survives", ["spouse-only-house","spouse-only-nohouse","spouse-two-kids-house","spouse-one-kid-house","spouse-parents-house","two-widows","debts-eat-in"]],
+  ["No spouse, but children", ["kids-only-house","three-kids","grandchildren-represent","child-died-childless"]],
+  ["No spouse and no children", ["parents-only","siblings-only","grandparents-only","uncles-aunts-only","nobody"]],
+  ["Where the Act stops", ["foreign-domicile","muslim-estate"]],
+];
+
+function chips(f){
+  const out = [];
+  out.push(f.house ? "a flat" : "no property");
+  if(f.spouses) out.push(f.spouses>1 ? f.spouses+" wives" : "spouse");
+  if(f.children) out.push(f.children===1 ? "1 child" : f.children+" children");
+  if(f.parents) out.push(f.parents+" parent"+(f.parents>1?"s":""));
+  if(f.siblings) out.push(f.siblings+" siblings");
+  if(f.debts) out.push("debts");
+  if(!f.domiciled) out.push("lived abroad");
+  if(f.muslim) out.push("Muslim estate");
+  return out;
+}
+
+function buildRail(){
+  const rail = document.getElementById("rail");
+  rail.innerHTML = "";
+  for(const [title, ids] of GROUPS){
+    const g = document.createElement("div"); g.className = "grp";
+    const h = document.createElement("p"); h.className = "railhead"; h.textContent = title;
+    g.appendChild(h);
+    for(const id of ids){
+      const s = S.find(x => x.id === id); if(!s) continue;
+      const b = document.createElement("button");
+      b.className = "pick"; b.type = "button"; b.dataset.id = id;
+      b.innerHTML = `<span class="nm"></span><span class="chips"></span>`;
+      b.querySelector(".nm").textContent = s.label;
+      const c = b.querySelector(".chips");
+      for(const t of chips(s.facts)){ const e=document.createElement("span"); e.className="chip"; e.textContent=t; c.appendChild(e); }
+      b.addEventListener("click", () => select(id));
+      g.appendChild(b);
+    }
+    rail.appendChild(g);
+  }
+}
+
+function render(s){
+  const el = document.getElementById("answer");
+  const amounts = s.shares.length ? allocate(s.distributes, s.shares) : [];
+  const parts = [];
+
+  parts.push(`<section class="card"><div class="pad">
+    <p class="eyebrow">What happens next</p>
+    <p class="lede">${esc(s.whatHappensNext)}</p>
+    <p class="govern"><strong>Governing law:</strong> ${esc(s.governingAct)}</p>
+  </div></section>`);
+
+  if(!s.governedByTheAct){
+    parts.push(`<section class="card"><div class="pad">
+      <div class="note"><strong>This Act does not decide it.</strong><br>${esc(s.note)}</div>
+    </div></section>`);
+  } else {
+    const segs = s.shares.map((sh,i) => {
+      const cls = CLASS_OF(sh.basis);
+      return `<span title="${esc(sh.taker)}" style="flex:${sh.decimal};background:${cssvar(COLOR[cls])}"></span>`;
+    }).join("");
+    const seen = new Set();
+    const legend = s.shares.filter(sh => { const c=CLASS_OF(sh.basis); if(seen.has(c))return false; seen.add(c); return true; })
+      .map(sh => { const c=CLASS_OF(sh.basis);
+        return `<b><i class="sw" style="background:${cssvar(COLOR[c])}"></i>${esc(labelOf(c))}</b>`; }).join("");
+
+    const rows = s.shares.map((sh,i) => `<tr>
+        <td><span class="who"><i class="sw" style="background:${cssvar(COLOR[CLASS_OF(sh.basis)])}"></i>${esc(sh.taker)}</span>
+            <span class="basis">${esc(sh.basis)}</span></td>
+        <td class="num frac">${sh.fraction ? sh.fraction.n+"&frasl;"+sh.fraction.d : "&mdash;"}</td>
+        <td class="num">${pct(sh.decimal)}</td>
+        <td class="num">${money(amounts[i])}</td></tr>`).join("");
+
+    parts.push(`<section class="card"><div class="pad">
+      <p class="eyebrow">How the estate divides</p>
+      <div class="bar">${segs}</div>
+      <div class="legend">${legend}</div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Who takes, and under which rule</th><th class="num">Share</th><th class="num">%</th><th class="num">Amount</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td>Distributed under this Act</td><td class="num frac">1</td><td class="num">100%</td>
+        <td class="num">${money(amounts.reduce((a,b)=>a+b,0))}</td></tr></tfoot>
+    </table></div></section>`);
+
+    const reached = s.distributes !== s.distributableEstate;
+    parts.push(`<section class="card"><div class="pad">
+      <p class="eyebrow">What is actually divided</p>
+      <div class="tbl-wrap"><table><tbody>
+        <tr><td>The estate at death</td><td class="num">${money(s.facts.immovable + s.facts.movable)}</td></tr>
+        ${s.facts.expenses ? `<tr><td>Less funeral, testamentary and administration expenses <span class="basis">PAA s 57(4) and the Second Schedule set the order these come out of.</span></td><td class="num">&minus;${money(s.facts.expenses)}</td></tr>` : ""}
+        ${s.facts.debts ? `<tr><td>Less debts and liabilities</td><td class="num">&minus;${money(s.facts.debts)}</td></tr>` : ""}
+        <tr><td>Left to distribute <span class="basis">ISA s 5 distributes the estate &ldquo;after payment thereout of the expenses of due administration&rdquo;.</span></td><td class="num">${money(s.distributableEstate)}</td></tr>
+        ${reached ? `<tr><td><strong>Governed by this Act</strong> <span class="basis">${esc(s.note)}</span></td><td class="num"><strong>${money(s.distributes)}</strong></td></tr>` : ""}
+      </tbody></table></div>
+    </div></section>`);
+  }
+
+  if(s.timeline.length){
+    parts.push(`<section class="card"><div class="pad">
+      <p class="eyebrow">The timetable the statutes set</p>
+      <ol class="tl">${s.timeline.map(t => `<li><span class="dot"></span>
+        <span class="when">${fmtDate(t.date)}</span>
+        <p class="what">${esc(t.event)}</p>
+        <span class="cite">${esc(t.basis)}</span></li>`).join("")}</ol>
+      <p class="basis" style="margin-top:14px">Dates assume the grant is made six months after the death.
+        Change that and every date after it moves; the intervals themselves are fixed by statute.</p>
+    </div></section>`);
+  }
+
+  el.innerHTML = parts.join("");
+}
+
+function labelOf(c){
+  return {spouse:"Spouse", issue:"Children and their issue", parents:"Parents",
+          siblings:"Brothers and sisters", grand:"Grandparents", uncles:"Uncles and aunts",
+          state:"The Government"}[c];
+}
+function fmtDate(iso){
+  const [y,m,d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y,m-1,d)).toLocaleDateString("en-SG",
+    {timeZone:"UTC", day:"numeric", month:"short", year:"numeric"});
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function select(id){
+  const s = S.find(x => x.id === id); if(!s) return;
+  for(const b of document.querySelectorAll(".pick")) b.setAttribute("aria-current", String(b.dataset.id === id));
+  render(s);
+}
+
+document.getElementById("prov").innerHTML =
+  "Sources: the official texts at <code>sso.agc.gov.sg</code>, fetched with provenance and hashed. " +
+  "Encoded in L4 and checked by " + DATA.assertions + " scenario assertions. " +
+  "Where two readings of a provision both survive the text, the encoding records both &mdash; " +
+  "see the fork register in the corpus.";
+
+buildRail();
+select("spouse-two-kids-house");
+</script>

@@ -49,9 +49,12 @@
 # The milestone-scoped module set, resolved by the driver as GO_MODULES with
 # GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
 # documented direct-invocation route — the committed corpus set is the default,
-# preserving the pre-2026-08-09 contract.
+# preserving the pre-2026-08-09 contract. Kept byte-for-byte in step with the
+# driver's own derivation (go.sh, the g1 arm): a fallback that resolved a
+# NARROWER set than a run does would make a direct invocation measure something
+# other than what the receipt claims.
 if [[ -z "${GO_MODULES+x}" ]]; then
-  GO_MODULES="${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  GO_MODULES="${GO_S_CORPUS_MODULES:-${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
   GO_MODULES_ORIGIN="corpus"
 fi
 
