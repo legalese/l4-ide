@@ -1,0 +1,2 @@
+lowering errors: 1
+  mutual.l4:20:1-22:32: in `p holds`: non-structural recursion: mutual recursion between `p holds` and `q holds`; M1's one recursion warrant is a structurally decreasing list argument in a definition's own body

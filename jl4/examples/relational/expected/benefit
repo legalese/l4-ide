@@ -1,0 +1,58 @@
+relational program — benefit.l4
+
+records:
+  Applicant  % benefit.l4:30:1-33:27
+    age : NUMBER
+    income : NUMBER
+    isVeteran : BOOLEAN
+
+predicates:
+  input age/1 : NUMBER  % <no source range>
+    params: Applicant
+    (no clauses)
+  input income/1 : NUMBER  % <no source range>
+    params: Applicant
+    (no clauses)
+  input isVeteran/1 : BOOLEAN  % <no source range>
+    params: Applicant
+    (no clauses)
+  computed exported eligible for benefit/1 : (goal)  % benefit.l4:36:1-41:42
+    params: Applicant
+    eligible for benefit(A_0) :- proj(A_0, age, Age_1), Age_1 >= 65, proj(A_0, income, Income_2), Income_2 =< 100000.  % benefit.l4:39:8-41:42
+    eligible for benefit(A_0) :- proj(A_0, isVeteran, IsVeteran_3), IsVeteran_3 = TRUE, proj(A_0, income, Income_4), Income_4 =< 100000.  % benefit.l4:39:8-41:42
+  computed exported benefit amount/1 : NUMBER  % benefit.l4:44:1-48:55
+    params: Applicant
+    benefit amount(A_5, Tmp_10) :- eligible for benefit(A_5), bonus(A_5, Bonus_9), Tmp_10 is (1000 + Bonus_9).  % benefit.l4:47:38-53
+    benefit amount(A_5, 0) :- [ not eligible for benefit(A_5) ].  % benefit.l4:47:59-60
+  auxiliary bonus/1 : NUMBER  % benefit.l4:48:11-55
+    params: Applicant
+    bonus(A_6, 250) :- proj(A_6, isVeteran, IsVeteran_7), IsVeteran_7 = TRUE.  % benefit.l4:48:45-48
+    bonus(A_6, 0) :- [ proj(A_6, isVeteran, IsVeteran_8), IsVeteran_8 = FALSE ].  % benefit.l4:48:54-55
+
+queries:
+  EVAL q1: benefit amount(A0_11) -> Benefitamount_12 => (expectation from the L4 evaluator)  % benefit.l4:50:1-87
+    facts: age(A0_11, 70), income(A0_11, 50000), isVeteran(A0_11, FALSE)
+
+dependencies:
+  eligible for benefit -> age (+)
+  eligible for benefit -> income (+)
+  eligible for benefit -> isVeteran (+)
+  benefit amount -> eligible for benefit (+)
+  benefit amount -> bonus (+)
+  benefit amount -> eligible for benefit (-)
+  bonus -> isVeteran (+)
+  bonus -> isVeteran (-)
+
+stratification:
+  stratified
+    0  age
+    0  eligible for benefit
+    0  income
+    0  isVeteran
+    1  benefit amount
+    1  bonus
+
+fidelity report — relational
+  [R-SORT] advisory — bonus  (benefit.l4:48:11-55)
+      result sort recovered from the lowered clauses (no declared or inferred type)
+      lost: nothing; the sort is inferred, not declared

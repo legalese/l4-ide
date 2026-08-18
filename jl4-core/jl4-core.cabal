@@ -154,6 +154,9 @@ library
     L4.OpenFisca.IR
     L4.OpenFisca.Lower
     L4.OpenFisca.Emit
+    L4.Relational.IR
+    L4.Relational.Lower
+    L4.Relational.Debug
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry
@@ -225,6 +228,7 @@ test-suite jl4-core-test
     BitemporalRecallSpec
     TraceOrderingSpec
     StateGraphSpec
+    RelationalSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

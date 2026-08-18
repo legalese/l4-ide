@@ -52,6 +52,7 @@ import qualified VizAutoRefresh
 import qualified VizImplies
 import qualified VizGuardedRows
 import qualified DmnExport
+import qualified RelationalExport
 
 main :: IO ()
 main = do
@@ -132,6 +133,7 @@ main = do
     describe "viz implies" VizImplies.spec
     describe "viz guarded rows" VizGuardedRows.spec
     DmnExport.spec examplesRoot
+    RelationalExport.spec examplesRoot
     describe "bpmn export" BpmnExport.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =

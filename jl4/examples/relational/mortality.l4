@@ -1,0 +1,27 @@
+-- The minimal seed: two unary predicates, one rule, one query.
+--
+-- `isHuman` is an INPUT predicate (a stored record field, so no clauses);
+-- `is mortal` is a COMPUTED one with a single clause. Everything the relational
+-- lowering does to a real module — selection, ANF, the signed dependency graph,
+-- stratification, query capture — is present here at the smallest size that
+-- still has all of it, which makes this the fixture to read first when a golden
+-- moves.
+--
+-- Each directive below carries its L4-oracle value on the line after it, as a
+-- `-- L4 oracle ==>` comment produced by `l4 run mortality.l4` — the
+-- differential harness's expectation, kept outside the emitted program per
+-- BLAWX-EXPORT-SPEC R11 and kept in exactly one place per directive.
+
+DECLARE Person HAS
+    isHuman IS A BOOLEAN
+
+@export
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `is mortal` IF p's isHuman
+
+#EVAL `is mortal` (Person WITH isHuman IS TRUE)
+-- L4 oracle ==> TRUE
+
+#EVAL `is mortal` (Person WITH isHuman IS FALSE)
+-- L4 oracle ==> FALSE
