@@ -826,17 +826,17 @@ DECLARE Applicant HAS
     income    IS A NUMBER
     isVeteran IS A BOOLEAN
 
+@export
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-@export
 DECIDE `eligible for benefit` IF
        a's age AT LEAST 65
     OR a's isVeteran
   UNLESS a's income GREATER THAN 100000
 
+@export
 GIVEN a IS AN Applicant
 GIVETH A NUMBER
-@export
 `benefit amount` a MEANS
     IF `eligible for benefit` a THEN 1000 PLUS bonus ELSE 0
     WHERE bonus MEANS IF a's isVeteran THEN 250 ELSE 0
