@@ -1,4 +1,4 @@
-# Record Update for L4 — `alice WITH age IS 31`
+# Record Update for L4 — `alice BUT WITH age IS 31`
 
 > **Status (2026-08-18): PROPOSED, NOT IMPLEMENTED.** No code in this repo implements record update;
 > `alice WITH age IS 31` is a type error on `unstable` today (`IllegalAppNamed`, reproduced in §1.2).
@@ -7,9 +7,11 @@
 > output is reproduced verbatim; sections marked **ARGUED** are design reasoning that the
 > measurements constrain but do not settle.
 >
-> **One ruling is contested.** R2 (the surface syntax) is ruled for `alice WITH age IS 31`; the
-> adversarial review's judge ruled the other way, for a distinct keyword. Both cases are set out at
-> R2, and everything from R3.1 onward is written to hold either way.
+> **R2 was reversed on 2026-08-19.** The spec first ruled for the bare `alice WITH age IS 31` of
+> smucclaw#438; the adversarial review's judge dissented for a distinct keyword; the keyword half of
+> that dissent was conceded and the word itself re-argued, landing on **`alice BUT WITH age IS 31`**.
+> The reasoning and the reversal are recorded at R2/R2.1/R2.2 rather than rewritten away, because the
+> road not taken is what makes R3's simplification legible.
 >
 > **Seed:** a user question — "in haskell if i want to update a record i give the name of the
 > existing record and i give overrides in braces. in l4 is there a similar syntax?" The answer today
@@ -20,12 +22,16 @@
 
 ## 0. The one-sentence proposal
 
-Let the head of a `WITH` expression be a **value** of record type, not only a **type constructor**:
+Give L4 an update form whose head is a **value** of record type, spelled with a reserved `BUT`:
 
 ```l4
 alice MEANS Person WITH name IS "Alice", age IS 30, email IS "a@x.com"   -- construction (today)
-older MEANS alice  WITH age IS 31                                        -- update (proposed)
+older MEANS alice BUT WITH age IS 31                                     -- update (proposed)
 ```
+
+The seed request (smucclaw#438) was for the bare `alice WITH age IS 31`. R2 rules against that and
+for `BUT WITH`, on grounds that only became visible after the adversarial review; §R2.1 is why a
+keyword, §R2.2 is why this keyword.
 
 Construction stays **total** (every stored field, exactly once). Update is **partial** (a non-empty
 subset; everything else carries through from the base).
@@ -63,8 +69,12 @@ inferAppNamed r t _nes = do                    -- anything else: refuse
 Record construction works because a `DECLARE`d record's constructor is a `Fun` with named
 arguments. `alice`'s type is `Person`, not a `Fun`, so it falls to the second clause.
 
-**Consequence: this is a type-checker proposal, not a grammar proposal.** That fact drives R3 and
-collapses most of the blast radius (§5).
+**Consequence:** the bare-`WITH` reading of this proposal would have been a _type-checker_ change
+with no grammar change at all — which is what made it tempting, and what R2 ultimately ruled against
+(the same absence of a grammatical discriminator is why `shadowed-ctor` and `comma-slurp` bite). Under
+the ruled `BUT WITH` a grammar change is exactly what buys the safety. Either way, the fact that
+`inferAppNamed`'s second clause is the _only_ thing standing between today and update is what makes
+the semantic core small.
 
 ### 1.2 The error today — MEASURED
 
@@ -225,7 +235,7 @@ The stdlib's ACTUS state-transition functions are the cleanest witnesses. `jl4-c
 Six field lines, **four of them pure boilerplate**. Under the proposal:
 
 ```l4
-`STF_IP` MEANS preState WITH statusDate IS eventDate, accruedInterest IS 0
+`STF_IP` MEANS preState BUT WITH statusDate IS eventDate, accruedInterest IS 0
 ```
 
 And the file **already apologises for the absence in a comment** — `jl4-core/libraries/actus.l4:70`:
@@ -363,9 +373,15 @@ only `jl4-core/src/L4/` and missed `jl4-mlir`; 19 wrongly counted `TypeCheck/Typ
 contains no bare `AppNamed` — only the _error_ constructors `IllegalAppNamed`/`IncompleteAppNamed`
 at `:94-95`. Both slips are recorded rather than quietly fixed, because an undercounted blast radius
 is exactly the drift CLAUDE.md warns about.)
-The reason the radius is nonetheless small is §1.1: **the surface
-syntax is byte-identical to construction**, so the lexer, the parser, and both printers need no
-change whatsoever.
+
+> **Read this table as the census of what _could_ be affected, not of what R2/R3 actually touch.**
+> It was written for the superseded bare-`WITH` surface, whose selling point was that the syntax is
+> byte-identical to construction. Under the ruled `BUT WITH` the lexer and parser **do** change (one
+> keyword, one production), and a new `Restate` constructor forces an arm in each row. But under
+> **R3.1** that node is elaborated away before the checked module is returned, so every row below
+> still only ever _sees_ the total `AppNamed` it already handles. The arms are one-liners; the
+> behaviour is unchanged. The rightmost column is kept in the bare-`WITH` framing because that is the
+> analysis that produced R3.1, and R3.1 is the reason the radius collapses.
 
 | module                                   | what it does with `AppNamed`                                      | effect of update                                       |
 | ---------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------ |
@@ -516,8 +532,10 @@ field.
 the field list is partial by design, so a slurped field is simply not updated and **nothing is
 reported**. `claim WITH x IS alice WITH y IS 2` would silently drop the `y` update.
 
-This is the strongest technical objection in the review and R2/R5 must answer it. Note precisely
-what it does _not_ say: the hazard is not partiality alone and not slurping alone, it is **the two
+**Disposition (2026-08-19): survives R2, and is answered by R6.** A keyword does not stop the slurp —
+`x IS y BUT WITH f IS v, z IS 3` still lets the inner list eat the comma — but because `BUT WITH` is a
+new production, R6's bracketing rule cannot break an existing file. Note precisely
+what this finding does _not_ say: the hazard is not partiality alone and not slurping alone, it is **the two
 composed**. Whatever is ruled must keep a total check somewhere on that path.
 
 Note also the asymmetry (also measured): whether a following `WITH` attaches at all depends on
@@ -542,6 +560,11 @@ g MEANS Person WITH name IS "x", age IS Person
 Construction becomes **unreachable**, and the failure lands in **exactly the `IllegalAppNamed`
 branch this proposal repurposes**. Repurposing it silently converts this diagnostic into an attempt
 to "update a NUMBER".
+
+**Disposition (2026-08-19): DISSOLVED by R2.** Under `BUT WITH` the parser has already decided, so
+`Person BUT WITH …` is unambiguously an update of the local and construction is spelled
+`Person WITH …`. The finding is retained because it is the single sharpest argument for the keyword
+and would return immediately if the bare-`WITH` surface were revived.
 
 This corrects the optimistic reading in §1.4: **top-level** same-named definitions resolve fine by
 field set (measured there), but a **`GIVEN`/local** binder shadows the constructor entirely
@@ -577,6 +600,11 @@ The sum case is genuinely undecidable at the type level: `p`'s static type is `P
 and `Owed` disagree about the field set. R4 must restrict update heads to values of a
 **single-constructor record type** and reject the rest by name.
 
+(The two probes above are spelled in _today's_ syntax, because that is what produced the output
+quoted. Under R2 they read `red BUT WITH …` and `p BUT WITH …`, and the keyword does **not** help
+here — this is the one major hazard a keyword leaves entirely untouched, which is why R4's
+single-constructor gate is load-bearing rather than belt-and-braces.)
+
 ### 5.4 The totality argument — raised as fatal, and it does NOT survive
 
 The review's other **fatal** finding: `IncompleteAppNamed` makes a drafter answer every question the
@@ -590,8 +618,9 @@ proposal only ever touches the `:2971` fallback that today emits `IllegalAppName
 diagnostic is lost on any program that compiles today.**
 
 What remains is the weaker, real claim: _a reader cannot tell whether a given `X WITH …` is total
-without knowing whether `X` names a type or a value._ That is a legibility cost, not a lost check,
-and it is what R2 weighs.
+without knowing whether `X` names a type or a value._ That is a legibility cost, not a lost check.
+**R2 dissolved it on 2026-08-19**: under `BUT WITH`, total and partial are visibly different syntax,
+so the reader never has to resolve a name to know which rules apply.
 
 The associated "then it becomes ambiguous whenever a value shares a type's name" objection is
 **empirically empty**. Measured over all 749 `.l4` files:
@@ -721,11 +750,14 @@ Ten distinct findings survived in all. The seven minors are `demand-is-100pct-te
 The three majors — and only these — are load-bearing for the design (`shadowed-ctor` was raised
 independently by two different lenses):
 
-| id                         | what it is                                                        | mitigation (all use machinery already in the tree) |
-| -------------------------- | ----------------------------------------------------------------- | -------------------------------------------------- |
-| `shadowed-ctor`            | a local binder of the same name deletes the constructor candidate | resolve the head under `LocalsSpareSelectors`      |
-| `comma-slurp`              | a nested unbracketed `WITH` swallows the outer comma list         | bracketing rule; **zero corpus churn**             |
-| `head-must-be-a-bare-name` | `AppNamed`'s head is a `Name` in the AST, not an `Expr`           | accept the limit in v1 (R5)                        |
+| id                         | what it is                                                        | disposition under R2's `BUT WITH`                                                                              |
+| -------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `shadowed-ctor`            | a local binder of the same name deletes the constructor candidate | **dissolved** — the parser decides, so the head is never resolved through a construct/update fork (R2.1)       |
+| `comma-slurp`              | a nested unbracketed update swallows the outer comma list         | **survives**; answered by R6, whose rule now attaches to a new production and so cannot break an existing file |
+| `head-must-be-a-bare-name` | `AppNamed`'s head is a `Name` in the AST, not an `Expr`           | **mostly dissolved** — R5 admits a parenthesised head, which a keyword makes cheap                             |
+
+Two of the three majors are answered by the **surface** ruling rather than by mitigation. That is the
+substance of R2.1, and it is why the 2026-08-18 ruling was reversed.
 
 Two headline objections were raised as **fatal** and did **not** survive; both are corrected in place
 above, because a spec that quietly drops a refuted objection teaches nothing: the totality argument
@@ -753,74 +785,111 @@ rejects that should read R1 as "don't ship" and go to §8.
 **Not a reason to ship:** legislative amendment (§4.1). That is answered by version-per-file plus the
 temporal axis, and conflating rules with facts here would be an error.
 
-### R2 — Surface: keep `<value> WITH <field> IS <v>`. Ruled 2026-08-18.
+### R2 — Surface: `<value> BUT WITH <field> IS <v>`. Ruled 2026-08-19, reversing the 2026-08-18 ruling.
 
-Adopt the proposal as written, i.e. upstream issue **smucclaw/l4-ide#438** as filed (2025-05-19).
-Rejected alternatives: a distinct keyword and the no-new-syntax routes. (`EXCEPT` in particular is
-**not** available — see the table.)
+```l4
+alice MEANS Person WITH name IS "Alice", age IS 30, email IS "a@x.com"   -- construction
+older MEANS alice BUT WITH age IS 31                                     -- update
+```
 
-The case for a distinct keyword was the totality-legibility argument, and **§5.4 measured it away**:
-no existing diagnostic is lost, and the ctor/value name collision that would force a reader to
-disambiguate occurs **0 times** in 583 type names against 2,749 value names.
+`BUT` becomes a reserved keyword; `BUT WITH` is a distinct production from `namedApp`.
+
+**This reverses the first ruling**, which kept the bare `alice WITH age IS 31` of
+smucclaw/l4-ide#438. The reversal has two halves, decided separately:
+
+- **A distinct keyword beats overloading `WITH`.** Conceded to the review's judge — its argument is
+  in §R2.1 and it is right. The two surviving majors are killed _by construction_ rather than by
+  mitigation.
+- **But the keyword is `BUT WITH`, not the judge's `RESTATED WITH`.** Reasons in §R2.2. In short:
+  `RESTATED` is amendment vocabulary, and §4.1 rules that amendment is **not** what this feature is
+  for.
+
+#### R2.1 — Why a keyword wins (conceded to the review's judge)
+
+One token of lookahead decides the reading **in the parser**, before any name resolution or type
+information is consulted. That is not a smaller version of the bare-`WITH` design; it is a different
+one, and it dissolves rather than mitigates:
+
+| finding                         | under bare `WITH`                                                | under `BUT WITH`                                                                                                              |
+| ------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `shadowed-ctor` (§5.2)          | needs `LocalsSpareSelectors` at the head                         | **dissolved** — `Person BUT WITH …` is unambiguously an update of the local; construction is spelled `Person WITH …`          |
+| `overload-two-successes`        | needs the `viab` filter to avoid a two-success fork              | **dissolved** — there is no fork; the parser has already decided                                                              |
+| `comma-slurp` (§5.1)            | R6's rule modifies the **existing** `WITH` production            | R6's rule applies to a **new** production, so it _cannot_ break an existing file — structurally zero churn, not measured-zero |
+| §5.4's residual legibility cost | a reader must resolve the head to know whether the list is total | **dissolved** — total and partial are visibly different syntax                                                                |
+
+The last row is worth pausing on, because §5.4 spent a lot of effort measuring the collision
+frequency at zero in order to argue the legibility cost away. A keyword makes the argument
+unnecessary: you can see which one you are reading.
+
+#### R2.2 — Why `BUT WITH` and not `RESTATED WITH`
+
+**The register has to match the ruled use case, and `RESTATED`'s does not.** §4.1 rules that
+legislative and contract amendment are **not** a reason to ship this — that is answered by
+version-per-file plus the temporal axis, and treating a delta over _rules_ and a delta over _facts_
+as the same operation is precisely the conflation this spec warns against. On that basis `AMENDED BY`
+was rejected in the table below as "actively misleading".
+
+"Amended and restated" is _the_ instrument-amendment idiom. `RESTATED WITH` therefore commits the
+same category error as `AMENDED BY`, one step removed — and the judge chose it **for** that instrument
+register. But §2.4 rules the demand is **fixture- and scenario-sited**: variation over _facts_. What
+the 43 constructor factories of §2.2 simulate is "the same claimant, but with a later date of birth".
+That sentence is `BUT WITH`.
+
+**Verified safe to reserve** (all on `origin/unstable` @ `afcef88f`):
+
+| check                                                 | result                                                                                                                                                                                                                                                        |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BUT` in the lexer keyword table (`Lexer.hs:245-332`) | **free**                                                                                                                                                                                                                                                      |
+| uppercase `BUT` in the 749 `.l4` files                | 10 occurrences — **all** inside `--` comments or backticked `§§` titles                                                                                                                                                                                       |
+| `BUT` as a **bare token** anywhere in the corpus      | **0**                                                                                                                                                                                                                                                         |
+| `<expr> BUT WITH …` today                             | **already a parse error** — and the error lands on `WITH`, with `BUT` consumed as an identifier                                                                                                                                                               |
+| claimed by any sibling spec                           | **no** — `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` enumerates `SUBJECT TO`, `NOTWITHSTANDING`, `DESPITE`, `EXCEPT WHEN`, `WITHOUT AFFECTING`, `QUALIFIED BY`, `PROVIDED`, `UNLESS`; `BUT` appears nowhere, and its §512 moves _away_ from more connective keywords |
+
+The fourth row is the one that matters for compatibility: because any program containing
+`<expr> BUT WITH` **already fails to parse**, reserving `BUT` cannot silently change the meaning of
+a program that compiles today. It can only break a bare-token use of `BUT` as an identifier, and
+there are none.
+
+**House style fits.** L4 already builds multi-word constructs from individually reserved words —
+`GREATER`+`THAN`, `AT`+`LEAST`/`MOST`, `FOLLOWED`+`BY` (`Lexer.hs:301-311`). `BUT`+`WITH` is that
+shape. And keeping `WITH` visible means the field list reads identically in construction and update:
+a reader sees `WITH f IS v` and knows what it is, with `BUT` as a one-word marker on an otherwise
+unchanged production.
+
+**The one real objection, recorded because it is not silly.** In statutory prose a bare "but" usually
+signals a **proviso** — "…but this shall not apply where…" — so a lawyer may read _restriction_ where
+variation is meant. The rebuttal, accepted 2026-08-19: English "but **with** X" is unambiguously
+variation, unlike bare "but", and the following `WITH` is doing that disambiguating work in the
+surface syntax as well as in the grammar. If field evidence ever contradicts this, `RESTATED WITH` is
+the fallback and R2.1 carries over unchanged.
 
 #### The alternatives that were weighed
 
 Every candidate is free in the **lexer** table (`Lexer.hs:245-332`, checked individually):
 `EXCEPT`, `SAVE`, `COPYING`, `AMENDED`, `LIKE`, `BUT`, `SUBSTITUTING`, `VARYING`, `OVERRIDE`,
-`RESTATED`. Lexical availability is not the whole test, though — `EXCEPT` is free in the lexer and
-still ruled out below, because another spec in this repo has already claimed it for a different
-meaning.
+`RESTATED`. Lexical availability is not the whole test — `EXCEPT` is free in the lexer and still
+ruled out, because another spec has claimed it for a different meaning.
 
-| candidate                                | reads as                         | why not                                                                                                                                                                                                                                            |
-| ---------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alice WITH age IS 31`                   | **chosen**                       | zero new tokens; identical to `#438` as filed; §5.4 removes the legibility objection's factual basis                                                                                                                                               |
-| `alice EXCEPT age IS 31`                 | real legal idiom ("except that") | **ruled out on a collision**: `EXCEPT WHEN` is claimed by `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md` (`:3`, `:475`, `:635`, `:691`) for **defeating a rule** — an adjacent, differently-typed meaning one token away from copying a **value** |
-| `alice RESTATED WITH age IS 31`          | "amended and restated"           | **the named fallback** — free in the lexer, 1 corpus occurrence, and the idiom means exactly "re-issued with changes"; costs a new `Expr` constructor across 19 exhaustively-matched files                                                         |
-| `alice SAVE THAT age IS 31`              | the most lawyerly option         | two tokens; `THAT` is not a keyword and adding it is a wider change than the feature                                                                                                                                                               |
-| `alice AMENDED BY age IS 31`             | amendment framing                | **actively misleading** — §4.1: amendment is a rules-level operation answered by the temporal axis, and this name would invite exactly the rules/facts conflation the spec warns against                                                           |
-| auto-derived per-field withers (desugar) | no new syntax                    | **the serious rival — see below**                                                                                                                                                                                                                  |
-| documentation only                       | no change                        | rejected on §2.2/§2.3 — 43 factories, 74% frozen, and call sites that degrade to anonymous booleans                                                                                                                                                |
+| candidate                                | reads as                            | verdict                                                                                                                                                                                                                  |
+| ---------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `alice BUT WITH age IS 31`               | "the same, but with X"              | **CHOSEN** (R2.2) — register matches the ruled use case; safe to reserve; keeps the `WITH` field list visible                                                                                                            |
+| `alice RESTATED WITH age IS 31`          | "amended and restated"              | **the named fallback.** Structurally equivalent (R2.1 carries over), but the idiom points at _instrument amendment_ — the use case §4.1 rules OUT                                                                        |
+| `alice WITH age IS 31`                   | the bare overload, as #438 filed it | **ruled out 2026-08-19** — needs R3's resolution knobs to mitigate two majors that a keyword dissolves outright                                                                                                          |
+| `alice EXCEPT age IS 31`                 | "except that"                       | **collision**: `EXCEPT WHEN` is claimed by `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` (`:3`, `:475`, `:635`, `:691`) for **defeating a rule** — an adjacent, differently-typed meaning one token away from copying a **value** |
+| `alice AMENDED BY age IS 31`             | amendment framing                   | **actively misleading** — §4.1; the same objection that demotes `RESTATED`                                                                                                                                               |
+| `alice SAVE THAT age IS 31`              | the most lawyerly option            | `THAT` is not a keyword; adding it is a wider change than the feature, and "save that" is exception vocabulary, not variation vocabulary                                                                                 |
+| auto-derived per-field withers (desugar) | no new syntax                       | **the serious rival — see below**                                                                                                                                                                                        |
+| documentation only                       | no change                           | rejected on §2.2/§2.3 — 43 factories, 74% frozen, call sites that decay to anonymous booleans                                                                                                                            |
 
-The distinct-keyword options are not _wrong_; they are unnecessary. **The named fallback is
-`RESTATED WITH`** — `alice RESTATED WITH age IS 31` — not `EXCEPT`: `RESTATED` is free in the lexer
-table, occurs once in the whole corpus, and "amended and restated" is real drafting idiom for
-_re-issuing a document with changes_, which is exactly the semantics. Reach for it if §5.4's
-collision count ever comes back non-zero, or if R3's resolution knobs prove unsafe.
+**The cost of the keyword route, stated plainly.** A distinct keyword needs a new `Expr` constructor,
+and `Expr` is matched exhaustively — `-Wall -Werror` (`jl4-core/jl4-core.cabal:35`), no `_ ->`
+catch-all in e.g. `Desugar.rewriteFieldRefs` (`Desugar.hs:330-375`) — across **19 files**, three of
+which the `AppNamed` census in §3 does not reach: `jl4-core/src/L4/Viz/Ladder.hs`,
+`jl4-lsp/src/LSP/L4/Viz/Ladder.hs`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs`.
 
-The cost of that fallback is the honest one: a distinct keyword needs a new `Expr` constructor, and
-`Expr` is matched exhaustively — with `-Wall -Werror` (`jl4-core/jl4-core.cabal:35`) and no `_ ->`
-catch-all in e.g. `Desugar.rewriteFieldRefs` (`Desugar.hs:330-375`) — across **19 files**, including
-three the `AppNamed` census in §3 does not reach: `jl4-core/src/L4/Viz/Ladder.hs`,
-`jl4-lsp/src/LSP/L4/Viz/Ladder.hs`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs`. That is precisely
-why R3 rules for a **flag on `AppNamed`** rather than a new node.
-
-#### ⚠️ Dissent — the review's judge ruled the other way, and this ruling is genuinely contested
-
-**The synthesising judge ruled `DON'T SHIP` on the surface proposed here**, in favour of a distinct
-reserved keyword — `alice RESTATED WITH age IS 31` — with a new `Restate` AST node. Its reasoning,
-recorded because a spec that hides the strongest objection to its own ruling is not worth reading:
-
-- The two surviving majors (`shadowed-ctor`, `comma-slurp`) are _the same two_ that the keyword kills
-  **by construction** rather than by mitigation: one token of lookahead decides the reading in the
-  **parser**, so no resolution fork exists to become ambiguous, and the update field list becomes a
-  **different production** that can carry its own nesting rule without touching `namedApp`.
-- Because a keyword's nesting rule is new-syntax-only, it **cannot** break an existing file. R6's
-  bracketing rule modifies the existing `WITH` production; I measured its churn at zero, but zero
-  measured is weaker than zero possible.
-- `RESTATED` is free everywhere (`grep -rwn` over `.hs`/`.l4`/`.md` returns nothing), and
-  "amended and restated" is the standard instrument idiom for _carry everything forward, state what
-  changed_ — a total result from a partial diff, which is the semantics exactly.
-
-**Why I have nonetheless kept `alice WITH age IS 31` as the ruling:** it is what smucclaw#438 asks
-for and what this spec was commissioned to specify; §5.4 measured the collision that motivates the
-keyword at frequency **zero**; and R3's three resolution knobs plus R6 answer both majors with
-machinery that already exists. But the margin is thin, and the judge's case is the better one if
-either of two things is true — R3's knobs regress anything (§8.2/§8.3), or a future corpus produces a
-non-zero collision count.
-
-**Meng's call, not mine.** If the answer is the keyword, R3.1, R4, R5 and R6 all carry over unchanged;
-only the parser alternative and the AST node change. That is deliberate — the rest of this spec was
-written to be surface-agnostic.
+That is the honest price, and R2.1 is the argument that it is worth paying. Under R3.1 every one of
+those 19 arms is trivial — the node is elaborated away before anything downstream can see it — so the
+cost is 19 one-line cases and a forced read of each consumer, not 19 real ports.
 
 #### The rival that nearly won: auto-derived withers
 
@@ -865,49 +934,46 @@ Also ruled: **`#438`'s second ask, "support for colons please", is already shipp
 `Parser.hs:689`, `separator = spacedKeyword_ TKIs <|> hidden (spacedSymbol_ TColon)`; verified,
 `Person WITH name: "Alice", age: 30` evaluates. The issue should be updated to say so.
 
-### R3 — Disambiguate at resolution, via knobs that already exist. Ruled 2026-08-18.
+### R3 — Disambiguation lives in the PARSER. New AST node, erased in the type checker. Ruled 2026-08-19.
 
-**Do not add a candidate to the overload fork.** §5.6's precedent is explicit: the last change to
-named-argument disambiguation (`TYPICALLY`, `dedupByOrigin`/`allSameTermDescriptor`) was reverted for
-a heisenbug, and its post-mortem says _"consider a simpler approach that doesn't require complex name
-disambiguation."_
+**Superseded the 2026-08-18 ruling**, which put the decision in name resolution and reused
+`AppNamed` with a flag. That design existed to defend the bare-`WITH` surface; R2 having ruled for
+`BUT WITH`, it is no longer the cheapest correct thing.
 
-`resolveTermFilteredIn` (`TypeCheck/Types.hs:1131-1139`) **already** takes all three knobs needed, and
-`resolveTerm'` (`:1039`) currently passes the identity for two of them:
+- **Parser.** A new alternative beside `namedApp` (`Parser.hs:1846`). The `BUT` token decides;
+  **no type information and no name resolution are consulted.** This is the whole point of R2.1.
+- **AST.** A new constructor — `Restate Anno (Expr n) [NamedExpr n]` — beside `AppNamed`
+  (`Syntax.hs:248`). **Not a flag.** A flag would compile silently in all 18 consumers of §3; a new
+  constructor makes `-Wall -Werror` turn each into a forced question. The sharpest instance is
+  `Dmn/Lower.hs:1980-1984`, whose record→FEEL guard is a totality conjunction: a partial `AppNamed`
+  fails it silently and emits pretty-printed L4 inside a FEEL literal, and no test catches that.
+- **Type checker.** `Restate` is **elaborated away** — see R3.1, which is the ruling that pays for
+  everything else.
+- **Head resolution.** The head resolves as an ordinary term, then must be a **value binding of
+  single-constructor record type** (R4). A `TermKind`/type filter is still wanted here, and
+  `resolveTermFilteredIn` (`TypeCheck/Types.hs:1131-1139`) already takes both a `TermKind` predicate
+  and a `viab` type filter. **But note the difference from the superseded design:** there, the
+  filters had to be tuned so as not to regress programs that compile today; here they cannot regress
+  anything, because **no existing program uses this syntax**. That removes §8's second and third kill
+  criteria outright.
 
-```haskell
-resolveTermFilteredIn :: LocalShadowing -> Bool -> (TermKind -> Bool) -> (Type' Resolved -> Bool) -> …
-resolveTerm' p n = resolveTermFiltered False p (const True) n pure
---                 ^ LocalsShadowAll                ^ viab = unused
-```
-
-So the ruling is **three arguments at one call site**, not a redesign:
-
-| knob                 | value at the `AppNamed` head                                                                                     | fixes                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `LocalShadowing`     | `LocalsSpareSelectors` (`Types.hs:1049`; already used by `resolveProjectionLabel` at `:1083`, filter at `:1167`) | `shadowed-ctor`          |
-| `viab`               | keep `Fun`-typed candidates when any exists, else keep all — _the filter built for smucclaw#929_                 | `overload-two-successes` |
-| `TermKind` predicate | `Constructor` ⇒ construct; `isValueBinding` ⇒ update                                                             | the dispatch itself      |
-
-**AST: a flag on `AppNamed`, not a new node.** A new constructor would touch all 18 modules of §3; a
-flag leaves every generic traversal correct and both printers untouched. `Export/Document.hs:263-272`
-fabricates an `AppNamed` to render records — that synthetic node must be construction-flagged.
-
-> **Contested.** The judge ruled the opposite — a new `Restate` node — precisely _because_ a flag
-> compiles silently in all 18 consumers while a new constructor makes `-Wall -Werror` turn each into
-> a forced question. That argument is strong, and it is weakened only by R3.1: if the node never
-> reaches a consumer, there is little for the forced question to discover. Decide this together with
-> R2, not separately.
+**What this ruling no longer needs.** The 2026-08-18 design turned on three knobs at the `AppNamed`
+head — `LocalsSpareSelectors`, the smucclaw#929 `viab` filter, and the `TermKind` predicate — chosen
+specifically to avoid widening the overload fork, because the last change to that machinery
+(`TYPICALLY`, §5.6) was reverted for a heisenbug. **Under `BUT WITH` there is no fork to widen**, so
+the precedent in §5.6 stops being a live risk rather than being mitigated. The knobs are recorded
+here as the road not taken, and because they are exactly what a future bare-`WITH` revival would
+need.
 
 #### R3.1 — Elaborate update away in the type checker. **This is the most important ruling here.**
 
-Whatever the surface and whatever the node, **update must be erased before the checked module is
+Whatever the surface, **update must be erased before the checked module is
 returned** — rewritten into an ordinary, _total_ `AppNamed` whose supplied-field set equals the
 declaration's, with the carried fields spelled as projections. The elaboration target is exactly the
 idiom the corpus already writes by hand:
 
 ```l4
-older MEANS alice WITH age IS 31
+older MEANS alice BUT WITH age IS 31
 -- elaborates to:
 older MEANS Person WITH name IS alice's name, age IS 31, email IS alice's email
 ```
@@ -1019,20 +1085,23 @@ to spell which reading they meant, because `(alice) WITH age IS 2` is a parse er
 expressible if verbose:
 
 ```l4
-alice WITH addr IS ((alice's addr) WITH city IS "Zurich")
+alice BUT WITH addr IS ((alice's addr) BUT WITH city IS "Zurich")
 ```
 
-Still deferred: an unparenthesised general head (`alice's spouse WITH age IS 31`). And **chaining is
-not supported in v1** — write one field list; the parenthesised form covers the rest.
+Still deferred: an unparenthesised general head (`alice's spouse BUT WITH age IS 31`). And
+**chaining is not supported in v1** — write one field list; the parenthesised form covers the rest.
 
-### R6 — Bracketing rule for a nested `WITH` in field-value position. Ruled 2026-08-18.
+### R6 — Bracketing rule for a nested update in field-value position. Ruled 2026-08-18, strengthened 2026-08-19.
 
 This answers §5.1, the sharpest technical objection. Today `Pair WITH x IS alice WITH y IS 2` binds
 the inner `WITH` to `alice` and is caught **only** because the outer construction is total; under
 partial update both levels become legal and the diagnostic vanishes.
 
-**Ruled: a `WITH` appearing in field-value position may not consume the enclosing comma list —
-parenthesise it.** The correct meaning is already expressible today
+**Ruled: a `BUT WITH` appearing in field-value position may not consume the enclosing comma list —
+parenthesise it.** Under R2 this rule attaches to the **new** production only, so unlike the
+superseded bare-`WITH` design it **cannot break an existing file at all** — the churn is structurally
+zero, not measured-zero. The measurement below is retained because it is what a bare-`WITH` revival
+would have to re-establish. The correct meaning is already expressible today
 (`Person WITH spouse IS (bob WITH age IS 9), name IS "a"` parses and the outer receives all fields).
 
 **Measured cost of the rule: zero — but state the rule precisely, or it is not zero.** The review
@@ -1092,19 +1161,17 @@ Stated so the spec is falsifiable. If any of these turns out to hold, R1 flips t
    the scenario block against one canonical base, and have a knowledge engineer who did not write
    either version say which they would maintain. This is cheap and should be done **before** the
    implementation, not after.
-2. **If the `LocalsSpareSelectors` switch at the `AppNamed` head turns out to regress anything.** R3
-   asserts it cannot, because every `AppNamed` on a local head is an error today. **Falsified by:** a
-   single golden that changes. The comment at `Types.hs:1152-1163` argues explicitly why that policy
-   is _not_ used at ordinary occurrences — read it before touching this.
-3. **If the `viab` pre-filter reintroduces the smucclaw#929 exponential** rather than damping it.
-   #929 was a measured exponential from AND/OR overloads; the filter exists to cut candidates, so it
-   should help — but **falsified by:** `jl4/examples/legal/charities-cleanroom/` type-check time
-   regressing.
-4. **If the bracketing rule (R6) turns out to cost corpus churn.** Measured at zero — but only under
-   the _precise_ statement of the rule (it bites solely when the **enclosing** list is
-   comma-separated; ~15 sites nest a `WITH` under a layout-separated list and must keep working).
-   **Falsified by:** any site appearing where a nested unparenthesised `WITH` sits inside a
-   comma-separated enclosing field list.
+2. ~~**If the `LocalsSpareSelectors` switch at the `AppNamed` head regresses anything.**~~
+   **RETIRED 2026-08-19 by R2.** The switch was needed only to disambiguate an overloaded `WITH`;
+   `BUT WITH` has no fork to disambiguate. Reinstate this criterion if the bare-`WITH` surface is
+   ever revived.
+3. ~~**If the `viab` pre-filter reintroduces the smucclaw#929 exponential.**~~ **RETIRED 2026-08-19
+   by R2**, for the same reason. Note what this buys: the §5.6 `TYPICALLY` precedent — the reverted
+   name-disambiguation heisenbug — stops being a live risk rather than a mitigated one, because
+   nothing in this design touches overload resolution.
+4. ~~**If the bracketing rule (R6) costs corpus churn.**~~ **RETIRED 2026-08-19 by R2**: the rule
+   attaches to a new production, so no existing file can be affected. The §R6 measurement is kept as
+   what a bare-`WITH` revival would have to re-establish.
 5. **If a `TYPICALLY`-style heisenbug reappears.** The tell from last time: behaviour that changes
    when `trace` statements are removed. If that recurs, **stop and revert** rather than debug — the
    December 2025 attempt lost more time to debugging than the feature was worth.
@@ -1113,14 +1180,14 @@ Stated so the spec is falsifiable. If any of these turns out to hold, R1 flips t
 
 Deliberately staged so the risky thing is provable before anything irreversible happens.
 
-| #   | step                                                                       | why here                                                      |
-| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| 0   | The §8.1 readability experiment on `bna.l4`                                | cheapest possible falsification of R1; do it first            |
-| 1   | `viab` + `LocalsSpareSelectors` at the `AppNamed` head, **no feature**     | proves R3's knobs regress nothing, on their own, with goldens |
-| 2   | The update node/flag + R4's single-constructor gate + **R3.1 elaboration** | the feature; elaboration is part of step 2, not a follow-up   |
-| 3   | R3.1's head-binding and duplicate-field checks                             | correctness, not polish — see R3.1's two obligations          |
-| 4   | R6 bracketing rule                                                         | independent; do after the semantics are settled               |
-| 5   | R5 parenthesised head                                                      | one parser alternative; dissolves the third major             |
+| #   | step                                                                       | why here                                                                  |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 0   | The §8.1 readability experiment on `bna.l4`                                | cheapest possible falsification of R1; do it first                        |
+| 1   | Lexer: reserve `BUT`; parser: the `BUT WITH` alternative beside `namedApp` | R2/R3 — the discriminator, before any semantics                           |
+| 2   | `Restate` AST node + the 19 forced `Expr` arms                             | `-Werror` turns each consumer into a read; under R3.1 they are one-liners |
+| 3   | R3.1 elaboration + R4's single-constructor gate                            | the feature; elaboration is part of this step, not a follow-up            |
+| 4   | R3.1's head-binding and duplicate-field checks                             | correctness, not polish — see R3.1's two obligations                      |
+| 5   | R6 bracketing rule; R5 parenthesised head                                  | both attach to the new production only                                    |
 
 **No step for the evaluator, and no step for any backend.** That is R3.1's dividend: elaboration
 happens before the checked module is returned, so `EvaluateLazy/Machine.hs`, `Dmn/Lower`, `jl4-mlir`,
@@ -1128,18 +1195,28 @@ happens before the checked module is returned, so `EvaluateLazy/Machine.hs`, `Dm
 handle. If R3.1 is **not** adopted, add back: an evaluator partial-rebuild path, a `jl4-mlir`
 expanded field set, DMN expansion-at-export, and the §5.7 deontic base-consultation.
 
-Per CLAUDE.md §3.2.1, run the **evaluation differential** after step 2 even though §3 predicts no
-printer delta — the property that matters is that a printed module still _means_ the same thing, and
+**And no step for either printer.** `BUT WITH` is new syntax, so unlike the superseded design there
+is no claim that the surface is unchanged — but `Restate` is erased before the module is returned, so
+`prettyLayout` never sees it and CLAUDE.md §3.2's 300-file round-trip is untouched. `ExactPrint` is
+generic over the `Anno` (`ExactPrint.hs`, 42 lines, no per-constructor case), so it prints the new
+tokens without change. **Open question Q3 changes shape accordingly**: `l4 batch` will re-emit an
+update as its elaborated construction, not as `BUT WITH`. Decide whether that is acceptable before
+step 3 — it is the one user-visible consequence of R3.1.
+
+Per CLAUDE.md §3.2.1, run the **evaluation differential** after step 3 even though no printer delta
+is expected — the property that matters is that a printed module still _means_ the same thing, and
 that is exactly what a bad elaboration would break.
 
 ## 10. Prior art in-tree
 
 - **smucclaw/l4-ide#438**, _"syntax for record updates (e.g. RecordInstance WITH)"_ — open since
   2025-05-19, labelled `enhancement, language design, ready-to-start`. **This spec is that issue.**
-  Its example is `NewRecord MEANS OldRecord WITH bar IS 40`. `kosmikus` commented: _"We could make
-  this simpler by disallowing type-changing updates."_ R4's single-constructor gate and R3's
-  concrete-type requirement together implement that suggestion; a type-changing update is not
-  expressible under either.
+  Its example is `NewRecord MEANS OldRecord WITH bar IS 40` — i.e. the **bare** form. **R2 rules
+  against the issue as filed**, for `NewRecord MEANS OldRecord BUT WITH bar IS 40`; when this lands,
+  update the issue with §R2.1/§R2.2 rather than closing it as asked-and-delivered. `kosmikus`
+  commented: _"We could make this simpler by disallowing type-changing updates."_ R4's
+  single-constructor gate and R3's concrete-type requirement together implement that suggestion; a
+  type-changing update is not expressible under either.
 - **smucclaw/l4-ide#420**, _"default values for named arguments to make writing 'stateupdate'-like
   functions easier"_ — the rival design. Answered by `TYPICALLY`
   (`specs/todo/TYPICALLY-DEFAULTS-SPEC.md`, **PARTIALLY LANDED**: metadata-only since `27cd4770`, no
@@ -1155,8 +1232,8 @@ place.` Delete this comment when the feature lands; it is the file's own apology
 
 ## 11. Open questions
 
-| #   | question                                                                                      | what would settle it                                                                                                                                                               |
-| --- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Should update be allowed to _widen_ to a supertype, or strictly preserve the head's type?     | kosmikus's #438 comment says disallow type-changing; R4 follows, but no one has tested whether a widening case exists in the corpus                                                |
-| Q2  | Does the trace/provenance layer need an explicit node for carried-through fields?             | `inherited-fields-have-no-trace-node` was **refuted** (derived values have no ledger entry today either), but no one has looked at what `#EVALTRACE` _prints_ for a chained update |
-| Q3  | Should `l4 batch`/the REPL print an update back as an update, or expand it to a construction? | §3 says the printer needs no change, which implies "as an update" — but that has not been round-tripped, because the feature does not exist                                        |
+| #   | question                                                                                          | what would settle it                                                                                                                                                                                                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Should update be allowed to _widen_ to a supertype, or strictly preserve the head's type?         | kosmikus's #438 comment says disallow type-changing; R4 follows, but no one has tested whether a widening case exists in the corpus                                                                                                                                                                                             |
+| Q2  | Does the trace/provenance layer need an explicit node for carried-through fields?                 | `inherited-fields-have-no-trace-node` was **refuted** (derived values have no ledger entry today either), but no one has looked at what `#EVALTRACE` _prints_ for a chained update                                                                                                                                              |
+| Q3  | Should `l4 batch`/the REPL print an update back as `BUT WITH`, or as its elaborated construction? | **RESOLVED in shape by R3.1, still open in policy.** Because `Restate` is erased before the module is returned, the printers will emit the _construction_. Decide before step 3 of §9 whether that round-trip loss is acceptable; if not, elaboration must move later than R3.1 puts it, and R7's "nothing to do" is forfeited. |
