@@ -161,28 +161,52 @@ if [[ $HEALTH_RC -ne 0 ]]; then
   exit "$GO_EXIT_CLEAN"
 fi
 
-# jl4-service caps a deployment id at 36 characters ("Validation rules" in
-# jl4-service/README.md), and refuses a longer one with HTTP 400. The natural
-# id -- subject plus run id -- fits only while the subject id is short:
-# `regcf-<runid>` is 29 characters, but `sg-succession-<runid>` is 37, so this
-# leg reported DEGRADED on a perfectly healthy service the first time a subject
-# with a longer name ran it. Keep the RUN id whole (it is what makes the
-# deployment traceable to a journal) and trim the SUBJECT from the right,
-# leaving at least a recognisable stub.
-DEPLOY_ID="$GO_S_ID-$GO_RUNID"
-if [ "${#DEPLOY_ID}" -gt 36 ]; then
-  _keep=$((36 - ${#GO_RUNID} - 1))
+# THE DEPLOYMENT ID, AND THE LENGTH CAP.
+#
+# The natural id is `<subject>-<run-id>`: the subject so a human can recognise
+# the deployment, the run id so it is traceable back to a journal. jl4-service
+# USED to cap an id at 36 characters -- a bound whose own comment said "(UUID
+# length)", i.e. sized to the id the service generates when a caller omits one,
+# not to anything the service needs. `regcf-<runid>` is 29 and fit;
+# `sg-succession-<runid>` is 37 and a healthy service answered HTTP 400. The cap
+# is now 128 (jl4-service/src/ControlPlane.hs, `maxDeploymentIdLength`).
+#
+# This leg cannot ASSUME a patched service -- the operator runs whatever they
+# run -- so it asks for the full id first and only shortens if the service
+# actually refuses it for length. A current service therefore gets the readable
+# id; an older one still deploys, and says so on the record rather than quietly
+# renaming the deployment a human is about to put in an MCP client config.
+#
+# Shortening keeps the RUN id whole, because that is what carries identity: the
+# run id embeds an 8-hex digest OF THIS SUBJECT'S OWN CORPUS FILES, so two
+# different subjects cannot produce the same run id short of a digest
+# collision. The subject prefix is for human recognition, not uniqueness.
+DEPLOY_ID_FULL="$GO_S_ID-$GO_RUNID"
+DEPLOY_ID="$DEPLOY_ID_FULL"
+RESP="$GO_OUT/p7-mcp.deploy.json"
+
+go_post_bundle() {
+  set +e
+  curl -sS --max-time 30 -o "$RESP" -w '%{http_code}' \
+    -X POST "$URL/deployments" -F "id=$1" -F "sources=@$ZIP" >"$GO_OUT/p7-mcp.httpcode" 2>>"$LOG"
+  CURL_RC=$?
+  set -e
+}
+
+go_post_bundle "$DEPLOY_ID"
+if [ "$CURL_RC" -eq 0 ] && [ "$(cat "$GO_OUT/p7-mcp.httpcode" 2>/dev/null)" = "400" ] \
+   && grep -qi "maximum length" "$RESP" 2>/dev/null; then
+  _cap="$(sed -n 's/.*maximum length of \([0-9][0-9]*\) characters.*/\1/p' "$RESP" | head -1)"
+  _cap="${_cap:-36}"
+  _keep=$((_cap - ${#GO_RUNID} - 1))
   if [ "$_keep" -lt 1 ]; then
-    go_skip "the run id alone is ${#GO_RUNID} characters, leaving no room for a subject prefix inside jl4-service's 36-character deployment-id cap"
+    go_skip "this jl4-service caps a deployment id at $_cap characters and the run id alone is ${#GO_RUNID}, leaving no room for a subject prefix. Upgrade the service (the cap is $_cap here; current jl4-service allows 128) or shorten the run id."
   fi
   DEPLOY_ID="$(printf '%s' "$GO_S_ID" | cut -c1-"$_keep")-$GO_RUNID"
-  echo "deployment id trimmed to fit jl4-service's 36-char cap: $DEPLOY_ID" | tee -a "$LOG"
+  echo "this jl4-service caps a deployment id at $_cap characters, so '$DEPLOY_ID_FULL' (${#DEPLOY_ID_FULL}) was refused; retrying as '$DEPLOY_ID'. The run id is kept whole -- it carries the corpus digest, and so the identity." | tee -a "$LOG"
+  go_post_bundle "$DEPLOY_ID"
 fi
-RESP="$GO_OUT/p7-mcp.deploy.json"
 set +e
-curl -sS --max-time 30 -o "$RESP" -w '%{http_code}' \
-  -X POST "$URL/deployments" -F "id=$DEPLOY_ID" -F "sources=@$ZIP" >"$GO_OUT/p7-mcp.httpcode" 2>>"$LOG"
-CURL_RC=$?
 set -e
 CODE="$(cat "$GO_OUT/p7-mcp.httpcode" 2>/dev/null || echo 000)"
 echo "POST $URL/deployments id=$DEPLOY_ID → HTTP $CODE (curl exit $CURL_RC)" | tee -a "$LOG"
