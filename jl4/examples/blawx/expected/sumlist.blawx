@@ -1,0 +1,239 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Sumlist
+    rule_text: "Sumlist\n\n1. Definition of running total.\n2. Definition of all positive.\n3. Definition of first or zero.\n4. Definition of total from."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: ''
+    scasp_encoding: |-
+      blawx_relationship(total_from,list,number,number).
+      blawx_relationship_nlg(total_from,"","and","and","are related as total from").
+      :- dynamic total_from/3.
+      #pred total_from(A,B,C) :: '@(A) and @(B) and @(C) are related as total from'.
+      #pred holds(user,total_from,A,B,C) :: 'it is provided as a fact that @(A) and @(B) and @(C) are related as total from'.
+      #pred holds(user,-total_from,A,B,C) :: 'it is provided as a fact that it is not the case that @(A) and @(B) and @(C) are related as total from'.
+      #pred holds(Z,total_from,A,B,C) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) are related as total from holds'.
+      #pred holds(Z,-total_from,A,B,C) :: 'the conclusion in @(Z) that it is not the case that @(A) and @(B) and @(C) are related as total from holds'.
+      #pred according_to(Z,total_from,A,B,C) :: 'according to @(Z), @(A) and @(B) and @(C) are related as total from'.
+      #pred according_to(Z,-total_from,A,B,C) :: 'according to @(Z), it is not the case that @(A) and @(B) and @(C) are related as total from'.
+      #pred blawx_defeated(Z,total_from,A,B,C) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) are related as total from is defeated'.
+      #pred blawx_defeated(Z,-total_from,A,B,C) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) are related as total from is defeated'.
+      #pred blawx_initially(total_from(A,B,C)) :: 'that @(A) and @(B) and @(C) are related as total from holds initially'.
+      #pred blawx_initially(-total_from(A,B,C)) :: 'that it is not the case that @(A) and @(B) and @(C) are related as total from holds initially'.
+      #pred blawx_ultimately(total_from(A,B,C)) :: 'that @(A) and @(B) and @(C) are related as total from holds ultimately'.
+      #pred blawx_ultimately(-total_from(A,B,C)) :: 'that it is not the case that @(A) and @(B) and @(C) are related as total from holds ultimately'.
+      #pred blawx_as_of(total_from(A,B,C),T) :: 'that @(A) and @(B) and @(C) are related as total from holds at @(T)'.
+      #pred blawx_as_of(-total_from(A,B,C),T) :: 'that it is not the case that @(A) and @(B) and @(C) are related as total from holds at @(T)'.
+      #pred blawx_during(T1,total_from(A,B,C),T2) :: 'that @(A) and @(B) and @(C) are related as total from held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-total_from(A,B,C),T2) :: 'that it is not the case that @(A) and @(B) and @(C) are related as total from held between @(T1) and @(T2)'.
+      #pred blawx_becomes(total_from(A,B,C),T) :: 'that @(A) and @(B) and @(C) are related as total from became true at @(T)'.
+      #pred blawx_becomes(-total_from(A,B,C),T) :: 'that it is not the case that @(A) and @(B) and @(C) are related as total from became true at @(T)'.
+      #pred blawx_not_interrupted(Start,total_from(A,B,C),End) :: '@(A) and @(B) and @(C) are related as total from remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-total_from(A,B,C),End) :: 'it is not the case that @(A) and @(B) and @(C) are related as total from remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),total_from(A,B,C),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-total_from(A,B,C),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-total_from(A,B,C),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(total_from(A,B,C),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),total_from(A,B,C),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-total_from(A,B,C),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-total_from(A,B,C),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(total_from(A,B,C),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),total_from(A,B,C),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-total_from(A,B,C),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-total_from(A,B,C),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(total_from(A,B,C),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),total_from(A,B,C),datetime(eot)) :- blawx_initially(total_from(A,B,C)), blawx_ultimately(total_from(A,B,C)), findall(Time,blawx_becomes(-total_from(A,B,C),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-total_from(A,B,C),datetime(eot)) :- blawx_initially(-total_from(A,B,C)), blawx_ultimately(-total_from(A,B,C)), findall(Time,blawx_becomes(total_from(A,B,C),datetime(Time)),[]).
+      blawx_as_of(total_from(A,B,C),datetime(Time)) :- blawx_initially(total_from(A,B,C)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),total_from(A,B,C),datetime(BeforeT)).
+      blawx_as_of(total_from(A,B,C),datetime(Time)) :- blawx_becomes(total_from(A,B,C),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),total_from(A,B,C),datetime(Time)).
+      blawx_as_of(-total_from(A,B,C),datetime(Time)) :- blawx_initially(-total_from(A,B,C)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-total_from(A,B,C),datetime(BeforeT)).
+      blawx_as_of(-total_from(A,B,C),datetime(Time)) :- blawx_becomes(-total_from(A,B,C),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-total_from(A,B,C),datetime(Time)).
+      blawx_during(datetime(Start),total_from(A,B,C),datetime(End)) :- blawx_becomes(total_from(A,B,C),datetime(Start)), blawx_becomes(-total_from(A,B,C),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),total_from(A,B,C),datetime(End)).
+      blawx_during(datetime(bot),total_from(A,B,C),datetime(End)) :- blawx_initially(total_from(A,B,C)), blawx_becomes(-total_from(A,B,C),datetime(End)), blawx_not_interrupted(datetime(bot),total_from(A,B,C),datetime(End)).
+      blawx_during(datetime(Start),total_from(A,B,C),datetime(eot)) :- blawx_ultimately(total_from(A,B,C)), blawx_becomes(-total_from(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(Start),total_from(A,B,C),datetime(eot)).
+      blawx_during(datetime(bot),total_from(A,B,C),datetime(eot)) :- blawx_initially(total_from(A,B,C)), blawx_ultimately(total_from(A,B,C)), blawx_becomes(-total_from(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(bot),total_from(A,B,C),datetime(eot)).
+      blawx_during(datetime(Start),-total_from(A,B,C),datetime(End)) :- blawx_becomes(-total_from(A,B,C),datetime(Start)), blawx_becomes(total_from(A,B,C),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-total_from(A,B,C),datetime(End)).
+      blawx_during(datetime(bot),-total_from(A,B,C),datetime(End)) :- blawx_initially(-total_from(A,B,C)), blawx_becomes(total_from(A,B,C),datetime(End)), blawx_not_interrupted(datetime(bot),-total_from(A,B,C),datetime(End)).
+      blawx_during(datetime(Start),-total_from(A,B,C),datetime(eot)) :- blawx_ultimately(-total_from(A,B,C)), blawx_becomes(total_from(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(Start),-total_from(A,B,C),datetime(eot)).
+      blawx_during(datetime(bot),-total_from(A,B,C),datetime(eot)) :- blawx_initially(-total_from(A,B,C)), blawx_ultimately(-total_from(A,B,C)), blawx_becomes(-total_from(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(bot),-total_from(A,B,C),datetime(eot)).
+      blawx_relationship(go,list,number,list,number).
+      blawx_relationship_nlg(go,"","and","and","and","are related as go").
+      :- dynamic go/4.
+      #pred go(A,B,C,D) :: '@(A) and @(B) and @(C) and @(D) are related as go'.
+      #pred holds(user,go,A,B,C,D) :: 'it is provided as a fact that @(A) and @(B) and @(C) and @(D) are related as go'.
+      #pred holds(user,-go,A,B,C,D) :: 'it is provided as a fact that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go'.
+      #pred holds(Z,go,A,B,C,D) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) and @(D) are related as go holds'.
+      #pred holds(Z,-go,A,B,C,D) :: 'the conclusion in @(Z) that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go holds'.
+      #pred according_to(Z,go,A,B,C,D) :: 'according to @(Z), @(A) and @(B) and @(C) and @(D) are related as go'.
+      #pred according_to(Z,-go,A,B,C,D) :: 'according to @(Z), it is not the case that @(A) and @(B) and @(C) and @(D) are related as go'.
+      #pred blawx_defeated(Z,go,A,B,C,D) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) and @(D) are related as go is defeated'.
+      #pred blawx_defeated(Z,-go,A,B,C,D) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) and @(D) are related as go is defeated'.
+      #pred blawx_initially(go(A,B,C,D)) :: 'that @(A) and @(B) and @(C) and @(D) are related as go holds initially'.
+      #pred blawx_initially(-go(A,B,C,D)) :: 'that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go holds initially'.
+      #pred blawx_ultimately(go(A,B,C,D)) :: 'that @(A) and @(B) and @(C) and @(D) are related as go holds ultimately'.
+      #pred blawx_ultimately(-go(A,B,C,D)) :: 'that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go holds ultimately'.
+      #pred blawx_as_of(go(A,B,C,D),T) :: 'that @(A) and @(B) and @(C) and @(D) are related as go holds at @(T)'.
+      #pred blawx_as_of(-go(A,B,C,D),T) :: 'that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go holds at @(T)'.
+      #pred blawx_during(T1,go(A,B,C,D),T2) :: 'that @(A) and @(B) and @(C) and @(D) are related as go held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-go(A,B,C,D),T2) :: 'that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go held between @(T1) and @(T2)'.
+      #pred blawx_becomes(go(A,B,C,D),T) :: 'that @(A) and @(B) and @(C) and @(D) are related as go became true at @(T)'.
+      #pred blawx_becomes(-go(A,B,C,D),T) :: 'that it is not the case that @(A) and @(B) and @(C) and @(D) are related as go became true at @(T)'.
+      #pred blawx_not_interrupted(Start,go(A,B,C,D),End) :: '@(A) and @(B) and @(C) and @(D) are related as go remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-go(A,B,C,D),End) :: 'it is not the case that @(A) and @(B) and @(C) and @(D) are related as go remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),go(A,B,C,D),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-go(A,B,C,D),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-go(A,B,C,D),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(go(A,B,C,D),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),go(A,B,C,D),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-go(A,B,C,D),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-go(A,B,C,D),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(go(A,B,C,D),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),go(A,B,C,D),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-go(A,B,C,D),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-go(A,B,C,D),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(go(A,B,C,D),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),go(A,B,C,D),datetime(eot)) :- blawx_initially(go(A,B,C,D)), blawx_ultimately(go(A,B,C,D)), findall(Time,blawx_becomes(-go(A,B,C,D),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-go(A,B,C,D),datetime(eot)) :- blawx_initially(-go(A,B,C,D)), blawx_ultimately(-go(A,B,C,D)), findall(Time,blawx_becomes(go(A,B,C,D),datetime(Time)),[]).
+      blawx_as_of(go(A,B,C,D),datetime(Time)) :- blawx_initially(go(A,B,C,D)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),go(A,B,C,D),datetime(BeforeT)).
+      blawx_as_of(go(A,B,C,D),datetime(Time)) :- blawx_becomes(go(A,B,C,D),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),go(A,B,C,D),datetime(Time)).
+      blawx_as_of(-go(A,B,C,D),datetime(Time)) :- blawx_initially(-go(A,B,C,D)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-go(A,B,C,D),datetime(BeforeT)).
+      blawx_as_of(-go(A,B,C,D),datetime(Time)) :- blawx_becomes(-go(A,B,C,D),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-go(A,B,C,D),datetime(Time)).
+      blawx_during(datetime(Start),go(A,B,C,D),datetime(End)) :- blawx_becomes(go(A,B,C,D),datetime(Start)), blawx_becomes(-go(A,B,C,D),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),go(A,B,C,D),datetime(End)).
+      blawx_during(datetime(bot),go(A,B,C,D),datetime(End)) :- blawx_initially(go(A,B,C,D)), blawx_becomes(-go(A,B,C,D),datetime(End)), blawx_not_interrupted(datetime(bot),go(A,B,C,D),datetime(End)).
+      blawx_during(datetime(Start),go(A,B,C,D),datetime(eot)) :- blawx_ultimately(go(A,B,C,D)), blawx_becomes(-go(A,B,C,D),datetime(Start)), blawx_not_interrupted(datetime(Start),go(A,B,C,D),datetime(eot)).
+      blawx_during(datetime(bot),go(A,B,C,D),datetime(eot)) :- blawx_initially(go(A,B,C,D)), blawx_ultimately(go(A,B,C,D)), blawx_becomes(-go(A,B,C,D),datetime(Start)), blawx_not_interrupted(datetime(bot),go(A,B,C,D),datetime(eot)).
+      blawx_during(datetime(Start),-go(A,B,C,D),datetime(End)) :- blawx_becomes(-go(A,B,C,D),datetime(Start)), blawx_becomes(go(A,B,C,D),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-go(A,B,C,D),datetime(End)).
+      blawx_during(datetime(bot),-go(A,B,C,D),datetime(End)) :- blawx_initially(-go(A,B,C,D)), blawx_becomes(go(A,B,C,D),datetime(End)), blawx_not_interrupted(datetime(bot),-go(A,B,C,D),datetime(End)).
+      blawx_during(datetime(Start),-go(A,B,C,D),datetime(eot)) :- blawx_ultimately(-go(A,B,C,D)), blawx_becomes(go(A,B,C,D),datetime(Start)), blawx_not_interrupted(datetime(Start),-go(A,B,C,D),datetime(eot)).
+      blawx_during(datetime(bot),-go(A,B,C,D),datetime(eot)) :- blawx_initially(-go(A,B,C,D)), blawx_ultimately(-go(A,B,C,D)), blawx_becomes(-go(A,B,C,D),datetime(Start)), blawx_not_interrupted(datetime(bot),-go(A,B,C,D),datetime(eot)).
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: ''
+    scasp_encoding: |-
+      running_total([],0).
+
+      according_to(sec_1_section,running_total,[X | Rest],Tmp) :- running_total(Rest,Runningtotal),
+      Tmp is X + Runningtotal.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,running_total,[X | Rest],Tmp) :- according_to(sec_1_section,running_total,[X | Rest],Tmp).
+
+      % BLAWX CHECK DUPLICATES
+        running_total([X | Rest],Tmp) :- holds(sec_1_section,running_total,[X | Rest],Tmp).
+- model: blawx.workspace
+  pk: 3
+  fields:
+    ruledoc: 1
+    workspace_name: sec_2_section
+    xml_content: ''
+    scasp_encoding: |-
+      all_positive([]).
+
+      according_to(sec_2_section,all_positive,[X | Rest]) :- blawx_comparison(X,gt,0),
+      all_positive(Rest).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,all_positive,[X | Rest]) :- according_to(sec_2_section,all_positive,[X | Rest]).
+
+      % BLAWX CHECK DUPLICATES
+        all_positive([X | Rest]) :- holds(sec_2_section,all_positive,[X | Rest]).
+- model: blawx.workspace
+  pk: 4
+  fields:
+    ruledoc: 1
+    workspace_name: sec_3_section
+    xml_content: ''
+    scasp_encoding: |-
+      first_or_zero([],0).
+
+      first_or_zero([X | Rest],X).
+- model: blawx.workspace
+  pk: 5
+  fields:
+    ruledoc: 1
+    workspace_name: sec_4_section
+    xml_content: ''
+    scasp_encoding: |-
+      according_to(sec_4_section,total_from,Xs,Floor,Go) :- go(Xs,Floor,Xs,Go).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,total_from,Xs,Floor,Go) :- according_to(sec_4_section,total_from,Xs,Floor,Go).
+
+      % BLAWX CHECK DUPLICATES
+        total_from(Xs,Floor,Go) :- holds(sec_4_section,total_from,Xs,Floor,Go).
+
+      go(Xs,Floor,[],Floor).
+
+      according_to(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp) :- go(Xs,Floor,Rest,Go),
+      Tmp is Y + Go.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp) :- according_to(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp).
+
+      % BLAWX CHECK DUPLICATES
+        go(Xs,Floor,[Y | Rest],Tmp) :- holds(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: q1
+    xml_content: ''
+    scasp_encoding: |-
+      ?- running_total([1 | [2 | [3 | []]]],Runningtotal).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 2
+  fields:
+    ruledoc: 1
+    test_name: q2
+    xml_content: ''
+    scasp_encoding: |-
+      ?- running_total([],Runningtotal).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 3
+  fields:
+    ruledoc: 1
+    test_name: q3
+    xml_content: ''
+    scasp_encoding: |-
+      ?- all_positive([1 | [2 | [3 | []]]]).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 4
+  fields:
+    ruledoc: 1
+    test_name: q4
+    xml_content: ''
+    scasp_encoding: |-
+      ?- all_positive([1 | [0 | [3 | []]]]).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 5
+  fields:
+    ruledoc: 1
+    test_name: q5
+    xml_content: ''
+    scasp_encoding: |-
+      ?- first_or_zero([7 | [8 | []]],Firstorzero).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 6
+  fields:
+    ruledoc: 1
+    test_name: q6
+    xml_content: ''
+    scasp_encoding: |-
+      ?- total_from([1 | [2 | [3 | []]]],10,Totalfrom).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
