@@ -217,6 +217,19 @@ builtinUnaryFunctions = Map.fromList
 --
 -- where s1..sN are all sibling fields (excluding f itself).
 -- The original DECLARE retains only stored fields (without MEANS clauses).
+--
+-- __Trap for every post-resolution consumer (backends, exporters, analyses):__
+-- this runs BEFORE type checking, so by @Module Resolved@ a computed field has
+-- no trace in its 'RecordDecl' — \"the fields of a record\" is the /stored/
+-- inventory only, and a projection onto a computed field must be routed to the
+-- synthesized selector (an ordinary call, including whatever calling convention
+-- the consumer gives calls — e.g. a boolean output-argument drop). Two backends
+-- have independently shipped defects by missing this: a dead per-field pathway
+-- plus a false \"record has no field\" diagnostic (docassemble M1), and an
+-- arity miscompile in the computed-BOOLEAN selector path (L4.Relational M1).
+-- The teaching witness is @jl4\/examples\/relational\/computed.l4@, whose golden
+-- shows the field stripped from the record and the selector lowered as its own
+-- predicate.
 desugarComputedFields :: Module Name -> Module Name
 desugarComputedFields (MkModule ann imports section) =
   MkModule ann imports (desugarCFSection section)
