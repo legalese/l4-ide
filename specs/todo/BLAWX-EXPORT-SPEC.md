@@ -760,6 +760,12 @@ toolchain (SWI-Prolog 9.2.9 + scasp pack). The crash also reproduces: a SECOND s
 by design. The Docker-image repetition (Blawx's pinned SWI/scasp) remains outstanding and
 still gates generalising the exactness claim — it is a P2 obligation._
 
+_P2 discharge (2026-08-19) **[E]**: executed inside the running `blawx` container —
+SWI-Prolog 9.1.14 x86_64-linux, the same engine `reasoner.py` drives via `swiplserver` —
+`X is 1 / 3` inside a `scasp/2` goal binds `X = 1r3`. The exact-rational result holds on
+both toolchains (local 9.2.9 arm64 and the container's pinned 9.1.14 amd64), so the
+exactness claim now generalises to the deployment target. The gate is closed._
+
 **Evidence.** The three timestamp landmines and the broken-block inventory, §2 **[E]**
 (float-vs-integer non-unification executed by this pass). **Proposal.** As §4.6; never emit
 via `fact_scenario`; never emit the broken predicate families; `blawx_now`/`blawx_today`
@@ -812,6 +818,17 @@ to the target's actual conventions beats local aesthetics; upstream the fix to B
 bridge; MIT-licensed, friendly project).
 
 **ANSWERED 2026-08-18 (Meng).** As proposed, byte-exact quirks included. The upstream question is decided: fork Blawx under our org (via `gh`), construct the quirk-fix PR against the fork first, and send upstream only after the interop story has demonstrated value.
+
+_Executed (2026-08-19): the quirk-fix PR is open as **legalese/blawx#1** (branch off pristine
+upstream `main`, eight sites). Building it sharpened the diagnosis: the "Neither" frame
+axioms' `blawx_becomes` goal contradicts their own `initially`/`ultimately`/uninterrupted
+premises, so `blawx_during(bot, F, eot)` is underivable for exactly the fluent it
+describes; the negative variant's missing sign-flip marks it a copy artifact. P1 also found
+a **third** quirk beyond the two pinned here — the negative `blawx_defeated` `#pred` omits
+"it is not the case that" in attribute/relationship variants but not the category variant —
+byte-reproduced in our emitter, candidate for a second fork PR. The reference checkout
+stays on the quirky branch so byte-comparisons remain against what upstream actually
+generates._
 
 ### 8.11 R11 — tests: one BlawxTest per `#EVAL`/`#ASSERT`; the oracle is L4
 
@@ -914,12 +931,34 @@ earmark in R10, not a deliverable).
   structural-recursion case — the construct Catala must reject); goldens wired in `tests-cli`;
   tier-1 harness green (raw s(CASP) queries answer L4-oracle values); the R7 numeric-fidelity
   experiment run and recorded. Exit: every emitted golden executes correctly under tier 1.
+
+  _**EXECUTED 2026-08-18** (legalese/l4-ide#273, on the #272 middle-end): tier-1 harness
+  16/16 queries answer their L4-oracle values; declaration blocks byte-identical to
+  `life_act.yaml` after name/NLG substitution; a third generator quirk (negative
+  `blawx_defeated` `#pred` NLG asymmetry between category and attribute/relationship
+  variants) found and byte-reproduced alongside the two R10 pinned; every synthesized
+  `rule_text` validated through `clean-law`'s actual parser, which caught that
+  lowercase-initial titles are unimportable (titles are recased). One documented deviation:
+  minimal-paren arithmetic vs the generator's always-parenthesized image — ruled at P3,
+  where `renderXml` makes UI re-saves possible._
+
 - **P2 — Blawx round-trip.** Docker instance up (images on `/Volumes/transcend` per
   environment constraint); `/import/` accepts every golden; run endpoint agrees with L4 on the
   full `#EVAL` population; eId prediction verified against `clean-law` (R4). Exit: tier-2 green
   on the seed corpus. _A single-example smoke of this whole phase was already executed during
   the design pass (Appendix A): import 302, answer `Amount = 1000` with justification tree,
   eIds as predicted — so P2's risk is volume, not mechanism._
+
+  _**EXECUTED 2026-08-19, GREEN AT VOLUME**: all four P1 goldens accepted by `/import/`
+  (HTTP 302); run endpoint **16/16** on the full `#EVAL`/`#ASSERT` population — every
+  binding (1000, 1250, 240, 90, 80, 35, 6, 0, 7, 16) and every model/no-model verdict
+  matches the L4 oracle; server-regenerated Akoma Ntoso carries exactly the predicted eIds
+  for all **12** sections across the four modules, each matching its emitted workspace name.
+  Interview tests confirm the abductive path (benefit 2 answers, mortality 1); the scores
+  interview times out at 120 s — an open abductive query over an aggregate is an unbounded
+  search, a property of the query shape, not a bridge defect. The R7 in-container
+  measurement also ran (see §8.7). Driver: `p2-roundtrip.py`, session scratchpad._
+
 - **P3 — editability.** `renderXml`; re-save fixpoint holds for every seed workspace (R12).
   Exit: byte-identical `scasp_encoding` after UI open-and-save of every workspace.
 - **P4 — the showcase.** A statute corpus (BNA §1 or a Housing Act ground — both have
