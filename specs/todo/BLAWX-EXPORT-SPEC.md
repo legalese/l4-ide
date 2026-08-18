@@ -1,10 +1,11 @@
 # L4 ⇄ Blawx: expressive-domain overlap and transpiler spec
 
-_Status: **design, not yet implemented.** Written 2026-08-16 on branch `mengwong/blawx-bridge`.
-Nothing exists under `jl4-core/src/L4/Blawx/`; there is no `blawx` subcommand in
-`jl4/app/Main.hs`. What would make the present tense true: an `L4.Blawx.{IR,Lower,Emit}` module
-triple plus a CLI verb, mirroring the shipped OpenFisca backend (`jl4-core/src/L4/OpenFisca/`,
-`jl4/app/L4/Cli/OpenFisca.hs`), and later a `Parse`/`Lift` pair for the import direction (R14).
+_Status: **rulings answered (R1–R14, Meng, 2026-08-18); implementation beginning.** Design
+written 2026-08-16 (merged as PR #261); rulings recorded 2026-08-18. As of that date nothing
+exists under `jl4-core/src/L4/Blawx/` or `jl4-core/src/L4/Relational/`; per R2 the shared
+middle-end is built first, Blawx-driven, on branch `mengwong/l4-relational`, followed by the
+`L4.Blawx.{IR,Lower,Emit}` triple plus the `l4 blawx` CLI verb mirroring the shipped OpenFisca
+backend (`jl4-core/src/L4/OpenFisca/`), and later a `Parse`/`Lift` pair for import (R14).
 Siblings: `CATALA-EXPORT-SPEC.md` (PR #260) is the house template this spec follows;
 `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` (PR #258) proposes the shared relational
 middle-end this spec consumes (§1.1, R2); the defeasibility prior-art evidence of §5.2 is
@@ -46,25 +47,28 @@ and test successfully **[E]** (see the appendix header); the Docker leg (colima,
 
 ## 0. Ruling status
 
-| ruling | state        | detail                                                      |
-| ------ | ------------ | ----------------------------------------------------------- |
-| R1     | **PROPOSED** | primary artifact: the `.blawx` fixture YAML, §8.1           |
-| R2     | **PROPOSED** | relationalization via the shared middle-end (PR #258), §8.2 |
-| R3     | **PROPOSED** | ontology projection and naming, §8.3                        |
-| R4     | **PROPOSED** | section anchoring: CLEAN synthesis from `§`/`@ref`, §8.4    |
-| R5     | **PROPOSED** | negation policy: the three-valued landing, §8.5             |
-| R6     | **PROPOSED** | defeasibility: Mode A now, Mode B flag-gated, §8.6          |
-| R7     | **PROPOSED** | numbers: CLP comparisons, measurement-gated exactness, §8.7 |
-| R8     | **PROPOSED** | dates: integer UTC timestamps, day-granular only, §8.8      |
-| R9     | **PROPOSED** | recursion admitted (structural), combinators, §8.9          |
-| R10    | **PROPOSED** | declaration emission is byte-exact, quirks included, §8.10  |
-| R11    | **PROPOSED** | tests: one BlawxTest per `#EVAL`, L4 as oracle, §8.11       |
-| R12    | **PROPOSED** | dual representation and the re-save fixpoint, §8.12         |
-| R13    | **PROPOSED** | validation harness: two tiers, never a build dep, §8.13     |
-| R14    | **PROPOSED** | import direction: shared IR pivot, lift fragment, §8.14     |
+| ruling | state                   | detail                                                             |
+| ------ | ----------------------- | ------------------------------------------------------------------ |
+| R1     | **ANSWERED 2026-08-18** | `.blawx` YAML primary; raw `.pl` dumped alongside, §8.1            |
+| R2     | **ANSWERED 2026-08-18** | Blawx _drives_ `L4.Relational`; findall/DNF middle-end first, §8.2 |
+| R3     | **ANSWERED 2026-08-18** | no `@desc` name side-channel in v1, §8.3                           |
+| R4     | **ANSWERED 2026-08-18** | flat numbered CLEAN sections for v1, §8.4                          |
+| R5     | **ANSWERED 2026-08-18** | as proposed; CWA bridges yes-later on corpus need, §8.5            |
+| R6     | **ANSWERED 2026-08-18** | Mode A first; Mode B gate = bounded truth tables, revisit, §8.6    |
+| R7     | **ANSWERED 2026-08-18** | as proposed; money = cents as integers, §8.7                       |
+| R8     | **ANSWERED 2026-08-18** | as proposed; date-library requirements ledger opened, §8.8         |
+| R9     | **ANSWERED 2026-08-18** | share recognisers for now; free to break loose later, §8.9         |
+| R10    | **ANSWERED 2026-08-18** | byte-exact incl. quirks; quirk-fix PR goes to our fork, §8.10      |
+| R11    | **ANSWERED 2026-08-18** | as proposed; `#ASSERT` also emits `false :-`, §8.11                |
+| R12    | **ANSWERED 2026-08-18** | delegated; proposal stands as written, §8.12                       |
+| R13    | **ANSWERED 2026-08-18** | no checksum pin; loud provenance comment instead, §8.13            |
+| R14    | **ANSWERED 2026-08-18** | CLI = `l4 blawx --import`; Blawx may drive SUBJECT-TO, §8.14       |
 
-No ruling is ANSWERED yet; all fourteen await sign-off. Each carries its evidence, its cost, and
-the case against it in §8, per house style.
+All fourteen rulings were answered by Meng on 2026-08-18; each §8 entry carries the ruling
+beneath its original evidence/cost/case-against, per house style. Consequences now in motion:
+`L4.Relational` is implemented under this programme with the Blawx session coordinating (R2);
+the date-library requirements ledger exists at `specs/todo/DATE-LIBRARY-SPEC.md` (R8); the
+Lexpedite quirk-fix path goes through our fork of Blawx (R10).
 
 ## 1. Purpose, direction, precedent
 
@@ -584,10 +588,9 @@ Mirror the OpenFisca triple under `jl4-core/src/L4/Blawx/` (registered in
   goldens in `expected/`, `expectFail` fixtures under `not-ok/`, one structural smoke test, one
   typecheck-failure case, one `--help` listing assertion.
 - **Import (P5)** — `L4.Blawx.Parse` (`.blawx` YAML + Blockly XML → the same IR) and
-  `L4.Blawx.Lift` (IR → L4 source text), surfaced as `l4 blawx --import FILE` or an `l4 import`
-  family (not decided, R14).
+  `L4.Blawx.Lift` (IR → L4 source text), surfaced as `l4 blawx --import FILE` (ruled, R14).
 
-## 8. Open rulings
+## 8. Rulings
 
 House template: evidence → proposal → cost → the case against → what it does not decide.
 
@@ -604,6 +607,8 @@ of two embedded languages (XML + Prolog) is fiddly; goldens are large. **Against
 raw s(CASP) only would be far simpler — but it dies on first UI save, is invisible on canvas,
 and forfeits the entire editor/community story; the YAML _is_ the product. **Not decided.**
 Whether to also emit a per-workspace `.pl` debug dump alongside the golden.
+
+**ANSWERED 2026-08-18 (Meng).** As proposed. The open item is decided: emit the raw concatenated s(CASP) as a `.pl` file alongside each `.blawx`.
 
 ### 8.2 R2 — relationalization is the shared middle-end's job; the Blawx `Lower` classifies
 
@@ -636,6 +641,8 @@ middle-end are the documented wreck (#258 §8.3). **Not decided.** Whether the `
 peephole and the DNF threshold live in the middle-end (both are target-agnostic) or the
 Blawx emitter; whether functionality constraints default on.
 
+**ANSWERED 2026-08-18 (Meng).** The Blawx work _drives_ the middle-end: `L4.Relational` is implemented now, under this programme, with this session coordinating — the contingency inverts (no private-then-extract). `findall`/aggregate recognition and DNF normalisation are attempted in the middle-end first, and move into the Blawx emitter only on demonstrated failure.
+
 ### 8.3 R3 — ontology projection and naming
 
 **Evidence.** Value types and declaration shapes (`scasp_generator.js:927-1156` **[E]**); name
@@ -651,6 +658,8 @@ R10). **Against.** Quoted atoms would preserve names exactly — but the blocks 
 the UI validator would rewrite them on first edit, breaking the fixpoint. **Not decided.**
 Whether `@desc` grows a `blawx name:` override side-channel (the `descKeyword` extension point,
 `Lower.hs:446-455` **[E]**).
+
+**ANSWERED 2026-08-18 (Meng).** No `@desc` name side-channel in v1 — it would confuse the other projections; revisit only if a consumer warrants it.
 
 ### 8.4 R4 — section anchoring: CLEAN `rule_text` synthesised from `§` structure and `@ref`
 
@@ -670,6 +679,8 @@ in `root_section` would sidestep eId prediction entirely — and forfeit the per
 canvases and `according_to` attributions that make the output legible and defeat-addressable,
 i.e. the isomorphism transfer of §4.9. **Not decided.** How `@ref` hierarchical citations map
 to CLEAN sub-provision nesting (flat numbered sections may suffice for v1).
+
+**ANSWERED 2026-08-18 (Meng).** Flat numbered sections for v1.
 
 ### 8.5 R5 — negation: complementary operators / classical `-p` on inputs / NAF on computed
 
@@ -695,6 +706,8 @@ signed dependency graph and stratification check (its §2.5) is the soundness ga
 `not` this ruling emits; non-stratified programs are rejected on this leg in v1 — s(CASP)
 tolerates them, but the L4-oracle determinism obligation does not.
 
+**ANSWERED 2026-08-18 (Meng).** As proposed; CWA bridges are yes-later, driven by a corpus need.
+
 ### 8.6 R6 — defeasibility: Mode A default; Mode B (`--idiomatic-defeat`) flag-gated
 
 **Evidence.** Landed L4 is total — `UNLESS` is `AND NOT` sugar (`Parser.hs:1669` **[E]**);
@@ -710,6 +723,8 @@ unverified semantic rewrite in a legal transpiler, the one bug class this projec
 prevent. Same verdict as the Catala study, independently re-derived. **Not decided.** Whether
 Mode B's equivalence check is truth-table enumeration (bounded inputs) or a query-diff harness
 over the P2 corpus.
+
+**ANSWERED 2026-08-18 (Meng).** Mode A ships first. Recorded plan: Mode B's equivalence gate is truth-table enumeration over bounded inputs — a decision to be revisited at the implementation juncture before Mode B work begins.
 
 ### 8.7 R7 — numbers: CLP comparisons; exactness is a measurement, not an assumption
 
@@ -734,7 +749,16 @@ calculation block emits Prolog `is` — the P1 experiment measures both, and byt
 the block idiom (R12) wins for emission unless the measurement shows `is` is lossy, in which
 case the finding goes upstream to Lexpedite rather than into a divergent encoding.
 
-### 8.8 R8 — dates: integer UTC-midnight timestamps, day-granular arithmetic only
+**ANSWERED 2026-08-18 (Meng).** As proposed; the money convention is decided: cents as integers.
+
+_P1 re-measurement (2026-08-18, L4.Blawx P1 build, recorded from
+`p1-design/r7-stageC-rerun.txt` in the implementation worktree) **[E]**: `X is 1 / 3` inside
+a `scasp/2` goal again binds `X = 1r3` — the exact-rational result reproduces on the local
+toolchain (SWI-Prolog 9.2.9 + scasp pack). The crash also reproduces: a SECOND sequential
+`scasp/2` call in the same process fails with an internal
+`scasp_solve:stack_parents/3` error, so the tier-1 harness runs ONE query per swipl process
+by design. The Docker-image repetition (Blawx's pinned SWI/scasp) remains outstanding and
+still gates generalising the exactness claim — it is a P2 obligation._
 
 **Evidence.** The three timestamp landmines and the broken-block inventory, §2 **[E]**
 (float-vs-integer non-unification executed by this pass). **Proposal.** As §4.6; never emit
@@ -747,6 +771,8 @@ serial-date helper library now would widen coverage — but Blawx's date story i
 stable part of its target surface (a whole block family is broken at HEAD), and building on
 the stable subset first is the OpenFisca sequencing lesson. **Not decided.** A timezone
 annotation for corpora that need civil-time semantics.
+
+**ANSWERED 2026-08-18 (Meng).** As proposed — and a dedicated requirements ledger is opened at `specs/todo/DATE-LIBRARY-SPEC.md`, recording the requirements this bridge emanates alongside the other backends', toward an eventual shared date library.
 
 ### 8.9 R9 — recursion: structural admitted, aggregates via `findall`, the rest deferred
 
@@ -764,6 +790,8 @@ an extraction (they pattern-match the same L4 idioms, `Lower.hs:240-263` **[E]**
 _Cross-reference._ #258's v1 fragment admits recursion natively and defers termination policy
 to its LP-R7 (tabling / well-founded semantics); this spec's structural-only boundary is
 deliberately narrower and should widen in step with LP-R7's ruling rather than independently.
+
+**ANSWERED 2026-08-18 (Meng).** Share the recognisers with OpenFisca for now; the sharing is not load-bearing — later divergence may break loose without gymnastics to force continued sharing.
 
 ### 8.10 R10 — declaration emission is byte-exact against the current generator, quirks included
 
@@ -783,6 +811,8 @@ to the target's actual conventions beats local aesthetics; upstream the fix to B
 **Not decided.** Whether to PR the axiom quirks upstream to Lexpedite (independent of this
 bridge; MIT-licensed, friendly project).
 
+**ANSWERED 2026-08-18 (Meng).** As proposed, byte-exact quirks included. The upstream question is decided: fork Blawx under our org (via `gh`), construct the quirk-fix PR against the fork first, and send upstream only after the interop story has demonstrated value.
+
 ### 8.11 R11 — tests: one BlawxTest per `#EVAL`/`#ASSERT`; the oracle is L4
 
 **Evidence.** Test anatomy and query conventions §2 **[E]**; run-endpoint payload/response
@@ -797,6 +827,8 @@ expected values in the `.blawx` as constraints would make tests self-contained i
 then a bridge bug that shifts both actual and expected passes silently; keeping the oracle
 outside the artifact preserves independence. **Not decided.** Whether `#ASSERT` failures also
 emit as `false :-` constraints (runtime-checked both sides).
+
+**ANSWERED 2026-08-18 (Meng).** As proposed — and yes: `#ASSERT`s additionally emit as `false :-` constraints, runtime-checked on both sides.
 
 ### 8.12 R12 — dual representation from one block-level IR; the re-save fixpoint is the gate
 
@@ -818,6 +850,8 @@ one-UI-save from data loss; "editable by the Blawx community" is the point of ch
 target. **Not decided.** Auto-layout policy (single column suffices?); whether P1 goldens
 already embed placeholder XML or empty strings.
 
+**ANSWERED 2026-08-18 (Meng, delegated).** Delegated to the implementing session; the proposal stands as written — block-level IR, `renderScasp` in P1, `renderXml` in P3, re-save fixpoint as the gate. The delegated sub-decisions: single-column auto-layout; P1 goldens carry empty `xml_content` (consistent with the executed tier-2 smoke).
+
 ### 8.13 R13 — validation harness: two tiers, optional-when-present, never a build dependency
 
 **Evidence.** The repo's standing `validate-dmn.mjs` posture; SWI-Prolog 9.2.9 present locally,
@@ -837,6 +871,8 @@ may be vendored into a test fixture with attribution. **Tier 1** (local, lightwe
   couple the merge queue to a foreign Docker image, which repo precedent forbids. **Not
   decided.** Whether tier-1 vendored libraries are pinned by checksum against the Blawx checkout
   to detect upstream drift.
+
+**ANSWERED 2026-08-18 (Meng).** As proposed, minus the checksum pin: vendored libraries are not pinned in code — a loud provenance comment names the source file, the Blawx commit, and the drift risk instead.
 
 ### 8.14 R14 — import: the block IR is the pivot; lift the stratified ground fragment
 
@@ -859,6 +895,8 @@ predicates), is stale in real corpora (§ evidence-legend warning), and would du
 the structure the XML already carries. **Not decided.** CLI surface (`l4 blawx --import` vs an
 `l4 import` family); whether lifted defeat structure waits for
 `SUBJECT-TO-NOTWITHSTANDING` to land as structure rather than comments.
+
+**ANSWERED 2026-08-18 (Meng).** CLI surface: `l4 blawx --import`. And the dependency direction is settled: where lifted defeat structure needs a landed `SUBJECT TO`/`NOTWITHSTANDING`, the Blawx project drives that work incrementally rather than waiting on it.
 
 ## 9. Non-goals (v1)
 
@@ -911,23 +949,31 @@ Ntoso carries exactly the predicted eIds `sec_1`/`sec_2` and slug `benefit-act`,
 R4's eId-prediction mechanism, and the duplicated bridge lines deduplicated correctly under
 the `% BLAWX CHECK DUPLICATES` pass. Only the Blockly XML pairing (P3) remains **[U]**._
 
+_Correction (2026-08-18, from the L4.Relational M1 build): both `@export` annotations moved
+**above** their `GIVEN`. The appendix originally wrote them between `GIVETH` and the
+definition head; measured on the tree at `afcef88f`, that placement does not reliably
+attach — `L4.Export.getExportedFunctions` returned only ONE of the two decisions, so half
+the program was unreachable from any entry point. Every `@export` in the in-tree corpus
+sits above `GIVEN`. The seed derived from this appendix
+(`jl4/examples/relational/benefit.l4`) records the same finding in its header._
+
 ```l4
 DECLARE Applicant HAS
     age       IS A NUMBER
     income    IS A NUMBER
     isVeteran IS A BOOLEAN
 
+@export
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-@export
 DECIDE `eligible for benefit` IF
        a's age AT LEAST 65
     OR a's isVeteran
     UNLESS a's income GREATER THAN 100000
 
+@export
 GIVEN a IS AN Applicant
 GIVETH A NUMBER
-@export
 `benefit amount` a MEANS
     IF `eligible for benefit` a THEN 1000 PLUS bonus ELSE 0
     WHERE bonus MEANS IF a's isVeteran THEN 250 ELSE 0
