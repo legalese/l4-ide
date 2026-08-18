@@ -1,0 +1,16 @@
+-- REJECTED (§8.1). Catala keeps enumeration constructors in one module-wide
+-- namespace and we emit them unqualified, so `deep red` and deepRed — which
+-- both mangle to `DeepRed` — are ambiguous to Catala ("it can belong to Colour
+-- or Fruit"). Before the constructor namespace joined the collision check,
+-- `l4 catala` exited 0 and the toolchain rejected the artifact instead.
+
+DECLARE Colour IS ONE OF `deep red`, green
+DECLARE Fruit  IS ONE OF deepRed, apple
+
+@export
+GIVEN c IS A Colour
+GIVETH A NUMBER
+`score` c MEANS
+  CONSIDER c
+    WHEN `deep red` THEN 1
+    WHEN green THEN 2
