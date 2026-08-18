@@ -942,23 +942,31 @@ Ntoso carries exactly the predicted eIds `sec_1`/`sec_2` and slug `benefit-act`,
 R4's eId-prediction mechanism, and the duplicated bridge lines deduplicated correctly under
 the `% BLAWX CHECK DUPLICATES` pass. Only the Blockly XML pairing (P3) remains **[U]**._
 
+_Correction (2026-08-18, from the L4.Relational M1 build): both `@export` annotations moved
+**above** their `GIVEN`. The appendix originally wrote them between `GIVETH` and the
+definition head; measured on the tree at `afcef88f`, that placement does not reliably
+attach — `L4.Export.getExportedFunctions` returned only ONE of the two decisions, so half
+the program was unreachable from any entry point. Every `@export` in the in-tree corpus
+sits above `GIVEN`. The seed derived from this appendix
+(`jl4/examples/relational/benefit.l4`) records the same finding in its header._
+
 ```l4
 DECLARE Applicant HAS
     age       IS A NUMBER
     income    IS A NUMBER
     isVeteran IS A BOOLEAN
 
+@export
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-@export
 DECIDE `eligible for benefit` IF
        a's age AT LEAST 65
     OR a's isVeteran
     UNLESS a's income GREATER THAN 100000
 
+@export
 GIVEN a IS AN Applicant
 GIVETH A NUMBER
-@export
 `benefit amount` a MEANS
     IF `eligible for benefit` a THEN 1000 PLUS bonus ELSE 0
     WHERE bonus MEANS IF a's isVeteran THEN 250 ELSE 0
