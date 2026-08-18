@@ -1,0 +1,4 @@
+lowering errors: 3
+  higher-order.l4:21:17-39: in `adder`: higher-order function: first-order Horn clauses cannot carry a function as a value; M1 admits a lambda only inside a recognised aggregate
+  higher-order.l4:26:20-52: in `doubled`: higher-order function: `map` is admitted only directly inside a recognised aggregate, where its lambda becomes the findall template
+  higher-order.l4:37:28-67: in `every positive`: higher-order function: `all` takes a function argument; M1 recognises no combinator beyond the aggregates (sum/count/minimum/maximum) and `map` directly inside one

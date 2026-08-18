@@ -1,0 +1,4 @@
+lowering errors: 3
+  nonstructural.l4:27:1-32:33: in `countdown`: non-structural recursion: self-reference with no structurally decreasing argument
+  nonstructural.l4:40:34-57: in `shuffle sum`: non-structural recursion: the recursive call does not pass `rest` in the scrutinised argument position, so nothing shows the recursion decreases
+  nonstructural.l4:54:34-49: in `empty loop`: non-structural recursion: the EMPTY arm calls `empty loop` again on the same empty list, so the recursion never decreases
