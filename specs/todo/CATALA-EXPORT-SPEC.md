@@ -1009,13 +1009,14 @@ target is `combine all … initially` over the bracket list, which is also the c
 
 ### 10.2 Authoring facts found while implementing P1 **[E]** (2026-08-16)
 
-Two annotation-attachment behaviours that the L4 listings in this spec do not reflect. Neither is a
-backend bug; both change how a source file has to be written before `l4 catala` sees the export.
+Two annotation-attachment behaviours found while implementing P1. Neither is a backend bug; both
+change how a source file has to be written before `l4 catala` sees the export.
 
-- **`@export` must sit above `GIVEN`.** Appendix A writes it between `GIVETH` and `DECIDE`; in that
-  position the annotation does not attach and `L4.Export.getExportedFunctions` does not report the
-  decision at all. Appendix A's listing therefore does not round-trip as written — move the `@export`
-  line above `GIVEN` (the unit fixture in `jl4-core/test/CatalaLowerSpec.hs` does).
+- **`@export` must sit above `GIVEN`.** In the slot between `GIVETH` and the head the annotation
+  does not attach and `L4.Export.getExportedFunctions` does not report the decision at all.
+  Appendix A originally wrote it there and did not round-trip as written; the listing was corrected
+  on the base branch (`ea4b3f85`, 2026-08-18) to match `jl4/examples/catala/benefit.l4` and the
+  unit fixture in `jl4-core/test/CatalaLowerSpec.hs`.
 - **`@nonexhaustive` and `@export` must share one annotation, spelled `@export nonexhaustive`.**
   `parseDescText` consumes both keywords from a single description string
   (`jl4-core/src/L4/Export.hs`, `consumeKeywords`), but two separate `@…` lines occupy the same
