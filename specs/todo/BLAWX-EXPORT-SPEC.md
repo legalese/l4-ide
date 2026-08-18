@@ -751,7 +751,14 @@ case the finding goes upstream to Lexpedite rather than into a divergent encodin
 
 **ANSWERED 2026-08-18 (Meng).** As proposed; the money convention is decided: cents as integers.
 
-### 8.8 R8 — dates: integer UTC-midnight timestamps, day-granular arithmetic only
+_P1 re-measurement (2026-08-18, L4.Blawx P1 build, recorded from
+`p1-design/r7-stageC-rerun.txt` in the implementation worktree) **[E]**: `X is 1 / 3` inside
+a `scasp/2` goal again binds `X = 1r3` — the exact-rational result reproduces on the local
+toolchain (SWI-Prolog 9.2.9 + scasp pack). The crash also reproduces: a SECOND sequential
+`scasp/2` call in the same process fails with an internal
+`scasp_solve:stack_parents/3` error, so the tier-1 harness runs ONE query per swipl process
+by design. The Docker-image repetition (Blawx's pinned SWI/scasp) remains outstanding and
+still gates generalising the exactness claim — it is a P2 obligation._
 
 **Evidence.** The three timestamp landmines and the broken-block inventory, §2 **[E]**
 (float-vs-integer non-unification executed by this pass). **Proposal.** As §4.6; never emit
