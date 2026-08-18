@@ -52,10 +52,18 @@ ZIP="$GO_OUT/$GO_S_ID-deployable.zip"
 LOG="$GO_OUT/p7-mcp.txt"
 : >"$LOG"
 
-# The subject's module set: the corpus proper, plus the wizard companion when
-# the sidecar declares one. Both go into the deployable zip.
-declare -a MODULES=("$GO_S_CORPUS")
-[[ -n "${GO_S_WIZARD:-}" ]] && MODULES+=("$GO_S_WIZARD")
+# The subject's module set. EVERY declared module goes into the deployable zip,
+# not just the entry module and the wizard: jl4-service compiles the bundle it
+# is given, so a module the wizard IMPORTS but the zip omits makes the whole
+# deployment fail to compile -- and it fails as a 404 that never resolves
+# (a POST id "simply does not exist until its job applies", jl4-service/README),
+# which reads like a slow service rather than a missing file.
+#
+# Measured: sg-succession's wizard imports the composition, which imports three
+# statute modules and the ontology. Zipping main+wizard produced a 6,660-byte
+# bundle that polled `unreachable` for the full 120s timeout.
+declare -a MODULES
+read -ra MODULES <<<"${GO_S_CORPUS_MODULES:-$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}}"
 
 # Bounds on a LOOPBACK service: how long an accepted deployment may take to
 # finish compiling, and how long any single HTTP call may take.
@@ -153,7 +161,23 @@ if [[ $HEALTH_RC -ne 0 ]]; then
   exit "$GO_EXIT_CLEAN"
 fi
 
+# jl4-service caps a deployment id at 36 characters ("Validation rules" in
+# jl4-service/README.md), and refuses a longer one with HTTP 400. The natural
+# id -- subject plus run id -- fits only while the subject id is short:
+# `regcf-<runid>` is 29 characters, but `sg-succession-<runid>` is 37, so this
+# leg reported DEGRADED on a perfectly healthy service the first time a subject
+# with a longer name ran it. Keep the RUN id whole (it is what makes the
+# deployment traceable to a journal) and trim the SUBJECT from the right,
+# leaving at least a recognisable stub.
 DEPLOY_ID="$GO_S_ID-$GO_RUNID"
+if [ "${#DEPLOY_ID}" -gt 36 ]; then
+  _keep=$((36 - ${#GO_RUNID} - 1))
+  if [ "$_keep" -lt 1 ]; then
+    go_skip "the run id alone is ${#GO_RUNID} characters, leaving no room for a subject prefix inside jl4-service's 36-character deployment-id cap"
+  fi
+  DEPLOY_ID="$(printf '%s' "$GO_S_ID" | cut -c1-"$_keep")-$GO_RUNID"
+  echo "deployment id trimmed to fit jl4-service's 36-char cap: $DEPLOY_ID" | tee -a "$LOG"
+fi
 RESP="$GO_OUT/p7-mcp.deploy.json"
 set +e
 curl -sS --max-time 30 -o "$RESP" -w '%{http_code}' \

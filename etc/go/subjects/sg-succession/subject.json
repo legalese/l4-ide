@@ -38,13 +38,15 @@
   "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
   "corpus": {
     "main": "jl4/examples/legal/sg-succession/sg-succession.l4",
+    "wizard": "jl4/examples/legal/sg-succession/sg-succession-wizard.l4",
     "modules": [
       "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
       "jl4/examples/legal/sg-succession/sg-wills.l4",
       "jl4/examples/legal/sg-succession/sg-isa.l4",
       "jl4/examples/legal/sg-succession/sg-paa.l4",
       "jl4/examples/legal/sg-succession/sg-succession.l4",
-      "jl4/examples/legal/sg-succession/sg-succession-cases.l4"
+      "jl4/examples/legal/sg-succession/sg-succession-cases.l4",
+      "jl4/examples/legal/sg-succession/sg-succession-wizard.l4"
     ]
   },
   "checks": {
@@ -58,6 +60,8 @@
   },
   "legs": {
     "p7-lts": {},
-    "p7-akn": {}
+    "p7-akn": {},
+    "p7-wizard": {},
+    "p7-mcp": {}
   }
 }
