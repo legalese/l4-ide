@@ -25,6 +25,9 @@ module L4.Docassemble.IR
   , DAExpr (..)
   , DABinOp (..)
   , DACmpOp (..)
+  , DAFile (..)
+  , DAPackageTree (..)
+  , runtimeExports
   ) where
 
 import Base
@@ -100,6 +103,12 @@ data DACode = MkDACode
   , cL4   :: !(Maybe Text)    -- ^ the original L4 name, for the provenance comment
   , cBody :: !DACodeBody
   , cDeps :: ![Text]          -- ^ direct free variables → @depends on:@ (stale-value trap, R9.3)
+  , cCite :: !(Maybe Text)
+    -- ^ M2: this rule's @\@ref@ citation, herald-stripped and raw (escaping is
+    -- the emitter's job). Emitted as an @explain(…)@ call /after/ the
+    -- assignment, so a rule that raised on a missing input — and therefore
+    -- decided nothing yet — records nothing. Because CPython short-circuits,
+    -- the accumulated list is exactly the rules that fired, in order.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -127,6 +136,10 @@ data DAScreen = MkDAScreen
   , sVerdict :: !Text           -- ^ Complies | InBreach | NotApplicable | Holds | Fails | Result
   , sExplain :: !Text           -- ^ generated explanation sentence (ASCII, not L4-derived)
   , sShowVar :: !(Maybe Text)   -- ^ value screens: variable rendered via @${ … }@
+  , sCites   :: !Bool
+    -- ^ M2: render the accumulated @\@ref@ citations through
+    -- @logic_explanation()@. False when the module emitted no @explain(…)@ at
+    -- all, so a module without citations keeps its v1 screen byte for byte.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -145,9 +158,63 @@ data DAPackage = MkDAPackage
   { pkgSource :: !Text        -- ^ provenance (source file basename) for the header
   , pkgTitle  :: !Text        -- ^ interview @metadata: title@
   , pkgBlocks :: ![DABlock]   -- ^ in stable emission order
+  , pkgGloss  :: ![(Text, Text)]
+    -- ^ M2: the @auto terms:@ glossary — (L4 defined term, its @\@desc@), in
+    -- declaration order. Empty for a module that defines no glossed term, and
+    -- the block is then not emitted at all.
   , pkgPlan   :: !(Maybe Text)
     -- ^ reserved slot for M3's embedded compiled decision query (spec R1
     -- cost: the IR anticipates M3 so M3 does not rework Emit). Always
     -- 'Nothing' in v1; the emitter ignores it.
   }
   deriving stock (Eq, Show, Generic)
+
+-- | One file of a generated docassemble package tree.
+data DAFile = MkDAFile
+  { dafPath :: ![Text]   -- ^ path segments relative to the package root
+  , dafBody :: !Text
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | The installable package tree (R11, M2): the modern PEP 420 shape, whose
+-- exemplar is @docassemble_demo/@ at the 1.10.7 pin — @pyproject.toml@ only,
+-- @MANIFEST.in@ grafting @data/@, and deliberately __no__
+-- @docassemble/__init__.py@ (setuptools' pyproject path defaults to PEP 420
+-- namespace finding, and a namespace @__init__.py@ would turn @docassemble@
+-- into a regular package that shadows the installed @docassemble.base@).
+--
+-- The @.l4@ source itself is /not/ a 'DAFile': provenance means the bytes, so
+-- the caller copies the file rather than re-encoding its text. 'ptSourceCopy'
+-- and 'ptFidelity' say where.
+data DAPackageTree = MkDAPackageTree
+  { ptDistName   :: !Text      -- ^ @docassemble.l4\<slug\>@
+  , ptFiles      :: ![DAFile]  -- ^ every generated text file, root-relative
+  , ptSourceCopy :: ![Text]    -- ^ where to copy the @.l4@ source, byte for byte
+  , ptFidelity   :: ![Text]    -- ^ where to write the fidelity report
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | The @__all__@ of the generated @l4runtime.py@ (R11, M2), declared here
+-- because /two/ modules must agree on it and neither may drift.
+--
+-- 'L4.Docassemble.Emit' writes it into the module. 'L4.Docassemble.Lower'
+-- reserves the names an L4 identifier could actually land on, because
+-- @modules: [.l4runtime]@ is exec'd as @from \<pkg\>.l4runtime import *@
+-- (@parse.py:8572@ at @1b6678384@) into the interview dict on every assemble
+-- pass: a star-import cannot collide with an interview variable only in the
+-- sense that @__all__@ bounds /which/ names arrive — it does nothing to stop an
+-- interview variable from being one of them, and the loser is the interview's.
+--
+-- Only the lower-case entries are reachable from L4: 'L4.Docassemble.Lower's
+-- @pyIdent@ lower-cases, and Python names are case-sensitive, so no L4 name can
+-- sanitise onto @L4_SOURCE_NAME@. That filter is applied where the names are
+-- reserved, not here — this list is the module's contract, verbatim.
+runtimeExports :: [Text]
+runtimeExports =
+  [ "L4_SOURCE_NAME"
+  , "L4_PACKAGE_NAME"
+  , "L4_GENERATOR"
+  , "L4_DOCASSEMBLE_PIN"
+  , "l4_source_path"
+  , "l4_source_text"
+  ]
