@@ -1188,8 +1188,24 @@ earmark in R10, not a deliverable).
   spot checks green. Found en route: CLEAN's title grammar rejects an **em dash in the
   act title** (`ParseException` in `generate_akn` during `RuleDoc.save()` → import 500;
   hyphens/commas/parens fine, body text unaffected) — the emitter's title channel now
-  maps em/en dashes to a hyphen, beside P1's recasing guard. The screen-recorded
-  scenario-explorer interview remains owed._
+  maps em/en dashes to a hyphen, beside P1's recasing guard — and a second, subtler
+  member of the same family: CLEAN gives a **mid-body em dash structural meaning**
+  (legislative sub-paragraph introduction), so a section text containing one silently
+  swallowed every following section — the housing AKN carried ONLY `sec_1` and every
+  later citation link (`/rule/sec_N/`) 500'd. The section-text channel now maps dashes
+  too; re-measured: AKN eIds ↔ workspace names agree **6/6 modules** (housing
+  `sec_1`…`sec_14`). The **screen-recorded run is delivered**: Ground 8's q6 (the
+  three-months boundary, monthly rent 800, arrears 2400/3200) driven through the real
+  test editor — transpiled blocks on the canvas, Run, and the justification tree citing
+  section 1 and section 4 with "2400 is greater than or equal to 2400" as the threshold
+  step (`housing-q6-run.webm`, session scratchpad). Two upstream limits found while
+  aiming for the scenario-explorer page and worth fork PRs: the interview endpoint's
+  `find_assumptions` crashes on classical negation in the answer tree
+  (`reasoner.py:1457`, `TypeError` on a string node — fires for our R5 `-p` encodings
+  and for `type:"false"` scenario facts), and the same endpoint's abductive search
+  grows unusable when input predicates are left unpinned (measured: rodents 2 pinned
+  facts >180 s vs 3 pruning facts 11.8 s; housing grounded >200 s). The test editor's
+  `run/` path — which the recording uses — is unaffected._
 
 - **P5 — import.** R14's `Parse`/`Lift`; `lift . emit = id` property on the v1 fragment;
   one genuine Blawx-authored example (e.g. `bird.yaml`, defeat and all) lifted to L4, its

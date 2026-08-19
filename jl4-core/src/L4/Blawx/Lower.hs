@@ -241,7 +241,15 @@ lowerBlawx prog0 = do
                 -- free, and R4's promise that a target-side answer lifts back
                 -- to a citation stops depending on whether the author also
                 -- wrote prose. 'refText' has already stripped the @\@ref@
-                -- herald; 'squash' flattens a multi-line citation.
+                -- herald; 'squash' flattens a multi-line citation AND maps
+                -- em\/en dashes to hyphens: CLEAN gives an em dash STRUCTURAL
+                -- meaning in section bodies (a legislative sub-paragraph
+                -- introduction), so a mid-text em dash silently swallows
+                -- every following section into this one — measured 2026-08-19
+                -- against the pinned clean-law: a 14-section rule_text whose
+                -- section 1 contained "hearing—" produced an AKN with ONLY
+                -- sec_1, breaking every later citation link (/rule/sec_N/
+                -- 500s). Same family as 'capitalizeFirst''s title guard.
                 , bsText   = squash (fromMaybe (stubSection p) (p.rpDesc <|> p.rpRef))
                 }
             | (i, p) <- zip [1 ..] exported
@@ -252,7 +260,8 @@ lowerBlawx prog0 = do
     }
  where
   stubSection p = "Definition of " <> p.rpName.rnBase <> "."
-  squash = Text.unwords . Text.words
+  squash =
+    Text.unwords . Text.words . Text.replace "\x2014" "-" . Text.replace "\x2013" "-"
 
 -- | Blawx v1 rejects a non-stratified program with a named diagnostic: its
 -- L4-oracle determinism obligation does not tolerate multiple stable models,
