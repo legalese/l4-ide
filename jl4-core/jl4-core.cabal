@@ -113,6 +113,7 @@ library
     L4.Blawx.IR
     L4.Blawx.Lower
     L4.Blawx.Emit
+    L4.Blawx.EmitXml
     L4.Bpmn.IR
     L4.Bpmn.Lower
     L4.Bpmn.Emit

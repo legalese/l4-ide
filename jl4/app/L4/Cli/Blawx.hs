@@ -20,6 +20,7 @@ module L4.Cli.Blawx
   , blawxCmd
   ) where
 
+import Control.Monad (forM_)
 import qualified Base.Text as Text
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
@@ -30,7 +31,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.Blawx.Emit (renderBlawxYaml, renderPlDump)
+import L4.Blawx.Emit (blawxXmlGaps, renderBlawxYaml, renderPlDump)
 import L4.Blawx.Lower (lowerBlawx)
 import L4.Relational.IR (renderLowerError)
 import L4.Relational.Lower (defaultLowerOptions, lowerModule)
@@ -96,6 +97,16 @@ blawxCmd opts = do
             )
           exitFailure
         Right doc -> do
+          -- A workspace or test with no Blockly image ships an empty
+          -- `xml_content` beside a non-empty `scasp_encoding`: the Blawx
+          -- editor draws a blank canvas for it and its first Save writes that
+          -- blankness back over the rule (buttons.js:441-447 loads only `if
+          -- (output_object.xml_content)`, :22-24 saves
+          -- `sCASP.workspaceToCode(demoWorkspace)`). That must never be
+          -- silent, so say so on stderr, naming the construct.
+          forM_ (blawxXmlGaps doc) \g ->
+            hPutStrLn stderr
+              ("l4 blawx: WARNING no Blockly image, xml_content left empty — " <> Text.unpack g)
           let source = Text.pack (takeFileName opts.bxFile)
               plDump = renderPlDump source doc
           if opts.bxScasp

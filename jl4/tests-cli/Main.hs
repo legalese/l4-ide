@@ -369,6 +369,43 @@ expectGolden bin args goldenPath = do
 readUtf8 :: FilePath -> IO String
 readUtf8 fp = T.unpack . TE.decodeUtf8Lenient <$> BS.readFile fp
 
+-- | R12's sharpest failure mode: a @.blawx@ row whose @xml_content@ is empty
+-- while its @scasp_encoding@ is not.
+--
+-- Blawx draws a workspace only @if (output_object.xml_content)@
+-- (@buttons.js:444@; a falsy value leaves the canvas cleared by @:441@) and
+-- its Save writes @sCASP.workspaceToCode(demoWorkspace)@ straight back
+-- (@:22-24@) — so opening such a row and saving DELETES the rule. The
+-- headless fixpoint harness (@etc\/blawx-fixpoint-harness.mjs@) fails on the
+-- same condition, but it is optional-when-present; this is the copy that runs
+-- in CI on every event.
+--
+-- Both halves are asserted: the pairing in the emitted stream, and the
+-- absence of the emitter's own stderr diagnostic for it.
+noBlankedBlawxRow :: FilePath -> String -> IO ()
+noBlankedBlawxRow bin stem = do
+  Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4"]
+  code `shouldBe` ExitSuccess
+  (stem, "no Blockly image" `isInfixOf` serr) `shouldBe` (stem, False)
+  let fields = [f | l <- lines sout, Just f <- [blawxStoredField l]]
+      traps =
+        [ stem
+        | (("xml_content", "''"), ("scasp_encoding", v)) <- zip fields (drop 1 fields)
+        , v /= "''"
+        ]
+  traps `shouldBe` []
+
+-- | @    xml_content: |-@ → @Just ("xml_content","|-")@. Four-space indent
+-- exactly, so the six-space block-scalar content lines (which are full of
+-- colons — @xmlns=\"http:\/\/…\"@) cannot masquerade as fields.
+blawxStoredField :: String -> Maybe (String, String)
+blawxStoredField l
+  | not ("    " `isPrefixOf` l) || "     " `isPrefixOf` l = Nothing
+  | otherwise = case break (== ':') (drop 4 l) of
+      (k, ':' : v) | k `elem` ["xml_content", "scasp_encoding"] ->
+        Just (k, dropWhile (== ' ') v)
+      _ -> Nothing
+
 -- | Index of the first line containing a needle.
 --
 -- An ABSENT needle yields 'maxBound' rather than a negative sentinel, so it
@@ -2654,6 +2691,9 @@ spec bin = do
     it "dumps sumlist's s(CASP) to its golden .pl" $
       expectGolden bin ["blawx", "examples/blawx/sumlist.l4", "--scasp"]
                        "examples/blawx/expected/sumlist.pl"
+
+    it "never blanks a row's xml_content while its scasp_encoding is non-empty (R12)" $
+      mapM_ (noBlankedBlawxRow bin) ["benefit", "mortality", "scores", "sumlist"]
 
     it "emits the ruledoc first, then workspaces with the dedup-marked triple (structural smoke)" $ do
       Output code sout _ <- runL4 bin ["blawx", "examples/blawx/benefit.l4"]

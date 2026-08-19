@@ -336,7 +336,7 @@ holds(sec_1_section,eligible_for_benefit,A) :- according_to(sec_1_section,eligib
 according_to(sec_2_section,benefit_amount,A,Tmp) :- applicant(A),
 eligible_for_benefit(A),
 bonus(A,Bonus),
-Tmp is 1000 + Bonus.
+Tmp is ( 1000 + Bonus ).
 
 % BLAWX CHECK DUPLICATES
 holds(sec_2_section,benefit_amount,A,Tmp) :- according_to(sec_2_section,benefit_amount,A,Tmp).
