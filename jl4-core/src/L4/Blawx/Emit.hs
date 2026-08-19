@@ -27,20 +27,24 @@
 --    /postfix/ slot (generator 1378 escapes only the prefixes); the category
 --    and attribute variants escape all slots.
 --
--- __One documented deviation__: arithmetic ('renderArith') emits minimal
--- parentheses (@Tmp is 1000 + Bonus@) where the generator's
--- @math_operation@ always emits @( left op right )@ (generator 557-563).
--- This follows the ACCEPTED import exemplar (which used the bare form and
--- ran correctly); no shipped example exercises a calculation line, so
--- there is no generator-output witness either way. It means an
--- arithmetic-bearing rule is not byte-for-byte the fixpoint of generator
--- regeneration — semantics, precedence and association are identical, and
--- P3's @renderXml@ (which will make re-saves possible) is the point at
--- which the parenthesised image must be revisited.
+-- __Arithmetic is the generator's image__ (adopted 2026-08-19, R12-delegated
+-- sub-decision; spec §8.12): @math_operation@ emits @( left op right )@ with
+-- one space immediately inside each paren (generator 557-563), and Blockly's
+-- @valueToCode@ adds no wrapper (both operand sites pass @ORDER_ATOMIC@, the
+-- block returns @ORDER_ATOMIC@, @ORDER_OVERRIDES@ is empty — the
+-- ATOMIC-ATOMIC carve-out fires), so every binary node carries exactly one
+-- paren layer. 'BANeg' has no block of its own: a negated literal folds into
+-- @number_value@'s signed field, and any other negation becomes @( 0 - e )@.
+-- P1's minimal-paren deviation is retired — it was not reachable from any
+-- workspace, so an arithmetic-bearing rule could never have satisfied the
+-- re-save fixpoint. The image is read from the generator source, not
+-- witnessed by a shipped example (@life_act.yaml@ has no arithmetic and every
+-- other shipped example is stale-generator); it is /executed/ by the headless
+-- fixpoint harness. See @p3-design\/arith-plan.md@.
 --
--- P1 renders @renderScasp@ and @renderBlawxYaml@ only; @renderXml@ is P3 and
--- every emitted @xml_content@ is meanwhile the empty string (R12 delegated
--- sub-decision, consistent with the executed tier-2 smoke).
+-- The paired Blockly XML is "L4.Blawx.EmitXml"'s job (P3);
+-- 'renderBlawxYaml' stores both, and the two must agree — the XML is what
+-- makes the editor regenerate /this/ text on save.
 module L4.Blawx.Emit
   ( renderScasp
   , renderBlawxYaml
@@ -51,6 +55,7 @@ module L4.Blawx.Emit
   , renderBlock
   , renderGoal
   , renderTerm
+  , blawxXmlGaps
   ) where
 
 import Base
@@ -58,6 +63,7 @@ import qualified Base.Text as Text
 import Data.Char (isAlphaNum, isDigit)
 import Data.Ratio (denominator, numerator)
 
+import L4.Blawx.EmitXml (BlawxXml (..), renderDocXml, renderXmlGap)
 import L4.Blawx.IR
 
 -- ---------------------------------------------------------------------------
@@ -91,11 +97,20 @@ renderTestScasp t = renderStacks t.btStacks
 -- | Empty stacks contribute no bytes and are filtered rather than rendered as
 -- stray blank lines (a test with no scenario facts still carries the empty
 -- facts stack structurally — see 'L4.Blawx.IR.BTest').
+--
+-- The blank line goes between 'blockRuns', not between 'bwStacks' entries:
+-- only the declaration and fact blocks chain, so a stack that mixes them with
+-- a constraint, an abducible, a rule or a query draws as several canvas
+-- roots, and @Generator.workspaceToCode@ puts a blank line between roots.
+-- Reading the boundary from 'L4.Blawx.IR.blockRuns' is what keeps this
+-- renderer and "L4.Blawx.EmitXml" from disagreeing about it.
 renderStacks :: [[BBlock]] -> Text
 renderStacks stacks =
-  Text.intercalate "\n\n" (map renderStack (filter (not . null) stacks))
- where
-  renderStack = Text.intercalate "\n" . map renderBlock
+  Text.intercalate "\n\n"
+    [ Text.intercalate "\n" (map renderBlock (runBlocks run))
+    | stack <- filter (not . null) stacks
+    , run <- blockRuns stack
+    ]
 
 -- ---------------------------------------------------------------------------
 -- The .blawx YAML stream (R1) and the sibling .pl dump
@@ -106,19 +121,29 @@ renderStacks stacks =
 -- @\/import\/@ remaps pk, owner and each ruledoc FK), then the
 -- @blawx.workspace@ rows in document order, then the @blawx.blawxtest@ rows.
 -- @akoma_ntoso@\/@navtree@\/@rule_slug@ are omitted (recomputed by
--- @pre_save@); every @xml_content@ is @''@ in P1 (R12 delegated
--- sub-decision). Field order per model mirrors the ACCEPTED exemplar
+-- @pre_save@). Field order per model mirrors the ACCEPTED exemplar
 -- (@p1-design\/emit-plan.md@ §6).
 --
+-- Each row stores TWO texts, and they are two views of one block structure:
+-- @scasp_encoding@ from 'renderWorkspaceScasp' \/ 'renderTestScasp', and
+-- @xml_content@ from "L4.Blawx.EmitXml"'s 'renderDocXml' — the blocks that
+-- make the editor regenerate that same encoding on save (R12). A row whose
+-- blocks have no XML image keeps an empty @xml_content@; that row is a
+-- __data-loss trap__ (opening it shows a blank canvas whose Save writes an
+-- empty @scasp_encoding@ back over the rule), so the reason is carried out
+-- through 'blawxXmlGaps' and the CLI prints it. No corpus golden may contain
+-- such a row — @jl4\/tests-cli@ asserts it.
+--
 -- Hand-rolled and line-oriented — no YAML library — for golden stability:
--- encodings are @|-@ block scalars (strip chomping realises \"no trailing
--- newline inside the encodings\") indented six spaces, @rule_text@ is one
--- double-quoted @\\n@-escaped line, and placeholder pks number 1..n per
+-- both stored texts are @|-@ block scalars (strip chomping realises \"no
+-- trailing newline inside the value\") indented six spaces, @rule_text@ is
+-- one double-quoted @\\n@-escaped line, and placeholder pks number 1..n per
 -- model.
 renderBlawxYaml :: BlawxDoc -> Text
 renderBlawxYaml doc =
   Text.unlines (ruledocRow <> concat wsRows <> concat testRows)
  where
+  xml = renderDocXml doc
   ruledocRow =
     [ "- model: blawx.ruledoc"
     , "  pk: 1"
@@ -136,10 +161,10 @@ renderBlawxYaml doc =
       , "  fields:"
       , "    ruledoc: 1"
       , "    workspace_name: " <> renderSectionRef ws.bwName
-      , "    xml_content: ''"
       ]
-        <> yamlEncoding (renderWorkspaceScasp ws)
-    | (k, ws) <- zip [1 ..] doc.bdWorkspaces
+        <> yamlBlockScalar "xml_content" x
+        <> yamlBlockScalar "scasp_encoding" (renderWorkspaceScasp ws)
+    | (k, ws, x) <- zip3 [1 ..] doc.bdWorkspaces xml.bxWorkspaces
     ]
   testRows =
     [ [ "- model: blawx.blawxtest"
@@ -147,26 +172,38 @@ renderBlawxYaml doc =
       , "  fields:"
       , "    ruledoc: 1"
       , "    test_name: " <> yamlScalar t.btName
-      , "    xml_content: ''"
       ]
-        <> yamlEncoding (renderTestScasp t)
+        <> yamlBlockScalar "xml_content" x
+        <> yamlBlockScalar "scasp_encoding" (renderTestScasp t)
         <> [ "    tutorial: ''"
            , "    view: ''"
            , "    fact_scenario: ''"
            ]
-    | (k, t) <- zip [1 ..] doc.bdTests
+    | (k, t, x) <- zip3 [1 ..] doc.bdTests xml.bxTests
     ]
 
--- | A @scasp_encoding@ field: a @|-@ block scalar with every line indented
--- six spaces (blank lines stay empty — YAML forbids nothing, but trailing
--- whitespace would be noise), or @''@ when the encoding is empty.
-yamlEncoding :: Text -> [Text]
-yamlEncoding enc
-  | Text.null enc = ["    scasp_encoding: ''"]
+-- | Why a @.blawx@ row came out with an empty @xml_content@, one line per
+-- gap, for the CLI to print. Empty is the normal case and the only one the
+-- corpus is allowed to be in; a non-empty result means the emitted project
+-- contains a workspace or test the Blawx editor cannot draw, and therefore
+-- would blank on its first save.
+blawxXmlGaps :: BlawxDoc -> [Text]
+blawxXmlGaps doc = map renderXmlGap (renderDocXml doc).bxGaps
+
+-- | A stored-text field — @xml_content@ or @scasp_encoding@ — as a @|-@ block
+-- scalar with every line indented six spaces (blank lines stay empty — YAML
+-- forbids nothing, but trailing whitespace would be noise), or @''@ when the
+-- text is empty. Strip chomping is what realises \"no trailing newline inside
+-- the value\", which is also the form the server stores: DRF's @CharField@
+-- has @trim_whitespace=True@, so a saved value comes back stripped either
+-- way.
+yamlBlockScalar :: Text -> Text -> [Text]
+yamlBlockScalar field val
+  | Text.null val = ["    " <> field <> ": ''"]
   | otherwise =
-      "    scasp_encoding: |-"
+      "    " <> field <> ": |-"
         : [ if Text.null ln then "" else "      " <> ln
-          | ln <- Text.splitOn "\n" enc
+          | ln <- Text.splitOn "\n" val
           ]
 
 -- | A plain scalar where safe, a double-quoted one otherwise. Names here are
@@ -332,7 +369,7 @@ attributeVariant d = case d.baType of
  where
   n = bNameText d.baName
   cat = bNameText d.baCategory
-  orderAtom = case d.baOrder of BOrderOV -> "ov"; BOrderVO -> "vo"
+  orderAtom = renderNlgOrder d.baOrder
 
 -- | @relationship_declaration@ (generator 1339–1448). Argument variables are
 -- @A@–@J@ in order (1371); note quirk 4: the postfix NLG slot is NOT escaped.
@@ -434,17 +471,6 @@ frameAxioms v =
   p = v.dvName <> "(" <> v.dvArgs <> ")"
   n = "-" <> p
 
-renderValueType :: BValueType -> Text
-renderValueType = \case
-  BVBoolean    -> "boolean"
-  BVNumber     -> "number"
-  BVDate       -> "date"
-  BVTime       -> "time"
-  BVDatetime   -> "datetime"
-  BVDuration   -> "duration"
-  BVList       -> "list"
-  BVCategory n -> bNameText n
-
 -- ---------------------------------------------------------------------------
 -- The attributed-rule triple
 -- ---------------------------------------------------------------------------
@@ -482,11 +508,6 @@ ruleTriple r =
     "% BLAWX CHECK DUPLICATES\n"
       <> "  " <> unflat <> " :- holds(" <> sec <> "," <> flat <> ")."
 
-renderSectionRef :: BSectionRef -> Text
-renderSectionRef = \case
-  BRoot  -> "root_section"
-  BSec i -> "sec_" <> Text.textShow i <> "_section"
-
 -- ---------------------------------------------------------------------------
 -- Goals, terms, arithmetic
 -- ---------------------------------------------------------------------------
@@ -503,7 +524,7 @@ renderGoal = \case
     "blawx_comparison(" <> renderTerm x <> "," <> cmpAtom op <> "," <> renderTerm y <> ")"
   BGUnify x y -> renderTerm x <> " = " <> renderTerm y
   BGDiseq x y -> "blawx_diseq(" <> renderTerm x <> "," <> renderTerm y <> ")"
-  BGIs (MkBVar out) e -> out <> " is " <> renderArith 0 e
+  BGIs (MkBVar out) e -> out <> " is " <> renderArith e
   BGFindall (MkBVar tmpl) body (MkBVar out) ->
     -- v1 bodies are single-goal by construction (Lower factors multi-goal
     -- bodies through an auxiliary predicate); the "," join below is for
@@ -531,42 +552,54 @@ aggAtom = \case
   BMin     -> "min"
   BMax     -> "max"
 
-renderTerm :: BTerm -> Text
-renderTerm = \case
-  BTVar (MkBVar v) -> v
-  BTNum q          -> renderRational q
-  BTAtom n         -> bNameText n
-  BTNil            -> "[]"
-  BTCons h t       -> "[" <> renderTerm h <> " | " <> renderTerm t <> "]"
-
--- | An integral 'Rational' renders as its integer text. A non-integral one
--- renders @num\/den@ — reachable only if Lower's R7 gate is lifted (the
--- measurement is re-run as part of P1; until then Lower rejects non-integral
--- literals with a named diagnostic, so this arm is totality, not policy).
-renderRational :: Rational -> Text
-renderRational q
+-- | A 'Rational' in __arithmetic__ position. Integral: the @number_value@
+-- field's text, as 'renderRational'. Non-integral: the only block image is a
+-- @math_operation@ division of two @number_value@ fields, i.e.
+-- @( num \/ den )@ — never the bare @num\/den@ text, which no workspace can
+-- produce. Unreachable today (R7 gate, as above); this is the form the gate
+-- would have to emit if it were lifted.
+renderArithNum :: Rational -> Text
+renderArithNum q
   | denominator q == 1 = Text.textShow (numerator q)
-  | otherwise          = Text.textShow (numerator q) <> "/" <> Text.textShow (denominator q)
+  | otherwise =
+      "( " <> Text.textShow (numerator q) <> " / " <> Text.textShow (denominator q) <> " )"
 
--- | Arithmetic with the calculation block's @ + @\/@ - @\/@ * @\/@ \/ @
--- spacing, minimal parentheses, never reassociated. The 'Int' is the
--- enclosing precedence context (0 = none).
-renderArith :: Int -> BArith -> Text
-renderArith ctx = \case
-  BANum q -> renderRational q
+-- | Arithmetic in the generator's image. Every binary node renders as
+-- @( left op right )@ — one space immediately inside each paren — because
+-- @sCASP['math_operation']@ concatenates exactly
+-- @"( " + left + " " + text2math(op) + " " + right + " )"@ (generator
+-- 557-563) with operators @+ - * \/@ from @text2math@ (generator 69-82), and
+-- Blockly's @valueToCode@ adds no further parens: both operand sites pass
+-- @ORDER_ATOMIC@, the block returns @ORDER_ATOMIC@ and @ORDER_OVERRIDES@ is
+-- empty (generator 12-15), so the ATOMIC-ATOMIC carve-out fires. Exactly one
+-- paren layer per node; association is carried entirely by the parens and is
+-- never reassociated.
+--
+-- Blawx has __no unary-negation block__: the complete @output: "Number"@
+-- inventory is @number_value@, @math_operation@ and the two unimplemented
+-- @*_element@ stubs (which emit the placeholder @\'...\'@ and are commented
+-- out of the toolbox), and @math_operation@'s dropdown is
+-- @add@\/@sub@\/@mul@\/@div@ only (@blawx-blocks.js:1102-1121@). So 'BANeg'
+-- takes two UI-expressible images: a negated literal folds into a signed
+-- @number_value@ field, and every other negation emits the @math_operation@
+-- @( 0 - e )@.
+--
+-- __Neither arm is exercised by anything__, and not merely by no seed:
+-- 'L4.Relational.IR.RANeg' has no construction site anywhere in the tree
+-- (it is only pattern-matched, in @Blawx\/Lower.hs@ and
+-- @Relational\/Debug.hs@), so no L4 source can reach 'BANeg' today — a
+-- negated literal arrives already folded as a negative 'BANum' (measured:
+-- @x PLUS -3@ emits @Tmp is ( A + -3 )@). Both arms ship on the block
+-- evidence, as the form the images would have to take, not on coverage.
+renderArith :: BArith -> Text
+renderArith = \case
+  BANum q          -> renderArithNum q
   BAVar (MkBVar v) -> v
-  BANeg e -> "-(" <> renderArith 0 e <> ")"
-  BABin op l r ->
-    let prec = opPrec op
-        rendered =
-          renderArith prec l <> " " <> opText op <> " " <> renderArith (prec + 1) r
-    in  if prec < ctx then "(" <> rendered <> ")" else rendered
+  BANeg (BANum q)  -> renderArithNum (negate q)
+  BANeg e          -> "( 0 - " <> renderArith e <> " )"
+  BABin op l r     ->
+    "( " <> renderArith l <> " " <> opText op <> " " <> renderArith r <> " )"
  where
-  opPrec = \case
-    BAdd -> 1
-    BSub -> 1
-    BMul -> 2
-    BDiv -> 2
   opText = \case
     BAdd -> "+"
     BSub -> "-"

@@ -12,7 +12,10 @@
   fields:
     ruledoc: 1
     workspace_name: root_section
-    xml_content: ''
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">person</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a person</field><next><block type="new_attribute_declaration" id="l4b000003"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person" attribute_type="boolean"></mutation><field name="category_name">person</field><field name="attribute_name">is_human</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is human</field><next><block type="new_attribute_declaration" id="l4b000004"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person" attribute_type="boolean"></mutation><field name="category_name">person</field><field name="attribute_name">is_mortal</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is mortal</field></block></next></block></next></block></statement></block>
+      </xml>
     scasp_encoding: |-
       blawx_category(person).
       blawx_category_nlg(person,"","is a person").
@@ -151,7 +154,10 @@
   fields:
     ruledoc: 1
     workspace_name: sec_1_section
-    xml_content: ''
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000005" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000006"><value name="object"><block type="variable" id="l4b000007"><field name="variable_name">P</field></block></value><value name="category"><block type="category_selector" id="l4b000008"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value><next><block type="unary_attribute_selector" id="l4b000009"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_human" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is human</field><value name="first_element"><block type="variable" id="l4b000010"><field name="variable_name">P</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000011"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">M 1</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000012"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_mortal" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is mortal</field><value name="first_element"><block type="variable" id="l4b000013"><field name="variable_name">P</field></block></value></block></statement></block>
+      </xml>
     scasp_encoding: |-
       according_to(sec_1_section,is_mortal,P) :- person(P),
       is_human(P).
@@ -166,7 +172,11 @@
   fields:
     ruledoc: 1
     test_name: q1
-    xml_content: ''
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000014" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000015"><value name="object"><block type="object_selector" id="l4b000016"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="l4b000017"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value><next><block type="unary_attribute_selector" id="l4b000018"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_human" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is human</field><value name="first_element"><block type="object_selector" id="l4b000019"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value></block></next></block></statement></block>
+      <block type="query" id="l4b000020" x="40" y="268"><statement name="query"><block type="unary_attribute_selector" id="l4b000021"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_mortal" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is mortal</field><value name="first_element"><block type="object_selector" id="l4b000022"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value></block></statement></block>
+      </xml>
     scasp_encoding: |-
       person(p1).
       is_human(p1).
@@ -180,7 +190,11 @@
   fields:
     ruledoc: 1
     test_name: q2
-    xml_content: ''
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000023" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000024"><value name="object"><block type="object_selector" id="l4b000025"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="l4b000026"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value><next><block type="logical_negation" id="l4b000027"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000028"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_human" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is human</field><value name="first_element"><block type="object_selector" id="l4b000029"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value></block></statement></block></next></block></statement></block>
+      <block type="query" id="l4b000030" x="40" y="298"><statement name="query"><block type="unary_attribute_selector" id="l4b000031"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_mortal" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is mortal</field><value name="first_element"><block type="object_selector" id="l4b000032"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value></block></statement></block>
+      </xml>
     scasp_encoding: |-
       person(p1).
       -is_human(p1).
@@ -194,7 +208,12 @@
   fields:
     ruledoc: 1
     test_name: interview
-    xml_content: ''
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="assume" id="l4b000033" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000034"><value name="object"><block type="variable" id="l4b000035"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000036"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000037" x="40" y="208"><statement name="statements"><block type="unary_attribute_selector" id="l4b000038"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_human" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is human</field><value name="first_element"><block type="variable" id="l4b000039"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="query" id="l4b000040" x="40" y="346"><statement name="query"><block type="unary_attribute_selector" id="l4b000041"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_mortal" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is mortal</field><value name="first_element"><block type="variable" id="l4b000042"><field name="variable_name">X</field></block></value></block></statement></block>
+      </xml>
     scasp_encoding: |-
       #abducible person(X).
 

@@ -830,6 +830,18 @@ byte-reproduced in our emitter, candidate for a second fork PR. The reference ch
 stays on the quirky branch so byte-comparisons remain against what upstream actually
 generates._
 
+_P3 found a **fourth** quirk, this one a data-corrupting UI race rather than an NLG
+asymmetry: on the test editor page the workspace auto-load (an async XHR issued at script
+evaluation) races `window.onload` populating `knownCategories`, so
+`updateLocalCategories`'s `updateDropDownOptions` (blawx-blocks.js:5586-5615) validates
+every `new_object_category` dropdown against an empty category list and snaps it to the
+first option — twice: value → `none` → the first declared category. Measured in the tier-2
+UI drive: a test asserting `basket(b1)` re-saved as `student(b1)`. Any Blawx user whose
+test workspace asserts membership in a non-first-declared category silently loses data on
+open-and-save. Our emitter is immune by construction — category-membership facts emit as
+`object_category` + `category_selector` (a serialisable label, no dropdown; byte-identical
+generated code) — and the race is a candidate for a third fork PR._
+
 ### 8.11 R11 — tests: one BlawxTest per `#EVAL`/`#ASSERT`; the oracle is L4
 
 **Evidence.** Test anatomy and query conventions §2 **[E]**; run-endpoint payload/response
@@ -868,6 +880,118 @@ target. **Not decided.** Auto-layout policy (single column suffices?); whether P
 already embed placeholder XML or empty strings.
 
 **ANSWERED 2026-08-18 (Meng, delegated).** Delegated to the implementing session; the proposal stands as written — block-level IR, `renderScasp` in P1, `renderXml` in P3, re-save fixpoint as the gate. The delegated sub-decisions: single-column auto-layout; P1 goldens carry empty `xml_content` (consistent with the executed tier-2 smoke).
+
+_R12 sub-decision — arithmetic image (2026-08-19, delegated, decided in the P3 build) **[E]**:
+**adopt the generator's image.** P1 shipped one documented deviation — `renderScasp`
+parenthesised minimally (`Tmp is 1000 + Bonus`) — because no shipped example exercises a
+calculation line and either form runs. P3 pairs Blockly XML with every workspace, so the re-save
+fixpoint now decides it. Read at Blawx `02eded1` (identical at HEAD `e36ac8f`, a CLAUDE.md-only
+commit): `sCASP['math_operation']` (`scasp_generator.js:557-563`) emits
+`"( " + left + " " + text2math(op) + " " + right + " )"` — **spaces immediately inside both
+parens** — with operators `+ - * /` from `text2math` (`:69-82`); `sCASP['calculation']`
+(`:550-555`) emits `variable + " is " + calculation`; `sCASP['number_value']` (`:512-516`) emits
+the `field_number`'s JS number text (`blawx-blocks.js:924-938`: no `min`, no `precision`, so
+negatives and decimals are admissible and integers carry no decimal point). Both operand sites
+and the `is` wrapper call `valueToCode` with `ORDER_ATOMIC`, `math_operation` returns
+`ORDER_ATOMIC`, and `ORDER_OVERRIDES` is empty (`:12-15`), so Blockly's ATOMIC-ATOMIC carve-out
+suppresses wrapper parens: **exactly one paren layer per binary node**, e.g.
+`Tmp is ( 1000 + Bonus )` and `X is ( ( A + B ) * C )`. `BANeg` has no block image — the
+complete `output: "Number"` inventory is `number_value`, `math_operation` and the two
+unimplemented `*_element` stubs that emit `'...'` and are commented out of the toolbox
+(`toolbox.html:47,59`), and `math_operation`'s dropdown is `add`/`sub`/`mul`/`div` only
+(`blawx-blocks.js:1102-1121`) — so a negated literal folds into a signed `number_value` field and
+every other negation emits as `( 0 - e )`. Non-integral literals stay R7-gated in `Lower`; their
+only block image would be `( num / den )`, never `num/den`, and the emitter's arithmetic path now
+renders them that way (`Emit.renderArithNum`) while term position keeps `renderRational`'s
+`num/den`, which has no block image at all and so is the thing lifting the gate must answer for
+first. Three golden is-goals move (`sumlist.pl:96,130`, `benefit.pl:339`, and their `.blawx`
+mirrors); the tier-1 harness re-runs 16/16 **[E]**, showing parenthesization is semantically
+inert. Two findings for Lexpedite, recorded in `p3-design/arith-plan.md`:
+`X is <bare variable>` is unrepresentable (`calculation`'s `calculation` input is
+`check: "Number"`; all variable blocks are `output: "VARIABLE"`), and the `calculation` block is
+absent from the toolbox in both editors, so a human cannot create one from the drawer even though
+it deserialises and regenerates correctly._
+
+Nothing in §8.7 (R7) changes: the cents-as-integers convention and the two executed
+exact-rational measurements stand unaltered by this ruling.
+
+_R12 sub-decision — what the XML renderer does when a slot has no structural image (2026-08-19,
+delegated, decided in the P3 build) **[E]**. Four rulings, all forced by measurement against the
+real restorers and the real generator:_
+
+_**(1) The blank line goes between block RUNS, not between `bwStacks` entries.** Only the
+declaration and fact blocks carry a `previousStatement`; `unattributed_constraint`, `assume`,
+`attributed_rule` and `query` do not (`blawx-blocks.js:565-581, 1907-1923, 3107-3146, 235-250`),
+so they can only be canvas roots, and `Generator.workspaceToCode` joins top-block outputs with
+`'\n'` while each root's code already ends in one — every run boundary is a blank line.
+`Lower.convertQuery` puts an `#ASSERT` constraint in the same stack as the scenario facts, so
+`renderScasp` was emitting one blank line too few for `benefit blawxtest/q2` and `/q3` (measured:
+stored 130 B / 7 lines vs regenerated 131 B / 8 lines). Fixed by moving the partition into
+`L4.Blawx.IR.blockRuns` and having **both** renderers read it, so they cannot disagree again; the
+latent cases (`BAbducible`, `BAttributedRule`, `BQuery` in a mixed stack) are closed by
+construction. This is a change to `renderScasp` output — the only one outside arithmetic — and it
+is the fixpoint correcting P1, not a new policy: two `.blawx` test rows gain one blank line each,
+the four `.pl` dumps are byte-unchanged (no workspace stack mixes kinds), and the tier-1 harness
+re-runs **16/16 [E]**._
+
+_**(2) `attributes.js` is part of the load path, and an empty `attributetype` is not "no check".**
+`setAttributeType` (`attributes.js:1-21`) is registered on `demoWorkspace` by both editor
+templates (`blawx.html:168`, `test.html:164`) and fires on every `BLOCK_CREATE` with **no
+`if (attributeType)` guard** — unlike `ATTRIBUTE_SELECTOR_MUTATOR_MIXIN.domToMutation`
+(`mutators.js:165`), which is the only place the P3 design had looked. Since
+`blawxTypeToBlocklyType("")` returns `'OBJECT'` (`mutators.js:18-20`) and `Connection.setCheck`
+unplugs an already-connected incompatible child, the `attributetype=""` we were emitting tore the
+`empty_list` / `head_tail` / `number_value` operands off **six** golden rows
+(`scores/sec_5_section`, `sumlist/{sec_1_section, sec_3_section, q1, q2, q5}`), which then
+regenerated `[X | Rest].` as a naked top-level statement and `running_total(,)` for the clause
+that had lost both arguments **[E]**. Ruling: `attributetype` is now **derived from the operand
+actually in the value slot** (declared type when it admits that operand, else `list`/`number`/
+`object` by the term's Blockly output), and is never empty and never absent._
+
+_**(3) A slot pinned to `[OBJECT,VARIABLE]` takes an `object_selector` surrogate, not a gap.**
+Three inputs cannot be widened from XML at all: `attribute_selector`'s object slot (ruling 2 —
+and `attributes.js` pins the mirror input the same way under `vo`, so swapping the argument order
+does not help), `unary_attribute_selector`'s `first_element` (`blawx-blocks.js:3041-3048`, mutator
+never calls `setCheck`, `mutators.js:181-195`) and `new_object_category`'s `object`. A list in one
+of those — `running_total([],0)`, `all_positive([X|Rest])` — therefore has **no structural image
+anywhere in the 127-block inventory** (`relationship_selector` starts at arity 3). The P3 build
+had been shipping those rows with an empty `xml_content`, which is not a neutral omission: Blawx
+draws a workspace only `if (output_object.xml_content)` (`buttons.js:441-447`) and Save writes
+`sCASP.workspaceToCode(demoWorkspace)` straight back (`:22-24`), so **opening such a row and
+saving deletes the rule** — the sharpest possible violation of the R12 exit criterion. Ruling:
+emit an `object_selector` whose `object_name` label is the term's own s(CASP) text. Its output is
+`OBJECT` so it survives every pin; its field is a `field_label_serializable` with no validator so
+it round-trips verbatim; and its generator arm is `this.getFieldValue('object_name')`
+(`scasp_generator.js:471-474`) so the regenerated bytes are exactly ours. What is lost is
+editability of that subterm in the UI, and only that — a strictly better failure than a blank
+canvas, and fail-safe, because a label is not editable and so cannot be silently corrupted. The
+surrogate is used **only** where the structural image would be torn off: a list in a value slot
+still gets real `head_tail` blocks._
+
+_**(4) A blanked row is a compile-time diagnostic, and no golden may contain one.** What the
+surrogate cannot rescue still yields an `XmlGap`, but the reason is no longer discarded:
+`L4.Blawx.Emit.blawxXmlGaps` carries it out and `l4 blawx` prints one `WARNING no Blockly image`
+line per gap to stderr, and `jl4/tests-cli` asserts for all four seeds that no row pairs an empty
+`xml_content` with a non-empty `scasp_encoding` (and that the warning is absent). **After rulings
+2 and 3 the corpus has zero gaps**: all 35 rows — 13 workspaces and 22 tests — carry XML.
+Shape note: the renderer the brief names as the P3 deliverable, `renderXml :: BlawxDoc -> Text`,
+is not what shipped and has been removed; the row-level values the YAML stores can only come from
+a per-row renderer, so the module's surface is `renderDocXml :: BlawxDoc -> BlawxXml` (workspaces,
+tests, gaps), and `L4.Blawx.IR`'s two-renderer contract now names it._
+
+_**Status.** The headless fixpoint harness (`etc/blawx-fixpoint-harness.mjs`) is green on all four
+goldens — **35 checked, 0 failed**, and again under `BLAWX_FIXPOINT_ISOLATE=1` (a fresh jsdom
+realm per row) **[E]**. It was itself repaired in this build: it had omitted `attributes.js` and
+the two listeners the templates register (`onCategoryChange`,
+`updateRelationshipDeclaration` — `blawx.html:100-101`, `test.html:149-150`) on the false premise
+that the UI-only files "contribute nothing to the generator", and Blockly drains its event queue
+on a macrotask, so nothing fired inside a synchronous `domToWorkspace(); workspaceToCode()`. It
+now boots the page globals, models `getAllWorkspaces` with the file's own workspace rows (what
+the server would return) and awaits the queue. Headless remains the fast 99%, not the authority:
+**the coordinator's tier-2 browser pass is still what marks §10 P3 EXECUTED**, and it must run in
+the same timezone the harness pins (`TZ=UTC`), because date and datetime blocks encode through the
+local-time `Date` constructor (`scasp_generator.js:528-535`, `:790-800`) — latent for this corpus,
+which has no numeric date literals, and live for the next one that does._
 
 ### 8.13 R13 — validation harness: two tiers, optional-when-present, never a build dependency
 
@@ -961,6 +1085,25 @@ earmark in R10, not a deliverable).
 
 - **P3 — editability.** `renderXml`; re-save fixpoint holds for every seed workspace (R12).
   Exit: byte-identical `scasp_encoding` after UI open-and-save of every workspace.
+
+  _**EXECUTED 2026-08-19, FIXPOINT HOLDS AT FULL WIDTH**: `L4.Blawx.EmitXml` pairs every
+  row — all **35** workspaces and tests across the four seeds carry Blockly XML, zero
+  gaps (a tests-cli assertion now forbids empty `xml_content` beside non-empty
+  `scasp_encoding`, and `l4 blawx` warns on stderr if a construct ever gaps again). The
+  arithmetic image adopted the generator's `( l op r )` form (§8.12 sub-decision) and the
+  stack→canvas-root partition moved into the IR (`BRun`) so both renderers read one
+  boundary. Verified on four independent instruments: tier-1 harness **16/16** oracle
+  answers; the headless fixpoint harness (`etc/blawx-fixpoint-harness.mjs` — real vendored
+  Blockly 10.1.3 + restorers + generator under jsdom, attributes.js loaded, event queue
+  drained) **35/35** byte-identical; the authoritative tier-2 drive — import into the
+  container, then every row opened and saved through the REAL editor pages in Chrome
+  (puppeteer calling the pages' own `load_section_workspace`/`updateWorkspace`/
+  `updateBlawxTest`) — **35/35** byte-identical stored encodings; and the run endpoint
+  re-answering **16/16** on the post-save state. The UI drive caught what headless could
+  not: quirk #4 (§8.10), the test-page category-dropdown race, fixed on our side by the
+  `object_category` + `category_selector` image. Drivers: `drive-saves.mjs` +
+  `compare.py`, session scratchpad (`tier2-fixpoint/`)._
+
 - **P4 — the showcase.** A statute corpus (BNA §1 or a Housing Act ground — both have
   `§`-anchored L4 encodings) emitted with full NLG; published on a Blawx instance; the
   scenario explorer runs an interview and every answer carries a justification tree with
@@ -1068,7 +1211,7 @@ according_to(sec_2_section,veteran_bonus,A,0) :- applicant(A),
 according_to(sec_2_section,benefit_amount,A,Amount) :- applicant(A),
 eligible_for_benefit(A),
 veteran_bonus(A,Bonus),
-Amount is 1000 + Bonus.
+Amount is ( 1000 + Bonus ).
 
 according_to(sec_2_section,benefit_amount,A,0) :- applicant(A),
 not eligible_for_benefit(A).

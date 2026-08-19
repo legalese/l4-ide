@@ -93,7 +93,7 @@ blawx_during(datetime(bot),-go(A,B,C,D),datetime(eot)) :- blawx_initially(-go(A,
 running_total([],0).
 
 according_to(sec_1_section,running_total,[X | Rest],Tmp) :- running_total(Rest,Runningtotal),
-Tmp is X + Runningtotal.
+Tmp is ( X + Runningtotal ).
 
 % BLAWX CHECK DUPLICATES
 holds(sec_1_section,running_total,[X | Rest],Tmp) :- according_to(sec_1_section,running_total,[X | Rest],Tmp).
@@ -127,7 +127,7 @@ holds(sec_4_section,total_from,Xs,Floor,Go) :- according_to(sec_4_section,total_
 go(Xs,Floor,[],Floor).
 
 according_to(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp) :- go(Xs,Floor,Rest,Go),
-Tmp is Y + Go.
+Tmp is ( Y + Go ).
 
 % BLAWX CHECK DUPLICATES
 holds(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp) :- according_to(sec_4_section,go,Xs,Floor,[Y | Rest],Tmp).
