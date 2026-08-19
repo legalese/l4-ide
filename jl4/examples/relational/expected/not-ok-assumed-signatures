@@ -1,0 +1,4 @@
+lowering errors: 3
+  assumed-signatures.l4:30:1-31:34: in `positive holds`: higher-order function: `holds for` takes a function-typed parameter; the relational middle end is first-order Horn, so an ASSUMEd predicate's parameters must be values
+  assumed-signatures.l4:33:1-34:35: in `born on their own birthday`: date arithmetic: date-valued parameters and results are M2 (see specs/todo/DATE-LIBRARY-SPEC.md)
+  assumed-signatures.l4:36:1-37:41: in `has a middle name`: MAYBE beyond isJust/isNothing/fromMaybe: a MAYBE-valued parameter or result is outside the M1 fragment

@@ -1,0 +1,27 @@
+relational program — assumed-nullary.l4
+
+predicates:
+  input the notice was served/0 : (goal)  % assumed-nullary.l4:27:1-44
+    desc: the notice was served on the recipient
+    (no clauses)
+  input days allowed/0 : NUMBER  % assumed-nullary.l4:29:1-47
+    (no clauses)
+  computed exported is in time/1 : (goal)  % assumed-nullary.l4:32:1-36:31
+    params: NUMBER
+    desc: whether the recipient is in time to appeal
+    is in time(N_0) :- the notice was served, days allowed(Daysallowed_1), N_0 =< Daysallowed_1.  % assumed-nullary.l4:35:7-36:31
+
+dependencies:
+  is in time -> the notice was served (+)
+  is in time -> days allowed (+)
+
+stratification:
+  stratified
+    0  days allowed
+    0  is in time
+    0  the notice was served
+
+fidelity report — relational
+  [R-TYPICALLY] lossy — days allowed  (assumed-nullary.l4:29:1-47)
+      a TYPICALLY default on an ASSUME is dropped: the name becomes an input predicate, and seeding it would answer the question the target's interview exists to ask
+      lost: the default value

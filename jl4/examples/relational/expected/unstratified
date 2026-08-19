@@ -1,0 +1,28 @@
+relational program — unstratified.l4
+
+records:
+  Flag  % unstratified.l4:15:1-16:22
+    seed : BOOLEAN
+
+predicates:
+  input seed/1 : BOOLEAN  % <no source range>
+    params: Flag
+    (no clauses)
+  computed exported p holds/1 : (goal)  % unstratified.l4:19:1-22:33
+    params: Flag
+    p holds(F_0) :- proj(F_0, seed, Seed_1), Seed_1 = TRUE, not q holds(F_0).  % unstratified.l4:22:5-33
+  computed exported q holds/1 : (goal)  % unstratified.l4:25:1-28:20
+    params: Flag
+    q holds(F_2) :- not p holds(F_2).  % unstratified.l4:28:5-20
+
+dependencies:
+  p holds -> seed (+)
+  p holds -> q holds (-)
+  q holds -> p holds (-)
+
+stratification:
+  NOT stratified
+    cycle: p holds -> q holds
+
+fidelity report — relational
+  (nothing lost)

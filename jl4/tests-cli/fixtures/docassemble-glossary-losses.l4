@@ -1,0 +1,40 @@
+-- The two ways an L4 defined term cannot become a docassemble `auto terms:`
+-- entry. Both used to be silent, and the fidelity report used to say
+-- "(nothing lost)" over them.
+--
+--   * `s 12(1)` carries regex metacharacters. Docassemble interpolates an
+--     `auto terms` key straight into a regular expression with no re.escape
+--     (parse.py:2908 at 1b6678384), so a BALANCED `(...)` compiles to a
+--     capture group whose pattern no longer matches the term that named it,
+--     and an UNBALANCED one raises re.error while the Interview is being
+--     constructed — the emitted interview then cannot be loaded at all, while
+--     `l4 check` and `l4 docassemble` both report success. Expect
+--     DA-GLOSS-REGEX and no glossary entry.
+--
+--   * `notice` folds onto `Notice` under docassemble's own key normalisation
+--     (lower-case + whitespace-collapse, parse.py:2905), so only one of the two
+--     can be a key at all — and what the loser costs is not a duplicate key but
+--     its whole definition. Expect DA-GLOSS-COLLIDE, `Notice`'s gloss kept
+--     (first spelling wins, deterministically), and `notice`'s gone.
+
+@desc A formal notice served under the Act
+DECLARE Notice
+    HAS
+      @desc whether the notice was served
+      `served` IS A BOOLEAN
+      @desc whether the deadline has passed
+      `deadline passed` IS A BOOLEAN
+
+@export Whether the notice rule is met
+GIVEN n IS A Notice @desc The notice under assessment
+GIVETH A BOOLEAN
+DECIDE `notice rule met` n IF `s 12(1)` AND `notice`
+ WHERE
+    @desc REGEXDROPPEDGLOSS the served requirement of the section
+    `s 12(1)` MEANS n's `served`
+
+    @desc COLLIDEDROPPEDGLOSS a completely different meaning from the type's
+    `notice` MEANS n's `deadline passed`
+
+#EVAL `notice rule met` OF Notice WITH `served` IS TRUE, `deadline passed` IS TRUE
+-- TRUE
