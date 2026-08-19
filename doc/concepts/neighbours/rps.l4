@@ -1,0 +1,101 @@
+-- The Rock Paper Scissors Act, encoded in idiomatic L4.
+--
+-- This is the same imaginary statute that Blawx's official Beginner's Guide
+-- encodes in blocks (see blawx-and-scasp.md alongside this file). The point of
+-- this file is contrast, not export: it uses L4's typed, functional idiom —
+-- an enumeration for the signs, records for players and games, a total
+-- function with a MAYBE result for the winner — where Blawx uses a flat
+-- universe of objects, categories, and defeasible relational rules.
+--
+-- The Act (from the Blawx Beginner's Guide):
+--
+--   Rock Paper Scissors Act
+--
+--   Players
+--   1. A game of rock paper scissors has two players.
+--   2. There are three signs:
+--     (a) Rock,
+--     (b) Paper, and
+--     (c) Scissors.
+--
+--   Defeating Relationships
+--   3. The signs are related in the following ways:
+--     (a) Rock beats Scissors,
+--     (b) Scissors beats Paper, and
+--     (c) Paper beats Rock.
+--
+--   Winner
+--   4. The winner of a game is the player who throws
+--   a sign that beats the sign of the other player.
+
+IMPORT prelude
+
+§ `Rock Paper Scissors Act`
+
+§§ `Section 2 — there are three signs`
+
+DECLARE Sign IS ONE OF
+    rock
+    paper
+    scissors
+
+§§ `Section 1 — a game has two players`
+
+DECLARE Player HAS
+    name    IS A STRING
+    threw   IS A Sign
+
+DECLARE Game HAS
+    player1 IS A Player
+    player2 IS A Player
+
+§§ `Section 3 — the defeating relationships`
+
+GIVEN a IS A Sign
+      b IS A Sign
+GIVETH A BOOLEAN
+DECIDE a beats b IF
+       ( a EQUALS rock     AND b EQUALS scissors )   -- 3(a)
+    OR ( a EQUALS scissors AND b EQUALS paper )      -- 3(b)
+    OR ( a EQUALS paper    AND b EQUALS rock )       -- 3(c)
+
+§§ `Section 4 — the winner`
+
+-- The Act's sentence is partial: a drawn game has no winner. L4 makes the
+-- partiality a type: the result is a MAYBE Player, and the drawn case is
+-- NOTHING rather than an absent model.
+GIVEN g IS A Game
+GIVETH A MAYBE Player
+`the winner of` g MEANS
+    IF g's player1's threw beats g's player2's threw
+    THEN JUST (g's player1)
+    ELSE IF g's player2's threw beats g's player1's threw
+         THEN JUST (g's player2)
+         ELSE NOTHING
+
+-- Blawx's Beginner's Guide tests this encoding with "bob threw scissors,
+-- jane threw rock". The L4 equivalents of that test:
+
+#EVAL `the winner of` OF
+        Game WITH
+            player1 IS Player WITH
+                        name  IS "bob"
+                        threw IS scissors
+            player2 IS Player WITH
+                        name  IS "jane"
+                        threw IS rock
+-- jane wins: rock beats scissors
+
+-- the drawn game, which the Blawx encoding answers with "no models":
+#EVAL `the winner of` OF
+        Game WITH
+            player1 IS Player WITH
+                        name  IS "bob"
+                        threw IS rock
+            player2 IS Player WITH
+                        name  IS "jane"
+                        threw IS rock
+-- NOTHING: no winner
+
+#ASSERT rock beats scissors
+#ASSERT NOT rock beats paper

@@ -928,6 +928,16 @@ open-and-save. Our emitter is immune by construction — category-membership fac
 `object_category` + `category_selector` (a serialisable label, no dropdown; byte-identical
 generated code) — and the race is a candidate for a third fork PR._
 
+_Executed (2026-08-20): every remaining fork-PR candidate above and below is now an open PR
+on the fork, each built and adversarially verified in fresh containers against pristine
+upstream `main`: the `holds`→`-blawx_applies` bridge (§8.14 finding 1) as **legalese/blawx#2**
+(one clause in `ldap.py` — the generator turned out to have no per-workspace standard block,
+so the server-side home avoids any stored-workspace migration and leaves this emitter's
+byte-fidelity contract untouched); the interview endpoint's `find_assumptions` crash (§10 P4)
+as **legalese/blawx#3**; the category-dropdown race (quirk #4, above) as **legalese/blawx#4**;
+and the negative `blawx_defeated` NLG asymmetry (quirk #3, above) as **legalese/blawx#5**.
+Per R10, all four wait on the fork beside #1 until upstreaming to Lexpedite is warranted._
+
 ### 8.11 R11 — tests: one BlawxTest per `#EVAL`/`#ASSERT`; the oracle is L4
 
 **Evidence.** Test anatomy and query conventions §2 **[E]**; run-endpoint payload/response
@@ -1165,6 +1175,7 @@ Two findings the execution produced, both recorded where they belong:
    `-blawx_applies(S,X) :- holds(_Z,-blawx_applies,S,X).`; the harness adds it, names the finding
    in one place, and a control run without it reproduces the failure exactly (3/4, the fourth
    FAIL). The lift implements the intended semantics. File upstream beside `legalese/blawx#1`.
+   _(Filed 2026-08-20 as legalese/blawx#2 — see the executed note in §8.10.)_
 2. **The recorded expectation is the L4 engine's own answer, written by the pipeline** (`-- L4
 oracle ==> …`, spliced after each `#EVAL` by re-running the module through the evaluator), and
    the design's second herald `-- Blawx <test> ==>` is deliberately **not** emitted: the lift
@@ -1313,7 +1324,8 @@ earmark in R10, not a deliverable).
   comment differs), and discharging P1's `#abducible`-interview earmark (a module with
   zero `DECLARE`s now gets an interview; abduction confirmed live in the container: 2 and
   3 answers); **P4c** `housing-grounds.l4` — Housing Act 1988 Sch 2 grounds 8, 13, 15
-  and 17 inlined into one 695-line module, 14 `@export` citations, 49 directives all
+  and 17 inlined into one 727-line module (an earlier draft of this note said 695;
+  `wc -l` on the committed file says 727 and always has), 14 `@export` citations, 49 directives all
   oracle-verified against `l4 run` (0 mismatches). The BNA was declined for P4: its three
   `DATE` fields are fatal in v1 and pre-resolving them would delete the statute's actual
   legal content (the commencement boundary). Verification at full width: tier-1

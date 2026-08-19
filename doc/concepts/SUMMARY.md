@@ -20,6 +20,10 @@
 - [Algebraic Types](type-system/algebraic-types.md)
 - [Exhaustiveness](type-system/exhaustiveness.md)
 
+## Neighbours
+
+- [Blawx and s(CASP)](neighbours/blawx-and-scasp.md)
+
 ## Reviewing
 
 - [Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)
