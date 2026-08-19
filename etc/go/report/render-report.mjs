@@ -295,7 +295,13 @@ function sourceSection() {
     .map(([k, v]) => `| \`${k.replace(/^corpus_sha_/, "")}\` | \`${v}\` |`);
   return [
     absent(
-      "SPEC.md §P1 requires the source bundle with provenance — the SEC entry point, the eCFR retrieval, and the FR citations for the adoption and each amendment.",
+      // Subject-GENERIC. This sentence used to name "the SEC entry point, the
+      // eCFR retrieval, and the FR citations", which is Reg CF's apparatus and
+      // nobody else's: the sg-succession report told a reader that a Singapore
+      // succession corpus owed an eCFR retrieval. The requirement is the same
+      // for every subject; only the sources differ, and those are the
+      // subject's own business, not this renderer's.
+      "SPEC.md §P1 requires the source bundle with provenance — the retrieval of each source document, its integrity digest or immutable capture, the publisher's in-force statement, and the citation of the instrument and of each amendment.",
       "`p1-ingest` is not declared at this milestone: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — at `g2` it validates a deposited source bundle — but a bundle is not what this run read.)",
     ),
     "",
@@ -312,7 +318,11 @@ function sweepSection() {
   if (r) return receiptBlock(r);
   return absent(
     'SPEC.md §P2 requires the external-modification register, and requires this report to state what was SEARCHED, not only what was found — "no modification found" is a checked claim, not a default.',
-    "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts, C&DIs, no-action letters, or rules in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
+    // Also subject-generic: "C&DIs, no-action letters" is the SEC's guidance
+    // apparatus. Courts, regulator guidance and instruments in flight are the
+    // three classes every jurisdiction has; what they are CALLED is the
+    // subject's business.
+    "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
   );
 }
 
