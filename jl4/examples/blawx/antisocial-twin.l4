@@ -1,0 +1,279 @@
+§ `Anti-social Behaviour, Crime and Policing Act 2014 — section 43 (record spelling)`
+
+-- The SEMANTIC TWIN of `antisocial.l4`: the same section 43, the same decisions
+-- under the same names, spelled with `DECLARE` records instead of top-level
+-- `ASSUME`.
+--
+-- WHY IT EXISTS. `ASSUME` is uninterpreted, so `l4 run` cannot evaluate a
+-- decision in `antisocial.l4`, and `lowerQuery` builds a scenario only out of a
+-- record-literal query argument — an `#EVAL` there would lower to a query with
+-- no facts at all. An ASSUME-shaped seed therefore ships no evaluable
+-- directive, and pairing its zero oracles against its zero tests would be a
+-- VACUOUS green: the tier-1 harness would report a pass having executed
+-- nothing.
+--
+-- HOW IT ANCHORS THE OTHER FILE. Every record field below is named EXACTLY as
+-- the corresponding `ASSUME` in `antisocial.l4` — character for character — and
+-- every record is named exactly as the corresponding `ASSUME`d TYPE. The two
+-- files therefore mangle to the SAME s(CASP) atoms at the SAME arities: a
+-- boolean field reaches the Blawx leg through `RProj` + `RUnify TRUE` and is
+-- collapsed by the boolean-projection peephole to the signed unary goal
+-- `is_authorised(P)`, which is exactly what `` `is authorised` p `` lowers to on
+-- the `ASSUME` side; a value field `conduct` and an `ASSUME`d `conduct` both
+-- give `conduct(R,B)`.
+--
+-- So `etc/blawx-tier1-harness.py` runs each `#EVAL` below TWICE: once against
+-- this file's own workspaces, and once with the same fact rows replayed against
+-- `antisocial.l4`'s workspaces. The `-- L4 oracle ==>` value measured here is
+-- the single expectation for both runs. No expectation is authored twice, and
+-- none is hand-derived — which is what the P4 brief asks for, and the reason
+-- the field names below must not be "tidied".
+--
+-- The declaration ORDER is load-bearing too, for a smaller reason: it is what
+-- lets the two emitted ontologies be compared block for block rather than as
+-- sets. Records are declared in the order the `ASSUME`d TYPEs appear in
+-- `antisocial.l4`, and fields in the order the `ASSUME`s appear.
+--
+-- ONE THING THIS FILE CANNOT MIRROR: `antisocial.l4` carries an unreferenced
+-- `ASSUME EffectTarget IS A TYPE` as the reachability gate's witness. A record
+-- world has no equivalent — an unused `DECLARE` is dropped by a different
+-- mechanism — so `effect_target` is simply absent from both goldens, for two
+-- different reasons.
+--
+-- The grouping recorded in `antisocial.l4`'s header was measured on this
+-- spelling; rows q10 and q11 below are the two discriminating scenarios that
+-- pinned it, and they are kept for that purpose.
+
+DECLARE Person HAS
+    `is authorised` IS A BOOLEAN
+
+DECLARE Receiver HAS
+    `is an individual aged 16 or over` IS A BOOLEAN
+    `is a body` IS A BOOLEAN
+    conduct IS A Behaviour
+
+DECLARE Behaviour HAS
+    effect IS A Consequence
+    `is unreasonable` IS A BOOLEAN
+
+DECLARE Consequence HAS
+    `is detrimental` IS A BOOLEAN
+    `is of a persistent or continuing nature` IS A BOOLEAN
+    `affects the quality of life of those in the locality` IS A BOOLEAN
+
+@export Anti-social Behaviour, Crime and Policing Act 2014 s.43(1): an authorised person may issue a community protection notice to an individual aged 16 or over, or to a body, if satisfied on reasonable grounds that (a) the conduct of the individual or body is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality, and (b) the conduct is unreasonable.
+@ref https://www.legislation.gov.uk/ukpga/2014/12/section/43
+GIVEN p IS A Person
+      r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `may issue a community protection notice` IF
+        p's `is authorised`
+    AND `the recipient is a person to whom a notice may be given` r
+    AND `the conduct is having a detrimental effect of a persistent or continuing nature` r
+    AND `the conduct is unreasonable` r
+
+@export s.43(1): the notice may be given "to an individual aged 16 or over, or to a body". The two limbs are alternatives, and nothing else is a permissible recipient.
+GIVEN r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `the recipient is a person to whom a notice may be given` IF
+        r's `is an individual aged 16 or over`
+     OR r's `is a body`
+
+@export s.43(1)(a): the conduct of the individual or body "is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality".
+GIVEN r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `the conduct is having a detrimental effect of a persistent or continuing nature` IF
+    `the effect is detrimental, persistent, and affects the quality of life in the locality` (r's conduct's effect)
+
+@export s.43(1)(a), of the effect itself: it must be "detrimental", "of a persistent or continuing nature", and on "the quality of life of those in the locality" — all three, of the same effect.
+GIVEN c IS A Consequence
+GIVETH A BOOLEAN
+DECIDE `the effect is detrimental, persistent, and affects the quality of life in the locality` IF
+        c's `is detrimental`
+    AND c's `is of a persistent or continuing nature`
+    AND c's `affects the quality of life of those in the locality`
+
+@export
+@ref Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)
+GIVEN r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `the conduct is unreasonable` IF
+    r's conduct's `is unreasonable`
+
+-- q1: an authorised person, an individual aged 16 or over, every limb of (a), and unreasonable conduct
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> TRUE
+
+-- q2: the issuer is not authorised
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS FALSE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q3: the recipient is a body rather than an individual -- s.43(1)'s second limb
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS TRUE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> TRUE
+
+-- q4: neither an individual aged 16 or over nor a body
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q5: the effect is not detrimental
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS FALSE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q6: the effect is not of a persistent or continuing nature
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS FALSE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q7: the effect does not affect the quality of life of those in the locality
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS FALSE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q8: limb (b) fails -- the conduct is not unreasonable
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS FALSE))
+-- L4 oracle ==> FALSE
+
+-- q9: an individual aged 16 or over who is also a body -- the OR is inclusive
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS TRUE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> TRUE
+
+-- q10 GROUPING PIN: not authorised, but a body with every other limb true.
+-- Any reading that lets the OR escape its conjunct answers TRUE here.
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS FALSE)
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS TRUE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q11 GROUPING PIN: an authorised individual with none of the conduct limbs.
+-- Any reading that lets the OR escape its conjunct answers TRUE here.
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS FALSE,
+                                                                              `is of a persistent or continuing nature` IS FALSE,
+                                                                              `affects the quality of life of those in the locality` IS FALSE),
+                                                  `is unreasonable` IS FALSE))
+-- L4 oracle ==> FALSE
+
+-- q12: the recipient limb alone -- a body qualifies
+#EVAL `the recipient is a person to whom a notice may be given`
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS TRUE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS FALSE,
+                                                                              `is of a persistent or continuing nature` IS FALSE,
+                                                                              `affects the quality of life of those in the locality` IS FALSE),
+                                                  `is unreasonable` IS FALSE))
+-- L4 oracle ==> TRUE
+
+-- q13: the recipient limb alone -- neither limb holds
+#EVAL `the recipient is a person to whom a notice may be given`
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> FALSE
+
+-- q14: limb (a) of the effect itself -- all three properties
+#EVAL `the effect is detrimental, persistent, and affects the quality of life in the locality`
+        (Consequence WITH `is detrimental` IS TRUE,
+                          `is of a persistent or continuing nature` IS TRUE,
+                          `affects the quality of life of those in the locality` IS TRUE)
+-- L4 oracle ==> TRUE
+
+-- q15: limb (a) of the effect itself -- detrimental and persistent, but not on the quality of life
+#EVAL `the effect is detrimental, persistent, and affects the quality of life in the locality`
+        (Consequence WITH `is detrimental` IS TRUE,
+                          `is of a persistent or continuing nature` IS TRUE,
+                          `affects the quality of life of those in the locality` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q16: limb (b) alone, reached through the conduct chain
+#EVAL `the conduct is unreasonable`
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                              `is of a persistent or continuing nature` IS TRUE,
+                                                                              `affects the quality of life of those in the locality` IS TRUE),
+                                                  `is unreasonable` IS TRUE))
+-- L4 oracle ==> TRUE
+
+-- q17: the #ASSERT path on the headline decision
+#ASSERT `may issue a community protection notice`
+            (Person WITH `is authorised` IS TRUE)
+            (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                           `is a body` IS FALSE,
+                           conduct IS (Behaviour WITH effect IS (Consequence WITH `is detrimental` IS TRUE,
+                                                                                  `is of a persistent or continuing nature` IS TRUE,
+                                                                                  `affects the quality of life of those in the locality` IS TRUE),
+                                                      `is unreasonable` IS TRUE))
+-- L4 oracle ==> assertion satisfied

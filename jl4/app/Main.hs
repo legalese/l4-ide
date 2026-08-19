@@ -30,6 +30,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
+import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
@@ -57,6 +58,7 @@ data Command
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
+  | CmdBlawx      BlawxOptions
   | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
@@ -103,6 +105,9 @@ commandParser =
       <> command "openfisca"
            (info (CmdOpenFisca <$> openFiscaOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
+      <> command "blawx"
+           (info (CmdBlawx <$> blawxOptionsParser)
+             (progDesc "Compile the decision-rule subset of an L4 file to a Blawx project (.blawx YAML + s(CASP) dump)"))
       <> command "docassemble"
            (info (CmdDocassemble <$> docassembleOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a docassemble interview (YAML), with a fidelity report"))
@@ -175,6 +180,7 @@ main = do
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
+    CmdBlawx      opts -> blawxCmd      opts
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts

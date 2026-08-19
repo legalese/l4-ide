@@ -1,0 +1,502 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Benefit
+    rule_text: "Benefit\n\n1. Definition of eligible for benefit.\n2. Definition of benefit amount."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">applicant</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is an applicant</field><next><block type="new_attribute_declaration" id="l4b000003"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant" attribute_type="number"></mutation><field name="category_name">applicant</field><field name="attribute_name">age</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has age of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000004"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant" attribute_type="number"></mutation><field name="category_name">applicant</field><field name="attribute_name">income</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has income of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000005"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant" attribute_type="boolean"></mutation><field name="category_name">applicant</field><field name="attribute_name">is_veteran</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is veteran</field><next><block type="new_attribute_declaration" id="l4b000006"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant" attribute_type="boolean"></mutation><field name="category_name">applicant</field><field name="attribute_name">eligible_for_benefit</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">eligible for benefit</field><next><block type="new_attribute_declaration" id="l4b000007"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant" attribute_type="number"></mutation><field name="category_name">applicant</field><field name="attribute_name">benefit_amount</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has benefit amount of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000008"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant" attribute_type="number"></mutation><field name="category_name">applicant</field><field name="attribute_name">bonus</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has bonus of</field><field name="second_element">value</field><field name="postfix"></field></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(applicant).
+      blawx_category_nlg(applicant,"","is an applicant").
+      :- dynamic applicant/1.
+      #pred applicant(X) :: '@(X) is an applicant'.
+      #pred holds(user,applicant,X) :: 'it is provided as a fact that @(X) is an applicant'.
+      #pred holds(user,-applicant,X) :: 'it is provided as a fact that it is not the case that @(X) is an applicant'.
+      #pred holds(Z,applicant,X) :: 'the conclusion in @(Z) that @(X) is an applicant holds'.
+      #pred holds(Z,-applicant,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is an applicant holds'.
+      #pred according_to(Z,applicant,X) :: 'according to @(Z), @(X) is an applicant'.
+      #pred according_to(Z,-applicant,X) :: 'according to @(Z), it is not the case that @(X) is an applicant'.
+      #pred blawx_defeated(Z,applicant,X) :: 'the conclusion in @(Z) that @(X) is an applicant is defeated'.
+      #pred blawx_defeated(Z,-applicant,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is an applicant is defeated'.
+      #pred blawx_initially(applicant(X)) :: 'that @(X) is an applicant holds initially'.
+      #pred blawx_initially(-applicant(X)) :: 'that it is not the case that @(X) is an applicant holds initially'.
+      #pred blawx_ultimately(applicant(X)) :: 'that @(X) is an applicant holds ultimately'.
+      #pred blawx_ultimately(-applicant(X)) :: 'that it is not the case that @(X) is an applicant holds ultimately'.
+      #pred blawx_as_of(applicant(X),T) :: 'that @(X) is an applicant holds at @(T)'.
+      #pred blawx_as_of(-applicant(X),T) :: 'that it is not the case that @(X) is an applicant holds at @(T)'.
+      #pred blawx_during(T1,applicant(X),T2) :: 'that @(X) is an applicant held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-applicant(X),T2) :: 'that it is not the case that @(X) is an applicant held between @(T1) and @(T2)'.
+      #pred blawx_becomes(applicant(X),T) :: 'that @(X) is an applicant became true at @(T)'.
+      #pred blawx_becomes(-applicant(X),T) :: 'that it is not the case that @(X) is an applicant became true at @(T)'.
+      #pred blawx_not_interrupted(Start,applicant(X),End) :: '@(X) is an applicant remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-applicant(X),End) :: 'it is not the case that @(X) is an applicant remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),applicant(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-applicant(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-applicant(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(applicant(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),applicant(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-applicant(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-applicant(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(applicant(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),applicant(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-applicant(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-applicant(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(applicant(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),applicant(X),datetime(eot)) :- blawx_initially(applicant(X)), blawx_ultimately(applicant(X)), findall(Time,blawx_becomes(-applicant(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-applicant(X),datetime(eot)) :- blawx_initially(-applicant(X)), blawx_ultimately(-applicant(X)), findall(Time,blawx_becomes(applicant(X),datetime(Time)),[]).
+      blawx_as_of(applicant(X),datetime(Time)) :- blawx_initially(applicant(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),applicant(X),datetime(BeforeT)).
+      blawx_as_of(applicant(X),datetime(Time)) :- blawx_becomes(applicant(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),applicant(X),datetime(Time)).
+      blawx_as_of(-applicant(X),datetime(Time)) :- blawx_initially(-applicant(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-applicant(X),datetime(BeforeT)).
+      blawx_as_of(-applicant(X),datetime(Time)) :- blawx_becomes(-applicant(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-applicant(X),datetime(Time)).
+      blawx_during(datetime(Start),applicant(X),datetime(End)) :- blawx_becomes(applicant(X),datetime(Start)), blawx_becomes(-applicant(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),applicant(X),datetime(End)).
+      blawx_during(datetime(bot),applicant(X),datetime(End)) :- blawx_initially(applicant(X)), blawx_becomes(-applicant(X),datetime(End)), blawx_not_interrupted(datetime(bot),applicant(X),datetime(End)).
+      blawx_during(datetime(Start),applicant(X),datetime(eot)) :- blawx_ultimately(applicant(X)), blawx_becomes(-applicant(X),datetime(Start)), blawx_not_interrupted(datetime(Start),applicant(X),datetime(eot)).
+      blawx_during(datetime(bot),applicant(X),datetime(eot)) :- blawx_initially(applicant(X)), blawx_ultimately(applicant(X)), blawx_becomes(-applicant(X),datetime(Start)), blawx_not_interrupted(datetime(bot),applicant(X),datetime(eot)).
+      blawx_during(datetime(Start),-applicant(X),datetime(End)) :- blawx_becomes(-applicant(X),datetime(Start)), blawx_becomes(applicant(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-applicant(X),datetime(End)).
+      blawx_during(datetime(bot),-applicant(X),datetime(End)) :- blawx_initially(-applicant(X)), blawx_becomes(applicant(X),datetime(End)), blawx_not_interrupted(datetime(bot),-applicant(X),datetime(End)).
+      blawx_during(datetime(Start),-applicant(X),datetime(eot)) :- blawx_ultimately(-applicant(X)), blawx_becomes(applicant(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-applicant(X),datetime(eot)).
+      blawx_during(datetime(bot),-applicant(X),datetime(eot)) :- blawx_initially(-applicant(X)), blawx_ultimately(-applicant(X)), blawx_becomes(-applicant(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-applicant(X),datetime(eot)).
+      blawx_attribute(applicant,age,number).
+      blawx_attribute_nlg(age,ov,"","has age of","").
+      :- dynamic age/2.
+      #pred age(X,Y) :: '@(X) has age of @(Y)'.
+      #pred holds(user,age,X,Y) :: 'it is provided as a fact that @(X) has age of @(Y)'.
+      #pred holds(user,-age,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has age of @(Y)'.
+      #pred holds(Z,age,X,Y) :: 'the conclusion in @(Z) that @(X) has age of @(Y) holds'.
+      #pred holds(Z,-age,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has age of @(Y) holds'.
+      #pred according_to(Z,age,X,Y) :: 'according to @(Z), @(X) has age of @(Y)'.
+      #pred according_to(Z,-age,X,Y) :: 'according to @(Z), it is not the case that @(X) has age of @(Y)'.
+      #pred blawx_defeated(Z,age,X,Y) :: 'the conclusion in @(Z) that @(X) has age of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-age,X,Y) :: 'the conclusion in @(Z) that @(X) has age of @(Y) is defeated'.
+      #pred blawx_initially(age(X,Y)) :: 'that @(X) has age of @(Y) holds initially'.
+      #pred blawx_initially(-age(X,Y)) :: 'that it is not the case that @(X) has age of @(Y) holds initially'.
+      #pred blawx_ultimately(age(X,Y)) :: 'that @(X) has age of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-age(X,Y)) :: 'that it is not the case that @(X) has age of @(Y) holds ultimately'.
+      #pred blawx_as_of(age(X,Y),T) :: 'that @(X) has age of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-age(X,Y),T) :: 'that it is not the case that @(X) has age of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,age(X,Y),T2) :: 'that @(X) has age of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-age(X,Y),T2) :: 'that it is not the case that @(X) has age of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(age(X,Y),T) :: 'that @(X) has age of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-age(X,Y),T) :: 'that it is not the case that @(X) has age of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,age(X,Y),End) :: '@(X) has age of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-age(X,Y),End) :: 'it is not the case that @(X) has age of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),age(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-age(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-age(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(age(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),age(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-age(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-age(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(age(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),age(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-age(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-age(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(age(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),age(X,Y),datetime(eot)) :- blawx_initially(age(X,Y)), blawx_ultimately(age(X,Y)), findall(Time,blawx_becomes(-age(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-age(X,Y),datetime(eot)) :- blawx_initially(-age(X,Y)), blawx_ultimately(-age(X,Y)), findall(Time,blawx_becomes(age(X,Y),datetime(Time)),[]).
+      blawx_as_of(age(X,Y),datetime(Time)) :- blawx_initially(age(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),age(X,Y),datetime(BeforeT)).
+      blawx_as_of(age(X,Y),datetime(Time)) :- blawx_becomes(age(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),age(X,Y),datetime(Time)).
+      blawx_as_of(-age(X,Y),datetime(Time)) :- blawx_initially(-age(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-age(X,Y),datetime(BeforeT)).
+      blawx_as_of(-age(X,Y),datetime(Time)) :- blawx_becomes(-age(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-age(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),age(X,Y),datetime(End)) :- blawx_becomes(age(X,Y),datetime(Start)), blawx_becomes(-age(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),age(X,Y),datetime(End)).
+      blawx_during(datetime(bot),age(X,Y),datetime(End)) :- blawx_initially(age(X,Y)), blawx_becomes(-age(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),age(X,Y),datetime(End)).
+      blawx_during(datetime(Start),age(X,Y),datetime(eot)) :- blawx_ultimately(age(X,Y)), blawx_becomes(-age(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),age(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),age(X,Y),datetime(eot)) :- blawx_initially(age(X,Y)), blawx_ultimately(age(X,Y)), blawx_becomes(-age(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),age(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-age(X,Y),datetime(End)) :- blawx_becomes(-age(X,Y),datetime(Start)), blawx_becomes(age(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-age(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-age(X,Y),datetime(End)) :- blawx_initially(-age(X,Y)), blawx_becomes(age(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-age(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-age(X,Y),datetime(eot)) :- blawx_ultimately(-age(X,Y)), blawx_becomes(age(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-age(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-age(X,Y),datetime(eot)) :- blawx_initially(-age(X,Y)), blawx_ultimately(-age(X,Y)), blawx_becomes(-age(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-age(X,Y),datetime(eot)).
+      blawx_attribute(applicant,income,number).
+      blawx_attribute_nlg(income,ov,"","has income of","").
+      :- dynamic income/2.
+      #pred income(X,Y) :: '@(X) has income of @(Y)'.
+      #pred holds(user,income,X,Y) :: 'it is provided as a fact that @(X) has income of @(Y)'.
+      #pred holds(user,-income,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has income of @(Y)'.
+      #pred holds(Z,income,X,Y) :: 'the conclusion in @(Z) that @(X) has income of @(Y) holds'.
+      #pred holds(Z,-income,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has income of @(Y) holds'.
+      #pred according_to(Z,income,X,Y) :: 'according to @(Z), @(X) has income of @(Y)'.
+      #pred according_to(Z,-income,X,Y) :: 'according to @(Z), it is not the case that @(X) has income of @(Y)'.
+      #pred blawx_defeated(Z,income,X,Y) :: 'the conclusion in @(Z) that @(X) has income of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-income,X,Y) :: 'the conclusion in @(Z) that @(X) has income of @(Y) is defeated'.
+      #pred blawx_initially(income(X,Y)) :: 'that @(X) has income of @(Y) holds initially'.
+      #pred blawx_initially(-income(X,Y)) :: 'that it is not the case that @(X) has income of @(Y) holds initially'.
+      #pred blawx_ultimately(income(X,Y)) :: 'that @(X) has income of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-income(X,Y)) :: 'that it is not the case that @(X) has income of @(Y) holds ultimately'.
+      #pred blawx_as_of(income(X,Y),T) :: 'that @(X) has income of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-income(X,Y),T) :: 'that it is not the case that @(X) has income of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,income(X,Y),T2) :: 'that @(X) has income of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-income(X,Y),T2) :: 'that it is not the case that @(X) has income of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(income(X,Y),T) :: 'that @(X) has income of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-income(X,Y),T) :: 'that it is not the case that @(X) has income of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,income(X,Y),End) :: '@(X) has income of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-income(X,Y),End) :: 'it is not the case that @(X) has income of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),income(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-income(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-income(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(income(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),income(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-income(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-income(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(income(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),income(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-income(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-income(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(income(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),income(X,Y),datetime(eot)) :- blawx_initially(income(X,Y)), blawx_ultimately(income(X,Y)), findall(Time,blawx_becomes(-income(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-income(X,Y),datetime(eot)) :- blawx_initially(-income(X,Y)), blawx_ultimately(-income(X,Y)), findall(Time,blawx_becomes(income(X,Y),datetime(Time)),[]).
+      blawx_as_of(income(X,Y),datetime(Time)) :- blawx_initially(income(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),income(X,Y),datetime(BeforeT)).
+      blawx_as_of(income(X,Y),datetime(Time)) :- blawx_becomes(income(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),income(X,Y),datetime(Time)).
+      blawx_as_of(-income(X,Y),datetime(Time)) :- blawx_initially(-income(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-income(X,Y),datetime(BeforeT)).
+      blawx_as_of(-income(X,Y),datetime(Time)) :- blawx_becomes(-income(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-income(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),income(X,Y),datetime(End)) :- blawx_becomes(income(X,Y),datetime(Start)), blawx_becomes(-income(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),income(X,Y),datetime(End)).
+      blawx_during(datetime(bot),income(X,Y),datetime(End)) :- blawx_initially(income(X,Y)), blawx_becomes(-income(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),income(X,Y),datetime(End)).
+      blawx_during(datetime(Start),income(X,Y),datetime(eot)) :- blawx_ultimately(income(X,Y)), blawx_becomes(-income(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),income(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),income(X,Y),datetime(eot)) :- blawx_initially(income(X,Y)), blawx_ultimately(income(X,Y)), blawx_becomes(-income(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),income(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-income(X,Y),datetime(End)) :- blawx_becomes(-income(X,Y),datetime(Start)), blawx_becomes(income(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-income(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-income(X,Y),datetime(End)) :- blawx_initially(-income(X,Y)), blawx_becomes(income(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-income(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-income(X,Y),datetime(eot)) :- blawx_ultimately(-income(X,Y)), blawx_becomes(income(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-income(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-income(X,Y),datetime(eot)) :- blawx_initially(-income(X,Y)), blawx_ultimately(-income(X,Y)), blawx_becomes(-income(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-income(X,Y),datetime(eot)).
+      blawx_attribute(applicant,is_veteran,boolean).
+      blawx_attribute_nlg(is_veteran,not_applicable,"",not_applicable,"is veteran").
+      :- dynamic is_veteran/1.
+      #pred is_veteran(X) :: '@(X) is veteran'.
+      #pred holds(user,is_veteran,X) :: 'it is provided as a fact that @(X) is veteran'.
+      #pred holds(user,-is_veteran,X) :: 'it is provided as a fact that it is not the case that @(X) is veteran'.
+      #pred holds(Z,is_veteran,X) :: 'the conclusion in @(Z) that @(X) is veteran holds'.
+      #pred holds(Z,-is_veteran,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is veteran holds'.
+      #pred according_to(Z,is_veteran,X) :: 'according to @(Z), @(X) is veteran'.
+      #pred according_to(Z,-is_veteran,X) :: 'according to @(Z), it is not the case that @(X) is veteran'.
+      #pred blawx_defeated(Z,is_veteran,X) :: 'the conclusion in @(Z) that @(X) is veteran is defeated'.
+      #pred blawx_defeated(Z,-is_veteran,X) :: 'the conclusion in @(Z) that @(X) is veteran is defeated'.
+      #pred blawx_initially(is_veteran(X)) :: 'that @(X) is veteran holds initially'.
+      #pred blawx_initially(-is_veteran(X)) :: 'that it is not the case that @(X) is veteran holds initially'.
+      #pred blawx_ultimately(is_veteran(X)) :: 'that @(X) is veteran holds ultimately'.
+      #pred blawx_ultimately(-is_veteran(X)) :: 'that it is not the case that @(X) is veteran holds ultimately'.
+      #pred blawx_as_of(is_veteran(X),T) :: 'that @(X) is veteran holds at @(T)'.
+      #pred blawx_as_of(-is_veteran(X),T) :: 'that it is not the case that @(X) is veteran holds at @(T)'.
+      #pred blawx_during(T1,is_veteran(X),T2) :: 'that @(X) is veteran held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_veteran(X),T2) :: 'that it is not the case that @(X) is veteran held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_veteran(X),T) :: 'that @(X) is veteran became true at @(T)'.
+      #pred blawx_becomes(-is_veteran(X),T) :: 'that it is not the case that @(X) is veteran became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_veteran(X),End) :: '@(X) is veteran remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_veteran(X),End) :: 'it is not the case that @(X) is veteran remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_veteran(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_veteran(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_veteran(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_veteran(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_veteran(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_veteran(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_veteran(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_veteran(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_veteran(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_veteran(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_veteran(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_veteran(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_veteran(X),datetime(eot)) :- blawx_initially(is_veteran(X)), blawx_ultimately(is_veteran(X)), findall(Time,blawx_becomes(-is_veteran(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_veteran(X),datetime(eot)) :- blawx_initially(-is_veteran(X)), blawx_ultimately(-is_veteran(X)), findall(Time,blawx_becomes(is_veteran(X),datetime(Time)),[]).
+      blawx_as_of(is_veteran(X),datetime(Time)) :- blawx_initially(is_veteran(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_veteran(X),datetime(BeforeT)).
+      blawx_as_of(is_veteran(X),datetime(Time)) :- blawx_becomes(is_veteran(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_veteran(X),datetime(Time)).
+      blawx_as_of(-is_veteran(X),datetime(Time)) :- blawx_initially(-is_veteran(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_veteran(X),datetime(BeforeT)).
+      blawx_as_of(-is_veteran(X),datetime(Time)) :- blawx_becomes(-is_veteran(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_veteran(X),datetime(Time)).
+      blawx_during(datetime(Start),is_veteran(X),datetime(End)) :- blawx_becomes(is_veteran(X),datetime(Start)), blawx_becomes(-is_veteran(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_veteran(X),datetime(End)).
+      blawx_during(datetime(bot),is_veteran(X),datetime(End)) :- blawx_initially(is_veteran(X)), blawx_becomes(-is_veteran(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_veteran(X),datetime(End)).
+      blawx_during(datetime(Start),is_veteran(X),datetime(eot)) :- blawx_ultimately(is_veteran(X)), blawx_becomes(-is_veteran(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_veteran(X),datetime(eot)).
+      blawx_during(datetime(bot),is_veteran(X),datetime(eot)) :- blawx_initially(is_veteran(X)), blawx_ultimately(is_veteran(X)), blawx_becomes(-is_veteran(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_veteran(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_veteran(X),datetime(End)) :- blawx_becomes(-is_veteran(X),datetime(Start)), blawx_becomes(is_veteran(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_veteran(X),datetime(End)).
+      blawx_during(datetime(bot),-is_veteran(X),datetime(End)) :- blawx_initially(-is_veteran(X)), blawx_becomes(is_veteran(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_veteran(X),datetime(End)).
+      blawx_during(datetime(Start),-is_veteran(X),datetime(eot)) :- blawx_ultimately(-is_veteran(X)), blawx_becomes(is_veteran(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_veteran(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_veteran(X),datetime(eot)) :- blawx_initially(-is_veteran(X)), blawx_ultimately(-is_veteran(X)), blawx_becomes(-is_veteran(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_veteran(X),datetime(eot)).
+      blawx_attribute(applicant,eligible_for_benefit,boolean).
+      blawx_attribute_nlg(eligible_for_benefit,not_applicable,"",not_applicable,"eligible for benefit").
+      :- dynamic eligible_for_benefit/1.
+      #pred eligible_for_benefit(X) :: '@(X) eligible for benefit'.
+      #pred holds(user,eligible_for_benefit,X) :: 'it is provided as a fact that @(X) eligible for benefit'.
+      #pred holds(user,-eligible_for_benefit,X) :: 'it is provided as a fact that it is not the case that @(X) eligible for benefit'.
+      #pred holds(Z,eligible_for_benefit,X) :: 'the conclusion in @(Z) that @(X) eligible for benefit holds'.
+      #pred holds(Z,-eligible_for_benefit,X) :: 'the conclusion in @(Z) that it is not the case that @(X) eligible for benefit holds'.
+      #pred according_to(Z,eligible_for_benefit,X) :: 'according to @(Z), @(X) eligible for benefit'.
+      #pred according_to(Z,-eligible_for_benefit,X) :: 'according to @(Z), it is not the case that @(X) eligible for benefit'.
+      #pred blawx_defeated(Z,eligible_for_benefit,X) :: 'the conclusion in @(Z) that @(X) eligible for benefit is defeated'.
+      #pred blawx_defeated(Z,-eligible_for_benefit,X) :: 'the conclusion in @(Z) that @(X) eligible for benefit is defeated'.
+      #pred blawx_initially(eligible_for_benefit(X)) :: 'that @(X) eligible for benefit holds initially'.
+      #pred blawx_initially(-eligible_for_benefit(X)) :: 'that it is not the case that @(X) eligible for benefit holds initially'.
+      #pred blawx_ultimately(eligible_for_benefit(X)) :: 'that @(X) eligible for benefit holds ultimately'.
+      #pred blawx_ultimately(-eligible_for_benefit(X)) :: 'that it is not the case that @(X) eligible for benefit holds ultimately'.
+      #pred blawx_as_of(eligible_for_benefit(X),T) :: 'that @(X) eligible for benefit holds at @(T)'.
+      #pred blawx_as_of(-eligible_for_benefit(X),T) :: 'that it is not the case that @(X) eligible for benefit holds at @(T)'.
+      #pred blawx_during(T1,eligible_for_benefit(X),T2) :: 'that @(X) eligible for benefit held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-eligible_for_benefit(X),T2) :: 'that it is not the case that @(X) eligible for benefit held between @(T1) and @(T2)'.
+      #pred blawx_becomes(eligible_for_benefit(X),T) :: 'that @(X) eligible for benefit became true at @(T)'.
+      #pred blawx_becomes(-eligible_for_benefit(X),T) :: 'that it is not the case that @(X) eligible for benefit became true at @(T)'.
+      #pred blawx_not_interrupted(Start,eligible_for_benefit(X),End) :: '@(X) eligible for benefit remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-eligible_for_benefit(X),End) :: 'it is not the case that @(X) eligible for benefit remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),eligible_for_benefit(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-eligible_for_benefit(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-eligible_for_benefit(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(eligible_for_benefit(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),eligible_for_benefit(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-eligible_for_benefit(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-eligible_for_benefit(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(eligible_for_benefit(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),eligible_for_benefit(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-eligible_for_benefit(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-eligible_for_benefit(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(eligible_for_benefit(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),eligible_for_benefit(X),datetime(eot)) :- blawx_initially(eligible_for_benefit(X)), blawx_ultimately(eligible_for_benefit(X)), findall(Time,blawx_becomes(-eligible_for_benefit(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-eligible_for_benefit(X),datetime(eot)) :- blawx_initially(-eligible_for_benefit(X)), blawx_ultimately(-eligible_for_benefit(X)), findall(Time,blawx_becomes(eligible_for_benefit(X),datetime(Time)),[]).
+      blawx_as_of(eligible_for_benefit(X),datetime(Time)) :- blawx_initially(eligible_for_benefit(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),eligible_for_benefit(X),datetime(BeforeT)).
+      blawx_as_of(eligible_for_benefit(X),datetime(Time)) :- blawx_becomes(eligible_for_benefit(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),eligible_for_benefit(X),datetime(Time)).
+      blawx_as_of(-eligible_for_benefit(X),datetime(Time)) :- blawx_initially(-eligible_for_benefit(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-eligible_for_benefit(X),datetime(BeforeT)).
+      blawx_as_of(-eligible_for_benefit(X),datetime(Time)) :- blawx_becomes(-eligible_for_benefit(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-eligible_for_benefit(X),datetime(Time)).
+      blawx_during(datetime(Start),eligible_for_benefit(X),datetime(End)) :- blawx_becomes(eligible_for_benefit(X),datetime(Start)), blawx_becomes(-eligible_for_benefit(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),eligible_for_benefit(X),datetime(End)).
+      blawx_during(datetime(bot),eligible_for_benefit(X),datetime(End)) :- blawx_initially(eligible_for_benefit(X)), blawx_becomes(-eligible_for_benefit(X),datetime(End)), blawx_not_interrupted(datetime(bot),eligible_for_benefit(X),datetime(End)).
+      blawx_during(datetime(Start),eligible_for_benefit(X),datetime(eot)) :- blawx_ultimately(eligible_for_benefit(X)), blawx_becomes(-eligible_for_benefit(X),datetime(Start)), blawx_not_interrupted(datetime(Start),eligible_for_benefit(X),datetime(eot)).
+      blawx_during(datetime(bot),eligible_for_benefit(X),datetime(eot)) :- blawx_initially(eligible_for_benefit(X)), blawx_ultimately(eligible_for_benefit(X)), blawx_becomes(-eligible_for_benefit(X),datetime(Start)), blawx_not_interrupted(datetime(bot),eligible_for_benefit(X),datetime(eot)).
+      blawx_during(datetime(Start),-eligible_for_benefit(X),datetime(End)) :- blawx_becomes(-eligible_for_benefit(X),datetime(Start)), blawx_becomes(eligible_for_benefit(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-eligible_for_benefit(X),datetime(End)).
+      blawx_during(datetime(bot),-eligible_for_benefit(X),datetime(End)) :- blawx_initially(-eligible_for_benefit(X)), blawx_becomes(eligible_for_benefit(X),datetime(End)), blawx_not_interrupted(datetime(bot),-eligible_for_benefit(X),datetime(End)).
+      blawx_during(datetime(Start),-eligible_for_benefit(X),datetime(eot)) :- blawx_ultimately(-eligible_for_benefit(X)), blawx_becomes(eligible_for_benefit(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-eligible_for_benefit(X),datetime(eot)).
+      blawx_during(datetime(bot),-eligible_for_benefit(X),datetime(eot)) :- blawx_initially(-eligible_for_benefit(X)), blawx_ultimately(-eligible_for_benefit(X)), blawx_becomes(-eligible_for_benefit(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-eligible_for_benefit(X),datetime(eot)).
+      blawx_attribute(applicant,benefit_amount,number).
+      blawx_attribute_nlg(benefit_amount,ov,"","has benefit amount of","").
+      :- dynamic benefit_amount/2.
+      #pred benefit_amount(X,Y) :: '@(X) has benefit amount of @(Y)'.
+      #pred holds(user,benefit_amount,X,Y) :: 'it is provided as a fact that @(X) has benefit amount of @(Y)'.
+      #pred holds(user,-benefit_amount,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has benefit amount of @(Y)'.
+      #pred holds(Z,benefit_amount,X,Y) :: 'the conclusion in @(Z) that @(X) has benefit amount of @(Y) holds'.
+      #pred holds(Z,-benefit_amount,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has benefit amount of @(Y) holds'.
+      #pred according_to(Z,benefit_amount,X,Y) :: 'according to @(Z), @(X) has benefit amount of @(Y)'.
+      #pred according_to(Z,-benefit_amount,X,Y) :: 'according to @(Z), it is not the case that @(X) has benefit amount of @(Y)'.
+      #pred blawx_defeated(Z,benefit_amount,X,Y) :: 'the conclusion in @(Z) that @(X) has benefit amount of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-benefit_amount,X,Y) :: 'the conclusion in @(Z) that @(X) has benefit amount of @(Y) is defeated'.
+      #pred blawx_initially(benefit_amount(X,Y)) :: 'that @(X) has benefit amount of @(Y) holds initially'.
+      #pred blawx_initially(-benefit_amount(X,Y)) :: 'that it is not the case that @(X) has benefit amount of @(Y) holds initially'.
+      #pred blawx_ultimately(benefit_amount(X,Y)) :: 'that @(X) has benefit amount of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-benefit_amount(X,Y)) :: 'that it is not the case that @(X) has benefit amount of @(Y) holds ultimately'.
+      #pred blawx_as_of(benefit_amount(X,Y),T) :: 'that @(X) has benefit amount of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-benefit_amount(X,Y),T) :: 'that it is not the case that @(X) has benefit amount of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,benefit_amount(X,Y),T2) :: 'that @(X) has benefit amount of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-benefit_amount(X,Y),T2) :: 'that it is not the case that @(X) has benefit amount of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(benefit_amount(X,Y),T) :: 'that @(X) has benefit amount of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-benefit_amount(X,Y),T) :: 'that it is not the case that @(X) has benefit amount of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,benefit_amount(X,Y),End) :: '@(X) has benefit amount of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-benefit_amount(X,Y),End) :: 'it is not the case that @(X) has benefit amount of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),benefit_amount(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-benefit_amount(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-benefit_amount(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(benefit_amount(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),benefit_amount(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-benefit_amount(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-benefit_amount(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(benefit_amount(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),benefit_amount(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-benefit_amount(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-benefit_amount(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(benefit_amount(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),benefit_amount(X,Y),datetime(eot)) :- blawx_initially(benefit_amount(X,Y)), blawx_ultimately(benefit_amount(X,Y)), findall(Time,blawx_becomes(-benefit_amount(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-benefit_amount(X,Y),datetime(eot)) :- blawx_initially(-benefit_amount(X,Y)), blawx_ultimately(-benefit_amount(X,Y)), findall(Time,blawx_becomes(benefit_amount(X,Y),datetime(Time)),[]).
+      blawx_as_of(benefit_amount(X,Y),datetime(Time)) :- blawx_initially(benefit_amount(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),benefit_amount(X,Y),datetime(BeforeT)).
+      blawx_as_of(benefit_amount(X,Y),datetime(Time)) :- blawx_becomes(benefit_amount(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),benefit_amount(X,Y),datetime(Time)).
+      blawx_as_of(-benefit_amount(X,Y),datetime(Time)) :- blawx_initially(-benefit_amount(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-benefit_amount(X,Y),datetime(BeforeT)).
+      blawx_as_of(-benefit_amount(X,Y),datetime(Time)) :- blawx_becomes(-benefit_amount(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-benefit_amount(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),benefit_amount(X,Y),datetime(End)) :- blawx_becomes(benefit_amount(X,Y),datetime(Start)), blawx_becomes(-benefit_amount(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),benefit_amount(X,Y),datetime(End)).
+      blawx_during(datetime(bot),benefit_amount(X,Y),datetime(End)) :- blawx_initially(benefit_amount(X,Y)), blawx_becomes(-benefit_amount(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),benefit_amount(X,Y),datetime(End)).
+      blawx_during(datetime(Start),benefit_amount(X,Y),datetime(eot)) :- blawx_ultimately(benefit_amount(X,Y)), blawx_becomes(-benefit_amount(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),benefit_amount(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),benefit_amount(X,Y),datetime(eot)) :- blawx_initially(benefit_amount(X,Y)), blawx_ultimately(benefit_amount(X,Y)), blawx_becomes(-benefit_amount(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),benefit_amount(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-benefit_amount(X,Y),datetime(End)) :- blawx_becomes(-benefit_amount(X,Y),datetime(Start)), blawx_becomes(benefit_amount(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-benefit_amount(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-benefit_amount(X,Y),datetime(End)) :- blawx_initially(-benefit_amount(X,Y)), blawx_becomes(benefit_amount(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-benefit_amount(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-benefit_amount(X,Y),datetime(eot)) :- blawx_ultimately(-benefit_amount(X,Y)), blawx_becomes(benefit_amount(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-benefit_amount(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-benefit_amount(X,Y),datetime(eot)) :- blawx_initially(-benefit_amount(X,Y)), blawx_ultimately(-benefit_amount(X,Y)), blawx_becomes(-benefit_amount(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-benefit_amount(X,Y),datetime(eot)).
+      blawx_attribute(applicant,bonus,number).
+      blawx_attribute_nlg(bonus,ov,"","has bonus of","").
+      :- dynamic bonus/2.
+      #pred bonus(X,Y) :: '@(X) has bonus of @(Y)'.
+      #pred holds(user,bonus,X,Y) :: 'it is provided as a fact that @(X) has bonus of @(Y)'.
+      #pred holds(user,-bonus,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has bonus of @(Y)'.
+      #pred holds(Z,bonus,X,Y) :: 'the conclusion in @(Z) that @(X) has bonus of @(Y) holds'.
+      #pred holds(Z,-bonus,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has bonus of @(Y) holds'.
+      #pred according_to(Z,bonus,X,Y) :: 'according to @(Z), @(X) has bonus of @(Y)'.
+      #pred according_to(Z,-bonus,X,Y) :: 'according to @(Z), it is not the case that @(X) has bonus of @(Y)'.
+      #pred blawx_defeated(Z,bonus,X,Y) :: 'the conclusion in @(Z) that @(X) has bonus of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-bonus,X,Y) :: 'the conclusion in @(Z) that @(X) has bonus of @(Y) is defeated'.
+      #pred blawx_initially(bonus(X,Y)) :: 'that @(X) has bonus of @(Y) holds initially'.
+      #pred blawx_initially(-bonus(X,Y)) :: 'that it is not the case that @(X) has bonus of @(Y) holds initially'.
+      #pred blawx_ultimately(bonus(X,Y)) :: 'that @(X) has bonus of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-bonus(X,Y)) :: 'that it is not the case that @(X) has bonus of @(Y) holds ultimately'.
+      #pred blawx_as_of(bonus(X,Y),T) :: 'that @(X) has bonus of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-bonus(X,Y),T) :: 'that it is not the case that @(X) has bonus of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,bonus(X,Y),T2) :: 'that @(X) has bonus of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-bonus(X,Y),T2) :: 'that it is not the case that @(X) has bonus of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(bonus(X,Y),T) :: 'that @(X) has bonus of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-bonus(X,Y),T) :: 'that it is not the case that @(X) has bonus of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,bonus(X,Y),End) :: '@(X) has bonus of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-bonus(X,Y),End) :: 'it is not the case that @(X) has bonus of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),bonus(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-bonus(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-bonus(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(bonus(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),bonus(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-bonus(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-bonus(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(bonus(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),bonus(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-bonus(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-bonus(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(bonus(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),bonus(X,Y),datetime(eot)) :- blawx_initially(bonus(X,Y)), blawx_ultimately(bonus(X,Y)), findall(Time,blawx_becomes(-bonus(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-bonus(X,Y),datetime(eot)) :- blawx_initially(-bonus(X,Y)), blawx_ultimately(-bonus(X,Y)), findall(Time,blawx_becomes(bonus(X,Y),datetime(Time)),[]).
+      blawx_as_of(bonus(X,Y),datetime(Time)) :- blawx_initially(bonus(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),bonus(X,Y),datetime(BeforeT)).
+      blawx_as_of(bonus(X,Y),datetime(Time)) :- blawx_becomes(bonus(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),bonus(X,Y),datetime(Time)).
+      blawx_as_of(-bonus(X,Y),datetime(Time)) :- blawx_initially(-bonus(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-bonus(X,Y),datetime(BeforeT)).
+      blawx_as_of(-bonus(X,Y),datetime(Time)) :- blawx_becomes(-bonus(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-bonus(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),bonus(X,Y),datetime(End)) :- blawx_becomes(bonus(X,Y),datetime(Start)), blawx_becomes(-bonus(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),bonus(X,Y),datetime(End)).
+      blawx_during(datetime(bot),bonus(X,Y),datetime(End)) :- blawx_initially(bonus(X,Y)), blawx_becomes(-bonus(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),bonus(X,Y),datetime(End)).
+      blawx_during(datetime(Start),bonus(X,Y),datetime(eot)) :- blawx_ultimately(bonus(X,Y)), blawx_becomes(-bonus(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),bonus(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),bonus(X,Y),datetime(eot)) :- blawx_initially(bonus(X,Y)), blawx_ultimately(bonus(X,Y)), blawx_becomes(-bonus(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),bonus(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-bonus(X,Y),datetime(End)) :- blawx_becomes(-bonus(X,Y),datetime(Start)), blawx_becomes(bonus(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-bonus(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-bonus(X,Y),datetime(End)) :- blawx_initially(-bonus(X,Y)), blawx_becomes(bonus(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-bonus(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-bonus(X,Y),datetime(eot)) :- blawx_ultimately(-bonus(X,Y)), blawx_becomes(bonus(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-bonus(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-bonus(X,Y),datetime(eot)) :- blawx_initially(-bonus(X,Y)), blawx_ultimately(-bonus(X,Y)), blawx_becomes(-bonus(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-bonus(X,Y),datetime(eot)).
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000009" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000010"><value name="object"><block type="variable" id="l4b000011"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000012"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="attribute_selector" id="l4b000013"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="age" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has age of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000014"><field name="variable_name">A</field></block></value><value name="second_element"><block type="variable" id="l4b000015"><field name="variable_name">Age</field></block></value><next><block type="numerical_constraint" id="l4b000016"><field name="operator">gte</field><value name="first_comparator"><block type="variable" id="l4b000017"><field name="variable_name">Age</field></block></value><value name="second_comparator"><block type="number_value" id="l4b000018"><field name="value">65</field></block></value><next><block type="attribute_selector" id="l4b000019"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="income" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has income of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000020"><field name="variable_name">A</field></block></value><value name="second_element"><block type="variable" id="l4b000021"><field name="variable_name">Income</field></block></value><next><block type="numerical_constraint" id="l4b000022"><field name="operator">lte</field><value name="first_comparator"><block type="variable" id="l4b000023"><field name="variable_name">Income</field></block></value><value name="second_comparator"><block type="number_value" id="l4b000024"><field name="value">100000</field></block></value></block></next></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000025"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">B 1</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000026"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="variable" id="l4b000027"><field name="variable_name">A</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000028" x="40" y="718"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000029"><value name="object"><block type="variable" id="l4b000030"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000031"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="unary_attribute_selector" id="l4b000032"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="variable" id="l4b000033"><field name="variable_name">A</field></block></value><next><block type="attribute_selector" id="l4b000034"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="income" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has income of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000035"><field name="variable_name">A</field></block></value><value name="second_element"><block type="variable" id="l4b000036"><field name="variable_name">Income</field></block></value><next><block type="numerical_constraint" id="l4b000037"><field name="operator">lte</field><value name="first_comparator"><block type="variable" id="l4b000038"><field name="variable_name">Income</field></block></value><value name="second_comparator"><block type="number_value" id="l4b000039"><field name="value">100000</field></block></value></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000040"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">B 1</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000041"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="variable" id="l4b000042"><field name="variable_name">A</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_1_section,eligible_for_benefit,A) :- applicant(A),
+      age(A,Age),
+      blawx_comparison(Age,gte,65),
+      income(A,Income),
+      blawx_comparison(Income,lte,100000).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,eligible_for_benefit,A) :- according_to(sec_1_section,eligible_for_benefit,A).
+
+      % BLAWX CHECK DUPLICATES
+        eligible_for_benefit(A) :- holds(sec_1_section,eligible_for_benefit,A).
+
+      according_to(sec_1_section,eligible_for_benefit,A) :- applicant(A),
+      is_veteran(A),
+      income(A,Income),
+      blawx_comparison(Income,lte,100000).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,eligible_for_benefit,A) :- according_to(sec_1_section,eligible_for_benefit,A).
+
+      % BLAWX CHECK DUPLICATES
+        eligible_for_benefit(A) :- holds(sec_1_section,eligible_for_benefit,A).
+- model: blawx.workspace
+  pk: 3
+  fields:
+    ruledoc: 1
+    workspace_name: sec_2_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000043" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000044"><value name="object"><block type="variable" id="l4b000045"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000046"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="unary_attribute_selector" id="l4b000047"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="variable" id="l4b000048"><field name="variable_name">A</field></block></value><next><block type="attribute_selector" id="l4b000049"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="bonus" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has bonus of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000050"><field name="variable_name">A</field></block></value><value name="second_element"><block type="variable" id="l4b000051"><field name="variable_name">Bonus</field></block></value><next><block type="calculation" id="l4b000052"><value name="variable"><block type="variable" id="l4b000053"><field name="variable_name">Tmp</field></block></value><value name="calculation"><block type="math_operation" id="l4b000054"><field name="operator">add</field><value name="left_side"><block type="number_value" id="l4b000055"><field name="value">1000</field></block></value><value name="right_side"><block type="variable" id="l4b000056"><field name="variable_name">Bonus</field></block></value></block></value></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000057"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">B 2</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000058"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="benefit_amount" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has benefit amount of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000059"><field name="variable_name">A</field></block></value><value name="second_element"><block type="variable" id="l4b000060"><field name="variable_name">Tmp</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000061" x="40" y="688"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000062"><value name="object"><block type="variable" id="l4b000063"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000064"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="default_negation" id="l4b000065"><statement name="default_negated_statement"><block type="unary_attribute_selector" id="l4b000066"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="variable" id="l4b000067"><field name="variable_name">A</field></block></value></block></statement></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000068"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">B 2</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000069"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="benefit_amount" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has benefit amount of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000070"><field name="variable_name">A</field></block></value><value name="second_element"><block type="number_value" id="l4b000071"><field name="value">0</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000072" x="40" y="1126"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000073"><value name="object"><block type="variable" id="l4b000074"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000075"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="unary_attribute_selector" id="l4b000076"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="variable" id="l4b000077"><field name="variable_name">A</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000078"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">B 2</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000079"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="bonus" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has bonus of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000080"><field name="variable_name">A</field></block></value><value name="second_element"><block type="number_value" id="l4b000081"><field name="value">250</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000082" x="40" y="1534"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000083"><value name="object"><block type="variable" id="l4b000084"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000085"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="logical_negation" id="l4b000086"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000087"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="variable" id="l4b000088"><field name="variable_name">A</field></block></value></block></statement></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000089"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">B 2</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000090"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="bonus" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has bonus of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000091"><field name="variable_name">A</field></block></value><value name="second_element"><block type="number_value" id="l4b000092"><field name="value">0</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_2_section,benefit_amount,A,Tmp) :- applicant(A),
+      eligible_for_benefit(A),
+      bonus(A,Bonus),
+      Tmp is ( 1000 + Bonus ).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,benefit_amount,A,Tmp) :- according_to(sec_2_section,benefit_amount,A,Tmp).
+
+      % BLAWX CHECK DUPLICATES
+        benefit_amount(A,Tmp) :- holds(sec_2_section,benefit_amount,A,Tmp).
+
+      according_to(sec_2_section,benefit_amount,A,0) :- applicant(A),
+      not eligible_for_benefit(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,benefit_amount,A,0) :- according_to(sec_2_section,benefit_amount,A,0).
+
+      % BLAWX CHECK DUPLICATES
+        benefit_amount(A,0) :- holds(sec_2_section,benefit_amount,A,0).
+
+      according_to(sec_2_section,bonus,A,250) :- applicant(A),
+      is_veteran(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,bonus,A,250) :- according_to(sec_2_section,bonus,A,250).
+
+      % BLAWX CHECK DUPLICATES
+        bonus(A,250) :- holds(sec_2_section,bonus,A,250).
+
+      according_to(sec_2_section,bonus,A,0) :- applicant(A),
+      -is_veteran(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,bonus,A,0) :- according_to(sec_2_section,bonus,A,0).
+
+      % BLAWX CHECK DUPLICATES
+        bonus(A,0) :- holds(sec_2_section,bonus,A,0).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: q1
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000093" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000094"><value name="object"><block type="object_selector" id="l4b000095"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="category"><block type="category_selector" id="l4b000096"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="attribute_selector" id="l4b000097"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="age" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has age of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000098"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000099"><field name="value">70</field></block></value><next><block type="attribute_selector" id="l4b000100"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="income" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has income of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000101"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000102"><field name="value">50000</field></block></value><next><block type="logical_negation" id="l4b000103"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000104"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="object_selector" id="l4b000105"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value></block></statement></block></next></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000106" x="40" y="478"><statement name="query"><block type="attribute_selector" id="l4b000107"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="benefit_amount" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has benefit amount of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000108"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="variable" id="l4b000109"><field name="variable_name">Benefitamount</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      applicant(a1).
+      age(a1,70).
+      income(a1,50000).
+      -is_veteran(a1).
+
+      ?- benefit_amount(a1,Benefitamount).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 2
+  fields:
+    ruledoc: 1
+    test_name: q2
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000110" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000111"><value name="object"><block type="object_selector" id="l4b000112"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="category"><block type="category_selector" id="l4b000113"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="attribute_selector" id="l4b000114"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="age" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has age of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000115"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000116"><field name="value">70</field></block></value><next><block type="attribute_selector" id="l4b000117"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="income" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has income of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000118"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000119"><field name="value">50000</field></block></value><next><block type="logical_negation" id="l4b000120"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000121"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="object_selector" id="l4b000122"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value></block></statement></block></next></block></next></block></next></block></statement></block>
+      <block type="unattributed_constraint" id="l4b000123" x="40" y="478"><statement name="conditions"><block type="default_negation" id="l4b000124"><statement name="default_negated_statement"><block type="unary_attribute_selector" id="l4b000125"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="object_selector" id="l4b000126"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value></block></statement></block></statement></block>
+      <block type="query" id="l4b000127" x="40" y="646"><statement name="query"><block type="unary_attribute_selector" id="l4b000128"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="object_selector" id="l4b000129"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      applicant(a1).
+      age(a1,70).
+      income(a1,50000).
+      -is_veteran(a1).
+
+      false :- not eligible_for_benefit(a1).
+
+      ?- eligible_for_benefit(a1).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 3
+  fields:
+    ruledoc: 1
+    test_name: q3
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000130" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000131"><value name="object"><block type="object_selector" id="l4b000132"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="category"><block type="category_selector" id="l4b000133"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value><next><block type="attribute_selector" id="l4b000134"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="age" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has age of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000135"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000136"><field name="value">30</field></block></value><next><block type="attribute_selector" id="l4b000137"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="income" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has income of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000138"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000139"><field name="value">50000</field></block></value><next><block type="unary_attribute_selector" id="l4b000140"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="object_selector" id="l4b000141"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value></block></next></block></next></block></next></block></statement></block>
+      <block type="unattributed_constraint" id="l4b000142" x="40" y="448"><statement name="conditions"><block type="default_negation" id="l4b000143"><statement name="default_negated_statement"><block type="attribute_selector" id="l4b000144"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="benefit_amount" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has benefit amount of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000145"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="number_value" id="l4b000146"><field name="value">1250</field></block></value></block></statement></block></statement></block>
+      <block type="query" id="l4b000147" x="40" y="646"><statement name="query"><block type="attribute_selector" id="l4b000148"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="benefit_amount" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has benefit amount of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000149"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="a1"></mutation><field name="object_name">a1</field></block></value><value name="second_element"><block type="variable" id="l4b000150"><field name="variable_name">Benefitamount</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      applicant(a1).
+      age(a1,30).
+      income(a1,50000).
+      is_veteran(a1).
+
+      false :- not benefit_amount(a1,1250).
+
+      ?- benefit_amount(a1,Benefitamount).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 4
+  fields:
+    ruledoc: 1
+    test_name: interview
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="assume" id="l4b000151" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000152"><value name="object"><block type="variable" id="l4b000153"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000154"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="applicant"></mutation><field name="category_name">applicant</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000155" x="40" y="208"><statement name="statements"><block type="attribute_selector" id="l4b000156"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="age" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has age of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000157"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000158"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000159" x="40" y="376"><statement name="statements"><block type="attribute_selector" id="l4b000160"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="income" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has income of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000161"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000162"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000163" x="40" y="544"><statement name="statements"><block type="unary_attribute_selector" id="l4b000164"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_veteran" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is veteran</field><value name="first_element"><block type="variable" id="l4b000165"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="query" id="l4b000166" x="40" y="682"><statement name="query"><block type="unary_attribute_selector" id="l4b000167"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="eligible_for_benefit" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">eligible for benefit</field><value name="first_element"><block type="variable" id="l4b000168"><field name="variable_name">X</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      #abducible applicant(X).
+
+      #abducible age(X,Y).
+
+      #abducible income(X,Y).
+
+      #abducible is_veteran(X).
+
+      ?- eligible_for_benefit(X).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''

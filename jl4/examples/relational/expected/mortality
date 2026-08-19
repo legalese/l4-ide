@@ -1,0 +1,30 @@
+relational program — mortality.l4
+
+records:
+  Person  % mortality.l4:15:1-16:25
+    isHuman : BOOLEAN
+
+predicates:
+  input isHuman/1 : BOOLEAN  % <no source range>
+    params: Person
+    (no clauses)
+  computed exported is mortal/1 : (goal)  % mortality.l4:19:1-21:34
+    params: Person
+    is mortal(P_0) :- proj(P_0, isHuman, IsHuman_1), IsHuman_1 = TRUE.  % mortality.l4:21:23-34
+
+queries:
+  EVAL q1: is mortal(P0_2) => (expectation from the L4 evaluator)  % mortality.l4:23:1-48
+    facts: isHuman(P0_2, TRUE)
+  EVAL q2: is mortal(P0_3) => (expectation from the L4 evaluator)  % mortality.l4:26:1-49
+    facts: isHuman(P0_3, FALSE)
+
+dependencies:
+  is mortal -> isHuman (+)
+
+stratification:
+  stratified
+    0  is mortal
+    0  isHuman
+
+fidelity report — relational
+  (nothing lost)

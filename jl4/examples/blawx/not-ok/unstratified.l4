@@ -1,0 +1,24 @@
+-- The stratification rejection fixture: a cycle THROUGH a negation.
+--
+-- `p holds` depends negatively on `q holds`, which depends negatively on
+-- `p holds` — the Apt–Blair–Walker definition of unstratified. The shared
+-- relational middle-end RECORDS this (jl4/examples/relational/unstratified.l4
+-- lowers successfully and asserts on its `stratification:` block); the Blawx
+-- leg REJECTS it in v1 with a named diagnostic, because its L4-oracle
+-- determinism obligation cannot honour multiple stable models
+-- (BLAWX-EXPORT-SPEC R2 / #258 §2.5 division of labour).
+
+DECLARE Flag HAS
+    seed IS A BOOLEAN
+
+@export
+GIVEN f IS A Flag
+GIVETH A BOOLEAN
+DECIDE `p holds` IF
+    f's seed AND NOT `q holds` f
+
+@export
+GIVEN f IS A Flag
+GIVETH A BOOLEAN
+DECIDE `q holds` IF
+    NOT `p holds` f

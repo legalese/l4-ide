@@ -1,0 +1,16 @@
+§ `Arity three with no category anywhere`
+
+ASSUME Person IS A TYPE
+
+GIVEN p IS A Person
+ASSUME `base rate` p IS A NUMBER
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+ASSUME `scaled by` a b IS A NUMBER
+
+@export a probe
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `qualifies` p IF
+    `scaled by` (`base rate` p) 2 AT LEAST 10
