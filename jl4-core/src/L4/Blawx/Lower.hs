@@ -190,12 +190,13 @@ lowerBlawx prog0 = do
         [ declBlocks | not (null declBlocks) ]
           <> [ enumFacts | let enumFacts = enumConstructorFacts env prog
              , not (null enumFacts) ]
-      rootWs = [ MkBWorkspace { bwName = BRoot, bwStacks = rootStacks }
+      rootWs = [ MkBWorkspace { bwName = BRoot, bwStacks = rootStacks, bwComment = Nothing }
                | not (null rootStacks) ]
       secWs =
         [ MkBWorkspace
-            { bwName   = BSec i
+            { bwName   = bSec i
             , bwStacks = [ [b] | b <- Map.findWithDefault [] i ruleBySec ]
+            , bwComment = Nothing
             }
         | i <- [1 .. nSecs]
         ]
@@ -223,6 +224,9 @@ lowerBlawx prog0 = do
         }
     , bdWorkspaces = rootWs <> secWs
     , bdTests      = tests
+      -- import-only (the observed doc_selector labels); Mode-A export has
+      -- none, so EmitXml falls through to its computed label
+    , bdDocPartNames = mempty
     }
  where
   stubSection p = "Definition of " <> p.rpName.rnBase <> "."
@@ -743,7 +747,7 @@ sectionAssignment prog exported =
 ruleBlocks :: Env -> RelProgram -> Map Unique Int -> Either [LowerError] (Map Int [BBlock])
 ruleBlocks env prog secOf = do
   rules <- collectE
-    [ fmap (sec,) (convertClause env p (BSec sec) cl)
+    [ fmap (sec,) (convertClause env p (bSec sec) cl)
     | p <- prog.rpgPreds
     , not (null p.rpClauses)
     , let sec = Map.findWithDefault 1 p.rpName.rnUnique secOf
@@ -771,6 +775,8 @@ convertClause env p sec cl = do
       , brConclusion = MkBConclusion { bcSign = True, bcPred = headAtom, bcArgs = headTerms }
       , brConditions = conds
       , brDefeasible = False
+        -- Mode A has no applicability layer; see IR.brInapplicable
+      , brInapplicable = False
       , brProvenance = Just (cl.rcProv.rpvUnique, cl.rcProv.rpvRange)
       }
 
@@ -1088,8 +1094,9 @@ convertQuery env q = do
   pure MkBTest
     { btName   = slugify q.rqId
     , btStacks = [ catFacts <> facts <> constraint
-                 , [BQuery goalAtom queryArgs]
+                 , [BQuery [BGCall True goalAtom queryArgs]]
                  ]
+    , btComment = Nothing
     , btProv   = Just (q.rqProv.rpvUnique, q.rqProv.rpvRange)
     }
 
@@ -1131,10 +1138,11 @@ interviewTest env prog exported = case (inputs, exported) of
       ]
     qAtom <- atomOf env first0.rpName
     let qArity = length first0.rpParams + maybe 0 (const 1) first0.rpResult
-        query  = BQuery qAtom (map (BTVar . MkBVar) (declVars qArity))
+        query  = BQuery [BGCall True qAtom (map (BTVar . MkBVar) (declVars qArity))]
     pure $ Just MkBTest
       { btName   = "interview"
       , btStacks = [ [b] | b <- catAbds <> inpAbds ] <> [[query]]
+      , btComment = Nothing
       , btProv   = Nothing
       }
  where

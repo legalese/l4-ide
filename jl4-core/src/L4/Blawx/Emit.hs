@@ -106,11 +106,45 @@ renderTestScasp t = renderStacks t.btStacks
 -- renderer and "L4.Blawx.EmitXml" from disagreeing about it.
 renderStacks :: [[BBlock]] -> Text
 renderStacks stacks =
-  Text.intercalate "\n\n"
-    [ Text.intercalate "\n" (map renderBlock (runBlocks run))
-    | stack <- filter (not . null) stacks
-    , run <- blockRuns stack
-    ]
+  scrubTrailingBlanks $
+    Text.intercalate "\n\n"
+      [ Text.intercalate "\n" (map renderBlock (runBlocks run))
+      | stack <- filter (not . null) stacks
+      , run <- blockRuns stack
+      ]
+
+-- | Blockly's own last act before handing back a workspace's code. The tail of
+-- @Generator.workspaceToCode@ (Blockly 10.1.3, @blockly_compressed.js@) is
+--
+-- > b = b.join("\n"); b = this.finish(b);
+-- > b = b.replace(/^\s+\n/, ""); b = b.replace(/\n\s+$/, "\n");
+-- > return b = b.replace(/[ \t]+\n/g, "\n");
+--
+-- so __every trailing space or tab before a newline is stripped from the whole
+-- workspace__, not by any generator arm. The stored @scasp_encoding@ is that
+-- scrubbed text (@buttons.js:24@, @:487@), so it is the fixpoint target and
+-- this belongs here rather than in a block renderer.
+--
+-- It matters for exactly one arm today: @sCASP['unattributed_rule']@ emits
+-- @\" :- \\n\"@ with a trailing space (@scasp_generator.js:228@, unchanged
+-- since the generator was written), yet bird's stored @sec_5_section@ reads
+-- @blawx_applies(sec_5_section,A) :-\\nnot -blawx_applies(…)@ with no space.
+-- The scrub is why. 'renderBlock' keeps the generator's literal bytes so the
+-- two facts stay separately documented and separately testable.
+--
+-- The last line is scrubbed too: the real output ends @\".\\n\"@ where ours
+-- stops at the @.@, so a trailing space at our end of text sits before a
+-- newline in Blockly's.
+--
+-- __Byte-inert on every P1\/P3 golden__ — measured: no line of any committed
+-- @.blawx@ or @.pl@ golden ends in a space or a tab. The two sibling scrubs
+-- (@^\\s+\\n@, @\\n\\s+$@) cannot fire on our shapes: a workspace's first block
+-- never begins with whitespace, and its text always ends at a @.@.
+scrubTrailingBlanks :: Text -> Text
+scrubTrailingBlanks =
+  Text.intercalate "\n"
+    . map (Text.dropWhileEnd (\c -> c == ' ' || c == '\t'))
+    . Text.splitOn "\n"
 
 -- ---------------------------------------------------------------------------
 -- The .blawx YAML stream (R1) and the sibling .pl dump
@@ -296,7 +330,68 @@ renderBlock = \case
     -- currently emits single-goal constraints only, so the join is latent
     "false :- " <> Text.intercalate ",\n" (map renderGoal goals) <> "."
   BAbducible p args      -> "#abducible " <> atomApp p args <> "."
-  BQuery p args          -> "?- " <> atomApp p args <> "."
+  -- The query separator is ", " WITH a space (generator :200), unlike the
+  -- ",\n" of attributed_rule / unattributed_rule / unattributed_constraint. A
+  -- singleton reproduces the pre-P5 "?- p(…)." byte for byte.
+  BQuery goals           -> "?- " <> Text.intercalate ", " (map renderGoal goals) <> "."
+  -- The P5 import extension. The trailing "." on the three fact-position arms
+  -- is sCASP['unattributed_fact']'s (generator :324-337): it appends ".\n"
+  -- after each member whose own code does not already end in a newline — true
+  -- of every one of these, false of the 44-line declaration blocks, which is
+  -- exactly the split the arms above already encode.
+  BDeclareObject d       -> objectDeclBlock d <> "."
+  BOverrules o           -> overrulesBlock o <> "."
+  BAssertGoal g          -> renderGoal g <> "."
+  BUnattributedRule r    -> unattributedRuleBlock r
+
+-- | @object_declaration@ (generator @:476-481@): the category comes from the
+-- mutation-restored @blawxCategoryName@, the object from the @object_name@
+-- field. Witness: bird's @sec_5__span_pingu_section@ stores @penguin(pingu).@
+objectDeclBlock :: BObjectDecl -> Text
+objectDeclBlock d = bNameText d.bodCategory <> "(" <> bNameText d.bodName <> ")"
+
+-- | @overrules@ (generator @:272-295@):
+-- @blawx_defeated(\<defeated\>,\<Q…\>) :- holds(\<defeating\>,\<P…\>)@.
+--
+-- __The comma after each section ref is unconditional__ — the generator writes
+-- @\"blawx_defeated(\" + rule + \",\"@ before the loop, so a payload that
+-- 'deconstructTerm' flattens to nothing emits the degenerate
+-- @blawx_defeated(sec,)@. That differs from @holds@\/@according_to@, which
+-- build one list and join it, and it is reproduced rather than repaired (R10).
+--
+-- Witness: bird's @sec_3_section@ stores
+-- @blawx_defeated(sec_2_section,flies,A) :- holds(sec_3_section,-flies,A).@
+overrulesBlock :: BOverrule -> Text
+overrulesBlock o =
+  "blawx_defeated(" <> renderDocAtom o.bovDefeated <> ","
+    <> commaTrimmed (deconstructTerm (conclusionText o.bovDefeatedStmt))
+    <> ") :- holds(" <> renderDocAtom o.bovDefeating <> ","
+    <> commaTrimmed (deconstructTerm (conclusionText o.bovDefeatingStmt))
+    <> ")"
+
+-- | @unattributed_rule@ (generator @:217-241@): conclusion members joined
+-- @\",\\n\"@, then the literal @\" :- \\n\"@ — trailing space included, as the
+-- generator writes it — then the conditions, then the period. The space is
+-- removed later, at workspace level, by 'scrubTrailingBlanks'; see there.
+--
+-- An empty conclusion list therefore begins the block @\" :- \\n\"@ and an
+-- empty condition list ends it @\" :- \\n.\"@. Both are reproduced.
+unattributedRuleBlock :: BURule -> Text
+unattributedRuleBlock r =
+  Text.intercalate ",\n" (map renderGoal r.burConclusion)
+    <> " :- \n"
+    <> Text.intercalate ",\n" (map renderGoal r.burConditions)
+    <> "."
+
+-- | The text a conclusion's own block generates, which is what the generator
+-- hands to @deconstruct_term@.
+conclusionText :: BConclusion -> Text
+conclusionText c = (if c.bcSign then "" else "-") <> atomApp c.bcPred c.bcArgs
+
+-- | The generator's accumulation loops: @code += parameters[i].trim()@ with a
+-- @\",\"@ between.
+commaTrimmed :: [Text] -> Text
+commaTrimmed = Text.intercalate "," . map Text.strip
 
 -- ---------------------------------------------------------------------------
 -- Declaration blocks: the 44-line templates
@@ -484,7 +579,10 @@ ruleTriple :: BRule -> Text
 ruleTriple r =
   firstRule <> "\n\n" <> secondRule <> "\n\n" <> thirdRule
  where
-  sec  = renderSectionRef r.brSection
+  -- The section reaches the s(CASP) only through doc_selector's generator arm,
+  -- which lowercases it; see 'renderDocAtom'. Identical bytes for every ref
+  -- Mode-A export builds.
+  sec  = renderDocAtom r.brSection
   c    = r.brConclusion
   sign = if c.bcSign then "" else "-"
   -- deconstruct_term: functor (sign-prefixed), then its args, comma-joined,
@@ -496,7 +594,27 @@ ruleTriple r =
   -- the category guard is always first)
   firstRule =
     "according_to(" <> sec <> "," <> flat <> ") :- "
-      <> Text.intercalate ",\n" (map renderGoal r.brConditions) <> "."
+      <> Text.intercalate ",\n" (map condText r.brConditions) <> "."
+  -- The applicability injection (generator :1188-1194), and ONLY here. It
+  -- keys on the block IMAGE — a condition whose type is literally
+  -- @new_object_category@ — not on the semantic category, because
+  -- "L4.Blawx.EmitXml" images our own category goals as @object_category@,
+  -- which the generator does not treat as a trigger. Guarding on
+  -- 'BGNewObjectCategory' is what states that.
+  --
+  -- Byte-stability: 'L4.Blawx.Lower' sets 'brInapplicable' 'False' AND never
+  -- builds a 'BGNewObjectCategory', so both conjuncts fail on every P1/P3
+  -- golden and 'firstRule' is character-identical.
+  --
+  -- The guard goes AFTER the condition it belongs to. It went BEFORE all of
+  -- them until Blawx commit c9195be ("change order of applies clauses"), which
+  -- is why bird's own stored sec_5 encoding disagrees with this — that
+  -- encoding predates the commit and is one of the stale ones P5-2 warns
+  -- about, not counter-evidence.
+  condText g@(BGNewObjectCategory _ obj)
+    | r.brInapplicable =
+        renderGoal g <> ",\nblawx_applies(" <> sec <> "," <> Text.strip (renderTerm obj) <> ")"
+  condText g = renderGoal g
   secondRule =
     "% BLAWX CHECK DUPLICATES\n"
       <> "holds(" <> sec <> "," <> flat <> ") :- according_to(" <> sec <> "," <> flat <> ")"
@@ -534,6 +652,21 @@ renderGoal = \case
       <> " , " <> out <> ")"
   BGAggregate fn (MkBVar list) (MkBVar out) ->
     aggAtom fn <> "_blawx_list(" <> list <> " , " <> out <> ")"
+  -- The P5 import extension; "L4.Blawx.Lower" reaches none of these.
+  BGApplies sec t ->
+    "blawx_applies(" <> renderDocAtom sec <> "," <> renderTerm t <> ")"
+  -- holds/according_to build ONE parameter list — the section ref then the
+  -- deconstructed payload — and join it, so a paren-free payload yields the
+  -- 1-ary holds(sec) rather than overrules' degenerate trailing comma.
+  BGHolds sec g ->
+    "holds(" <> commaTrimmed (renderDocAtom sec : deconstructTerm (renderGoal g)) <> ")"
+  BGAccordingTo sec g ->
+    "according_to(" <> commaTrimmed (renderDocAtom sec : deconstructTerm (renderGoal g)) <> ")"
+  BGNegated BNegClassical g -> "-" <> Text.strip (renderGoal g)
+  BGNegated BNegDefault   g -> "not " <> Text.strip (renderGoal g)
+  -- Byte-identical to BGCall True; the constructors differ only in their XML
+  -- image and in whether the applicability injection fires. See the IR.
+  BGNewObjectCategory cat t -> bNameText cat <> "(" <> renderTerm t <> ")"
 
 cmpAtom :: BCmpOp -> Text
 cmpAtom = \case

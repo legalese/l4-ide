@@ -37,6 +37,16 @@ against raw s(CASP) only — Blawx-the-container is tier 2's other half
 (exercised in the design pass's tier-2 smoke, not here), and nothing in this
 repo claims tier 3 for the Blawx leg.
 
+THE IMPORT DIRECTION (BLAWX-EXPORT-SPEC R14, spec §10 P5) rides the same
+machinery, from `jl4/examples/blawx/imported/`: the .l4 is what
+`l4 blawx --import` LIFTED, its `-- L4 oracle ==>` lines are what the L4
+engine answered, and the .blawx beside it is what `l4 blawx --import
+--reemit` regenerated FROM THE PARSED BLOCKS via `renderScasp` (never the
+stored, and usually stale, encoding).  So a PASS here is the cross-engine
+claim P5 exists to make: the same query, put to L4 and to s(CASP), coming
+back with the same answer.  See IMPORT_BRIDGE below for the one clause that
+has to be added to make the comparison honest, and why.
+
 Usage:  python3 etc/blawx-tier1-harness.py  [seed ...]
 """
 
@@ -53,11 +63,70 @@ EXAMPLES = REPO / "jl4" / "examples" / "blawx"
 VENDORED = Path(__file__).resolve().parent / "blawx-vendored-libs.pl"
 SEEDS = ["benefit", "mortality", "scores", "sumlist"]
 
+# The import direction's seeds: <stem> -> the subdirectory of jl4/examples/blawx
+# holding BOTH `<stem>.l4` (lifted) and `<stem>.blawx` (re-emitted).
+IMPORTED = {"bird": "imported"}
+
+# UPSTREAM FINDING (legalese/blawx; belongs beside the quirk-fix issue #1).
+#
+# bird's span workspace asserts
+#     holds(sec_5__span_pingu_section,-blawx_applies,sec_5_section,pingu).
+# and NOTHING CONSUMES IT.  `blawx/ldap.py` declares #pred NLG for holds/4 and
+# stops there; `scasp_generator.js` emits an `L(X) :- holds(S,L,X).` bridge only
+# from an attributed_rule's THIRD clause and only for that rule's own section;
+# `reasoner.py` contains no occurrence of `holds` at all.  So
+# -blawx_applies(sec_5_section,pingu) is never derivable, the closed-world
+# default `not -blawx_applies(...)` succeeds, NBA 5 applies to pingu after all,
+# and `pingu_with_jetpack_cant_fly` comes back with NO MODEL -- contradicting
+# its own pinned comment, the Act's own s.5 carve-out, and the L4 lift.
+#
+# The lift implements the INTENDED semantics (the span is effective), so the
+# comparison is run against the bridged program.  Saying so here, in one place,
+# is the difference between a green run that means something and a green run
+# that is quietly claiming an agreement it does not have.
+IMPORT_BRIDGE = """\
+% Added by etc/blawx-tier1-harness.py -- see IMPORT_BRIDGE: the shipped
+% generator emits no consumer for a `holds` block naming blawx_applies.
+-blawx_applies(S,X) :- holds(_Z,-blawx_applies,S,X).
+"""
+
 PREAMBLE = """\
 :- use_module(library(scasp)).
 :- style_check(-discontiguous).
 :- style_check(-singleton).
 """
+
+# UPSTREAM FINDING #2 (s(CASP) itself, not Blawx and not our emitter).
+#
+# Enumerating instead of committing to the first model -- see run_test -- turned
+# up one query on which s(CASP) reports an answer L4 does not: benefit/q1 asks
+# `benefit_amount(a1,X)` and gets BOTH 1000 (right) and 0.  The 0 comes from
+#
+#     according_to(sec_2_section,benefit_amount,A,0) :- applicant(A),
+#                                                       not eligible_for_benefit(A).
+#
+# and it is not our clause being wrong: put that clause's own body to the SAME
+# program as a query and s(CASP) refuses it.  Measured, with the .pl this
+# harness keeps in its temp dir:
+#
+#     ?- applicant(a1), not eligible_for_benefit(a1).           -> 0 models
+#     ?- according_to(sec_2_section,benefit_amount,a1,0).       -> 1 model
+#
+# A rule body that succeeds where the identical conjunction fails is an engine
+# inconsistency, and the model it returns says so out loud: it contains
+# `age(a1,70)` and `not age(a1,_)` together, and `-is_veteran(a1)` beside
+# `not -is_veteran(_)` -- the dual of a body with a free variable over an
+# unbounded domain, satisfied by an unbound witness rather than checked over
+# the ground instances.
+#
+# The harness's posture, matching IMPORT_BRIDGE above: name it in ONE place,
+# keep the agreement claim (the L4 oracle must be among s(CASP)'s answers),
+# and PIN the surplus so it cannot grow or wander unnoticed.  A divergence that
+# changes shape fails the run.  Delete an entry when the engine stops producing
+# it -- an entry that no longer fires also fails, so this cannot rot.
+KNOWN_SURPLUS = {
+    ("benefit", "q1"): ["0"],
+}
 
 
 def have_scasp():
@@ -168,17 +237,26 @@ def strip_preds(text):
 
 # --- per-test program assembly and execution -------------------------------
 
-def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir):
+def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
+             bridge=""):
     goal = query[len("?- "):-1]  # chop "?- " and the final "."
     out_vars = re.findall(r"(?<![\w'])([A-Z_]\w*)", goal)
-    show = "".join(
-        f"format(\"BIND {v} = ~w~n\", [{v}]), " for v in out_vars
-    )
+    # ENUMERATE, DO NOT COMMIT.  This was an if-then-else around scasp/2, which
+    # takes the FIRST model and never looks again -- so a query with several
+    # answer substitutions was compared on one of them and the rest were
+    # invisible.  That is exactly the shape the lift renders `?- p(A).` into
+    # (`filter p `all objects``, i.e. an enumeration of the universe), so the
+    # one comparison most likely to disagree was the one least able to say so.
+    # `sort/2` also dedupes: s(CASP) can return the same substitution under
+    # more than one justification, which is not a disagreement.
+    tmpl = "[" + ",".join(out_vars) + "]"
     main = (
         f"main :-\n"
-        f"    ( scasp(({goal}), [model(_), tree(_)])\n"
-        f"    -> {show}format(\"MODEL~n\", [])\n"
-        f"    ;  format(\"NOMODEL~n\", []) ),\n"
+        f"    findall({tmpl}, scasp(({goal}), [model(_)]), Rows0),\n"
+        f"    sort(Rows0, Rows),\n"
+        f"    ( Rows == [] -> format(\"NOMODEL~n\", [])\n"
+        f"    ;  forall(member(Row, Rows), format(\"ROW ~q~n\", [Row])),\n"
+        f"       format(\"MODEL~n\", []) ),\n"
         f"    halt(0).\n"
         f"main :- format(\"HARNESSERROR~n\", []), halt(1).\n"
     )
@@ -190,6 +268,7 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir):
         strip_preds(VENDORED.read_text(encoding="utf-8")),
         scasp_now,
         program_body,
+        bridge,
         main,
     ])
     pl = keep_dir / f"{seed}-{test_name}.pl"
@@ -198,8 +277,8 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir):
         [swipl, "-q", "-g", "main", str(pl)],
         capture_output=True, text=True, timeout=300,
     )
-    binds = dict(re.findall(r"BIND (\w+) = (\S+)", r.stdout))
-    model = "MODEL" in r.stdout and "NOMODEL" not in r.stdout
+    rows = [split_row(m) for m in re.findall(r"^ROW (\[.*\])$", r.stdout, re.M)]
+    model = bool(rows)
 
     if oracle is None:
         return False, "no oracle comment in the .l4"
@@ -210,13 +289,51 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir):
         return (model, f"expected a model; got {'model' if model else 'NO model'}")
     if oracle == "FALSE":
         return (not model, f"expected no model; got {'model' if model else 'NO model'}")
-    # value oracle: compare against the (single) output binding
-    if not model:
-        return False, f"expected {oracle}; got NO model"
     if len(out_vars) != 1:
         return False, f"expected one output variable in {goal!r}, saw {out_vars}"
-    got = binds.get(out_vars[0])
-    return (got == oracle, f"expected {oracle}; got {got}")
+    got = sorted({row[0] for row in rows})
+    # The lift renders `?- p(A).` as `filter p `all objects`` -- an enumeration
+    # of the object universe -- so its L4 counterpart is a LIST and s(CASP)'s
+    # is the set of answer substitutions. Compare them as SETS: one element or
+    # twenty, order is not meaning on either side, but a missing element is.
+    if oracle.startswith("LIST "):
+        want = sorted(i.strip().strip('"') for i in oracle[len("LIST "):].split(","))
+        return (got == want, f"expected {want}; got {got}")
+    # value oracle: the L4 answer must be among s(CASP)'s, and any surplus must
+    # be exactly the pinned one (KNOWN_SURPLUS) -- absent, or larger, is a fail
+    if not model:
+        return False, f"expected {oracle}; got NO model"
+    surplus = [g for g in got if g != oracle]
+    pinned = KNOWN_SURPLUS.get((seed, test_name), [])
+    if surplus != pinned:
+        return False, (
+            f"expected {oracle}"
+            + (f" plus the pinned surplus {pinned}" if pinned else " and nothing else")
+            + f"; got {got}"
+        )
+    detail = f"expected {oracle}; got {oracle}" + (
+        f" (+ pinned s(CASP) surplus {pinned}, see KNOWN_SURPLUS)" if pinned else ""
+    )
+    return (oracle in got, detail)
+
+
+def split_row(text):
+    """Split a printed Prolog list `[a,b,c]` at TOP-LEVEL commas."""
+    inner, depth, cur, out = text[1:-1], 0, "", []
+    if not inner:
+        return []
+    for ch in inner:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    out.append(cur.strip())
+    return out
 
 
 def main():
@@ -225,13 +342,22 @@ def main():
         print(f"blawx-tier1: SKIP ({why}) — the harness is optional-when-present")
         return 0
     swipl = shutil.which("swipl")
-    seeds = sys.argv[1:] or SEEDS
+    seeds = sys.argv[1:] or (SEEDS + sorted(IMPORTED))
     keep_dir = Path(tempfile.mkdtemp(prefix="blawx-tier1-"))
     failures = 0
     total = 0
     for seed in seeds:
-        l4 = EXAMPLES / f"{seed}.l4"
-        blawx = EXAMPLES / "expected" / f"{seed}.blawx"
+        # Export seeds sit at examples/blawx/<seed>.l4 with their golden under
+        # expected/; import seeds have both halves in one subdirectory, because
+        # BOTH were produced by the pipeline rather than one being a golden.
+        subdir = IMPORTED.get(seed)
+        bridge = IMPORT_BRIDGE if subdir else ""
+        if subdir:
+            l4 = EXAMPLES / subdir / f"{seed}.l4"
+            blawx = EXAMPLES / subdir / f"{seed}.blawx"
+        else:
+            l4 = EXAMPLES / f"{seed}.l4"
+            blawx = EXAMPLES / "expected" / f"{seed}.blawx"
         if not blawx.exists():
             print(f"blawx-tier1: {seed}: missing golden {blawx}")
             failures += 1
@@ -271,7 +397,7 @@ def main():
                 dedup([e for _, e in workspaces] + [enc_body])
             )
             passed, detail = run_test(
-                swipl, seed, test_name, query, body, oracle, keep_dir
+                swipl, seed, test_name, query, body, oracle, keep_dir, bridge
             )
             status = "PASS" if passed else "FAIL"
             print(f"blawx-tier1: {status} {seed}/{test_name}: {directive}  [{detail}]")
