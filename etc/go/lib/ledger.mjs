@@ -244,17 +244,54 @@ export function findReplayableAcrossRuns(
   if (!runRoot || !existsSync(runRoot)) return null;
   let entries;
   try {
-    entries = readdirSync(runRoot).sort().reverse();
+    entries = readdirSync(runRoot);
   } catch {
     return null;
   }
   const current = currentRunDir ? currentRunDir.replace(/\/+$/, "") : "";
+
+  // ORDERED BY WHEN THE RUN BEGAN, not by the run id's spelling.
+  //
+  // A run id is `YYYY-MM-DD-<corpus_sha8>-NNN`, so a lexicographic sort orders
+  // by date, then by the CORPUS HASH, then by sequence. Within a single day the
+  // greater sha8 therefore outranks the temporally later run — and the sha8 is
+  // a content hash, so its order carries no meaning at all. Reachable whenever
+  // one day holds runs over different corpora and a stage declares inputs
+  // narrow enough to match across them (`p7-wizard` names only the wizard
+  // module), and the consequence is borrowing an older receipt while a newer
+  // execution over the same inputs sits right there.
+  //
+  // THE SELECTION RULE IS "the most recent execution over these inputs", and it
+  // stays that. It is deliberately NOT "the best status over these inputs": a
+  // lookup that preferred a PASS to a more recent DEGRADED would be status
+  // shopping — picking the answer you want out of a set of equally valid ones —
+  // which is the erosion this file refuses everywhere else. The ordering is the
+  // bug; the rule is not, and the obvious "improvement" to a freshly-touched
+  // ordering function is exactly the corruption.
+  const candidates = [];
   for (const name of entries) {
     const dir = join(runRoot, name);
     if (dir === current) continue;
     const journal = join(dir, "journal.ndjson");
     if (!existsSync(journal)) continue;
     if (runSubject(journal) !== subject) continue;
+    let ts = "";
+    try {
+      const first = read(journal)[0];
+      ts = first?.kind === "run_begin" ? (first.ts ?? "") : "";
+    } catch {
+      ts = "";
+    }
+    candidates.push({ name, dir, journal, ts });
+  }
+  // ts descending; a run with no readable ts sorts last rather than first, so a
+  // malformed journal can never outrank a well-formed one. Run id descending
+  // breaks a tie, which is the old behaviour restored where it was harmless.
+  candidates.sort((a, b) =>
+    a.ts === b.ts ? (a.name < b.name ? 1 : -1) : a.ts < b.ts ? 1 : -1,
+  );
+
+  for (const { name, dir, journal } of candidates) {
     let record;
     try {
       record = findReplayable(journal, stage, inputsDigest);

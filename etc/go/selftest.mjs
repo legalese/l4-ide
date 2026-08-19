@@ -4880,6 +4880,197 @@ process.stdout.write("\n-- borrowed artifacts --\n");
 }
 // ===== END borrowed artifacts ===============================================
 
+// ===== the cross-run lookup picks the LATEST execution ======================
+//
+// findReplayableAcrossRuns ordered candidates with readdirSync().sort()
+// .reverse(). A run id is `YYYY-MM-DD-<corpus_sha8>-NNN`, so that orders by
+// date, then by the CORPUS HASH, then by sequence — and a content hash's order
+// carries no meaning. Within one day the greater sha8 outranked the temporally
+// later run, so a stage could borrow an older receipt while a newer execution
+// over byte-identical inputs sat in the store.
+//
+// The fixture below is that exact shape and the old code fails it: the earlier
+// run's sha8 sorts ABOVE the later run's, so a lexicographic reverse picks the
+// earlier one.
+process.stdout.write("\n-- cross-run ordering --\n");
+{
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-order-"));
+  const DIG = "sha256:" + "d".repeat(64);
+  const mk = (id, ts, status) => {
+    const d = resolve(root, id);
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      ts,
+      milestone: "g1",
+      subject: "subj",
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: ["p7-wizard"],
+    });
+    append(j, {
+      kind: "stage_end",
+      stage: "p7-wizard",
+      status,
+      reason: null,
+      blocker: null,
+      oracle: { class: "structural", because: "counted" },
+      artifacts: [],
+      metrics: {},
+      notes: [],
+      inputs_digest: DIG,
+    });
+    return d;
+  };
+
+  // Same day. The EARLIER run's corpus sha8 sorts lexicographically ABOVE the
+  // LATER run's, which is precisely the case the old ordering got wrong.
+  mk("2026-03-01-ffffffff-001", "2026-03-01T09:00:00.000Z", "DEGRADED");
+  mk("2026-03-01-00000000-001", "2026-03-01T17:00:00.000Z", "PASS");
+
+  const hit = findReplayableAcrossRuns(
+    root,
+    resolve(root, "current"),
+    "subj",
+    "p7-wizard",
+    DIG,
+  );
+  check("the cross-run lookup finds a candidate", Boolean(hit));
+  check(
+    "it picks the run that began LATER, not the one whose id sorts higher",
+    hit?.runId === "2026-03-01-00000000-001",
+  );
+
+  // And the rule is "most recent execution", never "best status" — so make the
+  // later run the WORSE one and assert it is still chosen. A lookup that
+  // preferred the PASS here would be status shopping.
+  const root2 = mkdtempSync(resolve(tmpdir(), "l4-go-order2-"));
+  const mk2 = (id, ts, status) => {
+    const d = resolve(root2, id);
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      ts,
+      milestone: "g1",
+      subject: "subj",
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: ["p7-wizard"],
+    });
+    append(j, {
+      kind: "stage_end",
+      stage: "p7-wizard",
+      status,
+      reason: null,
+      blocker: null,
+      oracle: { class: "structural", because: "counted" },
+      artifacts: [],
+      metrics: {},
+      notes: [],
+      inputs_digest: DIG,
+    });
+  };
+  mk2("2026-03-01-aaaaaaaa-001", "2026-03-01T09:00:00.000Z", "PASS");
+  mk2("2026-03-01-bbbbbbbb-001", "2026-03-01T17:00:00.000Z", "DEGRADED");
+  const hit2 = findReplayableAcrossRuns(
+    root2,
+    resolve(root2, "current"),
+    "subj",
+    "p7-wizard",
+    DIG,
+  );
+  check(
+    "the rule is most-recent-execution, NOT best-status — no status shopping",
+    hit2?.record?.status === "DEGRADED",
+  );
+
+  // A journal with no readable ts must sort LAST, so a malformed run can never
+  // outrank a well-formed one by accident. Written RAW, not through append():
+  // append() stamps `ts: new Date().toISOString()` itself, so a fixture built
+  // with it is never actually ts-less — and would in fact carry TODAY's clock,
+  // outranking every dated fixture and passing this check for the wrong reason.
+  const root3 = mkdtempSync(resolve(tmpdir(), "l4-go-order3-"));
+  const rawRun = (id, rows) => {
+    const d = resolve(root3, id);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(
+      resolve(d, "journal.ndjson"),
+      rows.map((r) => JSON.stringify(r)).join("\n") + "\n",
+    );
+  };
+  // No `ts` anywhere, and an id that sorts ABOVE the well-formed run.
+  rawRun("2026-03-09-zzzzzzzz-001", [
+    {
+      journal_schema: 2,
+      seq: 0,
+      kind: "run_begin",
+      run_id: "2026-03-09-zzzzzzzz-001",
+      subject: "subj",
+      milestone: "g1",
+      declared_stages: ["p7-wizard"],
+    },
+    {
+      journal_schema: 2,
+      seq: 1,
+      kind: "stage_end",
+      stage: "p7-wizard",
+      status: "PASS",
+      reason: null,
+      blocker: null,
+      oracle: { class: "structural", because: "counted" },
+      artifacts: [],
+      metrics: {},
+      notes: [],
+      inputs_digest: DIG,
+    },
+  ]);
+  rawRun("2026-03-01-aaaaaaaa-001", [
+    {
+      journal_schema: 2,
+      seq: 0,
+      ts: "2026-03-01T09:00:00.000Z",
+      kind: "run_begin",
+      run_id: "2026-03-01-aaaaaaaa-001",
+      subject: "subj",
+      milestone: "g1",
+      declared_stages: ["p7-wizard"],
+    },
+    {
+      journal_schema: 2,
+      seq: 1,
+      ts: "2026-03-01T09:00:01.000Z",
+      kind: "stage_end",
+      stage: "p7-wizard",
+      status: "DEGRADED",
+      reason: null,
+      blocker: null,
+      oracle: { class: "structural", because: "counted" },
+      artifacts: [],
+      metrics: {},
+      notes: [],
+      inputs_digest: DIG,
+    },
+  ]);
+  const hit3 = findReplayableAcrossRuns(
+    root3,
+    resolve(root3, "current"),
+    "subj",
+    "p7-wizard",
+    DIG,
+  );
+  check(
+    "a run with no readable ts sorts last, so it cannot outrank a well-formed one",
+    hit3?.runId === "2026-03-01-aaaaaaaa-001",
+  );
+}
+// ===== END cross-run ordering ===============================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

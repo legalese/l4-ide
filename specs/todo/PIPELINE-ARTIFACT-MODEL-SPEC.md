@@ -213,6 +213,22 @@ measured, the seven digests move and `p0-preflight` and `p7-lts` do not.
 
 **Closed — a borrowed artifact could be laundered.** See §3.8.
 
+**Closed — the lookup preferred a corpus hash to a clock.** `findReplayableAcrossRuns` ordered its
+candidates with `readdirSync().sort().reverse()`. A run id is `YYYY-MM-DD-<corpus_sha8>-NNN`, so
+that orders by date, then by the **corpus hash**, then by sequence — and a content hash's order
+carries no meaning whatever. Within one day the greater `sha8` outranked the temporally later run,
+so a stage could borrow an older receipt while a newer execution over byte-identical inputs sat in
+the store. Reachable whenever a day holds runs over different corpora and a stage's declared inputs
+are narrow enough to match across them (`p7-wizard` names only the wizard module). Now ordered by
+`run_begin.ts` descending, with a run whose `ts` is unreadable sorting **last** so a malformed
+journal cannot outrank a well-formed one.
+
+The selection rule is unchanged and deliberately so: **the most recent execution over these inputs
+wins, never the best status.** A lookup that preferred a `PASS` to a more recent `DEGRADED` would be
+status shopping, which is the erosion this codebase refuses everywhere else — and it is exactly the
+"improvement" a freshly-touched ordering function invites. Both properties are selftested, and the
+old ordering fails the new fixture.
+
 **Recorded, not closed.** In rough order of blast radius:
 
 | gap                                                              | why it matters                                                                                                                                                                                                                                                                                                  |
