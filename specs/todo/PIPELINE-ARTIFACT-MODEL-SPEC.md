@@ -365,6 +365,44 @@ must refuse to answer from an artifact that has no such edge.
 
 _This is the ruling most likely to be got wrong by building R6 first and R11 later._
 
+**Four constraints on any implementation, from a design review run 2026-08-20** (three independent
+designs, judged against the surveyed invariants, then attacked from the safety, migration and
+erosion angles). Recorded here because each was reached by measurement and would otherwise have to
+be rediscovered:
+
+1. **Write the serving predicate once.** Three separate erosion attacks — `gc` collecting servable
+   objects, a graft reintroducing a forbidden field, and a flag satisfying R11's only live check —
+   turned out to be the same defect: "an object is servable iff…" gets written once in `gc`'s
+   retention roots, once in the blessing lookup, and once in the refusal, and the copies disagree
+   about `waived`. One exported `servability(rec)` that all three call is the only version in which
+   that sentence is a fact about the code rather than a claim about three of them.
+
+2. **Derive the blessing inside the receipt writer; never accept it as a flag.** `receipt.mjs` is
+   the only journal writer precisely so that no caller can assert a status it did not earn. Passing
+   a `--blessing` from the driver re-opens that asymmetry for any phase script, debug flag or future
+   agent. `run_begin.gated_stages` already exists and is already what `verify-run.mjs` trusts
+   _instead of_ the driver, so the derivation needs no new channel.
+
+3. **Gate the act that actually serves.** `p7-mcp` POSTs to a live `jl4-service` **before it writes
+   any receipt**, so no receipt-level rule can see it; `p10-publish` exits 3 and has never run.
+   Wiring only the latter would let R11 be marked implemented while the pipeline's one real serving
+   act stays unchecked. (Measured caveat: `p10-publish` does not source `phase-prelude.sh` and CI
+   asserts its exit 3, so adding a prelude-dependent check there fails CI as `rc=2, expected 3`.)
+
+4. **Validate blessing records the way receipts are validated.** Gate rows bypass `checkReceipt`
+   today — it is applied only under `case stage_end` — so a row claiming `satisfied` with a null
+   signature is written without complaint. In a run directory that is disposable; in a durable
+   ledger it is permanent. HG2's unwaivability in particular has to move out of `go.sh`'s prose and
+   into the writer, because a waived-HG2 claim in a ledger nothing sweeps could never be taken back.
+
+**And one thing the review changed about the order of work.** The safety attack found that the L4
+standard library was an input to every stage and in no digest (§3.7a), which under a durable ledger
+would have converted an under-specified binding into a **permanent, itemised, quotable false claim
+naming a real human** — while R6's own comparator stayed silent, because its witness key is computed
+from the same under-declared set the gate is. Both the gate's binding and the comparator's key fail
+together when that set is wrong. That is now fixed; it was not when the designs were written, and
+building R6 first would have made it durable.
+
 ### 3.12 R12 — a first encoding has no home — ANSWERED 2026-08-20
 
 **The problem, as measured before this ruling was implemented:** a subject whose `encoding.main` did

@@ -1299,6 +1299,76 @@ process.stdout.write("\n-- the signable document --\n");
     "a g2 payload REFUSES — p0-preflight is not a g2 stage",
     blindG2.status === 2,
   );
+
+  // The REALISTIC g2 case, and the one the check above is too weak to pin: a
+  // fully populated journal with every declared stage green. An empty journal
+  // would refuse under a much weaker rule ("no stages, no payload"); a g2 run
+  // that did everything asked of it and still cannot describe what it blesses
+  // is the actual property, because p0-preflight is not in G2_STAGES at all.
+  {
+    const d = resolve(root, "2026-01-05-aaaaaaaa-001");
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    const g2Stages = [
+      "p1-ingest",
+      "p2-sweep",
+      "p3-encode",
+      "p3-check",
+      "p4-forks",
+      "p5-gate",
+      "p6-tests",
+      "p7-dmn",
+      "p8-verify",
+      "p8-diff",
+      "p9-report",
+    ];
+    append(j, {
+      kind: "run_begin",
+      run_id: "2026-01-05-aaaaaaaa-001",
+      milestone: "g2",
+      subject: "subj",
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: g2Stages,
+    });
+    for (const stage of g2Stages)
+      append(j, {
+        kind: "stage_end",
+        stage,
+        status: "PASS",
+        reason: null,
+        blocker: null,
+        oracle: { class: "structural", because: "counted" },
+        artifacts: [],
+        metrics: { some_number: 1 },
+        notes: [],
+      });
+    const fullG2 = render(d);
+    check(
+      "a FULLY GREEN g2 run still refuses — every stage passed and none states the corpus",
+      fullG2.status === 2,
+    );
+    check(
+      "and it says so without claiming the run failed",
+      /not a declared g2 stage/.test(fullG2.stderr),
+    );
+  }
+
+  // WHERE the corpus section comes from is itself a property. It is built from
+  // p0-preflight's `corpus_sha_*` METRICS — a measurement a stage recorded
+  // after reading the files — and gate-payload.mjs calls that "a CONTRACT, not
+  // an implementation detail". The tempting future edit is to source it from a
+  // driver-written record instead, which is cheaper, always available, and
+  // silently downgrades the signed document's evidence from "a stage measured
+  // this" to "the driver asserted this" — and would delete the g2 refusal as a
+  // side effect, because a driver record exists at g2 and the section is then
+  // never empty.
+  check(
+    "the corpus section is derived from a stage receipt's metrics, not a driver record",
+    /corpus_sha_/.test(readFileSync(GP, "utf8")) &&
+      /stage_end/.test(readFileSync(GP, "utf8")),
+  );
   check(
     "the g2 refusal explains why g2 differs, and names the waiver as the honest alternative",
     /not a declared g2 stage/.test(blindG2.stderr) &&
