@@ -45,7 +45,18 @@
 -- synthesised @member\/2@) → __no declaration block__, rules only: Blawx's
 -- relationship blocks start at arity 3, and s(CASP) needs no declaration to
 -- execute. The block-fidelity gap this leaves for such predicates is
--- recorded for P3 (they have no scenario-editor image either way).
+-- recorded for P3 (they have no scenario-editor image either way). The one
+-- shape that is not merely undeclared but __refused__ is an 'RInput' landing
+-- in that last bucket: an input is a fact the scenario editor and the
+-- interview must be able to state, and a fact with no category subject has no
+-- block to state it in (see 'declarations').
+--
+-- __The two sources of 'RInput' are declared from different places.__ A
+-- stored record field's block comes from the record ('fieldAttribute'); a
+-- top-level @ASSUME@\'s comes from the classifier, through the same
+-- 'attributeBlock', so the two spellings of one fact emit identical
+-- declarations. Categories likewise come from @DECLARE@d records, @ASSUME@d
+-- types ('rpgAbstract') and enums, in that order.
 --
 -- __Category guards__: every clause of a predicate with record- or
 -- enum-sorted head parameters gets @cat(X)@ goals prepended, in parameter
@@ -132,13 +143,19 @@
 -- with another string, a declared name, or a skolem constant.
 --
 -- __One @#abducible@ interview test per module__ ('interviewTest', R11 as
--- ruled) when the module has input predicates; test-name slugs are checked
--- for uniqueness ('checkTestNames').
+-- ruled) when the module has input predicates — of either source, so a module
+-- with no @DECLARE@ at all still gets one; test-name slugs are checked for
+-- uniqueness ('checkTestNames').
+--
+-- __A section's @rule_text@ falls back through the citation__: @\@desc@, then
+-- @\@ref@, then the @\"Definition of x.\"@ stub (see 'lowerBlawx'). @\@nlg@
+-- remains deliberately unconsumed here, for the reason recorded above.
 module L4.Blawx.Lower
   ( lowerBlawx
   ) where
 
 import Base
+import Control.Applicative ((<|>))
 import qualified Base.Map as Map
 import qualified Base.Text as Text
 import Data.Char (chr, isAsciiLower, isAsciiUpper, isDigit, ord, toLower, toUpper)
@@ -216,7 +233,16 @@ lowerBlawx prog0 = do
         , brSections =
             [ MkBSection
                 { bsNumber = i
-                , bsText   = squash (fromMaybe (stubSection p) p.rpDesc)
+                -- @\@desc@ first, then the @\@ref@ citation, then a stub. The
+                -- citation is a worse section text than prose and a much better
+                -- one than "Definition of x." — a corpus annotated for
+                -- provenance rather than for explanation (a statute encoding
+                -- with a @\@ref@ per section) gets its section headings for
+                -- free, and R4's promise that a target-side answer lifts back
+                -- to a citation stops depending on whether the author also
+                -- wrote prose. 'refText' has already stripped the @\@ref@
+                -- herald; 'squash' flattens a multi-line citation.
+                , bsText   = squash (fromMaybe (stubSection p) (p.rpDesc <|> p.rpRef))
                 }
             | (i, p) <- zip [1 ..] exported
             ]
@@ -283,6 +309,11 @@ buildEnv prog = do
   entities =
     [ (r.rrName, "record", r.rrProv.rpvRange) | r <- prog.rpgRecords ]
       <> [ (f.rfName, "field", Nothing) | r <- prog.rpgRecords, f <- r.rrFields ]
+      -- An ASSUMEd TYPE is a category and needs an atom like any other: it is
+      -- declared, it is the subject of its attributes' blocks, and it must be
+      -- in the injectivity check or a record and an assumed type spelled alike
+      -- would silently become one category.
+      <> [ (a.raName, "assumed type", a.raProv.rpvRange) | a <- prog.rpgAbstract ]
       <> [ (e.reName, "enum", e.reProv.rpvRange) | e <- prog.rpgEnums ]
       <> [ (c, "enum constructor", e.reProv.rpvRange)
          | e <- prog.rpgEnums, c <- e.reCons ]
@@ -579,11 +610,17 @@ classifyPred env p = case (p.rpParams, p.rpResult) of
     | otherwise -> Right PCUndeclared
    where
     arity = length params + maybe 0 (const 1) res
- where
-  categoryOf = \case
-    RSRecord r -> Just r
-    RSEnum r   -> Just r
-    _          -> Nothing
+
+-- | The category a sort names, if it names one. Blawx's ontology is
+-- category-centric: a declaration block hangs off a subject, and a sort that is
+-- not a category cannot be one. 'RSRecord' covers both a declared record and an
+-- @ASSUME@d type ("L4.Relational.IR"), which is exactly the collapse this leg
+-- wants — the two produce the same category block.
+categoryOf :: RSort -> Maybe RName
+categoryOf = \case
+  RSRecord r -> Just r
+  RSEnum r   -> Just r
+  _          -> Nothing
 
 -- | An attribute/relationship argument's declared Blawx value type.
 valueType :: Env -> RPred -> RSort -> Either [LowerError] BValueType
@@ -614,25 +651,81 @@ blawxValueType env who rng = \case
                  <> Text.textShow s <> ", which Blawx's ontology cannot declare" ) ]
 
 -- | The @root_section@ declaration stack, in the order of
--- @p1-design/emit-plan.md@ §11: categories (records, then enums), field
--- attributes, decision attributes, relationships.
+-- @p1-design/emit-plan.md@ §11: categories (records, then @ASSUME@d types, then
+-- enums), field attributes, @ASSUME@d-input attributes, decision attributes,
+-- relationships.
+--
+-- __The two kinds of 'RInput' are declared from different places, and that is
+-- why the filter is a membership test rather than a kind test.__ A
+-- field-derived input already has its block from 'fieldAttribute' (built from
+-- the record, which is where the field's owning category is written down), so
+-- putting it through 'classifyPred' as well would declare it twice. An
+-- @ASSUME@-derived input has no field twin and nothing else to build a block
+-- from, so it goes through the classifier like any other predicate — and gets
+-- the /same/ 'attributeBlock', which is what makes an @ASSUME@d boolean and a
+-- boolean field emit byte-identical @blawx_attribute@, @*_nlg@ and
+-- @:- dynamic@ lines. An input predicate shares its field's 'Unique' when it
+-- has one ('mangleAll'), so the test is exact.
 declarations :: Env -> RelProgram -> Either [LowerError] [BBlock]
 declarations env prog = do
   cats <- collectE $
     [ categoryBlock r.rrName r.rrProv | r <- prog.rpgRecords ]
+      <> [ categoryBlock a.raName a.raProv | a <- prog.rpgAbstract ]
       <> [ categoryBlock e.reName e.reProv | e <- prog.rpgEnums ]
   fieldAttrs <- collectE
     [ fieldAttribute r f | r <- prog.rpgRecords, f <- r.rrFields ]
   classified <- collectE
-    [ (p,) <$> classifyPred env p | p <- prog.rpgPreds, p.rpKind /= RInput ]
+    [ (p,) <$> classifyPred env p | p <- prog.rpgPreds, not (isFieldInput env p) ]
+  let (inputCls, computedCls) = partition (\(p, _) -> p.rpKind == RInput) classified
+  -- An input that 'classifyPred' cannot place has no Blawx image at all: no
+  -- declaration block, no attribute selector, and no block in
+  -- 'L4.Blawx.EmitXml' it could be stated with, which is the R12 blank-row loss
+  -- the fixpoint harness fails on.
+  --
+  -- __The refused band is total arity ≤ 2 that is not attribute-shaped, and
+  -- nothing else.__ Blawx hangs a declaration block off a subject, so at that
+  -- end the ontology is category-centric: arity 0 (a bare proposition), a
+  -- non-category arity 1, and every arity 2 other than @(category) -> value@
+  -- land in 'PCUndeclared'. From total arity 3 up the input is declared as a
+  -- /relationship/ instead, whose arguments 'valueType' types individually and
+  -- does NOT require to be categories — so an @ASSUME@ over two @NUMBER@s
+  -- returning a @NUMBER@ is accepted here. The condition is therefore a floor
+  -- with a hole in it, not a blanket "first parameter must be a category"; the
+  -- message below and BLAWX-EXPORT-SPEC §6.1 both say so explicitly, because an
+  -- earlier wording of each claimed the blanket rule and contradicted the code.
+  --
+  -- Refused HERE and not in the middle end on purpose: `RInput/0` is a
+  -- perfectly good relational predicate that a swipl or Logical English leg can
+  -- emit, and narrowing the shared layer to fit one target's block palette is
+  -- the inversion of #258 §2.5's division of labour.
+  case [ blawxErr p.rpName.rnBase p.rpProv.rpvRange
+           (LEUnsupported "input predicate with no category subject (Blawx)")
+           ( "`" <> p.rpName.rnBase <> "` is an input of total arity "
+               <> Text.textShow (length p.rpParams + maybe 0 (const 1) p.rpResult)
+               <> ", which Blawx has no declaration block for. At total arity 2 \
+                 \or below an input must be ATTRIBUTE-shaped — exactly one \
+                 \parameter, category-sorted (an ASSUMEd TYPE, a record or an \
+                 \enum), plus at most a result — because a fact is stated in \
+                 \Blawx by hanging an attribute off its subject. Relationship \
+                 \blocks, whose arguments need not be categories, start at \
+                 \total arity 3" )
+       | (p, PCUndeclared) <- inputCls
+       ] of
+    []   -> Right ()
+    errs -> Left errs
+  inputAttrs <- collectE
+    [ predAttribute p cat vt
+    | (p, cls) <- inputCls
+    , Just (cat, vt) <- [attrOf cls]
+    ]
   declAttrs <- collectE
     [ predAttribute p cat vt
-    | (p, cls) <- classified
+    | (p, cls) <- computedCls
     , Just (cat, vt) <- [attrOf cls]
     ]
   rels <- collectE
     [ relationship p vts | (p, PCRelationship vts) <- classified ]
-  pure (cats <> fieldAttrs <> declAttrs <> rels)
+  pure (cats <> fieldAttrs <> inputAttrs <> declAttrs <> rels)
  where
   attrOf = \case
     PCAttrBool cat     -> Just (cat, BVBoolean)
@@ -682,15 +775,32 @@ declarations env prog = do
       , brProv     = Just (p.rpName.rnUnique, p.rpProv.rpvRange)
       }
 
+-- | Whether an 'RInput' predicate came from a stored record field (as opposed
+-- to a top-level @ASSUME@). The join is the 'Unique': an input predicate built
+-- from a field carries that field's identity, which is why it also carries the
+-- field's atom ('mangleAll').
+isFieldInput :: Env -> RPred -> Bool
+isFieldInput env p = p.rpKind == RInput && Map.member p.rpName.rnUnique env.envFieldCat
+
 prettyAtom :: Text -> Text
 prettyAtom = Text.replace "_" " "
 
 -- | See the title derivation in 'lowerBlawx': CLEAN requires an
 -- uppercase-initial title, or the import view rejects the whole document.
+--
+-- CLEAN's title grammar also rejects an em\/en dash — measured against the
+-- pinned clean-law inside the Blawx container (2026-08-19): a title @Act X — Y@
+-- raises @ParseException: found '—'@ in @generate_akn@ during
+-- @RuleDoc.save()@, making the import 500; @-@, commas, and parentheses all
+-- parse, and body text tolerates em dashes fine. So the TITLE channel maps
+-- em\/en dashes to an ASCII hyphen; the L4 source keeps its typography, and
+-- @\@desc@\/section prose is untouched.
 capitalizeFirst :: Text -> Text
-capitalizeFirst t = case Text.uncons t of
+capitalizeFirst t = case Text.uncons (dashSafe t) of
   Just (c, rest) -> Text.cons (toUpper c) rest
   Nothing        -> t
+ where
+  dashSafe = Text.replace "\x2014" "-" . Text.replace "\x2013" "-"
 
 isATxt :: Text -> Text
 isATxt atom =
@@ -1105,7 +1215,14 @@ convertQuery env q = do
 -- * emitted only when the module has at least one 'RInput' predicate: with
 --   nothing to abduce the query would run the decision over wholly unbound
 --   arguments, which for a recursive module (sumlist) is an unbounded
---   search, not an interview;
+--   search, not an interview. __This is a ruling, not a deferral.__ P1 left
+--   it open whether a module with no /record/ inputs could get an interview;
+--   the @ASSUME@ widening answers half of it — an @ASSUME@-style module has
+--   no @DECLARE@ at all and still gets one, because 'RInput' no longer
+--   implies \"stored field\" — and closes the other half: @sumlist@ has
+--   neither kind of input (its parameters are @LIST OF NUMBER@), so it gets
+--   no interview permanently. The gate is \"has an abducible input\", and a
+--   list-recursive module has none in either source;
 -- * variable naming follows the declaration blocks' convention (@X@ /
 --   @X,Y@; @A@… above arity 2) — each directive's variables scope to
 --   itself, so sharing letters is cosmetic and matches the shipped example;
@@ -1139,16 +1256,27 @@ interviewTest env prog exported = case (inputs, exported) of
       }
  where
   inputs = [ p | p <- prog.rpgPreds, p.rpKind == RInput ]
+  -- The subject's category, read off the predicate's OWN signature rather than
+  -- from the field table, because an ASSUME-derived input has no field to look
+  -- up. Byte-identical on a field-derived input: 'inputPreds' builds its
+  -- rpParams as @[RSRecord \<owning record\>]@, from the same walk that fills
+  -- @envFieldCat@.
   cats = nubOrdOn (.rnUnique)
     [ cat
     | p <- inputs
-    , Just cat <- [Map.lookup p.rpName.rnUnique env.envFieldCat]
+    , (s : _) <- [p.rpParams]
+    , Just cat <- [categoryOf s]
     ]
-  -- an input predicate is a stored field: unary when boolean (truth rides
-  -- the sign), binary otherwise — same shape as its declaration block
-  inputArity p = case Map.lookup p.rpName.rnUnique env.envFieldSort of
-    Just RSBool -> 1
-    _           -> 2
+  -- Its arity, likewise from the signature — and equal to the arity of the
+  -- declaration block, which is the shape the abducible has to match. A boolean
+  -- attribute is unary (truth rides the sign): a stored BOOLEAN field spells
+  -- that as @rpResult = Just RSBool@ and an ASSUMEd boolean as
+  -- @rpResult = Nothing@ (the output argument is dropped), and both land on 1.
+  inputArity p =
+    length p.rpParams + case p.rpResult of
+      Just RSBool -> 0
+      Just _      -> 1
+      Nothing     -> 0
   declVars n
     | n <= 2    = take n ["X", "Y"]
     | otherwise = take n ["A","B","C","D","E","F","G","H","I","J"]

@@ -1,0 +1,2 @@
+lowering errors: 1
+  local-assume.l4:20:5-33: in `above the threshold`: local ASSUME: a local ASSUME has no relational image: unlike a top-level one — which becomes an input predicate a target can declare and abduce — it is scoped to a single definition, so there is no module-level name to declare and nothing for an interview to ask about

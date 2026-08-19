@@ -1,0 +1,42 @@
+-- The subjectless-input rejection fixture, in the shape of
+-- `jl4/examples/legal/imaginary-alcohol-act.l4`: a nullary top-level `ASSUME`
+-- referenced from a nullary `@export`ed decision.
+--
+-- The middle end ADMITS this. A nullary `RInput` is a perfectly good Horn
+-- predicate, and `jl4/examples/relational/assumed-nullary.l4` carries the Debug
+-- golden that says so — a future non-Blawx consumer (Logical English, PROLEG,
+-- plain swipl) has an image for it. Refusing it in `L4.Relational.Lower` would
+-- narrow the shared layer to fit one target's block palette.
+--
+-- The Blawx leg refuses it, by name, because at total arity 2 and below Blawx's
+-- ontology is category-centric: a fact is stated by hanging an attribute off a
+-- subject, so a proposition with no subject has no declaration block, no
+-- `unary_attribute_selector` in the scenario editor, and no `#abducible` line
+-- the interview could offer. `L4.Blawx.EmitXml.predicateNode` has no block for
+-- a zero-argument goal at all, so letting it through would blank the row's
+-- `xml_content` while its `scasp_encoding` stayed non-empty — exactly the R12
+-- data loss that `noBlankedBlawxRow` and `etc/blawx-fixpoint-harness.mjs` exist
+-- to catch. A loud rejection here is strictly better than a quiet blank there.
+--
+-- THE REFUSED BAND IS TOTAL ARITY ≤ 2, NOT "every input needs a category
+-- subject". `arity-two.l4` beside this file is the other half of the band (a
+-- two-place input WITH a category first parameter, refused all the same), and
+-- from total arity 3 up an input is declared as a relationship whose arguments
+-- need not be categories at all — see BLAWX-EXPORT-SPEC §6.1, second bullet,
+-- and `classifyPred` in `L4.Blawx.Lower`, which tests `categoryOf` only in its
+-- two arity-1 arms.
+--
+-- `jl4/examples/blawx/alcohol.l4` is the same Act written the way the ontology
+-- needs at this arity: every `ASSUME` takes the thing it is about as its one
+-- parameter.
+
+ASSUME `the person is a body corporate` IS BOOLEAN
+ASSUME `the person engages in business for profit` IS BOOLEAN
+ASSUME `the person has an alcohol banning order` IS BOOLEAN
+
+@export Imaginary Alcohol Act ss (1)-(2), written without a subject.
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        `the person is a body corporate`
+    AND `the person engages in business for profit`
+    AND `the person has an alcohol banning order`

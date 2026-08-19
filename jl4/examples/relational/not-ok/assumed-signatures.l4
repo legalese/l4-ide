@@ -1,0 +1,51 @@
+-- Named rejections: the ASSUMEs the M1 fragment does NOT admit as input
+-- predicates, batched so the whole residue of the widening is visible at once.
+--
+-- The widening lowers a top-level ASSUME to an `RInput` predicate. What is left
+-- out is left out for the same reasons any other signature is, and — this is
+-- the point of the fixture — each is reported with the range of the ASSUME
+-- rather than of the reference. One ASSUME can be referenced from four
+-- decisions; the signature is where the reader has to go, so that is the span
+-- the diagnostic names. (Read the golden: every `assumed.l4:NN` below points at
+-- an `ASSUME` line, never at a `DECIDE` line.)
+--
+--   * `holds for` takes a function. The middle end is first-order Horn: a Horn
+--     clause cannot carry a predicate as an argument, and defunctionalising one
+--     silently is how a bridge starts answering a different question.
+--
+--   * `date of birth` is DATE-sorted. Dates are M2 for every signature in this
+--     fragment (specs/todo/DATE-LIBRARY-SPEC.md); an ASSUME is not an exception
+--     to that, and the diagnostic names the ASSUME so the fix is obvious.
+--
+--   * `middle name` is MAYBE-sorted, likewise.
+--
+-- All three are written in the `GIVEN x ... ASSUME f x IS A T` spelling rather
+-- than as `FUNCTION FROM ... TO ...`, because the latter would be rejected
+-- EARLIER, by `L4.Export.validateExportInputs`, as a type error — and a fixture
+-- that never reaches the lowering cannot pin the lowering's diagnostics. See
+-- the header of ../assumed.l4.
+
+ASSUME Person IS A TYPE
+
+GIVEN g IS A FUNCTION FROM NUMBER TO BOOLEAN
+ASSUME `holds for` g IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `date of birth` p IS A DATE
+
+GIVEN p IS A Person
+ASSUME `middle name` p IS A MAYBE STRING
+
+@export
+GIVETH A BOOLEAN
+DECIDE `positive holds` IF `holds for` (GIVEN x YIELD x GREATER THAN 0)
+
+@export
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `born on their own birthday` IF `date of birth` p EQUALS `date of birth` p
+
+@export
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `has a middle name` IF `middle name` p EQUALS `middle name` p

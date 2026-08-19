@@ -233,6 +233,7 @@ test-suite jl4-core-test
     TraceOrderingSpec
     StateGraphSpec
     RelationalSpec
+    BlawxAssumeSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

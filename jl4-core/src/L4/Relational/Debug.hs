@@ -22,6 +22,8 @@
 -- > records:
 -- >   Applicant
 -- >     age : NUMBER
+-- > abstract categories:
+-- >   Person
 -- > enums:
 -- >   Colour = Red | Green
 -- > predicates:
@@ -97,6 +99,10 @@ renderProgram prog =
   Text.unlines $
        header
     <> section "records:"      (concatMap (recordLines nm) prog.rpgRecords)
+    -- An ASSUMEd TYPE is a category with no fields, so it gets its own block
+    -- rather than printing as a fieldless record — a reader of a golden must be
+    -- able to tell "declared, no fields projected" from "assumed, has none".
+    <> section "abstract categories:" (map (abstractLine nm) prog.rpgAbstract)
     <> section "enums:"        (map (enumLine nm) prog.rpgEnums)
     <> section "predicates:"   (concatMap (predLines nm) prog.rpgPreds)
     <> section "queries:"      (concatMap (queryLines nm) prog.rpgQueries)
@@ -162,6 +168,7 @@ displayNames prog =
 allNames :: RelProgram -> [RName]
 allNames prog =
      concatMap recNames prog.rpgRecords
+  <> map (.raName) prog.rpgAbstract
   <> concatMap enumNames prog.rpgEnums
   <> concatMap predNames prog.rpgPreds
   <> concatMap queryNames prog.rpgQueries
@@ -236,6 +243,9 @@ recordLines nm r =
     ind 2 <> nameOf nm f.rfName <> " : " <> renderSort nm f.rfSort
       <> maybe "" (\d -> "  -- " <> d) f.rfDesc
       <> maybe "" (\n -> "  -- nlg: " <> n) f.rfNlg
+
+abstractLine :: DisplayNames -> RAbstractDef -> Text
+abstractLine nm a = ind 1 <> nameOf nm a.raName <> prov a.raProv
 
 enumLine :: DisplayNames -> REnumDef -> Text
 enumLine nm e =

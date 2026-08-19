@@ -395,6 +395,29 @@ noBlankedBlawxRow bin stem = do
         ]
   traps `shouldBe` []
 
+-- | An @ASSUME@-shaped seed and its record-spelled semantic twin must emit the
+-- SAME s(CASP): same ontology, same rule stack, byte for byte, apart from the
+-- first line — the generator's provenance comment, which names the source file
+-- and is expected to differ.
+--
+-- This is the load-bearing property behind the tier-1 oracle for an
+-- @ASSUME@-shaped module. Such a module has no evaluable directive at all
+-- (@ASSUME@ is uninterpreted, and @lowerQuery@ builds a scenario only out of a
+-- record-literal query argument), so the harness takes its expectations from the
+-- twin, whose @#EVAL@s DO run under @l4 run@, and replays the twin's fact rows
+-- against the @ASSUME@ seed's own workspaces. That replay only means anything
+-- while the two spellings share their atoms — otherwise every replayed query
+-- finds no model and every FALSE expectation "passes". Asserting it here makes
+-- a drifting field name a red test rather than a quietly weaker harness.
+twinsAgree :: FilePath -> (String, String) -> IO ()
+twinsAgree bin (seed, twin) = do
+  Output codeA soutA _ <- runL4 bin ["blawx", "examples/blawx/" ++ seed ++ ".l4", "--scasp"]
+  Output codeB soutB _ <- runL4 bin ["blawx", "examples/blawx/" ++ twin ++ ".l4", "--scasp"]
+  codeA `shouldBe` ExitSuccess
+  codeB `shouldBe` ExitSuccess
+  let body = drop 1 . lines
+  (seed, body soutA) `shouldBe` (seed, body soutB)
+
 -- | @    xml_content: |-@ → @Just ("xml_content","|-")@. Four-space indent
 -- exactly, so the six-space block-scalar content lines (which are full of
 -- colons — @xmlns=\"http:\/\/…\"@) cannot masquerade as fields.
@@ -2692,8 +2715,153 @@ spec bin = do
       expectGolden bin ["blawx", "examples/blawx/sumlist.l4", "--scasp"]
                        "examples/blawx/expected/sumlist.pl"
 
+    it "compiles the rodents-and-vermin exclusion to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/rodents.l4"]
+                       "examples/blawx/expected/rodents.blawx"
+
+    it "dumps rodents' s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/rodents.l4", "--scasp"]
+                       "examples/blawx/expected/rodents.pl"
+
+    it "compiles the ASSUME-shaped anti-social example to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/antisocial.l4"]
+                       "examples/blawx/expected/antisocial.blawx"
+
+    it "dumps antisocial's s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/antisocial.l4", "--scasp"]
+                       "examples/blawx/expected/antisocial.pl"
+
+    it "compiles antisocial's record-spelled semantic twin to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4"]
+                       "examples/blawx/expected/antisocial-twin.blawx"
+
+    it "dumps the antisocial twin's s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4", "--scasp"]
+                       "examples/blawx/expected/antisocial-twin.pl"
+
+    it "compiles the ASSUME-shaped alcohol act to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/alcohol.l4"]
+                       "examples/blawx/expected/alcohol.blawx"
+
+    it "dumps alcohol's s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
+                       "examples/blawx/expected/alcohol.pl"
+
+    it "compiles alcohol's record-spelled semantic twin to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4"]
+                       "examples/blawx/expected/alcohol-twin.blawx"
+
+    it "dumps the alcohol twin's s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4", "--scasp"]
+                       "examples/blawx/expected/alcohol-twin.pl"
+
+    -- P4c, the statute showcase: Housing Act 1988 Sch 2 grounds 8, 13, 15 and
+    -- 17 inlined into ONE module (`buildCtx` is module-scoped, so an aggregator
+    -- that IMPORTed them would emit queries against an ontology that does not
+    -- exist). Four records in one Blawx namespace, 49 oracle-anchored
+    -- directives, and the corpus's only arity-2 computed predicate.
+    it "compiles the four Housing Act grounds to their golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4"]
+                       "examples/blawx/expected/housing-grounds.blawx"
+
+    it "compiles the four Housing Act grounds to their golden s(CASP) dump" $
+      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4", "--scasp"]
+                       "examples/blawx/expected/housing-grounds.pl"
+
+    -- The arity-2 gap, pinned rather than assumed. `per-period threshold met`
+    -- is (Ground8Claim, NUMBER) -> BOOLEAN: total arity 2 with the boolean
+    -- output dropped, and its second parameter is neither record- nor
+    -- enum-sorted, so it is not attribute-shaped and does not reach the arity-3
+    -- relationship form either. It therefore gets NO `blawx_attribute`
+    -- declaration (`L4.Blawx.Lower`, the recorded relationships-start-at-arity-3
+    -- gap) while its rules and its four query rows DO emit. This asserts both
+    -- halves: the declaration is absent, and nothing downstream blanks — the
+    -- `noBlankedBlawxRow` row below covers the images, and the headless fixpoint
+    -- harness re-saves every one of them. If a later change starts declaring
+    -- arity-2 predicates, this test is the one to delete.
+    it "emits an undeclared but imaged arity-2 predicate (the recorded gap)" $ do
+      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/housing-grounds.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("per_period_threshold_met(Claim,Arrears)" `isInfixOf`)
+      sout `shouldSatisfy` ("?- per_period_threshold_met(g1,1300)." `isInfixOf`)
+      sout `shouldSatisfy`
+        (not . ("blawx_attribute(ground8_claim,per_period_threshold_met" `isInfixOf`))
+      -- and the four records really did land in one namespace, un-collided
+      mapM_ (\c -> sout `shouldSatisfy` (("blawx_category(" ++ c ++ ")") `isInfixOf`))
+        ["ground8_claim", "ground13_claim", "ground15_claim", "ground17_claim"]
+      -- the rename that made that possible: the enum keeps `rent_period`, the
+      -- field became `the basis on which rent is payable`
+      sout `shouldSatisfy` ("blawx_category(rent_period)" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("blawx_attribute(ground8_claim,the_basis_on_which_rent_is_payable" `isInfixOf`)
+      -- the interview follows the FIRST @export: the mandatory ground
+      sout `shouldSatisfy` ("?- ground_8_made_out(X)." `isInfixOf`)
+
+    -- The twin discipline, as a property rather than a comment. An
+    -- `ASSUME`-shaped seed has no evaluable directive, so `etc/blawx-tier1-harness.py`
+    -- takes its expectations from a record-spelled twin and replays the twin's
+    -- fact rows against the ASSUME seed's own workspaces. That is only sound if
+    -- the two spellings share their atoms, and this is the assertion that they
+    -- do: the emitted s(CASP) is identical apart from the first line, which is
+    -- the provenance comment naming the source file. If someone renames a field
+    -- in a twin "for readability", this fails here rather than degrading the
+    -- tier-1 run into a comparison of two unrelated programs.
+    it "emits byte-identical s(CASP) for an ASSUME seed and its record twin" $
+      mapM_ (twinsAgree bin)
+        [("antisocial", "antisocial-twin"), ("alcohol", "alcohol-twin")]
+
     it "never blanks a row's xml_content while its scasp_encoding is non-empty (R12)" $
-      mapM_ (noBlankedBlawxRow bin) ["benefit", "mortality", "scores", "sumlist"]
+      mapM_ (noBlankedBlawxRow bin)
+        [ "benefit", "mortality", "scores", "sumlist", "rodents"
+        , "antisocial", "antisocial-twin", "alcohol", "alcohol-twin"
+        , "housing-grounds" ]
+
+    it "carries the @export prose into rule_text, and falls back to @ref (structural)" $ do
+      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      code `shouldBe` ExitSuccess
+      -- arm A: a decision carrying BOTH @export prose and @ref shows the prose
+      sout `shouldSatisfy`
+        ("1. Anti-social Behaviour, Crime and Policing Act 2014 s.43(1): an authorised person"
+           `isInfixOf`)
+      -- arm B: a bare @export with only a @ref shows the citation, not the stub
+      sout `shouldSatisfy`
+        ("5. Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)" `isInfixOf`)
+      sout `shouldSatisfy`
+        (not . ("Definition of the conduct is unreasonable." `isInfixOf`))
+      -- the P1 earmark discharged: an interview on a module with no DECLARE
+      sout `shouldSatisfy` ("#abducible person(X)." `isInfixOf`)
+      sout `shouldSatisfy` ("#abducible conduct(X,Y)." `isInfixOf`)
+      sout `shouldSatisfy` ("?- may_issue_a_community_protection_notice(X,Y)." `isInfixOf`)
+      -- the reachability gate: an ASSUME no clause reaches contributes nothing
+      sout `shouldSatisfy` (not . ("effect_target" `isInfixOf`))
+
+    it "gives NOT over an ASSUMEd input classical negation, not NAF (R5)" $ do
+      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("-the_proprietor_corrects_the_price_list(Pr)." `isInfixOf`)
+      sout `shouldSatisfy` (not . ("not the_proprietor_corrects_the_price_list" `isInfixOf`))
+
+    it "rejects a subjectless ASSUMEd input rather than blanking its row" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/zero-arity.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("no category subject" `isInfixOf`)
+      -- the refused band is an ARITY band; the message must say so, because
+      -- `arity-two.l4` below satisfies "first parameter is a category" and is
+      -- refused anyway
+      serr `shouldSatisfy` ("total arity 0" `isInfixOf`)
+      serr `shouldSatisfy` ("start at total arity 3" `isInfixOf`)
+
+    it "rejects a two-place ASSUMEd input EVEN WITH a category first parameter" $ do
+      -- The other half of the refused band. `classifyPred` places an input as
+      -- an attribute only at (category) or (category) -> value; relationship
+      -- blocks start at total arity 3; a two-place input falls between them.
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity-two.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("no category subject" `isInfixOf`)
+      serr `shouldSatisfy` ("`severity exceeds` is an input of total arity 2" `isInfixOf`)
+      -- and it must NOT tell an author who already has a category subject to
+      -- add one: that was the old wording, and it named no reachable fix
+      serr `shouldSatisfy` (not . ("first parameter is not a category" `isInfixOf`))
 
     it "emits the ruledoc first, then workspaces with the dedup-marked triple (structural smoke)" $ do
       Output code sout _ <- runL4 bin ["blawx", "examples/blawx/benefit.l4"]
