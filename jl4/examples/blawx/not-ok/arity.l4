@@ -1,0 +1,23 @@
+-- The arity-ceiling rejection fixture: Blawx relationship blocks take at most
+-- 10 arguments, and the ceiling is the Blawx leg's to enforce (the shared
+-- middle-end's `loMaxArity` defaults to no limit). Eleven NUMBER parameters
+-- plus the NUMBER result make a would-be relationship of arity 12, which the
+-- classifier rejects with the named `arity` diagnostic.
+
+@export
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+      d IS A NUMBER
+      e IS A NUMBER
+      f IS A NUMBER
+      g IS A NUMBER
+      h IS A NUMBER
+      i IS A NUMBER
+      j IS A NUMBER
+      k IS A NUMBER
+GIVETH A NUMBER
+`grand total` a b c d e f g h i j k MEANS
+    a PLUS b PLUS c PLUS d PLUS e PLUS f PLUS g PLUS h PLUS i PLUS j PLUS k
+
+#EVAL `grand total` 1 2 3 4 5 6 7 8 9 10 11

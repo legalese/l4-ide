@@ -369,6 +369,43 @@ expectGolden bin args goldenPath = do
 readUtf8 :: FilePath -> IO String
 readUtf8 fp = T.unpack . TE.decodeUtf8Lenient <$> BS.readFile fp
 
+-- | R12's sharpest failure mode: a @.blawx@ row whose @xml_content@ is empty
+-- while its @scasp_encoding@ is not.
+--
+-- Blawx draws a workspace only @if (output_object.xml_content)@
+-- (@buttons.js:444@; a falsy value leaves the canvas cleared by @:441@) and
+-- its Save writes @sCASP.workspaceToCode(demoWorkspace)@ straight back
+-- (@:22-24@) — so opening such a row and saving DELETES the rule. The
+-- headless fixpoint harness (@etc\/blawx-fixpoint-harness.mjs@) fails on the
+-- same condition, but it is optional-when-present; this is the copy that runs
+-- in CI on every event.
+--
+-- Both halves are asserted: the pairing in the emitted stream, and the
+-- absence of the emitter's own stderr diagnostic for it.
+noBlankedBlawxRow :: FilePath -> String -> IO ()
+noBlankedBlawxRow bin stem = do
+  Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4"]
+  code `shouldBe` ExitSuccess
+  (stem, "no Blockly image" `isInfixOf` serr) `shouldBe` (stem, False)
+  let fields = [f | l <- lines sout, Just f <- [blawxStoredField l]]
+      traps =
+        [ stem
+        | (("xml_content", "''"), ("scasp_encoding", v)) <- zip fields (drop 1 fields)
+        , v /= "''"
+        ]
+  traps `shouldBe` []
+
+-- | @    xml_content: |-@ → @Just ("xml_content","|-")@. Four-space indent
+-- exactly, so the six-space block-scalar content lines (which are full of
+-- colons — @xmlns=\"http:\/\/…\"@) cannot masquerade as fields.
+blawxStoredField :: String -> Maybe (String, String)
+blawxStoredField l
+  | not ("    " `isPrefixOf` l) || "     " `isPrefixOf` l = Nothing
+  | otherwise = case break (== ':') (drop 4 l) of
+      (k, ':' : v) | k `elem` ["xml_content", "scasp_encoding"] ->
+        Just (k, dropWhile (== ' ') v)
+      _ -> Nothing
+
 -- | Index of the first line containing a needle.
 --
 -- An ABSENT needle yields 'maxBound' rather than a negative sentinel, so it
@@ -1110,6 +1147,7 @@ spec bin = do
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
       sout `shouldSatisfy` ("export" `isInfixOf`)
       sout `shouldSatisfy` ("openfisca" `isInfixOf`)
+      sout `shouldSatisfy` ("blawx" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
 
@@ -2701,6 +2739,86 @@ spec bin = do
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["openfisca", errorFixture]
+
+  describe "l4 blawx" $ do
+    it "compiles the Appendix-A benefit example to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/benefit.l4"]
+                       "examples/blawx/expected/benefit.blawx"
+
+    it "dumps benefit's concatenated s(CASP) (--scasp) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/benefit.l4", "--scasp"]
+                       "examples/blawx/expected/benefit.pl"
+
+    it "compiles the minimal mortality example to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/mortality.l4"]
+                       "examples/blawx/expected/mortality.blawx"
+
+    it "dumps mortality's s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/mortality.l4", "--scasp"]
+                       "examples/blawx/expected/mortality.pl"
+
+    it "compiles the aggregates example (findall + *_blawx_list) to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/scores.l4"]
+                       "examples/blawx/expected/scores.blawx"
+
+    it "dumps scores' s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/scores.l4", "--scasp"]
+                       "examples/blawx/expected/scores.pl"
+
+    it "compiles the structural-recursion example to its golden .blawx stream" $
+      expectGolden bin ["blawx", "examples/blawx/sumlist.l4"]
+                       "examples/blawx/expected/sumlist.blawx"
+
+    it "dumps sumlist's s(CASP) to its golden .pl" $
+      expectGolden bin ["blawx", "examples/blawx/sumlist.l4", "--scasp"]
+                       "examples/blawx/expected/sumlist.pl"
+
+    it "never blanks a row's xml_content while its scasp_encoding is non-empty (R12)" $
+      mapM_ (noBlankedBlawxRow bin) ["benefit", "mortality", "scores", "sumlist"]
+
+    it "emits the ruledoc first, then workspaces with the dedup-marked triple (structural smoke)" $ do
+      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/benefit.l4"]
+      code `shouldBe` ExitSuccess
+      -- R1: exactly one ruledoc row, FIRST — before any workspace row
+      firstLineWith "- model: blawx.ruledoc" sout
+        `shouldSatisfy` (< firstLineWith "- model: blawx.workspace" sout)
+      sout `shouldSatisfy` ("workspace_name: root_section" `isInfixOf`)
+      sout `shouldSatisfy` ("workspace_name: sec_1_section" `isInfixOf`)
+      sout `shouldSatisfy` (":- dynamic applicant/1." `isInfixOf`)
+      sout `shouldSatisfy` ("% BLAWX CHECK DUPLICATES" `isInfixOf`)
+      sout `shouldSatisfy` ("?- benefit_amount(a1,Benefitamount)." `isInfixOf`)
+      -- R11: the #ASSERT-as-constraint emission and the #abducible interview test
+      sout `shouldSatisfy` ("false :- not eligible_for_benefit(a1)." `isInfixOf`)
+      sout `shouldSatisfy` ("false :- not benefit_amount(a1,1250)." `isInfixOf`)
+      sout `shouldSatisfy` ("test_name: interview" `isInfixOf`)
+      sout `shouldSatisfy` ("#abducible applicant(X)." `isInfixOf`)
+      sout `shouldSatisfy` ("#abducible age(X,Y)." `isInfixOf`)
+      sout `shouldSatisfy` ("#abducible is_veteran(X)." `isInfixOf`)
+      sout `shouldSatisfy` ("?- eligible_for_benefit(X)." `isInfixOf`)
+
+    it "refuses -o FILE.pl without --scasp (the dump would clobber its own YAML)" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/benefit.l4",
+                                       "-o", "examples/blawx/refused.pl"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("--scasp" `isInfixOf`)
+
+    it "rejects a DATE-sorted field by name (Blawx v1)" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/dates.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("dates (Blawx v1)" `isInfixOf`)
+
+    it "rejects an unstratified module (the middle-end records, this leg refuses)" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/unstratified.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("unstratified negation (Blawx v1)" `isInfixOf`)
+
+    it "rejects a relationship above the arity-10 block ceiling" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("above the block ceiling of 10" `isInfixOf`)
+
+    it "fails on a file that does not typecheck" $
+      expectFail bin ["blawx", errorFixture]
 
   describe "l4 docassemble" $ do
     it "compiles the WHERE-heavy rodents example to its golden interview (R3 survival)" $

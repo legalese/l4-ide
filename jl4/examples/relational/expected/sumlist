@@ -1,0 +1,50 @@
+relational program — sumlist.l4
+
+predicates:
+  computed exported running total/1 : NUMBER  % sumlist.l4:31:1-36:61
+    params: LIST OF NUMBER
+    recursion: structural on argument 0
+    running total([], 0).  % sumlist.l4:35:34-35
+    running total([X_1 | Rest_2], Tmp_4) :- running total(Rest_2, Runningtotal_3), Tmp_4 is (X_1 + Runningtotal_3).  % sumlist.l4:36:34-61
+  computed exported all positive/1 : (goal)  % sumlist.l4:39:1-44:74
+    params: LIST OF NUMBER
+    recursion: structural on argument 0
+    all positive([]).  % sumlist.l4:43:34-38
+    all positive([X_6 | Rest_7]) :- X_6 > 0, all positive(Rest_7).  % sumlist.l4:44:34-74
+  computed exported first or zero/1 : NUMBER  % sumlist.l4:47:1-52:35
+    params: LIST OF NUMBER
+    first or zero([], 0).  % sumlist.l4:51:34-35
+    first or zero([X_9 | Rest_10], X_9).  % sumlist.l4:52:34-35
+  computed exported total from/2 : NUMBER  % sumlist.l4:66:1-78:52
+    params: LIST OF NUMBER, NUMBER
+    total from(Xs_11, Floor_12, Go_20) :- go(Xs_11, Floor_12, Xs_11, Go_20).  % sumlist.l4:71:3-8
+  auxiliary go/3 : NUMBER  % sumlist.l4:73:5-78:52
+    params: LIST OF NUMBER, NUMBER, LIST OF NUMBER
+    recursion: structural on argument 2
+    go(Xs_13, Floor_14, [], Floor_14).  % sumlist.l4:77:38-43
+    go(Xs_13, Floor_14, [Y_16 | Rest_17], Tmp_19) :- go(Xs_13, Floor_14, Rest_17, Go_18), Tmp_19 is (Y_16 + Go_18).  % sumlist.l4:78:38-52
+
+queries:
+  EVAL q1: running total([1, 2, 3]) -> Runningtotal_21 => (expectation from the L4 evaluator)  % sumlist.l4:80:1-37
+  EVAL q2: running total([]) -> Runningtotal_22 => (expectation from the L4 evaluator)  % sumlist.l4:83:1-28
+  EVAL q3: all positive([1, 2, 3]) => (expectation from the L4 evaluator)  % sumlist.l4:86:1-36
+  EVAL q4: all positive([1, 0, 3]) => (expectation from the L4 evaluator)  % sumlist.l4:89:1-36
+  EVAL q5: first or zero([7, 8]) -> Firstorzero_23 => (expectation from the L4 evaluator)  % sumlist.l4:92:1-34
+  EVAL q6: total from([1, 2, 3], 10) -> Totalfrom_24 => (expectation from the L4 evaluator)  % sumlist.l4:95:1-37
+
+dependencies:
+  running total -> running total (+)
+  all positive -> all positive (+)
+  total from -> go (+)
+  go -> go (+)
+
+stratification:
+  stratified
+    0  all positive
+    0  first or zero
+    0  go
+    0  running total
+    0  total from
+
+fidelity report — relational
+  (nothing lost)
