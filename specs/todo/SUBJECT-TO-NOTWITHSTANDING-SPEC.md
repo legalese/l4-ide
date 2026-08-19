@@ -33,6 +33,7 @@
 **Date:** 2025-01-23
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
+**Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
 **Branch:** mengwong/spec-notwithstanding
 
 ---
@@ -645,18 +646,26 @@ _same graph_, sharing one acyclicity/stratification check (§9.6).
 ### 9.4 Drafters already write the decomposition
 
 The strongest argument that `APPLIES` deserves surface syntax: modern drafting already factors
-provisions this way. The standard two-step idiom —
+provisions this way. The standard two-step idiom writes the applicability predicate and the
+operative rule as separate subsections — verbatim, Companies Act 2006 (UK) s 724 (Treasury
+shares):
 
-> (1) This section applies where \[conditions].
-> (2) Where this section applies, \[operative rule].
+> "(1) This section applies where– (a) a limited company makes a purchase of its own shares in
+> accordance with Chapter 4, and (b) the purchase is made out of distributable profits. \[…]
+> (3) Where this section applies the company may— (a) hold the shares (or any of them), or
+> (b) deal with any of them, at any time, in accordance with section 727 or 729."
 
-— hand-separates the applicability predicate from the operative rule, in line with drafting
-guidance (OPC) that the main proposition should not be buried among its conditions. Human Rights
-Act 1998 (UK) s 10 self-declares in exactly this style; one of its triggers is a declaration of
-incompatibility made under section 4 — an applicability condition that cites the _exercise of
-another section's power_ — and it continues: "This section also applies where the provision in
-question is in subordinate legislation and has been quashed, or declared invalid, by reason of
-incompatibility with a Convention right …".
+— in line with drafting guidance (OPC) that the main proposition should not be buried among its
+conditions. The same section then reads its own predicate **retrospectively**: treasury shares
+are, per s 724(5)(a), shares that "were (or are treated as having been) purchased by it in
+circumstances in which this section applies" — an evaluation of `applies` at the past time of
+purchase, which is conjunct 1 of §9.2 doing real work (and grist for §9.9.4). Human Rights Act
+1998 (UK) s 10 self-declares in the same style — "This section applies if— (a) a provision of
+legislation has been declared under section 4 to be incompatible with a Convention right …" —
+an applicability condition that cites the _exercise of another section's power_ — and s 10(4)
+extends it: "This section also applies where the provision in question is in subordinate
+legislation and has been quashed, or declared invalid, by reason of incompatibility with a
+Convention right …".
 
 The Singapore Contracts (Rights of Third Parties) Act 2001 exhibits the whole design in nine
 sections:
@@ -810,6 +819,9 @@ to **unfold**.
 4. **Reading events, not predicates:** HRA s 10 triggers on a declaration _made under_ section 4
    — a read of another provision's **output event** in the regulative trace, not of a static
    predicate. How does `APPLIES` interact with the ledger (`RECORD`/`ATTEST`) and the LTS?
+   CA 2006 s 724(5)(a) is the temporal form of the same question: shares "purchased by it in
+   circumstances in which this section applies" evaluates `applies` **as of the past purchase**,
+   i.e. a conjunct-1-pinned read against the trace.
 5. **Cross-instrument reads:** "applies for the purposes of this Act" versus reading another
    instrument entirely — is that an `IMPORT` of the other instrument's projections, pinned to a
    version via conjunct 1?
@@ -876,7 +888,8 @@ to **unfold**.
 ### Statutes and Drafting Guidance Cited in §9
 
 - Contracts (Rights of Third Parties) Act 2001 (Singapore). [SSO](https://sso.agc.gov.sg/Act/CRTPA2001) — s 2 (operative rule), s 4(1) (applicability gate), s 5 (savings), s 7 (write-side "Exceptions" section). Verified against the current revised edition via the lawplain corpus, 2026-08-16.
-- Human Rights Act 1998 (UK), s 10 — "This section applies …" self-declaration whose triggers cite the exercise of s 4.
+- Companies Act 2006 (UK), s 724 (Treasury shares). [legislation.gov.uk](https://www.legislation.gov.uk/ukpga/2006/46/section/724) — the two-step idiom verbatim in (1)/(3); (5)(a) reads the applicability predicate retrospectively. Quotes verified against the current revision via legislation.gov.uk, 2026-08-19.
+- Human Rights Act 1998 (UK), s 10. [legislation.gov.uk](https://www.legislation.gov.uk/ukpga/1998/42/section/10) — "This section applies if …" self-declaration whose trigger (1)(a) cites a declaration made under s 4; s 10(4) is the "also applies" extension. Quotes verified against the current revision via legislation.gov.uk, 2026-08-19.
 - Office of the Parliamentary Counsel (UK). _Drafting Guidance_ (March 2024). [PDF](https://assets.publishing.service.gov.uk/media/660407d091a320001a82b06b/2024.03.19.Drafting-guidance.pdf) — clause structure: conditions versus the main proposition.
 
 ### Philology (§9.8)

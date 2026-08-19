@@ -1,0 +1,272 @@
+-- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
+--
+--   source        /Volumes/transcend/src/blawx/blawx/static/blawx/examples/bird.yaml
+--   ruledoc       "New Bird Act"
+--   rows          8 blawx.workspace, 4 blawx.blawxtest
+--   blocks        109 across 17 block types
+--   WARNING       stored `scasp_encoding` is STALE against the current
+--                 generator (P5-2) in 8 row(s), first sec_1_section.
+--                 The XML is canonical (R14); the encodings were not used.
+--
+-- Blawx models a flat universe of atoms under unary predicates. Every
+-- category and every boolean attribute is one such predicate, so this lift
+-- declares ONE record for the universe, carrying a `MAYBE BOOLEAN` input
+-- slot per predicate that is not derived (the s(CASP) fact channel) and one
+-- BOOLEAN decision per predicate. The defeat layer is unfolded: one decision
+-- per (section, literal) pair, named from the generator's own #pred wording.
+
+IMPORT prelude
+IMPORT `negation-as-failure`
+
+§ `New Bird Act`
+
+§§ `Ontology`
+
+-- @ref sec_1_section new_category_declaration penguin  (NLG "" / "is a penguin")
+-- @ref sec_1_section new_category_declaration bird     (NLG "" / "is a bird")
+-- @ref sec_2_section new_category_declaration thing    (NLG "" / "is a thing")
+-- @ref sec_2_section new_attribute_declaration thing.flies : boolean
+-- @ref sec_3_section new_attribute_declaration penguin.on_plane : boolean
+-- @ref sec_5_section new_attribute_declaration penguin.cartoon_jetpack : boolean
+DECLARE Object
+    HAS
+      @desc the object's Blawx atom
+      name                     IS A STRING
+      @desc x is a penguin
+      `penguin fact`           IS A MAYBE BOOLEAN
+      @desc x is a bird
+      `bird fact`              IS A MAYBE BOOLEAN
+      @desc x is a thing
+      `thing fact`             IS A MAYBE BOOLEAN
+      @desc x can fly
+      `flies fact`             IS A MAYBE BOOLEAN
+      @desc x is on a plane
+      `on_plane fact`          IS A MAYBE BOOLEAN
+      @desc x is a cartoon with a jetpack
+      `cartoon_jetpack fact`   IS A MAYBE BOOLEAN
+      @desc it is not the case that NBA 5 applies to x
+      `NBA 5 exclusion fact`   IS A MAYBE BOOLEAN
+
+@ref sec_5__span_pingu_section object_declaration — pingu is a penguin
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE penguin x @nlg %x% is a penguin
+    IF holds (x's `penguin fact`)
+    OR x's name EQUALS "pingu"
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE thing x @nlg %x% is a thing
+    IF holds (x's `thing fact`)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE on_plane x @nlg %x% is on a plane
+    IF holds (x's `on_plane fact`)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE cartoon_jetpack x @nlg %x% is a cartoon with a jetpack
+    IF holds (x's `cartoon_jetpack fact`)
+
+§§ `NBA 1 — Penguins are birds.`
+
+@ref NBA 1 — sec_1_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to NBA 1, x is a bird` x IF penguin x
+
+@ref NBA 1 — indefeasible: no `not blawx_defeated` conjunct
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 1 that x is a bird holds` x
+    IF `according to NBA 1, x is a bird` x
+
+§§ `NBA 2 — Birds fly.`
+
+@ref NBA 2 — sec_2_section attributed_rule (defeasible TRUE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to NBA 2, x can fly` x IF bird x
+
+@ref NBA 2 — defeasible: `not blawx_defeated(sec_2_section, flies, x)`
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 2 that x can fly holds` x
+    IF      `according to NBA 2, x can fly` x
+    AND NOT `the conclusion in NBA 2 that x can fly is defeated` x
+
+§§ `NBA 3 — Despite 2, penguins do not fly, subject to 4.`
+
+@ref NBA 3 — sec_3_section overrules: NBA 3 (-flies) defeats NBA 2 (flies)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 2 that x can fly is defeated` x
+    IF `the conclusion in NBA 3 that it is not the case that x can fly holds` x
+
+@ref NBA 3 — sec_3_section attributed_rule (defeasible TRUE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to NBA 3, it is not the case that x can fly` x IF penguin x
+
+@ref NBA 3 — defeasible: `not blawx_defeated(sec_3_section, -flies, x)`
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 3 that it is not the case that x can fly holds` x
+    IF      `according to NBA 3, it is not the case that x can fly` x
+    AND NOT `the conclusion in NBA 3 that it is not the case that x can fly is defeated` x
+
+-- overrules #2: sec_3_section, NBA 4 (flies) defeats NBA 3 (-flies)
+-- overrules #3: sec_5_section, NBA 5 (flies) defeats NBA 3 (-flies)
+@ref NBA 3 — defeated by NBA 4 and by NBA 5
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 3 that it is not the case that x can fly is defeated` x
+    IF `the conclusion in NBA 4 that x can fly holds` x
+    OR `the conclusion in NBA 5 that x can fly holds` x
+
+§§ `NBA 4 — Penguins on planes can fly.`
+
+@ref NBA 4 — sec_4_section attributed_rule (defeasible TRUE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to NBA 4, x can fly` x
+    IF  penguin x
+    AND on_plane x
+
+-- defeasible TRUE, but no overrules names NBA 4 as defeated,
+-- so the `not blawx_defeated(sec_4_section, flies, x)` conjunct is vacuous.
+@ref NBA 4 — sec_4_section attributed_rule, holds-layer
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 4 that x can fly holds` x
+    IF `according to NBA 4, x can fly` x
+
+§§ `NBA 5 — Despite 3, cartoon penguins with jetpacks can fly, [pingu]{except for pingu}.`
+
+-- UPSTREAM: the shipped Blawx generator emits no consumer for a `holds` block
+-- naming blawx_applies (ldap.py declares only #pred NLG for holds/4, and
+-- reasoner.py has no occurrence of `holds` at all), so real Blawx derives
+-- nothing from the carve-out below and answers as if NBA 5 applied.
+-- The lift implements the INTENDED semantics — the carve-out is effective —
+-- and the s(CASP) leg of the cross-engine check runs against a bridged
+-- program: see etc/blawx-tier1-harness.py IMPORT_BRIDGE, spec §10 P5 finding 1.
+@ref NBA 5pingu — sec_5__span_pingu_section holds( -blawx_applies(NBA 5, pingu) )
+GIVEN x IS AN Object
+GIVETH A MAYBE BOOLEAN
+`it is not the case that NBA 5 applies to x` x
+    MEANS IF   x's name EQUALS "pingu"
+          THEN JUST TRUE
+          ELSE x's `NBA 5 exclusion fact`
+
+-- the closed-world applicability default
+-- `blawx_applies(S,x) :- not -blawx_applies(S,x)`
+@ref NBA 5 — sec_5_section unattributed_rule
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `NBA 5 applies to x` x
+    IF naf (`it is not the case that NBA 5 applies to x` x)
+
+@ref NBA 5 — sec_5_section attributed_rule (defeasible FALSE, inapplicable TRUE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to NBA 5, x can fly` x
+    IF  penguin x
+    AND `NBA 5 applies to x` x
+    AND cartoon_jetpack x
+
+@ref NBA 5 — indefeasible: no `not blawx_defeated` conjunct
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in NBA 5 that x can fly holds` x
+    IF `according to NBA 5, x can fly` x
+
+§§ `NBA 6`
+
+-- sec_6_section carries no blocks.
+
+§§ `The base predicates`
+
+-- `p(x) :- holds(sec_N, p, x).` for every section concluding p, OR-joined,
+-- plus the scenario fact channel (a bare `p(a).` is another clause of p).
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE bird x @nlg %x% is a bird
+    IF holds (x's `bird fact`)
+    OR `the conclusion in NBA 1 that x is a bird holds` x
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE flies x @nlg %x% can fly
+    IF holds (x's `flies fact`)
+    OR `the conclusion in NBA 2 that x can fly holds` x
+    OR `the conclusion in NBA 4 that x can fly holds` x
+    OR `the conclusion in NBA 5 that x can fly holds` x
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `it is not the case that x can fly` x @nlg it is not the case that %x% can fly
+    IF `the conclusion in NBA 3 that it is not the case that x can fly holds` x
+
+§§ `Objects`
+
+@ref sec_5__span_pingu_section object_declaration pingu
+pingu MEANS
+    Object WITH
+        name                   IS "pingu"
+        `penguin fact`         IS NOTHING
+        `bird fact`            IS NOTHING
+        `thing fact`           IS NOTHING
+        `flies fact`           IS NOTHING
+        `on_plane fact`        IS NOTHING
+        `cartoon_jetpack fact` IS NOTHING
+        `NBA 5 exclusion fact` IS NOTHING
+
+`all objects` MEANS LIST pingu
+
+GIVEN x IS AN Object
+GIVETH A STRING
+`the name of` x MEANS x's name
+
+§§ `Tests`
+
+-- blawxtest is_pingu_a_bird — `?- bird(A).`
+-- The rule in section 1 holds, indefeasibly.
+#EVAL map `the name of` (filter bird `all objects`)
+-- L4 oracle ==> LIST "pingu"
+
+-- blawxtest pingu_cant_fly — `?- not flies(pingu).`
+-- Section 2 defeasibly concludes that pingu can fly, because he is bird
+-- according to section 1, because he is a penguin. That conclusion is
+-- defeated by section 3.
+#EVAL NOT (flies pingu)
+-- L4 oracle ==> TRUE
+
+-- blawxtest pingu_on_plane_can_fly — `on_plane(pingu).` `?- flies(pingu).`
+-- Pingu can fly, because section 2 applies, because section 3 would defeat
+-- it, but section 4 defeats section 3. Also, section 4 applies on its own.
+#EVAL flies (Object WITH
+                 name                   IS "pingu"
+                 `penguin fact`         IS NOTHING
+                 `bird fact`            IS NOTHING
+                 `thing fact`           IS NOTHING
+                 `flies fact`           IS NOTHING
+                 `on_plane fact`        IS JUST TRUE
+                 `cartoon_jetpack fact` IS NOTHING
+                 `NBA 5 exclusion fact` IS NOTHING)
+-- L4 oracle ==> TRUE
+
+-- blawxtest pingu_with_jetpack_cant_fly — `cartoon_jetpack(pingu).` `?- not flies(pingu).`
+-- Pingu can't fly because section 2 is defeated by section 3, which is not
+-- defeated by section 5 because it doesn't apply to pingu.
+#EVAL NOT (flies (Object WITH
+                 name                   IS "pingu"
+                 `penguin fact`         IS NOTHING
+                 `bird fact`            IS NOTHING
+                 `thing fact`           IS NOTHING
+                 `flies fact`           IS NOTHING
+                 `on_plane fact`        IS NOTHING
+                 `cartoon_jetpack fact` IS JUST TRUE
+                 `NBA 5 exclusion fact` IS NOTHING))
+-- L4 oracle ==> TRUE

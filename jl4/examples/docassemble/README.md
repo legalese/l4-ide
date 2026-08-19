@@ -149,6 +149,19 @@ recognise the same program.
   example it additionally asserts the exact ordered citation list, the
   citations' presence in the **rendered** screen, and the parsed
   `auto terms:` glossary.
+- `date_idiom_sweep.py` — re-runnable evidence for the §8.12/R12 date finding.
+  The four numbers the spec, `Lower.hs`, `Main.hs` and `roundtrip_check.py` all
+  quote (13,514 birth dates, 27,028 comparisons, `date_difference(…).years`
+  disagreeing on 6,629, `.plus(years=n)` on 9) were measured once during M4 and
+  survived only as prose in four comments — while being cited by the
+  cross-backend ledger `DATE-LIBRARY-SPEC.md` §3.7 as the witness for a rule
+  other backends are asked to follow. This re-derives them from scratch against
+  real `docassemble.base`, and exits non-zero on drift. `--emit-oracle-l4 PATH`
+  writes 1096 `#EVAL`s over every birth date where a convention could differ
+  (every 29th/30th/31st, every leap day, plus a fixed-stride sample) so `l4 run`
+  checks the script's Python model of L4's rolling `Date` against the real
+  evaluator — a model of an oracle is not an oracle. Both legs verified
+  2026-08-18: all four figures reproduce, 1096/1096 `#EVAL`s TRUE.
 - **The M4 examples.** Each pins one clause of spec §10, and each is a
   real rule with a real oracle, not a smoke test:
   - `tenant-list.l4` — `LIST OF Tenant` gathered as a `DAList`. The claim is

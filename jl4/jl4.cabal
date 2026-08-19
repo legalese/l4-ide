@@ -52,6 +52,7 @@ executable l4
   other-modules:
     L4.Cli.Ast
     L4.Cli.Batch
+    L4.Cli.Blawx
     L4.Cli.Check
     L4.Cli.Common
     L4.Cli.Docassemble
@@ -117,6 +118,7 @@ test-suite jl4-test
     VizImplies
     VizGuardedRows
     DmnExport
+    RelationalExport
     Paths_jl4
   autogen-modules:
     Paths_jl4
