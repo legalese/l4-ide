@@ -1182,6 +1182,139 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
   }
 }
 
+// ---- the signable document must NAME what it blesses (2026-08-20) ---------
+//
+// The block above proves every module reaches the payload WHEN p0-preflight
+// executed. It has no control for the two states in which p0-preflight did not,
+// and both were live in this tree:
+//
+//   * cross-run replay. The corpus section was selected out of the
+//     replay-FILTERED receipts list, so a run that borrowed p0-preflight from an
+//     earlier run rendered "(none recorded — p0-preflight has not run)" while
+//     its own p0 row carried all seven corpus_sha_ metrics. MEASURED on run
+//     2026-08-19-951d08d8-004, the run that validated cross-run replay itself.
+//
+//   * every g2 run, in every state, because p0-preflight is not a declared g2
+//     stage at all.
+//
+// In both, a human would have signed a document naming no corpus file while the
+// journal's corpus_digest carried the real binding they were never shown. The
+// replay exclusion is right for the receipts list, which attests WORK, and wrong
+// for the corpus section, which states what the corpus IS — a replayed row
+// restates that faithfully.
+process.stdout.write("\n-- the signable document --\n");
+{
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-payload-"));
+  const GP = resolve(HERE, "lib/gate-payload.mjs");
+
+  const mkRun = (id, milestone, p0Row) => {
+    const d = resolve(root, id);
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      milestone,
+      subject: "subj",
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: p0Row ? ["p0-preflight"] : ["p3-check"],
+    });
+    if (p0Row) append(j, p0Row);
+    return d;
+  };
+  const p0 = (extra) => ({
+    kind: "stage_end",
+    stage: "p0-preflight",
+    status: "PASS",
+    reason: null,
+    blocker: null,
+    oracle: { class: "structural", because: "counted" },
+    artifacts: [],
+    metrics: {
+      "corpus_sha_a.l4": "sha256:" + "a".repeat(64),
+      "corpus_sha_b.l4": "sha256:" + "b".repeat(64),
+    },
+    notes: [],
+    ...extra,
+  });
+  const render = (dir) =>
+    spawnSync("node", [GP, "HG1", dir], { encoding: "utf8" });
+  const corpusOf = (out) =>
+    (out.split("corpus (sha256 of every file this gate blesses):\n")[1] ?? "")
+      .split("\n\n")[0]
+      .split("\n")
+      .filter(Boolean);
+
+  const executed = render(mkRun("2026-01-01-aaaaaaaa-001", "g1", p0({})));
+  check(
+    "a payload over an EXECUTED p0-preflight renders",
+    executed.status === 0,
+  );
+  check("it names both modules", corpusOf(executed.stdout).length === 2);
+
+  // The regression proper.
+  const replayed = render(
+    mkRun(
+      "2026-01-02-aaaaaaaa-001",
+      "g1",
+      p0({
+        replayed_from: "sha256:" + "c".repeat(64),
+        replayed_from_run: "2026-01-01-aaaaaaaa-001",
+      }),
+    ),
+  );
+  check(
+    "a payload over a REPLAYED p0-preflight still renders",
+    replayed.status === 0,
+  );
+  check(
+    "a replayed p0-preflight states the corpus just as an executed one does",
+    corpusOf(replayed.stdout).length === 2,
+  );
+  check(
+    "the two payloads agree on the corpus section — same corpus, same statement",
+    corpusOf(replayed.stdout).join("\n") ===
+      corpusOf(executed.stdout).join("\n"),
+  );
+
+  // And the refusals: a document that names nothing must not be signable.
+  const blindG1 = render(mkRun("2026-01-03-aaaaaaaa-001", "g1", null));
+  check(
+    "a g1 payload with no p0-preflight at all REFUSES",
+    blindG1.status === 2,
+  );
+  check(
+    "the g1 refusal names p0-preflight as the stage to run",
+    /p0-preflight/.test(blindG1.stderr),
+  );
+  check(
+    "the refusal never emits a signable document",
+    !/l4-go gate payload/.test(blindG1.stdout),
+  );
+
+  const blindG2 = render(mkRun("2026-01-04-aaaaaaaa-001", "g2", null));
+  check(
+    "a g2 payload REFUSES — p0-preflight is not a g2 stage",
+    blindG2.status === 2,
+  );
+  check(
+    "the g2 refusal explains why g2 differs, and names the waiver as the honest alternative",
+    /not a declared g2 stage/.test(blindG2.stderr) &&
+      /[Ww]aive/.test(blindG2.stderr),
+  );
+
+  // The old behaviour, pinned so it cannot come back: the parenthetical must
+  // never be PUSHED into the document again. (The string still appears in
+  // gate-payload.mjs's prose, explaining what was removed and why, so the check
+  // has to look for the emission rather than the mention.)
+  check(
+    "no payload path pushes the '(none recorded)' parenthetical into the document",
+    !/lines\.push\([^)]*none recorded/.test(readFileSync(GP, "utf8")),
+  );
+}
+
 // ------------------------------------------- 3e. the deposit-contract schemas
 process.stdout.write("\n-- the register schemas --\n");
 

@@ -749,8 +749,18 @@ document that committed to them. `p0-preflight` now records one metric per modul
 (`etc/go/lib/corpus-metrics.mjs`), keyed by repo-relative path rather than basename because
 metrics are last-wins and two modules sharing a basename would otherwise collapse to one line;
 and it declares every module as an input, so an edit to any of them re-executes the stage instead
-of replaying it — a replayed receipt contributes no row, so the payload would otherwise keep
-describing the pre-edit corpus.
+of replaying it.
+
+_(That clause read, until 2026-08-20: "a replayed receipt contributes no row, so the payload would
+otherwise keep describing the pre-edit corpus." The second half is no longer true — the corpus
+section now reads the last `p0-preflight` row whether it executed or replayed — and the safety
+argument no longer rests on it. It rests on the first half: every module is a declared input, so a
+replay can only occur over a corpus that has not moved, and a replayed row therefore restates the
+CURRENT corpus faithfully. Excluding replays turned out to be the more dangerous of the two, because
+it made a cross-run-replayed `p0-preflight` render a payload naming no corpus file at all — measured
+on run `2026-08-19-951d08d8-004`, whose own `p0` row carried all seven module hashes. The document
+a human signs may not be silent about what it blesses, so `gate-payload.mjs` now refuses to render
+rather than degrade to a parenthetical.)_
 
 **One residual, named rather than implied.** The payload's corpus section changes when
 `p0-preflight` re-executes, which an ordinary run does. A run resumed with `--only <a gated
