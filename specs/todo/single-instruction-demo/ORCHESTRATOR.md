@@ -388,14 +388,36 @@ keeps the original verdict, names the earlier receipt in `replayed_from`, and co
 records **verbatim** — re-hashing would launder a file that changed after the original receipt was
 written.
 
+**Replay crosses run boundaries as of 2026-08-20.** The lookup was one run wide
+(`findReplayable` read `$RUN/journal.ndjson`), so a fresh run id redid everything even where
+nothing had moved. A stage now also borrows a receipt from an earlier run of the **same subject**
+when the inputs digest is byte-identical — which is what makes "edit one exporter, re-run, and only
+that leg re-executes" true across sessions rather than only within one run. The digest already
+folds in each stage's own script, the checkers it calls, and the `l4` binary's sha256, so a
+rebuilt toolchain still invalidates everything downstream.
+
+Two qualifications, both load-bearing:
+
+- **`lib/ledger.mjs`'s `CROSS_RUN_INELIGIBLE` is a closed list**, currently `p7-mcp` and
+  `p2-sweep`. The digest covers files, not the world: `p7-mcp` posts to a live jl4-service and
+  reads the tool list back, and `p2-sweep` exists _because_ time has passed. Both still replay
+  **within** a run, so resuming an interrupted run is unaffected.
+- **A cross-run replay COPIES the borrowed artifacts into the current run.** `--artifacts-from`
+  resolves its hash inside the current journal and structurally cannot name another run's receipt;
+  referencing another run's files would be worse, since `gc` prunes run directories and
+  `go.sh verify` re-hashes what a receipt names. The receipt records `replayed_from_run` and the
+  report names the source run instead of claiming the evidence is "on this journal".
+
 Three properties, all mechanically checked by `etc/go/selftest.mjs --with-driver`:
 
-- a run **re-entered with `--run-id`** re-executes nothing but the report. (Qualified
+- a run **re-entered with `--run-id`** re-executes nothing but the report. (Qualified twice.
   2026-08-09: a _bare_ second `go.sh run` is not that run — the driver increments the sequence
-  suffix while a directory with the id exists, so it allocates a fresh run dir, never sees the
-  prior journal, and re-executes every stage; measured, 11/11 stages fresh with `replayed_from`
-  null. Resuming is the documented route; back-to-back bare runs are independent runs by
-  design, and this bullet used to read as if the bare route replayed too);
+  suffix while a directory with the id exists, so it allocates a fresh run dir and never sees the
+  prior journal. **2026-08-20: that second half is no longer true.** A bare second run now finds
+  the prior run through the cross-run lookup above and replays every eligible stage; the measured
+  "11/11 stages fresh with `replayed_from` null" described the pre-2026-08-20 driver and would be
+  false if run today. Resuming with `--run-id` remains the route that reuses the same run
+  _directory_; a bare run is still a distinct run, it is simply no longer a redo);
 - the milestone verdict is unchanged by replay;
 - replayed receipts keep their original verdict.
 

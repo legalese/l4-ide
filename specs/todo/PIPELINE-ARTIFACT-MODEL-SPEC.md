@@ -1,0 +1,306 @@
+# The pipeline as an artifact graph: phases, witnesses, and what the labels are for
+
+_Status: **rulings recorded; three of thirteen implemented.** Written 2026-08-20 on branch
+`mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
+(`sg-succession`) and found that several of its central nouns name the wrong things._
+
+_What IS implemented, and where: **R1** (`corpus` → `encoding`, commit `dd55a6c8`), **R7** and
+**R8** (cross-run replay with a closed ineligible list, and borrowed artifacts copied rather than
+referenced, commit `41a7b5ac`), and **R10** (the three senses of "corpus" deliberately retained).
+Everything else on this page is a decision, not a description: there is no artifact store, no
+read-set, no per-phase comparator and no subject-level report. What would make the rest of the
+present tense true is named per ruling in §3._
+
+_Why this document exists at all: the rulings below were reached in conversation and existed
+nowhere else. `CLAUDE.md` §4 — a decision is recorded in its owning document or it is not
+decided — and the specific failure it guards against had already happened once here, when a
+report committed to `legalese/canon` described an encoding that no longer existed because nobody
+had a document saying what the report was an account **of**._
+
+---
+
+## 1. One-line summary
+
+The pipeline's stages already declare a dependency graph and do not use it as one; its nouns name
+positions in a history (`denovo` = "the second pass") rather than things (`natlang_sources` = "the
+fetched legal text"); and its artifacts are treated as build products to be clobbered when they
+are in fact **witnesses whose disagreement is the product**.
+
+## 2. The distinction everything else follows from
+
+**Intrinsic** — what a job _is_. An agentic download ran, sourcing legislation from SSO or
+legislation.gov.uk or lawplain. An agentic research pass ran, looking for case law. An agentic
+encoding pass ran, producing L4. Each consumed some artifacts and produced others.
+
+**Extrinsic** — labels applied from outside, by counting: "the first time", "the second time",
+"de novo", "cleanroom", "G1", "G2". These are facts about a subject's _history_. They are answers
+to queries over the artifact graph.
+
+A phase-1 download is a phase-1 download whether it is the first or the fifth. Nothing about the
+job changes; what changes is what else exists to compare it against.
+
+**The error this spec exists to stop: extrinsic labels are currently stored as intrinsic
+configuration.** `subject.json` has a `denovo` object — a schema key named after an ordinal. The
+milestone flag `--milestone g1|g2` selects a stage set by a label that denotes a tooling
+capability. Both make a subject's _position in its own history_ something you declare rather than
+something the graph answers.
+
+## 3. Rulings
+
+| ruling | status                     | one line                                                                                                |
+| ------ | -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| R1     | **ANSWERED · IMPLEMENTED** | the subject's L4 is `encoding`, not `corpus`, §3.1                                                      |
+| R2     | **ANSWERED**               | the fetched legal text is `natlang_sources`; `denovo` is deferred, not half-renamed, §3.2               |
+| R3     | **ANSWERED**               | phase identity is intrinsic; ordinals are extrinsic and are not schema keys, §3.3                       |
+| R4     | **ANSWERED**               | blindness is a recorded read-set, not a flag; freshness is derived from it, §3.4                        |
+| R5     | **ANSWERED**               | a diff means a different thing per phase, and an encoding diff is a fork only if upstream matched, §3.5 |
+| R6     | **ANSWERED**               | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
+| R7     | **ANSWERED · IMPLEMENTED** | replay crosses run boundaries, except for a closed list of stages, §3.7                                 |
+| R8     | **ANSWERED · IMPLEMENTED** | a run directory stays self-contained; borrowed artifacts are copied, §3.8                               |
+| R9     | **ANSWERED**               | G0–G4 are capability milestones, not lifecycle phases, and should stop being run labels, §3.9           |
+| R10    | **ANSWERED · IMPLEMENTED** | three other senses of "corpus" are retained deliberately, §3.10                                         |
+| R11    | **OPEN**                   | if artifacts are equal witnesses, the HG1 blessing must become a first-class edge, §3.11                |
+| R12    | **OPEN**                   | a subject cannot be declared before its encoding exists, so a first encoding has no home, §3.12         |
+| R13    | **OPEN**                   | reporting is run-oriented; a subject-level fold is needed, and it is not a union, §3.13                 |
+
+### 3.1 R1 — the subject's L4 is `encoding` — ANSWERED, IMPLEMENTED
+
+"Corpus" was doing four jobs: the subject's L4 modules, the repository of encodings
+(`legalese/canon`, "a corpus of L4 encodings"), the fetched legal text, and an external legal
+database (lawplain's "Singapore legal corpus"). The first had the worst word for it — an encoding
+is not a corpus of anything — and the overloading made _"did the agent read the corpus?"_
+unanswerable, because an encoding agent always reads the fetched text and may or may not read a
+prior encoding.
+
+`encoding.main` / `.wizard` / `.modules`; `GO_S_ENCODING*`; `GO_ENCODING_FILES`. Verified as a
+pure rename: `go.sh plan` byte-identical for both subjects including the gate digest.
+
+### 3.2 R2 — the fetched legal text is `natlang_sources` — ANSWERED, deferred
+
+Named for the axis that matters: **natural language** versus the formal language it is encoded
+into. `sources` alone was rejected because jl4-service's deploy API already uses `sources` for the
+**L4 zip** — the opposite meaning.
+
+`natlang_sources` also covers phase 1 and phase 2 together, which is correct: legislation and case
+law are the same kind of thing, differing by role, and the source-bundle schema's `role` enum
+(`current · historical · amendment · instrument · guidance · corroboration · scholarship`) already
+spans both.
+
+**Deliberately not yet applied, and this is not a half-finished rename.** `denovo` currently
+bundles the sources together with modules, checks and a surface map. Renaming it wholesale would
+move the category error under a better word. Splitting it needs §3.6's store first.
+
+### 3.3 R3 — phase identity is intrinsic — ANSWERED
+
+Phases are named by what they do: `source` (agentic download), `research` (agentic case-law
+sweep), `encode` (agentic encoding), then the projections. Ordinals — first, second, "de novo",
+"cleanroom" — are queries over history and appear in no schema key, no stage-set name and no
+config value.
+
+The immediate consequence: **"de novo" is the wrong word for the pass it currently names.** It
+means _anew, from the beginning_, and the run it labels **requires a predecessor** — SPEC.md §8's
+acceptance diff compares a blind re-derivation _against the committed encoding_. Measured: a
+subject whose `encoding.main` does not exist cannot be resolved at all, and a descriptor whose
+`denovo.modules` names a corpus module is refused outright. The vocabulary is inverted — the word
+meaning "no prior" is attached to the pass that needs one, while the pass that genuinely has no
+prior (§3.12) has no name.
+
+"Cleanroom" is the accurate term of art for the second pass and is **already used for it in this
+repo**, two lines apart in the same file: `charities-cleanroom/README.md` reads _"encoded de novo"_
+in its title and _"A cleanroom smoke test"_ in its first sentence. But see R4: even "cleanroom" is
+trying to be a flag for something that is properly an edge, so the right move is not to rename
+`denovo` to `cleanroom` — it is to stop needing either word.
+
+### 3.4 R4 — blindness is a read-set, not a flag — ANSWERED
+
+An encoding agent **always** reads _some_ corpus — the fetched legal text. So "blind" was only ever
+meaningful against one sense of the word: blind to _prior L4 encodings of the same law_.
+
+Three independent provenance edges had been conflated into one boolean:
+
+| edge                                       | determines                                      |
+| ------------------------------------------ | ----------------------------------------------- |
+| which `natlang_sources` artifact was read  | **what law is encoded**, and hence its currency |
+| whether a prior `encoding` was read        | **whether this is an independent witness**      |
+| whether the `research` artifacts were read | **whether case law is accounted for**           |
+
+Only the second is blindness. The first is not a quality at all — it is the dependency edge.
+
+**Record the producer's complete read-set on each artifact, and all three fall out**, plus a fourth:
+
+- **freshness** — compare the read-set against the newest artifacts available for those sources.
+  Freshness is therefore _derived_, never stored, and "stale" keeps its exact Make meaning: a newer
+  prerequisite exists.
+- **independence** — does the read-set contain an encoding artifact for this subject?
+- **comparability** — do two encodings share the same `natlang_sources` read-set? (See R5.)
+
+A `blind: true` flag cannot express the fourth at all, which is what settles it.
+
+### 3.5 R5 — a diff means something different per phase — ANSWERED
+
+A uniform "diff the artifacts" layer would mislabel three different events:
+
+| phase             | a diff between runs means  | it is                                                                            |
+| ----------------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `natlang_sources` | the fetched text moved     | a **currency event** — the law changed, or the publisher revised it. Not a fork. |
+| `research`        | new authority surfaced     | a **sweep finding** — routes to the external-modification register               |
+| `encode`          | same sources, different L4 | an **interpretive fork** — the fork register's actual subject                    |
+
+**An encoding diff is an interpretive fork only if the upstream read-sets were identical.**
+Otherwise it is two encodings of two different texts, and calling their difference a fork is
+spurious. This is the load-bearing constraint on the whole comparison layer, and it is why
+content-addressing (R6) is a requirement and not an optimisation.
+
+`etc/go/lib/denovo-diff.mjs` survives this reframing unchanged: it already compares **behaviourally**
+— by what two encodings _answer_ over a battery, never by their text. It stops being "the G2
+acceptance test" and becomes the general `encode`-phase comparator, callable between any two
+encoding artifacts.
+
+### 3.6 R6 — artifacts are witnesses — ANSWERED
+
+Make clobbers because a rebuild is deterministic and the artifact is fungible. Neither holds here:
+the producer is a non-deterministic agent, so two runs over identical inputs yield **different**
+artifacts, and that difference is the product rather than waste.
+
+So the store accumulates rather than overwrites, content-addressed by
+`(phase, upstream-digest, content-hash)`, with run directories holding references. Today artifacts
+live in `$TMPDIR/l4-go/<run-id>/artifacts/` — measured 2026-08-20 at 92 run directories and 5.4 MB, and growing with every run, in a
+location designed to be discarded, with no cross-run identity. Identical fetches dedupe under
+content addressing, so retention is cheaper than it sounds.
+
+_What would make this true: an artifact store outside `$TMPDIR`, and `gc` becoming a policy over
+references rather than a delete of the only copy._
+
+### 3.7 R7 — replay crosses run boundaries — ANSWERED, IMPLEMENTED
+
+Each stage's `--inputs` already names its own script, the checkers it calls and (folded in by
+`go.sh`) the sha256 of the `l4` binary. That is a dependency graph; only the lookup was one run
+wide. A stage now borrows a receipt from an earlier run of the **same subject** when the inputs
+digest is byte-identical.
+
+**Two stages may never cross a run boundary**, as a closed list in `lib/ledger.mjs`
+(`CROSS_RUN_INELIGIBLE`) rather than a heuristic, because the digest covers files and not the
+world: `p7-mcp` posts to a live jl4-service and reads the tool list back, so a borrowed `PASS`
+could assert a deployment that is not there; and `p2-sweep` exists _because_ time has passed, so a
+six-month-old sweep has unchanged inputs and a stale answer. Both still replay **within** a run, so
+resuming an interrupted run is unaffected.
+
+Measured, touching only `p7-akn.sh`: six stages replayed (`p0-preflight`, `p3-check`, `p6-tests`, `p8-verify`, `p7-lts`, `p7-wizard`); `p7-akn` re-executed because its digest moved, and `p7-mcp` because it is ineligible. `p9-report` and `p9-explain` declare no inputs and never replay by design.
+
+### 3.8 R8 — a run directory stays self-contained — ANSWERED, IMPLEMENTED
+
+`--artifacts-from` resolves its hash inside the current journal, so it structurally cannot name
+another run's receipt — and referencing another run's files would be worse, because `gc` prunes run
+directories and `go.sh verify` re-hashes every artifact a receipt names, so a borrowed path would
+dangle and verification of a healthy run would fail.
+
+Borrowed artifacts are therefore **copied in**. The invariant this preserves is the one that makes
+`verify` worth anything to a second party: **a run directory is checkable on its own, by someone who
+has only that directory.** Measured on a run with five borrowed stages: 44 artifacts recorded, 44
+still hash as recorded.
+
+The receipt records `replayed_from_run`, and the report names the run the evidence was earned in
+rather than saying it is "on this journal", which for a borrowed row is false.
+
+### 3.9 R9 — G0–G4 are capability milestones — ANSWERED
+
+SPEC.md §6 is headed _"Gaps → milestones"_: G0 spec accepted, G1 the pipeline can replay, G2 it can
+validate-and-diff a blind re-derivation, G3 every projection executes, G4 published. They describe
+**what the tooling can do, in the order it was built**.
+
+They are not phases a subject passes through, and using them as run labels (`--milestone g1`) is
+what makes _"how can G1 run before G2?"_ a reasonable question to ask — as it was asked, by the
+person who commissioned the spec. Runs should be labelled by what they do; the capability
+milestones belong in a changelog.
+
+### 3.10 R10 — three senses of "corpus" are retained — ANSWERED, IMPLEMENTED
+
+Deliberately **not** renamed by R1, each a different and legitimate sense:
+
+- `etc/check-corpus-goldens.mjs` and "corpus files" — the repo's body of `.l4` **examples**.
+- the `corpus_sha_*` receipt metrics and `corpus_sha8` in run ids — written into hash-chained
+  journals, and journals from earlier runs are already committed in `legalese/canon`. Renaming
+  would split the journal format for no benefit today.
+- `GO_MODULES_ORIGIN=corpus|denovo` — a two-valued sentinel whose other value is deferred under R2.
+  Renaming one half of a pair is worse than renaming neither.
+
+### 3.11 R11 — the blessing must become a first-class edge — OPEN
+
+If artifacts accumulate as equal witnesses, _"which one did the domain expert review?"_ must stay
+answerable. Today HG1 binds to a digest over the files at `encoding.main`, so the blessing is an
+implicit property of whichever file sits at that path.
+
+Under R6 that is no longer sufficient, and the failure mode is the worst one available: **a
+confident answer served from an unreviewed encoding.** The blessing must be an edge in the store —
+_this signature, over this artifact digest, by this signer, at this time_ — and the serving path
+must refuse to answer from an artifact that has no such edge.
+
+_This is the ruling most likely to be got wrong by building R6 first and R11 later._
+
+### 3.12 R12 — a first encoding has no home — OPEN
+
+Measured: a subject whose `encoding.main` does not exist **cannot be resolved at all**
+(`corpus.main`/`encoding.main` is `mustExist`), so no milestone can run on a body of law nobody has
+encoded. And a first pass cannot be registered as its own de novo deposit either, because the
+resolver refuses a de novo module that is also an encoding module.
+
+So the most consequential work in the pipeline — fetch, sweep, encode, fork, for the first time —
+is **unmilestoned agent work that produces no receipt**. That is precisely how, for
+`sg-succession`, three registers were built, hand-validated with `register-validate.mjs` and
+committed while the pipeline held no receipt for any of them; eight runs had happened, all `g1`,
+and the reports correctly said the source bundle was ABSENT.
+
+Two candidate closures, not yet ruled between:
+
+1. a phase set for the first pass, permitting `encoding == the artifact under review` because there
+   is nothing to diff, with the comparator reporting `NOT-APPLICABLE` rather than `SKIPPED` — a
+   different and more honest status;
+2. relax the resolver so a subject may be declared before its encoding exists, letting the source
+   and research phases run and deposit first, with `encoding.main` required only from the
+   projection phases onward. Closer to how the work actually proceeds, but it weakens a check that
+   currently catches typos in every declared path.
+
+### 3.13 R13 — reporting needs a subject-level fold — OPEN
+
+`p9-report` renders **one run's** journal. No single run exercises every phase, so no single report
+is the account of the subject: `sg-succession`'s `g1` report marks §P1 and §P2 **ABSENT** while its
+`g2` report marks the measurement stages **SKIPPED**, and both are correct about their own run.
+
+**The fold is not a union.** A receipt binds to the digest it ran over, so evidence from two runs is
+jointly meaningful only where both ran over the same inputs. A subject-level report must resolve
+each phase to one of three states:
+
+| state       | meaning                                                                                |
+| ----------- | -------------------------------------------------------------------------------------- |
+| `CURRENT`   | a receipt exists over today's digest                                                   |
+| `STALE`     | a receipt exists, but over an older digest — shown, marked, with the digest it covered |
+| `NEVER RUN` | no receipt at any milestone                                                            |
+
+`NEVER RUN` is the state that would have caught R12's failure. Today a report says a phase is "not
+declared at this milestone" — true, and readable as "accounted for elsewhere" when nothing had
+accounted for it anywhere.
+
+---
+
+## 4. What this does not settle
+
+- **Where the store lives**, and whether `gc` becomes a reference policy or is retired.
+- **Whether comparison is a phase or a query.** The argument for query: _"show me the encoding
+  divergences for this subject where the sources were identical"_ is a question, not a build step.
+- **Whether `--milestone` survives R9 at all.** Once staleness is computed from the graph, a
+  pre-cut stage set is a filter one would rarely reach for.
+- **The cost of retention** under R6 at real corpus sizes. 2.7 MB across 86 runs is not evidence
+  about a subject with a decade of sources.
+
+## 5. What review changed
+
+Written in one pass out of a working conversation, so there is no second reviewer yet. Two claims
+in it were **corrected mid-conversation** and are recorded here in their corrected form, because
+each was believed for a while:
+
+- _"the first report would have said something different but it was clobbered"_ — checked against
+  the surviving run directory and **false**: both reports were `g1` runs and their §P1 paragraphs
+  are byte-identical. Nothing was lost. The real defect was R12's, one level down.
+- _"blindness is whether the agent read the corpus"_ — ill-formed, because an encoding agent always
+  reads the fetched text. Corrected to R4's read-set, which is what makes the fourth question
+  (comparability) expressible at all.

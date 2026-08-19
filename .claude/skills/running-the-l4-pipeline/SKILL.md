@@ -142,11 +142,11 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 etc/go/go.sh run --milestone g1 --subject regcf --run-id <run-id>
 ```
 
-Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact. A second run back to back re-executes only the two stages that declare no inputs.
+Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact — and since 2026-08-20 that lookup crosses run boundaries, so a stage borrows a receipt from an earlier run of the SAME subject when the digest matches. A second run back to back therefore re-executes only the two stages that declare no inputs, plus anything whose digest actually moved. (This sentence was WRONG until 2026-08-20 and is now right by accident: it survived a 2026-08-09 correction that fixed the same claim in ORCHESTRATOR.md but not here, and the cross-run change happens to have made it true.)
 
 **Key idioms:**
 
-- **Resume into the same run id.** A new run id is a new run, and it will redo everything.
+- **Resume into the same run id** when you want the same run _directory_ — that is what `--run-id` is for. A new run id is still a distinct run, but since 2026-08-20 it is no longer a redo: eligible stages replay from the earlier run's receipts. The exceptions are `p7-mcp` and `p2-sweep`, which never cross a run boundary because their results are not a function of their declared inputs (`CROSS_RUN_INELIGIBLE` in `etc/go/lib/ledger.mjs` says why), and `p9-report`/`p9-explain`, which declare no inputs and so never replay at all.
 - **`p9-report` and `p9-explain` never replay**, by design: each is a function of the journal, the journal grows while it runs, and a stale document claiming to be current is the worst possible artifact. They are the only two stages that declare an empty `--inputs` set, and `etc/go/selftest.mjs` asserts that as a named set rather than as a count.
 - **If a stage re-runs when you expected a replay, an input moved.** That is the digest doing its job. Find out what changed before assuming the driver is wrong.
 
