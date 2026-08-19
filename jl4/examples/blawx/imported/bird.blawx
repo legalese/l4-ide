@@ -1,0 +1,470 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: New Bird Act
+    rule_text: "New Bird Act\n\n1. Penguins are birds.\n2. Birds fly.\n3. Despite 2, penguins do not fly, subject to 4.\n4. Penguins on planes can fly.\n5. Despite 3, cartoon penguins with jetpacks can fly, [pingu]{except for pingu}."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: ''
+    scasp_encoding: ''
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">penguin</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a penguin</field><next><block type="new_category_declaration" id="l4b000003"><field name="category_name">bird</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a bird</field></block></next></block></statement></block>
+      <block type="attributed_rule" id="l4b000004" x="40" y="298"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="new_object_category" id="l4b000005"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin"></mutation><field name="category_name">penguin</field><value name="object"><block type="variable" id="l4b000006"><field name="variable_name">A</field></block></value></block></statement><value name="source"><block type="doc_selector" id="l4b000007"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">NBA 1</field></block></value><statement name="conclusion"><block type="object_category" id="l4b000008"><value name="object"><block type="variable" id="l4b000009"><field name="variable_name">A</field></block></value><value name="category"><block type="category_selector" id="l4b000010"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="bird"></mutation><field name="category_name">bird</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(penguin).
+      blawx_category_nlg(penguin,"","is a penguin").
+      :- dynamic penguin/1.
+      #pred penguin(X) :: '@(X) is a penguin'.
+      #pred holds(user,penguin,X) :: 'it is provided as a fact that @(X) is a penguin'.
+      #pred holds(user,-penguin,X) :: 'it is provided as a fact that it is not the case that @(X) is a penguin'.
+      #pred holds(Z,penguin,X) :: 'the conclusion in @(Z) that @(X) is a penguin holds'.
+      #pred holds(Z,-penguin,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a penguin holds'.
+      #pred according_to(Z,penguin,X) :: 'according to @(Z), @(X) is a penguin'.
+      #pred according_to(Z,-penguin,X) :: 'according to @(Z), it is not the case that @(X) is a penguin'.
+      #pred blawx_defeated(Z,penguin,X) :: 'the conclusion in @(Z) that @(X) is a penguin is defeated'.
+      #pred blawx_defeated(Z,-penguin,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a penguin is defeated'.
+      #pred blawx_initially(penguin(X)) :: 'that @(X) is a penguin holds initially'.
+      #pred blawx_initially(-penguin(X)) :: 'that it is not the case that @(X) is a penguin holds initially'.
+      #pred blawx_ultimately(penguin(X)) :: 'that @(X) is a penguin holds ultimately'.
+      #pred blawx_ultimately(-penguin(X)) :: 'that it is not the case that @(X) is a penguin holds ultimately'.
+      #pred blawx_as_of(penguin(X),T) :: 'that @(X) is a penguin holds at @(T)'.
+      #pred blawx_as_of(-penguin(X),T) :: 'that it is not the case that @(X) is a penguin holds at @(T)'.
+      #pred blawx_during(T1,penguin(X),T2) :: 'that @(X) is a penguin held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-penguin(X),T2) :: 'that it is not the case that @(X) is a penguin held between @(T1) and @(T2)'.
+      #pred blawx_becomes(penguin(X),T) :: 'that @(X) is a penguin became true at @(T)'.
+      #pred blawx_becomes(-penguin(X),T) :: 'that it is not the case that @(X) is a penguin became true at @(T)'.
+      #pred blawx_not_interrupted(Start,penguin(X),End) :: '@(X) is a penguin remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-penguin(X),End) :: 'it is not the case that @(X) is a penguin remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),penguin(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-penguin(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-penguin(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(penguin(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),penguin(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-penguin(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-penguin(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(penguin(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),penguin(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-penguin(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-penguin(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(penguin(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),penguin(X),datetime(eot)) :- blawx_initially(penguin(X)), blawx_ultimately(penguin(X)), findall(Time,blawx_becomes(-penguin(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-penguin(X),datetime(eot)) :- blawx_initially(-penguin(X)), blawx_ultimately(-penguin(X)), findall(Time,blawx_becomes(penguin(X),datetime(Time)),[]).
+      blawx_as_of(penguin(X),datetime(Time)) :- blawx_initially(penguin(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),penguin(X),datetime(BeforeT)).
+      blawx_as_of(penguin(X),datetime(Time)) :- blawx_becomes(penguin(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),penguin(X),datetime(Time)).
+      blawx_as_of(-penguin(X),datetime(Time)) :- blawx_initially(-penguin(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-penguin(X),datetime(BeforeT)).
+      blawx_as_of(-penguin(X),datetime(Time)) :- blawx_becomes(-penguin(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-penguin(X),datetime(Time)).
+      blawx_during(datetime(Start),penguin(X),datetime(End)) :- blawx_becomes(penguin(X),datetime(Start)), blawx_becomes(-penguin(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),penguin(X),datetime(End)).
+      blawx_during(datetime(bot),penguin(X),datetime(End)) :- blawx_initially(penguin(X)), blawx_becomes(-penguin(X),datetime(End)), blawx_not_interrupted(datetime(bot),penguin(X),datetime(End)).
+      blawx_during(datetime(Start),penguin(X),datetime(eot)) :- blawx_ultimately(penguin(X)), blawx_becomes(-penguin(X),datetime(Start)), blawx_not_interrupted(datetime(Start),penguin(X),datetime(eot)).
+      blawx_during(datetime(bot),penguin(X),datetime(eot)) :- blawx_initially(penguin(X)), blawx_ultimately(penguin(X)), blawx_becomes(-penguin(X),datetime(Start)), blawx_not_interrupted(datetime(bot),penguin(X),datetime(eot)).
+      blawx_during(datetime(Start),-penguin(X),datetime(End)) :- blawx_becomes(-penguin(X),datetime(Start)), blawx_becomes(penguin(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-penguin(X),datetime(End)).
+      blawx_during(datetime(bot),-penguin(X),datetime(End)) :- blawx_initially(-penguin(X)), blawx_becomes(penguin(X),datetime(End)), blawx_not_interrupted(datetime(bot),-penguin(X),datetime(End)).
+      blawx_during(datetime(Start),-penguin(X),datetime(eot)) :- blawx_ultimately(-penguin(X)), blawx_becomes(penguin(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-penguin(X),datetime(eot)).
+      blawx_during(datetime(bot),-penguin(X),datetime(eot)) :- blawx_initially(-penguin(X)), blawx_ultimately(-penguin(X)), blawx_becomes(-penguin(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-penguin(X),datetime(eot)).
+      blawx_category(bird).
+      blawx_category_nlg(bird,"","is a bird").
+      :- dynamic bird/1.
+      #pred bird(X) :: '@(X) is a bird'.
+      #pred holds(user,bird,X) :: 'it is provided as a fact that @(X) is a bird'.
+      #pred holds(user,-bird,X) :: 'it is provided as a fact that it is not the case that @(X) is a bird'.
+      #pred holds(Z,bird,X) :: 'the conclusion in @(Z) that @(X) is a bird holds'.
+      #pred holds(Z,-bird,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a bird holds'.
+      #pred according_to(Z,bird,X) :: 'according to @(Z), @(X) is a bird'.
+      #pred according_to(Z,-bird,X) :: 'according to @(Z), it is not the case that @(X) is a bird'.
+      #pred blawx_defeated(Z,bird,X) :: 'the conclusion in @(Z) that @(X) is a bird is defeated'.
+      #pred blawx_defeated(Z,-bird,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a bird is defeated'.
+      #pred blawx_initially(bird(X)) :: 'that @(X) is a bird holds initially'.
+      #pred blawx_initially(-bird(X)) :: 'that it is not the case that @(X) is a bird holds initially'.
+      #pred blawx_ultimately(bird(X)) :: 'that @(X) is a bird holds ultimately'.
+      #pred blawx_ultimately(-bird(X)) :: 'that it is not the case that @(X) is a bird holds ultimately'.
+      #pred blawx_as_of(bird(X),T) :: 'that @(X) is a bird holds at @(T)'.
+      #pred blawx_as_of(-bird(X),T) :: 'that it is not the case that @(X) is a bird holds at @(T)'.
+      #pred blawx_during(T1,bird(X),T2) :: 'that @(X) is a bird held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-bird(X),T2) :: 'that it is not the case that @(X) is a bird held between @(T1) and @(T2)'.
+      #pred blawx_becomes(bird(X),T) :: 'that @(X) is a bird became true at @(T)'.
+      #pred blawx_becomes(-bird(X),T) :: 'that it is not the case that @(X) is a bird became true at @(T)'.
+      #pred blawx_not_interrupted(Start,bird(X),End) :: '@(X) is a bird remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-bird(X),End) :: 'it is not the case that @(X) is a bird remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),bird(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-bird(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-bird(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(bird(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),bird(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-bird(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-bird(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(bird(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),bird(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-bird(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-bird(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(bird(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),bird(X),datetime(eot)) :- blawx_initially(bird(X)), blawx_ultimately(bird(X)), findall(Time,blawx_becomes(-bird(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-bird(X),datetime(eot)) :- blawx_initially(-bird(X)), blawx_ultimately(-bird(X)), findall(Time,blawx_becomes(bird(X),datetime(Time)),[]).
+      blawx_as_of(bird(X),datetime(Time)) :- blawx_initially(bird(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),bird(X),datetime(BeforeT)).
+      blawx_as_of(bird(X),datetime(Time)) :- blawx_becomes(bird(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),bird(X),datetime(Time)).
+      blawx_as_of(-bird(X),datetime(Time)) :- blawx_initially(-bird(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-bird(X),datetime(BeforeT)).
+      blawx_as_of(-bird(X),datetime(Time)) :- blawx_becomes(-bird(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-bird(X),datetime(Time)).
+      blawx_during(datetime(Start),bird(X),datetime(End)) :- blawx_becomes(bird(X),datetime(Start)), blawx_becomes(-bird(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),bird(X),datetime(End)).
+      blawx_during(datetime(bot),bird(X),datetime(End)) :- blawx_initially(bird(X)), blawx_becomes(-bird(X),datetime(End)), blawx_not_interrupted(datetime(bot),bird(X),datetime(End)).
+      blawx_during(datetime(Start),bird(X),datetime(eot)) :- blawx_ultimately(bird(X)), blawx_becomes(-bird(X),datetime(Start)), blawx_not_interrupted(datetime(Start),bird(X),datetime(eot)).
+      blawx_during(datetime(bot),bird(X),datetime(eot)) :- blawx_initially(bird(X)), blawx_ultimately(bird(X)), blawx_becomes(-bird(X),datetime(Start)), blawx_not_interrupted(datetime(bot),bird(X),datetime(eot)).
+      blawx_during(datetime(Start),-bird(X),datetime(End)) :- blawx_becomes(-bird(X),datetime(Start)), blawx_becomes(bird(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-bird(X),datetime(End)).
+      blawx_during(datetime(bot),-bird(X),datetime(End)) :- blawx_initially(-bird(X)), blawx_becomes(bird(X),datetime(End)), blawx_not_interrupted(datetime(bot),-bird(X),datetime(End)).
+      blawx_during(datetime(Start),-bird(X),datetime(eot)) :- blawx_ultimately(-bird(X)), blawx_becomes(bird(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-bird(X),datetime(eot)).
+      blawx_during(datetime(bot),-bird(X),datetime(eot)) :- blawx_initially(-bird(X)), blawx_ultimately(-bird(X)), blawx_becomes(-bird(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-bird(X),datetime(eot)).
+
+      according_to(sec_1_section,bird,A) :- penguin(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,bird,A) :- according_to(sec_1_section,bird,A).
+
+      % BLAWX CHECK DUPLICATES
+        bird(A) :- holds(sec_1_section,bird,A).
+- model: blawx.workspace
+  pk: 3
+  fields:
+    ruledoc: 1
+    workspace_name: sec_2_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000011" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000012"><field name="category_name">thing</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a thing</field><next><block type="new_attribute_declaration" id="l4b000013"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="thing" attribute_type="boolean"></mutation><field name="category_name">thing</field><field name="attribute_name">flies</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">can fly</field></block></next></block></statement></block>
+      <block type="attributed_rule" id="l4b000014" x="40" y="298"><field name="defeasible">TRUE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="new_object_category" id="l4b000015"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="bird"></mutation><field name="category_name">bird</field><value name="object"><block type="variable" id="l4b000016"><field name="variable_name">A</field></block></value></block></statement><value name="source"><block type="doc_selector" id="l4b000017"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">NBA 2</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000018"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000019"><field name="variable_name">A</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(thing).
+      blawx_category_nlg(thing,"","is a thing").
+      :- dynamic thing/1.
+      #pred thing(X) :: '@(X) is a thing'.
+      #pred holds(user,thing,X) :: 'it is provided as a fact that @(X) is a thing'.
+      #pred holds(user,-thing,X) :: 'it is provided as a fact that it is not the case that @(X) is a thing'.
+      #pred holds(Z,thing,X) :: 'the conclusion in @(Z) that @(X) is a thing holds'.
+      #pred holds(Z,-thing,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a thing holds'.
+      #pred according_to(Z,thing,X) :: 'according to @(Z), @(X) is a thing'.
+      #pred according_to(Z,-thing,X) :: 'according to @(Z), it is not the case that @(X) is a thing'.
+      #pred blawx_defeated(Z,thing,X) :: 'the conclusion in @(Z) that @(X) is a thing is defeated'.
+      #pred blawx_defeated(Z,-thing,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a thing is defeated'.
+      #pred blawx_initially(thing(X)) :: 'that @(X) is a thing holds initially'.
+      #pred blawx_initially(-thing(X)) :: 'that it is not the case that @(X) is a thing holds initially'.
+      #pred blawx_ultimately(thing(X)) :: 'that @(X) is a thing holds ultimately'.
+      #pred blawx_ultimately(-thing(X)) :: 'that it is not the case that @(X) is a thing holds ultimately'.
+      #pred blawx_as_of(thing(X),T) :: 'that @(X) is a thing holds at @(T)'.
+      #pred blawx_as_of(-thing(X),T) :: 'that it is not the case that @(X) is a thing holds at @(T)'.
+      #pred blawx_during(T1,thing(X),T2) :: 'that @(X) is a thing held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-thing(X),T2) :: 'that it is not the case that @(X) is a thing held between @(T1) and @(T2)'.
+      #pred blawx_becomes(thing(X),T) :: 'that @(X) is a thing became true at @(T)'.
+      #pred blawx_becomes(-thing(X),T) :: 'that it is not the case that @(X) is a thing became true at @(T)'.
+      #pred blawx_not_interrupted(Start,thing(X),End) :: '@(X) is a thing remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-thing(X),End) :: 'it is not the case that @(X) is a thing remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),thing(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-thing(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-thing(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(thing(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),thing(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-thing(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-thing(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(thing(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),thing(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-thing(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-thing(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(thing(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),thing(X),datetime(eot)) :- blawx_initially(thing(X)), blawx_ultimately(thing(X)), findall(Time,blawx_becomes(-thing(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-thing(X),datetime(eot)) :- blawx_initially(-thing(X)), blawx_ultimately(-thing(X)), findall(Time,blawx_becomes(thing(X),datetime(Time)),[]).
+      blawx_as_of(thing(X),datetime(Time)) :- blawx_initially(thing(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),thing(X),datetime(BeforeT)).
+      blawx_as_of(thing(X),datetime(Time)) :- blawx_becomes(thing(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),thing(X),datetime(Time)).
+      blawx_as_of(-thing(X),datetime(Time)) :- blawx_initially(-thing(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-thing(X),datetime(BeforeT)).
+      blawx_as_of(-thing(X),datetime(Time)) :- blawx_becomes(-thing(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-thing(X),datetime(Time)).
+      blawx_during(datetime(Start),thing(X),datetime(End)) :- blawx_becomes(thing(X),datetime(Start)), blawx_becomes(-thing(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),thing(X),datetime(End)).
+      blawx_during(datetime(bot),thing(X),datetime(End)) :- blawx_initially(thing(X)), blawx_becomes(-thing(X),datetime(End)), blawx_not_interrupted(datetime(bot),thing(X),datetime(End)).
+      blawx_during(datetime(Start),thing(X),datetime(eot)) :- blawx_ultimately(thing(X)), blawx_becomes(-thing(X),datetime(Start)), blawx_not_interrupted(datetime(Start),thing(X),datetime(eot)).
+      blawx_during(datetime(bot),thing(X),datetime(eot)) :- blawx_initially(thing(X)), blawx_ultimately(thing(X)), blawx_becomes(-thing(X),datetime(Start)), blawx_not_interrupted(datetime(bot),thing(X),datetime(eot)).
+      blawx_during(datetime(Start),-thing(X),datetime(End)) :- blawx_becomes(-thing(X),datetime(Start)), blawx_becomes(thing(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-thing(X),datetime(End)).
+      blawx_during(datetime(bot),-thing(X),datetime(End)) :- blawx_initially(-thing(X)), blawx_becomes(thing(X),datetime(End)), blawx_not_interrupted(datetime(bot),-thing(X),datetime(End)).
+      blawx_during(datetime(Start),-thing(X),datetime(eot)) :- blawx_ultimately(-thing(X)), blawx_becomes(thing(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-thing(X),datetime(eot)).
+      blawx_during(datetime(bot),-thing(X),datetime(eot)) :- blawx_initially(-thing(X)), blawx_ultimately(-thing(X)), blawx_becomes(-thing(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-thing(X),datetime(eot)).
+      blawx_attribute(thing,flies,boolean).
+      blawx_attribute_nlg(flies,not_applicable,"",not_applicable,"can fly").
+      :- dynamic flies/1.
+      #pred flies(X) :: '@(X) can fly'.
+      #pred holds(user,flies,X) :: 'it is provided as a fact that @(X) can fly'.
+      #pred holds(user,-flies,X) :: 'it is provided as a fact that it is not the case that @(X) can fly'.
+      #pred holds(Z,flies,X) :: 'the conclusion in @(Z) that @(X) can fly holds'.
+      #pred holds(Z,-flies,X) :: 'the conclusion in @(Z) that it is not the case that @(X) can fly holds'.
+      #pred according_to(Z,flies,X) :: 'according to @(Z), @(X) can fly'.
+      #pred according_to(Z,-flies,X) :: 'according to @(Z), it is not the case that @(X) can fly'.
+      #pred blawx_defeated(Z,flies,X) :: 'the conclusion in @(Z) that @(X) can fly is defeated'.
+      #pred blawx_defeated(Z,-flies,X) :: 'the conclusion in @(Z) that @(X) can fly is defeated'.
+      #pred blawx_initially(flies(X)) :: 'that @(X) can fly holds initially'.
+      #pred blawx_initially(-flies(X)) :: 'that it is not the case that @(X) can fly holds initially'.
+      #pred blawx_ultimately(flies(X)) :: 'that @(X) can fly holds ultimately'.
+      #pred blawx_ultimately(-flies(X)) :: 'that it is not the case that @(X) can fly holds ultimately'.
+      #pred blawx_as_of(flies(X),T) :: 'that @(X) can fly holds at @(T)'.
+      #pred blawx_as_of(-flies(X),T) :: 'that it is not the case that @(X) can fly holds at @(T)'.
+      #pred blawx_during(T1,flies(X),T2) :: 'that @(X) can fly held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-flies(X),T2) :: 'that it is not the case that @(X) can fly held between @(T1) and @(T2)'.
+      #pred blawx_becomes(flies(X),T) :: 'that @(X) can fly became true at @(T)'.
+      #pred blawx_becomes(-flies(X),T) :: 'that it is not the case that @(X) can fly became true at @(T)'.
+      #pred blawx_not_interrupted(Start,flies(X),End) :: '@(X) can fly remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-flies(X),End) :: 'it is not the case that @(X) can fly remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),flies(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-flies(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-flies(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(flies(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),flies(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-flies(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-flies(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(flies(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),flies(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-flies(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-flies(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(flies(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),flies(X),datetime(eot)) :- blawx_initially(flies(X)), blawx_ultimately(flies(X)), findall(Time,blawx_becomes(-flies(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-flies(X),datetime(eot)) :- blawx_initially(-flies(X)), blawx_ultimately(-flies(X)), findall(Time,blawx_becomes(flies(X),datetime(Time)),[]).
+      blawx_as_of(flies(X),datetime(Time)) :- blawx_initially(flies(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),flies(X),datetime(BeforeT)).
+      blawx_as_of(flies(X),datetime(Time)) :- blawx_becomes(flies(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),flies(X),datetime(Time)).
+      blawx_as_of(-flies(X),datetime(Time)) :- blawx_initially(-flies(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-flies(X),datetime(BeforeT)).
+      blawx_as_of(-flies(X),datetime(Time)) :- blawx_becomes(-flies(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-flies(X),datetime(Time)).
+      blawx_during(datetime(Start),flies(X),datetime(End)) :- blawx_becomes(flies(X),datetime(Start)), blawx_becomes(-flies(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),flies(X),datetime(End)).
+      blawx_during(datetime(bot),flies(X),datetime(End)) :- blawx_initially(flies(X)), blawx_becomes(-flies(X),datetime(End)), blawx_not_interrupted(datetime(bot),flies(X),datetime(End)).
+      blawx_during(datetime(Start),flies(X),datetime(eot)) :- blawx_ultimately(flies(X)), blawx_becomes(-flies(X),datetime(Start)), blawx_not_interrupted(datetime(Start),flies(X),datetime(eot)).
+      blawx_during(datetime(bot),flies(X),datetime(eot)) :- blawx_initially(flies(X)), blawx_ultimately(flies(X)), blawx_becomes(-flies(X),datetime(Start)), blawx_not_interrupted(datetime(bot),flies(X),datetime(eot)).
+      blawx_during(datetime(Start),-flies(X),datetime(End)) :- blawx_becomes(-flies(X),datetime(Start)), blawx_becomes(flies(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-flies(X),datetime(End)).
+      blawx_during(datetime(bot),-flies(X),datetime(End)) :- blawx_initially(-flies(X)), blawx_becomes(flies(X),datetime(End)), blawx_not_interrupted(datetime(bot),-flies(X),datetime(End)).
+      blawx_during(datetime(Start),-flies(X),datetime(eot)) :- blawx_ultimately(-flies(X)), blawx_becomes(flies(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-flies(X),datetime(eot)).
+      blawx_during(datetime(bot),-flies(X),datetime(eot)) :- blawx_initially(-flies(X)), blawx_ultimately(-flies(X)), blawx_becomes(-flies(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-flies(X),datetime(eot)).
+
+      according_to(sec_2_section,flies,A) :- bird(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,flies,A) :- according_to(sec_2_section,flies,A), not blawx_defeated(sec_2_section,flies,A).
+
+      % BLAWX CHECK DUPLICATES
+        flies(A) :- holds(sec_2_section,flies,A).
+- model: blawx.workspace
+  pk: 4
+  fields:
+    ruledoc: 1
+    workspace_name: sec_3_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000020" x="40" y="40"><statement name="statements"><block type="overrules" id="l4b000021"><value name="defeating_rule"><block type="doc_selector" id="l4b000022"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">NBA 3</field></block></value><statement name="defeating_statement"><block type="logical_negation" id="l4b000023"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000024"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000025"><field name="variable_name">A</field></block></value></block></statement></block></statement><value name="defeated_rule"><block type="doc_selector" id="l4b000026"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">NBA 2</field></block></value><statement name="defeated_statement"><block type="unary_attribute_selector" id="l4b000027"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000028"><field name="variable_name">A</field></block></value></block></statement></block></statement></block>
+      <block type="unattributed_fact" id="l4b000029" x="40" y="358"><statement name="statements"><block type="overrules" id="l4b000030"><value name="defeating_rule"><block type="doc_selector" id="l4b000031"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_4_section"></mutation><field name="doc_part_name">NBA 4</field></block></value><statement name="defeating_statement"><block type="unary_attribute_selector" id="l4b000032"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000033"><field name="variable_name">A</field></block></value></block></statement><value name="defeated_rule"><block type="doc_selector" id="l4b000034"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">NBA 3</field></block></value><statement name="defeated_statement"><block type="logical_negation" id="l4b000035"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000036"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000037"><field name="variable_name">A</field></block></value></block></statement></block></statement></block></statement></block>
+      <block type="unattributed_fact" id="l4b000038" x="40" y="676"><statement name="statements"><block type="new_attribute_declaration" id="l4b000039"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin" attribute_type="boolean"></mutation><field name="category_name">penguin</field><field name="attribute_name">on_plane</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is on a plane</field></block></statement></block>
+      <block type="attributed_rule" id="l4b000040" x="40" y="844"><field name="defeasible">TRUE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="new_object_category" id="l4b000041"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin"></mutation><field name="category_name">penguin</field><value name="object"><block type="variable" id="l4b000042"><field name="variable_name">A</field></block></value></block></statement><value name="source"><block type="doc_selector" id="l4b000043"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">NBA 3</field></block></value><statement name="conclusion"><block type="logical_negation" id="l4b000044"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000045"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000046"><field name="variable_name">A</field></block></value></block></statement></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_defeated(sec_2_section,flies,A) :- holds(sec_3_section,-flies,A).
+
+      blawx_defeated(sec_3_section,-flies,A) :- holds(sec_4_section,flies,A).
+
+      blawx_attribute(penguin,on_plane,boolean).
+      blawx_attribute_nlg(on_plane,not_applicable,"",not_applicable,"is on a plane").
+      :- dynamic on_plane/1.
+      #pred on_plane(X) :: '@(X) is on a plane'.
+      #pred holds(user,on_plane,X) :: 'it is provided as a fact that @(X) is on a plane'.
+      #pred holds(user,-on_plane,X) :: 'it is provided as a fact that it is not the case that @(X) is on a plane'.
+      #pred holds(Z,on_plane,X) :: 'the conclusion in @(Z) that @(X) is on a plane holds'.
+      #pred holds(Z,-on_plane,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is on a plane holds'.
+      #pred according_to(Z,on_plane,X) :: 'according to @(Z), @(X) is on a plane'.
+      #pred according_to(Z,-on_plane,X) :: 'according to @(Z), it is not the case that @(X) is on a plane'.
+      #pred blawx_defeated(Z,on_plane,X) :: 'the conclusion in @(Z) that @(X) is on a plane is defeated'.
+      #pred blawx_defeated(Z,-on_plane,X) :: 'the conclusion in @(Z) that @(X) is on a plane is defeated'.
+      #pred blawx_initially(on_plane(X)) :: 'that @(X) is on a plane holds initially'.
+      #pred blawx_initially(-on_plane(X)) :: 'that it is not the case that @(X) is on a plane holds initially'.
+      #pred blawx_ultimately(on_plane(X)) :: 'that @(X) is on a plane holds ultimately'.
+      #pred blawx_ultimately(-on_plane(X)) :: 'that it is not the case that @(X) is on a plane holds ultimately'.
+      #pred blawx_as_of(on_plane(X),T) :: 'that @(X) is on a plane holds at @(T)'.
+      #pred blawx_as_of(-on_plane(X),T) :: 'that it is not the case that @(X) is on a plane holds at @(T)'.
+      #pred blawx_during(T1,on_plane(X),T2) :: 'that @(X) is on a plane held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-on_plane(X),T2) :: 'that it is not the case that @(X) is on a plane held between @(T1) and @(T2)'.
+      #pred blawx_becomes(on_plane(X),T) :: 'that @(X) is on a plane became true at @(T)'.
+      #pred blawx_becomes(-on_plane(X),T) :: 'that it is not the case that @(X) is on a plane became true at @(T)'.
+      #pred blawx_not_interrupted(Start,on_plane(X),End) :: '@(X) is on a plane remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-on_plane(X),End) :: 'it is not the case that @(X) is on a plane remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),on_plane(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-on_plane(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-on_plane(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(on_plane(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),on_plane(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-on_plane(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-on_plane(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(on_plane(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),on_plane(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-on_plane(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-on_plane(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(on_plane(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),on_plane(X),datetime(eot)) :- blawx_initially(on_plane(X)), blawx_ultimately(on_plane(X)), findall(Time,blawx_becomes(-on_plane(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-on_plane(X),datetime(eot)) :- blawx_initially(-on_plane(X)), blawx_ultimately(-on_plane(X)), findall(Time,blawx_becomes(on_plane(X),datetime(Time)),[]).
+      blawx_as_of(on_plane(X),datetime(Time)) :- blawx_initially(on_plane(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),on_plane(X),datetime(BeforeT)).
+      blawx_as_of(on_plane(X),datetime(Time)) :- blawx_becomes(on_plane(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),on_plane(X),datetime(Time)).
+      blawx_as_of(-on_plane(X),datetime(Time)) :- blawx_initially(-on_plane(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-on_plane(X),datetime(BeforeT)).
+      blawx_as_of(-on_plane(X),datetime(Time)) :- blawx_becomes(-on_plane(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-on_plane(X),datetime(Time)).
+      blawx_during(datetime(Start),on_plane(X),datetime(End)) :- blawx_becomes(on_plane(X),datetime(Start)), blawx_becomes(-on_plane(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),on_plane(X),datetime(End)).
+      blawx_during(datetime(bot),on_plane(X),datetime(End)) :- blawx_initially(on_plane(X)), blawx_becomes(-on_plane(X),datetime(End)), blawx_not_interrupted(datetime(bot),on_plane(X),datetime(End)).
+      blawx_during(datetime(Start),on_plane(X),datetime(eot)) :- blawx_ultimately(on_plane(X)), blawx_becomes(-on_plane(X),datetime(Start)), blawx_not_interrupted(datetime(Start),on_plane(X),datetime(eot)).
+      blawx_during(datetime(bot),on_plane(X),datetime(eot)) :- blawx_initially(on_plane(X)), blawx_ultimately(on_plane(X)), blawx_becomes(-on_plane(X),datetime(Start)), blawx_not_interrupted(datetime(bot),on_plane(X),datetime(eot)).
+      blawx_during(datetime(Start),-on_plane(X),datetime(End)) :- blawx_becomes(-on_plane(X),datetime(Start)), blawx_becomes(on_plane(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-on_plane(X),datetime(End)).
+      blawx_during(datetime(bot),-on_plane(X),datetime(End)) :- blawx_initially(-on_plane(X)), blawx_becomes(on_plane(X),datetime(End)), blawx_not_interrupted(datetime(bot),-on_plane(X),datetime(End)).
+      blawx_during(datetime(Start),-on_plane(X),datetime(eot)) :- blawx_ultimately(-on_plane(X)), blawx_becomes(on_plane(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-on_plane(X),datetime(eot)).
+      blawx_during(datetime(bot),-on_plane(X),datetime(eot)) :- blawx_initially(-on_plane(X)), blawx_ultimately(-on_plane(X)), blawx_becomes(-on_plane(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-on_plane(X),datetime(eot)).
+
+      according_to(sec_3_section,-flies,A) :- penguin(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_3_section,-flies,A) :- according_to(sec_3_section,-flies,A), not blawx_defeated(sec_3_section,-flies,A).
+
+      % BLAWX CHECK DUPLICATES
+        -flies(A) :- holds(sec_3_section,-flies,A).
+- model: blawx.workspace
+  pk: 5
+  fields:
+    ruledoc: 1
+    workspace_name: sec_4_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000047" x="40" y="40"><field name="defeasible">TRUE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="new_object_category" id="l4b000048"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin"></mutation><field name="category_name">penguin</field><value name="object"><block type="variable" id="l4b000049"><field name="variable_name">A</field></block></value><next><block type="unary_attribute_selector" id="l4b000050"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="on_plane" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is on a plane</field><value name="first_element"><block type="variable" id="l4b000051"><field name="variable_name">A</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000052"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_4_section"></mutation><field name="doc_part_name">NBA 4</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000053"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000054"><field name="variable_name">A</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_4_section,flies,A) :- penguin(A),
+      on_plane(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,flies,A) :- according_to(sec_4_section,flies,A), not blawx_defeated(sec_4_section,flies,A).
+
+      % BLAWX CHECK DUPLICATES
+        flies(A) :- holds(sec_4_section,flies,A).
+- model: blawx.workspace
+  pk: 6
+  fields:
+    ruledoc: 1
+    workspace_name: sec_5_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000055" x="40" y="40"><statement name="statements"><block type="new_attribute_declaration" id="l4b000056"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin" attribute_type="boolean"></mutation><field name="category_name">penguin</field><field name="attribute_name">cartoon_jetpack</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is a cartoon with a jetpack</field></block></statement></block>
+      <block type="unattributed_fact" id="l4b000057" x="40" y="208"><statement name="statements"><block type="overrules" id="l4b000058"><value name="defeating_rule"><block type="doc_selector" id="l4b000059"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">NBA 5</field></block></value><statement name="defeating_statement"><block type="unary_attribute_selector" id="l4b000060"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000061"><field name="variable_name">A</field></block></value></block></statement><value name="defeated_rule"><block type="doc_selector" id="l4b000062"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">NBA 3</field></block></value><statement name="defeated_statement"><block type="logical_negation" id="l4b000063"><statement name="negated_statement"><block type="unary_attribute_selector" id="l4b000064"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000065"><field name="variable_name">A</field></block></value></block></statement></block></statement></block></statement></block>
+      <block type="unattributed_rule" id="l4b000066" x="40" y="526"><statement name="conditions"><block type="default_negation" id="l4b000067"><statement name="default_negated_statement"><block type="logical_negation" id="l4b000068"><statement name="negated_statement"><block type="applies" id="l4b000069"><value name="applicable_rule"><block type="doc_selector" id="l4b000070"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">NBA 5</field></block></value><value name="object"><block type="variable" id="l4b000071"><field name="variable_name">A</field></block></value></block></statement></block></statement></block></statement><statement name="conclusion"><block type="applies" id="l4b000072"><value name="applicable_rule"><block type="doc_selector" id="l4b000073"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">NBA 5</field></block></value><value name="object"><block type="variable" id="l4b000074"><field name="variable_name">A</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000075" x="40" y="844"><field name="defeasible">FALSE</field><field name="inapplicable">TRUE</field><statement name="conditions"><block type="new_object_category" id="l4b000076"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin"></mutation><field name="category_name">penguin</field><value name="object"><block type="variable" id="l4b000077"><field name="variable_name">A</field></block></value><next><block type="unary_attribute_selector" id="l4b000078"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="cartoon_jetpack" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is a cartoon with a jetpack</field><value name="first_element"><block type="variable" id="l4b000079"><field name="variable_name">A</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000080"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">NBA 5</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000081"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="variable" id="l4b000082"><field name="variable_name">A</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_attribute(penguin,cartoon_jetpack,boolean).
+      blawx_attribute_nlg(cartoon_jetpack,not_applicable,"",not_applicable,"is a cartoon with a jetpack").
+      :- dynamic cartoon_jetpack/1.
+      #pred cartoon_jetpack(X) :: '@(X) is a cartoon with a jetpack'.
+      #pred holds(user,cartoon_jetpack,X) :: 'it is provided as a fact that @(X) is a cartoon with a jetpack'.
+      #pred holds(user,-cartoon_jetpack,X) :: 'it is provided as a fact that it is not the case that @(X) is a cartoon with a jetpack'.
+      #pred holds(Z,cartoon_jetpack,X) :: 'the conclusion in @(Z) that @(X) is a cartoon with a jetpack holds'.
+      #pred holds(Z,-cartoon_jetpack,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a cartoon with a jetpack holds'.
+      #pred according_to(Z,cartoon_jetpack,X) :: 'according to @(Z), @(X) is a cartoon with a jetpack'.
+      #pred according_to(Z,-cartoon_jetpack,X) :: 'according to @(Z), it is not the case that @(X) is a cartoon with a jetpack'.
+      #pred blawx_defeated(Z,cartoon_jetpack,X) :: 'the conclusion in @(Z) that @(X) is a cartoon with a jetpack is defeated'.
+      #pred blawx_defeated(Z,-cartoon_jetpack,X) :: 'the conclusion in @(Z) that @(X) is a cartoon with a jetpack is defeated'.
+      #pred blawx_initially(cartoon_jetpack(X)) :: 'that @(X) is a cartoon with a jetpack holds initially'.
+      #pred blawx_initially(-cartoon_jetpack(X)) :: 'that it is not the case that @(X) is a cartoon with a jetpack holds initially'.
+      #pred blawx_ultimately(cartoon_jetpack(X)) :: 'that @(X) is a cartoon with a jetpack holds ultimately'.
+      #pred blawx_ultimately(-cartoon_jetpack(X)) :: 'that it is not the case that @(X) is a cartoon with a jetpack holds ultimately'.
+      #pred blawx_as_of(cartoon_jetpack(X),T) :: 'that @(X) is a cartoon with a jetpack holds at @(T)'.
+      #pred blawx_as_of(-cartoon_jetpack(X),T) :: 'that it is not the case that @(X) is a cartoon with a jetpack holds at @(T)'.
+      #pred blawx_during(T1,cartoon_jetpack(X),T2) :: 'that @(X) is a cartoon with a jetpack held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-cartoon_jetpack(X),T2) :: 'that it is not the case that @(X) is a cartoon with a jetpack held between @(T1) and @(T2)'.
+      #pred blawx_becomes(cartoon_jetpack(X),T) :: 'that @(X) is a cartoon with a jetpack became true at @(T)'.
+      #pred blawx_becomes(-cartoon_jetpack(X),T) :: 'that it is not the case that @(X) is a cartoon with a jetpack became true at @(T)'.
+      #pred blawx_not_interrupted(Start,cartoon_jetpack(X),End) :: '@(X) is a cartoon with a jetpack remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-cartoon_jetpack(X),End) :: 'it is not the case that @(X) is a cartoon with a jetpack remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),cartoon_jetpack(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-cartoon_jetpack(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-cartoon_jetpack(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(cartoon_jetpack(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),cartoon_jetpack(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-cartoon_jetpack(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-cartoon_jetpack(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(cartoon_jetpack(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),cartoon_jetpack(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-cartoon_jetpack(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-cartoon_jetpack(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(cartoon_jetpack(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),cartoon_jetpack(X),datetime(eot)) :- blawx_initially(cartoon_jetpack(X)), blawx_ultimately(cartoon_jetpack(X)), findall(Time,blawx_becomes(-cartoon_jetpack(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-cartoon_jetpack(X),datetime(eot)) :- blawx_initially(-cartoon_jetpack(X)), blawx_ultimately(-cartoon_jetpack(X)), findall(Time,blawx_becomes(cartoon_jetpack(X),datetime(Time)),[]).
+      blawx_as_of(cartoon_jetpack(X),datetime(Time)) :- blawx_initially(cartoon_jetpack(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),cartoon_jetpack(X),datetime(BeforeT)).
+      blawx_as_of(cartoon_jetpack(X),datetime(Time)) :- blawx_becomes(cartoon_jetpack(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),cartoon_jetpack(X),datetime(Time)).
+      blawx_as_of(-cartoon_jetpack(X),datetime(Time)) :- blawx_initially(-cartoon_jetpack(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-cartoon_jetpack(X),datetime(BeforeT)).
+      blawx_as_of(-cartoon_jetpack(X),datetime(Time)) :- blawx_becomes(-cartoon_jetpack(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-cartoon_jetpack(X),datetime(Time)).
+      blawx_during(datetime(Start),cartoon_jetpack(X),datetime(End)) :- blawx_becomes(cartoon_jetpack(X),datetime(Start)), blawx_becomes(-cartoon_jetpack(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),cartoon_jetpack(X),datetime(End)).
+      blawx_during(datetime(bot),cartoon_jetpack(X),datetime(End)) :- blawx_initially(cartoon_jetpack(X)), blawx_becomes(-cartoon_jetpack(X),datetime(End)), blawx_not_interrupted(datetime(bot),cartoon_jetpack(X),datetime(End)).
+      blawx_during(datetime(Start),cartoon_jetpack(X),datetime(eot)) :- blawx_ultimately(cartoon_jetpack(X)), blawx_becomes(-cartoon_jetpack(X),datetime(Start)), blawx_not_interrupted(datetime(Start),cartoon_jetpack(X),datetime(eot)).
+      blawx_during(datetime(bot),cartoon_jetpack(X),datetime(eot)) :- blawx_initially(cartoon_jetpack(X)), blawx_ultimately(cartoon_jetpack(X)), blawx_becomes(-cartoon_jetpack(X),datetime(Start)), blawx_not_interrupted(datetime(bot),cartoon_jetpack(X),datetime(eot)).
+      blawx_during(datetime(Start),-cartoon_jetpack(X),datetime(End)) :- blawx_becomes(-cartoon_jetpack(X),datetime(Start)), blawx_becomes(cartoon_jetpack(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-cartoon_jetpack(X),datetime(End)).
+      blawx_during(datetime(bot),-cartoon_jetpack(X),datetime(End)) :- blawx_initially(-cartoon_jetpack(X)), blawx_becomes(cartoon_jetpack(X),datetime(End)), blawx_not_interrupted(datetime(bot),-cartoon_jetpack(X),datetime(End)).
+      blawx_during(datetime(Start),-cartoon_jetpack(X),datetime(eot)) :- blawx_ultimately(-cartoon_jetpack(X)), blawx_becomes(cartoon_jetpack(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-cartoon_jetpack(X),datetime(eot)).
+      blawx_during(datetime(bot),-cartoon_jetpack(X),datetime(eot)) :- blawx_initially(-cartoon_jetpack(X)), blawx_ultimately(-cartoon_jetpack(X)), blawx_becomes(-cartoon_jetpack(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-cartoon_jetpack(X),datetime(eot)).
+
+      blawx_defeated(sec_3_section,-flies,A) :- holds(sec_5_section,flies,A).
+
+      blawx_applies(sec_5_section,A) :-
+      not -blawx_applies(sec_5_section,A).
+
+      according_to(sec_5_section,flies,A) :- penguin(A),
+      blawx_applies(sec_5_section,A),
+      cartoon_jetpack(A).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_5_section,flies,A) :- according_to(sec_5_section,flies,A).
+
+      % BLAWX CHECK DUPLICATES
+        flies(A) :- holds(sec_5_section,flies,A).
+- model: blawx.workspace
+  pk: 7
+  fields:
+    ruledoc: 1
+    workspace_name: sec_6_section
+    xml_content: ''
+    scasp_encoding: ''
+- model: blawx.workspace
+  pk: 8
+  fields:
+    ruledoc: 1
+    workspace_name: sec_5__span_pingu_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000083" x="40" y="40"><statement name="statements"><block type="object_declaration" id="l4b000084"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="penguin" prefix="null" postfix="null"></mutation><field name="prefix"></field><field name="object_name">pingu</field><field name="postfix">is a penguin</field><next><block type="holds" id="l4b000085"><value name="section"><block type="doc_selector" id="l4b000086"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5__span_pingu_section"></mutation><field name="doc_part_name">NBA 5pingu</field></block></value><statement name="statement"><block type="logical_negation" id="l4b000087"><statement name="negated_statement"><block type="applies" id="l4b000088"><value name="applicable_rule"><block type="doc_selector" id="l4b000089"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">NBA 5</field></block></value><value name="object"><block type="object_selector" id="l4b000090"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="pingu"></mutation><field name="object_name">pingu</field></block></value></block></statement></block></statement></block></next></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      penguin(pingu).
+      holds(sec_5__span_pingu_section,-blawx_applies,sec_5_section,pingu).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: is_pingu_a_bird
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="query" id="l4b000091" x="40" y="40"><statement name="query"><block type="new_object_category" id="l4b000092"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="bird"></mutation><field name="category_name">bird</field><value name="object"><block type="variable" id="l4b000093"><field name="variable_name">A</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      ?- bird(A).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 2
+  fields:
+    ruledoc: 1
+    test_name: pingu_cant_fly
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="query" id="l4b000094" x="40" y="40"><statement name="query"><block type="default_negation" id="l4b000095"><statement name="default_negated_statement"><block type="unary_attribute_selector" id="l4b000096"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="object_selector" id="l4b000097"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="pingu"></mutation><field name="object_name">pingu</field></block></value></block></statement></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      ?- not flies(pingu).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 3
+  fields:
+    ruledoc: 1
+    test_name: pingu_on_plane_can_fly
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000098" x="40" y="40"><statement name="statements"><block type="unary_attribute_selector" id="l4b000099"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="on_plane" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is on a plane</field><value name="first_element"><block type="object_selector" id="l4b000100"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="pingu"></mutation><field name="object_name">pingu</field></block></value></block></statement></block>
+      <block type="query" id="l4b000101" x="40" y="178"><statement name="query"><block type="unary_attribute_selector" id="l4b000102"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="object_selector" id="l4b000103"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="pingu"></mutation><field name="object_name">pingu</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      on_plane(pingu).
+
+      ?- flies(pingu).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 4
+  fields:
+    ruledoc: 1
+    test_name: pingu_with_jetpack_cant_fly
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000104" x="40" y="40"><statement name="statements"><block type="unary_attribute_selector" id="l4b000105"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="cartoon_jetpack" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is a cartoon with a jetpack</field><value name="first_element"><block type="object_selector" id="l4b000106"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="pingu"></mutation><field name="object_name">pingu</field></block></value></block></statement></block>
+      <block type="query" id="l4b000107" x="40" y="178"><statement name="query"><block type="default_negation" id="l4b000108"><statement name="default_negated_statement"><block type="unary_attribute_selector" id="l4b000109"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="flies" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">can fly</field><value name="first_element"><block type="object_selector" id="l4b000110"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="pingu"></mutation><field name="object_name">pingu</field></block></value></block></statement></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      cartoon_jetpack(pingu).
+
+      ?- not flies(pingu).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''

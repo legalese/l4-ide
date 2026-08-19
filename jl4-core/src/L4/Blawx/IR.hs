@@ -66,22 +66,35 @@ module L4.Blawx.IR
   , BRuleText (..)
   , BSection (..)
   , BSectionRef (..)
+  , BStep -- abstract: see 'mkBStep'
+  , mkBStep
+  , bStepKind
+  , bStepLabel
+  , bSec
     -- * Workspaces and blocks
   , BWorkspace (..)
   , BBlock (..)
   , BRun (..)
+  , BChain (..)
+  , chainKind
   , blockRuns
   , runBlocks
     -- * Ontology declaration blocks
   , BCategoryDecl (..)
   , BAttributeDecl (..)
   , BRelationshipDecl (..)
+  , BObjectDecl (..)
   , BValueType (..)
   , BNlgOrder (..)
     -- * Rules and goals
   , BRule (..)
   , BConclusion (..)
+  , BOverrule (..)
+  , BURule (..)
   , BGoal (..)
+  , BNegKind (..)
+  , mkBGNegated
+  , mkBAssertGoal
   , BCmpOp (..)
   , BAggFn (..)
   , BArith (..)
@@ -94,10 +107,12 @@ module L4.Blawx.IR
   , mkBName
     -- * Structural renderers, shared by both emitters
   , renderSectionRef
+  , renderDocAtom
   , renderValueType
   , renderNlgOrder
   , renderTerm
   , renderRational
+  , deconstructTerm
     -- * Tests
   , BTest (..)
   ) where
@@ -170,10 +185,21 @@ newtype BVar = MkBVar Text
 -- numbered sections ascending — the emission order of the YAML stream and of
 -- the concatenated s(CASP).
 data BlawxDoc = MkBlawxDoc
-  { bdName       :: !Text        -- ^ @ruledoc_name@
-  , bdRuleText   :: !BRuleText   -- ^ structured CLEAN source; rendered by Emit
-  , bdWorkspaces :: ![BWorkspace]
-  , bdTests      :: ![BTest]
+  { bdName         :: !Text        -- ^ @ruledoc_name@
+  , bdRuleText     :: !BRuleText   -- ^ structured CLEAN source; rendered by Emit
+  , bdWorkspaces   :: ![BWorkspace]
+  , bdTests        :: ![BTest]
+  , bdDocPartNames :: !(Map BSectionRef Text)
+    -- ^ __Import only.__ The @doc_selector@ labels a parsed document actually
+    -- stores, by the section they point at. @\<field name=\"doc_part_name\"\>@
+    -- is display-only — the generator reads the /mutation/
+    -- (@scasp_generator.js:264-270@) — but it is stored bytes, and a
+    -- re-emission that invents @NBA 5@ where bird wrote @NBA 5pingu@ fails the
+    -- XML fixpoint even though the s(CASP) matches.
+    --
+    -- "L4.Blawx.Lower" sets 'mempty' and
+    -- "L4.Blawx.EmitXml"\'s @docPartLabel@ then falls through to its computed
+    -- label, so every P1\/P3 golden is unchanged by this field's existence.
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
@@ -196,11 +222,72 @@ data BSection = MkBSection
   deriving anyclass (NFData)
 
 -- | A workspace name, structurally: never a free-form string, so a typo like
--- @sec1_section@ cannot be constructed. Rendered @root_section@ \/
--- @sec_\<n\>_section@.
-data BSectionRef = BRoot | BSec !Int
+-- @sec1_section@ cannot be constructed.
+--
+-- Blawx derives the name as @\<AKN eId\> \<\> \"_section\"@
+-- (@blawx\/parse_an.py:53,62@), so the shape is the eId's: @__@-separated
+-- components, each a kind and a label. Measured over the 110 workspaces of the
+-- 15 shipped examples the kinds are @sec@, @subsec@, @para@, @subpara@ and
+-- @span@ — but a kind is stored as 'Text', not an enum, because CLEAN\/AKN can
+-- mint others (@art@, @sched@, @chp@) and an unknown kind must round-trip
+-- rather than crash. Rendered @root_section@ \/ @sec_5_section@ \/
+-- @sec_5__span_pingu_section@ \/ @sec_34__subsec_1__para_b__subpara_i_section@.
+--
+-- __One spelling per name.__ 'BPath' is the only non-root form and 'bSec'
+-- builds the flat case Mode-A export uses; there is deliberately no @BSec Int@
+-- constructor beside it, because two ways to spell @sec_5_section@ would make
+-- the P5 @lift . emit = id@ property fail on structural equality for documents
+-- that are byte-identical.
+data BSectionRef
+  = BRoot
+  | BPath !(NonEmpty BStep)
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (NFData)
+
+-- | One @__@-separated component of a section path: a kind and a label —
+-- @sec@ + @5@, @span@ + @pingu@, @subpara@ + @i@.
+--
+-- Abstract: the only constructor is 'mkBStep', which rejects a label
+-- containing @__@ (it would re-split into two components on the way back in),
+-- a label bounded by @_@ (same reason, one underscore short) and a kind
+-- containing @_@ (the kind\/label split is at the FIRST underscore, so a kind
+-- with one is not recoverable). Same discipline as 'BName', for the same
+-- reason: a value that cannot be written back cannot break the round trip.
+data BStep = MkBStep
+  { bstKind  :: !Text  -- ^ @sec@, @subsec@, @para@, @subpara@, @span@, …
+  , bstLabel :: !Text
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (NFData)
+
+bStepKind :: BStep -> Text
+bStepKind s = s.bstKind
+
+bStepLabel :: BStep -> Text
+bStepLabel s = s.bstLabel
+
+-- | Smart constructor; 'Nothing' when the pair could not be recovered from the
+-- rendered name. A 'Nothing' at an import call site is a named diagnostic,
+-- never a section ref that renders back to a different workspace.
+mkBStep :: Text -> Text -> Maybe BStep
+mkBStep kind label
+  | okKind, okLabel = Just (MkBStep kind label)
+  | otherwise       = Nothing
+ where
+  okKind =
+    not (Text.null kind) && Text.all wordChar kind && not (Text.any (== '_') kind)
+  okLabel =
+    not (Text.null label)
+      && Text.all wordChar label
+      && not ("__" `Text.isInfixOf` label)
+      && not ("_" `Text.isPrefixOf` label)
+      && not ("_" `Text.isSuffixOf` label)
+  wordChar c = isAsciiLower c || isAsciiUpper c || isDigit c || c == '_'
+
+-- | The flat case, @sec_\<n\>_section@ — what Mode-A export builds and the
+-- only 'BSectionRef' shape "L4.Blawx.Lower" ever constructs.
+bSec :: Int -> BSectionRef
+bSec i = BPath (MkBStep "sec" (Text.textShow i) :| [])
 
 data BWorkspace = MkBWorkspace
   { bwName   :: !BSectionRef
@@ -213,6 +300,17 @@ data BWorkspace = MkBWorkspace
     -- "L4.Blawx.EmitXml" turns into @\<block\>@ roots with @x@\/@y@
     -- placement. Convention from the evidence pair: declarations form ONE
     -- stack; each attributed rule is its OWN stack.
+  , bwComment :: !(Maybe Text)
+    -- ^ __Import only__ (ruling P5-4), and the exact twin of 'btComment' —
+    -- same provenance, same non-imaging, same reason. It exists separately
+    -- because __6 of the corpus's 18 @\<comment\>@ elements sit on
+    -- @blawx.workspace@ rows__, not on tests (`oasa` ×3, `r34` ×3), and those
+    -- six are the drafter's rationale — /\"This is hopelessly circular, but it
+    -- is what the law says.\"/ Reading only 'btComment' honoured P5-4 for two
+    -- thirds of the corpus and dropped the rest with no diagnostic.
+    --
+    -- "L4.Blawx.Lower" sets 'Nothing' and neither renderer images it, so
+    -- every P1\/P3 golden is unchanged by this field's existence.
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
@@ -242,12 +340,62 @@ data BBlock
     -- ^ @false :- goals.@ — the @#ASSERT@-as-constraint emission (R11)
   | BAbducible !BName ![BTerm]
     -- ^ @#abducible p(…).@ — the interview test's input declarations
-  | BQuery !BName ![BTerm]
-    -- ^ the test query, rendered as the LAST line @?- p(…).@ (reasoner scan
+  | BQuery ![BGoal]
+    -- ^ the test query, rendered as the LAST line @?- g1, g2.@ (reasoner scan
     -- contract). Only valid inside a 'BTest' body; Lower never puts one in a
     -- workspace.
+    --
+    -- A /list/ because the block's @query@ input is an @input_statement@ whose
+    -- members the generator joins with @\", \"@
+    -- (@scasp_generator.js:191-205@), and because 3 of bird's 4 tests query
+    -- @?- not flies(pingu).@, which a bare @!BName ![BTerm]@ could not say. A
+    -- singleton @'BGCall' 'True'@ reproduces the old rendering byte for byte.
+    -- ---------------------------------------------------------------------
+    -- The P5 import extension (spec §10 P5, ruling P5-1). Everything below is
+    -- reachable only from "L4.Blawx.Parse": the Mode-A export "L4.Blawx.Lower"
+    -- constructs NONE of it, which is what keeps every P1\/P3 golden
+    -- byte-identical through the extension. Each arm still owes BOTH images —
+    -- @renderScasp@ and @renderXml@ — per the module header's two-renderer
+    -- contract.
+  | BDeclareObject !BObjectDecl
+    -- ^ @object_declaration@ — 44 occurrences across the 15 shipped examples,
+    -- always in fact position. __Mode-A export never constructs it__:
+    -- enum-constructor membership is a 'BFact'.
+  | BOverrules !BOverrule
+    -- ^ @overrules@ — 21 occurrences, always in fact position, always
+    -- __terminal__ (@previousStatement@ @\"OUTER\"@ and no @nextStatement@,
+    -- @blawx-blocks.js:386-425@). __Mode-A export never constructs it__ (R6:
+    -- Mode A has no defeat rules, so nothing generates a priority edge).
+  | BUnattributedRule !BURule
+    -- ^ @unattributed_rule@ — 4 occurrences, always a canvas root. __Mode-A
+    -- export never constructs it__: R4 anchors every emitted decision to a
+    -- section, so every emitted rule is attributed.
+  | BAssertGoal !BGoal
+    -- ^ a statement-position goal asserted as a fact: the
+    -- @holds@\/@according_to@\/@applies@ blocks, which are goals everywhere
+    -- else. Build ONLY via 'mkBAssertGoal', which rejects every goal that
+    -- already has a block spelling — @'BGCall'@ is 'BFact', and admitting it
+    -- here would give one byte-image two IR spellings and break
+    -- @lift . emit = id@ on structural equality. __Mode-A export never
+    -- constructs it.__
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
+
+-- | The single admission gate for 'BAssertGoal'. 'Nothing' for a goal that has
+-- another statement-position spelling ('BGCall' → 'BFact') or none at all
+-- ('BGCompare', 'BGUnify', 'BGDiseq', 'BGIs', 'BGFindall', 'BGAggregate' are
+-- condition-position blocks; 'BGNaf' and 'BGNewObjectCategory' are held back
+-- deliberately — the first is spelled by no fact block and the second by
+-- 'BFact', and neither occurs in fact position anywhere in the measured
+-- corpus, so admitting them would be inventing a shape). A 'Nothing' at an
+-- import call site is a diagnostic, never a silent rewrite.
+mkBAssertGoal :: BGoal -> Maybe BBlock
+mkBAssertGoal = \case
+  g@BGHolds{}       -> Just (BAssertGoal g)
+  g@BGAccordingTo{} -> Just (BAssertGoal g)
+  g@BGApplies{}     -> Just (BAssertGoal g)
+  g@BGNegated{}     -> Just (BAssertGoal g)   -- a negated one of the above
+  _                 -> Nothing
 
 -- | __One @'bwStacks'@ entry is not one Blockly stack.__ Only the declaration
 -- and fact blocks have a @previousStatement@ and can therefore chain;
@@ -268,22 +416,59 @@ data BRun
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
+-- | How a block may sit in a Blockly stack, read off @previousStatement@ \/
+-- @nextStatement@ in @blawx-blocks.js@ block by block.
+--
+-- 'BChainLast' exists for exactly one block: @overrules@ declares
+-- @\"previousStatement\": \"OUTER\"@ and NO @nextStatement@
+-- (@blawx-blocks.js:386-425@), so it may be chained /to/ and never /from/. The
+-- old two-valued predicate could not say that, and XML that puts a block after
+-- an @overrules@ is XML Blockly rejects on load.
+data BChain
+  = BChainNone  -- ^ neither connection: a canvas root and nothing else
+  | BChainMid   -- ^ both: may be followed
+  | BChainLast  -- ^ @previousStatement@ only: may be chained to, never from
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+chainKind :: BBlock -> BChain
+chainKind = \case
+  BDeclareCategory{}     -> BChainMid
+  BDeclareAttribute{}    -> BChainMid
+  BDeclareRelationship{} -> BChainMid
+  BFact{}                -> BChainMid
+  BAttributedRule{}      -> BChainNone
+  BConstraint{}          -> BChainNone
+  BAbducible{}           -> BChainNone
+  BQuery{}               -> BChainNone
+  -- P5 import extension; see the per-constructor haddocks for the citations.
+  BDeclareObject{}       -> BChainMid   -- prev ["OUTER","STATEMENT"], next "STATEMENT"
+  BAssertGoal{}          -> BChainMid   -- holds / according_to / applies: same
+  BOverrules{}           -> BChainLast  -- prev "OUTER", NO next
+  BUnattributedRule{}    -> BChainNone  -- neither (blawx-blocks.js:277-300)
+
+-- | A maximal chain of 'BChainMid' blocks, optionally terminated by ONE
+-- 'BChainLast'; a 'BChainNone' is a root of its own.
+--
+-- __Byte-stability__ (the P1\/P3 regression gate): on the eight pre-extension
+-- constructors 'chainKind' returns 'BChainMid' exactly where the old @chains@
+-- predicate returned 'True', and 'BChainLast' is unreachable from
+-- "L4.Blawx.Lower", so the run partition — which decides blank lines in
+-- @renderScasp@ and root @\<block\>@ boundaries in @renderDocXml@ — is
+-- unchanged.
 blockRuns :: [BBlock] -> [BRun]
 blockRuns = go
  where
   go [] = []
-  go (b : bs)
-    | chains b  = let (more, rest) = span chains bs in BRunMembers (b : more) : go rest
-    | otherwise = BRunRoot b : go bs
-  chains = \case
-    BDeclareCategory{}     -> True
-    BDeclareAttribute{}    -> True
-    BDeclareRelationship{} -> True
-    BFact{}                -> True
-    BAttributedRule{}      -> False
-    BConstraint{}          -> False
-    BAbducible{}           -> False
-    BQuery{}               -> False
+  go (b : bs) = case chainKind b of
+    BChainNone -> BRunRoot b : go bs
+    BChainLast -> BRunMembers [b] : go bs
+    BChainMid ->
+      let (mid, rest) = span ((== BChainMid) . chainKind) bs
+      in  case rest of
+            t : rest' | chainKind t == BChainLast ->
+              BRunMembers (b : mid <> [t]) : go rest'
+            _ -> BRunMembers (b : mid) : go rest
 
 runBlocks :: BRun -> [BBlock]
 runBlocks = \case
@@ -352,6 +537,34 @@ data BRelationshipDecl = MkBRelationshipDecl
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
+-- | @object_declaration@ (@blawx-blocks.js:781-808@; generator @:476-481@;
+-- mutation restorer @mutators.js:23-45@). Declares an object AND asserts its
+-- category membership: the s(CASP) image is @\<category\>(\<object_name\>)@.
+--
+-- __Which side each datum comes from.__ The generator reads the category from
+-- @block.blawxCategoryName@, which only @domToMutation@ ever sets — so
+-- @\<mutation category_name\>@ is MANDATORY, exactly as @doc_selector@'s
+-- @section_reference@ is. The NLG comes from the FIELDS ('bodPrefix',
+-- 'bodPostfix'); the mutation's own @prefix@\/@postfix@ attributes are
+-- write-only for code generation and are stale in the wild (bird stores the
+-- literal string @\"null\"@ for both while its @postfix@ field reads
+-- @is a penguin@). They are carried verbatim in 'bodMutNlg' so a re-emission
+-- is byte-faithful; 'Nothing' renders as @null@\/@null@, which is what the
+-- evidence shows and what @getAttribute@ returning @null@ round-trips to.
+--
+-- __Mode-A export never constructs this__ (P5-1): "L4.Blawx.Lower" has no
+-- object declarations — enum-constructor membership is a 'BFact'.
+data BObjectDecl = MkBObjectDecl
+  { bodName     :: !BName
+  , bodCategory :: !BName
+  , bodPrefix   :: !Text                  -- ^ @\<field name=\"prefix\"\>@
+  , bodPostfix  :: !Text                  -- ^ @\<field name=\"postfix\"\>@
+  , bodMutNlg   :: !(Maybe (Text, Text))  -- ^ verbatim mutation @prefix@\/@postfix@
+  , bodProv     :: !(Maybe (Unique, Maybe SrcRange))
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
 -- ---------------------------------------------------------------------------
 -- Rules
 -- ---------------------------------------------------------------------------
@@ -368,6 +581,21 @@ data BRule = MkBRule
   , brConclusion :: !BConclusion
   , brConditions :: ![BGoal]     -- ^ ordered; order is semantics (inherited from RClause)
   , brDefeasible :: !Bool
+  , brInapplicable :: !Bool
+    -- ^ the @subject to applicability@ checkbox (@blawx-blocks.js:3107-3146@,
+    -- field @inapplicable@). 'True' makes the generator append
+    -- @\",\\nblawx_applies(\<source\>,\<obj\>)\"@ after every condition
+    -- __whose block image is literally @new_object_category@__
+    -- (@scasp_generator.js:1188-1194@) — i.e. after every
+    -- 'BGNewObjectCategory' and after nothing else. The trigger is the block
+    -- image, not the semantic category: "L4.Blawx.EmitXml" images our own
+    -- category goals as @object_category@ on purpose (upstream quirk #4, the
+    -- test-page dropdown race), and the generator does not treat that as a
+    -- trigger.
+    --
+    -- __Mode-A export always sets 'False'__: "L4.Blawx.Lower" has no
+    -- applicability layer and never builds a 'BGNewObjectCategory', so a
+    -- 'True' here would be a rule whose two images agree only by accident.
   , brProvenance :: !(Maybe (Unique, Maybe SrcRange))
   }
   deriving stock (Eq, Show, Generic)
@@ -377,6 +605,50 @@ data BConclusion = MkBConclusion
   { bcSign :: !Bool              -- ^ 'False' = classical negative conclusion @-p@
   , bcPred :: !BName
   , bcArgs :: ![BTerm]
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | @overrules@ (@blawx-blocks.js:386-425@; generator @:272-295@). One
+-- priority edge: /the conclusion in A that P overrules the conclusion in B
+-- that Q/, imaged as
+-- @blawx_defeated(B,Q…) :- holds(A,P…)@.
+--
+-- __The statement slots are conclusion-shaped, not goal-shaped.__ Both are fed
+-- through @deconstruct_term@, a functor-and-args regex
+-- (@scasp_generator.js:1542-1554@, mirrored here as 'deconstructTerm'): a
+-- comparison, a unification or a NAF goal in that slot is silently mangled
+-- rather than rejected. Typing them 'BConclusion' states that restriction
+-- where it cannot be forgotten.
+--
+-- __Mode-A export never constructs this__ (R6).
+data BOverrule = MkBOverrule
+  { bovDefeating     :: !BSectionRef
+  , bovDefeatingStmt :: !BConclusion
+  , bovDefeated      :: !BSectionRef
+  , bovDefeatedStmt  :: !BConclusion
+  , bovProv          :: !(Maybe (Unique, Maybe SrcRange))
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | @unattributed_rule@ (@blawx-blocks.js:277-300@; generator @:217-241@): a
+-- clause with no section attribution, hence no @according_to@\/@holds@ bridge
+-- and no defeat hook. bird's @sec_5@ uses one for the closed-world
+-- applicability default
+-- (@blawx_applies(sec_5_section,A) :-\\nnot -blawx_applies(sec_5_section,A).@).
+--
+-- The head is a statement /chain/, not a single goal, because the block's
+-- @conclusion@ input is an @input_statement@ whose members the generator joins
+-- with @\",\\n\"@ — a shape that is nonsense in s(CASP) but constructible in
+-- the editor, so the IR keeps it and "L4.Blawx.Lift" refuses a head longer
+-- than one with a named diagnostic.
+--
+-- __Mode-A export never constructs this__ (R4).
+data BURule = MkBURule
+  { burConclusion :: ![BGoal]
+  , burConditions :: ![BGoal]
+  , burProv       :: !(Maybe (Unique, Maybe SrcRange))
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
@@ -411,8 +683,65 @@ data BGoal
   | BGAggregate !BAggFn !BVar !BVar
     -- ^ @\<fn\>_blawx_list(List , Out)@ — list first, out second, matching
     -- 'L4.Relational.IR.RAggregate''s stated order
+    -- ---------------------------------------------------------------------
+    -- The P5 import extension (ruling P5-1). "L4.Blawx.Lower" constructs NONE
+    -- of these, which is what keeps every P1\/P3 golden byte-identical.
+  | BGApplies !BSectionRef !BTerm
+    -- ^ @applies@ (@blawx-blocks.js:3176-3199@; generator @:1259-1264@):
+    -- @blawx_applies(\<sec\>,\<obj\>)@. The @object@ slot checks
+    -- @[\"OBJECT\",\"VARIABLE\"]@, so it is an @objectSlot@ in the XML; the
+    -- @applicable_rule@ slot checks @[\"RULE\",\"VARIABLE\"]@ and we only ever
+    -- put a @doc_selector@ there.
+  | BGHolds !BSectionRef !BGoal
+    -- ^ @holds@ (@blawx-blocks.js:2010-2036@; generator @:755-769@):
+    -- @holds(\<sec\>, \<deconstruct_term of the inner\>)@ — the payload is
+    -- FLATTENED into the argument list, not nested, so @holds@ of
+    -- @-blawx_applies(sec_5_section,pingu)@ is the 4-ary
+    -- @holds(sec_5__span_pingu_section,-blawx_applies,sec_5_section,pingu)@
+    -- (witness: bird's @sec_5__span_pingu_section@ workspace).
+  | BGAccordingTo !BSectionRef !BGoal
+    -- ^ @according_to@ (@blawx-blocks.js:1966-1998@; generator @:733-747@);
+    -- same flattening, different functor, and a @rule@ (not @section@) input.
+  | BGNegated !BNegKind !BGoal
+    -- ^ @logical_negation@ (@blawx-blocks.js:109-129@) \/ @default_negation@
+    -- (@:130-152@) over an arbitrary statement — the general wrappers, needed
+    -- because bird nests them: @not -blawx_applies(…)@.
+    --
+    -- Build ONLY via 'mkBGNegated', which normalises the two cases that
+    -- already have a spelling ('BGCall' 'False' and 'BGNaf'). Without that,
+    -- the P3 seeds would emit one form and Parse would rebuild the other, and
+    -- @lift . emit = id@ would fail on documents that are byte-identical.
+  | BGNewObjectCategory !BName !BTerm
+    -- ^ @new_object_category@ (@blawx-blocks.js:3066-3105@; generator
+    -- @:1161-1166@) — byte-identical in s(CASP) to @'BGCall' 'True' cat [obj]@
+    -- (both print @cat(obj)@), and DISTINCT from it for exactly one reason:
+    -- the @attributed_rule@ generator injects the applicability guard only for
+    -- a condition whose block type is literally @new_object_category@
+    -- (@scasp_generator.js:1188-1194@), and "L4.Blawx.EmitXml" images our own
+    -- category goals as @object_category@ instead, on purpose (quirk #4, the
+    -- test-page dropdown race). So the trigger is the IMAGE, not the
+    -- semantics.
+    --
+    -- __Mode-A export never constructs it__: Parse builds it only for a wild
+    -- @new_object_category@; a wild @object_category@ normalises to
+    -- @'BGCall' 'True'@, which is the form our own renderers emit and re-read.
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
+
+-- | Classical negation (@-p@) versus negation as failure (@not p@).
+data BNegKind = BNegClassical | BNegDefault
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | Normalising constructor for 'BGNegated': after it, every negated goal has
+-- exactly one spelling. @logical_negation@ of a plain positive call is
+-- 'BGCall' 'False'; @default_negation@ of one is 'BGNaf'; everything else —
+-- including bird's @not -blawx_applies(…)@, where the inner is itself negated
+-- — is the general wrapper.
+mkBGNegated :: BNegKind -> BGoal -> BGoal
+mkBGNegated BNegClassical (BGCall True p as) = BGCall False p as
+mkBGNegated BNegDefault   (BGCall True p as) = BGNaf p as
+mkBGNegated k             g                  = BGNegated k g
 
 data BCmpOp = BEq | BNeq | BGt | BGte | BLt | BLte
   deriving stock (Eq, Ord, Show, Generic)
@@ -470,13 +799,35 @@ data BTerm
 -- They live here, beside the types they render, so there is exactly one
 -- spelling to keep right.
 
--- | The workspace name: @root_section@ \/ @sec_\<n\>_section@. Also the
--- @doc_selector@ mutation's @section_reference@ and the first argument of
--- every @according_to@ \/ @holds@ literal.
+-- | The workspace name, __verbatim__: @root_section@ \/ @sec_\<n\>_section@ \/
+-- @sec_5__span_pingu_section@. This is the @.blawx@ YAML's @workspace_name@
+-- and the @doc_selector@ mutation's @section_reference@.
+--
+-- It is __not__ what reaches the s(CASP) — see 'renderDocAtom'.
+--
+-- __Byte-stability__ (the P1\/P3 regression gate): @renderSectionRef (bSec i)@
+-- is @\"sec\" \<\> \"_\" \<\> textShow i \<\> \"_section\"@, character for
+-- character the old @BSec i@ rendering, for every @i@; 'BRoot' is untouched.
 renderSectionRef :: BSectionRef -> Text
 renderSectionRef = \case
-  BRoot  -> "root_section"
-  BSec i -> "sec_" <> Text.textShow i <> "_section"
+  BRoot    -> "root_section"
+  BPath ss -> Text.intercalate "__" (map step (toList ss)) <> "_section"
+ where
+  step s = s.bstKind <> "_" <> s.bstLabel
+
+-- | A section reference __as the s(CASP) sees it__. Every path from a section
+-- reference into generated logic runs through @sCASP['doc_selector']@, which
+-- is @block.section_reference.toLowerCase()@
+-- (@scasp_generator.js:264-270@) — so @according_to@, @holds@,
+-- @blawx_defeated@ and @blawx_applies@ all receive the lowercased name.
+-- Everywhere it reaches the XML or the YAML it is verbatim
+-- ('renderSectionRef').
+--
+-- The two coincide for every reference Mode-A export builds ('bSec' is already
+-- lowercase, and so is @root_section@), so no golden byte moves; they diverge
+-- on an imported span whose label carries a capital.
+renderDocAtom :: BSectionRef -> Text
+renderDocAtom = Text.toLower . renderSectionRef
 
 -- | The Blawx value-type keyword: the third argument of @blawx_attribute@,
 -- the type list of @blawx_relationship@, and the @attribute_type@ \/ @typeN@
@@ -532,6 +883,79 @@ renderRational q
   | otherwise          = Text.textShow (numerator q) <> "/" <> Text.textShow (denominator q)
 
 -- ---------------------------------------------------------------------------
+-- deconstruct_term
+-- ---------------------------------------------------------------------------
+
+-- | @deconstruct_term@ (@scasp_generator.js:1542-1554@), reproduced including
+-- its limits, because three generator arms — @overrules@, @holds@ and
+-- @according_to@ — flatten their statement payload through it and the emitted
+-- bytes are whatever it returns (R10).
+--
+-- The JS is
+--
+-- > const term_pattern  = /(?<functor>[^\(\)]*)\((?<parameters>.*)\)/gm
+-- > const param_pattern = /(?:([^,\(\)]+(?:\([^\)]+\))?)(?:,?))/gm;
+--
+-- so, faithfully:
+--
+--   * the functor match is @[^()]*@ and the parameter match is greedy to the
+--     LAST @)@ __on the same line__ (@.@ does not match a newline and the @s@
+--     flag is absent), which is why exactly one level of nesting is recovered;
+--   * a paren-free input yields the EMPTY list — which is why @holds@ of a
+--     bare atom prints as the 1-ary @holds(sec)@. Callers must not \"fix\"
+--     that;
+--   * if the first paren is a @)@, or a @(@ has no @)@ after it on its line,
+--     the engine advances the start index and retries — so the functor is
+--     re-measured from just past that paren.
+--
+-- It is fed the already-rendered inner statement, because that is literally
+-- what the generator does (@statementToCode@, then the regex). The leading
+-- two-space Blockly statement indent lands in the functor and is removed by
+-- the caller's per-element strip, exactly as the JS @.trim()@ does — so
+-- passing un-indented text gives the same answer.
+--
+-- __Deliberately not used to re-express @L4.Blawx.Emit@'s @ruleTriple@__,
+-- whose structural flattener is byte-frozen by four goldens; routing that
+-- through a regex mirror would make a golden depend on this function. They are
+-- cross-checked by a test instead.
+deconstructTerm :: Text -> [Text]
+deconstructTerm t = case termMatch t of
+  Nothing              -> []
+  Just (functor, args) -> functor : paramMatches args
+ where
+  isParen c = c == '(' || c == ')'
+  -- The first successful start index of @term_pattern@.
+  termMatch s =
+    let (pre, rest) = Text.break isParen s
+    in  case Text.uncons rest of
+          Nothing -> Nothing
+          Just ('(', after) ->
+            let line = Text.takeWhile (/= '\n') after
+                (upto, _) = Text.breakOnEnd ")" line
+            in  if Text.null upto then termMatch after else Just (pre, Text.dropEnd 1 upto)
+          -- a bare ')': every start at or before it fails identically, so the
+          -- engine resumes just past it
+          Just (_, after) -> termMatch after
+  -- @matchAll(param_pattern)@, collecting capture group 1.
+  paramMatches s = case Text.uncons s of
+    Nothing -> []
+    Just (c, rest)
+      | isSep c -> paramMatches rest
+      | otherwise ->
+          let (core, r1)  = Text.break isSep s          -- [^,()]+
+              (grp, r2)   = optParenGroup r1            -- (?:\([^)]+\))?
+              r3          = fromMaybe r2 (Text.stripPrefix "," r2)
+          in  (core <> grp) : paramMatches r3
+  isSep c = c == ',' || isParen c
+  optParenGroup r = case Text.uncons r of
+    Just ('(', after) ->
+      let (inner, rest) = Text.break (== ')') after
+      in  if Text.null inner || Text.null rest
+            then ("", r)
+            else ("(" <> inner <> ")", Text.drop 1 rest)
+    _ -> ("", r)
+
+-- ---------------------------------------------------------------------------
 -- Tests
 -- ---------------------------------------------------------------------------
 
@@ -541,10 +965,20 @@ renderRational q
 -- here — it lives in the tier-1 harness (R11: the oracle stays outside the
 -- artifact).
 data BTest = MkBTest
-  { btName   :: !Text        -- ^ slug, @[-a-zA-Z0-9_]+@ (Django URL converter)
-  , btStacks :: ![[BBlock]]  -- ^ facts\/constraints\/abducibles; the 'BQuery'
-                             --   must be the last block of the last stack
-  , btProv   :: !(Maybe (Unique, Maybe SrcRange))
+  { btName    :: !Text        -- ^ slug, @[-a-zA-Z0-9_]+@ (Django URL converter)
+  , btStacks  :: ![[BBlock]]  -- ^ facts\/constraints\/abducibles; the 'BQuery'
+                              --   must be the last block of the last stack
+  , btComment :: !(Maybe Text)
+    -- ^ __Import only__ (ruling P5-4): the @\<comment\>@ text the test's
+    -- blocks carry, newlines intact, which "L4.Blawx.Lift" re-wraps as @--@
+    -- lines above the @#EVAL@. It is deliberately __not__ imaged by either
+    -- renderer, so a re-emitted @.blawx@ drops it: the generator prefixes a
+    -- block comment through @Blockly.utils.string.wrap@
+    -- (@scasp_generator.js:41-49@), whose line balancing we do not reproduce,
+    -- so an XML comment without that exact wrap would break the R12 byte-diff.
+    -- Dropping it on BOTH sides keeps the two agreeing, and keeps every
+    -- P1\/P3 golden byte-identical ("L4.Blawx.Lower" sets 'Nothing').
+  , btProv    :: !(Maybe (Unique, Maybe SrcRange))
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)

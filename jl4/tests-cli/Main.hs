@@ -2907,6 +2907,127 @@ spec bin = do
     it "fails on a file that does not typecheck" $
       expectFail bin ["blawx", errorFixture]
 
+  -- The import direction (R14, spec §10 P5). `lift . emit = id` has two
+  -- halves; this is the parse half, and it is checked in the only way that
+  -- needs no foreign toolchain and no external corpus: emit a real document,
+  -- read it back through every layer, and compare both the IR and the bytes.
+  describe "l4 blawx --import" $ do
+    it "round-trips each P1/P3 seed: emit -> parse -> the same block IR and the same bytes" $
+      mapM_
+        (\stem -> do
+            Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4", "--roundtrip"]
+            unless (code == ExitSuccess) $
+              expectationFailure (stem ++ ": --roundtrip failed\n--- stderr ---\n" ++ serr)
+            sout `shouldSatisfy` ("IR and bytes unchanged" `isInfixOf`))
+        ["benefit", "mortality", "scores", "sumlist"]
+
+    it "parses an emitted .blawx back and reports a clean census" $ do
+      Output code sout serr <- runL4 bin
+        ["blawx", "--import", "--parse-only", "examples/blawx/expected/mortality.blawx"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("--import --parse-only failed\n--- stderr ---\n" ++ serr)
+      -- One machine-readable line, so the census harness need not scrape prose.
+      sout `shouldSatisfy` ("CENSUS mortality clean" `isInfixOf`)
+      sout `shouldSatisfy` ("workspaces=2 tests=3" `isInfixOf`)
+      -- Our own emission is by construction not stale, so nothing warns.
+      serr `shouldSatisfy` (not . ("stale-encoding" `isInfixOf`))
+
+    it "names the row and the block when a document is outside the liftable fragment" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/unsupported.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-parse/unsupported-block" `isInfixOf`)
+      serr `shouldSatisfy` ("sec_1_section" `isInfixOf`)
+      serr `shouldSatisfy` ("date_value" `isInfixOf`)
+
+    it "warns per skipped disabled block rather than silently dropping it (P5-3)" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/disabled.blawx"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("blawx-parse/disabled-block-skipped" `isInfixOf`)
+      serr `shouldSatisfy` ("skipped disabled <query>" `isInfixOf`)
+
+    it "refuses a stream whose first row is not the ruledoc" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/no-ruledoc.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-parse/row-order" `isInfixOf`)
+
+    it "refuses XML outside the Blockly subset by name and offset" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/bad-xml.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-parse/xml-malformed" `isInfixOf`)
+      serr `shouldSatisfy` ("mismatched close tag" `isInfixOf`)
+
+    -- `l4 blawx` has no --help of its own (the subcommand parsers carry no
+    -- helper), so the usage banner optparse prints on a bad option is where
+    -- the surface is documented. Asserting on it keeps the new flags from
+    -- being added to the parser and forgotten in the spec.
+    it "documents the new flags in the usage banner" $ do
+      Output code _ serr <- runL4 bin ["blawx", "--help"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("--import" `isInfixOf`)
+      serr `shouldSatisfy` ("--parse-only" `isInfixOf`)
+      serr `shouldSatisfy` ("--reemit" `isInfixOf`)
+
+  -- The lift (R14's other half). Its evidence is `jl4/examples/blawx/imported/`,
+  -- both halves of which the pipeline produced: `bird.l4` is what the lift
+  -- emitted from upstream's own bird.yaml, and `bird.blawx` is what the
+  -- renderers re-emitted from the same parsed blocks. The reference checkout
+  -- is NOT a test dependency -- these tests read only what is committed.
+  describe "l4 blawx --import (the lift)" $ do
+    it "the committed bird artifact evaluates to the oracles recorded in it" $ do
+      Output code sout serr <- runL4 bin ["run", "--trace", "none", "examples/blawx/imported/bird.l4"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("l4 run on the lifted bird failed\n--- stderr ---\n" ++ serr)
+      -- The four blawxtests, in document order: an unbound query filtered over
+      -- the declared universe, then the three defeat-layer booleans. The last
+      -- is the one the whole example exists for -- the [pingu] span makes NBA 5
+      -- inapplicable, so NBA 3 survives and pingu cannot fly.
+      let ls = lines sout
+          results = [dropWhile (== ' ') l | (prev, l) <- zip ls (drop 1 ls), prev == "Result:"]
+      results `shouldBe` ["LIST \"pingu\"", "TRUE", "TRUE", "TRUE"]
+
+    it "re-lifting the re-emitted .blawx reproduces the same rules and the same oracles" $ do
+      Output code sout serr <- runL4 bin ["blawx", "--import", "examples/blawx/imported/bird.blawx"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("--import on the re-emitted bird failed\n--- stderr ---\n" ++ serr)
+      -- The applies-idiom, the unfolded defeat layer, and the recorded answers.
+      sout `shouldSatisfy` ("DECIDE `NBA 5 applies to x` x" `isInfixOf`)
+      sout `shouldSatisfy` ("IF naf (`it is not the case that NBA 5 applies to x` x)" `isInfixOf`)
+      sout `shouldSatisfy` ("AND NOT `the conclusion in NBA 2 that x can fly is defeated` x" `isInfixOf`)
+      sout `shouldSatisfy` ("-- L4 oracle ==> LIST \"pingu\"" `isInfixOf`)
+      length (filter ("-- L4 oracle ==> " `isPrefixOf`) (lines sout)) `shouldBe` 4
+
+    it "refuses a document outside the liftable fragment, naming every construct" $ do
+      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/sumlist.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("cannot lift this document to L4" `isInfixOf`)
+      -- an n-ary relation is not a unary predicate over the object universe
+      serr `shouldSatisfy` ("blawx-lift/relationship" `isInfixOf`)
+      serr `shouldSatisfy` ("total_from/3" `isInfixOf`)
+      -- and the refusal is BATCHED: one run names them all, so a caller does
+      -- not have to fix them one at a time.
+      serr `shouldSatisfy` ("go/4" `isInfixOf`)
+
+    it "refuses a non-boolean attribute by name and value type" $ do
+      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/benefit.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-lift/attribute-type" `isInfixOf`)
+      serr `shouldSatisfy` ("has value type number" `isInfixOf`)
+
+    it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
+      Output code sout serr <- runL4 bin
+        ["blawx", "--import", "--reemit", "examples/blawx/expected/mortality.blawx"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("--reemit failed\n--- stderr ---\n" ++ serr)
+      -- Our own emission parsed and re-emitted is byte-identical to itself;
+      -- that is the byte half of `lift . emit = id`, reached through the CLI
+      -- rather than through --roundtrip's in-process comparison.
+      original <- readFile "examples/blawx/expected/mortality.blawx"
+      sout `shouldBe` original
+
   describe "l4 docassemble" $ do
     it "compiles the WHERE-heavy rodents example to its golden interview (R3 survival)" $
       expectGolden bin ["docassemble", "examples/docassemble/rodents-and-vermin.l4"]
