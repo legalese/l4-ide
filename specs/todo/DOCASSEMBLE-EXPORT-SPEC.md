@@ -50,7 +50,8 @@ M3 was measured and declined on 2026-08-18, and the reserved field was removed w
 _**M3 DECLINED 2026-08-18** on branch `mengwong/m3-decision`, on the measurement §8.5's own gate
 demanded. Info-gain plan ordering asks 3.38 % fewer questions than declaration order across the
 138 corpus decisions that have an ordering at all — 0.059 of one question each — and a
-compile-time operand sort captures **100.00 %** of that, beating the adaptive planner on 0 of 138. Most L4 legal decisions are flat AND/OR chains where every atom is equally informative, so
+compile-time operand sort captures **100.00 %** of that, beating the adaptive planner on 0 of 138.
+Most L4 legal decisions are flat AND/OR chains where every atom is equally informative, so
 there is nothing for a runtime plan to be clever about. The static sort is declined too: it would
 trade "operand order preserved = question order", a property a reader can verify, for a saving
 nobody can feel. The measurement harness is committed at `jl4/measure/` and reproduces
@@ -867,7 +868,8 @@ worlds from a stated seed.
 | plan order — what M3 would have built | 1.6955         |
 | **static compile-time operand sort**  | **1.6955**     |
 
-Plan order asks **3.38 % fewer** — 0.059 of one question per decision, 8.18 questions across all 138. Per decision: plan fewer on 11, tie on 127, worse on 0.
+Plan order asks **3.38 % fewer** — 0.059 of one question per decision, 8.18 questions across
+all 138. Per decision: plan fewer on 11, tie on 127, worse on 0.
 
 **The number that decided it is the third row.** A compile-time operand sort — no BDD, no Python
 port, no runtime plan — captures **100.00 %** of the saving, and plan order is strictly better
