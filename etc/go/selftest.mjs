@@ -4386,6 +4386,61 @@ process.stdout.write("\n-- gc retention --\n");
 }
 // ===== END gc retention =====================================================
 
+// ===== run resolution is subject-aware ======================================
+//
+// `status` and `verify` read a journal and check it, so they need no subject --
+// but they ACCEPT --subject, and a flag that is accepted and unread is a silent
+// wrong answer: `go.sh status --subject regcf` answering with sg-succession's
+// newest run produces a completely normal-looking report about a different body
+// of law. These pin the three outcomes.
+process.stdout.write("\n-- run resolution --\n");
+{
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-resolve-"));
+  const mk = (id, subject) => {
+    const d = resolve(root, id);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(
+      resolve(d, "journal.ndjson"),
+      JSON.stringify({ kind: "run_begin", run_id: id, subject }) + "\n",
+    );
+  };
+  // regcf is OLDER, so a subject-blind resolver returns sg-succession for both.
+  mk("2026-01-01-aaaaaaaa-001", "regcf");
+  mk("2026-02-01-bbbbbbbb-001", "sg-succession");
+
+  const go = (args) =>
+    spawnSync("bash", [resolve(HERE, "go.sh"), ...args], {
+      env: { ...process.env, L4_GO_RUNDIR: root },
+      encoding: "utf8",
+    });
+
+  check(
+    "status with no --subject resolves the newest run of any subject",
+    /2026-02-01-bbbbbbbb-001/.test(go(["status"]).stdout),
+  );
+  check(
+    "status --subject resolves the newest run OF THAT SUBJECT",
+    /2026-01-01-aaaaaaaa-001/.test(go(["status", "--subject", "regcf"]).stdout),
+  );
+
+  // The refusal has to survive a command substitution. resolve_run refuses with
+  // `exit 2`, which inside `$(...)` exits only the subshell -- so the driver
+  // used to print the right diagnosis and then hand verify-run.mjs an empty
+  // argument, producing a `usage:` line about another script under the wrong
+  // exit code.
+  const empty = mkdtempSync(resolve(tmpdir(), "l4-go-empty-"));
+  const r = spawnSync("bash", [resolve(HERE, "go.sh"), "status"], {
+    env: { ...process.env, L4_GO_RUNDIR: empty },
+    encoding: "utf8",
+  });
+  check("an empty run store refuses with exit 2", r.status === 2);
+  check(
+    "the refusal is not followed by verify-run.mjs's usage line",
+    !/usage: verify-run\.mjs/.test(r.stdout + r.stderr),
+  );
+}
+// ===== END run resolution ===================================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

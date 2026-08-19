@@ -518,8 +518,20 @@ cmd_plan() {
   echo "non-executable DMN at G1 provided the report says so in Blocking terms."
 }
 
+# latest_run [SUBJECT] -> the newest run dir, optionally of one subject only.
+#
+# `status` and `verify` are subject-independent — they read a journal and check
+# it — so with no --subject the newest run of ANY subject is the right answer.
+# But once a second subject exists, `go.sh status --subject regcf` is a
+# question with an obvious meaning, and answering it with sg-succession's
+# newest run because the flag went unread is a silent wrong answer: the report
+# would be about a different body of law and would look entirely normal.
 latest_run() {
-  ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sort | tail -1 | sed 's:/$::'
+  if [[ -n "${1:-}" ]]; then
+    node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE" "$1" | sort | tail -1
+  else
+    ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sort | tail -1 | sed 's:/$::'
+  fi
 }
 
 # gate_grant_state JOURNAL GATE CORPUS_DIGEST -> open | stale | closed
@@ -555,23 +567,37 @@ resolve_run() {
     echo "$RUNDIR_BASE/$RUN_ID"
   else
     local l
-    l=$(latest_run || true)
+    l=$(latest_run "$SUBJECT" || true)
     [[ -n "$l" ]] || {
-      echo "go.sh: no runs under $RUNDIR_BASE" >&2
+      if [[ -n "$SUBJECT" ]]; then
+        echo "go.sh: no runs of subject '$SUBJECT' under $RUNDIR_BASE" >&2
+      else
+        echo "go.sh: no runs under $RUNDIR_BASE" >&2
+      fi
       exit 2
     }
     echo "$l"
   fi
 }
 
+# `run="$(resolve_run)" || exit` and not `node ... "$(resolve_run)"`:
+# resolve_run refuses by calling `exit 2`, and inside a command substitution
+# that exits the SUBSHELL. Inlined, the refusal printed and then the driver
+# carried on and handed verify-run.mjs an empty argument, so the user saw the
+# right diagnosis followed by a `usage:` line about a different script, under
+# verify-run.mjs's exit code rather than 2. Assigning first makes the
+# substitution's status visible, which is the only place the refusal survives.
 cmd_status() {
-  node "$LIB/verify-run.mjs" "$(resolve_run)"
+  local run
+  run="$(resolve_run)" || exit $?
+  node "$LIB/verify-run.mjs" "$run"
 }
 
 cmd_verify() {
-  local extra=()
+  local extra=() run
   [[ $WANT_GATES -eq 1 ]] && extra+=(--gates)
-  node "$LIB/verify-run.mjs" "$(resolve_run)" "${extra[@]}"
+  run="$(resolve_run)" || exit $?
+  node "$LIB/verify-run.mjs" "$run" "${extra[@]}"
 }
 
 cmd_gc() {
