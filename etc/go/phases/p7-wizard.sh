@@ -41,7 +41,15 @@ case $DEFECT_RC in
     echo "::error::a defect recorded in $GO_S_KNOWN_DEFECTS no longer reproduces. Delete the entry; a stale negative control is a lie about what this leg measures." >&2
     go_broken "a known-defect negative control stopped reproducing; see $LOG"
     ;;
-  2) go_broken "known-defects.mjs usage error" ;;
+  2) go_broken "known-defects.mjs usage error; see $LOG" ;;
+  0) : ;;
+  # ANY other exit is a checker that did not answer. It used to fall through
+  # this `case` and the stage carried on as if the negative controls had run --
+  # measured, when sg-succession's catalogue used the wrong key name and the
+  # checker threw a TypeError under exit 1. Silence from a control is not a
+  # pass; it is a control that did not run, and it has to be as loud as one
+  # that failed.
+  *) go_broken "known-defects.mjs exited $DEFECT_RC, which is not one of its defined outcomes (0 held, 2 usage, 4 stopped reproducing); the negative controls for this leg did NOT run. See $LOG." ;;
 esac
 
 # Count what the plan actually offers the interview. MEASURED 2026-08-02: 406

@@ -12,21 +12,31 @@
     "a mixfix name ending in a keyword being undefinable-in-practice) are NOT",
     "recorded here. They are defects in the toolchain, not in this subject's",
     "projections, and they are reported upstream instead; etc/check-not-precedence.mjs",
-    "is the standing guard against the first."
+    "is the standing guard against the first.",
+    "",
+    "SCHEMA REPAIR, 2026-08-20. Every group below previously used the keys",
+    "'entries' and 'why_empty'. The reader is known-defects.mjs, which reads",
+    "'defects' and 'note' -- so it threw a TypeError and exited 1, and p7-wizard's",
+    "case handled only 4 and 2, so exit 1 fell through and the leg emitted its",
+    "receipt with the negative controls SILENTLY NOT RUN. Measured, not inferred.",
+    "The checker now refuses a malformed group under the usage code and names the",
+    "missing key, and p7-wizard treats any undefined exit as BROKEN, so this file",
+    "being wrong can no longer be quiet. Two claims below were also false and are",
+    "corrected in place; see each group's note."
   ],
   "wizard": {
     "measured_on": null,
-    "entries": [],
-    "why_empty": "No wizard module exists for this subject yet, so `render --format plan` has no export surface to measure."
+    "note": "No defect has been MEASURED for this leg on this subject, so the group is empty and the leg's negative controls are vacuous -- which is a statement about what has been measured, not a claim that the leg is defect-free. Until 2026-08-20 this group instead read 'No wizard module exists for this subject yet'. That was written before the wizard was built and was already false when this file was last touched: jl4/examples/legal/sg-succession/sg-succession-wizard.l4 exists, carries three @export declarations, and is named by encoding.wizard, and the p7-wizard leg is declared. To fill this group, run `l4 render <wizard> --format plan` and record what it does NOT offer -- regcf's 'plan-has-no-asks' entry is the worked example, and it may well reproduce here, but it is not recorded until it is observed here.",
+    "defects": []
   },
   "dmn": {
     "measured_on": null,
-    "entries": [],
-    "why_empty": "The p7-dmn leg is not declared: no DMN golden, fidelity golden or cases file has been generated for this corpus, and recording unmeasured defects would be exactly the drift this orchestrator exists to prevent."
+    "note": "The p7-dmn leg is not declared for this subject: no DMN golden, fidelity golden or cases file has been generated for this corpus, and recording unmeasured defects would be exactly the drift this orchestrator exists to prevent. The group is retained rather than deleted so that declaring the leg later finds a home for its measurements instead of a missing-group refusal.",
+    "defects": []
   },
   "mcp": {
     "measured_on": null,
-    "entries": [],
-    "why_empty": "No jl4-service was reachable when this file was written, and the corpus carries no @export surface to deploy."
+    "note": "No defect has been MEASURED for this leg. Until 2026-08-20 this group read 'the corpus carries no @export surface to deploy', which was false: sg-succession-wizard.l4 carries three @export declarations and was deployed to a local jl4-service during this arc. What is true is that no defect of that deployment was recorded, so the group is empty for want of a measurement rather than for want of a surface.",
+    "defects": []
   }
 }

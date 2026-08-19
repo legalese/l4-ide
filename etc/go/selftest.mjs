@@ -4581,6 +4581,77 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
 }
 // ===== END new-subject ======================================================
 
+// ===== a negative control that did not run is not a pass ====================
+//
+// known-defects.mjs used to dereference `g.defects.length` with no schema
+// check. sg-succession's catalogue was written with `entries`/`why_empty`
+// instead of `defects`/`note`, so the checker threw a TypeError and exited 1 --
+// and p7-wizard's `case` handled only 4 (a control stopped reproducing) and 2
+// (usage). Exit 1 matched neither, fell through, and the stage emitted its
+// receipt with the negative controls SILENTLY NOT RUN.
+//
+// That is the exact shape of erosion this file exists to catch: not a check
+// that says the wrong thing, but a check that says nothing while looking like
+// it said yes. Both halves are pinned -- the checker must refuse a malformed
+// group under a code the caller handles, and the caller must treat any
+// undefined exit as broken.
+process.stdout.write("\n-- known-defects schema --\n");
+{
+  const dir = mkdtempSync(resolve(tmpdir(), "l4-go-defects-"));
+  const artifact = resolve(dir, "artifact.json");
+  writeFileSync(artifact, JSON.stringify({ units: [] }));
+  const run = (catalogue) => {
+    const c = resolve(dir, "catalogue.json");
+    writeFileSync(c, JSON.stringify(catalogue));
+    return spawnSync(
+      "node",
+      [resolve(HERE, "lib/known-defects.mjs"), "wizard", artifact],
+      { env: { ...process.env, GO_S_KNOWN_DEFECTS: c }, encoding: "utf8" },
+    );
+  };
+
+  const wrong = run({
+    wizard: { measured_on: null, entries: [], why_empty: "because" },
+  });
+  check(
+    "a group with no 'defects' array exits 2 (usage), not 1 (crash)",
+    wrong.status === 2,
+  );
+  check(
+    "the refusal names the key that is missing",
+    /no 'defects' array/.test(wrong.stderr),
+  );
+  check(
+    "the refusal lists the keys that ARE there, so the fix is obvious",
+    /entries/.test(wrong.stderr) && /why_empty/.test(wrong.stderr),
+  );
+
+  const right = run({
+    wizard: { measured_on: null, note: "nothing measured", defects: [] },
+  });
+  check("a well-formed empty group still exits 0", right.status === 0);
+  check(
+    "an empty group states its reason rather than passing silently",
+    /nothing measured/.test(right.stdout),
+  );
+
+  // The caller half: p7-wizard must not let an undefined exit code through.
+  const wizardSrc = readFileSync(resolve(HERE, "phases/p7-wizard.sh"), "utf8");
+  const caseBlock = wizardSrc.slice(
+    wizardSrc.indexOf("case $DEFECT_RC in"),
+    wizardSrc.indexOf("esac", wizardSrc.indexOf("case $DEFECT_RC in")),
+  );
+  check(
+    "p7-wizard's defect case has a catch-all arm",
+    /^\s*\*\)/m.test(caseBlock),
+  );
+  check(
+    "the catch-all arm is BROKEN, not a shrug",
+    /\*\)[\s\S]*go_broken/.test(caseBlock),
+  );
+}
+// ===== END known-defects schema =============================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );
