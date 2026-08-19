@@ -45,6 +45,24 @@ It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative
 
 ## Core workflow
 
+### 0. Register the subject, if it does not exist yet
+
+Everything the pipeline knows about one body of law lives in a sidecar under `etc/go/subjects/<id>/`. To create one:
+
+```bash
+etc/go/go.sh new-subject sg-tax \
+  --citation "Income Tax Act 1947" \
+  --source-url "https://sso.agc.gov.sg/Act/ITA1947"
+```
+
+That is enough to make `plan --subject sg-tax` work immediately, **before any L4 exists**. The sidecar declares `encoding.state: "unwritten"`: the encoding is not written, `encoding.main` is where it _will_ live, and every stage that reads a module reports SKIPPED naming the file to deposit. The gate digest is taken over the absent path, so depositing the first module moves the digest and re-opens HG1 — a gate granted before the encoding existed cannot survive the encoding arriving.
+
+The declaration is checked in both directions. Once the file exists, `subject.mjs` refuses the sidecar until you flip the state to `"written"`, so it cannot rot into a false statement about the tree.
+
+`pins.json` and `known-defects.json` are written **empty and marked unmeasured**, and that is deliberate. Both are measurement records — pins are probed against a real binary, defects are observed on a stated date — so a scaffolder that emitted plausible contents would be manufacturing the evidence the pipeline exists to demand, and it would be believed, because a file that looks measured is indistinguishable from one that is. The stages that need them refuse loudly instead.
+
+Then: write the encoding (that is [`writing-l4-rules`](../writing-l4-rules/SKILL.md), not this skill), flip the state, measure the pins, and declare only the projection legs the subject genuinely supports — the driver declares a stage **iff** its leg is declared, so an omitted leg is an honest silence rather than a failing stage.
+
 ### 1. Run the doctor first
 
 ```bash
@@ -158,7 +176,7 @@ $TMPDIR/l4-go/<run-id>/report.md
 
 It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 requires but this milestone cannot fill render as **ABSENT** with the reason and the stage that would have supplied them — never omitted. Notes you asked a phase script to record render in a block labelled _claimed, not verified_, with the author.
 
-Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most recent few **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected.
+Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most recent few **of each subject** **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected. Per subject matters once more than one exists: retention used to take the newest few across the whole store, so a burst of runs on one subject would have collected every run of another, and cross-run replay reuses receipts from exactly those older runs.
 
 ### 7b. Read the explainer, which is a different document for a different reader
 

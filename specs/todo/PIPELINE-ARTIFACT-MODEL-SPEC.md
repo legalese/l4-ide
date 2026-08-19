@@ -1,15 +1,16 @@
 # The pipeline as an artifact graph: phases, witnesses, and what the labels are for
 
-_Status: **rulings recorded; three of thirteen implemented.** Written 2026-08-20 on branch
+_Status: **rulings recorded; four of thirteen implemented.** Written 2026-08-20 on branch
 `mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
 (`sg-succession`) and found that several of its central nouns name the wrong things._
 
 _What IS implemented, and where: **R1** (`corpus` → `encoding`, commit `dd55a6c8`), **R7** and
 **R8** (cross-run replay with a closed ineligible list, and borrowed artifacts copied rather than
-referenced, commit `41a7b5ac`), and **R10** (the three senses of "corpus" deliberately retained).
-Everything else on this page is a decision, not a description: there is no artifact store, no
-read-set, no per-phase comparator and no subject-level report. What would make the rest of the
-present tense true is named per ruling in §3._
+referenced, commit `41a7b5ac`), **R10** (the three senses of "corpus" deliberately retained), and
+**R12** (`encoding.state`, and `go.sh new-subject` on top of it — see §3.12 for the third closure
+that neither candidate had). Everything else on this page is a decision, not a description: there
+is no artifact store, no read-set, no per-phase comparator and no subject-level report. What would
+make the rest of the present tense true is named per ruling in §3._
 
 _Why this document exists at all: the rulings below were reached in conversation and existed
 nowhere else. `CLAUDE.md` §4 — a decision is recorded in its owning document or it is not
@@ -60,7 +61,7 @@ something the graph answers.
 | R9     | **ANSWERED**               | G0–G4 are capability milestones, not lifecycle phases, and should stop being run labels, §3.9           |
 | R10    | **ANSWERED · IMPLEMENTED** | three other senses of "corpus" are retained deliberately, §3.10                                         |
 | R11    | **OPEN**                   | if artifacts are equal witnesses, the HG1 blessing must become a first-class edge, §3.11                |
-| R12    | **OPEN**                   | a subject cannot be declared before its encoding exists, so a first encoding has no home, §3.12         |
+| R12    | ANSWERED 2026-08-20, §3.12 | a subject may declare `encoding.state: "unwritten"`; `go.sh new-subject` scaffolds one, §3.12           |
 | R13    | **OPEN**                   | reporting is run-oriented; a subject-level fold is needed, and it is not a union, §3.13                 |
 
 ### 3.1 R1 — the subject's L4 is `encoding` — ANSWERED, IMPLEMENTED
@@ -99,11 +100,16 @@ config value.
 
 The immediate consequence: **"de novo" is the wrong word for the pass it currently names.** It
 means _anew, from the beginning_, and the run it labels **requires a predecessor** — SPEC.md §8's
-acceptance diff compares a blind re-derivation _against the committed encoding_. Measured: a
-subject whose `encoding.main` does not exist cannot be resolved at all, and a descriptor whose
+acceptance diff compares a blind re-derivation _against the committed encoding_. A descriptor whose
 `denovo.modules` names a corpus module is refused outright. The vocabulary is inverted — the word
 meaning "no prior" is attached to the pass that needs one, while the pass that genuinely has no
 prior (§3.12) has no name.
+
+_(This paragraph also read, when written: "a subject whose `encoding.main` does not exist cannot be
+resolved at all". That was true on 2026-08-20 morning and is no longer — §3.12's `encoding.state`
+gives exactly that subject a home, later the same day. It was a measurement of the tree offered as
+evidence for a claim about vocabulary, and the vocabulary claim survives it, which is why the
+sentence is retracted here rather than the ruling being reopened.)_
 
 "Cleanroom" is the accurate term of art for the second pass and is **already used for it in this
 repo**, two lines apart in the same file: `charities-cleanroom/README.md` reads _"encoded de novo"_
@@ -237,12 +243,13 @@ must refuse to answer from an artifact that has no such edge.
 
 _This is the ruling most likely to be got wrong by building R6 first and R11 later._
 
-### 3.12 R12 — a first encoding has no home — OPEN
+### 3.12 R12 — a first encoding has no home — ANSWERED 2026-08-20
 
-Measured: a subject whose `encoding.main` does not exist **cannot be resolved at all**
-(`corpus.main`/`encoding.main` is `mustExist`), so no milestone can run on a body of law nobody has
-encoded. And a first pass cannot be registered as its own de novo deposit either, because the
-resolver refuses a de novo module that is also an encoding module.
+**The problem, as measured before this ruling was implemented:** a subject whose `encoding.main` did
+not exist could not be resolved at all (`corpus.main`/`encoding.main` was `mustExist`), so no
+milestone could run on a body of law nobody had encoded. And a first pass could not be registered as
+its own de novo deposit either, because the resolver refuses a de novo module that is also an
+encoding module — that half still holds.
 
 So the most consequential work in the pipeline — fetch, sweep, encode, fork, for the first time —
 is **unmilestoned agent work that produces no receipt**. That is precisely how, for
@@ -250,7 +257,7 @@ is **unmilestoned agent work that produces no receipt**. That is precisely how, 
 committed while the pipeline held no receipt for any of them; eight runs had happened, all `g1`,
 and the reports correctly said the source bundle was ABSENT.
 
-Two candidate closures, not yet ruled between:
+Two candidate closures were on the table:
 
 1. a phase set for the first pass, permitting `encoding == the artifact under review` because there
    is nothing to diff, with the comparator reporting `NOT-APPLICABLE` rather than `SKIPPED` — a
@@ -259,6 +266,51 @@ Two candidate closures, not yet ruled between:
    and research phases run and deposit first, with `encoding.main` required only from the
    projection phases onward. Closer to how the work actually proceeds, but it weakens a check that
    currently catches typos in every declared path.
+
+**RULED: neither, and the objection to (2) is what produced the answer.** Candidate 2's weakness is
+real and is the same one `subject.mjs` already refuses further down its own file, where the
+explainer is required to be an EXPLICIT DECLARATION rather than a discovered directory, because "a
+mistyped directory name would then yield a fully-ABSENT explainer with no error anywhere — absence
+experienced as breakage". Tolerating absence turns every typo into a silent skip. So absence is
+**declared**, not tolerated:
+
+```json
+"encoding": { "state": "unwritten", "main": "jl4/examples/legal/sg-tax/sg-tax.l4" }
+```
+
+and the declaration is checked in **both directions**. With `state` absent or `"written"` — what
+every existing sidecar means — `main`, `wizard` and every module must exist, byte-for-byte the old
+rule, so a typo still fails loudly naming the path. With `state: "unwritten"` they must **not**
+exist: depositing the first module without flipping the state is itself an error, naming the file
+and the one-line edit. A declaration that is checked when it stops being true cannot rot into a lie.
+
+Nothing downstream needed teaching, which is the evidence that this is the right seam rather than a
+convenient one. The stages already report a declared module that is not a file as `SKIPPED` with the
+deposit instruction attached (`p3-check`, `p6-tests`, `p8-verify`, via `go_skip`), and `digestSet`
+already records a missing path as `ABSENT` rather than skipping it — so an unwritten encoding has a
+real gate digest. **Measured**: the `sg-tax` scaffold planned at digest
+`7715…7638a1` with the file absent and `96ff…33efe2` once a one-line module was deposited, so an HG1
+granted before the encoding existed cannot survive the encoding arriving. That is the property that
+makes registering-before-encoding safe rather than merely possible.
+
+On top of it, `etc/go/go.sh new-subject <id> --citation … --source-url …` scaffolds a sidecar that
+`plan --subject <id>` accepts at once. It writes `subject.json` from the arguments and refuses the
+ones with no defensible default; it does **not** write the encoding, because that would falsify the
+state it just declared. `pins.json` and `known-defects.json` are emitted **empty and marked
+unmeasured** — both are measurement records, pins probed against a real binary and defects observed
+on a stated date, and a scaffolder that emitted plausible contents would be manufacturing exactly
+the evidence this pipeline exists to demand. It would also be believed, because a file that looks
+measured is not distinguishable from one that is. The stages that need them refuse loudly instead:
+`p0-preflight` reports BROKEN on a pin-set mismatch, and `known-defects.mjs` refuses with "no group
+`<name>`".
+
+Seventeen selftests cover it, including both directions of the declaration, the digest movement, and
+the assertion that the scaffolded measurement files claim nothing.
+
+What this ruling does **not** close: the first pass still produces no receipt for its own fetch,
+sweep and encode work. `encoding.state` gives that work a registered subject to happen against and a
+gate digest that moves when it lands, but the phases themselves remain unmilestoned — that is R4 and
+R11, and R12 was the precondition, not the substitute.
 
 ### 3.13 R13 — reporting needs a subject-level fold — OPEN
 

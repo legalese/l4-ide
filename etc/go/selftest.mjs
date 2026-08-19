@@ -22,6 +22,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -59,6 +60,7 @@ import {
 import { CANONICALISATIONS } from "./lib/canon-diff.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, "../..");
 
 let failures = 0;
 let skips = 0;
@@ -4440,6 +4442,144 @@ process.stdout.write("\n-- run resolution --\n");
   );
 }
 // ===== END run resolution ===================================================
+
+// ===== new-subject and the unwritten encoding ===============================
+//
+// R12: until encoding.state existed, registering a body of law required having
+// already encoded it -- `main` was mandatory AND had to exist -- so the FIRST
+// encoding had no home and `new-subject` could not exist.
+//
+// The risk in fixing that is turning a mistyped path into a silent skip, which
+// is the exact failure subject.mjs's own "EXPLICIT DECLARATION, not directory
+// discovery" comment refuses. So the declaration is checked in BOTH directions,
+// and these tests pin both, plus the property that makes registering-before-
+// encoding safe rather than merely possible: the gate digest is taken over the
+// absent path, so depositing the first module MOVES it and re-opens HG1.
+process.stdout.write("\n-- new-subject / unwritten encoding --\n");
+{
+  const subjectsDir = resolve(HERE, "subjects");
+  const id = "selftest-unwritten";
+  const dir = resolve(subjectsDir, id);
+  const encRel = `jl4/examples/legal/${id}/${id}.l4`;
+  const encAbs = resolve(REPO, encRel);
+
+  const rmAll = () => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(dirname(encAbs), { recursive: true, force: true });
+  };
+  rmAll();
+
+  const go = (args) =>
+    spawnSync("bash", [resolve(HERE, "go.sh"), ...args], { encoding: "utf8" });
+
+  const made = go([
+    "new-subject",
+    id,
+    "--citation",
+    "Selftest Act 1867",
+    "--source-url",
+    "https://example.invalid/selftest",
+  ]);
+  check("new-subject exits 0", made.status === 0);
+  check(
+    "new-subject writes all four sidecar files",
+    ["subject.json", "pins.json", "known-defects.json", "NOTES.md"].every((f) =>
+      existsSync(resolve(dir, f)),
+    ),
+  );
+  check(
+    "new-subject does NOT create the encoding -- that would falsify the state it just declared",
+    !existsSync(encAbs),
+  );
+
+  // The measurement files must claim nothing. A scaffolded pins.json carrying
+  // enumerations copied from another subject would be a measurement nobody
+  // took, and it would be believed, because a file that looks measured is not
+  // distinguishable from one that is.
+  const pins = JSON.parse(readFileSync(resolve(dir, "pins.json"), "utf8"));
+  check(
+    "scaffolded pins.json asserts no measured value",
+    Object.keys(pins).every((k) => k.startsWith("_")),
+  );
+  check(
+    "scaffolded pins.json says it is not measured",
+    /NOT MEASURED/.test(JSON.stringify(pins)),
+  );
+  const defects = JSON.parse(
+    readFileSync(resolve(dir, "known-defects.json"), "utf8"),
+  );
+  check(
+    "scaffolded known-defects.json declares no group",
+    Object.keys(defects).every((k) => k.startsWith("_")),
+  );
+
+  // It is a real subject immediately: that is the whole point of R12.
+  const planned = go(["plan", "--subject", id, "--milestone", "g1"]);
+  check("the scaffolded subject plans at once", planned.status === 0);
+  check(
+    "the plan says the encoding is unwritten rather than leaving it to be inferred",
+    /encoding\.state "unwritten"/.test(planned.stdout),
+  );
+  const digestAbsent = (planned.stdout.match(/sha256:[0-9a-f]{64}/) || [])[0];
+  check("the plan still shows a gate digest", Boolean(digestAbsent));
+
+  // Direction two: once the file exists, the declaration is false, and a false
+  // declaration must not survive. This is what stops the state key from rotting.
+  mkdirSync(dirname(encAbs), { recursive: true });
+  writeFileSync(encAbs, "§ `Selftest`\n");
+  const stale = go(["plan", "--subject", id, "--milestone", "g1"]);
+  check(
+    "a written encoding under an 'unwritten' sidecar is refused",
+    stale.status !== 0,
+  );
+  check(
+    "the refusal names the one-line edit that repairs it",
+    /Set encoding\.state to "written"/.test(stale.stderr),
+  );
+
+  // Flip it, and the digest MOVES -- so an HG1 granted while the encoding did
+  // not exist cannot survive the encoding arriving.
+  const descPath = resolve(dir, "subject.json");
+  const desc = JSON.parse(readFileSync(descPath, "utf8"));
+  desc.encoding.state = "written";
+  writeFileSync(descPath, JSON.stringify(desc, null, 2) + "\n");
+  const written = go(["plan", "--subject", id, "--milestone", "g1"]);
+  check(
+    "flipping the state to written resolves the sidecar",
+    written.status === 0,
+  );
+  const digestPresent = (written.stdout.match(/sha256:[0-9a-f]{64}/) || [])[0];
+  check(
+    "depositing the first encoding MOVES the gate digest, re-opening HG1",
+    Boolean(digestPresent) && digestPresent !== digestAbsent,
+  );
+  check(
+    "the written plan no longer claims the encoding is unwritten",
+    !/encoding\.state "unwritten"/.test(written.stdout),
+  );
+
+  // Refusals around the scaffolder itself.
+  const again = go([
+    "new-subject",
+    id,
+    "--citation",
+    "x",
+    "--source-url",
+    "https://example.invalid/y",
+  ]);
+  check(
+    "new-subject refuses to overwrite an existing sidecar",
+    again.status === 2,
+  );
+  check(
+    "the overwrite refusal names the measurement files it would destroy",
+    /measurement records/.test(again.stderr),
+  );
+
+  rmAll();
+  check("selftest cleaned up its scaffolded subject", !existsSync(dir));
+}
+// ===== END new-subject ======================================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,

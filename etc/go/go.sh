@@ -32,10 +32,21 @@
 #             the front-door forecast: which declared stages will run whole,
 #             which will SKIP and why, each with its remedy. Runs no stage.
 #             Exit: 0 wants met · 1 will not run whole · 2 no usable l4.
-#     plan    [--milestone g1|g2]
-#     status  [--run-id ID]
-#     verify  [--run-id ID] [--gates]
+#     plan    [--milestone g1|g2] [--subject ID]
+#     status  [--run-id ID] [--subject ID]
+#     verify  [--run-id ID] [--subject ID] [--gates]
 #     gc      [--keep N]
+#     new-subject ID --citation TEXT --source-url URL [--display-name TEXT]
+#             [--encoding PATH] [--force]
+#             Scaffold etc/go/subjects/ID/ so `plan --subject ID` works at
+#             once. The sidecar declares encoding.state "unwritten": the
+#             encoding does not exist yet, every stage that reads a module
+#             will SKIP naming the file to deposit, and the gate digest is
+#             already over that absent path, so depositing it re-opens HG1.
+#             pins.json and known-defects.json are emitted EMPTY and marked
+#             unmeasured — both are measurement records, and a scaffolder
+#             that invented plausible contents would be manufacturing the
+#             evidence the pipeline exists to demand.
 #     help
 #
 #   Exit codes (extending etc/check-bpmn-kie.sh's 0/1/2/3/4):
@@ -153,6 +164,12 @@ ONLY=""
 KEEP=5
 WANT_GATES=0
 declare -a WAIVERS=()
+NEW_ID=""
+NEW_DISPLAY_NAME=""
+NEW_CITATION=""
+NEW_SOURCE_URL=""
+NEW_ENCODING=""
+NEW_FORCE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -192,11 +209,42 @@ while [[ $# -gt 0 ]]; do
       WANT_GATES=1
       shift
       ;;
+    --display-name)
+      NEW_DISPLAY_NAME="$2"
+      shift 2
+      ;;
+    --citation)
+      NEW_CITATION="$2"
+      shift 2
+      ;;
+    --source-url)
+      NEW_SOURCE_URL="$2"
+      shift 2
+      ;;
+    --encoding)
+      NEW_ENCODING="$2"
+      shift 2
+      ;;
+    --force)
+      NEW_FORCE=1
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
       ;;
-    *) die_usage "unknown option $1" ;;
+    # One bare positional, and only for `new-subject`: the id of the subject
+    # being created. Every other command names its subject with --subject,
+    # which resolves an EXISTING sidecar — the thing this command's argument
+    # by definition is not.
+    *)
+      if [[ "$CMD" == "new-subject" && -z "$NEW_ID" && "$1" != -* ]]; then
+        NEW_ID="$1"
+        shift
+      else
+        die_usage "unknown option $1"
+      fi
+      ;;
   esac
 done
 
@@ -507,6 +555,19 @@ cmd_plan() {
   echo "the digest a gate on this run would bind to, over ${#GO_ENCODING_FILES[@]} file(s):"
   echo "  $(node "$LIB/digest.mjs" "${GO_ENCODING_FILES[@]}")"
   for s in "${GO_ENCODING_FILES[@]}"; do printf '  %s\n' "${s#"$GO_ROOT"/}"; done
+  # Say it, rather than leaving the reader to infer it from a run in which every
+  # stage skipped. The digest above is real either way — digestSet records an
+  # absent path as ABSENT — so depositing the first module MOVES it and re-opens
+  # HG1, which is the property that makes registering a subject before encoding
+  # it safe rather than merely possible.
+  if [[ "${GO_S_ENCODING_STATE:-written}" == "unwritten" ]]; then
+    echo
+    echo "  NOTE: this sidecar declares encoding.state \"unwritten\" — the paths above"
+    echo "  are where the encoding WILL live, and none of them is a file yet. Every"
+    echo "  stage that reads a module will report SKIPPED naming the file to deposit."
+    echo "  Writing the encoding is agent work; flip the state to \"written\" when it"
+    echo "  lands (subject.mjs refuses the stale declaration, so you cannot forget)."
+  fi
   echo
   echo "entry points that exist and refuse, each with a named blocker:"
   for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
@@ -598,6 +659,76 @@ cmd_verify() {
   [[ $WANT_GATES -eq 1 ]] && extra+=(--gates)
   run="$(resolve_run)" || exit $?
   node "$LIB/verify-run.mjs" "$run" "${extra[@]}"
+}
+
+# --- new-subject ------------------------------------------------------------
+#
+# Registering a body of law used to require having already encoded it: `main`
+# was mandatory AND had to exist, so there was no way to say "this subject is
+# real, its encoding is not written yet". That is R12 in
+# specs/todo/PIPELINE-ARTIFACT-MODEL-SPEC.md — the first encoding has no home —
+# and it is why this command could not exist before encoding.state did.
+#
+# WHAT IS AND IS NOT SCAFFOLDED. subject.json is configuration: every value in
+# it is a decision the caller makes, so it is written from the arguments and
+# the caller is required to supply the ones that cannot be guessed. pins.json
+# and known-defects.json are MEASUREMENT RECORDS — pins.json records a CLI
+# surface probed against a real binary, known-defects.json records defects
+# observed on a stated date. A scaffolder that emitted plausible contents for
+# either would be manufacturing exactly the evidence this pipeline exists to
+# demand, so both are emitted empty and marked unmeasured, and the stages that
+# need them refuse loudly and name the recipe. An empty measurement file claims
+# nothing, which is the only honest thing it can say.
+cmd_new_subject() {
+  [[ -n "$NEW_ID" ]] || die_usage "new-subject: an id is required — etc/go/go.sh new-subject <id> --citation ... --source-url ..."
+  [[ "$NEW_ID" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die_usage "new-subject: id '$NEW_ID' must match ^[a-z0-9][a-z0-9-]*$ (subject.mjs refuses anything else, and the id is a directory name)"
+  [[ -n "$NEW_CITATION" ]] || die_usage "new-subject: --citation is required; it is what the report cites this subject AS, and there is no defensible default"
+  [[ -n "$NEW_SOURCE_URL" ]] || die_usage "new-subject: --source-url is required; it is the provenance of every later claim about this body of law"
+
+  local dir="$GO_ROOT/etc/go/subjects/$NEW_ID"
+  if [[ -d "$dir" && $NEW_FORCE -eq 0 ]]; then
+    echo "go.sh: etc/go/subjects/$NEW_ID already exists. Refusing to overwrite a sidecar:" >&2
+    echo "  pins.json and known-defects.json are measurement records, and re-scaffolding" >&2
+    echo "  would replace measured content with empty stubs. Pass --force if that is what" >&2
+    echo "  you want, or edit the files in place." >&2
+    exit 2
+  fi
+
+  # Where the encoding WILL live. Defaults to the house layout; the file is not
+  # created, because creating it would make encoding.state "unwritten" false on
+  # the very next line.
+  local enc="${NEW_ENCODING:-jl4/examples/legal/$NEW_ID/$NEW_ID.l4}"
+  if [[ -e "$GO_ROOT/$enc" ]]; then
+    echo "go.sh: $enc already exists, so this subject's encoding is not unwritten." >&2
+    echo "  new-subject scaffolds the UNWRITTEN case. Write the sidecar by hand with" >&2
+    echo "  encoding.state \"written\" (the default), using etc/go/subjects/regcf as the" >&2
+    echo "  worked example." >&2
+    exit 2
+  fi
+
+  local name="${NEW_DISPLAY_NAME:-$NEW_ID}"
+  mkdir -p "$dir"
+
+  NEW_ID="$NEW_ID" NEW_NAME="$name" NEW_CITATION="$NEW_CITATION" \
+    NEW_SOURCE_URL="$NEW_SOURCE_URL" NEW_ENC="$enc" NEW_DIR="$dir" \
+    node "$LIB/new-subject.mjs" || exit $?
+
+  echo
+  echo "created etc/go/subjects/$NEW_ID/ — subject.json, pins.json, known-defects.json, NOTES.md"
+  echo
+  echo "it is already a subject:"
+  echo "  etc/go/go.sh plan --subject $NEW_ID"
+  echo
+  echo "what is NOT done, in the order it has to happen:"
+  echo "  1. write the encoding at $enc (agent work — the L4 encoding skill)"
+  echo "  2. flip encoding.state to \"written\" in etc/go/subjects/$NEW_ID/subject.json"
+  echo "     (subject.mjs refuses the stale declaration once the file exists, so this"
+  echo "      cannot be forgotten silently)"
+  echo "  3. measure pins.json against a real l4 — see etc/go/subjects/regcf/pins.json"
+  echo "     for the shape and etc/go/lib/discover.mjs for how the values are probed"
+  echo "  4. declare the projection legs this subject supports, in subject.json's"
+  echo "     'legs' — the driver declares a stage IFF the leg is there, so an omitted"
+  echo "     leg is an honest silence rather than a failing stage"
 }
 
 cmd_gc() {
@@ -1148,6 +1279,7 @@ case "$CMD" in
   status) cmd_status ;;
   verify) cmd_verify ;;
   gc) cmd_gc ;;
+  new-subject) cmd_new_subject ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;
 esac

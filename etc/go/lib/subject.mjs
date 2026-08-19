@@ -187,12 +187,72 @@ export function loadSubject(id) {
 
   if (typeof desc.encoding !== "object" || desc.encoding === null)
     die(`subject.json: 'encoding' must be an object`);
-  checkKeys("encoding", desc.encoding, ["main", "wizard", "modules"]);
+  checkKeys("encoding", desc.encoding, ["main", "wizard", "modules", "state"]);
   if (typeof desc.encoding.main !== "string")
     die(`subject.json: corpus.main is required`);
-  const encodingMain = mustExist("corpus.main", desc.encoding.main);
+
+  // --- encoding.state: written (default) | unwritten -------------------------
+  //
+  // THE THIRD STATE. Until 2026-08-20 a sidecar could say only two things about
+  // its encoding: this file, which must exist, or nothing at all — and `main`
+  // is required, so "nothing at all" was not available either. That made the
+  // FIRST encoding of a subject homeless: you cannot register a body of law
+  // until you have already encoded it, and you cannot run `plan`, `doctor` or
+  // any stage against it to find out what encoding it would involve. This is
+  // ruling R12 in specs/todo/PIPELINE-ARTIFACT-MODEL-SPEC.md, and it is the
+  // reason `go.sh new-subject` could not exist.
+  //
+  // The fix is a DECLARED state, not a relaxed check. The existence rule a few
+  // lines below is deliberate — its own comment says a de novo module's absence
+  // is a stage's SKIPPED story while a committed module's absence is a
+  // misconfiguration — and simply permitting absence would turn a mistyped path
+  // into a silent skip, which is precisely the failure the explainer's
+  // "EXPLICIT DECLARATION, not directory discovery" comment refuses further
+  // down this file.
+  //
+  // So the declaration is checked in BOTH directions:
+  //
+  //   state written (the default, and what every existing sidecar means):
+  //     main, wizard and every module MUST exist. Byte-for-byte today's rule,
+  //     so a typo still fails loudly naming the path.
+  //
+  //   state unwritten:
+  //     they must NOT exist. Depositing the first module without flipping the
+  //     state is itself an error, naming the file and the one-line edit — which
+  //     is what stops the declaration from rotting into a lie the moment it
+  //     stops being true.
+  //
+  // Nothing downstream needs teaching. The stages already report a declared
+  // module that is not a file as SKIPPED with a named reason and the deposit
+  // instruction (p3-check, p6-tests, p8-verify, via go_skip), and digestSet
+  // records a missing path as ABSENT rather than skipping it — so an unwritten
+  // encoding has a real gate digest, and depositing the first module moves that
+  // digest and re-opens HG1, which is the property §6.3 already claims for a
+  // post-gate edit.
+  const encodingState = desc.encoding.state ?? "written";
+  if (encodingState !== "written" && encodingState !== "unwritten")
+    die(
+      `encoding.state: unknown state '${encodingState}' (expected "written" or "unwritten")`,
+    );
+  const unwritten = encodingState === "unwritten";
+
+  const encodingPath = (where, rel) => {
+    const abs = resolve(REPO, rel);
+    if (unwritten) {
+      if (existsSync(abs))
+        die(
+          `${where}: the sidecar declares encoding.state "unwritten", but ${abs} exists.\n` +
+            `  The encoding has been written, so the sidecar is now false. Set encoding.state to "written" in ${resolve(SUBJECTS_DIR, id, "subject.json")}\n` +
+            `  (or delete the key — "written" is the default). Every stage will then hold this subject to the same rules as any other.`,
+        );
+      return abs;
+    }
+    return mustExist(where, rel);
+  };
+
+  const encodingMain = encodingPath("corpus.main", desc.encoding.main);
   const encodingWizard = desc.encoding.wizard
-    ? mustExist("corpus.wizard", desc.encoding.wizard)
+    ? encodingPath("corpus.wizard", desc.encoding.wizard)
     : "";
 
   // --- the corpus module set ------------------------------------------------
@@ -245,7 +305,7 @@ export function loadSubject(id) {
         die(
           `encoding.modules['${m}']: a module path may not contain whitespace`,
         );
-      const a = mustExist(`encoding.modules['${m}']`, m);
+      const a = encodingPath(`encoding.modules['${m}']`, m);
       if (seenAt.has(a))
         die(
           `encoding.modules['${m}'] duplicates '${seenAt.get(a)}': both resolve to ${a}. The set is the gate digest's file list and the list p3-check/p6-tests/p8-verify iterate, so a repeat would double-count one module's assertions and findings`,
@@ -535,6 +595,11 @@ export function loadSubject(id) {
       // wizard role pointer, so the single-module legs read the same value they
       // always did.
       GO_S_ENCODING_MODULES: encodingModules.join(" "),
+      // Exported so the report and the plan can SAY "unwritten" rather than
+      // leaving the reader to infer it from a run in which every stage skipped.
+      // The stages themselves need nothing: a declared path that is not a file
+      // is already their SKIPPED story, with the deposit instruction attached.
+      GO_S_ENCODING_STATE: encodingState,
       GO_S_PINS: pins,
       GO_S_KNOWN_DEFECTS: defects,
       GO_S_MIN_DATED_ARMS: String(desc.checks.min_dated_arms),
