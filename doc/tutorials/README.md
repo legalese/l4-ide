@@ -46,6 +46,7 @@ Export your L4 rules as live REST API endpoints:
 - **[Use Deployed Rules from an AI Agent (MCP)](legalese-cloud/agent-marketplace.md)** - Connect an agent to the org's rules MCP server; it finds and calls the right rule (scales to many deployments)
 - **[WebMCP Embed Script](legalese-cloud/webmcp-embed.md)** - One embed tag so your website serves its own rules
 - **[RESTful OpenAPI Specification](legalese-cloud/openapi-spec.md)** - Generate clients and call rules as plain REST
+- **[Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)** - Compile L4 decisions into a Blawx project with `l4 blawx`, run them under s(CASP) with English justification trees, and lift Blawx projects back into L4
 
 **Prerequisites:** Basic L4 knowledge
 

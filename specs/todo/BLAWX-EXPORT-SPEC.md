@@ -1313,7 +1313,8 @@ earmark in R10, not a deliverable).
   comment differs), and discharging P1's `#abducible`-interview earmark (a module with
   zero `DECLARE`s now gets an interview; abduction confirmed live in the container: 2 and
   3 answers); **P4c** `housing-grounds.l4` — Housing Act 1988 Sch 2 grounds 8, 13, 15
-  and 17 inlined into one 695-line module, 14 `@export` citations, 49 directives all
+  and 17 inlined into one 727-line module (an earlier draft of this note said 695;
+  `wc -l` on the committed file says 727 and always has), 14 `@export` citations, 49 directives all
   oracle-verified against `l4 run` (0 mismatches). The BNA was declined for P4: its three
   `DATE` fields are fatal in v1 and pre-resolving them would delete the statute's actual
   legal content (the commencement boundary). Verification at full width: tier-1
