@@ -172,7 +172,7 @@ export function loadSubject(id) {
     "display_name",
     "citation",
     "source_url",
-    "corpus",
+    "encoding",
     "checks",
     "legs",
     "denovo",
@@ -185,14 +185,14 @@ export function loadSubject(id) {
   if (desc.id !== id)
     die(`subject.json: id '${desc.id}' does not match directory name '${id}'`);
 
-  if (typeof desc.corpus !== "object" || desc.corpus === null)
-    die(`subject.json: 'corpus' must be an object`);
-  checkKeys("corpus", desc.corpus, ["main", "wizard", "modules"]);
-  if (typeof desc.corpus.main !== "string")
+  if (typeof desc.encoding !== "object" || desc.encoding === null)
+    die(`subject.json: 'encoding' must be an object`);
+  checkKeys("encoding", desc.encoding, ["main", "wizard", "modules"]);
+  if (typeof desc.encoding.main !== "string")
     die(`subject.json: corpus.main is required`);
-  const corpusMain = mustExist("corpus.main", desc.corpus.main);
-  const corpusWizard = desc.corpus.wizard
-    ? mustExist("corpus.wizard", desc.corpus.wizard)
+  const encodingMain = mustExist("corpus.main", desc.encoding.main);
+  const encodingWizard = desc.encoding.wizard
+    ? mustExist("corpus.wizard", desc.encoding.wizard)
     : "";
 
   // --- the corpus module set ------------------------------------------------
@@ -205,7 +205,7 @@ export function loadSubject(id) {
   // module alone would leave a granted HG1 open across an edit to any of the
   // others. That is a false signature, not a cosmetic gap.
   //
-  // `corpus.modules` declares the whole set, IN DEPENDENCY ORDER (an ontology
+  // `encoding.modules` declares the whole set, IN DEPENDENCY ORDER (an ontology
   // module before the statute modules that IMPORT it), and is validated exactly
   // the way `denovo.modules` is below — with one deliberate difference: a
   // corpus module must EXIST. A de novo module is an agent deposit whose
@@ -221,44 +221,51 @@ export function loadSubject(id) {
   // Omitting `modules` resolves to exactly the historical set — main, plus the
   // wizard when declared — so an existing sidecar keeps meaning precisely what
   // it meant.
-  let corpusModules;
-  if (desc.corpus.modules === undefined) {
-    corpusModules = corpusWizard ? [corpusMain, corpusWizard] : [corpusMain];
+  let encodingModules;
+  if (desc.encoding.modules === undefined) {
+    encodingModules = encodingWizard
+      ? [encodingMain, encodingWizard]
+      : [encodingMain];
   } else {
-    if (!Array.isArray(desc.corpus.modules) || desc.corpus.modules.length === 0)
-      die(`corpus.modules must be a non-empty array of module paths`);
-    corpusModules = [];
+    if (
+      !Array.isArray(desc.encoding.modules) ||
+      desc.encoding.modules.length === 0
+    )
+      die(`encoding.modules must be a non-empty array of module paths`);
+    encodingModules = [];
     const seenAt = new Map(); // absolute path -> the declared string that got there
-    for (const m of desc.corpus.modules) {
+    for (const m of desc.encoding.modules) {
       if (typeof m !== "string" || !m)
-        die(`corpus.modules: every entry must be a non-empty string`);
-      // The env transport is space-separated (GO_S_CORPUS_MODULES, exactly as
+        die(`encoding.modules: every entry must be a non-empty string`);
+      // The env transport is space-separated (GO_S_ENCODING_MODULES, exactly as
       // GO_S_DENOVO_MODULES and GO_S_LEGS). A path with whitespace would split
       // silently into two nonexistent paths, so it is refused here rather than
       // mis-read there.
       if (/\s/.test(m))
-        die(`corpus.modules['${m}']: a module path may not contain whitespace`);
-      const a = mustExist(`corpus.modules['${m}']`, m);
+        die(
+          `encoding.modules['${m}']: a module path may not contain whitespace`,
+        );
+      const a = mustExist(`encoding.modules['${m}']`, m);
       if (seenAt.has(a))
         die(
-          `corpus.modules['${m}'] duplicates '${seenAt.get(a)}': both resolve to ${a}. The set is the gate digest's file list and the list p3-check/p6-tests/p8-verify iterate, so a repeat would double-count one module's assertions and findings`,
+          `encoding.modules['${m}'] duplicates '${seenAt.get(a)}': both resolve to ${a}. The set is the gate digest's file list and the list p3-check/p6-tests/p8-verify iterate, so a repeat would double-count one module's assertions and findings`,
         );
       seenAt.set(a, m);
-      corpusModules.push(a);
+      encodingModules.push(a);
     }
-    if (!seenAt.has(corpusMain))
+    if (!seenAt.has(encodingMain))
       die(
-        `corpus.modules does not contain corpus.main ('${desc.corpus.main}' -> ${corpusMain}). main is the subject's ENTRY module — the one the single-artifact legs export from — so a module set that omits it is a misdeclaration, not a shorthand`,
+        `encoding.modules does not contain corpus.main ('${desc.encoding.main}' -> ${encodingMain}). main is the subject's ENTRY module — the one the single-artifact legs export from — so a module set that omits it is a misdeclaration, not a shorthand`,
       );
-    if (corpusWizard && !seenAt.has(corpusWizard))
+    if (encodingWizard && !seenAt.has(encodingWizard))
       die(
-        `corpus.modules does not contain corpus.wizard ('${desc.corpus.wizard}' -> ${corpusWizard}). The wizard is a ROLE POINTER into the module set, not a module beside it: leaving it out would drop it from the gate digest, so editing it could not re-open HG1`,
+        `encoding.modules does not contain corpus.wizard ('${desc.encoding.wizard}' -> ${encodingWizard}). The wizard is a ROLE POINTER into the module set, not a module beside it: leaving it out would drop it from the gate digest, so editing it could not re-open HG1`,
       );
   }
   // Membership set for the de novo identity guard below. Built once, from the
   // resolved set, so that widening the schema cannot leave that guard testing a
   // narrower list than the one the pipeline actually runs over.
-  const corpusModuleSet = new Set(corpusModules);
+  const encodingModuleSet = new Set(encodingModules);
 
   if (typeof desc.checks !== "object" || desc.checks === null)
     die(`subject.json: 'checks' must be an object`);
@@ -325,7 +332,7 @@ export function loadSubject(id) {
         env[envName] = kind === "dir" && key === "figures_dir" ? val : abs;
     }
   }
-  if (legs.includes("p7-wizard") && !corpusWizard)
+  if (legs.includes("p7-wizard") && !encodingWizard)
     die(
       `legs['p7-wizard'] is declared but corpus.wizard is not: the wizard leg renders the wizard module, so a subject with no wizard module omits the leg`,
     );
@@ -401,7 +408,7 @@ export function loadSubject(id) {
         // statute modules, a collision with any of the others is the same defect
         // and would otherwise make the acceptance diff a partial identity with
         // no error anywhere.
-        if (corpusModuleSet.has(a))
+        if (encodingModuleSet.has(a))
           die(
             `denovo.modules['${m}'] is also a corpus module. G2 re-derives the subject from source without reading the committed encoding (SPEC.md §8), so a de novo module that is the replay corpus makes the acceptance diff an identity`,
           );
@@ -520,14 +527,14 @@ export function loadSubject(id) {
       GO_S_CITATION: desc.citation,
       GO_S_SOURCE_URL: desc.source_url,
       GO_S_DIR: dir,
-      GO_S_CORPUS: corpusMain,
-      GO_S_WIZARD: corpusWizard,
+      GO_S_ENCODING: encodingMain,
+      GO_S_WIZARD: encodingWizard,
       // The whole encoding, space-separated, in declared (dependency) order —
-      // same transport as GO_S_DENOVO_MODULES and GO_S_LEGS. GO_S_CORPUS and
+      // same transport as GO_S_DENOVO_MODULES and GO_S_LEGS. GO_S_ENCODING and
       // GO_S_WIZARD stay exactly what they were, the entry module and the
       // wizard role pointer, so the single-module legs read the same value they
       // always did.
-      GO_S_CORPUS_MODULES: corpusModules.join(" "),
+      GO_S_ENCODING_MODULES: encodingModules.join(" "),
       GO_S_PINS: pins,
       GO_S_KNOWN_DEFECTS: defects,
       GO_S_MIN_DATED_ARMS: String(desc.checks.min_dated_arms),

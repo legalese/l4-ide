@@ -25,7 +25,7 @@ if [[ "${1:-}" == "--inputs" ]]; then
   # direct-invocation fallback, deliberately: a narrower set here would
   # under-declare the digest.
   declare -a _INPUT_MODULES=()
-  read -ra _INPUT_MODULES <<<"${GO_S_CORPUS_MODULES:-${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  read -ra _INPUT_MODULES <<<"${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
   printf '%s\n' "${_INPUT_MODULES[@]}" "${BASH_SOURCE[0]}" "$GO_S_PINS"
   exit 0
 fi
@@ -55,7 +55,7 @@ node "$GO_LIB/probe.mjs" >"$PROBES"
 # unrelated reflow, and a tripwire that cries wolf gets deleted. The pin file
 # is the subject's own: it was measured against that subject's corpus.
 set +e
-node "$GO_LIB/discover.mjs" check "$GO_S_CORPUS" "$GO_S_PINS" >"$PINLOG" 2>&1
+node "$GO_LIB/discover.mjs" check "$GO_S_ENCODING" "$GO_S_PINS" >"$PINLOG" 2>&1
 PIN_EXIT=$?
 set -e
 cat "$PINLOG"
@@ -121,9 +121,9 @@ fi
 # etc/go/lib/corpus-metrics.mjs, which is also where a selftest can measure the
 # coverage instead of trusting this comment.
 declare -a CORPUS_MODULES=()
-read -ra CORPUS_MODULES <<<"${GO_S_CORPUS_MODULES:-${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+read -ra CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
 if [[ ${#CORPUS_MODULES[@]} -eq 0 ]]; then
-  go_broken "no corpus module resolved: GO_S_CORPUS_MODULES and GO_S_CORPUS are both empty, so this receipt would record no corpus sha256 at all and the HG1 payload would commit to nothing"
+  go_broken "no corpus module resolved: GO_S_ENCODING_MODULES and GO_S_ENCODING are both empty, so this receipt would record no corpus sha256 at all and the HG1 payload would commit to nothing"
 fi
 set +e
 CORPUS_METRICS="$(node "$GO_LIB/corpus-metrics.mjs" "${CORPUS_MODULES[@]}" 2>&1)"
@@ -139,13 +139,13 @@ done <<<"$CORPUS_METRICS"
 # The rule-name discovery only applies to a subject whose sidecar pins
 # regulative rules; a purely constitutive corpus has none to discover.
 if node -e 'process.exit(require("'"$GO_S_PINS"'").regulative_rules ? 0 : 1)'; then
-  RULES="$(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS" | tr '\n' ';')"
+  RULES="$(node "$GO_LIB/discover.mjs" rules "$GO_S_ENCODING" | tr '\n' ';')"
   METRICS+=(--metric "regulative_rules=$RULES")
 fi
 
 go_receipt \
   --status PASS \
-  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_CORPUS") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire still exits 0" \
+  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_ENCODING") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire still exits 0" \
   --oracle-exit 0 \
   --oracle-class structural \
   --oracle-because "the four CLI enumerations and the module's regulative rule names are recovered by discovery calls and compared as SETS against the subject's pins.json, so a rename fails loudly naming the exact strings; the tripwire independently confirms the l4-run workaround is still needed" \

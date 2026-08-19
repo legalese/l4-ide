@@ -36,7 +36,7 @@
   "display_name": "Singapore succession — Wills, Intestate Succession, Probate and Administration",
   "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934 (Singapore)",
   "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
-  "corpus": {
+  "encoding": {
     "main": "jl4/examples/legal/sg-succession/sg-succession.l4",
     "wizard": "jl4/examples/legal/sg-succession/sg-succession-wizard.l4",
     "modules": [

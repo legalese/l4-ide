@@ -291,7 +291,7 @@ sidecar owns every fact about one body of law.** The driver, libraries and phase
 no subject literals; everything subject-specific lives in `etc/go/subjects/<id>/`, four files:
 
 - **`subject.json`** — the machine-readable descriptor: id, display name, legal citation, source
-  entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check
+  entry URL, corpus module paths (`encoding.main`, optional `encoding.wizard`), per-subject check
   floors (`checks.min_dated_arms`, `checks.min_assertions` — these are _measurements_ of the
   corpus, which is why they cannot be pipeline constants), a `legs` object carrying one entry
   per projection leg with its committed golden/cases/aux paths, and an optional `denovo` object
@@ -320,7 +320,7 @@ sidecars and the recipe for adding one. Both refusals are selftest-covered.
 
 **The `legs` object is the leg declaration.** `go.sh` declares `p0-preflight`, `p3-check`,
 `p6-tests` and `p9-report` for every subject, and a p7 stage iff `legs` has its entry; the
-wizard-dependent halves of p0/p3/p6/p7-mcp engage iff `corpus.wizard` is present. This is what
+wizard-dependent halves of p0/p3/p6/p7-mcp engage iff `encoding.wizard` is present. This is what
 keeps the §3.2 milestone rule honest across subjects: a future subject with no wizard and no
 regulative rules (so no bpmn/lts legs and no NLG goldens) omits those entries, and `COMPLETE`
 still means every stage _that subject declares_ is accounted for — not that its sidecar faked
@@ -721,7 +721,7 @@ granting row records the digest of the corpus the run is actually using.
 A third hole was closed on 2026-08-18. "The sha256 of every corpus file" was rendered from
 `p0-preflight`'s `corpus_sha_*` metrics, and that stage recorded exactly two — the entry module
 and the wizard — which was the whole set only while an encoding was one module plus a wizard.
-Under `corpus.modules` an encoding is N modules, and modules 3..N appeared in **no** payload in
+Under `encoding.modules` an encoding is N modules, and modules 3..N appeared in **no** payload in
 **any** run state: the reviewer was never shown them, and no honest re-run could produce a
 document that committed to them. `p0-preflight` now records one metric per module
 (`etc/go/lib/corpus-metrics.mjs`), keyed by repo-relative path rather than basename because
@@ -734,7 +734,7 @@ describing the pre-edit corpus.
 `p0-preflight` re-executes, which an ordinary run does. A run resumed with `--only <a gated
 stage>` never reaches `p0-preflight` at all, so an edit made after the gate was granted moves the
 corpus digest — the grant correctly goes `stale` — but leaves the payload byte-identical, and the
-existing signature re-satisfies the gate over the new digest. This is older than `corpus.modules`
+existing signature re-satisfies the gate over the new digest. This is older than `encoding.modules`
 and behaves the same way for a single-module subject. Closing it means the gate check refusing a
 `stale` grant whose payload cannot have seen the change, rather than handing it to
 `gate-verify.sh`; until that is built, `--only` past a granted gate is a route to be aware of.

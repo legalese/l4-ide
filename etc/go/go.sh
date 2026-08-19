@@ -234,9 +234,9 @@ export "${!GO_S_@}"
 # that does not re-open over the thing it gates is not a gate over that thing
 # (the same lesson the narrative deposit taught below, at a different scale).
 # Split the same way the g2 branch splits GO_S_DENOVO_MODULES.
-declare -a GO_CORPUS_FILES=()
-read -ra _CORPUS_MODULES <<<"${GO_S_CORPUS_MODULES:-$GO_S_CORPUS}"
-GO_CORPUS_FILES+=("${_CORPUS_MODULES[@]}")
+declare -a GO_ENCODING_FILES=()
+read -ra _CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING}"
+GO_ENCODING_FILES+=("${_CORPUS_MODULES[@]}")
 
 # At g2 the gate binds to the DE NOVO deposits instead, because that is what HG1
 # is being asked about. A waiver granted over the committed corpus says nothing
@@ -245,20 +245,20 @@ GO_CORPUS_FILES+=("${_CORPUS_MODULES[@]}")
 # or a module changes the digest and re-opens the gate, which is the behaviour
 # §6.3 claims for a post-gate edit.
 if [[ "$MILESTONE" == "g2" ]]; then
-  GO_CORPUS_FILES=()
+  GO_ENCODING_FILES=()
   # The surface map is in the set for the same reason the narrative deposit is
   # in g1's: HG1 covers the pairing declaration too, and a map edited after a
   # waiver would otherwise ride the old grant into p8-diff.
   for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
-    [[ -n "$_p" ]] && GO_CORPUS_FILES+=("$_p")
+    [[ -n "$_p" ]] && GO_ENCODING_FILES+=("$_p")
   done
   if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
     read -ra _mods <<<"$GO_S_DENOVO_MODULES"
-    GO_CORPUS_FILES+=("${_mods[@]}")
+    GO_ENCODING_FILES+=("${_mods[@]}")
   fi
   # A subject with no `denovo` section at all still needs a digest to bind a
   # gate to; `text:` entries are literal digest contributors (digestSet).
-  [[ ${#GO_CORPUS_FILES[@]} -eq 0 ]] && GO_CORPUS_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
+  [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
 else
   # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
   #
@@ -277,7 +277,7 @@ else
   # moves and HG1 shuts.
   if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]]; then
     for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
-      [[ -e "$_f" ]] && GO_CORPUS_FILES+=("$_f")
+      [[ -e "$_f" ]] && GO_ENCODING_FILES+=("$_f")
     done
   fi
 fi
@@ -303,7 +303,7 @@ else
   # resolved and validated by subject.mjs. The `:-` arm is the pre-2026-08-18
   # shape, kept so a sidecar resolved by an older subject.mjs — or a hand-set
   # environment — still names a module set rather than none.
-  GO_MODULES="${GO_S_CORPUS_MODULES:-$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
   GO_MODULES_ORIGIN="corpus"
 fi
 export GO_MODULES GO_MODULES_ORIGIN
@@ -337,7 +337,7 @@ gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
 # are the §8 comparator and the report, so those are what HG1 gates — and, as
 # at g1, a g2 run stops there with exit 3 until the gate is signed or waived on
 # the record. At g2 the gate binds to the DE NOVO deposit-set digest (see
-# GO_CORPUS_FILES above), so a waiver over the replay corpus covers nothing
+# GO_ENCODING_FILES above), so a waiver over the replay corpus covers nothing
 # here, and depositing or editing a deposit — the surface map included —
 # re-opens the gate.
 if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p6-tests p7-dmn p8-verify p8-diff p9-report"; fi
@@ -474,9 +474,9 @@ cmd_plan() {
   # question a reader of a waiver actually has — and it is the question that was
   # answered wrongly for the explainer's narrative deposit, which the gate was
   # supposed to cover and did not.
-  echo "the digest a gate on this run would bind to, over ${#GO_CORPUS_FILES[@]} file(s):"
-  echo "  $(node "$LIB/digest.mjs" "${GO_CORPUS_FILES[@]}")"
-  for s in "${GO_CORPUS_FILES[@]}"; do printf '  %s\n' "${s#"$GO_ROOT"/}"; done
+  echo "the digest a gate on this run would bind to, over ${#GO_ENCODING_FILES[@]} file(s):"
+  echo "  $(node "$LIB/digest.mjs" "${GO_ENCODING_FILES[@]}")"
+  for s in "${GO_ENCODING_FILES[@]}"; do printf '  %s\n' "${s#"$GO_ROOT"/}"; done
   echo
   echo "entry points that exist and refuse, each with a named blocker:"
   for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
@@ -651,7 +651,7 @@ EOF
   # rows bind to it so a waiver granted over one corpus does not silently cover
   # a later edit.
   local corpus_digest corpus_sha8
-  corpus_digest=$(node "$LIB/digest.mjs" "${GO_CORPUS_FILES[@]}")
+  corpus_digest=$(node "$LIB/digest.mjs" "${GO_ENCODING_FILES[@]}")
   corpus_sha8=$(printf '%s' "$corpus_digest" | sed 's/^sha256://' | cut -c1-8)
   local RUN
   if [[ -n "$RUN_ID" ]]; then

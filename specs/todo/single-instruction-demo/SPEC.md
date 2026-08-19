@@ -640,7 +640,7 @@ elsewhere should say "SI-Rn".
   re-obtained.
 
   Two things were wrong with the retracted claim, one of them at the time it was written. The
-  basename form could not survive `corpus.modules`: metrics are last-wins, so two modules sharing
+  basename form could not survive `encoding.modules`: metrics are last-wins, so two modules sharing
   a basename in different directories — an ordinary shape once an encoding is an ontology module
   plus three statute modules — collapsed to one payload line and dropped a module out of the
   signed document silently. And the value was never the file's sha256: it was

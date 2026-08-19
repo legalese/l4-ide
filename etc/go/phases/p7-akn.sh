@@ -14,7 +14,7 @@
 # verdict no matter what it reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}"
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}"
   exit 0
 fi
 
@@ -24,7 +24,7 @@ OUT="$GO_OUT/$GO_S_ID.akn.xml"
 LOG="$GO_OUT/p7-akn.txt"
 
 set +e
-"$L4" render "$GO_S_CORPUS" --format akn -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
+"$L4" render "$GO_S_ENCODING" --format akn -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
 RC=$?
 set -e
 if [[ $RC -ne 0 ]]; then

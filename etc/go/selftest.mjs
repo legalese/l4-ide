@@ -700,42 +700,47 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
       "utf8",
     ),
   );
-  const MAIN = resolve(REPO_ROOT, fixtureDesc.corpus.main);
-  const WIZARD = fixtureDesc.corpus.wizard
-    ? resolve(REPO_ROOT, fixtureDesc.corpus.wizard)
+  const MAIN = resolve(REPO_ROOT, fixtureDesc.encoding.main);
+  const WIZARD = fixtureDesc.encoding.wizard
+    ? resolve(REPO_ROOT, fixtureDesc.encoding.wizard)
     : "";
   const FIVE = (desc) => {
-    desc.corpus.modules = [
+    desc.encoding.modules = [
       ONTOLOGY,
-      desc.corpus.main,
+      desc.encoding.main,
       WILLS,
       INTESTATE,
-      desc.corpus.wizard,
+      desc.encoding.wizard,
     ];
   };
 
   {
     const r = withCorpus(FIVE);
     check(
-      "corpus.modules resolves EVERY declared module into GO_S_CORPUS_MODULES, in declared (dependency) order",
+      "corpus.modules resolves EVERY declared module into GO_S_ENCODING_MODULES, in declared (dependency) order",
       r.status === 0 &&
         r.stdout.includes(
-          `GO_S_CORPUS_MODULES='${ONTOLOGY} ${MAIN} ${WILLS} ${INTESTATE} ${WIZARD}'`,
+          `GO_S_ENCODING_MODULES='${ONTOLOGY} ${MAIN} ${WILLS} ${INTESTATE} ${WIZARD}'`,
         ),
     );
     // The two old names are ROLE POINTERS into the set, not a second encoding
     // of it: every single-module leg still reads them, so widening the schema
     // must not have moved them.
     check(
-      "GO_S_CORPUS and GO_S_WIZARD still name the entry module and the wizard, unchanged",
+      "GO_S_ENCODING and GO_S_WIZARD still name the entry module and the wizard, unchanged",
       r.status === 0 &&
-        r.stdout.includes(`GO_S_CORPUS='${MAIN}'`) &&
+        r.stdout.includes(`GO_S_ENCODING='${MAIN}'`) &&
         r.stdout.includes(`GO_S_WIZARD='${WIZARD}'`),
     );
   }
   {
     const r = withCorpus((desc) => {
-      desc.corpus.modules = [ONTOLOGY, WILLS, INTESTATE, desc.corpus.wizard];
+      desc.encoding.modules = [
+        ONTOLOGY,
+        WILLS,
+        INTESTATE,
+        desc.encoding.wizard,
+      ];
     });
     check(
       "a corpus.modules set that omits corpus.main is refused, naming the entry module",
@@ -746,7 +751,7 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
   }
   {
     const r = withCorpus((desc) => {
-      desc.corpus.modules = [desc.corpus.main, ONTOLOGY];
+      desc.encoding.modules = [desc.encoding.main, ONTOLOGY];
     });
     check(
       "a declared corpus.wizard that is not a member of corpus.modules is refused — it would fall outside the gate digest",
@@ -757,9 +762,9 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
   }
   {
     const r = withCorpus((desc) => {
-      desc.corpus.modules = [
-        desc.corpus.main,
-        desc.corpus.wizard,
+      desc.encoding.modules = [
+        desc.encoding.main,
+        desc.encoding.wizard,
         "jl4/examples/legal/no-such-statute.l4",
       ];
     });
@@ -771,10 +776,10 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
   }
   {
     const r = withCorpus((desc) => {
-      desc.corpus.modules = [
+      desc.encoding.modules = [
         ONTOLOGY,
-        desc.corpus.main,
-        desc.corpus.wizard,
+        desc.encoding.main,
+        desc.encoding.wizard,
         ONTOLOGY,
       ];
     });
@@ -787,20 +792,20 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
   }
   {
     const r = withCorpus((desc) => {
-      desc.corpus.modules = [
-        desc.corpus.main,
-        desc.corpus.wizard,
+      desc.encoding.modules = [
+        desc.encoding.main,
+        desc.encoding.wizard,
         "jl4/examples/legal/two words.l4",
       ];
     });
     check(
-      "a corpus module path containing whitespace is refused — GO_S_CORPUS_MODULES is space-separated",
+      "a corpus module path containing whitespace is refused — GO_S_ENCODING_MODULES is space-separated",
       r.status === 2 && /may not contain whitespace/.test(r.stderr),
     );
   }
   {
     const r = withCorpus((desc) => {
-      desc.corpus.modules = [];
+      desc.encoding.modules = [];
     });
     check(
       "an empty corpus.modules array is refused rather than read as 'no modules'",
@@ -812,13 +817,13 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
     check(
       "a descriptor with NO corpus.modules resolves to exactly main + wizard, as before the key existed",
       r.status === 0 &&
-        r.stdout.includes(`GO_S_CORPUS_MODULES='${MAIN} ${WIZARD}'`),
+        r.stdout.includes(`GO_S_ENCODING_MODULES='${MAIN} ${WIZARD}'`),
     );
   }
   {
     // SPEC.md §8's identity guard, at the new arity. This is the regression the
     // widened schema could have introduced in silence: the old check named
-    // corpusMain and corpusWizard, so a de novo module colliding with the third
+    // encodingMain and encodingWizard, so a de novo module colliding with the third
     // or fourth corpus module would have been waved through and the acceptance
     // diff would have been a partial identity with no error anywhere.
     const r = withCorpus((desc) => {
@@ -832,7 +837,7 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
   }
   {
     // BEHAVIOURAL, for the same reason the narrative-deposit check above is:
-    // a source-text assertion about go.sh would pass over a GO_CORPUS_FILES
+    // a source-text assertion about go.sh would pass over a GO_ENCODING_FILES
     // array that was built and then overwritten. So the driver is ASKED, via
     // `plan`, for the digest it would bind a gate to.
     withCorpus(FIVE);
@@ -1292,7 +1297,7 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
   //
   // This asks the driver, via `plan`, for the digest it would bind a gate to,
   // and checks that touching a narrative file moves it. A source-text
-  // assertion about go.sh would pass over a `GO_CORPUS_FILES` array that was
+  // assertion about go.sh would pass over a `GO_ENCODING_FILES` array that was
   // built and then overwritten.
   {
     const digestOf = () => {
@@ -2893,7 +2898,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         display_name: "Selftest Subject",
         citation: "n/a",
         source_url: "https://example.invalid/",
-        corpus: { main: corpus },
+        encoding: { main: corpus },
         checks: { min_dated_arms: 0, min_assertions: 0 },
         legs: {},
         ...(denovo ? { denovo } : {}),
@@ -3049,7 +3054,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         GO_S_ID: "smoke",
         GO_S_DIR: resolve(sidecars, "smoke"),
         GO_S_CITATION: "n/a",
-        GO_S_CORPUS: CORPUS,
+        GO_S_ENCODING: CORPUS,
         GO_S_DENOVO_BUNDLE: "",
         GO_S_DENOVO_REGISTER: "",
         GO_S_DENOVO_FORKS: "",

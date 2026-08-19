@@ -54,7 +54,7 @@
 # NARROWER set than a run does would make a direct invocation measure something
 # other than what the receipt claims.
 if [[ -z "${GO_MODULES+x}" ]]; then
-  GO_MODULES="${GO_S_CORPUS_MODULES:-${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
   GO_MODULES_ORIGIN="corpus"
 fi
 

@@ -42,7 +42,7 @@
 #      count to equal the function count the deployment itself reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
+  printf '%s\n' "$GO_S_ENCODING" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
   exit 0
 fi
 
@@ -63,7 +63,7 @@ LOG="$GO_OUT/p7-mcp.txt"
 # statute modules and the ontology. Zipping main+wizard produced a 6,660-byte
 # bundle that polled `unreachable` for the full 120s timeout.
 declare -a MODULES
-read -ra MODULES <<<"${GO_S_CORPUS_MODULES:-$GO_S_CORPUS${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+read -ra MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
 
 # Bounds on a LOOPBACK service: how long an accepted deployment may take to
 # finish compiling, and how long any single HTTP call may take.
@@ -82,7 +82,7 @@ SERVICE_OWN_TOOLS="list_files read_file search_identifier search_text"
 # --- 1. the local half, which always runs ------------------------------------
 command -v zip >/dev/null 2>&1 || go_skip "zip is not on PATH; the deployable surface is a zip of the subject's module set (${MODULES[*]##*/})"
 rm -f "$ZIP"
-(cd "$(dirname "$GO_S_CORPUS")" && zip -q -r "$ZIP" "${MODULES[@]##*/}") >>"$LOG" 2>&1
+(cd "$(dirname "$GO_S_ENCODING")" && zip -q -r "$ZIP" "${MODULES[@]##*/}") >>"$LOG" 2>&1
 [[ -f "$ZIP" ]] || go_broken "zip reported success but produced no $ZIP"
 echo "built deployable surface: $ZIP ($(wc -c <"$ZIP" | tr -d ' ') bytes)" | tee -a "$LOG"
 

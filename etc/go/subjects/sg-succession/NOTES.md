@@ -23,8 +23,8 @@ family tree and let the copies disagree, and the questions users actually ask cr
 Acts in one breath.
 
 That decision is what drove the pipeline's **N-module corpus** work: before this subject, a
-`subject.json` could declare `corpus.main` plus an optional `corpus.wizard` and nothing else.
-`corpus.modules` exists because this subject needs an ontology module plus three statute modules
+`subject.json` could declare `encoding.main` plus an optional `encoding.wizard` and nothing else.
+`encoding.modules` exists because this subject needs an ontology module plus three statute modules
 plus cases plus a wizard.
 
 ## This is the first subject where "de novo" and "corpus" are the same encoding

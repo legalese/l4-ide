@@ -28,7 +28,7 @@
 # this leg exists to notice.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" \
     "$GO_S_TNR_GOLDEN" \
     ${GO_S_WIZARD:+"$GO_S_WIZARD"} \
     ${GO_S_TNR_WIZARD_GOLDEN:+"$GO_S_TNR_WIZARD_GOLDEN"}
@@ -55,7 +55,7 @@ content_sha() {
 # The (source, golden) pairs this subject declares. The wizard pair is optional
 # — subject.mjs marks `wizard_golden` as `o` — so it joins only when both the
 # module and its golden are declared.
-declare -a PAIRS=("$GO_S_CORPUS|$GO_S_TNR_GOLDEN")
+declare -a PAIRS=("$GO_S_ENCODING|$GO_S_TNR_GOLDEN")
 if [[ -n "${GO_S_WIZARD:-}" && -n "${GO_S_TNR_WIZARD_GOLDEN:-}" ]]; then
   PAIRS+=("$GO_S_WIZARD|$GO_S_TNR_WIZARD_GOLDEN")
 fi
