@@ -4299,6 +4299,93 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
 }
 // ===== END toolchain discovery + the doctor =================================
 
+// ===== gc retention is per subject ==========================================
+//
+// `gc` is the only destructive command in the driver, and it had no test at
+// all. What it deletes is not scratch: cross-run replay (SPEC §R7) satisfies a
+// stage from a receipt in an EARLIER run, so the run store is the input to
+// "tweak one exporter and re-measure cheaply". Collecting it wrongly does not
+// fail loudly — it just makes the next run do all the work again, which reads
+// as slowness rather than as data loss.
+//
+// The specific bug these checks pin: retention claimed "the latest run per
+// subject" in a comment and implemented `sort | tail -$KEEP` over the whole
+// store. One subject, no difference. Two subjects and a burst of runs on the
+// newer one, and every run of the older subject is inside the window that gets
+// deleted. The fixture below is that exact shape.
+process.stdout.write("\n-- gc retention --\n");
+{
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-gc-"));
+  const mkRun = (id, subject, gated = false) => {
+    const d = resolve(root, id);
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    // `subject: undefined` is dropped by JSON.stringify, which is exactly the
+    // shape of a pre-subject-field run_begin — so this fixture reproduces the
+    // real unattributed runs rather than simulating them.
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      milestone: "g1",
+      subject: subject ?? undefined,
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: ["p6-tests"],
+    });
+    if (gated)
+      append(j, { kind: "gate", gate: "HG1", state: "satisfied", by: "test" });
+    return d;
+  };
+
+  // Newer subject dominating the sort order, older subject buried beneath it.
+  mkRun("2026-01-01-aaaaaaaa-001", "old-subject", true); // gated, oldest
+  mkRun("2026-01-02-aaaaaaaa-001", "old-subject");
+  mkRun("2026-01-03-aaaaaaaa-001", "old-subject");
+  mkRun("2026-01-04-nnnnnnnn-001", null); // unattributed
+  for (let i = 1; i <= 8; i++)
+    mkRun(`2026-02-${String(i).padStart(2, "0")}-bbbbbbbb-001`, "new-subject");
+
+  const before = readdirSync(root).sort();
+  check("gc fixture has 12 runs before collection", before.length === 12);
+
+  const r = spawnSync("bash", [resolve(HERE, "go.sh"), "gc", "--keep", "2"], {
+    env: { ...process.env, L4_GO_RUNDIR: root },
+    encoding: "utf8",
+  });
+  check("gc exits 0", r.status === 0);
+
+  const kept = new Set(readdirSync(root));
+  check(
+    "gc keeps the newest --keep runs of the DOMINANT subject",
+    kept.has("2026-02-08-bbbbbbbb-001") && kept.has("2026-02-07-bbbbbbbb-001"),
+  );
+  check(
+    "gc collects the dominant subject's runs beyond the window",
+    !kept.has("2026-02-01-bbbbbbbb-001"),
+  );
+  // The regression proper. Under global `tail -$KEEP` every one of these sorts
+  // below eight newer runs and is deleted, taking the older subject's entire
+  // replay corpus with it.
+  check(
+    "gc keeps the newest --keep runs of the BURIED subject",
+    kept.has("2026-01-03-aaaaaaaa-001") && kept.has("2026-01-02-aaaaaaaa-001"),
+  );
+  check(
+    "a granted gate is retained even outside its subject's window",
+    kept.has("2026-01-01-aaaaaaaa-001"),
+  );
+  check(
+    "an unattributed run gets its own window, not a discard",
+    kept.has("2026-01-04-nnnnnnnn-001"),
+  );
+  check(
+    "gc says per subject, so the line cannot drift from the rule again",
+    /latest 2 per subject/.test(r.stdout),
+  );
+}
+// ===== END gc retention =====================================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

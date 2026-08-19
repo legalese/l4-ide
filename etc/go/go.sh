@@ -204,10 +204,28 @@ RUNDIR_BASE="${L4_GO_RUNDIR:-${TMPDIR:-/tmp}/l4-go}"
 FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
 
 # --- subject resolution -----------------------------------------------------
+# Only three commands are ABOUT a body of law: `run` executes stages against
+# one, `plan` prints that subject's stage list, and `doctor` checks the
+# environment those stages want. `help`, `status`, `verify` and `gc` are about
+# the DRIVER and the run store; none of them reads a GO_S_* variable, and
+# demanding a subject from them is a requirement with nothing behind it.
+#
+# That distinction was free while one sidecar existed, because the sole subject
+# was the silent default. Adding a second made the requirement bite, and it bit
+# `help` first: `etc/go/go.sh help` — the command the refusal message itself
+# tells you to run — exited 2 without printing usage, which is how the CI step
+# that calls it went red on a PR that never touched the driver.
+# A membership test and not a `case`, deliberately: check-skill-drift.mjs finds
+# the dispatch table by matching the FIRST `case "$CMD" in` at column 0, so a
+# second one here would shadow it and the checker would report every real
+# command as undispatched. One dispatch table per driver is also just true.
+_NEEDS_SUBJECT=0
+[[ " run plan doctor " == *" $CMD "* ]] && _NEEDS_SUBJECT=1
+
 # With no --subject, the sole sidecar under etc/go/subjects/ is the default;
 # once a second subject exists, naming one becomes mandatory — a silent
 # default among several would make a run about an unnamed body of law.
-if [[ -z "$SUBJECT" ]]; then
+if [[ $_NEEDS_SUBJECT -eq 1 && -z "$SUBJECT" ]]; then
   mapfile -t _SUBJECTS < <(node "$LIB/subject.mjs" --list)
   if [[ ${#_SUBJECTS[@]} -eq 1 && -n "${_SUBJECTS[0]}" ]]; then
     SUBJECT="${_SUBJECTS[0]}"
@@ -221,126 +239,138 @@ fi
 # refused, referenced goldens must exist) and prints shell-safe GO_S_* lines;
 # an unknown subject exits 2 listing the available sidecars and the recipe for
 # adding one. The eval is safe because subject.mjs single-quotes every value.
-SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT")" || exit 2
-eval "$SUBJECT_ENV"
-export "${!GO_S_@}"
+if [[ -n "$SUBJECT" ]]; then
+  SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT")" || exit 2
+  eval "$SUBJECT_ENV"
+  export "${!GO_S_@}"
+fi
 
-# The subject's corpus file set: EVERY module the sidecar declares, resolved by
-# subject.mjs into one space-separated list (corpus.modules, defaulting to
-# corpus.main plus the wizard module when no set is declared). Used for the
-# corpus digest that gates bind to — which is why it has to be the whole
-# encoding and not just the entry module: a digest over one module of four
-# would leave a granted HG1 open across an edit to the other three, and a gate
-# that does not re-open over the thing it gates is not a gate over that thing
-# (the same lesson the narrative deposit taught below, at a different scale).
-# Split the same way the g2 branch splits GO_S_DENOVO_MODULES.
-declare -a GO_ENCODING_FILES=()
-read -ra _CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING}"
-GO_ENCODING_FILES+=("${_CORPUS_MODULES[@]}")
+# Everything from here to the end of the stage assembly is ABOUT a subject: it
+# resolves the module set, the gate digest set and the declared stage list from
+# the sidecar. `help`, `status`, `verify` and `gc` reach none of it, and under
+# `set -u` it would abort them on GO_S_ENCODING being unbound — which is how
+# `gc` came to exit 1 rather than collect anything the first time the subject
+# requirement was made conditional. Guarding the region, rather than the
+# requirement alone, is what makes those four commands genuinely
+# subject-independent.
+if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
+  # The subject's corpus file set: EVERY module the sidecar declares, resolved by
+  # subject.mjs into one space-separated list (corpus.modules, defaulting to
+  # corpus.main plus the wizard module when no set is declared). Used for the
+  # corpus digest that gates bind to — which is why it has to be the whole
+  # encoding and not just the entry module: a digest over one module of four
+  # would leave a granted HG1 open across an edit to the other three, and a gate
+  # that does not re-open over the thing it gates is not a gate over that thing
+  # (the same lesson the narrative deposit taught below, at a different scale).
+  # Split the same way the g2 branch splits GO_S_DENOVO_MODULES.
+  declare -a GO_ENCODING_FILES=()
+  read -ra _CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING}"
+  GO_ENCODING_FILES+=("${_CORPUS_MODULES[@]}")
 
-# At g2 the gate binds to the DE NOVO deposits instead, because that is what HG1
-# is being asked about. A waiver granted over the committed corpus says nothing
-# about an encoding that did not exist when it was granted — and since digestSet
-# records a missing file as ABSENT rather than skipping it, DEPOSITING a bundle
-# or a module changes the digest and re-opens the gate, which is the behaviour
-# §6.3 claims for a post-gate edit.
-if [[ "$MILESTONE" == "g2" ]]; then
-  GO_ENCODING_FILES=()
-  # The surface map is in the set for the same reason the narrative deposit is
-  # in g1's: HG1 covers the pairing declaration too, and a map edited after a
-  # waiver would otherwise ride the old grant into p8-diff.
-  for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
-    [[ -n "$_p" ]] && GO_ENCODING_FILES+=("$_p")
-  done
-  if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
-    read -ra _mods <<<"$GO_S_DENOVO_MODULES"
-    GO_ENCODING_FILES+=("${_mods[@]}")
-  fi
-  # A subject with no `denovo` section at all still needs a digest to bind a
-  # gate to; `text:` entries are literal digest contributors (digestSet).
-  [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
-else
-  # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
-  #
-  # `p9-explain` is HG1-gated because it publishes narrative prose about a body
-  # of law. But the gate binds to this digest, and this digest used to cover the
-  # L4 modules alone — MEASURED: editing `explainer/orientation.md`, re-running
-  # `--only p9-explain` with no new grant, and watching the gate stay open while
-  # the replaced prose went straight into the rendered document. The drift
-  # detector fired (an inline `UNRECORDED EDIT` banner, a `narrative-drift`
-  # finding), and `--bless` cleared all of it in one command with nothing left
-  # to compare. A gate that does not re-open over the thing it gates is not a
-  # gate over that thing.
-  #
-  # Folding the deposit in here also closes the `--bless` hole for free:
-  # blessing rewrites `provenance.json`, which is in this set, so the digest
-  # moves and HG1 shuts.
-  if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]]; then
-    for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
-      [[ -e "$_f" ]] && GO_ENCODING_FILES+=("$_f")
+  # At g2 the gate binds to the DE NOVO deposits instead, because that is what HG1
+  # is being asked about. A waiver granted over the committed corpus says nothing
+  # about an encoding that did not exist when it was granted — and since digestSet
+  # records a missing file as ABSENT rather than skipping it, DEPOSITING a bundle
+  # or a module changes the digest and re-opens the gate, which is the behaviour
+  # §6.3 claims for a post-gate edit.
+  if [[ "$MILESTONE" == "g2" ]]; then
+    GO_ENCODING_FILES=()
+    # The surface map is in the set for the same reason the narrative deposit is
+    # in g1's: HG1 covers the pairing declaration too, and a map edited after a
+    # waiver would otherwise ride the old grant into p8-diff.
+    for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
+      [[ -n "$_p" ]] && GO_ENCODING_FILES+=("$_p")
     done
+    if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
+      read -ra _mods <<<"$GO_S_DENOVO_MODULES"
+      GO_ENCODING_FILES+=("${_mods[@]}")
+    fi
+    # A subject with no `denovo` section at all still needs a digest to bind a
+    # gate to; `text:` entries are literal digest contributors (digestSet).
+    [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
+  else
+    # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
+    #
+    # `p9-explain` is HG1-gated because it publishes narrative prose about a body
+    # of law. But the gate binds to this digest, and this digest used to cover the
+    # L4 modules alone — MEASURED: editing `explainer/orientation.md`, re-running
+    # `--only p9-explain` with no new grant, and watching the gate stay open while
+    # the replaced prose went straight into the rendered document. The drift
+    # detector fired (an inline `UNRECORDED EDIT` banner, a `narrative-drift`
+    # finding), and `--bless` cleared all of it in one command with nothing left
+    # to compare. A gate that does not re-open over the thing it gates is not a
+    # gate over that thing.
+    #
+    # Folding the deposit in here also closes the `--bless` hole for free:
+    # blessing rewrites `provenance.json`, which is in this set, so the digest
+    # moves and HG1 shuts.
+    if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]]; then
+      for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
+        [[ -e "$_f" ]] && GO_ENCODING_FILES+=("$_f")
+      done
+    fi
   fi
-fi
 
-# --- the milestone-scoped module set (ONE list per run) ----------------------
-# p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
-# g1 the committed corpus (corpus.modules — every module of the encoding, which
-# defaults to corpus.main plus the optional corpus.wizard when the sidecar
-# declares no set), at g2 the subject's declared de novo deposit
-# (denovo.modules — possibly empty, which those stages report as SKIPPED under
-# the deposit contract). GO_MODULES_ORIGIN
-# says which, so a stage selects the matching per-origin floor and never reads
-# a corpus floor over a deposit, or a deposit floor over the corpus.
-#
-# Exported EXPLICITLY: the `export "${!GO_S_@}"` glob above covers only the
-# sidecar-derived names, and the `--inputs` answers are produced by subshells
-# the dispatch loop spawns, which inherit only exported env.
-if [[ "$MILESTONE" == "g2" ]]; then
-  GO_MODULES="${GO_S_DENOVO_MODULES:-}"
-  GO_MODULES_ORIGIN="denovo"
-else
-  # Symmetrical with the g2 line above: one space-separated list, already
-  # resolved and validated by subject.mjs. The `:-` arm is the pre-2026-08-18
-  # shape, kept so a sidecar resolved by an older subject.mjs — or a hand-set
-  # environment — still names a module set rather than none.
-  GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
-  GO_MODULES_ORIGIN="corpus"
-fi
-export GO_MODULES GO_MODULES_ORIGIN
-
-# Assemble the declared stage list and the HG1 set from the sidecar's legs.
-# p8-verify sits directly after p6-tests (D3, 2026-08-09) and is HG1-gated on
-# the same line it is declared: SPEC.md §7.3 blocks P6 onward, and a
-# verification report about an unreviewed encoding is still analysis OF that
-# encoding. (ORCHESTRATOR.md §5.1a's gates row was retensed in the same
-# change.)
-G1_STAGES=(p0-preflight p3-check p6-tests p8-verify)
-gated_by_HG1="p6-tests p8-verify"
-for s in "${P7_LEG_ORDER[@]}"; do
-  if [[ " $GO_S_LEGS " == *" $s "* ]]; then
-    G1_STAGES+=("$s")
-    gated_by_HG1="$gated_by_HG1 $s"
+  # --- the milestone-scoped module set (ONE list per run) ----------------------
+  # p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
+  # g1 the committed corpus (corpus.modules — every module of the encoding, which
+  # defaults to corpus.main plus the optional corpus.wizard when the sidecar
+  # declares no set), at g2 the subject's declared de novo deposit
+  # (denovo.modules — possibly empty, which those stages report as SKIPPED under
+  # the deposit contract). GO_MODULES_ORIGIN
+  # says which, so a stage selects the matching per-origin floor and never reads
+  # a corpus floor over a deposit, or a deposit floor over the corpus.
+  #
+  # Exported EXPLICITLY: the `export "${!GO_S_@}"` glob above covers only the
+  # sidecar-derived names, and the `--inputs` answers are produced by subshells
+  # the dispatch loop spawns, which inherit only exported env.
+  if [[ "$MILESTONE" == "g2" ]]; then
+    GO_MODULES="${GO_S_DENOVO_MODULES:-}"
+    GO_MODULES_ORIGIN="denovo"
+  else
+    # Symmetrical with the g2 line above: one space-separated list, already
+    # resolved and validated by subject.mjs. The `:-` arm is the pre-2026-08-18
+    # shape, kept so a sidecar resolved by an older subject.mjs — or a hand-set
+    # environment — still names a module set rather than none.
+    GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+    GO_MODULES_ORIGIN="corpus"
   fi
-done
-# p9-explain follows p9-report: both read the journal, and the explainer also
-# reads the report's own presence. Declared, so that a run which produced no
-# explainer says so in its milestone verdict rather than staying silent; and
-# HG1-gated on the SAME LINE as it is declared, so the two cannot drift apart.
-# An ungated stage here would publish HG1-unreviewed narrative and every
-# downstream honesty check would report clean — the gate test below defaults to
-# UNGATED, and verify-run.mjs reads the gated set out of run_begin, so it would
-# agree with the omission. selftest.mjs asserts the invariant directly.
-G1_STAGES+=(p9-report p9-explain)
-gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
+  export GO_MODULES GO_MODULES_ORIGIN
 
-# SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the stages after P5
-# are the §8 comparator and the report, so those are what HG1 gates — and, as
-# at g1, a g2 run stops there with exit 3 until the gate is signed or waived on
-# the record. At g2 the gate binds to the DE NOVO deposit-set digest (see
-# GO_ENCODING_FILES above), so a waiver over the replay corpus covers nothing
-# here, and depositing or editing a deposit — the surface map included —
-# re-opens the gate.
-if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p6-tests p7-dmn p8-verify p8-diff p9-report"; fi
+  # Assemble the declared stage list and the HG1 set from the sidecar's legs.
+  # p8-verify sits directly after p6-tests (D3, 2026-08-09) and is HG1-gated on
+  # the same line it is declared: SPEC.md §7.3 blocks P6 onward, and a
+  # verification report about an unreviewed encoding is still analysis OF that
+  # encoding. (ORCHESTRATOR.md §5.1a's gates row was retensed in the same
+  # change.)
+  G1_STAGES=(p0-preflight p3-check p6-tests p8-verify)
+  gated_by_HG1="p6-tests p8-verify"
+  for s in "${P7_LEG_ORDER[@]}"; do
+    if [[ " $GO_S_LEGS " == *" $s "* ]]; then
+      G1_STAGES+=("$s")
+      gated_by_HG1="$gated_by_HG1 $s"
+    fi
+  done
+  # p9-explain follows p9-report: both read the journal, and the explainer also
+  # reads the report's own presence. Declared, so that a run which produced no
+  # explainer says so in its milestone verdict rather than staying silent; and
+  # HG1-gated on the SAME LINE as it is declared, so the two cannot drift apart.
+  # An ungated stage here would publish HG1-unreviewed narrative and every
+  # downstream honesty check would report clean — the gate test below defaults to
+  # UNGATED, and verify-run.mjs reads the gated set out of run_begin, so it would
+  # agree with the omission. selftest.mjs asserts the invariant directly.
+  G1_STAGES+=(p9-report p9-explain)
+  gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
+
+  # SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the stages after P5
+  # are the §8 comparator and the report, so those are what HG1 gates — and, as
+  # at g1, a g2 run stops there with exit 3 until the gate is signed or waived on
+  # the record. At g2 the gate binds to the DE NOVO deposit-set digest (see
+  # GO_ENCODING_FILES above), so a waiver over the replay corpus covers nothing
+  # here, and depositing or editing a deposit — the surface map included —
+  # re-opens the gate.
+  if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p6-tests p7-dmn p8-verify p8-diff p9-report"; fi
+fi
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -545,8 +575,23 @@ cmd_verify() {
 }
 
 cmd_gc() {
-  # Retention: keep the latest run per subject, AND any run holding a granted
-  # gate verdict — a signature is expensive to obtain and must not be collected.
+  # Retention: keep the latest --keep runs OF EACH SUBJECT, AND any run holding
+  # a granted gate verdict — a signature is expensive to obtain and must not be
+  # collected.
+  #
+  # "of each subject" is load-bearing and was, until 2026-08-20, only a comment:
+  # the code took `sort | tail -$KEEP` over the whole store. That was harmless
+  # while one subject existed and destructive the moment a second did — twelve
+  # consecutive sg-succession runs meant a single `gc` would have deleted every
+  # regcf run in the store, and cross-run replay (SPEC §R7) reuses receipts from
+  # exactly those older runs. The retention would have silently deleted the
+  # thing that makes a toolchain tweak cheap to re-measure.
+  #
+  # A run whose journal names no subject (the pre-subject runs of 2026-08-09,
+  # whose run_begin predates the field) is retained under the sentinel key
+  # "(unattributed)" rather than pooled with a real subject: it cannot be shown
+  # to be redundant with any subject's latest, so it is not collected as if it
+  # were.
   local keep_ids=()
   local d
   for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
@@ -554,7 +599,10 @@ cmd_gc() {
       keep_ids+=("$d")
     fi
   done
-  for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::' | sort | tail -"$KEEP"); do keep_ids+=("$d"); done
+  local subj
+  for subj in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE"); do
+    for d in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE" "$subj" | sort | tail -"$KEEP"); do keep_ids+=("$d"); done
+  done
   local removed=0
   for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
     local k
@@ -566,7 +614,7 @@ cmd_gc() {
       echo "gc: removed $d"
     fi
   done
-  echo "gc: kept ${#keep_ids[@]} run dir(s) (latest $KEEP, plus every run holding a granted gate); removed $removed"
+  echo "gc: kept ${#keep_ids[@]} run dir(s) (latest $KEEP per subject, plus every run holding a granted gate); removed $removed"
 }
 
 # The front-door forecast, runnable on its own. Discovery first (so the

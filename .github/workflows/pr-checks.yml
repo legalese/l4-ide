@@ -259,17 +259,43 @@ jobs:
       # The driver must be able to describe itself without a binary, a run
       # directory, or a network. If `plan` needs any of those, resumability and
       # dry-running are both broken.
+      #
+      # EVERY subject, not one: this step used to call `plan` bare, which worked
+      # only while exactly one sidecar existed -- go.sh defaults to the sole
+      # subject and refuses once there are two, so adding sg-succession turned
+      # this step red for a reason that had nothing to do with the change that
+      # tripped it. Enumerating from `subject.mjs --list` fixes that failure and
+      # buys the check a subject-independence property it did not have: a new
+      # sidecar whose `plan` cannot be printed fails here, on the PR that adds
+      # it, instead of on the next person's branch.
       - name: The driver can describe itself with no L4 and no run dir
         run: |
           etc/go/go.sh help > /dev/null
-          etc/go/go.sh plan --milestone g1 | tee /tmp/plan.txt
-          grep -q 'p0-preflight' /tmp/plan.txt
-          grep -q 'entry points that exist and refuse' /tmp/plan.txt
-          grep -q 'p9-explain' /tmp/plan.txt
-          etc/go/go.sh plan --milestone g2 | tee /tmp/plan-g2.txt
-          grep -q 'p1-ingest' /tmp/plan-g2.txt
-          grep -q 'NOT WIRED' /tmp/plan-g2.txt
-          grep -q 'does NOT mean a de novo run happened' /tmp/plan-g2.txt
+          subjects=$(node etc/go/lib/subject.mjs --list)
+          [ -n "$subjects" ] || { echo "::error::no subjects discovered"; exit 1; }
+          for s in $subjects; do
+            echo "--- plan --subject $s"
+            etc/go/go.sh plan --subject "$s" --milestone g1 > /tmp/plan-$s-g1.txt
+            grep -q 'p0-preflight' /tmp/plan-$s-g1.txt
+            grep -q 'entry points that exist and refuse' /tmp/plan-$s-g1.txt
+            grep -q 'p9-explain' /tmp/plan-$s-g1.txt
+            etc/go/go.sh plan --subject "$s" --milestone g2 > /tmp/plan-$s-g2.txt
+            grep -q 'p1-ingest' /tmp/plan-$s-g2.txt
+            grep -q 'NOT WIRED' /tmp/plan-$s-g2.txt
+            grep -q 'does NOT mean a de novo run happened' /tmp/plan-$s-g2.txt
+            echo "ok $s: g1 and g2 both plan"
+          done
+          # A bare `plan` must still be a loud refusal, not a silent pick among
+          # several -- a run about an unnamed body of law is the thing the
+          # requirement exists to prevent.
+          if etc/go/go.sh plan --milestone g1 > /tmp/plan-bare.txt 2>&1; then
+            n=$(printf '%s\n' $subjects | wc -l)
+            [ "$n" = "1" ] || { echo "::error::bare plan succeeded with $n subjects"; exit 1; }
+          else
+            grep -q 'subject is required' /tmp/plan-bare.txt \
+              || { echo "::error::bare plan failed without naming the reason"; cat /tmp/plan-bare.txt; exit 1; }
+            echo "ok a bare plan refuses and names --subject"
+          fi
 
       # Every stage that is STILL scaffolded must refuse with exit 3 and name its
       # blocker. A stage that exits 0 while doing nothing is the failure this
