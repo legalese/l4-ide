@@ -80,6 +80,7 @@ fields:
     datatype: yesnoradio
 ---
 id: c_insurance_covered_loss_or_damage_by_animals
+reconsider: True
 code: |
   # L4: `loss or damage by animals`
   insurance_covered_loss_or_damage_by_animals = (i_.loss_or_damage_caused_by_rodents or (i_.loss_or_damage_caused_by_insects or (i_.loss_or_damage_caused_by_vermin or i_.loss_or_damage_caused_by_birds)))
@@ -92,6 +93,7 @@ sets:
   - insurance_covered_loss_or_damage_by_animals
 ---
 id: c_insurance_covered_damage_to_contents_and_caused_by_birds
+reconsider: True
 code: |
   # L4: `damage to contents and caused by birds`
   insurance_covered_damage_to_contents_and_caused_by_birds = (i_.loss_or_damage_to_contents and i_.loss_or_damage_caused_by_birds)
@@ -102,6 +104,7 @@ sets:
   - insurance_covered_damage_to_contents_and_caused_by_birds
 ---
 id: c_insurance_covered_ensuing_covered_loss
+reconsider: True
 code: |
   # L4: `ensuing covered loss`
   insurance_covered_ensuing_covered_loss = i_.loss_or_damage_ensuing_covered_loss
@@ -111,6 +114,7 @@ sets:
   - insurance_covered_ensuing_covered_loss
 ---
 id: c_insurance_covered_exclusion_apply
+reconsider: True
 code: |
   # L4: `exclusion apply`
   insurance_covered_exclusion_apply = (i_.any_other_exclusion_applies or (i_.a_household_appliance or (i_.a_swimming_pool or i_.a_plumbing_heating_or_air_conditioning_system)))
@@ -123,6 +127,7 @@ sets:
   - insurance_covered_exclusion_apply
 ---
 id: c_insurance_covered
+reconsider: True
 code: |
   # L4: `insurance covered`
   insurance_covered = (insurance_covered_loss_or_damage_by_animals and (not (insurance_covered_damage_to_contents_and_caused_by_birds or (insurance_covered_ensuing_covered_loss and (not insurance_covered_exclusion_apply)))))
@@ -136,6 +141,7 @@ sets:
 ---
 id: driver_insurance_covered
 mandatory: True
+reconsider: True
 code: |
   # driver for @export `insurance covered`
   if insurance_covered:
@@ -160,3 +166,29 @@ subquestion: |
   insurance coverage decision
 
   On the answers given, this decision evaluates FALSE.
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      Loss or Damage.caused by rodents: ${ showifdef('i_.loss_or_damage_caused_by_rodents', '**not asked**') }
+  - note: |
+      Loss or Damage.caused by insects: ${ showifdef('i_.loss_or_damage_caused_by_insects', '**not asked**') }
+  - note: |
+      Loss or Damage.caused by vermin: ${ showifdef('i_.loss_or_damage_caused_by_vermin', '**not asked**') }
+  - note: |
+      Loss or Damage.caused by birds: ${ showifdef('i_.loss_or_damage_caused_by_birds', '**not asked**') }
+  - note: |
+      Loss or Damage.to Contents: ${ showifdef('i_.loss_or_damage_to_contents', '**not asked**') }
+  - note: |
+      any other exclusion applies: ${ showifdef('i_.any_other_exclusion_applies', '**not asked**') }
+  - note: |
+      a household appliance: ${ showifdef('i_.a_household_appliance', '**not asked**') }
+  - note: |
+      a swimming pool: ${ showifdef('i_.a_swimming_pool', '**not asked**') }
+  - note: |
+      a plumbing, heating, or air conditioning system: ${ showifdef('i_.a_plumbing_heating_or_air_conditioning_system', '**not asked**') }
+  - note: |
+      Loss or Damage.ensuing covered loss: ${ showifdef('i_.loss_or_damage_ensuing_covered_loss', '**not asked**') }

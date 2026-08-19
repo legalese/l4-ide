@@ -98,11 +98,19 @@ machine-independence.
 markdown tables differently from `3.4.2` and fails `format:check` on files you did not mean to
 touch. Run `npx prettier@3.4.2` or the repo-local binary.
 
-**A new corpus ships its goldens in the same commit as its `.l4`.** `jl4-test` writes four goldens
-per file (`<dir>/tests/<stem>.{golden,ep.golden,nlg.golden,schema.golden}`) and `failFirstTime` is
-`True`, so a `.l4` with no `tests/` directory turns the whole suite red. You will not see it: no
-paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not run on your PR, and
-the failure surfaces on the next person's branch instead. Generate them by running `cabal test
+**A new corpus file ships its goldens in the same commit as its `.l4` — if it is under a goldened
+glob.** `jl4-test` writes four goldens per file (`<dir>/tests/<stem>.{golden,ep.golden,nlg.golden,schema.golden}`)
+and `failFirstTime` is `True`, so a `.l4` with no `tests/` directory turns the whole suite red. You
+will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not
+run on your PR, and the failure surfaces on the next person's branch instead.
+
+**Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
+`ok/**`, `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `lsp/semantic-tokens/**`,
+`lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
+`jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
+directory and adding one there needs no goldens. State this rule with its scope: an earlier
+unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
+does not exist there. Generate them by running `cabal test
 jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the
 `.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
 looked at is how a wrong answer becomes the expected answer.

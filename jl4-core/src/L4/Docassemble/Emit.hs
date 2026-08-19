@@ -21,8 +21,11 @@
 --   4. Every @code:@ block carries a deterministic @id:@, explicit @sets:@,
 --      and @depends on:@ over its direct inputs (docassemble variables are
 --      otherwise stale-by-default).
---   5. Emitted Python contains no @all([…])@/@any([…])@ list forms (v1 emits
---      no @any@/@all@ at all — @and@/@or@ chains short-circuit natively).
+--   5. Emitted Python never builds an eager list to fold over. @and@/@or@
+--      chains short-circuit natively, and M4's @all@/@any@ over a gathered
+--      @DAList@ take a GENERATOR — @all(p(x) for x in xs)@, never
+--      @all([p(x) for x in xs])@ — so a decided quantifier stops reading
+--      elements, and the questions of the elements after it are never asked.
 --   6. The mandatory driver is idempotent — pure references and conditionals
 --      — and never wraps exceptions; @mandatory:@ is never mixed with
 --      @initial:@; every directive block carries @question:@.
@@ -34,6 +37,7 @@ module L4.Docassemble.Emit
   , emitterKeyVocabulary
   , emitterBlockKeys
   , emitterFieldModifiers
+  , emitterAttachmentKeys
   , daRecognisedKeys
   , emitterVocabularyViolations
   ) where
@@ -61,13 +65,17 @@ renderInterview extraBlocks pkg =
         ( firstBlock
             : extraBlocks
            <> glossaryBlocks
+           <> freshBlocks
+           <> attachBlocks
            <> featuresBlocks
-           <> map blockLines pkg.pkgBlocks ) )
+           <> map (blockLines pkg) pkg.pkgBlocks ) )
  where
   firstBlock = headerLines pkg <> metadataLines pkg
   glossaryBlocks
     | null pkg.pkgGloss = []
     | otherwise         = [glossaryLines pkg.pkgGloss]
+  freshBlocks = [ citationResetLines v | Just v <- [pkg.pkgFresh] ]
+  attachBlocks = [ attachmentLines a | Just a <- [pkg.pkgAttach] ]
   -- R9.10: emit interview-scale guards when the generated graph could
   -- plausibly approach docassemble's defaults of 500 (parse.py:7942).
   featuresBlocks
@@ -127,15 +135,41 @@ glossaryLines entries =
      | (term, defn) <- entries
      ]
 
-blockLines :: DABlock -> [Text]
-blockLines = \case
+-- | M4 (spec §8.4): the citation reset.
+--
+-- @explain()@ appends to a SESSION-scoped list, so a second assemble pass — the
+-- one that follows a changed answer — would leave the earlier run's rules in
+-- it. This block clears the list, and the mandatory driver references it BEFORE
+-- the goal, so the clear happens once, before any rule re-runs.
+--
+-- Once per assemble is exactly what @reconsider: True@ buys: the variables it
+-- names are deleted at the top of @Interview.assemble@ (@parse.py:8590-8596@),
+-- not on every internal iteration of the logic loop — so the sentinel is sought
+-- once, and stays defined for the rest of the pass while the rules explain into
+-- the list it just emptied.
+citationResetLines :: Text -> [Text]
+citationResetLines var =
+  [ "id: c_" <> var
+  , "reconsider: True"
+  , "code: |"
+  , "  # spec §8.4: one clean explanation list per assemble pass, before any"
+  , "  # rule block re-runs. The driver pulls this before it pulls the goal."
+  , "  clear_explanations()"
+  , "  " <> var <> " = True"
+  , "sets:"
+  , "  - " <> var
+  ]
+
+blockLines :: DAPackage -> DABlock -> [Text]
+blockLines pkg = \case
   DAObjectsBlock entries ->
     "id: objects_main"
       : "objects:" : [ "  - " <> var <> ": " <> cls | (var, cls) <- entries ]
   DAQuestionBlock q -> questionLines q
   DACodeBlock c     -> codeLines c
-  DADriverBlock d   -> driverLines d
-  DAScreenBlock s   -> screenLines s
+  DADriverBlock d   -> driverLines pkg.pkgFresh d
+  DAScreenBlock s   -> screenLines (if s.sAttach then pkg.pkgAttach else Nothing) s
+  DAReviewBlock rv  -> reviewLines rv
 
 -- ---------------------------------------------------------------------------
 -- Question blocks (one field per question, R2)
@@ -143,9 +177,14 @@ blockLines = \case
 
 questionLines :: DAQuestion -> [Text]
 questionLines q =
-     [ "id: " <> q.qId
-     , "question: |"
-     ]
+     [ "id: " <> q.qId ]
+  -- M4 (spec §8.4): clear the answers this one gates, so re-answering it cannot
+  -- leave a payload behind that the new answer does not carry. Block level, and
+  -- it has to be: `undefine` is one of the 169 block keys at parse.py:1947, and
+  -- it fires in `ask` before the question is rendered.
+  <> [ ln | not (null q.qUndefine)
+          , ln <- "undefine:" : [ "  - " <> v | v <- q.qUndefine ] ]
+  <> [ "question: |" ]
   <> blockScalar (escapeL4 q.qText)
   <> [ "fields:"
      , "  - " <> yamlStr (escapeL4 q.qLabel) <> ": " <> q.qVar
@@ -153,6 +192,28 @@ questionLines q =
   <> controlLines q.qControl
   <> [ "    default: " <> defaultScalar d | Just d <- [q.qDefault] ]
   <> [ "    help: " <> yamlStr (escapeL4 h) | Just h <- [q.qHelp] ]
+  <> concat [ showIfLines e | Just e <- [q.qShowIf] ]
+
+-- | M4: the server-side field guard, in its @code:@ spelling and no other.
+--
+-- The @{variable:, is:}@ spelling sets @show_if_var@\/@show_if_val@ and no
+-- @showif_code@ (@parse.py:3998-4002@ at @1b6678384@): it is browser-side
+-- JavaScript, so the engine shows every field and an API or headless drive
+-- defines them all — it cannot encode a constructor payload at all. The code
+-- form is evaluated server-side (@parse.py:6316-6325@ sets
+-- @extras['ok'][n] = False@) and leaves a hidden field genuinely undefined,
+-- which is the whole claim: absence is absence, not @0.0@ and not @''@.
+--
+-- Field level only. @show if@ is not among the 169 block keys at
+-- @parse.py:1947@, and an unrecognised block key is dropped in silence
+-- (@logmessage@ only, and only under debug), so a block-level @show if@ would
+-- do nothing AND say nothing.
+showIfLines :: DAExpr -> [Text]
+showIfLines e =
+  [ "    show if:"
+  , "      code: |"
+  , "        " <> renderPyExpr e
+  ]
 
 controlLines :: DAFieldControl -> [Text]
 controlLines = \case
@@ -187,9 +248,14 @@ defaultScalar = \case
 
 codeLines :: DACode -> [Text]
 codeLines c =
-     [ "id: " <> c.cId
-     , "code: |"
-     ]
+     [ "id: " <> c.cId ]
+  -- M4 (spec §8.4). A derived value is re-computed from the current answers on
+  -- every assemble pass. Without this, changing an earlier answer leaves the
+  -- VERDICT stale — measured, and worse than the citation staleness §8.4
+  -- originally bounded. Never on an instantiation: re-running one would replace
+  -- the object and discard everything gathered into it.
+  <> [ "reconsider: True" | c.cFresh ]
+  <> [ "code: |" ]
   <> map ("  " <>) (commentL <> pyBody)
   <> depsLines
   <> [ "sets:"
@@ -205,6 +271,14 @@ codeLines c =
       -- instanceName passed explicitly: docassemble otherwise sniffs the
       -- caller's bytecode to recover it, which generated code defeats (R2).
       [ c.cVar <> " = " <> cls <> "(" <> pyStr c.cVar <> ")" ]
+    DAInstantiateList cls ->
+      -- `object_type` is load-bearing: a DAList without it fails on the first
+      -- element access. `there_are_any` is deliberately NOT preset — presetting
+      -- it makes the empty list unreachable, and an empty list is an answer.
+      -- `complete_attribute` is deliberately absent too: it orders the gather,
+      -- it does not prune it, and setting it would force every element's named
+      -- attribute to be asked.
+      [ c.cVar <> " = DAList(" <> pyStr c.cVar <> ", object_type=" <> cls <> ")" ]
   -- M2. `explain` is a docassemble.base.util function, auto-exec'd into every
   -- interview dict unless a `modules:` block names `docassemble.base.util`
   -- itself (parse.py:2765-2767, 8523-8524), which this emitter never does — so
@@ -241,13 +315,20 @@ chainLines var arms d =
 -- The mandatory driver and terminal screens (R4)
 -- ---------------------------------------------------------------------------
 
-driverLines :: DADriver -> [Text]
-driverLines = \case
+-- | The mandatory driver. Its first statement, when the module cites anything,
+-- is a bare reference to the citation-reset sentinel: docassemble seeks it,
+-- runs its block (which empties the explanation list), and only then does the
+-- driver reach the goal that pulls the rules. Reference-before-goal is the
+-- whole mechanism, so the two must not be reordered.
+driverLines :: Maybe Text -> DADriver -> [Text]
+driverLines mFresh = \case
   DASeamDriver did goalL4 scopeV reqV verdictV evC evI evN ->
        [ "id: " <> did
        , "mandatory: True"
+       , "reconsider: True"
        , "code: |"
        ]
+    <> map ("  " <>) freshLines
     <> map ("  " <>)
        [ "# verdict driver for @export `" <> escapeL4 goalL4 <> "` — scope-first (R4)."
        , "# Never `not scope or requirement`: NotApplicable is not Complies."
@@ -268,8 +349,10 @@ driverLines = \case
   DABoolDriver did goalL4 goalV evH evF ->
        [ "id: " <> did
        , "mandatory: True"
+       , "reconsider: True"
        , "code: |"
        ]
+    <> map ("  " <>) freshLines
     <> map ("  " <>)
        [ "# driver for @export `" <> escapeL4 goalL4 <> "`"
        , "if " <> goalV <> ":"
@@ -280,16 +363,27 @@ driverLines = \case
   DAValueDriver did goalL4 goalV evR ->
        [ "id: " <> did
        , "mandatory: True"
+       , "reconsider: True"
        , "code: |"
        ]
+    <> map ("  " <>) freshLines
     <> map ("  " <>)
        [ "# driver for @export `" <> escapeL4 goalL4 <> "`"
        , goalV
        , evR
        ]
+ where
+  freshLines =
+    [ ln
+    | Just v <- [mFresh]
+    , ln <- [ "# spec §8.4: pull the citation reset BEFORE the goal, so the"
+            , "# explanation list is emptied before any rule re-explains into it."
+            , v
+            ]
+    ]
 
-screenLines :: DAScreen -> [Text]
-screenLines s =
+screenLines :: Maybe DAAttachment -> DAScreen -> [Text]
+screenLines mAttach s =
      [ "id: " <> s.sId
      , "event: " <> s.sEvent
      , "question: |"
@@ -303,6 +397,13 @@ screenLines s =
     <> s.sExplain
     <> maybe "" (\v -> "\n\n**${ " <> v <> " }**") s.sShowVar
     <> citationSection
+    <> documentSection
+  -- M4: the verdict screen hands back the document as well as the answer.
+  -- Referencing it here is what makes docassemble assemble it at all, and
+  -- `${ <var> }` on a DAFileCollection renders its download links.
+  documentSection = case mAttach of
+    Nothing -> ""
+    Just a  -> "\n\nYour document:\n\n${ " <> a.atVar <> " }"
   -- M2. The docassemble house pattern, copied from the canonical exhibit
   -- `docassemble_demo/…/examples/explain.yml` at 1b6678384: a Mako `% for`
   -- over `logic_explanation()`. The control line is legal here because
@@ -320,6 +421,99 @@ screenLines s =
         \* ${ citation }\n\
         \% endfor"
     | otherwise = ""
+
+-- | M4: the assembled letter (spec §10's document-assembly demo).
+--
+-- A STANDALONE block, not one hung off the verdict screen: the document is a
+-- definition like any other, sought when the screen references
+-- @${ \<variable name\> }@, and keeping it separate keeps the screen's prose out
+-- of the attachment's own key space (attachment sub-keys are a third
+-- vocabulary, 'emitterAttachmentKeys', read by @process_attachment@ rather than
+-- by the block-key loop — and an unrecognised one is ignored in silence).
+--
+-- The SINGULAR mapping form, not a list of attachments: one document, one
+-- variable to assert about.
+--
+-- @content:@ is INLINE rather than @content file:@ on purpose: @content file@
+-- resolves through @package_template_filename@ and raises @DASourceError@ when
+-- the file is not found (@parse.py:5059-5064@) — at PARSE time, before any
+-- question is asked — which would make the bare single-file artifact
+-- unloadable while the packaged one worked. The template still ships in the
+-- @--package@ tree, under @data\/templates@, as provenance.
+--
+-- @valid formats: [html]@ and nothing else: the harness venv has @docx@ and
+-- @docxtpl@ but no LibreOffice, so a PDF format would fail at assemble time.
+--
+-- @reconsider: True@ (repaired 2026-08-17, spec §8.4): an attachment is
+-- assembled only when the variable it names is SOUGHT (@parse.py:9513-9530@),
+-- and a variable that is already defined is never sought — so without this the
+-- letter is computed once and then survives every later answer. Measured on
+-- @notice-letter.l4@: change the notice period from three months to one and the
+-- verdict screen reads @…_screen_fails@ while the letter it carries still says
+-- \"Notice period served: 3 month(s)\" and \"the notice is valid\". A
+-- non-flipping edit is stale in the same way — correcting the tenant's name
+-- leaves the letter addressed to the old one. §8.4's original repair put
+-- @reconsider: True@ on the derived CODE blocks and stopped there; the document
+-- is derived too, and it is the artifact a reader would carry out of the room.
+attachmentLines :: DAAttachment -> [Text]
+attachmentLines a =
+     [ "id: attachment_" <> a.atVar
+     , "reconsider: True"
+     , "attachment:"
+     , "  name: " <> yamlStr (escapeL4 a.atName)
+     , "  filename: " <> yamlStr a.atFile
+     -- Without `variable name:` docassemble files the document under
+     -- `_internal['docvar'][n]` (parse.py:4997-5003) and nothing can assert
+     -- about it afterwards — and the failure worth catching is not an exception
+     -- but a SUCCESSFUL EMPTY RENDER, which raises nothing and logs nothing.
+     , "  variable name: " <> a.atVar
+     , "  valid formats:"
+     , "    - html"
+     -- The `2` is an explicit YAML INDENTATION INDICATOR, and it is load-bearing
+     -- (repaired 2026-08-17). Without it a block scalar takes its indentation
+     -- from its own first non-empty line, so a template whose first line carries
+     -- ANY leading whitespace — one space is enough, as is a whitespace-only
+     -- first line — sets the block indent above 4, and the first following line
+     -- at exactly 4 terminates the scalar early. The parser then meets template
+     -- prose where an `attachment:` sub-key must be and the WHOLE interview
+     -- fails to load, in both artifact shapes, while `l4 docassemble` exits 0.
+     -- Measured against real 1.10.7: `parse.Interview` raises `DASourceError`
+     -- from parse.py:8352-8360, so not one question survives. An indented
+     -- address block is the most idiomatic way to open a letter, and this is the
+     -- one string the emitter deliberately does not sanitise, so the indicator
+     -- is what makes "verbatim" true. `2` and not `4`: the indicator is an
+     -- offset from the PARENT node's indentation, and the `attachment:` mapping
+     -- sits at 2.
+     , "  content: |2"
+     ]
+  -- Verbatim, and indented four spaces: it is the author's own Mako, written to
+  -- be rendered (R9.1 escapes L4-derived prose, which this is not). The indent
+  -- also keeps every line clear of docassemble's `^--- *$` block splitter.
+  <> [ if Text.null ln then "" else "    " <> ln | ln <- Text.splitOn "\n" (Text.stripEnd a.atContent) ]
+
+-- | M4: the compliance checklist (spec §10).
+--
+-- Rows are @note:@s carrying @showifdef@, and that is the only recipe that
+-- works. @skip undefined: False@ FORCE-ASKS every undefined row
+-- (@parse.py:5876-5904@ stops wrapping the row's eval in try/except), and the
+-- default silently drops undefined rows into a debug log line — one
+-- interrogates the user about questions the law never reached, the other hides
+-- them. A @note:@ row has no @saveas@ to evaluate, so it renders either way.
+reviewLines :: DAReview -> [Text]
+reviewLines rv =
+     [ "id: " <> rv.rvId
+     , "event: " <> rv.rvEvent
+     , "question: |"
+     ]
+  <> blockScalar rv.rvTitle
+  <> [ "review:" ]
+  <> concatMap rowLines rv.rvRows
+ where
+  rowLines r =
+    [ "  - note: |"
+    , "      " <> escapeL4 r.rrLabel <> ": ${ showifdef("
+        <> pyStr r.rrVar <> ", '**not asked**') }"
+    ]
 
 -- ---------------------------------------------------------------------------
 -- Escaping (R9.1) and scalar rendering
@@ -413,6 +607,20 @@ renderPyExpr = go
     DANot a      -> paren ("not " <> go a)
     DACond c t e -> paren (go t <> " if " <> go c <> " else " <> go e)
     DAIsNone a   -> paren (go a <> " is None")
+    DAIsBool a b -> paren (go a <> " is " <> (if b then "True" else "False"))
+    DADateLit iso -> "as_datetime(" <> pyStr iso <> ")"
+    DAAttr a f   -> go a <> "." <> f
+    DAMethod a m kws ->
+      go a <> "." <> m <> "("
+        <> Text.intercalate ", " [ k <> "=" <> go v | (k, v) <- kws ] <> ")"
+    -- A generator expression, deliberately not a list comprehension: `all`
+    -- stops at the first false element, so the elements after it are never
+    -- read and their questions are never asked.
+    DAQuant op v lst body ->
+      quantName op <> "(" <> go body <> " for " <> v <> " in " <> go lst <> ")"
+  quantName = \case
+    DAAll -> "all"
+    DAAny -> "any"
   binOp = \case
     DAAdd -> "+"; DASub -> "-"; DAMul -> "*"; DADiv -> "/"; DAMod -> "%"
   cmpOp = \case
@@ -516,6 +724,13 @@ renderPackageTree srcBase pkg = MkDAPackageTree
       , MkDAFile (inner <> ["data", "questions", slug <> ".yml"])
           (renderInterview [modulesLines] pkg)
       ]
+      -- M4/R11: the letter template ships under `data/templates`, which
+      -- MANIFEST.in already grafts. The interview does NOT reference it from
+      -- there — it carries the content inline, so the bare artifact works too
+      -- (see 'attachmentLines') — so this copy is provenance: the template as
+      -- the author wrote it, travelling with the package compiled from it.
+   <> [ MkDAFile (inner <> ["data", "templates", a.atSource]) a.atContent
+      | Just a <- [pkg.pkgAttach] ]
   , ptSourceCopy = inner <> ["data", "sources", slug <> ".l4"]
   -- The fidelity report sits at the package root under the `-o FILE` sidecar
   -- convention (same stem, `.fidelity.txt`) rather than inside `data/`:
@@ -683,9 +898,9 @@ tomlComment = Text.map \ch -> if ch < ' ' || ch == '\DEL' then ' ' else ch
 -- loop. 'emitterVocabularyViolations' asserts this list is a subset.
 emitterBlockKeys :: [Text]
 emitterBlockKeys =
-  [ "auto terms", "code", "depends on", "event", "features", "fields", "id"
-  , "mandatory", "metadata", "modules", "objects", "question", "sets"
-  , "subquestion"
+  [ "attachment", "auto terms", "code", "depends on", "event", "features"
+  , "fields", "id", "mandatory", "metadata", "modules", "objects", "question"
+  , "reconsider", "review", "sets", "subquestion"
   ]
 
 -- | Every per-field modifier this emitter can write, kept /separate/ from
@@ -706,7 +921,24 @@ emitterBlockKeys =
 -- the byte goldens and the R10 harness both hit immediately.
 emitterFieldModifiers :: [Text]
 emitterFieldModifiers =
-  [ "choices", "datatype", "default", "help", "required" ]
+  [ "choices", "datatype", "default", "help", "note", "required", "show if" ]
+
+-- | M4: a THIRD vocabulary — the sub-keys of an @attachment:@ mapping.
+--
+-- 'daRecognisedKeys' is the wrong oracle for these in both directions: @name@,
+-- @filename@, @docx template file@ and @valid formats@ are not block keys at
+-- all, while @variable name@ and @content@ are block keys that mean something
+-- else entirely at block level. They are read by @process_attachment@
+-- (@parse.py:4914-5230@ at @1b6678384@), which — like the block-key loop —
+-- ignores what it does not recognise, in silence. So this list is a
+-- DECLARATION of what the emitter writes inside an attachment, checked by the
+-- test suite against what @process_attachment@ actually reads.
+--
+-- Kept out of 'emitterKeyVocabulary' deliberately: that list is exactly
+-- \"block keys plus field modifiers\", which is what the R9.5 split asserts.
+emitterAttachmentKeys :: [Text]
+emitterAttachmentKeys =
+  [ "content", "filename", "name", "valid formats", "variable name" ]
 
 -- | Everything the emitter writes, block keys and field modifiers together —
 -- the declaration a test reads to check that a newly emitted key was declared

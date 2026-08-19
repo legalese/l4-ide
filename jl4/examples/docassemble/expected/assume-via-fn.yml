@@ -20,6 +20,7 @@ fields:
     datatype: number
 ---
 id: c_over_threshold
+reconsider: True
 code: |
   # L4: `over threshold`
   over_threshold = ((amount + base_rate) > 100)
@@ -31,6 +32,7 @@ sets:
 ---
 id: driver_over_threshold
 mandatory: True
+reconsider: True
 code: |
   # driver for @export `over threshold`
   if over_threshold:
@@ -55,3 +57,13 @@ subquestion: |
   Whether the amount exceeds the adjusted threshold
 
   On the answers given, this decision evaluates FALSE.
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      amount: ${ showifdef('amount', '**not asked**') }
+  - note: |
+      base rate: ${ showifdef('base_rate', '**not asked**') }

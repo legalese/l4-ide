@@ -28,6 +28,8 @@
 -- @MAYBE STRING@ erasure are declared 'Advisory' (spec §5).
 module L4.Docassemble.Lower
   ( lowerModule
+  , DASideInputs (..)
+  , noSideInputs
   , LowerError (..)
   , renderLowerError
   ) where
@@ -52,7 +54,8 @@ import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..))
 import L4.Syntax
 import L4.TypeCheck.Environment
-  (booleanUnique, dateUnique, justUnique, maybeUnique, nothingUnique, numberUnique, stringUnique)
+  ( booleanUnique, dateDayUnique, dateMonthUnique, dateUnique, dateYearUnique
+  , justUnique, listUnique, maybeUnique, nothingUnique, numberUnique, stringUnique )
 
 -- | A reason a module (or one of its decisions) could not be compiled.
 data LowerError = MkLowerError
@@ -88,13 +91,22 @@ lfMessage = \case
 
 data EnumInfo = MkEnumInfo
   { eiName :: !Text
-  , eiCons :: ![(Text, Int)]  -- ^ (constructor L4 name, payload arity)
+  , eiCons :: ![ConInfo]      -- ^ in declaration order
   }
 
+-- | An @IS ONE OF@ constructor. M4 carries the payload FIELDS, not merely the
+-- arity: each becomes its own follow-up question, gated on the radio answer
+-- (R6's \"payload constructors via @show if@\").
 data ConInfo = MkConInfo
-  { ciName  :: !Text
-  , ciArity :: !Int
+  { ciName   :: !Text
+  , ciFields :: ![FieldSpec]
+  , ciAll    :: ![Text]
+    -- ^ every constructor of the enum this one belongs to, so a @CONSIDER@ can
+    -- be told exhaustive without a second lookup.
   }
+
+ciArity :: ConInfo -> Int
+ciArity ci = length ci.ciFields
 
 -- | A /stored/ record field. Computed (@MEANS@) fields never appear here:
 -- 'L4.Desugar.desugarComputedFields' strips them out of the @RecordDecl@
@@ -114,6 +126,19 @@ data FieldSpec = MkFieldSpec
 data RecordSpec = MkRecordSpec
   { rsName   :: !Text
   , rsFields :: ![FieldSpec]
+  }
+
+-- | A declared field, of a @DECLARE@d record or of an @IS ONE OF@ constructor
+-- payload — the two are the same syntax and lower to the same artifacts (a
+-- question apiece), which is why they share a spec.
+fieldSpecOf :: TypedName Resolved -> FieldSpec
+fieldSpecOf (MkTypedName fAnn fRes fTy mDflt _) = MkFieldSpec
+  { fsU       = getUnique fRes
+  , fsL4      = resolvedToText fRes
+  , fsSan     = attrIdent (resolvedToText fRes)
+  , fsTy      = fTy
+  , fsDesc    = getDesc <$> (fAnn ^. annDesc)
+  , fsDefault = mDflt
   }
 
 -- | The two annotations M2 carries off a definition site.
@@ -177,9 +202,12 @@ collectEnums (MkModule _ _ section) =
   goSection (MkSection _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) ->
-      let members = [ (resolvedToText c, length cargs) | MkConDecl _ c cargs <- conDecls ]
-          cons    = [ (getUnique c, MkConInfo (resolvedToText c) (length cargs))
-                    | MkConDecl _ c cargs <- conDecls ]
+      let allNames = [ resolvedToText c | MkConDecl _ c _ <- conDecls ]
+          infoOf (MkConDecl _ c cargs) =
+            MkConInfo (resolvedToText c) (map fieldSpecOf cargs) allNames
+          members = map infoOf conDecls
+          cons    = [ (getUnique c, infoOf cd)
+                    | cd@(MkConDecl _ c _) <- conDecls ]
       in [(getUnique tyRes, MkEnumInfo (resolvedToText tyRes) members, cons)]
     Section _ sub -> goSection sub
     _ -> []
@@ -193,19 +221,9 @@ collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
       [ ( getUnique recRes
         , MkRecordSpec
             { rsName   = resolvedToText recRes
-            , rsFields =
-                [ MkFieldSpec
-                    { fsU        = getUnique fRes
-                    , fsL4       = resolvedToText fRes
-                    , fsSan      = attrIdent (resolvedToText fRes)
-                    , fsTy       = fTy
-                    , fsDesc     = getDesc <$> (fAnn ^. annDesc)
-                    , fsDefault  = mDflt
-                    }
-                -- the 5th MkTypedName field (computed/MEANS) is always
-                -- Nothing post-desugar; see the FieldSpec haddock
-                | MkTypedName fAnn fRes fTy mDflt _ <- fields
-                ]
+            -- the 5th MkTypedName field (computed/MEANS) is always Nothing
+            -- post-desugar; see the FieldSpec haddock
+            , rsFields = map fieldSpecOf fields
             }
         )
       ]
@@ -432,13 +450,17 @@ decideFunShape (MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ _ 
 
 data InlineFun = MkInlineFun
   { ifU      :: !Unique
-  , ifParams :: ![Unique]
+  , ifParams :: ![Resolved]
+    -- ^ the parameter BINDERS, not merely their uniques: a quantifier that is
+    -- handed an eta-reduced predicate (@any \`the purpose is charitable\` xs@)
+    -- names its generator variable after the parameter it is binding.
   , ifBody   :: !(Expr Resolved)
   }
 
 data Env = MkEnv
   { envVars        :: !(Map Unique Text)            -- ^ reference → interview variable / attribute path
   , envRecVars     :: !(Map Unique (Text, Unique))  -- ^ record-typed vars → (path, record type unique)
+  , envListVars    :: !(Map Unique (Text, Unique))  -- ^ list-typed vars → (path, ELEMENT record type unique)
   , envMaybeVars   :: !(Map Unique MaybeRepr)       -- ^ MAYBE-typed scalar inputs → erased representation (R8)
   , envFuns        :: !(Map Unique InlineFun)       -- ^ function-valued bindings, inlined at application
   , envEnumCons    :: !(Map Unique ConInfo)
@@ -446,17 +468,22 @@ data Env = MkEnv
   , envInlineStack :: ![Unique]                     -- ^ inlining in progress (recursion guard)
   }
 
--- | How an erased @MAYBE@ input represents @NOTHING@ at interview runtime
--- (R8): @yesnomaybe@ stores it as Python @None@; an optional text field
--- submits it as @''@.
-data MaybeRepr = ReprNone | ReprEmpty
+-- | How a @MAYBE@ input represents @NOTHING@ at interview runtime (R8):
+-- @yesnomaybe@ stores it as Python @None@; an optional text field submits it as
+-- @''@; and a NUMBER or DATE — whose empty submission is a real-looking @0.0@
+-- or @''@ — carries a separate is-known flag, named here, which is the only
+-- representation of the three that cannot be forged by a blank widget.
+data MaybeRepr = ReprNone | ReprEmpty | ReprFlag !Text
   deriving stock (Eq, Show)
 
-maybeReprOfTy :: Type' Resolved -> Maybe MaybeRepr
-maybeReprOfTy = \case
+-- | The representation of a @MAYBE@-typed input asked into @var@.
+maybeReprAt :: Text -> Type' Resolved -> Maybe MaybeRepr
+maybeReprAt var = \case
   TyApp _ n [TyApp _ m []]
     | getUnique n == maybeUnique && getUnique m == booleanUnique -> Just ReprNone
     | getUnique n == maybeUnique && getUnique m == stringUnique  -> Just ReprEmpty
+    | getUnique n == maybeUnique && getUnique m == numberUnique  -> Just (ReprFlag (knownVar var))
+    | getUnique n == maybeUnique && getUnique m == dateUnique    -> Just (ReprFlag (knownVar var))
   _ -> Nothing
 
 mkBaseEnv :: Ctx -> Env
@@ -466,13 +493,14 @@ mkBaseEnv ctx = MkEnv
         (Map.fromList [ (td.tdU, td.tdSan) | td <- ctx.ctxTop, null td.tdParams ])
         (Map.fromList [ (u, pyIdent (assumeName a)) | (u, a) <- Map.toList ctx.ctxAssumes ])
   , envRecVars     = Map.empty
+  , envListVars    = Map.empty
   , envMaybeVars   = Map.fromList
       [ (u, mr)
-      | (u, MkAssume _ _ _ (Just ty) _) <- Map.toList ctx.ctxAssumes
-      , Just mr <- [maybeReprOfTy ty]
+      | (u, a@(MkAssume _ _ _ (Just ty) _)) <- Map.toList ctx.ctxAssumes
+      , Just mr <- [maybeReprAt (pyIdent (assumeName a)) ty]
       ]
   , envFuns        = Map.fromList
-      [ (td.tdU, MkInlineFun td.tdU (map getUnique td.tdParams) td.tdBody)
+      [ (td.tdU, MkInlineFun td.tdU td.tdParams td.tdBody)
       | td <- ctx.ctxTop, not (null td.tdParams)
       ]
   , envEnumCons    = ctx.ctxEnumCons
@@ -484,8 +512,24 @@ mkBaseEnv ctx = MkEnv
 -- Entry point
 -- ---------------------------------------------------------------------------
 
-lowerModule :: Module Resolved -> Either [LowerError] (DAPackage, FidelityReport)
-lowerModule mod' =
+-- | Inputs the lowering cannot read for itself: @jl4-core@ does no IO (R1), so
+-- anything that lives beside the @.l4@ on disk is handed in by the CLI.
+--
+-- 'siLetter' is the document-assembly trigger (spec §10): a sibling
+-- @\<stem\>.letter.md@ means \"assemble this letter on the verdict screen\". A
+-- filename convention was chosen over a flag or a new annotation because it
+-- adds no L4 grammar and no CLI state, and because the template has to exist as
+-- a file anyway — the @--package@ tree ships it under @data\/templates@.
+data DASideInputs = MkDASideInputs
+  { siLetter :: !(Maybe (Text, Text))  -- ^ (template basename, its body verbatim)
+  }
+  deriving stock (Eq, Show)
+
+noSideInputs :: DASideInputs
+noSideInputs = MkDASideInputs { siLetter = Nothing }
+
+lowerModule :: DASideInputs -> Module Resolved -> Either [LowerError] (DAPackage, FidelityReport)
+lowerModule side mod' =
   case getExportedFunctions mod' of
     [] -> Left [MkLowerError "" "no @export-annotated DECIDE found to compile to docassemble"]
     efs ->
@@ -551,11 +595,15 @@ lowerModule mod' =
                      <> map DACodeBlock (concatMap (.euCodes) units)
                      <> [ DADriverBlock d | u <- units, Just d <- [u.euDriver] ]
                      <> map DAScreenBlock (concatMap (.euScreens) units)
+                   attach = attachmentOf (moduleSource mod') side
+                   blocksA = blocks0 <> [ DAReviewBlock rv | Just rv <- [reviewOf blocks0] ]
                -- Name collisions are checked before id dedup so a user-facing
                -- collision (two L4 names sanitising to one variable) is
                -- reported as such, not as an internal id collision.
-               checkNameCollisions blocks0
-               blocks1 <- dedupById blocks0
+               checkNameCollisions
+                 [ (a.atVar, ("document", a.atSource)) | Just a <- [attach] ]
+                 blocksA
+               blocks1 <- dedupById blocksA
                -- M2: a verdict screen renders `logic_explanation()` exactly
                -- when something in the module actually calls `explain()`.
                -- Deciding it here, over the finished list, is the only place
@@ -563,7 +611,8 @@ lowerModule mod' =
                let cited = any (\case DACodeBlock c -> isJust c.cCite; _ -> False) blocks1
                    blocks =
                      [ case b of
-                         DAScreenBlock s -> DAScreenBlock s { sCites = cited }
+                         DAScreenBlock s -> DAScreenBlock s
+                           { sCites = cited, sAttach = isJust attach }
                          other           -> other
                      | b <- blocks1 ]
                    inertFound = any exprHasInert allBodies
@@ -574,6 +623,9 @@ lowerModule mod' =
                                   <> moduleNotes (moduleSource mod') inertFound blocks
                                   <> refNotes (moduleSource mod') droppedRefs
                                   <> glossNotes (moduleSource mod') ctx.ctxGlossOut
+                                  <> reviewNotes (moduleSource mod') blocks
+                                  <> undefineNotes (moduleSource mod') blocks
+                                  <> attachNotes (moduleSource mod') attach
                      }
                Right
                  ( MkDAPackage
@@ -581,10 +633,128 @@ lowerModule mod' =
                      , pkgTitle  = moduleTitleOf mod'
                      , pkgBlocks = blocks
                      , pkgGloss  = ctx.ctxGloss
+                     , pkgAttach = attach
+                     , pkgFresh  = if cited then Just citationSentinel else Nothing
                      , pkgPlan   = Nothing
                      }
                  , report
                  )
+
+-- | M4 (spec §10): the compliance-checklist view, emitted for every module that
+-- asks at least one question.
+--
+-- Universal rather than opted into, and that is a decision rather than an
+-- oversight: nothing in an L4 source says \"give me a checklist\", so the
+-- alternatives were a CLI flag (which would make the artifact depend on how it
+-- was invoked) or a new annotation (new grammar for a view). Every interview
+-- with an input to list gets one, reachable by firing its event and inert
+-- otherwise.
+--
+-- The one exception is the @null rows@ guard below, and it is exact rather than
+-- a hedge: a module with no non-element question at all emits no block, because
+-- an empty @review:@ sequence is malformed. A module whose only inputs are
+-- gathered list elements still gets one, since @there_are_any@ and
+-- @there_is_another@ are non-element questions. (This haddock and spec §10 both
+-- read \"every module\" until 2026-08-17 — three lines above the guard that
+-- contradicted them.)
+--
+-- List ELEMENT questions are left out: their variable carries docassemble's
+-- iterator (@\<list\>[i].\<attr\>@), which has no meaning outside the gather, so
+-- a row for it could only ever render \"not asked\". The omission is declared
+-- ('reviewNotes'), not silent.
+reviewOf :: [DABlock] -> Maybe DAReview
+reviewOf blocks
+  | null rows = Nothing
+  | otherwise = Just MkDAReview
+      { rvId    = "review_main"
+      , rvEvent = reviewEvent
+      , rvTitle = "Every question this interview can ask, and the answer it has."
+      , rvRows  = rows
+      }
+ where
+  rows = [ MkDAReviewRow q.qLabel q.qVar
+         | DAQuestionBlock q <- blocks, not (isElementVar q.qVar) ]
+
+isElementVar :: Text -> Bool
+isElementVar = Text.isInfixOf "[i]"
+
+reviewEvent :: Text
+reviewEvent = "review_answers"
+
+-- | The sentinel whose block clears the explanation list once per assemble
+-- pass (spec §8.4). Reserved in 'pyReserved', so no L4 name can land on it.
+citationSentinel :: Text
+citationSentinel = "l4_citations_fresh"
+
+-- | The letter, if the author put a template beside the @.l4@.
+attachmentOf :: Text -> DASideInputs -> Maybe DAAttachment
+attachmentOf src side = do
+  (name, body) <- side.siLetter
+  let stem = fromMaybe src (Text.stripSuffix ".l4" src)
+  pure MkDAAttachment
+    { atVar     = pyIdent stem
+    , atName    = "Letter generated from " <> stem
+    , atFile    = pyIdent stem
+    , atSource  = name
+    , atContent = body
+    }
+
+-- | M4: the checklist cannot enumerate a gathered list's elements, and says so.
+reviewNotes :: Text -> [DABlock] -> [FidelityNote]
+reviewNotes src blocks =
+  [ MkFidelityNote
+      { code = "DA-REVIEW-LIST", severity = Advisory, element = src, range = Nothing
+      , message = "the compliance checklist has no row for these gathered list attributes, \
+                  \because their variable carries docassemble's iterator and there is no \
+                  \element to name until the list is gathered: "
+                    <> Text.intercalate ", " elemVars
+      , lost = "the checklist view of list elements; the interview still asks and decides them"
+      }
+  | not (null elemVars) ]
+ where
+  elemVars = [ q.qVar | DAQuestionBlock q <- blocks, isElementVar q.qVar ]
+
+-- | M4 (spec §8.4): the changed-answer repair does not reach INSIDE a gather,
+-- and says so. A guarded question's gate is cleared by @undefine:@ on the
+-- question that gates it, but @ask@ runs @substitute_vars@ over @reconsider:@
+-- and not over @undefine:@ (@parse.py:5389@ beside @:5392@ at @1b6678384@), so
+-- a @\<list\>[i].\<attr\>@ spelling would reach @undefine()@ with the iterator
+-- unresolved. Rather than emit a name docassemble cannot resolve, the emitter
+-- emits nothing there and declares it.
+undefineNotes :: Text -> [DABlock] -> [FidelityNote]
+undefineNotes src blocks =
+  [ MkFidelityNote
+      { code = "DA-UNDEFINE-LIST", severity = Advisory, element = src, range = Nothing
+      , message = "these gathered list attributes are asked only under a guard, and \
+                  \changing the answer that guards one does not clear it, because \
+                  \docassemble does not resolve an element's iterator in an `undefine:` \
+                  \list: "
+                    <> Text.intercalate ", " gatedElemVars
+      , lost = "changed-answer hygiene inside a gather; the verdict is still recomputed \
+               \from the current answers, but a value whose guard has been withdrawn \
+               \stays defined at the answer it was given"
+      }
+  | not (null gatedElemVars) ]
+ where
+  gatedElemVars =
+    nubOrd [ q.qVar | DAQuestionBlock q <- blocks, isElementVar q.qVar, isJust q.qShowIf ]
+
+-- | M4: the letter template is the author's Mako and rides verbatim.
+attachNotes :: Text -> Maybe DAAttachment -> [FidelityNote]
+attachNotes src = \case
+  Nothing -> []
+  Just a ->
+    [ MkFidelityNote
+        { code = "DA-ATTACH-MAKO", severity = Advisory, element = src, range = Nothing
+        , message = "`" <> a.atSource <> "` is embedded in the interview as the attachment's \
+                    \`content:` and is rendered as Mako, VERBATIM — it is the author's own \
+                    \template, so R9.1's escaping (which exists to stop L4-derived prose being \
+                    \read as Mako) deliberately does not apply to it"
+        , lost = "nothing of the L4 module; but a defect in the template is the author's to \
+                 \find, and a template that renders to nothing produces an EMPTY letter without \
+                 \raising or logging anything"
+        }
+    ]
 
 -- | A top-level implication is necessarily boolean, so the seam fires when
 -- the declared GIVETH is BOOLEAN /or/ absent.
@@ -703,9 +873,10 @@ glossNotes src drops =
 
 bodyHasNumeric :: DACodeBody -> Bool
 bodyHasNumeric = \case
-  DAAssign e        -> exprHasNumeric e
-  DAIfChain arms d  -> any (\(c, v) -> exprHasNumeric c || exprHasNumeric v) arms || exprHasNumeric d
-  DAInstantiate _   -> False
+  DAAssign e          -> exprHasNumeric e
+  DAIfChain arms d    -> any (\(c, v) -> exprHasNumeric c || exprHasNumeric v) arms || exprHasNumeric d
+  DAInstantiate _     -> False
+  DAInstantiateList _ -> False
 
 exprHasNumeric :: DAExpr -> Bool
 exprHasNumeric = \case
@@ -717,6 +888,13 @@ exprHasNumeric = \case
   DANot a      -> exprHasNumeric a
   DACond c t e -> exprHasNumeric c || exprHasNumeric t || exprHasNumeric e
   DAIsNone a   -> exprHasNumeric a
+  DAIsBool a _ -> exprHasNumeric a
+  -- A date's `.year`/`.day` and the day arithmetic that builds a birthday are
+  -- integer calendar components, not the Rational→float divergence DA-FLOAT
+  -- describes; a quantifier's arithmetic lives in its body.
+  DAAttr a _   -> exprHasNumeric a
+  DAMethod a _ _    -> exprHasNumeric a
+  DAQuant _ _ lst b -> exprHasNumeric lst || exprHasNumeric b
   _            -> False
 
 exprHasInert :: Expr Resolved -> Bool
@@ -803,6 +981,7 @@ data ParamArt = MkParamArt
   , paVarEntry   :: !(Maybe (Unique, Text))
   , paRecEntry   :: !(Maybe (Unique, (Text, Unique)))
   , paMaybeEntry :: !(Maybe (Unique, MaybeRepr))
+  , paListEntry  :: !(Maybe (Unique, (Text, Unique)))
   }
 
 lowerExport
@@ -842,6 +1021,8 @@ lowerExport ctx baseEnv ef =
               (Map.fromList (mapMaybe (.paRecEntry) paramArts)) baseEnv.envRecVars
           , envMaybeVars = Map.union
               (Map.fromList (mapMaybe (.paMaybeEntry) paramArts)) baseEnv.envMaybeVars
+          , envListVars = Map.union
+              (Map.fromList (mapMaybe (.paListEntry) paramArts)) baseEnv.envListVars
           , envInlineStack = [getUnique fnRes]
           }
     (envB, pendings, inner) <- processBindings envP goalSan body0
@@ -921,10 +1102,11 @@ mkScreen :: Text -> Text -> Maybe Text -> Text -> Text -> Maybe Text -> DAScreen
 mkScreen ev goalL4 dsc verdict explain showVar = MkDAScreen
   { sId = "ev_" <> ev, sEvent = ev, sGoalL4 = goalL4
   , sDesc = dsc, sVerdict = verdict, sExplain = explain, sShowVar = showVar
-  -- Flipped once, in 'lowerModule', when the finished block list is known to
-  -- carry at least one citation: a screen cannot see the helper blocks from
-  -- here, and a module with no `@ref` keeps its v1 screen byte for byte.
+  -- Both flipped once, in 'lowerModule', over the finished block list: a screen
+  -- cannot see the helper blocks (or the module's side inputs) from here, and a
+  -- module with no `@ref` and no letter keeps its v1 screen byte for byte.
   , sCites = False
+  , sAttach = False
   }
 
 -- ---------------------------------------------------------------------------
@@ -943,20 +1125,28 @@ lowerParam ctx env (MkOptionallyTypedName ann r mTy mTypically) = do
       pure MkParamArt
         { paObject = Just (var, "DAObject"), paCodes = attrCodes, paQuestions = qs
         , paVarEntry = Nothing, paRecEntry = Just (u, (var, ru))
-        , paMaybeEntry = Nothing }
-    _ -> do
-      ctl  <- controlOf kind l4
-      dflt <- traverse (lowerDefaultLit ctx) mTypically
-      let dsc = (getDesc <$> (ann ^. annDesc)) <|> typeDescOf ctx ty
+        , paMaybeEntry = Nothing, paListEntry = Nothing }
+    PList ru rs -> do
+      when (isJust mTypically) $
+        Left (LFFatal ("TYPICALLY on list parameter `" <> l4 <> "` is not supported"))
+      (codes, qs) <- listArts ctx var l4 dsc rs
       pure MkParamArt
-        { paObject = Nothing, paCodes = []
-        , paQuestions = [mkQuestion var l4 dsc ctl dflt]
+        { paObject = Nothing, paCodes = codes, paQuestions = qs
         , paVarEntry = Just (u, var), paRecEntry = Nothing
-        , paMaybeEntry = (u,) <$> maybeReprOfTy ty }
+        , paMaybeEntry = Nothing, paListEntry = Just (u, (var, ru)) }
+    _ -> do
+      dflt <- traverse (lowerDefaultLit ctx) mTypically
+      (codes, qs) <- scalarArts ctx var l4 dsc kind dflt
+      pure MkParamArt
+        { paObject = Nothing, paCodes = codes
+        , paQuestions = qs
+        , paVarEntry = Just (u, var), paRecEntry = Nothing
+        , paMaybeEntry = (u,) <$> maybeReprAt var ty, paListEntry = Nothing }
  where
   l4  = resolvedToText r
   var = pyIdent l4
   u   = getUnique r
+  dsc = (getDesc <$> (ann ^. annDesc)) <|> (typeDescOf ctx =<< mTy)
 
 -- | One question per stored field, a @DAObject@ instantiation plus recursion
 -- per nested record field. Computed (@MEANS@) fields never reach this
@@ -965,12 +1155,13 @@ lowerParam ctx env (MkOptionallyTypedName ann r mTy mTypically) = do
 lowerRecordFields
   :: Ctx -> Env -> [Unique] -> Text -> RecordSpec
   -> Either LF ([DACode], [DAQuestion])
-lowerRecordFields ctx env visited path rs = do
+lowerRecordFields ctx _env visited path rs = do
   parts <- traverse fieldArt rs.rsFields
   pure (concatMap fst parts, concatMap snd parts)
  where
   fieldArt f = do
     let attrVar = path <> "." <> f.fsSan
+        dsc     = f.fsDesc <|> typeDescOf ctx f.fsTy
     kind <- classifyTy ctx f.fsTy
     case kind of
       PRecord ru rs' -> do
@@ -978,17 +1169,184 @@ lowerRecordFields ctx env visited path rs = do
           Left (LFFatal ("recursive record nesting via field `" <> f.fsL4 <> "`"))
         when (isJust f.fsDefault) $
           Left (LFFatal ("TYPICALLY on record-typed field `" <> f.fsL4 <> "` is not supported"))
-        (subCodes, subQs) <- lowerRecordFields ctx env (ru : visited) attrVar rs'
-        let initCode = MkDACode
-              { cId = "c_" <> attrVar, cVar = attrVar
-              , cL4 = Just f.fsL4, cBody = DAInstantiate "DAObject", cDeps = []
-              , cCite = Nothing }
-        pure (initCode : subCodes, subQs)
+        (subCodes, subQs) <- lowerRecordFields ctx _env (ru : visited) attrVar rs'
+        pure (instantiate attrVar f.fsL4 (DAInstantiate "DAObject") : subCodes, subQs)
+      PList ru rs' -> do
+        when (ru `elem` visited) $
+          Left (LFFatal ("recursive record nesting via list field `" <> f.fsL4 <> "`"))
+        when (isJust f.fsDefault) $
+          Left (LFFatal ("TYPICALLY on list-typed field `" <> f.fsL4 <> "` is not supported"))
+        listArts ctx attrVar f.fsL4 dsc rs'
       _ -> do
-        ctl  <- controlOf kind f.fsL4
         dflt <- traverse (lowerDefaultLit ctx) f.fsDefault
-        let dsc = f.fsDesc <|> typeDescOf ctx f.fsTy
-        pure ([], [mkQuestion attrVar f.fsL4 dsc ctl dflt])
+        scalarArts ctx attrVar f.fsL4 dsc kind dflt
+
+-- | An object/list instantiation block. Never @reconsider@ed: re-running it
+-- would replace the object and discard everything gathered into it.
+instantiate :: Text -> Text -> DACodeBody -> DACode
+instantiate var l4 body = MkDACode
+  { cId = "c_" <> var, cVar = var, cL4 = Just l4, cBody = body
+  , cDeps = [], cCite = Nothing, cFresh = False }
+
+-- | M4: the artifacts of a @LIST OF \<record\>@ input — the @DAList@ itself, its
+-- two gather-control questions, and one question per element attribute.
+--
+-- Three facts about the target shape it, all ablation-probed against 1.10.7:
+--
+--   * @object_type@ is required — a @DAList@ without it fails on the first
+--     element access;
+--   * a question for @there_are_any@ AND one for @there_is_another@ are both
+--     required, and dropping either raises @DAErrorMissingVariable@ (the
+--     alternative is @ask_number@ + @target_number@, one count question
+--     instead of 1+N; this emitter takes the first shape because the count is
+--     not always knowable in advance and the empty list must stay reachable);
+--   * @complete_attribute@ is deliberately NOT set. It controls gather
+--     ORDERING, not pruning — and setting it would force every element's named
+--     attribute to be asked during the gather, throwing away exactly the
+--     per-element short-circuit this backend exists to preserve.
+listArts
+  :: Ctx -> Text -> Text -> Maybe Text -> RecordSpec
+  -> Either LF ([DACode], [DAQuestion])
+listArts ctx var l4 dsc rs = do
+  elemParts <- traverse elemArt rs.rsFields
+  pure ( instantiate var l4 (DAInstantiateList "DAObject") : concatMap fst elemParts
+       , [anyQ, moreQ] <> concatMap snd elemParts )
+ where
+  anyQ = MkDAQuestion
+    { qId = "q_" <> var <> ".there_are_any", qVar = var <> ".there_are_any"
+    , qLabel = l4 <> " — is there at least one?"
+    , qText  = l4 <> " — is there at least one?"
+    , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing, qShowIf = Nothing
+    , qUndefine = [] }
+  moreQ = MkDAQuestion
+    { qId = "q_" <> var <> ".there_is_another", qVar = var <> ".there_is_another"
+    , qLabel = l4 <> " — is there another one?"
+    , qText  = l4 <> " — is there another one?"
+    , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing, qShowIf = Nothing
+    , qUndefine = [] }
+  -- `[i]` is docassemble's own iterator spelling: the question is generic over
+  -- the index, and the engine substitutes the concrete element when it seeks
+  -- `<list>[0].<attr>`.
+  elemArt f = do
+    let attrVar = var <> "[i]." <> f.fsSan
+    kind <- classifyTy ctx f.fsTy
+    case kind of
+      PRecord _ rs' -> Left (LFFatal ("list element field `" <> f.fsL4 <> "` is the record `"
+                                       <> rs'.rsName <> "`; a record inside a gathered element is a \
+                                       \later milestone"))
+      PList _ rs'   -> Left (LFFatal ("list element field `" <> f.fsL4 <> "` is `LIST OF "
+                                       <> rs'.rsName <> "`; a list inside a gathered element is a \
+                                       \later milestone"))
+      _ -> do
+        dflt <- traverse (lowerDefaultLit ctx) f.fsDefault
+        scalarArts ctx attrVar f.fsL4 (f.fsDesc <|> typeDescOf ctx f.fsTy) kind dflt
+
+-- | The artifacts of one scalar-shaped input: usually a single question, but
+-- TWO for a @MAYBE NUMBER@\/@DATE@ (R8's paired is-known question) and one more
+-- per payload field for an enum whose constructors carry payloads (R6's
+-- @show if@ follow-ups).
+scalarArts
+  :: Ctx -> Text -> Text -> Maybe Text -> ParamKind -> Maybe DAExpr
+  -> Either LF ([DACode], [DAQuestion])
+scalarArts ctx var l4 dsc kind dflt = do
+  ctl <- controlOf kind l4
+  extra <- payloadQs kind
+  let valueQ = MkDAQuestion
+        { qId = "q_" <> var, qVar = var, qLabel = l4, qText = l4
+        , qHelp = dsc, qControl = ctl, qDefault = dflt, qShowIf = guardOf kind
+        -- Re-answering the discriminator clears every constructor's payload
+        -- (spec §8.4). Not only the payloads of the constructor being left:
+        -- which constructor is being left is not knowable here, and the ones
+        -- the new answer needs are re-asked immediately.
+        , qUndefine = gatedBy [ q.qVar | q <- extra ] }
+  pure ([], knownQ kind <> [valueQ] <> extra)
+ where
+  -- R8. The flag comes FIRST so a backchaining interview asks "is there an
+  -- answer?" before "what is it?", and the value question carries the guard, so
+  -- on the absence path the value variable is never defined at all.
+  knownQ = \case
+    k | isPairedMaybe k ->
+        [ MkDAQuestion
+            { qId = "q_" <> knownVar var, qVar = knownVar var
+            , qLabel = l4 <> " — is there an answer?"
+            , qText  = l4 <> " — is there an answer?"
+            , qHelp = dsc, qControl = CtlYesNoRadio, qDefault = Nothing
+            , qShowIf = Nothing
+            -- Re-answering "is there an answer?" clears the value it gates: a
+            -- flag flipped back to False must not leave the old amount behind
+            -- for the checklist to report beside it (spec §8.4).
+            , qUndefine = gatedBy [var] } ]
+    _ -> []
+  -- Element questions are left out, exactly as 'reviewOf' leaves them out and
+  -- for the same reason: their variable carries docassemble's `[i]` iterator,
+  -- and `ask` does NOT run `substitute_vars` over `undefine:` the way it does
+  -- over `reconsider:` (parse.py:5389 beside :5392 at 1b6678384), so the
+  -- iterator would reach `undefine()` unresolved. Declared, not silent —
+  -- 'undefineNotes' says so per module.
+  gatedBy vs
+    | isElementVar var = []
+    | otherwise        = vs
+  guardOf k
+    | isPairedMaybe k = Just (DAVar (knownVar var))
+    | otherwise       = Nothing
+  -- R6. One follow-up per payload field, gated on the radio answer. It must be
+  -- its OWN question: a `show if: {code: …}` reading a variable that a field in
+  -- the SAME question defines is a fatal `DASourceError: Infinite loop`
+  -- (probed).
+  payloadQs = \case
+    PEnum ei -> concat <$> traverse conPayload ei.eiCons
+    _        -> Right []
+  conPayload ci = traverse (payloadQ ci) ci.ciFields
+  payloadQ ci f = do
+    fkind <- classifyTy ctx f.fsTy
+    case fkind of
+      PRecord _ rs' -> Left (LFFatal ("constructor `" <> ci.ciName <> "` carries the record `"
+                                       <> rs'.rsName <> "` as a payload; a sum-of-records payload is \
+                                       \refused, because `objects:` instantiates unconditionally and \
+                                       \every constructor's sub-tree would be created"))
+      PList _ rs'   -> Left (LFFatal ("constructor `" <> ci.ciName <> "` carries `LIST OF "
+                                       <> rs'.rsName <> "` as a payload; a list payload is refused"))
+      _ | isMaybeKind fkind ->
+            Left (LFFatal ("constructor `" <> ci.ciName <> "` carries the MAYBE payload `"
+                            <> f.fsL4 <> "`; an optional payload inside an optional constructor \
+                            \is refused"))
+      _ -> do
+        fctl <- controlOf fkind f.fsL4
+        pure MkDAQuestion
+          { qId = "q_" <> payloadVar var f.fsSan, qVar = payloadVar var f.fsSan
+          , qLabel = f.fsL4, qText = f.fsL4
+          , qHelp = f.fsDesc <|> typeDescOf ctx f.fsTy
+          , qControl = fctl, qDefault = Nothing
+          , qShowIf = Just (DACmp DAEq (DAVar var) (DAStrLit ci.ciName))
+          , qUndefine = [] }
+
+-- | The two @MAYBE@ payloads whose absence a widget cannot express, and which
+-- therefore ride as a PAIR of questions (R8): an unanswered number submits as
+-- @0.0@ and an unanswered date as @''@.
+isPairedMaybe :: ParamKind -> Bool
+isPairedMaybe = \case
+  PMaybeNumber -> True
+  PMaybeDate   -> True
+  _            -> False
+
+isMaybeKind :: ParamKind -> Bool
+isMaybeKind = \case
+  PMaybeBool   -> True
+  PMaybeString -> True
+  k            -> isPairedMaybe k
+
+-- | The is-known flag paired with a @MAYBE NUMBER@\/@DATE@ value (R8).
+knownVar :: Text -> Text
+knownVar var = var <> "_known"
+
+-- | Where a constructor payload field is asked. A payload qualifies the enum
+-- ANSWER, so it rides beside it: @d.the_outcome@'s payload lands at
+-- @d.the_number_of_conditions@, and a bare @outcome@'s at
+-- @outcome_the_number_of_conditions@.
+payloadVar :: Text -> Text -> Text
+payloadVar enumVar fieldSan =
+  let (prefix, _) = Text.breakOnEnd "." enumVar
+  in if Text.null prefix then enumVar <> "_" <> fieldSan else prefix <> fieldSan
 
 -- | Block ids are @q_@/@c_@ plus the docassemble variable name /verbatim/
 -- (dots included — docassemble ids are free-form strings), so distinct
@@ -998,7 +1356,8 @@ lowerRecordFields ctx env visited path rs = do
 mkQuestion :: Text -> Text -> Maybe Text -> DAFieldControl -> Maybe DAExpr -> DAQuestion
 mkQuestion var l4 dsc ctl dflt = MkDAQuestion
   { qId = "q_" <> var, qVar = var, qLabel = l4, qText = l4
-  , qHelp = dsc, qControl = ctl, qDefault = dflt }
+  , qHelp = dsc, qControl = ctl, qDefault = dflt, qShowIf = Nothing
+  , qUndefine = [] }
 
 -- ---------------------------------------------------------------------------
 -- Type classification (R6, R8)
@@ -1007,8 +1366,10 @@ mkQuestion var l4 dsc ctl dflt = MkDAQuestion
 data ParamKind
   = PBool | PNumber | PString | PDate
   | PMaybeBool | PMaybeString
+  | PMaybeNumber | PMaybeDate    -- ^ M4 (R8): paired is-known question
   | PEnum EnumInfo
   | PRecord Unique RecordSpec
+  | PList Unique RecordSpec      -- ^ M4: @LIST OF \<record\>@, gathered as a DAList
 
 classifyTy :: Ctx -> Type' Resolved -> Either LF ParamKind
 classifyTy ctx = \case
@@ -1019,16 +1380,43 @@ classifyTy ctx = \case
     | getUnique n == dateUnique    -> Right PDate
     | Just ei <- Map.lookup (getUnique n) ctx.ctxEnums   -> Right (PEnum ei)
     | Just rs <- Map.lookup (getUnique n) ctx.ctxRecords -> Right (PRecord (getUnique n) rs)
-    | otherwise -> Left (LFFatal ("unsupported type `" <> resolvedToText n <> "` for a docassemble input (v1: BOOLEAN, NUMBER, STRING, DATE, nullary enums, records of these)"))
+    | otherwise -> Left (LFFatal ("unsupported type `" <> resolvedToText n <> "` for a docassemble input (BOOLEAN, NUMBER, STRING, DATE, enums, records of these, MAYBE of a scalar, and LIST OF a record)"))
   TyApp _ n [inner]
+    -- M4 (R8): NUMBER and DATE now ride as a PAIRED is-known question — a
+    -- boolean flag plus a value field guarded by `show if: {code: <flag>}` — so
+    -- the absent path leaves the value genuinely undefined rather than letting a
+    -- blank submission arrive as 0.0 or ''.
     | getUnique n == maybeUnique -> do
         innerKind <- classifyTy ctx inner
         case innerKind of
-          PBool   -> Right PMaybeBool
-          PString -> Right PMaybeString
-          PNumber -> Left (LFFatal "MAYBE NUMBER is refused in v1 (R8): an unanswered docassemble number submits as 0, so absence would be indistinguishable from a real answer (M4: paired is-known question)")
-          PDate   -> Left (LFFatal "MAYBE DATE is refused in v1 (R8): an unanswered docassemble date submits as '', so absence would be indistinguishable from a real answer (M4: paired is-known question)")
-          _       -> Left (LFFatal "unsupported MAYBE payload for a docassemble input (v1: MAYBE BOOLEAN and MAYBE STRING only)")
+          PBool     -> Right PMaybeBool
+          PString   -> Right PMaybeString
+          PNumber   -> Right PMaybeNumber
+          PDate     -> Right PMaybeDate
+          -- Named, not recited: the moment NUMBER and DATE landed, a catch-all
+          -- saying "MAYBE BOOLEAN and MAYBE STRING only" became a false claim in
+          -- user-facing prose. Each remaining refusal names what it is refusing.
+          PEnum ei  -> Left (LFFatal ("MAYBE of the enum `" <> ei.eiName <> "` is refused: the paired \
+                                      \is-known design does not reach it, because the value question for an \
+                                      \enum is itself a radio, so its absent path would be a fourth choice \
+                                      \rather than the widget's empty submission — model the absence as an \
+                                      \explicit constructor of `" <> ei.eiName <> "` instead"))
+          PRecord _ rs -> Left (LFFatal ("MAYBE of the record `" <> rs.rsName <> "` is refused: a record \
+                                         \explodes into several questions, all of which the absence would \
+                                         \have to gate"))
+          PList _ rs   -> Left (LFFatal ("MAYBE of `LIST OF " <> rs.rsName <> "` is refused: an empty \
+                                         \gathered list already expresses \"none\""))
+          _         -> Left (LFFatal "MAYBE of a MAYBE is refused for a docassemble input")
+    -- M4: `LIST OF <record>` is gathered as a DAList of DAObjects, one question
+    -- per element attribute. `LIST OF <scalar>` is a different DAList shape (no
+    -- object_type, values gathered directly) and is refused by name.
+    | getUnique n == listUnique -> do
+        innerKind <- classifyTy ctx inner
+        case innerKind of
+          PRecord ru rs -> Right (PList ru rs)
+          _ -> Left (LFFatal ("`LIST OF " <> typeHead inner <> "` is refused: M4 gathers a list of \
+                              \RECORDS (one question per element attribute); a list of scalars is a \
+                              \different DAList shape and is a later milestone"))
   Fun {}    -> Left (LFFatal "a function-typed value cannot be a docassemble input")
   ty        -> Left (LFFatal ("unsupported type shape for a docassemble input: " <> typeHead ty))
  where
@@ -1040,6 +1428,9 @@ classifyTy ctx = \case
     Forall {} -> "FORALL"
     InfVar {} -> "inference variable"
 
+-- | The widget for the value question of a kind. For a @MAYBE NUMBER@\/@DATE@
+-- this is the /value/ half of the pair; its is-known flag is a separate
+-- question, built where the artifacts are (see 'scalarArts').
 controlOf :: ParamKind -> Text -> Either LF DAFieldControl
 controlOf kind l4 = case kind of
   PBool        -> Right CtlYesNoRadio
@@ -1048,12 +1439,13 @@ controlOf kind l4 = case kind of
   PDate        -> Right CtlDate
   PMaybeBool   -> Right CtlYesNoMaybe
   PMaybeString -> Right CtlTextOptional
-  PEnum ei     ->
-    case [ cn | (cn, ar) <- ei.eiCons, ar > 0 ] of
-      []        -> Right (CtlRadio (map fst ei.eiCons))
-      (bad : _) -> Left (LFFatal ("enum `" <> ei.eiName <> "` has payload constructor `" <> bad
-                                   <> "`; payload constructors are refused in v1 (M4: `show if` follow-ups)"))
+  PMaybeNumber -> Right CtlNumber
+  PMaybeDate   -> Right CtlDate
+  -- M4: payload-bearing constructors are now choices like any other; each
+  -- payload FIELD becomes a follow-up question gated on this radio.
+  PEnum ei     -> Right (CtlRadio [ ci.ciName | ci <- ei.eiCons ])
   PRecord _ _  -> Left (LFFatal ("internal: record-typed `" <> l4 <> "` reached scalar-control classification"))
+  PList _ _    -> Left (LFFatal ("internal: list-typed `" <> l4 <> "` reached scalar-control classification"))
 
 typeDescOf :: Ctx -> Type' Resolved -> Maybe Text
 typeDescOf ctx = \case
@@ -1069,7 +1461,7 @@ lowerDefaultLit ctx = \case
   App _ r []
     | Just b <- boolLit (resolvedToText r) -> Right (DABoolLit b)
     | Just ci <- Map.lookup (getUnique r) ctx.ctxEnumCons
-    , ci.ciArity == 0 -> Right (DAStrLit ci.ciName)
+    , ciArity ci == 0 -> Right (DAStrLit ci.ciName)
   _ -> Left (LFFatal "unsupported TYPICALLY default — v1 accepts literals and nullary enum constructors only")
 
 -- ---------------------------------------------------------------------------
@@ -1086,7 +1478,7 @@ data PendingCode = MkPendingCode
 data BindEntry
   = BindVar !Unique !Text !Text !DefAnns !(Expr Resolved)
     -- ^ unique, L4 name, variable, its own annotations, body
-  | BindFun !Unique !Text ![Unique] !(Expr Resolved)  -- ^ unique, L4 name, params, body
+  | BindFun !Unique !Text ![Resolved] !(Expr Resolved)  -- ^ unique, L4 name, params, body
 
 -- | Peel @WHERE@/@LET@ layers off the top of a definition body. Every
 -- zero-parameter binding becomes one @code:@ block named
@@ -1113,7 +1505,7 @@ processBindings env prefix expr0 = case expr0 of
           u       = getUnique (decideName d)
       in Right $ if null ps
            then BindVar u nm (prefix <> "_" <> pyIdent nm) (decideAnns localAnn d) b
-           else BindFun u nm (map getUnique ps) b
+           else BindFun u nm ps b
     LocalAssume _ a ->
       Left (LFFatal ("local ASSUME `" <> assumeName a
                       <> "` in WHERE is not supported in v1 — declare it at module level or pass it as a GIVEN"))
@@ -1132,16 +1524,19 @@ processBindings env prefix expr0 = case expr0 of
 pcToCode :: PendingCode -> DACode
 pcToCode pc = mkCode pc.pcCite pc.pcVar (Just pc.pcL4) pc.pcBody
 
+-- | A derived-value block. Always @reconsider@ed (spec §8.4): a rule that
+-- survived from an earlier answer is a stale verdict, not a cached one.
 mkCode :: Maybe Text -> Text -> Maybe Text -> DACodeBody -> DACode
 mkCode cite var mL4 cb = MkDACode
   { cId = "c_" <> var, cVar = var, cL4 = mL4
-  , cBody = cb, cDeps = nubOrd (bodyVars cb), cCite = cite }
+  , cBody = cb, cDeps = nubOrd (bodyVars cb), cCite = cite, cFresh = True }
 
 bodyVars :: DACodeBody -> [Text]
 bodyVars = \case
-  DAAssign e       -> exprVars e
-  DAIfChain arms d -> concatMap (\(c, v) -> exprVars c <> exprVars v) arms <> exprVars d
-  DAInstantiate _  -> []
+  DAAssign e          -> exprVars e
+  DAIfChain arms d    -> concatMap (\(c, v) -> exprVars c <> exprVars v) arms <> exprVars d
+  DAInstantiate _     -> []
+  DAInstantiateList _ -> []
 
 exprVars :: DAExpr -> [Text]
 exprVars = \case
@@ -1153,6 +1548,13 @@ exprVars = \case
   DANot a      -> exprVars a
   DACond c t e -> exprVars c <> exprVars t <> exprVars e
   DAIsNone a   -> exprVars a
+  DAIsBool a _ -> exprVars a
+  DAAttr a _   -> exprVars a
+  DAMethod a _ kws -> exprVars a <> concatMap (exprVars . snd) kws
+  -- Only the LIST is a dependency. The body's variables are element attributes
+  -- reached through the comprehension's own binding, which is not an interview
+  -- variable at all and must not reach `depends on:`.
+  DAQuant _ _ lst _ -> exprVars lst
   _            -> []
 
 -- ---------------------------------------------------------------------------
@@ -1182,18 +1584,67 @@ considerArms env scrut branches
   | Just repr <- scrutMaybeRepr env scrut = maybeArms env repr scrut branches
   | otherwise = do
       scrutE <- lowerExpr env scrut
-      let whens  = [ (con, b) | MkBranch _ (When _ (PatApp _ con [])) b <- branches ]
+      scrutV <- case scrutE of
+        DAVar v -> Right (Just v)
+        _       -> Right Nothing
+      -- M4 (R6): a payload constructor's binders name the follow-up questions
+      -- the `show if` gate asks, so `WHEN `granted subject to conditions` n`
+      -- binds `n` to the variable that follow-up defines.
+      let whens  = [ (con, ps, b) | MkBranch _ (When _ (PatApp _ con ps)) b <- branches ]
           others = [ b | MkBranch _ (Otherwise _) b <- branches ]
       when (length whens + length others /= length branches) $
-        Left (LFFatal "only nullary enum-constructor WHEN patterns (plus OTHERWISE) are supported in v1")
-      d <- case others of
-        (d0 : _) -> lowerExpr env d0
-        []       -> Left (LFFatal "CONSIDER without an OTHERWISE cannot be compiled to docassemble (R6: the ==/elif chain needs a default arm)")
-      arms <- for whens \(con, b) -> do
+        Left (LFFatal "only enum-constructor WHEN patterns (plus OTHERWISE) are supported")
+      -- The emitted if/elif chain needs a final `else`. An OTHERWISE is one;
+      -- so is an EXHAUSTIVE match, whose last arm is reached under exactly the
+      -- conditions the `else` is — and a CONSIDER over every constructor of an
+      -- enum is the idiomatic way to write one (M4: `payload-enum.l4` has no
+      -- OTHERWISE because there is nothing left for it to cover).
+      let lowerArm (con, ps, b) = do
+            env' <- bindPayload env scrutV con ps
+            lowerExpr env' b
+          covered = nubOrd [ ci.ciName | (con, _, _) <- whens
+                           , Just ci <- [Map.lookup (getUnique con) env.envEnumCons] ]
+          exhaustive = case whens of
+            ((con0, _, _) : _)
+              | Just ci0 <- Map.lookup (getUnique con0) env.envEnumCons ->
+                  sort covered == sort (nubOrd ci0.ciAll)
+            _ -> False
+      (d, tested) <- case (others, exhaustive) of
+        ((d0 : _), _) -> (,) <$> lowerExpr env d0 <*> pure whens
+        ([], True)    -> (,) <$> lowerArm (last whens) <*> pure (init whens)
+        ([], False)   -> Left (LFFatal "CONSIDER without an OTHERWISE, and not covering every \
+                                       \constructor of the enum, cannot be compiled to docassemble \
+                                       \(R6: the ==/elif chain needs a default arm)")
+      arms <- for tested \arm@(con, _, _) -> do
         cond <- enumTest env scrutE con
-        v    <- lowerExpr env b
+        v    <- lowerArm arm
         pure (cond, v)
       pure (arms, d)
+
+-- | Bind a payload constructor's pattern variables to the follow-up questions
+-- that ask them (R6). Only plain binders are supported: a nested pattern would
+-- be a match on the payload's own structure, which the follow-up question — one
+-- widget, one value — cannot express.
+bindPayload :: Env -> Maybe Text -> Resolved -> [Pattern Resolved] -> Either LF Env
+bindPayload env mScrutV con ps
+  | null ps = Right env
+  | otherwise = case Map.lookup (getUnique con) env.envEnumCons of
+      Nothing -> Left (LFFatal ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor"))
+      Just ci -> do
+        scrutV <- maybe
+          (Left (LFFatal ("CONSIDER: the payload of `" <> ci.ciName <> "` can only be read when the \
+                          \scrutinee is an input variable, because the payload rides beside it as a \
+                          \follow-up question")))
+          Right mScrutV
+        when (length ps /= length ci.ciFields) $
+          Left (LFFatal ("CONSIDER: `" <> ci.ciName <> "` carries " <> tshow (length ci.ciFields)
+                          <> " payload field(s) but the pattern binds " <> tshow (length ps)))
+        binds <- for (zip ps ci.ciFields) \(p, f) -> case p of
+          PatVar _ v -> Right (getUnique v, payloadVar scrutV f.fsSan)
+          _ -> Left (LFFatal ("CONSIDER: the payload pattern for `" <> ci.ciName <> "` must bind a \
+                              \plain variable; matching on the payload's own value is not supported \
+                              \— bind a variable and compare it in the arm body"))
+        pure env { envVars = Map.union (Map.fromList binds) env.envVars }
 
 -- | The erased representation of a @MAYBE@ scrutinee, when there is one: a
 -- bare @MAYBE@-typed parameter/ASSUME, or a projection whose field is
@@ -1202,16 +1653,23 @@ scrutMaybeRepr :: Env -> Expr Resolved -> Maybe MaybeRepr
 scrutMaybeRepr env = \case
   App _ r []     -> Map.lookup (getUnique r) env.envMaybeVars
   Proj _ inner f -> do
-    (_, spec) <- resolvePath env inner
+    (path, spec) <- resolvePath env inner
     fld <- find (\fs -> fs.fsL4 == resolvedToText f) spec.rsFields
-    maybeReprOfTy fld.fsTy
+    maybeReprAt (path <> "." <> fld.fsSan) fld.fsTy
   _ -> Nothing
 
--- | R8: a @CONSIDER@ over a @MAYBE@ input pattern-matches on /presence/. v1
--- accepts exactly one @WHEN JUST x@ arm plus one absence arm (@WHEN NOTHING@
--- or @OTHERWISE@). The absence test is the input's erased runtime
--- representation — @is None@ for @MAYBE BOOLEAN@ (@yesnomaybe@), @== ''@ for
--- @MAYBE STRING@ — and the @JUST@-bound variable reads the input itself.
+-- | R8: a @CONSIDER@ over a @MAYBE@ input. Two shapes, and M4 adds the second.
+--
+--   * PRESENCE. @WHEN JUST x@ binds the value and @WHEN NOTHING@\/@OTHERWISE@
+--     is the absence arm. The absence test is the input's runtime
+--     representation: @is None@ for @MAYBE BOOLEAN@ (@yesnomaybe@), @== ''@
+--     for @MAYBE STRING@, and @not \<flag\>@ for the paired
+--     @MAYBE NUMBER@\/@DATE@.
+--   * The payload VALUE — @WHEN JUST FALSE@ — ruled IN at M4 (spec §8.8).
+--     M1 refused it by name, and before that repair it compiled to a mere
+--     presence test, which answers @JUST FALSE@ and @NOTHING@ the same way.
+--     The pinning case is `maybe-scalars.l4` #EVAL 6 against #EVAL 7: a
+--     declaration positively disclaimed is referable, an unanswered one is not.
 maybeArms
   :: Env -> MaybeRepr -> Expr Resolved -> [Branch Resolved]
   -> Either LF ([(DAExpr, DAExpr)], DAExpr)
@@ -1220,36 +1678,104 @@ maybeArms env repr scrut branches = do
   scrutV <- case scrutE of
     DAVar v -> Right v
     _       -> Left (LFFatal "presence match (JUST/NOTHING) is supported only directly on a MAYBE input (R8)")
-  let justs    = [ (pv, b) | MkBranch _ (When _ (PatApp _ con [pv])) b <- branches
+  let absent = case repr of
+        ReprNone     -> DAIsNone scrutE
+        ReprEmpty    -> DACmp DAEq scrutE (DAStrLit "")
+        ReprFlag flg -> DANot (DAVar flg)
+      present = DANot absent
+      justs    = [ (pv, b) | MkBranch _ (When _ (PatApp _ con [pv])) b <- branches
                            , getUnique con == justUnique ]
       nothings = [ b | MkBranch _ (When _ (PatApp _ con [])) b <- branches
                      , getUnique con == nothingUnique ]
       others   = [ b | MkBranch _ (Otherwise _) b <- branches ]
   case (justs, nothings <> others) of
-    ([(pv, jb)], [nb]) | length branches == 2 -> do
-      -- Post-typecheck a binder is always PatVar (the scope checker rewrites
-      -- out-of-scope nullary PatApps to PatVar, TypeCheck.hs inferPattern),
-      -- so a PatApp payload here is a genuine constructor pattern — e.g.
-      -- `WHEN JUST TRUE` — which is a match on the payload VALUE, not a
-      -- binder. Treating it as a binder silently degraded the match to a
-      -- mere presence test (a wrong verdict); it is refused instead.
-      ju <- case pv of
-        PatVar _ v -> Right (getUnique v)
-        _          -> Left (LFFatal "the JUST pattern must bind a plain variable (v1); matching on the payload value (e.g. `WHEN JUST TRUE`) is not supported — bind a variable and compare it in the arm body")
-      bodyJ <- lowerExpr env { envVars = Map.insert ju scrutV env.envVars } jb
+    -- The M1 shape, kept verbatim: absence first, presence as the else.
+    ([(PatVar _ v, jb)], [nb]) | length branches == 2 -> do
+      bodyJ <- lowerExpr env { envVars = Map.insert (getUnique v) scrutV env.envVars } jb
       bodyN <- lowerExpr env nb
-      let absent = case repr of
-            ReprNone  -> DAIsNone scrutE
-            ReprEmpty -> DACmp DAEq scrutE (DAStrLit "")
       pure ([(absent, bodyN)], bodyJ)
-    _ -> Left (LFFatal "CONSIDER over a MAYBE value must have exactly one `WHEN JUST x` arm and one absence arm (`WHEN NOTHING` or OTHERWISE) (R8)")
+    _ -> do
+      -- The general chain, in source order. Post-typecheck a binder is always
+      -- PatVar (the scope checker rewrites out-of-scope nullary PatApps to
+      -- PatVar, TypeCheck.hs inferPattern), so a PatApp or PatLit payload here
+      -- is a genuine VALUE pattern.
+      let armOf = \case
+            MkBranch _ (When _ (PatApp _ con [pv])) b | getUnique con == justUnique ->
+              case pv of
+                PatVar _ v -> Just (Right (present, Just (getUnique v), b))
+                _          -> Just (Left (pv, b))
+            MkBranch _ (When _ (PatApp _ con [])) b | getUnique con == nothingUnique ->
+              Just (Right (absent, Nothing, b))
+            _ -> Nothing
+          otherArm = \case
+            MkBranch _ (Otherwise _) b -> Just b
+            _                          -> Nothing
+      d <- case others of
+        (d0 : _) -> lowerExpr env d0
+        []       -> Left (LFFatal "CONSIDER over a MAYBE value needs an absence arm (`WHEN NOTHING` or OTHERWISE) (R8)")
+      arms <- for [ br | br <- branches, isNothing (otherArm br) ] \br ->
+        case armOf br of
+          Nothing -> Left (LFFatal "CONSIDER over a MAYBE value accepts only `WHEN JUST …`, `WHEN NOTHING` and OTHERWISE arms (R8)")
+          Just (Right (cond, mBind, b)) -> do
+            let env' = case mBind of
+                  Just u  -> env { envVars = Map.insert u scrutV env.envVars }
+                  Nothing -> env
+            (cond,) <$> lowerExpr env' b
+          Just (Left (pv, b)) -> do
+            valTest <- payloadValueTest repr scrutE pv
+            (valTest,) <$> lowerExpr env b
+      pure (arms, d)
 
+-- | The test for @WHEN JUST \<value\>@ (spec §8.8, ruled IN at M4).
+--
+-- For a @yesnomaybe@ the identity test is enough and is exact: the three states
+-- are @True@\/@False@\/@None@, and @x is False@ is true of neither @None@ nor a
+-- numeric zero. For a paired @MAYBE NUMBER@\/@DATE@ the flag has to be
+-- consulted first, because the value variable does not exist on the absent path
+-- and reading it would raise.
+--
+-- @ReprEmpty@ — a @MAYBE STRING@, whose absence encoding IS @== \'\'@ — has one
+-- payload value it cannot express, and it is refused rather than lowered
+-- (narrowed 2026-08-17; spec §8.8). @WHEN JUST \"\"@ would compile to exactly
+-- the absence test, so two distinct L4 answers (@NOTHING@ and @JUST \"\"@)
+-- would become one Python expression; worse, this module's own
+-- @DA-MAYBE-STRING@ advisory declares that an empty submission READS AS
+-- @NOTHING@, so the one interview state the test can reach is the state where
+-- L4 says @FALSE@ — the emitted answer is inverted, not merely conflated.
+-- §8.8's ruling admits payload-value matches on the condition that
+-- \"@WHEN JUST \<value\>@ must NOT compile to a presence test\"; this is the
+-- one literal for which that cannot be honoured, so it refuses by name.
+-- Every non-empty string literal is unaffected.
+payloadValueTest :: MaybeRepr -> DAExpr -> Pattern Resolved -> Either LF DAExpr
+payloadValueTest repr scrutE pv = do
+  lit <- case pv of
+    PatApp _ r [] | Just b <- boolLit (resolvedToText r) -> Right (Left b)
+    PatLit _ (NumericLit _ n) -> Right (Right (DANum n))
+    PatLit _ (StringLit _ t)  -> Right (Right (DAStrLit t))
+    _ -> Left (LFFatal "the JUST pattern must bind a plain variable or match a literal value \
+                       \(`WHEN JUST TRUE`, `WHEN JUST 0`); a structured payload pattern is not \
+                       \supported")
+  let test = case lit of
+        Left b  -> DAIsBool scrutE b
+        Right e -> DACmp DAEq scrutE e
+  case (repr, lit) of
+    (ReprEmpty, Right (DAStrLit "")) ->
+      Left (LFFatal "`WHEN JUST \"\"` on a MAYBE STRING is refused: an optional text answer \
+                    \encodes NOTHING as the empty string, so this arm and the `WHEN NOTHING` \
+                    \arm would compile to the same test and the interview could not tell a \
+                    \positively blank answer from no answer at all (spec §8.8). Match a \
+                    \non-empty literal, or bind the payload (`WHEN JUST x`) and test it in \
+                    \the arm body")
+    (ReprFlag flg, _) -> pure (DAAnd (DAVar flg) test)
+    _                 -> pure test
+
+-- | The arm test: the radio answer is the constructor's L4 name, verbatim, for
+-- a payload-bearing constructor exactly as for a nullary one (R6). What the
+-- payload adds is the follow-up questions, not a different test.
 enumTest :: Env -> DAExpr -> Resolved -> Either LF DAExpr
 enumTest env scrutE con =
   case Map.lookup (getUnique con) env.envEnumCons of
-    Just ci
-      | ci.ciArity == 0 -> Right (DACmp DAEq scrutE (DAStrLit ci.ciName))
-      | otherwise -> Left (LFFatal ("CONSIDER: constructor `" <> ci.ciName <> "` carries a payload; payload patterns are refused in v1"))
+    Just ci -> Right (DACmp DAEq scrutE (DAStrLit ci.ciName))
     Nothing -> Left (LFFatal ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor (only enum CONSIDER is supported in v1)"))
 
 multiWayArms
@@ -1352,10 +1878,13 @@ lowerApp env go r args = case args of
     | Just b <- boolLit nm -> Right (DABoolLit b)
     | Just v <- Map.lookup u env.envVars -> Right (DAVar v)
     | Just (path, _) <- Map.lookup u env.envRecVars -> Right (DAVar path)
+    | Just (path, _) <- Map.lookup u env.envListVars -> Right (DAVar path)
     | Just ci <- Map.lookup u env.envEnumCons ->
-        if ci.ciArity == 0
+        if ciArity ci == 0
           then Right (DAStrLit ci.ciName)
-          else Left (LFFatal ("enum constructor `" <> nm <> "` carries a payload; payload constructors are refused in v1 (M4: `show if` follow-ups)"))
+          else Left (LFFatal ("enum constructor `" <> nm <> "` carries a payload and is being used as a \
+                              \VALUE; M4 asks a payload constructor as an INPUT (a radio plus a \
+                              \`show if` follow-up per payload field), it does not construct one"))
     | Map.member u env.envFuns ->
         Left (LFFatal ("higher-order use of function `" <> nm <> "` — only direct application can be inlined (v1 emits no Python module); refused by name (R3)"))
     | nm == "NOTHING" ->
@@ -1366,17 +1895,246 @@ lowerApp env go r args = case args of
     Just mk -> traverse go args >>= mk
     Nothing
       | nm == "JUST" ->
-          Left (LFFatal "`JUST` in a body: v1 supports MAYBE only as presence-erased inputs (R8), not as produced values")
+          Left (LFFatal "`JUST` in a body: MAYBE is supported as an INPUT (R8), not as a produced value")
       | Just ci <- Map.lookup u env.envEnumCons ->
-          Left (LFFatal ("construction of enum payload `" <> ci.ciName <> "` is refused in v1 (M4: `show if` follow-ups)"))
+          Left (LFFatal ("construction of the payload constructor `" <> ci.ciName <> "` is refused; \
+                         \M4 asks a payload constructor as an INPUT, it does not produce one"))
       | Just f <- Map.lookup u env.envFuns -> inlineApply env f nm args
+      -- The list and date surfaces are recognised BY NAME, after the in-module
+      -- bindings, so a module that defines its own `all` or `Date` still wins.
+      -- They arrive as references to prelude/library decides, which are not in
+      -- this module and therefore not in `envFuns` at all.
+      | Just r' <- quantOp nm, [lam, lst] <- args -> lowerQuant env r' lam lst
+      | Just mk <- dateCall u nm -> traverse go args >>= mk
       | Map.member u env.envVars ->
           Left (LFFatal ("`" <> nm <> "` is not a function but is applied to arguments"))
       | otherwise ->
-          Left (LFFatal ("cannot compile call to `" <> nm <> "` — v1 supports calls to in-module decisions and directly-applied WHERE bindings only"))
+          Left (LFFatal ("cannot compile call to `" <> nm <> "` — supported calls are in-module \
+                         \decisions, directly-applied WHERE bindings, `all`/`any` over a LIST OF \
+                         \input, and the R12 date surface (`YMD`, `Date`, DATE_YEAR/MONTH/DAY)"))
  where
   u  = getUnique r
   nm = resolvedToText r
+
+-- ---------------------------------------------------------------------------
+-- M4: quantifiers over a gathered list
+-- ---------------------------------------------------------------------------
+
+quantOp :: Text -> Maybe DAQuantOp
+quantOp = \case
+  "all" -> Just DAAll
+  "any" -> Just DAAny
+  _     -> Nothing
+
+-- | @all (GIVEN t YIELD \<pred\>) (h's tenants)@ → @all(\<pred\> for _t in
+-- h.tenants)@.
+--
+-- A GENERATOR, not a list comprehension: @all@ over a generator stops at the
+-- first false element, so the elements after it are never read and their
+-- questions are never asked. That is the per-element half of the pruning claim,
+-- and it is the reason the emitter must not build an eager list of per-element
+-- booleans first — nor reach for @complete_elements()@, which iterates
+-- @self.elements@ with no @_trigger_gather@ and silently returns nothing at all
+-- on an ungathered list (@util.py:3256-3274@).
+lowerQuant :: Env -> DAQuantOp -> Expr Resolved -> Expr Resolved -> Either LF DAExpr
+lowerQuant env op lam lst =
+  case lam of
+    -- The lambda written out at the call site.
+    Lam _ (MkGivenSig _ [p]) body ->
+      quantOver (givenName p) body env.envInlineStack
+    -- An ETA-REDUCED predicate: `any `the purpose is a charitable purpose`
+    -- (entity's purposes)`, which is how the corpus actually writes it. The
+    -- function's own parameter is the binder, and its body is inlined at the
+    -- element exactly as a lambda's would be — the same beta-reduction R3
+    -- already does for a direct application, with the generator variable
+    -- standing in for the argument.
+    App _ r []
+      | Just f <- Map.lookup (getUnique r) env.envFuns
+      , [p] <- f.ifParams ->
+          if f.ifU `elem` env.envInlineStack
+            then Left (LFFatal ("recursive predicate `" <> resolvedToText r
+                                 <> "` cannot be inlined into a generator expression"))
+            else quantOver p f.ifBody (f.ifU : env.envInlineStack)
+    _ -> Left (LFFatal "`all`/`any` expect a one-argument predicate — a lambda written out at \
+                       \the call site (`all (GIVEN x YIELD <pred>) <list>`) or the name of a \
+                       \one-parameter decision — because the predicate is inlined into the \
+                       \generator expression")
+ where
+  quantOver p body stack = do
+    (path, ru) <- case resolveList env lst of
+      Just pr -> Right pr
+      Nothing -> Left (LFFatal "`all`/`any` are supported over a `LIST OF <record>` INPUT (a GIVEN \
+                               \parameter or a record field of one); a computed list has no \
+                               \gathered DAList to quantify over")
+    let elemVar = freshElemVar env ("_" <> pyIdent (resolvedToText p))
+        env'    = env { envRecVars = Map.insert (getUnique p) (elemVar, ru) env.envRecVars
+                      , envInlineStack = stack }
+    body' <- lowerExpr env' body
+    pure (DAQuant op elemVar (DAVar path) body')
+
+-- | A generator variable that shadows nothing already in scope.
+--
+-- Python scopes a generator's variable to the generator, so a NESTED quantifier
+-- whose binder sanitises to the same name would shadow the outer one — which is
+-- right when the L4 binders are the same name (L4 shadows too) and WRONG when
+-- two different L4 names sanitise together, because then the inner body's
+-- reference to the outer binder would silently read the inner element instead.
+-- Disambiguating by suffix costs nothing in the common case: `_t` stays `_t`.
+freshElemVar :: Env -> Text -> Text
+freshElemVar env base = go base (2 :: Int)
+ where
+  go cand n
+    | cand `Set.notMember` taken = cand
+    | otherwise                  = go (base <> "_" <> tshow n) (n + 1)
+  taken = Set.fromList $
+       Map.elems env.envVars
+    <> map fst (Map.elems env.envRecVars)
+    <> map fst (Map.elems env.envListVars)
+
+-- | Resolve a list-valued expression to (the DAList's variable path, the
+-- element record's type unique).
+resolveList :: Env -> Expr Resolved -> Maybe (Text, Unique)
+resolveList env = \case
+  App _ r [] -> Map.lookup (getUnique r) env.envListVars
+  Proj _ inner f -> do
+    (path, spec) <- resolvePath env inner
+    fld <- find (\fs -> fs.fsL4 == resolvedToText f) spec.rsFields
+    ru  <- elementRecordOf env fld.fsTy
+    pure (path <> "." <> fld.fsSan, ru)
+  _ -> Nothing
+
+elementRecordOf :: Env -> Type' Resolved -> Maybe Unique
+elementRecordOf env = \case
+  TyApp _ n [TyApp _ e []]
+    | getUnique n == listUnique, Map.member (getUnique e) env.envRecords -> Just (getUnique e)
+  _ -> Nothing
+
+-- ---------------------------------------------------------------------------
+-- M4: the date surface (R12, spec §8.12)
+--
+-- Lowered: a date LITERAL, and \"the same day-and-month, n years later\". Every
+-- other date operation refuses BY NAME — L4 ships six date libraries on top of
+-- a DATE builtin, and carrying that surface is not this backend's job.
+-- ---------------------------------------------------------------------------
+
+dateCall :: Unique -> Text -> Maybe ([DAExpr] -> Either LF DAExpr)
+dateCall u nm
+  | u == dateYearUnique  = Just (attr1 "year")
+  | u == dateMonthUnique = Just (attr1 "month")
+  | u == dateDayUnique   = Just (attr1 "day")
+  | nm == "YMD"          = Just ymdCall
+  | nm == "Date" || nm == "Days to date" = Just dateCtor
+  | nm `elem` refusedDateNames = Just \_ ->
+      Left (LFFatal ("`" <> nm <> "` is outside the M4 date surface (spec R12), which is a date \
+                     \literal, a date comparison, and \"the same day-and-month, n years later\"; \
+                     \the rest of L4's date libraries are a later milestone"))
+  | otherwise = Nothing
+ where
+  attr1 field = \case
+    [e] -> Right (DAAttr e field)
+    xs  -> Left (LFFatal ("`" <> nm <> "` takes one date, got " <> tshow (length xs)))
+
+-- | Date operations the corpus uses that this backend does not lower. Named
+-- one by one, because a generic \"unsupported call\" would not tell an author
+-- which half of their date arithmetic the interview cannot carry.
+refusedDateNames :: [Text]
+refusedDateNames =
+  [ "Day", "Date to days", "years after", "the week after"
+  , "the date that many years earlier", "DATETIME", "TIME", "TIMEZONE"
+  , "DATE_SERIAL", "DATE_FROM_SERIAL", "DATE_FROM_DMY", "DATEVALUE", "TODAY"
+  ]
+
+-- | @YMD year month day@ — the STRICT constructor, so out-of-range components
+-- are refused here exactly as L4 refuses them (through @daydate.l4@'s ASSUME
+-- bottom) rather than being silently rolled.
+ymdCall :: [DAExpr] -> Either LF DAExpr
+ymdCall = \case
+  [DANum y, DANum m, DANum d]
+    | Just iso <- isoDate (truncate y) (truncate m) (truncate d) -> Right (DADateLit iso)
+    | otherwise -> Left (LFFatal ("`YMD " <> tshow (truncate y :: Integer) <> " "
+                                   <> tshow (truncate m :: Integer) <> " "
+                                   <> tshow (truncate d :: Integer)
+                                   <> "` is out of range; L4 refuses it through an ASSUME bottom"))
+  [_, _, _] -> Left (LFFatal "`YMD` is lowered as a date LITERAL, so its three components must be \
+                             \literal numbers (spec R12)")
+  xs -> Left (LFFatal ("`YMD` takes three components, got " <> tshow (length xs)))
+
+-- | @Date day month year@ — the LENIENT, rolling constructor. Two shapes lower:
+-- an all-literal date (rolled here, as L4 rolls it), and the birthday idiom.
+dateCtor :: [DAExpr] -> Either LF DAExpr
+dateCtor = \case
+  [DANum d, DANum m, DANum y] ->
+    Right (DADateLit (rolledDate (truncate y) (truncate m) (truncate d)))
+  -- "the same day-and-month, n years later": `Date (DATE_DAY e) (DATE_MONTH e)
+  -- (DATE_YEAR e PLUS n)`.
+  [DAAttr e1 "day", DAAttr e2 "month", DABin op (DAAttr e3 "year") (DANum n)]
+    | e1 == e2, e2 == e3, op == DAAdd || op == DASub, n >= 0, isInt n ->
+        Right (shiftYears e1 (if op == DAAdd then "plus" else "minus") (truncate n))
+  _ -> Left (LFFatal "`Date` is lowered for a date LITERAL and for \"the same day-and-month, n \
+                     \years later\" (`Date (DATE_DAY d) (DATE_MONTH d) (DATE_YEAR d PLUS n)`); \
+                     \other date arithmetic is a later milestone (spec R12)")
+ where
+  isInt r = r == fromIntegral (truncate r :: Integer)
+
+-- | The anniversary, computed the way L4's @Date@ computes it and NOT the way
+-- @relativedelta@ does.
+--
+-- @DADateTime.plus(years=n)@ CLAMPS: 2004-02-29 plus 18 years is 2022-02-28.
+-- L4's @Date 29 2 2022@ ROLLS FORWARD to 2022-03-01. Measured over every birth
+-- date from 1970-01-01 to 2006-12-31, tested on the L4 majority date and the
+-- day before (27,028 comparisons), the clamping form disagrees with the L4
+-- oracle on the nine leap-day births and @date_difference(…).years >= 18@ on
+-- 6,629 — the latter because it is elapsed days over the mean Gregorian year
+-- and reports 17.99900 on the applicant's own eighteenth birthday.
+--
+-- So the shift is done from the FIRST of the month, where no year is short and
+-- no clamp can fire, and the day is added back afterwards, which rolls into the
+-- next month exactly as L4 does.
+shiftYears :: DAExpr -> Text -> Integer -> DAExpr
+shiftYears e dir n =
+  let offset = DABin DASub (DAAttr e "day") (DANum 1)
+      monthStart = DAMethod e "minus" [("days", offset)]
+      shifted    = DAMethod monthStart dir [("years", DANum (fromIntegral n))]
+  in DAMethod shifted "plus" [("days", offset)]
+
+-- | ISO text for a strictly valid date; 'Nothing' when the components are out
+-- of range (which is what @YMD@ refuses).
+isoDate :: Integer -> Integer -> Integer -> Maybe Text
+isoDate y m d
+  | m >= 1, m <= 12, d >= 1, d <= daysInMonth y m = Just (isoText y m d)
+  | otherwise = Nothing
+
+-- | The rolling constructor's answer, in ISO text: the day may overflow its
+-- month, exactly as @Date 29 2 2022@ rolls to 1 March 2022.
+rolledDate :: Integer -> Integer -> Integer -> Text
+rolledDate y0 m0 d0 =
+  let (yA, mA) = normMonth y0 m0
+      go y m d
+        | d > daysInMonth y m =
+            let (y', m') = normMonth y (m + 1)
+            in go y' m' (d - daysInMonth y m)
+        | d < 1 =
+            let (y', m') = normMonth y (m - 1)
+            in go y' m' (d + daysInMonth y' m')
+        | otherwise = isoText y m d
+  in go yA mA d0
+ where
+  normMonth y m =
+    let z = m - 1
+    in (y + z `div` 12, z `mod` 12 + 1)
+
+isoText :: Integer -> Integer -> Integer -> Text
+isoText y m d =
+  pad 4 y <> "-" <> pad 2 m <> "-" <> pad 2 d
+ where
+  pad n v = Text.justifyRight n '0' (tshow v)
+
+daysInMonth :: Integer -> Integer -> Integer
+daysInMonth y m = case m of
+  1 -> 31; 2 -> if leap then 29 else 28; 3 -> 31; 4 -> 30; 5 -> 31; 6 -> 30
+  7 -> 31; 8 -> 31; 9 -> 30; 10 -> 31; 11 -> 30; _ -> 31
+ where
+  leap = (y `mod` 4 == 0 && y `mod` 100 /= 0) || y `mod` 400 == 0
 
 -- | Beta-reduce a directly-applied function-valued binding at lower time
 -- (R3): substitute the argument expressions for the parameters and lower the
@@ -1400,7 +2158,7 @@ inlineApply env f nm args
                      \argument to `" <> nm <> "`, and only direct application can be \
                      \inlined (v1 emits no Python module); refused by name (R3)"))
   | otherwise =
-      let sub   = Map.fromList (zip f.ifParams args)
+      let sub   = Map.fromList (zip (map getUnique f.ifParams) args)
           body' = substituteExpr sub f.ifBody
       in lowerExpr env { envInlineStack = f.ifU : env.envInlineStack } body'
 
@@ -1483,9 +2241,12 @@ refuse = \case
   ReadCell {} -> LFBlocked "DA-LEDGER"
     "RECALL ledger read has no docassemble form"
     "the state-as-a-ledger layer"
-  Lam {}      -> LFFatal "lambda outside a directly-applied WHERE binding cannot be emitted (v1 emits no Python module)"
-  List {}     -> LFFatal "list literal — LIST OF is a later milestone (M4: DAList gathering)"
-  Cons {}     -> LFFatal "list cons — LIST OF is a later milestone (M4)"
+  Lam {}      -> LFFatal "lambda outside a directly-applied WHERE binding or an `all`/`any` call cannot be emitted (this backend emits no Python module)"
+  -- M4 gathers a LIST OF input; it does not CONSTRUCT list values. A gathered
+  -- DAList is what the interview asks for, and there is no widget — and no
+  -- meaning — for a list a rule computes for itself.
+  List {}     -> LFFatal "list literal: a computed list has no docassemble form (M4 gathers a `LIST OF` INPUT as a DAList; producing a list value is a later milestone)"
+  Cons {}     -> LFFatal "list cons: a computed list has no docassemble form (M4 gathers a `LIST OF` INPUT as a DAList; producing a list value is a later milestone)"
   Concat {}   -> LFFatal "string concatenation is not supported in v1"
   AsString {} -> LFFatal "string coercion is not supported in v1"
   AppNamed {} -> LFFatal "named-argument application is not supported in v1"
@@ -1504,6 +2265,7 @@ blockId = \case
   DACodeBlock c     -> Just c.cId
   DADriverBlock d   -> Just (driverId d)
   DAScreenBlock s   -> Just s.sId
+  DAReviewBlock rv  -> Just rv.rvId
 
 driverId :: DADriver -> Text
 driverId = \case
@@ -1531,31 +2293,69 @@ dedupById = go Map.empty
 -- definitions that sanitise to the same name — or one name defined both by a
 -- question and by a code block — would silently conflate (the OpenFisca
 -- 'checkCollisions' discipline).
-checkNameCollisions :: [DABlock] -> Either [LowerError] ()
-checkNameCollisions blocks =
+--
+-- TWO collisions, not one (the second repaired 2026-08-17).
+--
+--   * TWO L4 NAMES, ONE VARIABLE — @notice period@ beside @notice_period@. Two
+--     different (role, L4 name) pairs claim one variable, and the message names
+--     both originals.
+--   * ONE L4 NAME, TWO DEFINITIONS. M4 hoists a constructor payload to a
+--     SIBLING attribute of the record that holds the enum ('payloadVar'), so a
+--     payload field named @the number of conditions@ collides with a record
+--     field of that name, and two constructors that each carry a @reason@
+--     collide with each other. Both pairs carry an IDENTICAL
+--     @(\"question\", label)@ meta, so the first check's @nubOrd@ folded them
+--     to one entry and said nothing; 'dedupById' then refused with
+--     @internal id collision@ — a message this module's own comment calls
+--     misleading, which names a block id and neither L4 definition. Comparing
+--     the BLOCKS rather than their metas is what tells \"the same question
+--     reached from two exports\" (legitimately emitted once, and equal) from
+--     \"two different questions\" (here, differing in their @show if@ guard).
+checkNameCollisions :: [(Text, (Text, Text))] -> [DABlock] -> Either [LowerError] ()
+checkNameCollisions extra blocks =
   case bad of
     []      -> Right ()
     (e : _) -> Left [e]
  where
-  entries = concatMap entryOf blocks
+  entries = [ (v, (meta, Nothing)) | (v, meta) <- extra ]
+         <> [ (v, (meta, Just b))  | b <- blocks, (v, meta) <- entryOf b ]
   entryOf = \case
     DAQuestionBlock q -> [(q.qVar, ("question", q.qLabel))]
     DACodeBlock c     -> [(c.cVar, ("code", fromMaybe c.cVar c.cL4))]
     DAScreenBlock s   -> [(s.sEvent, ("event", s.sEvent))]
+    DAReviewBlock rv  -> [(rv.rvEvent, ("review screen", rv.rvEvent))]
     DAObjectsBlock es -> [ (v, ("object", v)) | (v, _) <- es ]
     DADriverBlock d   -> case d of
       DASeamDriver _ _ _ _ verdictV _ _ _ -> [(verdictV, ("code", verdictV))]
       _                                   -> []
-  byName = Map.fromListWith (<>) [ (v, [meta]) | (v, meta) <- entries ]
-  bad =
-    [ MkLowerError ""
-        ( "name collision: `" <> v <> "` is produced by "
-            <> Text.intercalate " and "
-                 (nubOrd [ role <> " (L4 `" <> l4 <> "`)" | (role, l4) <- metas ])
-            <> " — distinct definitions sharing one docassemble variable are unsafe; rename one" )
-    | (v, metas) <- Map.toList byName
-    , length (nubOrd metas) > 1
-    ]
+  byName = Map.fromListWith (<>) [ (v, [e]) | (v, e) <- entries ]
+  bad = concat [ collisionsFor v es | (v, es) <- Map.toList byName ]
+
+  collisionsFor v es
+    | length (nubOrd metas) > 1 =
+        [ MkLowerError ""
+            ( "name collision: `" <> v <> "` is produced by "
+                <> Text.intercalate " and "
+                     (nubOrd [ role <> " (L4 `" <> l4 <> "`)" | (role, l4) <- metas ])
+                <> " — distinct definitions sharing one docassemble variable are unsafe; rename one" ) ]
+    | (role, l4) : _ <- metas, length (nub blocksHere) > 1 =
+        [ MkLowerError ""
+            ( "name collision: `" <> v <> "` is produced by two different "
+                <> role <> " blocks that both come from the L4 name `" <> l4 <> "`"
+                <> hint role
+                <> "; rename one" ) ]
+    | otherwise = []
+   where
+    metas      = map fst es
+    blocksHere = [ b | (_, Just b) <- es ]
+    -- The payload hoist is the only way to reach this today, and saying so is
+    -- the difference between a diagnostic and a puzzle.
+    hint "question" =
+      " — a constructor payload becomes a sibling attribute of the record that \
+      \holds the enum, so a payload field collides with a record field of the \
+      \same name, and two constructors carrying the same payload field name \
+      \collide with each other"
+    hint _ = " — distinct definitions sharing one docassemble variable are unsafe"
 
 -- ---------------------------------------------------------------------------
 -- Names
@@ -1622,6 +2422,12 @@ pyIdent raw =
 -- actually produce (it lower-cases, and Python is case-sensitive). Reserving
 -- them for the bare artifact too is deliberate: the two shapes must not
 -- disagree about a variable's name either.
+--
+-- 'daGlobalNamespace' is the rest of that same hazard, added 2026-08-17: the
+-- @l4runtime@ star-import is one of THREE things already bound in the
+-- interview's top-level namespace, and the two larger ones — Python's builtins
+-- and @docassemble.base.util@ — were left open. See its own haddock for the
+-- measurement.
 pyReserved :: Set Text
 pyReserved = Set.fromList $
   [ "and","as","assert","async","await","break","class","continue","def","del"
@@ -1633,8 +2439,126 @@ pyReserved = Set.fromList $
   , "role_needed","user","session","device_local","user_local","session_local"
   , "allow_cron","multi_user","menu_items","speak_text","track_location"
   , "incoming_email","daobject"
+  -- M4: the emitter's own generated names, in the same global namespace.
+  -- `l4_citations_fresh` is the citation-reset sentinel (spec §8.4); its block
+  -- runs once per assemble and an L4 name landing on it would break the reset.
+  , "l4_citations_fresh"
   ]
   <> [ n | n <- runtimeExports, Text.toLower n == n ]
+  <> Set.toList daGlobalNamespace
+
+-- | The rest of the interview's TOP-LEVEL namespace, vendored from docassemble
+-- 1.10.7 (checkout @1b6678384@), and the hole this closes is the same one the
+-- 'pyReserved' docstring above narrates having been bitten by once: a goal or
+-- rule variable whose name ALREADY RESOLVES is never sought, because
+-- docassemble backchains only on @NameError@. It resolves to a function object,
+-- which is truthy, so the driver takes the \"holds\" branch, NO QUESTION IS
+-- ASKED AT ALL, and the fidelity report says @(nothing lost)@. M2 closed the
+-- @l4runtime@ half of that namespace and left the two larger halves open.
+--
+-- Both halves measured, 2026-08-17, by driving real @docassemble.base@ 1.10.7:
+-- an @\@export@ named @All@ lowers to @all@, and the emitted interview answers
+-- @Holds@ against an L4 @#EVAL@ of @FALSE@ with @questions asked=[]@. The same
+-- for @Today@, @Value@, @Message@, @Word@ and @Currency@ — those five come from
+-- the second half, so they are in the user_dict for real rather than reached
+-- through @__builtins__@.
+--
+--   * PYTHON BUILTINS. The driver's @if all:@ execs in the user_dict, whose
+--     @__builtins__@ Python injects automatically; @'all' in user_dict@ is
+--     False while @eval('all', user_dict)@ returns the built-in. @defined()@
+--     agrees, for the same reason: it is @try: eval(var, {}); return True@
+--     (@functions.py@ at the pin), and an empty globals dict is auto-populated
+--     with @__builtins__@ too.
+--   * @docassemble.base.util@. @parse.py:131@ compiles
+--     @from docassemble.base.util import *@ and @Interview.assemble@ execs it
+--     into the user_dict on every pass unless the interview sets
+--     @imports_util@ (@parse.py:8523-8524@, @8643-8647@, @9055-9057@). The
+--     emitter deliberately keeps @docassemble.base.util@ out of @modules:@
+--     (spec §8.11) precisely so that auto-import still happens, so this is not
+--     avoidable by emitting differently.
+--
+-- Filtered to the names @pyIdent@ can actually produce: it lower-cases, so
+-- @DAObject@, @Person@, @ValueError@ and the rest of the CamelCase surface is
+-- unreachable and is not vendored. Regenerate with:
+--
+-- > python -c 'import builtins,re;d={};exec("from docassemble.base.util import *",d);\
+-- >   p=re.compile(r"^[a-z0-9_]+$");\
+-- >   print(sorted({n for n in set(d)|set(dir(builtins)) if not n.startswith("_") and p.match(n)}))'
+--
+-- Local evidence, never a build dep (spec §8.10) — the same discipline as
+-- 'daObjectReserved', which vendors the ATTRIBUTE namespace this one's
+-- top-level counterpart leaves alone.
+daGlobalNamespace :: Set Text
+daGlobalNamespace = Set.fromList
+  [ "abs", "action_argument", "action_arguments", "action_button_html"
+  , "action_menu_item", "add_separators", "aiter", "all"
+  , "all_variables", "alpha", "anext", "any", "as_datetime", "ascii"
+  , "assemble_docx", "background_action", "background_error_action"
+  , "background_response", "background_response_action", "bin", "bold"
+  , "bool", "breakpoint", "bytearray", "bytes", "callable"
+  , "capitalize", "chain", "chat_partners_available", "chr"
+  , "classmethod", "clear_explanations", "comma_and_list"
+  , "comma_list", "command", "compile", "complex", "copyright"
+  , "countries_list", "country_name", "create_session", "create_user"
+  , "credits", "currency", "currency_symbol", "current_context"
+  , "current_datetime", "date_difference", "date_interval", "day_of"
+  , "decode_name", "define", "defined", "delattr", "delete_record"
+  , "device", "dict", "dir", "dispatch", "divmod", "docx_concatenate"
+  , "dow_of", "encode_name", "enumerate", "eval", "exec", "exit"
+  , "explain", "filter", "fix_punctuation", "float", "force_ask"
+  , "force_gather", "forget_result_of", "format", "format_date"
+  , "format_datetime", "format_time", "from_b64_json", "frozenset"
+  , "get_chat_log", "get_config", "get_country"
+  , "get_default_timezone", "get_dialect", "get_emails", "get_info"
+  , "get_language", "get_locale", "get_progress", "get_question_data"
+  , "get_session_variables", "get_sms_session", "get_status"
+  , "get_user_info", "get_user_list", "get_user_secret", "get_voice"
+  , "getattr", "globals", "go_back_in_session", "hasattr", "hash"
+  , "help", "hex", "id", "include_docx_template", "indefinite_article"
+  , "indent", "initiate_sms_session", "input", "int", "interface"
+  , "interview_email", "interview_list", "interview_menu"
+  , "interview_url", "interview_url_action"
+  , "interview_url_action_as_qr", "interview_url_as_qr", "invalidate"
+  , "invite_user", "isinstance", "iso_country", "issubclass", "italic"
+  , "item_label", "iter", "json", "json_response"
+  , "language_from_browser", "language_name", "last_access_days"
+  , "last_access_delta", "last_access_hours", "last_access_minutes"
+  , "last_access_time", "len", "license", "list", "locals"
+  , "location_known", "location_returned", "log", "logic_explanation"
+  , "manage_privileges", "map", "map_of", "mark_task_as_performed"
+  , "max", "memoryview", "message", "min", "month_of", "name_suffix"
+  , "need", "next", "nice_number", "noun_plural", "noun_singular"
+  , "noyes", "object", "objects_from_file", "ocr_file"
+  , "ocr_file_in_background", "oct", "open", "ord", "ordinal"
+  , "ordinal_number", "overlay_pdf", "path_and_mimetype"
+  , "pdf_concatenate", "period_list", "phone_number_formatted"
+  , "phone_number_in_e164", "phone_number_is_valid"
+  , "phone_number_part", "plain", "pow", "prevent_going_back", "print"
+  , "process_action", "property", "qr_code", "quantity_noun", "quit"
+  , "quote_paragraphs", "range", "raw", "re", "re_run_logic"
+  , "read_qr", "read_records", "reconsider", "redact", "referring_url"
+  , "repr", "response", "retrieve_stashed_data", "returning_user"
+  , "reversed", "roman", "round", "run_action_in_session"
+  , "run_python_module", "selections", "send_email", "send_fax"
+  , "send_sms", "server_capabilities", "session_tags", "set"
+  , "set_country", "set_info", "set_language", "set_live_help_status"
+  , "set_locale", "set_parts", "set_progress", "set_save_status"
+  , "set_session_variables", "set_status", "set_task_counter"
+  , "set_title", "set_user_info", "set_variables", "setattr", "showif"
+  , "showifdef", "single_paragraph", "single_to_double_newlines"
+  , "slice", "sorted", "space_to_underscore", "split", "start_time"
+  , "stash_data", "state_name", "states_list", "static_image"
+  , "staticmethod", "store_variables_snapshot", "str"
+  , "subdivision_type", "sum", "super", "task_not_yet_performed"
+  , "task_performed", "terminate_sms_session", "times_task_performed"
+  , "timezone_list", "title_case", "today", "transform_json_variables"
+  , "tuple", "type", "undefine", "update_locale", "update_terms"
+  , "url_action", "url_ask", "url_of", "us", "user_has_privilege"
+  , "user_info", "user_lat_lon", "user_logged_in", "user_privileges"
+  , "validation_error", "value", "variables_as_json", "vars"
+  , "verb_past", "verb_present", "verbatim", "word", "write_record"
+  , "year_of", "yesno", "zip", "zip_file"
+  ]
 
 -- | Sanitise an L4 record-field name into a @DAObject@ attribute. On top of
 -- 'pyIdent', names that land in the DAObject class/instance namespace get a
