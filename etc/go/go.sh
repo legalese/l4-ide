@@ -737,12 +737,25 @@ cmd_gc() {
   # collected.
   #
   # "of each subject" is load-bearing and was, until 2026-08-20, only a comment:
-  # the code took `sort | tail -$KEEP` over the whole store. That was harmless
-  # while one subject existed and destructive the moment a second did — twelve
-  # consecutive sg-succession runs meant a single `gc` would have deleted every
-  # regcf run in the store, and cross-run replay (SPEC §R7) reuses receipts from
-  # exactly those older runs. The retention would have silently deleted the
-  # thing that makes a toolchain tweak cheap to re-measure.
+  # the code took `sort | tail -$KEEP` over the whole store. That is harmless
+  # while one subject exists and wrong the moment a second does — a burst of
+  # runs on the newer subject buries every run of the older one inside the
+  # window that gets deleted, and cross-run replay (SPEC §R7) reuses receipts
+  # from exactly those older runs. Retention would silently delete the thing
+  # that makes a toolchain tweak cheap to re-measure.
+  #
+  # MEASURED 2026-08-20, and stated carefully because the first draft of this
+  # comment was not: the store holds 92 run directories, of which 16 still hold
+  # a journal, ALL of them sg-succession — every regcf journal is already gone,
+  # reaped by $TMPDIR's own cleaner rather than by gc (files here survive about
+  # two to five days). So the concrete claim this comment first made, that one
+  # `gc` "would have deleted every regcf run in the store", is FALSE: there are
+  # no regcf runs in the store to delete. What is true is the general rule and
+  # what the fixture in selftest.mjs demonstrates directly — a subject buried
+  # under a burst of runs on another loses its entire replay corpus — plus the
+  # measured consequence here, that `gc --keep 5` under the old rule would have
+  # kept 5 directories and removed 87, including all 76 whose journals predate
+  # the subject field.
   #
   # A run whose journal names no subject (the pre-subject runs of 2026-08-09,
   # whose run_begin predates the field) is retained under the sentinel key

@@ -170,9 +170,25 @@ artifacts, and that difference is the product rather than waste.
 
 So the store accumulates rather than overwrites, content-addressed by
 `(phase, upstream-digest, content-hash)`, with run directories holding references. Today artifacts
-live in `$TMPDIR/l4-go/<run-id>/artifacts/` — measured 2026-08-20 at 92 run directories and 5.4 MB, and growing with every run, in a
-location designed to be discarded, with no cross-run identity. Identical fetches dedupe under
-content addressing, so retention is cheaper than it sounds.
+live in `$TMPDIR/l4-go/<run-id>/artifacts/`, in a location designed to be discarded, with no
+cross-run identity. Identical fetches dedupe under content addressing, so retention is cheaper than
+it sounds.
+
+**"Designed to be discarded" is not a figure of speech, and the measurement is the argument.**
+Re-measured 2026-08-20: **92 run directories, of which 16 still hold a journal.** The other 76 are
+empty shells — `$TMPDIR`'s own cleaner had already removed their contents, leaving the directory.
+Every `regcf` journal in the store is gone; the 16 survivors are all `sg-succession`. From directory
+mtimes, **files last roughly two to five days.**
+
+Three consequences, each of which changes a decision:
+
+- The evidence base for cross-run replay is not "everything since August", it is **this week**. A
+  toolchain tweak measured against a run from a fortnight ago has nothing to replay from.
+- `gc` retention policies calibrated in months are calibrating something that does not exist. The
+  reaper is the real retention policy, and nobody chose it.
+- A blessing recorded only in a run journal has the same half-life. **R11's requirement to leave
+  `$TMPDIR` is not an architectural preference; it is the observation that a human signature
+  currently expires in under a week, silently, for reasons no one decided.**
 
 _What would make this true: an artifact store outside `$TMPDIR`, and `gc` becoming a policy over
 references rather than a delete of the only copy._
