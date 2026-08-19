@@ -1061,7 +1061,28 @@ EOF
           });
         ' "$RUNDIR_BASE" "$RUN" "$SUBJECT" "$s" "$digest")
         if [[ -n "$prior" ]]; then
-          prior_run=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).from_run||"")))')
+          # THE DONOR'S ARTIFACTS ARE CHECKED BEFORE ANY OF THEM IS COPIED.
+          #
+          # Within-run replay copies artifact records VERBATIM, and receipt.mjs
+          # says why: "Re-hashing would launder a file that changed after the
+          # original receipt was written." The cross-run path cannot copy the
+          # records -- `--artifacts-from` resolves inside THIS journal, and a
+          # borrowed path would dangle once gc pruned the donor -- so it copies
+          # the FILES and records them with `--artifact`, which re-hashes. That
+          # is the laundering the comment forbids: a donor artifact tampered
+          # with after its receipt was written would report CHANGED under
+          # `verify` in its own run and `matches` here.
+          #
+          # A mismatch REFUSES the borrow rather than repairing it. If a donor
+          # artifact no longer matches its own receipt, that receipt is not
+          # evidence of anything, and the honest response is to execute the
+          # stage -- which is what clearing $prior makes happen.
+          if ! printf '%s' "$prior" | node "$LIB/donor-check.mjs"; then
+            echo "go: $s will NOT borrow from an earlier run (see above); executing instead" >&2
+            prior=""
+          else
+            prior_run=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).from_run||"")))')
+          fi
         fi
       fi
     fi

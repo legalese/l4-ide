@@ -4785,6 +4785,101 @@ process.stdout.write("\n-- known-defects schema --\n");
 }
 // ===== END known-defects schema =============================================
 
+// ===== a borrowed artifact may not be laundered =============================
+//
+// receipt.mjs states the rule for WITHIN-run replay: artifact records are
+// copied verbatim, never re-hashed, because "Re-hashing would launder a file
+// that changed after the original receipt was written". The CROSS-run path
+// cannot copy the records -- `--artifacts-from` resolves inside the current
+// journal, and a borrowed path would dangle once gc pruned the donor -- so it
+// copies the FILES and records them with `--artifact`, which re-hashes. Without
+// a check that is exactly the laundering the rule forbids: a donor artifact
+// tampered with after its receipt reports CHANGED under `verify` in its own run
+// and `matches` in the borrowing one.
+//
+// donor-check.mjs closes it BEFORE any file is copied, and a finding refuses the
+// borrow rather than repairing it -- a donor artifact that no longer matches its
+// own receipt means the receipt is not evidence, so the stage should execute.
+process.stdout.write("\n-- borrowed artifacts --\n");
+{
+  const DC = resolve(HERE, "lib/donor-check.mjs");
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-donor-"));
+  const donor = resolve(root, "donor");
+  mkdirSync(resolve(donor, "artifacts"), { recursive: true });
+
+  const put = (name, content) => {
+    const p = resolve(donor, "artifacts", name);
+    writeFileSync(p, content);
+    return { path: p, bytes: content.length, sha256: hashOf(p) };
+  };
+  const run = (prior) => {
+    const r = spawnSync("node", [DC], {
+      input: JSON.stringify(prior),
+      encoding: "utf8",
+    });
+    return r;
+  };
+
+  const a = put("a.json", "measured\n");
+  const b = put("b.txt", "also measured\n");
+  const intact = { from_dir: donor, artifacts: [a, b] };
+  check("an intact donor is borrowable", run(intact).status === 0);
+
+  // The laundering case.
+  writeFileSync(resolve(donor, "artifacts", "a.json"), "tampered\n");
+  const tampered = run(intact);
+  check(
+    "a donor artifact that CHANGED refuses the borrow",
+    tampered.status === 1,
+  );
+  check(
+    "the refusal shows both hashes, so the reader can see what moved",
+    /receipt: sha256:/.test(tampered.stderr) &&
+      /on disk: sha256:/.test(tampered.stderr),
+  );
+  check("the refusal names the artifact", /a\.json/.test(tampered.stderr));
+
+  // A donor whose file is gone is also not borrowable: the copy would silently
+  // skip it and the receipt would claim an artifact it does not have.
+  writeFileSync(resolve(donor, "artifacts", "a.json"), "measured\n");
+  rmSync(resolve(donor, "artifacts", "b.txt"));
+  const gone = run(intact);
+  check("a donor artifact that is GONE refuses the borrow", gone.status === 1);
+  check("the refusal says it is gone", /is gone/.test(gone.stderr));
+
+  // Basename collision: the copy flattens to basename, so two artifacts from
+  // different subdirectories with the same name would overwrite each other.
+  // p7-lts already writes into a state-graphs/ subdirectory.
+  mkdirSync(resolve(donor, "artifacts", "sub"), { recursive: true });
+  const c1 = put("g.svg", "one\n");
+  const p2 = resolve(donor, "artifacts", "sub", "g.svg");
+  writeFileSync(p2, "two\n");
+  const collide = run({
+    from_dir: donor,
+    artifacts: [c1, { path: p2, bytes: 4, sha256: hashOf(p2) }],
+  });
+  check(
+    "two artifacts sharing a basename refuse the borrow",
+    collide.status === 1,
+  );
+  check(
+    "the collision refusal explains that the copy flattens to basename",
+    /flattens to basename/.test(collide.stderr),
+  );
+
+  // And the driver must actually consult it.
+  const goSrc = readFileSync(resolve(HERE, "go.sh"), "utf8");
+  check(
+    "go.sh runs donor-check.mjs on the cross-run path",
+    /donor-check\.mjs/.test(goSrc),
+  );
+  check(
+    "a donor-check finding clears \$prior, so the stage executes instead",
+    /donor-check\.mjs[\s\S]{0,400}?prior=""/.test(goSrc),
+  );
+}
+// ===== END borrowed artifacts ===============================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

@@ -193,7 +193,43 @@ resuming an interrupted run is unaffected.
 
 Measured, touching only `p7-akn.sh`: six stages replayed (`p0-preflight`, `p3-check`, `p6-tests`, `p8-verify`, `p7-lts`, `p7-wizard`); `p7-akn` re-executed because its digest moved, and `p7-mcp` because it is ineligible. `p9-report` and `p9-explain` declare no inputs and never replay by design.
 
+#### 3.7a What the digest still does not cover — found 2026-08-20, two closed
+
+"The digest covers files and not the world" is quoted above to justify a two-stage exclusion list.
+A read of every `--inputs` block found the sentence is truer than that list assumed: ten things a
+stage's output demonstrably depends on that no `--inputs` line named. Two were closed on the spot
+because they make cross-run replay itself unsound; the rest are recorded here rather than fixed,
+because each needs a decision and an unrecorded gap is one nobody can decide about.
+
+**Closed — the pinned clock.** `--fixed-now` is passed to `l4` by seven stages (`p3-check`,
+`p3-encode`, `p6-tests`, `p7-akn`, `p7-tnr`, `p7-wizard`, `p8-verify`) and appeared in no stage's
+inputs. Two runs of the same subject, same tree, same binary and a **different** `--fixed-now`
+produced byte-identical digests, and `findReplayableAcrossRuns` filters on subject and digest only
+— so the second run borrowed the first run's answer **about a different point in legal time**. For a
+pipeline whose subject is what the law says as at a date, that is the worst available form of a
+stale replay. Each of the seven now declares `text:fixed_now=…`, per stage rather than folded
+centrally like the binary's sha, so only the stages that read the clock re-run when it moves;
+measured, the seven digests move and `p0-preflight` and `p7-lts` do not.
+
+**Closed — a borrowed artifact could be laundered.** See §3.8.
+
+**Recorded, not closed.** In rough order of blast radius:
+
+| gap                                                              | why it matters                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the transitive `IMPORT` closure of a declared entry module       | every projection leg declares its entry point only, so editing `sg-wills.l4` re-opens the **gate** (it is in `encoding.modules`) while `p7-akn`, `p7-wizard`, `p7-lts` and `p7-tnr` all replay receipts describing the pre-edit encoding                                                                        |
+| the stdlib on disk / `JL4_LIBRARY_PATH`                          | every module imports `prelude` and `daydate`; resolution prefers the repo copy over the binary's embedded one, so editing `jl4-core/libraries/daydate.l4` changes results across the pipeline while every digest holds still                                                                                    |
+| the adjudication layer                                           | `lib/phase-prelude.sh` is sourced by all 22 phases and declared by none; `receipt.mjs`, `verdict.mjs`, `ledger.mjs` likewise. Editing `ORACLE_CLASSES` changes what statuses are legal for every future receipt and moves no digest, so eligible stages replay their old status instead of being re-adjudicated |
+| checkers a stage invokes but does not declare                    | `probe.mjs`, `discover.mjs`, `corpus-metrics.mjs`, `label-order.mjs`, `known-defects.mjs`, `plan-shape.mjs`, `fidelity-counts.mjs`, `bpmn-to-svg.mjs` — several of which produce the metrics the receipt carries                                                                                                |
+| `p7-mcp`'s zip is built from seven modules, its digest names two | cross-run replay is blocked here, but **within**-run is not: `--only p7-mcp --run-id <id>` after editing `sg-paa.l4` replays                                                                                                                                                                                    |
+| `p7-ladder`'s committed figures                                  | its oracle diffs against them, and unlike `p7-dmn`/`p7-dmn-md`/`p7-tnr` it does not declare its golden                                                                                                                                                                                                          |
+| `JL4_LSP_CMD`                                                    | a second binary, on the same footing as `L4` in discovery, hashed nowhere; rebuild `jl4-lsp` alone and the stage driving it replays                                                                                                                                                                             |
+| `subject.json` itself                                            | scalar keys (`legs`, `ladder.npm_script`, `citation`) can change with no digest movement; only the two floors are folded as `text:` literals                                                                                                                                                                    |
+
 ### 3.8 R8 — a run directory stays self-contained — ANSWERED, IMPLEMENTED
+
+_Amended 2026-08-20: the copy path re-hashed, which is the one thing the rule it implements
+forbids. See the end of this section._
 
 `--artifacts-from` resolves its hash inside the current journal, so it structurally cannot name
 another run's receipt — and referencing another run's files would be worse, because `gc` prunes run
@@ -207,6 +243,23 @@ still hash as recorded.
 
 The receipt records `replayed_from_run`, and the report names the run the evidence was earned in
 rather than saying it is "on this journal", which for a borrowed row is false.
+
+**The copy laundered, until 2026-08-20.** `receipt.mjs` states the rule for within-run replay in its
+own comment: artifact records are copied **verbatim**, never re-hashed, because "Re-hashing would
+launder a file that changed after the original receipt was written" — keeping the original sha256 is
+what lets `verify` report `CHANGED`. The cross-run path cannot copy the records, for the reason in
+the first paragraph, so it copies the **files** and records them with `--artifact`, which re-hashes.
+That is precisely the laundering the rule forbids: a donor artifact tampered with after its receipt
+was written reported `CHANGED` under `verify` in its own run and `matches` in the borrowing one,
+because the borrowing receipt recorded the new hash as though it were the measured one.
+
+`etc/go/lib/donor-check.mjs` now checks every donor artifact against its recorded sha256 **before
+any file is copied**, and a finding **refuses the borrow** rather than repairing it — a donor
+artifact that no longer matches its own receipt means the receipt is not evidence, so the stage
+executes. It also refuses a donor whose artifact is gone (the copy would silently skip it, leaving
+the receipt claiming a file it does not have) and a donor with two artifacts sharing a basename (the
+copy flattens to basename, so one would overwrite the other — `p7-lts` already writes into a
+`state-graphs/` subdirectory, so this is close to reachable rather than theoretical).
 
 ### 3.9 R9 — G0–G4 are capability milestones — ANSWERED
 
