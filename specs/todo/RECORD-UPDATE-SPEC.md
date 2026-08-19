@@ -13,6 +13,13 @@
 > The reasoning and the reversal are recorded at R2/R2.1/R2.2 rather than rewritten away, because the
 > road not taken is what makes R3's simplification legible.
 >
+> **Reviewed 2026-08-20, second-head pass.** Every load-bearing citation was re-verified against the
+> tree and nine defects corrected in place, each with a dated note at the point of correction. The
+> two substantive ones: R3.1's obligations block still carried the superseded bare-`WITH` design's
+> obligations in place of the real ones (now R3.1 obligations 1–3, with the bare-`WITH` material
+> reframed as R3.2), and `elaborateUpdates` must fill the evaluator's argument-order slot — the
+> machine crashes on `Nothing` (`EvaluateLazy/Machine.hs:856-858`).
+>
 > **Seed:** a user question — "in haskell if i want to update a record i give the name of the
 > existing record and i give overrides in braces. in l4 is there a similar syntax?" The answer today
 > is no, and `skills/writing-l4-rules/references/drafting-patterns.md:511` documents that as a
@@ -48,11 +55,14 @@ This is the single most important structural fact about the proposal, and it is 
 that it denote a type:
 
 ```haskell
-namedApp = attachAnno $
-  AppNamed emptyAnno
-  <$> annoHole name
-  <*> (annoLexeme (spacedKeyword_ TKWith) *> annoHole (lsepBy1 namedExpr (spacedSymbol_ TComma)))
-  <*> pure Nothing
+namedApp :: Parser (Expr Name)
+namedApp = do
+  attachAnno $
+    AppNamed emptyAnno
+    <$> annoHole name
+    <*> (   annoLexeme (spacedKeyword_ TKWith) *> annoHole (lsepBy1 namedExpr (spacedSymbol_ TComma))
+        )
+    <*> pure Nothing
 ```
 
 So `alice WITH age IS 31` **already parses**. The refusal happens later, in
@@ -205,14 +215,18 @@ update could never help.
 | shipped example                      | `jl4/examples/legal/promissory-note.l4`                |      6 |          14 |                6 |
 | shipped backend corpus               | `jl4-proleg/l4/burden.l4`                              |      3 |           6 |                3 |
 | **shipped subtotal**                 |                                                        | **14** |      **50** |     **23 (46%)** |
-| experiments                          | `jl4/experiments/*` (7 files)                          |     23 |           — |                — |
+| experiments                          | `jl4/experiments/*` (8 files)                          |     23 |           — |                — |
 | teaching material                    | `doc/courses/advanced/module-a3-contracts-examples.l4` |      3 |           8 |                3 |
 | **false positive** (type conversion) | `jl4/examples/legal/regcf/regcf-wizard.l4:234`         |      1 |          11 |                1 |
 
-**Whole-corpus total: 41 sites in 13 files — 127 field lines written, 58 of them (46%) pure
-carry-through boilerplate. Under the proposal those 127 lines become 69.**
+**Whole-corpus total, false positive excluded: 40 sites in 12 files — 116 field lines written, 57
+of them (49%) pure carry-through boilerplate. Under the proposal those 116 lines become 59.**
+_(Corrected 2026-08-20: the headline previously read "41 sites in 13 files — 127/58/69", which
+counted the false-positive row into its own total — the method statement above excludes type
+conversions — and the experiments row undercounted its files at 7. An independent re-scan
+reproduced the `actus.l4` and `burden.l4` rows exactly and enumerated 8 experiment files.)_
 
-**Read on its own this looks modest — 13 files out of 749, 1.7% — and an earlier draft of this spec
+**Read on its own this looks modest — 12 files out of 749, 1.6% — and an earlier draft of this spec
 stopped here and said so. That was wrong: §2.2 shows this scan measures only one of the two
 workaround shapes and misses the larger one entirely.** The corrected figure is in §2.2; the
 argument that actually decides R1 is in §2.3.
@@ -282,7 +296,7 @@ and unlike the §2 sites, these are overwhelmingly in the **legal** corpus:
 | `jl4/examples/legal/regcf/denovo/regcf-denovo.l4`                |         6 | **38 fields spelled, 4 varied** (`:3164`) |
 | `jl4/examples/legal/regcf/regcf.l4`                              |         5 |                                           |
 | `paper/case-studies/charities-jersey-2014/part-7-information.l4` |         5 |                                           |
-| `.../charities-cleanroom/charity-test.l4`                        |         1 | **26 fields spelled, 1 varied** (`:682`)  |
+| `jl4/examples/legal/charities-cleanroom/charity-test.l4`         |         1 | **26 fields spelled, 1 varied** (`:682`)  |
 | `paper/case-studies/gco-jersey-covid/GCO-*.l4`                   |         3 |                                           |
 
 **Combined honest total: ~84 workaround sites across ~30 files, carrying ~492 lines of pure
@@ -372,38 +386,46 @@ draft said 16, then 19; 16 grepped
 only `jl4-core/src/L4/` and missed `jl4-mlir`; 19 wrongly counted `TypeCheck/Types.hs`, which
 contains no bare `AppNamed` — only the _error_ constructors `IllegalAppNamed`/`IncompleteAppNamed`
 at `:94-95`. Both slips are recorded rather than quietly fixed, because an undercounted blast radius
-is exactly the drift CLAUDE.md warns about.)
+is exactly the drift CLAUDE.md warns about.) (A third slip, caught in the 2026-08-20 review: the
+table below listed `TypeCheck/Types.hs` and `ExactPrint` — neither matches the grep — and omitted
+`Parser/ResolveAnnotation.hs`, which matches at `:477` and `:1276` and is exactly where the new
+production's annotation resolution lands. The table now agrees with the census; the count 18 was
+right throughout.)
 
 > **Read this table as the census of what _could_ be affected, not of what R2/R3 actually touch.**
 > It was written for the superseded bare-`WITH` surface, whose selling point was that the syntax is
 > byte-identical to construction. Under the ruled `BUT WITH` the lexer and parser **do** change (one
 > keyword, one production), and a new `Restate` constructor forces an arm in each row. But under
-> **R3.1** that node is elaborated by a _late_ pass, so every row below except `Print.hs` still only
-> ever _sees_ the total `AppNamed` it already handles. The arms are one-liners; the
+> **R3.1** that node is elaborated by a _late_ pass, so every row below except `Print.hs` and
+> `TypeCheck.hs` (which checks `Restate` itself and hosts §5.7's `subjectOfActionExpr` arm) still
+> only ever _sees_ the total `AppNamed` it already handles. The arms are one-liners; the
 > behaviour is unchanged. The rightmost column is kept in the bare-`WITH` framing because that is the
-> analysis that produced R3.1, and R3.1 is the reason the radius collapses.
+> analysis that produced R3.1, and R3.1 is the reason the radius collapses — except two cells
+> corrected 2026-08-20 (`Nlg`, `Export/Document`) where the bare-`WITH` claim would actively mislead
+> under R3.1.
 
-| module                                   | what it does with `AppNamed`                                      | effect of update                                       |
-| ---------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------ |
-| `Parser.hs:2100`                         | builds the node from `<name> WITH …`                              | **no change** — already parses                         |
-| `Print.hs:666`                           | prints `printWithLayout n <+> "WITH" <+> …`                       | **no change** — same surface                           |
-| `Print.hs:835`                           | `openTailed` guard, for bracketing                                | **no change** — same bracketing need                   |
-| `ExactPrint` (`Rules.ExactPrint`)        | re-emits concrete tokens                                          | **no change** — tokens unchanged                       |
-| `Syntax.hs:247`                          | the constructor                                                   | new flag or new node (R3)                              |
-| `TypeCheck.hs:2771,2967`                 | `resolveTerm` → `inferAppNamed`                                   | **the whole change lives here**                        |
-| `TypeCheck/Types.hs`, `…/Annotation.hs`  | error types, annotation                                           | one new error constructor                              |
-| `Desugar.hs:62,351`                      | traverses fields; strips computed fields                          | traversal unchanged; see R4                            |
-| `EvaluateLazy/Machine.hs:854-870`        | evaluates via the typechecker's `Just order` permutation          | needs a partial-rebuild path (R3)                      |
-| `Dmn/Lower.hs:1980-1984`                 | three-way guard: head ∈ `neRecordCtors` ∧ arity ∧ exact field set | **fails all three → `verbatim`/Blocking — fails safe** |
-| `Dmn/Analysis.hs:171`                    | `namedArgsPositional nes mOrder`                                  | needs partial-order handling                           |
-| `Export/Document.hs:263-272`             | **fabricates** an `AppNamed` to render records                    | synthetic node must stay construction-flagged          |
-| `Nlg.hs:209`                             | renders `<head> "where" <fields>`                                 | **reads correctly** — "alice where age is 31"          |
-| `StateGraph.hs:474`                      | `Just (getUnique n)` — head as state identity                     | head is now a value, not a ctor — check                |
-| `OpenFisca/Lower.hs:403`                 | diagnostic label only                                             | harmless                                               |
-| `Docassemble/Lower.hs:1217`              | `LFFatal` on **all** named application, construction included     | **zero new cost** — already refused                    |
-| `jl4-mlir/…/Lower.hs:1659,1709`          | reports the record's named type; uniform f64 ABI                  | slot layout assumes the full field set                 |
-| `jl4-mlir/…/Schema.hs:609,668,1505,1754` | schema walk + `chainList` over the named-expr values              | positional over a **partial** list                     |
-| `jl4/tests/DmnExport.hs`                 | test-side matching                                                | test update                                            |
+| module                                                                                     | what it does with `AppNamed`                                      | effect of update                                                                             |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `Parser.hs:2100`                                                                           | builds the node from `<name> WITH …`                              | **no change** — already parses                                                               |
+| `Parser/ResolveAnnotation.hs:477,1276`                                                     | attaches annos and refs to the parsed node (two traversals)       | new production needs arms in both                                                            |
+| `Print.hs:666`                                                                             | prints `printWithLayout n <+> "WITH" <+> …`                       | **no change** — same surface                                                                 |
+| `Print.hs:835`                                                                             | `openTailed` guard, for bracketing                                | **no change** — same bracketing need                                                         |
+| `ExactPrint.hs` _(not a census match — generic over `Anno`; listed for the printer story)_ | re-emits concrete tokens                                          | **no change** — tokens unchanged                                                             |
+| `Syntax.hs:248`                                                                            | the constructor                                                   | new flag or new node (R3)                                                                    |
+| `TypeCheck.hs:2771,2967`                                                                   | `resolveTerm` → `inferAppNamed`                                   | **the whole change lives here**                                                              |
+| `TypeCheck/Annotation.hs`                                                                  | annotation traversal                                              | one new arm (the error constructors live in `TypeCheck/Types.hs:94-95`, not a census member) |
+| `Desugar.hs:62,351`                                                                        | traverses fields; strips computed fields                          | traversal unchanged; see R4                                                                  |
+| `EvaluateLazy/Machine.hs:854-870`                                                          | evaluates via the typechecker's `Just order` permutation          | needs a partial-rebuild path (R3)                                                            |
+| `Dmn/Lower.hs:1980-1984`                                                                   | three-way guard: head ∈ `neRecordCtors` ∧ arity ∧ exact field set | **fails all three → `verbatim`/Blocking — fails safe**                                       |
+| `Dmn/Analysis.hs:171`                                                                      | `namedArgsPositional nes mOrder`                                  | needs partial-order handling                                                                 |
+| `Export/Document.hs:263-272`                                                               | **fabricates** an `AppNamed` to render records                    | fabricated node is a construction — unaffected; but renders the elaboration (R3.1 cost 3)    |
+| `Nlg.hs:209`                                                                               | renders `<head> "where" <fields>`                                 | read correctly under bare-`WITH` only; under R3.1 verbalizes the elaboration — R3.1 cost 3   |
+| `StateGraph.hs:474`                                                                        | `Just (getUnique n)` — head as state identity                     | head is now a value, not a ctor — check                                                      |
+| `OpenFisca/Lower.hs:403`                                                                   | diagnostic label only                                             | harmless                                                                                     |
+| `Docassemble/Lower.hs:1217`                                                                | `LFFatal` on **all** named application, construction included     | **zero new cost** — already refused                                                          |
+| `jl4-mlir/…/Lower.hs:1659,1709`                                                            | reports the record's named type; uniform f64 ABI                  | slot layout assumes the full field set                                                       |
+| `jl4-mlir/…/Schema.hs:609,668,1505,1754`                                                   | schema walk + `chainList` over the named-expr values              | positional over a **partial** list                                                           |
+| `jl4/tests/DmnExport.hs`                                                                   | test-side matching                                                | test update                                                                                  |
 
 Two of these deserve emphasis because they are the ones a reviewer will assume are blockers:
 
@@ -494,7 +516,10 @@ That is an argument, not a measurement. §8 states what would falsify it.
 
 `jl4-core/libraries/actus.l4:70` — `-- Note: L4 constructs new records rather than updating in
 place.` Six field lines where two would do, five times over in one file (§2.1). This is small, real,
-and not going away.
+and not going away. And it is not alone: the live legal corpus carries the same apology —
+`jl4/examples/legal/charities-cleanroom/charity-test.l4:678`, _"Full record literals: L4 has no
+record-update operator, so each scenario spells every field."_ (Found 2026-08-20 while verifying
+§2.2's citation of that file.)
 
 ---
 
@@ -781,8 +806,11 @@ above, because a spec that quietly drops a refuted objection teaches nothing: th
 The corrected demand (§2.2: 43 factories, 588 field lines spelled to vary 154, **74% frozen**,
 concentrated in `bna.l4`/`regcf-denovo.l4`/the Jersey charities files) plus §2.3 (the workaround
 **destroys named fields**, degrading call sites to `` `an appeal` TRUE FALSE FALSE FALSE ``) clears
-the bar. The blast radius is unusually small (§3) because the surface is byte-identical to
-construction, so neither printer nor the exact-printer changes at all.
+the bar. The blast radius is small (§3): 18 modules match `AppNamed`, and under R2+R3.1 all but two
+need only one-line `-Werror` arms. _(Corrected 2026-08-20: this sentence originally said the surface
+was "byte-identical to construction, so neither printer nor the exact-printer changes at all" — true
+of the superseded bare-`WITH` surface only. Under R2 the lexer, the parser and `prettyLayout` all
+change, deliberately — §9 calls the printer arm "the point".)_
 
 **Ruled honestly against §2.4:** the demand is **fixture-sited**, not operative-rule-sited. This is a
 test-and-scenario ergonomics feature. §4.3 argues that is squarely within what L4 sells; a reader who
@@ -893,9 +921,10 @@ catch-all in e.g. `Desugar.rewriteFieldRefs` (`Desugar.hs:330-375`) — across *
 which the `AppNamed` census in §3 does not reach: `jl4-core/src/L4/Viz/Ladder.hs`,
 `jl4-lsp/src/LSP/L4/Viz/Ladder.hs`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs`.
 
-That is the honest price, and R2.1 is the argument that it is worth paying. Under R3.1 every one of
-those 19 arms is trivial — the node is elaborated away before anything downstream can see it — so the
-cost is 19 one-line cases and a forced read of each consumer, not 19 real ports.
+That is the honest price, and R2.1 is the argument that it is worth paying. Under R3.1 seventeen of
+those 19 arms are trivial — the node is elaborated away before anything downstream can see it — so
+the cost is 17 one-line cases, two real arms (`Print.hs`; `TypeCheck.hs`, per R3.1), and a forced
+read of each consumer, not 19 real ports.
 
 #### The rival that nearly won: auto-derived withers
 
@@ -962,7 +991,8 @@ Also ruled: **`#438`'s second ask, "support for colons please", is already shipp
   and a `viab` type filter. **But note the difference from the superseded design:** there, the
   filters had to be tuned so as not to regress programs that compile today; here they cannot regress
   anything, because **no existing program uses this syntax**. That removes §8's second and third kill
-  criteria outright.
+  criteria outright. R3.2 holds the measured witness for why the filter is wanted, and the `InfVar`
+  fail-safe.
 
 **What this ruling no longer needs.** The 2026-08-18 design turned on three knobs at the `AppNamed`
 head — `LocalsSpareSelectors`, the smucclaw#929 `viab` filter, and the `TermKind` predicate — chosen
@@ -1020,9 +1050,11 @@ not hypothetical either: the computed-field desugar runs at that placement and i
 | `jl4-mlir` slot layout                                                      | fed a partial field list                       | fed the complete list it already assumes                           |
 | `Export/Document`, `Nlg`, `StateGraph`, `OpenFisca`, `EvaluateLazy/Machine` | each needs a partial-aware arm                 | **unchanged — the shape they see is unchanged**                    |
 
-Of §3's 18 `AppNamed` consumers, exactly **one** — `Print.hs` — gets a real `Restate` arm. The other
-17 consume the elaborated projection, where `Restate` cannot occur, so their forced `-Werror` arms
-are one-liners.
+Of §3's 18 `AppNamed` consumers, exactly **two** get real `Restate` arms: `Print.hs`, and
+`TypeCheck.hs` — which by R3's own terms checks `Restate` (`inferExpr`) and hosts §5.7's
+`subjectOfActionExpr` arm. _(Corrected 2026-08-20: an earlier draft said "exactly one — `Print.hs`",
+contradicting R3 and §5.7 a few paragraphs apart.)_ The other 16 consume the elaborated projection,
+where `Restate` cannot occur, so their forced `-Werror` arms are one-liners.
 
 **And it makes Q3 disappear rather than solving it.** The alternative was a printer-side
 _caramelisation_: recover `BUT WITH` by detecting, in a construction, a common base whose identity
@@ -1038,12 +1070,12 @@ Obligation 1 below forces a `LET`-binding there, so `(spouseOf bob) BUT WITH age
 a `LET`, and recovering the surface needs a fragile two-level match. Under late elaboration the
 question never arises — the printer prints the `Restate` it was given.
 
-Caramelisation remains worth building **later, for a different payoff**: it would re-sugar the **41
+Caramelisation remains worth building **later, for a different payoff**: it would re-sugar the **40
 hand-written identity-copy sites** already in the corpus (§2), so `l4 batch` on `actus.l4` would emit
 `BUT WITH` for code written before the feature existed. That is decoupled from correctness, and it is
 filed as such.
 
-**The cost, stated plainly.** Two things get worse than under early elaboration:
+**The cost, stated plainly.** Three things get worse than under early elaboration:
 
 1. **A second projection on `CheckResult`, and the discipline to use the right one.** Make that a
    type error rather than a convention — a newtype around the elaborated module, produced only by
@@ -1053,11 +1085,51 @@ filed as such.
    needs a real `Restate` arm that consults the base's declaration when the party field is carried
    rather than written. Early elaboration would have dissolved this; late elaboration does not, and
    pretending otherwise is exactly the drift CLAUDE.md §1 warns about.
+3. **Human-facing backends verbalize the elaboration, not the delta** _(added 2026-08-20)_. `Nlg`
+   renders `AppNamed` as `<head> "where" <fields>` (`Nlg.hs:209`), so the bare-`WITH` design would
+   have read "alice where age is 31". Under R3.1, `Nlg` and `Export/Document` consume the elaborated
+   projection, so the same update verbalizes as "Person where name is alice's name, and age is 31,
+   and email is alice's email" — the author's delta framing is lost precisely in the renderings
+   meant for lawyers. **Accepted for v1.** If it grates in practice, feed those two consumers the
+   unelaborated projection instead; the price is a real `Restate` arm in each, and nothing else
+   changes.
 
-**Two obligations that come with the elaboration itself, both easy to miss:**
+**Three obligations on the check and the elaboration, all easy to miss** _(rewritten 2026-08-20: an
+earlier draft listed two obligations here that belonged to the superseded bare-`WITH` design — the
+`viab` fork-protection example and an instruction to keep `IllegalAppNamed` on `InfVar` heads —
+while the obligations this section's own cross-references point at were missing entirely. The
+bare-`WITH` material now lives, reframed, in R3.2)_:
 
-**The `viab` knob is not hypothetical — here is the program it protects.** L4 permits one name to be
-overloaded as **both** a record value and a named-argument function, and it runs today:
+1. **Bind a non-variable head once.** The carried fields are spelled as projections of the base, so
+   a head that is not a variable must be `LET`-bound before projection —
+   `(spouseOf bob) BUT WITH age IS 31` elaborates to
+   `LET b = spouseOf bob IN Person WITH name IS b's name, age IS 31, …` — or the head expression is
+   duplicated once per carried field. This is the obligation the caramelisation paragraph above
+   leans on.
+2. **Re-implement the field-list checks that `supplyAppNamed` gave construction for free.**
+   Construction catches a duplicate field, an unknown field name, and a supplied computed field
+   because `supplyAppNamed`/`findOptionallyNamedType` consume the declaration's argument list as
+   they match (`TypeCheck.hs:2976-2986`). `Restate`'s own `inferExpr` case never calls that
+   machinery, so it must make the same three rejections itself: `alice BUT WITH age IS 1, age IS 2`
+   (duplicate), `alice BUT WITH nosuchfield IS 1` (unknown), and R4's computed-field gate.
+3. **Fill the evaluator's argument-order slot.** The machine evaluates
+   `AppNamed _ _ nes (Just order)` by permuting `nes` — and `AppNamed _ _ _ Nothing` is an
+   `internalException RuntimeTypeError` (`EvaluateLazy/Machine.hs:856-858`, measured 2026-08-19).
+   Today the checker fills the slot in `inferAppNamed`; a construction synthesized _after_ checking
+   gets no such help, so `elaborateUpdates` must compute the permutation itself — trivially
+   `Just [0..n-1]` if it spells fields in declaration order, but forgetting it is a crash on the
+   first evaluated update, not a type error.
+
+#### R3.2 — Head resolution: the two-bindings witness, and the `InfVar` fail-safe. Added 2026-08-20.
+
+_(This material stood in R3.1 as "two obligations that come with the elaboration", framed for the
+superseded bare-`WITH` design — where update was a new candidate inside the `WITH` overload fork
+and the `viab` filter existed to protect construction. Under R2 there is no fork and construction
+is untouched; what survives is a head-resolution question on the new production, so it is re-ruled
+here in that frame.)_
+
+**The witness.** L4 permits one name to be bound as **both** a record value and a named-argument
+function, and it runs today:
 
 ```l4
 acme MEANS Person WITH name IS "Acme Person", age IS 1        -- acme : Person
@@ -1073,17 +1145,23 @@ Result:
   Company OF "z", 9
 ```
 
-Today the value branch is a type error, so resolution discards it and the answer is unambiguous.
-**Naively adding update makes both branches type-check with different result types** (`Person` vs
-`Company`), turning a working program into an ambiguity error — or, worse, silently flipping which
-overload wins. Passing `viab` = _keep `Fun`-typed candidates when any exists_ drops the value branch
-**before** the fork, so this program keeps printing `Company OF "z", 9`. This is the single most
-important reason R3 is a resolution ruling and not an `inferAppNamed` ruling.
+Under R2 that `#EVAL` is construction syntax and never considers update — the program above is not
+at risk, which is precisely R2.1's point. The live question is the head of `acme BUT WITH age IS
+31`: **two `acme` bindings are in scope, and the head must resolve to the Person value, not the
+Company function.** That is what R3's `TermKind`/type filter at the head is for —
+`resolveTermFilteredIn`'s `viab` knob, aimed the opposite way from construction's (keep value-typed
+candidates, not `Fun`-typed ones) — and R4's single-constructor gate then applies to the type it
+selects. Because no existing program parses as `BUT WITH`, no tuning of this filter can regress a
+program that compiles today.
 
-**Fail safe on `InfVar`.** When the head's type is still an inference variable, keep today's
-`IllegalAppNamed`. This follows the convention already in the file — `isPrimitiveType` has
-`InfVar{} -> False -- Unknown type, don't skip analysis` (`TypeCheck.hs:2933-2936`). Update fires only
-on a concrete record type.
+**Fail safe on `InfVar`.** When the head's type is still an inference variable at the `Restate`
+check, reject with the new named diagnostic ("cannot update a value whose type is not yet known —
+annotate the head") rather than guessing a constructor. This follows the convention already in the
+file — `isPrimitiveType` has `InfVar{} -> False -- Unknown type, don't skip analysis`
+(`TypeCheck.hs:2933-2936`). Update fires only on a concrete record type. _(The earlier draft said
+"keep today's `IllegalAppNamed`" here — a bare-`WITH`-ism: that error's text, "you are trying to
+apply … (which is not a function) to (named) arguments", is nonsense on a production that is
+unambiguously an update.)_
 
 ### R4 — Partial field lists; single-constructor record types only; computed fields re-derive. Ruled 2026-08-18.
 
@@ -1092,10 +1170,14 @@ on a concrete record type.
   (`TypeCheck.hs:1828-1839`, keyed by `resultTypeHeadUnique`, already consumed by `checkConsider`)
   answers this. Reject enum values (`red WITH …`, §5.3) and multi-arm sums (`p : Payment`, §5.3) at
   check time with a named diagnostic. Measured over the 749 tracked `.l4` files:
-  **641 `DECLARE … HAS` against 425 `DECLARE … IS ONE OF`** — single-constructor records are the
-  _more_ common idiom, so this restriction does not gut the feature. (The review reported 418/375;
-  my own count differs on scanning window and on excluding the untracked `seqsim/` copy. The ratio,
-  which is the load-bearing part, is the same either way.) It is also **stricter than Haskell**, which permits multi-constructor update and fails at
+  **640 `DECLARE … HAS` against 417 `DECLARE … IS ONE OF`** — single-constructor records are the
+  _more_ common idiom, so this restriction does not gut the feature. (Method, stated because this
+  census now has a history: classify each `DECLARE`'s indented block, comments stripped, as a sum
+  if it contains `IS ONE OF`, else a record if it contains `HAS`. Layout puts `HAS` on the line
+  _after_ `DECLARE`, so single-line greps undercount by a third — which is what produced the review
+  agents' 418/375 and a 2026-08-19 check's 423/381; an earlier draft printed 641/425 without its
+  method. Re-measured 2026-08-20; the ratio, the load-bearing part, holds under every count.) It is
+  also **stricter than Haskell**, which permits multi-constructor update and fails at
   runtime.
 - **Computed fields re-derive, and may not be supplied.** §1.5 measured the re-derivation (`age`
   16→20, `adult` FALSE→TRUE) and the value carries only stored fields. The
@@ -1108,16 +1190,24 @@ on a concrete record type.
   obligation**, not a defect — but the current message says "this is most likely an internal error",
   which should be replaced with a real explanation.
 
-### R5 — Head is a bare name **or a parenthesised expression**. Ruled 2026-08-18.
+### R5 — Head is a bare name **or a parenthesised expression**. Ruled 2026-08-18; rationale re-argued 2026-08-20.
 
-`AppNamed`'s head is a `Name` in the AST (`Syntax.hs:248`), not merely in the grammar. Widening it to
-`Expr` touches exact-printing, `prettyLayout`'s 300-file round-trip (CLAUDE.md §3.2, **no exclusion
-list permitted**), the lazy machine, `Dmn/Lower` and `OpenFisca/Lower`.
+**The original rationale is superseded, though the ruling stands.** As first argued, the cost of a
+general head was AST-shaped: `AppNamed`'s head is a `Name` (`Syntax.hs:248`), and widening it to
+`Expr` would have touched exact-printing, `prettyLayout`'s 300-file round-trip (CLAUDE.md §3.2,
+**no exclusion list permitted**), the lazy machine, `Dmn/Lower` and `OpenFisca/Lower`. R3 dissolved
+all of that: `Restate`'s head is **already `Expr n`**, and R3.1 keeps the node out of every one of
+those consumers. What actually remains is a **grammar** question — an unparenthesised general head
+(`alice's spouse BUT WITH age IS 31`) needs a precedence ruling for `'s` against `BUT WITH`, and
+nobody has designed or measured one. The restriction is therefore kept for v1 on grammar grounds,
+not AST grounds; loosening it later is Q4.
 
-**Accepted cost, stated plainly:** `alice's spouse WITH age IS 31` — the most common Haskell
-record-update idiom — **cannot be written at all**, and this is the one surviving major with no
-workaround. Verified: a parenthesised head does not rescue it either (`(alice) WITH age IS 2` is a
-parse error). Building a list of variants _does_ work bracketed:
+**Accepted cost, stated plainly:** `alice's spouse BUT WITH age IS 31` — the most common Haskell
+record-update idiom — cannot be written **unparenthesised**; the workaround is
+`(alice's spouse) BUT WITH age IS 31`, which the revision below admits. _(Corrected 2026-08-20: an
+earlier draft said "cannot be written at all … no workaround", two paragraphs above the revision
+that provides one.)_ The measurements against today's grammar stand: `(alice) WITH age IS 2` is a
+parse error, and building a list of variants works bracketed —
 `LIST (bob WITH age IS 1), (bob WITH age IS 2)` parses.
 
 **Revised after review: admit a parenthesised head.** The grammar becomes
@@ -1205,7 +1295,8 @@ Stated so the spec is falsifiable. If any of these turns out to hold, R1 flips t
 1. **The scenario argument is the load-bearing one and it is an argument, not a measurement**
    (§2.5, §4.3). It says drafters would write more counterfactuals if each cost one line instead of
    twenty. **Falsified if:** a drafter given the feature keeps writing constructor factories anyway.
-   **Measurement that settles it:** take the five `bna.l4` factories (`:660,687,717,746,776`), rewrite
+   **Measurement that settles it:** take the five `PersonProfile` factories in `bna.l4`
+   (`:660,687,717,746,776`; the file's other two factories build `AdoptionCase`), rewrite
    the scenario block against one canonical base, and have a knowledge engineer who did not write
    either version say which they would maintain. This is cheap and should be done **before** the
    implementation, not after.
@@ -1235,7 +1326,7 @@ Deliberately staged so the risky thing is provable before anything irreversible 
 | 2   | `Restate` AST node + the 19 forced `Expr` arms; real `inferExpr` case + R4's gates | `-Werror` turns each consumer into a read; 17 of the arms are one-liners |
 | 3   | `elaborateUpdates` + the newtype'd second `CheckResult` projection                 | R3.1 — late, so the printer and LSP keep the written form                |
 | 4   | `Restate` arm in `subjectOfActionExpr` (§5.7)                                      | runs during checking, so late elaboration does not cover it              |
-| 5   | R3.1's head-binding and duplicate-field checks                                     | correctness, not polish — see R3.1's two obligations                     |
+| 5   | R3.1's obligations 1–3: head `LET`-binding, field-list checks, order slot          | correctness, not polish — see R3.1's obligations                         |
 | 6   | R6 bracketing rule; R5 parenthesised head                                          | both attach to the new production only                                   |
 
 **No step for the evaluator, and no step for any backend.** That is R3.1's dividend: elaboration
@@ -1250,7 +1341,7 @@ holds naturally, because the printed text is the text that parsed. `ExactPrint` 
 `Anno` (`ExactPrint.hs`, 42 lines, no per-constructor case), so `l4 format` needs no change at all.
 
 **Optional, and deliberately not on this list:** the printer-side _caramelisation_ described in
-R3.1. It buys nothing for correctness now that elaboration is late; its payoff is re-sugaring the 41
+R3.1. It buys nothing for correctness now that elaboration is late; its payoff is re-sugaring the 40
 hand-written identity-copy sites already in the corpus. If it is ever built, CLAUDE.md §3.2.1's
 evaluation differential is a **hard gate**, not a nicety — that section exists because a printer-side
 rewrite once rendered two different expressions as the same string.
@@ -1289,3 +1380,4 @@ place.` Delete this comment when the feature lands; it is the file's own apology
 | Q1  | Should update be allowed to _widen_ to a supertype, or strictly preserve the head's type?         | kosmikus's #438 comment says disallow type-changing; R4 follows, but no one has tested whether a widening case exists in the corpus                                                                                                                                                          |
 | Q2  | Does the trace/provenance layer need an explicit node for carried-through fields?                 | `inherited-fields-have-no-trace-node` was **refuted** (derived values have no ledger entry today either), but no one has looked at what `#EVALTRACE` _prints_ for a chained update                                                                                                           |
 | Q3  | Should `l4 batch`/the REPL print an update back as `BUT WITH`, or as its elaborated construction? | **RESOLVED 2026-08-19 by the re-ruled R3.1.** As `BUT WITH`: elaboration is late, so the printer is handed the `Restate` the author wrote. The alternative — a printer-side caramelisation recovering the surface from a construction — is described in R3.1 and deferred as optional sugar. |
+| Q4  | Should an unparenthesised projection head (`alice's spouse BUT WITH …`) be admitted later?        | Added 2026-08-20 (review). The AST already permits it — `Restate`'s head is `Expr n` — so this is purely a precedence ruling for `'s` against `BUT WITH`; a designed precedence plus the §5.1 slurp analysis re-run against it would settle it. R5 holds the v1 restriction.                 |
