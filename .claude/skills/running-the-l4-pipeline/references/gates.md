@@ -73,6 +73,17 @@ Any corpus file means **any module of the encoding**, not just the entry module.
 
 One route still slips past it, and it is worth knowing rather than discovering: resuming with `--only <a gated stage>` never re-runs `p0-preflight`, so an edit made after the grant moves the corpus digest — the driver says so, the grant goes stale — but the rebuilt payload is byte-identical and the old signature re-satisfies the gate. Resume without `--only`, or re-request the gate, when anything under the encoding has changed.
 
+**What the signature does NOT cover, and now at least names.** The corpus section lists the files the
+gate blesses. It does not list the `l4` binary or the L4 standard library, and until 2026-08-20 the
+standard library was in no digest anywhere — while every module of every subject opens with
+`IMPORT prelude` and `IMPORT daydate`, and `JL4_LIBRARY_PATH` lets the caller choose which copy is
+resolved. Measured: substituting one word in `daydate.l4`'s `DATE` comparison left all 79 `sg-paa`
+assertions passing byte-identically while a boundary `#EVAL` went `TRUE` → `FALSE`. The library is
+now folded into every stage's inputs digest beside the binary's sha, and the payload carries a
+**toolchain** section naming both — so a substitution invalidates every replay and moves the
+document, even though it does not re-open the gate. If you are signing, read that section: it is the
+other half of the answer.
+
 **Re-running is cheap.** HG1 over an unchanged corpus is effectively a _standing_ signature: the payload is the same, so the same signature keeps verifying, run after run, until something it covered changes.
 
 That second consequence was false until 2026-08-02 and is worth knowing why, because it is the shape this whole design is exposed to. The payload rendered one line per `stage_end` row, and a resumed run appends a fresh `stage_end` per replayed stage — so the very first resume the tools themselves print (`gate-request.sh` ends by telling you to re-run with `--run-id <id>`) changed the payload over a corpus nobody had touched, and `gate-verify.sh` refused before it ever reached `ssh-keygen -Y verify`. Re-signing did not converge: each resume appended two more rows. The payload's **receipts list** now excludes replayed rows, which carry no evidence a non-replayed row does not already carry. `etc/go/selftest.mjs` holds the property and its control: a replay must not move the payload, a receipt that executed must.

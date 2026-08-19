@@ -138,6 +138,35 @@ lines.push(`fixed_now: ${begin.fixed_now}`);
 lines.push("");
 lines.push("corpus (sha256 of every file this gate blesses):");
 for (const [name, sha] of corpus.sort()) lines.push(`  ${name} ${sha}`);
+// THE TOOLCHAIN THE ANSWER DEPENDS ON.
+//
+// The corpus section above names what the gate BLESSES. This names what the
+// blessing is CONDITIONAL ON, and it exists because those are different sets
+// and the difference was invisible: the `l4` binary and the L4 standard library
+// are inputs to every stage, and until 2026-08-20 the standard library was in
+// no digest at all. Measured then: substituting one word in `daydate.l4`'s DATE
+// comparison left all 79 sg-paa assertions passing and byte-identical while a
+// boundary EVAL went TRUE -> FALSE. A signer who is shown seven corpus hashes
+// and nothing else is being asked to bless an answer whose other half they
+// cannot see.
+//
+// Recorded from p0-preflight's metrics, on the same contract as the corpus
+// section: if a value is not on the receipt it is not in this document. A run
+// whose p0-preflight predates these metrics renders "(not recorded)" for that
+// line rather than omitting it, so an old journal reads as a gap and not as an
+// absence of dependency.
+const toolchainKeys = [
+  ["l4 binary     ", "l4_binary_sha"],
+  ["l4 stdlib     ", "l4_stdlib_sha"],
+  ["l4 stdlib path", "l4_stdlib"],
+];
+lines.push("");
+lines.push(
+  "toolchain this answer depends on (not blessed by this signature, but fixed by it):",
+);
+for (const [label, key] of toolchainKeys)
+  lines.push(`  ${label} ${p0?.metrics?.[key] ?? "(not recorded)"}`);
+
 lines.push("");
 lines.push("receipts that EXECUTED before this gate (replays excluded):");
 for (const r of stageEnds) lines.push(`  ${r.stage} ${r.status} ${r.hash}`);

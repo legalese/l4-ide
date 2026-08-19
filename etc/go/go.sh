@@ -896,6 +896,28 @@ EOF
   l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
   export GO_L4_PATH="$l4_path" GO_L4_SHA="$l4_sha"
 
+  # THE STANDARD LIBRARY IS THE SECOND UNDECLARED INPUT TO EVERY STAGE.
+  #
+  # The paragraph above folds `l4_sha` into every digest because "the `l4`
+  # binary is an input to every stage and is declared by none: no phase script
+  # can see the path the driver was handed." JL4_LIBRARY_PATH is an input to
+  # every stage on identical terms -- every module of every subject opens with
+  # IMPORT prelude and IMPORT daydate -- declared by none, invisible to every
+  # phase script, and, unlike the binary, settable by the caller.
+  #
+  # MEASURED before this was folded: copy jl4-core/libraries, change `__GEQ__`
+  # on DATE from `AT LEAST` to `GREATER THAN` (one word), point the env var at
+  # the copy. sg-paa.l4 still reports 79 assertions and 0 failures, byte for
+  # byte identical to the baseline, while a date-boundary EVAL goes TRUE ->
+  # FALSE. Every oracle in the pipeline stayed green and the answer moved.
+  #
+  # Content and not path, so relocating an identical library does not
+  # invalidate a replay; the path is exported separately for the report.
+  local stdlib_dir stdlib_sha
+  stdlib_dir="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  stdlib_sha="$(node "$LIB/stdlib-digest.mjs" "$stdlib_dir")"
+  export GO_STDLIB_DIR="$stdlib_dir" GO_STDLIB_SHA="$stdlib_sha"
+
   export GO_ROOT
   export GO_RUN="$RUN" GO_RUNID="$RUN_ID" GO_SUBJECT="$SUBJECT" GO_MILESTONE="$MILESTONE"
   export GO_FIXED_NOW="$FIXED_NOW"
@@ -1020,7 +1042,7 @@ EOF
     local inputs digest
     inputs=$(GO_STAGE="$s" bash "$script" --inputs 2>/dev/null || true)
     if [[ -n "$inputs" ]]; then
-      digest=$(printf '%s\ntext:l4-binary=%s\n' "$inputs" "$l4_sha" | node "$LIB/digest.mjs" --stdin)
+      digest=$(printf '%s\ntext:l4-binary=%s\ntext:l4-stdlib=%s\n' "$inputs" "$l4_sha" "$stdlib_sha" | node "$LIB/digest.mjs" --stdin)
     else
       digest=""
     fi

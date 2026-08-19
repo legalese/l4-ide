@@ -5071,6 +5071,116 @@ process.stdout.write("\n-- cross-run ordering --\n");
 }
 // ===== END cross-run ordering ===============================================
 
+// ===== the standard library is an input to every stage ======================
+//
+// THE ATTACK THIS CLOSES, measured on this tree before the fix. Every module of
+// every subject opens with IMPORT prelude and IMPORT daydate (7 of 7 for
+// sg-succession), so the library files are inputs to every `l4 check`, `l4 run`,
+// `l4 export` and `l4 verify` the pipeline performs. They were in NO digest --
+// not the gate's GO_ENCODING_FILES, not any stage's --inputs -- and the path is
+// an environment variable whose caller-supplied value wins.
+//
+// So: copy jl4-core/libraries, change `__GEQ__` on DATE from `AT LEAST` to
+// `GREATER THAN` (one word), point JL4_LIBRARY_PATH at the copy. sg-paa.l4 still
+// reported 79 assertions and 0 failures, byte-identical to the baseline, while a
+// date-boundary EVAL went TRUE -> FALSE. Every oracle stayed green and the
+// answer moved, under a signature a human gave for something else.
+//
+// The driver already folded the `l4` binary's sha for exactly this reason, in a
+// comment that says "the `l4` binary is an input to every stage and is declared
+// by none". The reasoning was written and not applied to the second case.
+process.stdout.write("\n-- the standard library --\n");
+{
+  const SD = resolve(HERE, "lib/stdlib-digest.mjs");
+  const dig = (dir) =>
+    spawnSync("node", [SD, dir], { encoding: "utf8" }).stdout.trim();
+
+  const real = mkdtempSync(resolve(tmpdir(), "l4-go-lib-"));
+  writeFileSync(
+    resolve(real, "daydate.l4"),
+    "`__GEQ__` MEANS Day a AT LEAST Day b\n",
+  );
+  writeFileSync(resolve(real, "prelude.l4"), "-- prelude\n");
+  const a = dig(real);
+  check(
+    "a populated library directory digests",
+    /^sha256:[0-9a-f]{64}$/.test(a),
+  );
+
+  // The one-word mutation.
+  const mut = mkdtempSync(resolve(tmpdir(), "l4-go-libmut-"));
+  writeFileSync(
+    resolve(mut, "daydate.l4"),
+    "`__GEQ__` MEANS Day a GREATER THAN Day b\n",
+  );
+  writeFileSync(resolve(mut, "prelude.l4"), "-- prelude\n");
+  check("one word changed in a library moves the digest", dig(mut) !== a);
+
+  // Content, not path: relocating an identical library must NOT invalidate a
+  // replay, or every worktree would re-run everything for no reason.
+  const copy = mkdtempSync(resolve(tmpdir(), "l4-go-libcopy-"));
+  writeFileSync(
+    resolve(copy, "daydate.l4"),
+    "`__GEQ__` MEANS Day a AT LEAST Day b\n",
+  );
+  writeFileSync(resolve(copy, "prelude.l4"), "-- prelude\n");
+  check(
+    "an identical library at a different path digests the same — content, not path",
+    dig(copy) === a,
+  );
+
+  // Three distinct absence states, all distinct from each other and from a
+  // populated directory. "No library directory" is not the same claim as "an
+  // empty one", and neither may collide with a real digest.
+  const empty = mkdtempSync(resolve(tmpdir(), "l4-go-libempty-"));
+  const states = [
+    dig(empty),
+    dig(resolve(tmpdir(), "definitely-not-here")),
+    dig(""),
+  ];
+  check(
+    "empty, absent and unset are three distinct digests",
+    new Set(states).size === 3,
+  );
+  check("none of them collides with a populated library", !states.includes(a));
+
+  // A file that is not a library must not move it: resolution is by basename
+  // and flat, so a stray README or a subdirectory is not reachable as a library.
+  writeFileSync(resolve(real, "NOTES.md"), "not a library\n");
+  mkdirSync(resolve(real, "sub"), { recursive: true });
+  writeFileSync(resolve(real, "sub", "other.l4"), "-- unreachable\n");
+  check(
+    "a non-.l4 file and a subdirectory do not move the digest",
+    dig(real) === a,
+  );
+
+  // And the driver must actually fold it, into EVERY stage, beside the binary.
+  const goSrc = readFileSync(resolve(HERE, "go.sh"), "utf8");
+  check(
+    "go.sh folds text:l4-stdlib into the per-stage digest",
+    /text:l4-stdlib=/.test(goSrc),
+  );
+  check(
+    "it is folded in the same printf as the binary, so no stage can miss one and get the other",
+    /text:l4-binary=[\s\S]{0,80}text:l4-stdlib=/.test(goSrc),
+  );
+
+  // p0-preflight records it, because the gate payload's toolchain section reads
+  // this receipt's metrics and what is not on the receipt is not in the document
+  // a human signs.
+  const p0Src = readFileSync(resolve(HERE, "phases/p0-preflight.sh"), "utf8");
+  check(
+    "p0-preflight records l4_stdlib_sha as a metric",
+    /--metric "l4_stdlib_sha=/.test(p0Src),
+  );
+  const gpSrc = readFileSync(resolve(HERE, "lib/gate-payload.mjs"), "utf8");
+  check(
+    "the gate payload names the stdlib the answer depends on",
+    /l4_stdlib_sha/.test(gpSrc),
+  );
+}
+// ===== END the standard library =============================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

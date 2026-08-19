@@ -213,6 +213,44 @@ measured, the seven digests move and `p0-preflight` and `p7-lts` do not.
 
 **Closed — a borrowed artifact could be laundered.** See §3.8.
 
+**Closed — the standard library was an input to every stage and was in nothing.** Found by an
+adversarial attack on the _proposed_ design; it turned out to be live in the tree, so it is recorded
+at length. Every module of every subject opens with `IMPORT prelude` and `IMPORT daydate` (7 of 7
+for `sg-succession`), so those files are inputs to every `l4 check`, `l4 run`, `l4 export` and
+`l4 verify` the pipeline performs. They were in **no** digest — not the gate's `GO_ENCODING_FILES`,
+not any stage's `--inputs` — and the path is an environment variable the driver exports with the
+caller's value winning.
+
+**MEASURED.** Copy `jl4-core/libraries`; change `__GEQ__` on `DATE` from `AT LEAST` to
+`GREATER THAN`, one word; point `JL4_LIBRARY_PATH` at the copy. `sg-paa.l4` still reports **79
+assertions, 0 failed**, byte-identical to the baseline, while a date-boundary `#EVAL` goes
+**TRUE → FALSE**. Every oracle stays green and the answer moves — under a signature a human gave for
+something else. The corpus's own 178 assertions cannot see it, because it asserts the boundary on
+the days either side of the one the mutation moves. (Control: a cruder mutation, `add months`
+shifted by one, _is_ caught — 7 of 79 fail. The suite is a real partial defence, and it is the
+boundary cases it misses, which is exactly where an attacker aims.)
+
+The indictment is in the driver's own comment. `go.sh` folds the `l4` binary's sha into every digest
+_because_ "the `l4` binary is an input to every stage and is declared by none: no phase script can
+see the path the driver was handed." `JL4_LIBRARY_PATH` is an input to every stage, declared by
+none, invisible to every phase script — and, unlike the binary, caller-settable. The reasoning was
+written and not applied to the second case; `etc/go/README.md`'s "**Leave `JL4_LIBRARY_PATH`
+alone**" is the design conceding that a value in the trust base was held by operator discipline.
+
+Now folded as `text:l4-stdlib=…` in the same `printf` as the binary, so no stage can get one and
+miss the other, via `etc/go/lib/stdlib-digest.mjs`. Keyed by **basename and content**, not absolute
+path — a library resolves by basename, so that is its identity, and two worktrees with identical
+libraries must not re-execute everything. `p0-preflight` records `l4_stdlib`/`l4_stdlib_sha`, and
+the gate payload grows a **toolchain** section naming what the answer depends on, since a signer
+shown seven corpus hashes and nothing else is blessing an answer whose other half they cannot see.
+
+Two things this does **not** close, recorded rather than implied. The library is not in
+`GO_ENCODING_FILES`, so editing it does not re-open a granted HG1 — it invalidates the _replay_ and
+moves the _payload_, which is weaker than a gate re-opening and is the right conservative default
+only until someone rules on whether HG1 blesses the stdlib. And `jl4-service` resolves `daydate`
+from **its own** copy, so the deployed endpoint is a third unattested library this fix does not
+reach; that containment is why the attack could not reach a served answer.
+
 **Closed — the lookup preferred a corpus hash to a clock.** `findReplayableAcrossRuns` ordered its
 candidates with `readdirSync().sort().reverse()`. A run id is `YYYY-MM-DD-<corpus_sha8>-NNN`, so
 that orders by date, then by the **corpus hash**, then by sequence — and a content hash's order
@@ -234,7 +272,6 @@ old ordering fails the new fixture.
 | gap                                                              | why it matters                                                                                                                                                                                                                                                                                                  |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | the transitive `IMPORT` closure of a declared entry module       | every projection leg declares its entry point only, so editing `sg-wills.l4` re-opens the **gate** (it is in `encoding.modules`) while `p7-akn`, `p7-wizard`, `p7-lts` and `p7-tnr` all replay receipts describing the pre-edit encoding                                                                        |
-| the stdlib on disk / `JL4_LIBRARY_PATH`                          | every module imports `prelude` and `daydate`; resolution prefers the repo copy over the binary's embedded one, so editing `jl4-core/libraries/daydate.l4` changes results across the pipeline while every digest holds still                                                                                    |
 | the adjudication layer                                           | `lib/phase-prelude.sh` is sourced by all 22 phases and declared by none; `receipt.mjs`, `verdict.mjs`, `ledger.mjs` likewise. Editing `ORACLE_CLASSES` changes what statuses are legal for every future receipt and moves no digest, so eligible stages replay their old status instead of being re-adjudicated |
 | checkers a stage invokes but does not declare                    | `probe.mjs`, `discover.mjs`, `corpus-metrics.mjs`, `label-order.mjs`, `known-defects.mjs`, `plan-shape.mjs`, `fidelity-counts.mjs`, `bpmn-to-svg.mjs` — several of which produce the metrics the receipt carries                                                                                                |
 | `p7-mcp`'s zip is built from seven modules, its digest names two | cross-run replay is blocked here, but **within**-run is not: `--only p7-mcp --run-id <id>` after editing `sg-paa.l4` replays                                                                                                                                                                                    |

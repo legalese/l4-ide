@@ -46,6 +46,19 @@ PINLOG="$GO_OUT/cli-surface.txt"
 L4_PATH="${GO_L4_PATH:-$(command -v "$L4" || echo "$L4")}"
 L4_SHA="${GO_L4_SHA:-$(node "$GO_LIB/digest.mjs" "$L4_PATH")}"
 
+# The standard library, on the same footing as the binary. Every module of every
+# subject opens with IMPORT prelude and IMPORT daydate, so these files are inputs
+# to every `l4` invocation the pipeline makes -- and until 2026-08-20 they were
+# in no digest, no receipt and no payload, while JL4_LIBRARY_PATH let the caller
+# choose them. Measured: one word changed in daydate.l4's DATE comparison left
+# all 79 sg-paa assertions passing byte-identically and moved a boundary EVAL
+# from TRUE to FALSE. Recorded here because the gate payload builds its
+# toolchain section from this receipt's metrics, on the same contract as the
+# corpus section: what is not on the receipt is not in the document a human
+# signs.
+STDLIB_DIR="${GO_STDLIB_DIR:-${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}}"
+STDLIB_SHA="${GO_STDLIB_SHA:-$(node "$GO_LIB/stdlib-digest.mjs" "$STDLIB_DIR")}"
+
 # --- 2. toolchain probes; every miss carries a named reason ------------------
 node "$GO_LIB/probe.mjs" >"$PROBES"
 
@@ -155,4 +168,6 @@ go_receipt \
   "${METRICS[@]}" \
   --metric "l4_binary=$L4_PATH" \
   --metric "l4_binary_sha=$L4_SHA" \
+  --metric "l4_stdlib=$STDLIB_DIR" \
+  --metric "l4_stdlib_sha=$STDLIB_SHA" \
   --metric "fixed_now=$GO_FIXED_NOW"
