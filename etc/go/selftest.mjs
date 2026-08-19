@@ -29,9 +29,12 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  CROSS_RUN_INELIGIBLE,
   append,
+  findReplayableAcrossRuns,
   hashRecord,
   read,
+  runSubject,
   sha256File as hashOf,
   verify,
 } from "./lib/ledger.mjs";
@@ -215,6 +218,179 @@ check(
 );
 
 // -------------------------------------------------------------- 2. milestone
+
+process.stdout.write("\n-- cross-run replay --\n");
+
+// Change 1: a receipt earned in an EARLIER run of the SAME subject satisfies a
+// later run when the declared inputs digest is byte-identical. The digest folds
+// in each stage's own script, the checkers it calls, and the `l4` binary's
+// sha256, so this is what makes "tweak one exporter, re-run, and only that leg
+// re-executes" true ACROSS sessions rather than only within one run.
+{
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-xrun-"));
+  const mkRun = (id, subject, rows) => {
+    const d = resolve(root, id);
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      milestone: "g1",
+      subject,
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: ["p6-tests"],
+    });
+    for (const r of rows) append(j, r);
+    return d;
+  };
+  const DIG = "sha256:" + "a".repeat(64);
+  const OTHER = "sha256:" + "b".repeat(64);
+  const row = (o) => ({
+    kind: "stage_end",
+    stage: "p6-tests",
+    status: "PASS",
+    reason: null,
+    blocker: null,
+    oracle: { class: "structural", because: "counted" },
+    artifacts: [],
+    metrics: {},
+    notes: [],
+    inputs_digest: DIG,
+    attempt: 1,
+    replayed_from: null,
+    replayed_from_run: null,
+    label: null,
+    ...o,
+  });
+
+  const older = mkRun("2026-01-01-aaaaaaaa-001", "subj", [row({})]);
+  const current = resolve(root, "2026-01-02-aaaaaaaa-001");
+  mkdirSync(current, { recursive: true });
+
+  const hit = findReplayableAcrossRuns(root, current, "subj", "p6-tests", DIG);
+  check(
+    "a receipt from an earlier run of the same subject is found, and names its run",
+    !!hit &&
+      hit.runId === "2026-01-01-aaaaaaaa-001" &&
+      hit.record.status === "PASS",
+  );
+
+  check(
+    "a DIFFERENT subject's receipt is never borrowed, however the digests fall",
+    findReplayableAcrossRuns(
+      root,
+      current,
+      "other-subject",
+      "p6-tests",
+      DIG,
+    ) === null,
+  );
+
+  check(
+    "a different inputs digest is not a hit — the digest is the whole authority",
+    findReplayableAcrossRuns(root, current, "subj", "p6-tests", OTHER) === null,
+  );
+
+  check(
+    "the CURRENT run is excluded; within-run replay is findReplayable's job",
+    findReplayableAcrossRuns(root, older, "subj", "p6-tests", DIG) === null,
+  );
+
+  // A harness defect is not evidence, in any run.
+  const brokenRoot = mkdtempSync(resolve(tmpdir(), "l4-go-xrun-broken-"));
+  {
+    const d = resolve(brokenRoot, "2026-01-01-bbbbbbbb-001");
+    mkdirSync(d, { recursive: true });
+    const j = resolve(d, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "2026-01-01-bbbbbbbb-001",
+      milestone: "g1",
+      subject: "subj",
+      repo_head: "abc",
+      tree_state: "clean",
+      fixed_now: "2025-01-31T00:00:00Z",
+      declared_stages: ["p6-tests"],
+    });
+    append(j, row({ status: "BROKEN", reason: "harness", oracle: null }));
+    check(
+      "a BROKEN receipt is never borrowed across runs",
+      findReplayableAcrossRuns(
+        brokenRoot,
+        resolve(brokenRoot, "2026-01-02-bbbbbbbb-001"),
+        "subj",
+        "p6-tests",
+        DIG,
+      ) === null,
+    );
+  }
+
+  check(
+    "runSubject reads the subject off run_begin",
+    runSubject(resolve(older, "journal.ndjson")) === "subj",
+  );
+  check(
+    "runSubject returns null for a directory that is not a run",
+    runSubject(resolve(root, "nope", "journal.ndjson")) === null,
+  );
+}
+
+// The closed list of stages whose result is NOT a function of their declared
+// inputs, and which therefore may never cross a run boundary.
+{
+  check(
+    "p7-mcp is cross-run ineligible — its oracle talks to a live service",
+    CROSS_RUN_INELIGIBLE.has("p7-mcp"),
+  );
+  check(
+    "p2-sweep is cross-run ineligible — its whole subject is that time has passed",
+    CROSS_RUN_INELIGIBLE.has("p2-sweep"),
+  );
+  const root = mkdtempSync(resolve(tmpdir(), "l4-go-xrun-inel-"));
+  const d = resolve(root, "2026-01-01-cccccccc-001");
+  mkdirSync(d, { recursive: true });
+  const j = resolve(d, "journal.ndjson");
+  const DIG = "sha256:" + "c".repeat(64);
+  append(j, {
+    kind: "run_begin",
+    run_id: "2026-01-01-cccccccc-001",
+    milestone: "g1",
+    subject: "subj",
+    repo_head: "abc",
+    tree_state: "clean",
+    fixed_now: "2025-01-31T00:00:00Z",
+    declared_stages: ["p7-mcp"],
+  });
+  append(j, {
+    kind: "stage_end",
+    stage: "p7-mcp",
+    status: "PASS",
+    reason: null,
+    blocker: null,
+    oracle: { class: "execution", because: "deployed" },
+    artifacts: [],
+    metrics: {},
+    notes: [],
+    inputs_digest: DIG,
+    attempt: 1,
+    replayed_from: null,
+    replayed_from_run: null,
+    label: null,
+  });
+  check(
+    "an ineligible stage is NOT borrowed even with a byte-identical digest",
+    findReplayableAcrossRuns(
+      root,
+      resolve(root, "2026-01-02-cccccccc-001"),
+      "subj",
+      "p7-mcp",
+      DIG,
+    ) === null,
+  );
+}
+
 process.stdout.write("\n-- the milestone rule --\n");
 
 const declared = ["a", "b", "c"];

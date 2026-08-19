@@ -186,7 +186,15 @@ function projectionsTable() {
       r.reason ??
       r.oracle?.because ??
       (r.replayed_from
-        ? `inputs unchanged; the verdict and its evidence are the receipt ${r.replayed_from.slice(0, 23)}… on this journal`
+        ? // `replayed_from_run` is null for the ordinary resume — the borrowed
+          // receipt is a few lines up in THIS journal. When it is set, the
+          // evidence was earned in another run, and saying "on this journal"
+          // would send a reader looking for a record that is not there.
+          `inputs unchanged; the verdict and its evidence are the receipt ${r.replayed_from.slice(0, 23)}… ${
+            r.replayed_from_run
+              ? `earned in run ${r.replayed_from_run}, whose artifacts were copied into this one`
+              : "on this journal"
+          }`
         : "");
     return `| \`${s}\` | ${r.status}${label} | ${oracle} | ${esc(says)} |`;
   });
@@ -234,7 +242,9 @@ function projectionsDetail() {
       out.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
     if (r.replayed_from)
       out.push(
-        `\n*Replayed* from receipt \`${r.replayed_from}\` — the inputs were unchanged and the oracle did not run again.`,
+        r.replayed_from_run
+          ? `\n*Replayed across runs* from receipt \`${r.replayed_from}\`, earned in run \`${r.replayed_from_run}\` — the declared inputs were byte-identical, so the oracle did not run again. That run's artifacts were COPIED into this one, so every hash below is checkable from this run directory alone.`
+          : `\n*Replayed* from receipt \`${r.replayed_from}\` — the inputs were unchanged and the oracle did not run again.`,
       );
     out.push("");
   }

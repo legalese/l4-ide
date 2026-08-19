@@ -821,8 +821,24 @@ EOF
     fi
     export GO_INPUTS_DIGEST="$digest"
 
-    # resumability: a completed stage with an unchanged inputs digest is replayed.
-    local prior=""
+    # Resumability, in two widths.
+    #
+    # WITHIN this run, a completed stage with an unchanged inputs digest is
+    # replayed — that is what makes a killed terminal or a usage limit cost
+    # nothing, and it is unchanged.
+    #
+    # ACROSS runs of the SAME SUBJECT, the same rule applies to a stage whose
+    # result is determined by its declared inputs. Those inputs already name the
+    # stage's own script, the checkers it calls, and (folded in above) the sha256
+    # of the `l4` binary — so editing any part of the toolchain moves the digest
+    # and the stage re-executes, while everything the edit did not touch is
+    # borrowed. That is the whole point: change one exporter, re-run, and only
+    # that leg runs again.
+    #
+    # `lib/ledger.mjs` owns which stages may NOT cross a run boundary
+    # (CROSS_RUN_INELIGIBLE) and why. The within-run lookup is tried FIRST and
+    # separately, because a receipt from this run needs no artifact copy.
+    local prior="" prior_run=""
     if [[ -n "$digest" ]]; then
       prior=$(node -e '
         import("'"$LIB"'/ledger.mjs").then(m => {
@@ -830,6 +846,19 @@ EOF
           if (r) process.stdout.write(JSON.stringify({hash: r.hash, status: r.status, reason: r.reason ?? "", blocker: r.blocker ?? "", label: r.label ?? "", metrics: r.metrics ?? {}, notes: r.notes ?? []}));
         });
       ' "$RUN/journal.ndjson" "$s" "$digest")
+      if [[ -z "$prior" ]]; then
+        prior=$(node -e '
+          import("'"$LIB"'/ledger.mjs").then(m => {
+            const f = m.findReplayableAcrossRuns(process.argv[1], process.argv[2], process.argv[3], process.argv[4], process.argv[5]);
+            if (!f) return;
+            const r = f.record;
+            process.stdout.write(JSON.stringify({hash: r.hash, status: r.status, reason: r.reason ?? "", blocker: r.blocker ?? "", label: r.label ?? "", metrics: r.metrics ?? {}, notes: r.notes ?? [], artifacts: r.artifacts ?? [], from_run: f.runId, from_dir: f.runDir}));
+          });
+        ' "$RUNDIR_BASE" "$RUN" "$SUBJECT" "$s" "$digest")
+        if [[ -n "$prior" ]]; then
+          prior_run=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).from_run||"")))')
+        fi
+      fi
     fi
 
     if [[ -n "$prior" ]]; then
@@ -879,9 +908,39 @@ EOF
           [[ -n "$nt" ]] && extra+=(--note "$nt")
         done <<<"$pnotes"
       fi
-      node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
-        --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${extra[@]}"
-      echo "go: $s replayed (inputs unchanged)"
+      if [[ -n "$prior_run" ]]; then
+        # CROSS-RUN replay. `--artifacts-from` resolves its hash inside THIS
+        # journal (lib/receipt.mjs), so it cannot name a receipt from another
+        # run — and pointing at another run's files would be worse anyway: `gc`
+        # prunes run directories, and `go.sh verify` re-hashes every artifact a
+        # receipt names, so a borrowed path would dangle and verification of a
+        # perfectly good run would fail.
+        #
+        # So the artifacts are COPIED in, and the receipt records them normally.
+        # The invariant that buys is the one that makes `verify` worth anything:
+        # a run directory is self-contained and checkable on its own, by someone
+        # who has only that directory.
+        local from_dir arts a base copied=()
+        from_dir=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).from_dir||"")))')
+        arts=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s).artifacts||[];process.stdout.write(a.map(x=>x.path).join("\n"))})')
+        while IFS= read -r a; do
+          [[ -z "$a" ]] && continue
+          base="${a##*/}"
+          if [[ -f "$from_dir/artifacts/$base" ]]; then
+            cp -p "$from_dir/artifacts/$base" "$RUN/artifacts/$base" 2>/dev/null && copied+=(--artifact "$RUN/artifacts/$base")
+          elif [[ -f "$a" ]]; then
+            copied+=(--artifact "$a")   # an in-tree path, still valid from here
+          fi
+        done <<<"$arts"
+        node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
+          --inputs-digest "$digest" --replayed-from "$phash" --replayed-from-run "$prior_run" \
+          "${copied[@]}" "${extra[@]}"
+        echo "go: $s replayed from run $prior_run (inputs unchanged)"
+      else
+        node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
+          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${extra[@]}"
+        echo "go: $s replayed (inputs unchanged)"
+      fi
       [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
       continue
     fi

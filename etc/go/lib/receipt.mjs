@@ -12,7 +12,8 @@
 //        [--reason TEXT] [--blocker TEXT] [--note TEXT] \
 //        [--oracle-cmd CMD --oracle-exit N --oracle-class CLASS] \
 //        [--oracle-because TEXT] [--artifact PATH]... [--inputs-digest D] \
-//        [--replayed-from HASH] [--metric key=value]...
+//        [--replayed-from HASH] [--replayed-from-run RUNID]
+//        [--metric key=value]...
 //   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --milestone M --subject S ...
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
 //   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
@@ -150,6 +151,13 @@ switch (kind) {
       inputs_digest: args.inputs_digest || null,
       attempt: Number(args.attempt ?? 1),
       replayed_from: args.replayed_from ?? null,
+      // The RUN the borrowed receipt came from. null means the same run — the
+      // ordinary resume case, where the evidence is a few lines up in this very
+      // journal. A value means the evidence was earned in ANOTHER run over a
+      // byte-identical inputs digest, and the report must say so rather than
+      // claim it is "on this journal": a reader who wants to check it has to be
+      // told where to look.
+      replayed_from_run: args.replayed_from_run ?? null,
       label: args.label ?? null,
     };
 

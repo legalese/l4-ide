@@ -14,7 +14,14 @@
 // receipt.mjs is the only module that calls append(). Nothing else may.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
+import { join } from "node:path";
 
 /**
  * Bumped when the record shape changes. An unknown schema is BROKEN, not
@@ -159,6 +166,102 @@ export function findReplayable(journalPath, stage, inputsDigest) {
     if (r.status === "BROKEN") return null; // never replay a broken harness
     if (r.inputs_digest !== inputsDigest) return null; // inputs moved; re-run
     return r;
+  }
+  return null;
+}
+
+/**
+ * Stages whose result is NOT determined by their declared inputs, and which
+ * therefore may never borrow a receipt from a DIFFERENT run.
+ *
+ * The inputs digest covers files. It does not cover the world. Two stages here
+ * are about the world:
+ *
+ *   * `p7-mcp` posts to a live jl4-service and reads the tool list back. Same
+ *     inputs, different service — or no service at all — and the cached PASS
+ *     would assert a deployment that is not there. Its oracle class is
+ *     `execution`, and execution is precisely what a cross-run replay does not
+ *     redo.
+ *   * `p2-sweep` exists BECAUSE time has passed: its subject is whether a court
+ *     or a regulator has moved since the text was printed. Caching it across
+ *     runs is close to a category error — a sweep from six months ago has
+ *     unchanged inputs and a stale answer, and SPEC.md §4 P2 requires the report
+ *     to state what was SEARCHED, which a borrowed row cannot honestly restate.
+ *
+ * These stages still replay WITHIN a run: resuming an interrupted run must not
+ * redo work the same run already did, and inside one run the world has not been
+ * given a chance to move. The rule is about crossing a run boundary only.
+ *
+ * This is a closed list, not a heuristic: a stage is cacheable across runs
+ * unless it is named here, and adding a name is a deliberate act.
+ */
+export const CROSS_RUN_INELIGIBLE = new Set(["p7-mcp", "p2-sweep"]);
+
+/**
+ * The subject a run is for, read from its `run_begin` record. Returns null for
+ * a directory that is not a run, or whose journal is unreadable — a malformed
+ * neighbour must never make the current run fail.
+ */
+export function runSubject(journalPath) {
+  try {
+    const first = read(journalPath)[0];
+    return first && first.kind === "run_begin" ? (first.subject ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find a replayable receipt in ANOTHER run of the SAME subject.
+ *
+ * Scoping rules, each of which exists to stop a specific wrong reuse:
+ *
+ *   * same subject — a `p6-tests` PASS earned by regcf must never satisfy
+ *     sg-succession, however the digests happen to fall;
+ *   * same inputs digest — this is the actual authority, and it already folds
+ *     in the `l4` binary's own sha256, so a rebuilt toolchain invalidates
+ *     everything downstream;
+ *   * never BROKEN — a harness defect is not evidence, in any run;
+ *   * never a stage in CROSS_RUN_INELIGIBLE;
+ *   * never the current run — that is `findReplayable`'s job, and it is
+ *     checked first because a receipt from THIS run needs no artifact copy.
+ *
+ * Milestones are deliberately NOT filtered. A stage that ran at g1 over the
+ * committed encoding and at g2 over a deposit has different inputs and so a
+ * different digest; the digest discriminates, and filtering on milestone as
+ * well would only mask a digest collision rather than prevent one.
+ *
+ * Newest run first, so the most recent qualifying evidence wins.
+ */
+export function findReplayableAcrossRuns(
+  runRoot,
+  currentRunDir,
+  subject,
+  stage,
+  inputsDigest,
+) {
+  if (!inputsDigest || CROSS_RUN_INELIGIBLE.has(stage)) return null;
+  if (!runRoot || !existsSync(runRoot)) return null;
+  let entries;
+  try {
+    entries = readdirSync(runRoot).sort().reverse();
+  } catch {
+    return null;
+  }
+  const current = currentRunDir ? currentRunDir.replace(/\/+$/, "") : "";
+  for (const name of entries) {
+    const dir = join(runRoot, name);
+    if (dir === current) continue;
+    const journal = join(dir, "journal.ndjson");
+    if (!existsSync(journal)) continue;
+    if (runSubject(journal) !== subject) continue;
+    let record;
+    try {
+      record = findReplayable(journal, stage, inputsDigest);
+    } catch {
+      continue;
+    }
+    if (record) return { record, runId: name, runDir: dir, journal };
   }
   return null;
 }
