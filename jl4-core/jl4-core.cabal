@@ -114,6 +114,10 @@ library
     L4.Blawx.Lower
     L4.Blawx.Emit
     L4.Blawx.EmitXml
+    L4.Blawx.Xml
+    L4.Blawx.Blocks
+    L4.Blawx.Parse
+    L4.Blawx.Lift
     L4.Bpmn.IR
     L4.Bpmn.Lower
     L4.Bpmn.Emit
@@ -233,6 +237,10 @@ test-suite jl4-core-test
     TraceOrderingSpec
     StateGraphSpec
     RelationalSpec
+    BlawxAssumeSpec
+    BlawxImportImageSpec
+    BlawxLiftSpec
+    BlawxParseSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

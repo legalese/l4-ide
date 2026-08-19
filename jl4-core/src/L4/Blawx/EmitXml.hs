@@ -103,6 +103,7 @@ import qualified Data.Set as Set
 import Numeric (showHex)
 
 import L4.Blawx.IR
+import L4.Blawx.Xml (XNode (..), renderNode, unrepresentable)
 
 -- ---------------------------------------------------------------------------
 -- The public surface
@@ -164,78 +165,13 @@ renderDocXml doc =
       in  (i', Right (rowText (layoutColumn numbered)))
    where
     build = do
-      rts <- rowRoots doc sym stacks
+      rts <- rowRoots sym stacks
       traverse_ representable rts
       pure rts
 
 -- ---------------------------------------------------------------------------
--- A tiny XML tree
+-- Representability
 -- ---------------------------------------------------------------------------
-
--- | Built as a tree rather than as text so the id counter can be assigned in
--- one document-order pass ('numberBlocks') and the layout in another
--- ('layoutColumn'), which is also why attributes come out in Blockly's own
--- order (@type@, @id@, @x@, @y@).
-data XNode
-  = XElem !Text ![(Text, Text)] ![XNode]
-  | XText !Text
-
--- | Never self-closing: @Blockly.Xml.domToText@ round-trips through
--- @XMLSerializer@, which writes @\<mutation …\>\<\/mutation\>@ and
--- @\<field name=\"prefix\"\>\<\/field\>@, and matching it keeps our XML
--- diffable against a re-save.
-renderNode :: XNode -> Text
-renderNode = \case
-  XText t -> escapeText t
-  XElem name attrs kids ->
-    "<" <> name
-      <> Text.concat [" " <> k <> "=\"" <> escapeAttr v <> "\"" | (k, v) <- attrs]
-      <> ">"
-      <> Text.concat (map renderNode kids)
-      <> "</" <> name <> ">"
-
--- | Text content: @&@, @\<@, @\>@ — and @\\r@, which XML 1.0 end-of-line
--- normalisation rewrites to @\\n@ in element content just as it does in an
--- attribute value, so a literal CR in a @\<field\>@ would come back changed.
--- Apostrophes are NOT escaped — the NLG slots are full of them (@\'s score
--- is@) and escaping them would change the field value the generator reads
--- back. Tab and LF survive normalisation in element content and stay literal.
---
--- 'unrepresentable' characters are dropped here for totality only: they are
--- rejected up front by 'representable', which turns them into an 'XmlGap'
--- rather than a silent rewrite.
-escapeText :: Text -> Text
-escapeText = Text.concatMap $ \case
-  '&'  -> "&amp;"
-  '<'  -> "&lt;"
-  '>'  -> "&gt;"
-  '\r' -> "&#13;"
-  c | unrepresentable c -> ""
-    | otherwise -> Text.singleton c
-
--- | Attribute values: additionally @\"@ (the evidence ships
--- @&quot;@-escaped attributes), and the three legal whitespace controls as
--- character references — an XML parser normalises literal newlines and tabs
--- in an attribute value to spaces, which would corrupt the datum silently.
--- Nothing we put in an attribute can contain them today (every mutation
--- attribute is a Blawx atom, a section ref, a type keyword or @ov@); this is
--- the belt for the braces.
-escapeAttr :: Text -> Text
-escapeAttr = Text.concatMap $ \case
-  '&'  -> "&amp;"
-  '<'  -> "&lt;"
-  '>'  -> "&gt;"
-  '"'  -> "&quot;"
-  '\n' -> "&#10;"
-  '\r' -> "&#13;"
-  '\t' -> "&#9;"
-  c | unrepresentable c -> ""
-    | otherwise -> Text.singleton c
-
--- | C0 controls other than tab\/LF\/CR cannot be represented in XML 1.0 at
--- all — not even as a character reference.
-unrepresentable :: Char -> Bool
-unrepresentable c = c < ' ' && c /= '\t' && c /= '\n' && c /= '\r'
 
 -- | Reject a row whose XML would carry a character XML 1.0 cannot express.
 -- Dropping it silently is the one thing this module refuses to do anywhere
@@ -367,9 +303,13 @@ rowText roots =
 -- a declaration, so the selectors work for them — only the UI's display text
 -- degrades.
 data BlockSym = MkBlockSym
-  { syCats  :: !(Set Text)
-  , syAttrs :: !(Map Text BAttributeDecl)
-  , syRels  :: !(Map Text BRelationshipDecl)
+  { syCats     :: !(Set Text)
+  , syAttrs    :: !(Map Text BAttributeDecl)
+  , syRels     :: !(Map Text BRelationshipDecl)
+  , syDocName  :: !Text
+    -- ^ the ruledoc name, for 'docPartLabel'\'s computed fallback
+  , syDocParts :: !(Map BSectionRef Text)
+    -- ^ 'L4.Blawx.IR.bdDocPartNames': the observed labels, when there are any
   }
 
 documentSymbols :: BlawxDoc -> BlockSym
@@ -378,6 +318,8 @@ documentSymbols doc =
     { syCats  = Set.fromList [bNameText d.bcName | BDeclareCategory d <- blocks]
     , syAttrs = Map.fromList [(bNameText d.baName, d) | BDeclareAttribute d <- blocks]
     , syRels  = Map.fromList [(bNameText d.brName, d) | BDeclareRelationship d <- blocks]
+    , syDocName  = doc.bdName
+    , syDocParts = doc.bdDocPartNames
     }
  where
   blocks = concat (concatMap (\ws -> ws.bwStacks) doc.bdWorkspaces)
@@ -440,15 +382,21 @@ gap what why = Left MkXmlGap {xgRow = "", xgWhat = what, xgWhy = why}
 -- declarations and facts shares one @unattributed_fact@ while every
 -- constraint, abducible, rule and query is a root of its own — which is
 -- exactly where @workspaceToCode@'s blank line between roots comes from.
-rowRoots :: BlawxDoc -> BlockSym -> [[BBlock]] -> Build [XNode]
-rowRoots doc sym stacks =
+rowRoots :: BlockSym -> [[BBlock]] -> Build [XNode]
+rowRoots sym stacks =
   concat
     <$> traverse
-      (traverse (rootNode doc sym) . blockRuns)
+      (traverse (rootNode sym) . blockRuns)
       (filter (not . null) stacks)
 
-rootNode :: BlawxDoc -> BlockSym -> BRun -> Build XNode
-rootNode doc sym = \case
+-- | Every arm is explicit and there is deliberately no catch-all: a new
+-- 'BBlock' constructor must be routed here by hand, and @-Wall -Werror@ is
+-- what makes that happen. The old fall-through wrapped an unrecognised block
+-- in an @unattributed_fact@, which for a block with no @memberNode@ arm would
+-- have produced an 'XmlGap' — an empty @xml_content@ row, i.e. the data-loss
+-- trap the module header exists to prevent — rather than a compile error.
+rootNode :: BlockSym -> BRun -> Build XNode
+rootNode sym = \case
   BRunMembers ms -> do
     kids <- traverse (memberNode sym) ms
     pure (blockE "unattributed_fact" (statementE "statements" (chainBlocks kids)))
@@ -459,15 +407,31 @@ rootNode doc sym = \case
     BAbducible p args -> do
       kid <- predicateNode sym p args
       pure (blockE "assume" (statementE "statements" (Just kid)))
-    BQuery p args -> do
-      kid <- predicateNode sym p args
-      pure (blockE "query" (statementE "query" (Just kid)))
-    BAttributedRule r -> ruleNode doc sym r
-    other -> do
-      kid <- memberNode sym other
+    BQuery goals -> do
+      -- A singleton produces one child with no <next>, so the four P3 goldens
+      -- are unchanged by BQuery becoming a goal list.
+      kids <- traverse (goalNode sym) goals
+      pure (blockE "query" (statementE "query" (chainBlocks kids)))
+    BAttributedRule r -> ruleNode sym r
+    BUnattributedRule r -> unattributedRuleNode sym r
+    -- The chainable constructors cannot reach BRunRoot ('blockRuns' puts even
+    -- a lone one in a BRunMembers), but the wrapper is the right answer if
+    -- they ever do, and stating it keeps the case total without a catch-all.
+    BDeclareCategory{}     -> wrapFact b
+    BDeclareAttribute{}    -> wrapFact b
+    BDeclareRelationship{} -> wrapFact b
+    BFact{}                -> wrapFact b
+    BDeclareObject{}       -> wrapFact b
+    BOverrules{}           -> wrapFact b
+    BAssertGoal{}          -> wrapFact b
+   where
+    wrapFact m = do
+      kid <- memberNode sym m
       pure (blockE "unattributed_fact" (statementE "statements" (Just kid)))
 
--- | A statement-position member of an @unattributed_fact@ stack.
+-- | A statement-position member of an @unattributed_fact@ stack. Explicit for
+-- the same reason 'rootNode' is: the old catch-all turned an unrouted block
+-- into a silent 'XmlGap'.
 memberNode :: BlockSym -> BBlock -> Build XNode
 memberNode sym = \case
   BDeclareCategory d     -> categoryDeclNode d
@@ -475,7 +439,14 @@ memberNode sym = \case
   BDeclareRelationship d -> relationshipDeclNode d
   BFact True p args      -> predicateNode sym p args
   BFact False p args      -> negatedNode "logical_negation" "negated_statement" <$> predicateNode sym p args
-  b                      -> gap (blockLabel b) "not a statement-position block"
+  BDeclareObject d       -> pure (objectDeclNode d)
+  BOverrules o           -> overrulesNode sym o
+  BAssertGoal g          -> goalNode sym g
+  b@BAttributedRule{}    -> gap (blockLabel b) "not a statement-position block"
+  b@BUnattributedRule{}  -> gap (blockLabel b) "not a statement-position block"
+  b@BConstraint{}        -> gap (blockLabel b) "not a statement-position block"
+  b@BAbducible{}         -> gap (blockLabel b) "not a statement-position block"
+  b@BQuery{}             -> gap (blockLabel b) "not a statement-position block"
 
 blockLabel :: BBlock -> Text
 blockLabel = \case
@@ -486,7 +457,11 @@ blockLabel = \case
   BFact _ p _            -> "fact " <> bNameText p
   BConstraint _          -> "constraint"
   BAbducible p _         -> "abducible " <> bNameText p
-  BQuery p _             -> "query " <> bNameText p
+  BQuery _               -> "query"
+  BDeclareObject d       -> "object " <> bNameText d.bodName
+  BOverrules o           -> "overrules " <> renderSectionRef o.bovDefeated
+  BUnattributedRule _    -> "unattributed rule"
+  BAssertGoal _          -> "asserted goal"
 
 negatedNode :: Text -> Text -> XNode -> XNode
 negatedNode ty slot inner = blockE ty [XElem "statement" [("name", slot)] [inner]]
@@ -500,31 +475,22 @@ negatedNode ty slot inner = blockE ty [XElem "statement" [("name", slot)] [inner
 -- all inputs — which is why the two checkboxes precede @conditions@ even
 -- though they sit on later inputs.
 --
--- @inapplicable@ is always @FALSE@ (Mode A): @TRUE@ would make the generator
--- inject a @blawx_applies(…)@ goal after every category condition, which
--- 'L4.Blawx.Emit.ruleTriple' does not emit.
-ruleNode :: BlawxDoc -> BlockSym -> BRule -> Build XNode
-ruleNode doc sym r = do
+-- @inapplicable@ mirrors 'L4.Blawx.IR.brInapplicable', which Mode A always
+-- sets 'False': @TRUE@ would make the generator inject a @blawx_applies(…)@
+-- goal after every @new_object_category@ condition, and Mode A emits neither
+-- the goal nor that block image.
+ruleNode :: BlockSym -> BRule -> Build XNode
+ruleNode sym r = do
   conds <- traverse (goalNode sym) r.brConditions
   concl <- conclusionNode sym r.brConclusion
   pure $
     blockE
       "attributed_rule"
       ( [ fieldE "defeasible" (if r.brDefeasible then "TRUE" else "FALSE")
-        , fieldE "inapplicable" "FALSE"
+        , fieldE "inapplicable" (if r.brInapplicable then "TRUE" else "FALSE")
         ]
           <> statementE "conditions" (chainBlocks conds)
-          <> [ valueE "source" $
-                 blockE
-                   "doc_selector"
-                   -- MANDATORY: sCASP['doc_selector'] reads the
-                   -- mutation-restored block.section_reference and calls
-                   -- .toLowerCase() on it; without the mutation that is a
-                   -- TypeError on load. doc_part_name is display-only.
-                   [ mutationE [("section_reference", renderSectionRef r.brSection)]
-                   , fieldE "doc_part_name" (docPartLabel doc r.brSection)
-                   ]
-             ]
+          <> [valueE "source" (docSelectorNode sym r.brSection)]
           <> statementE "conclusion" (Just concl)
       )
 
@@ -534,18 +500,45 @@ conclusionNode sym c
   | otherwise =
       negatedNode "logical_negation" "negated_statement" <$> predicateNode sym c.bcPred c.bcArgs
 
+-- | @doc_selector@. The @\<mutation section_reference\>@ is MANDATORY:
+-- @sCASP['doc_selector']@ reads the mutation-restored
+-- @block.section_reference@ and calls @.toLowerCase()@ on it, so without the
+-- mutation that is a @TypeError@ on load. It carries the VERBATIM name
+-- ('renderSectionRef'), never the lowercased 'L4.Blawx.IR.renderDocAtom' —
+-- the lowercasing is the generator's, and pre-applying it would change the
+-- stored workspace reference.
+--
+-- @doc_part_name@ is display-only.
+docSelectorNode :: BlockSym -> BSectionRef -> XNode
+docSelectorNode sym r =
+  blockE
+    "doc_selector"
+    [ mutationE [("section_reference", renderSectionRef r)]
+    , fieldE "doc_part_name" (docPartLabel sym r)
+    ]
+
 -- | The @doc_selector@'s visible label. Display-only (the generator reads the
 -- mutation), so this is legibility: the document's initials and the section
--- number, in the shape the evidence example uses (@LA 1@ for /Life Act/
--- section 1).
-docPartLabel :: BlawxDoc -> BSectionRef -> Text
-docPartLabel doc = \case
-  BRoot -> doc.bdName
-  BSec i
-    | Text.null initials -> doc.bdName <> " " <> Text.textShow i
-    | otherwise -> initials <> " " <> Text.textShow i
+-- path, in the shape the evidence example uses (@LA 1@ for /Life Act/ section
+-- 1).
+--
+-- An imported document's observed labels win, because they are stored bytes
+-- and a re-emission that invents @NBA 5@ where bird wrote @NBA 5pingu@ fails
+-- the XML fixpoint. 'L4.Blawx.Lower' supplies none, so the computed fallback
+-- is what every P1\/P3 golden gets — and for a 'L4.Blawx.IR.bSec' the path
+-- labels are the single section number, character for character the old
+-- rendering.
+docPartLabel :: BlockSym -> BSectionRef -> Text
+docPartLabel sym r = case Map.lookup r sym.syDocParts of
+  Just observed -> observed
+  Nothing -> case r of
+    BRoot -> sym.syDocName
+    BPath steps ->
+      let label = Text.unwords (map bStepLabel (toList steps))
+      in  if Text.null initials then sym.syDocName <> " " <> label else initials <> " " <> label
  where
-  initials = Text.pack [c | w <- Text.words doc.bdName, Just (c, _) <- [Text.uncons w], isAsciiUpper c]
+  initials =
+    Text.pack [c | w <- Text.words sym.syDocName, Just (c, _) <- [Text.uncons w], isAsciiUpper c]
 
 -- ---------------------------------------------------------------------------
 -- Goals
@@ -612,6 +605,47 @@ goalNode sym = \case
       blockE
         "list_aggregation"
         [fieldE "aggregation" (aggField fn), valueE "output" o, valueE "list" l]
+  -- The P5 import extension. Input names and child order are read off the
+  -- block definitions and confirmed against bird's own stored XML.
+  BGApplies sec t -> do
+    -- applies' `object` checks ["OBJECT","VARIABLE"] (blawx-blocks.js:3176-3199)
+    o <- objectSlot t
+    pure $
+      blockE "applies" [valueE "applicable_rule" (docSelectorNode sym sec), valueE "object" o]
+  BGHolds sec g -> do
+    inner <- goalNode sym g
+    pure $
+      blockE
+        "holds"
+        ([valueE "section" (docSelectorNode sym sec)] <> statementE "statement" (Just inner))
+  BGAccordingTo sec g -> do
+    inner <- goalNode sym g
+    -- according_to names its value input `rule`, not `section`
+    -- (blawx-blocks.js:1966-1998).
+    pure $
+      blockE
+        "according_to"
+        ([valueE "rule" (docSelectorNode sym sec)] <> statementE "statement" (Just inner))
+  BGNegated k g -> do
+    inner <- goalNode sym g
+    pure $ case k of
+      BNegClassical -> negatedNode "logical_negation" "negated_statement" inner
+      BNegDefault   -> negatedNode "default_negation" "default_negated_statement" inner
+  BGNewObjectCategory cat t -> do
+    -- The image we never CHOOSE: 'predicateNode' deliberately emits
+    -- object_category + category_selector for a category goal, because
+    -- new_object_category holds its category in a dropdown that
+    -- updateLocalCategories rewrites and which loses a race on the test page
+    -- (upstream quirk #4, measured in the P3 tier-2 drive). This arm exists so
+    -- an IMPORTED rule that depends on the applicability injection re-emits
+    -- the block the generator will actually inject for — the trigger is the
+    -- block type, not the semantics.
+    o <- objectSlot t
+    let n = bNameText cat
+    pure $
+      blockE
+        "new_object_category"
+        [mutationE [("category_name", n)], fieldE "category_name" n, valueE "object" o]
  where
   comparand t = do
     unless (accepts ["VARIABLE", "Number"] t) $
@@ -896,6 +930,68 @@ relationshipDeclNode d
  where
   arity = length d.brTypes
   slots = zip3 [1 :: Int ..] (d.brPrefixes <> repeat "") d.brTypes
+
+-- ---------------------------------------------------------------------------
+-- The P5 import extension's block images
+-- ---------------------------------------------------------------------------
+
+-- | @object_declaration@ (@blawx-blocks.js:781-808@; restorer
+-- @mutators.js:23-45@). Fields in @inputList@ × @fieldRow@ order — @prefix@,
+-- @object_name@, @postfix@ — after the mutation, matching bird's stored
+-- @sec_5__span_pingu_section@ byte for byte.
+--
+-- @category_name@ on the mutation is MANDATORY: the generator reads
+-- @block.blawxCategoryName@, which only @domToMutation@ sets. The mutation's
+-- @prefix@\/@postfix@ are write-only for code generation and stale in the wild
+-- — bird stores the literal @\"null\"@ for both while the @postfix@ FIELD
+-- reads @is a penguin@ — so they are re-emitted verbatim from
+-- 'L4.Blawx.IR.bodMutNlg', and 'Nothing' renders @null@, which is what
+-- @getAttribute@ returning @null@ round-trips to.
+objectDeclNode :: BObjectDecl -> XNode
+objectDeclNode d =
+  blockE
+    "object_declaration"
+    [ mutationE
+        [ ("category_name", bNameText d.bodCategory)
+        , ("prefix", mutPrefix)
+        , ("postfix", mutPostfix)
+        ]
+    , fieldE "prefix" d.bodPrefix
+    , fieldE "object_name" (bNameText d.bodName)
+    , fieldE "postfix" d.bodPostfix
+    ]
+ where
+  (mutPrefix, mutPostfix) = fromMaybe ("null", "null") d.bodMutNlg
+
+-- | @overrules@ (@blawx-blocks.js:386-425@): no fields and no mutation of its
+-- own, four inputs in @message0@ order. Confirmed against bird's
+-- @sec_3_section@ and @sec_5_section@.
+overrulesNode :: BlockSym -> BOverrule -> Build XNode
+overrulesNode sym o = do
+  defeating <- conclusionNode sym o.bovDefeatingStmt
+  defeated  <- conclusionNode sym o.bovDefeatedStmt
+  pure $
+    blockE
+      "overrules"
+      ( [valueE "defeating_rule" (docSelectorNode sym o.bovDefeating)]
+          <> statementE "defeating_statement" (Just defeating)
+          <> [valueE "defeated_rule" (docSelectorNode sym o.bovDefeated)]
+          <> statementE "defeated_statement" (Just defeated)
+      )
+
+-- | @unattributed_rule@ (@blawx-blocks.js:277-300@): two @input_dummy@s that
+-- carry nothing, then @conditions@ __before__ @conclusion@ — the @message0@
+-- order, confirmed in bird's @sec_5_section@.
+unattributedRuleNode :: BlockSym -> BURule -> Build XNode
+unattributedRuleNode sym r = do
+  conds <- traverse (goalNode sym) r.burConditions
+  concl <- traverse (goalNode sym) r.burConclusion
+  pure $
+    blockE
+      "unattributed_rule"
+      ( statementE "conditions" (chainBlocks conds)
+          <> statementE "conclusion" (chainBlocks concl)
+      )
 
 -- ---------------------------------------------------------------------------
 -- Terms and arithmetic

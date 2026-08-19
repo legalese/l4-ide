@@ -1,0 +1,145 @@
+DECLARE Effect HAS
+    `is detrimental` IS A BOOLEAN
+    `is of a persistent or continuing nature` IS A BOOLEAN
+    `affects the quality of life of those in the locality` IS A BOOLEAN
+
+DECLARE Conduct HAS
+    effect IS AN Effect
+    `is unreasonable` IS A BOOLEAN
+
+DECLARE Receiver HAS
+    `is an individual aged 16 or over` IS A BOOLEAN
+    `is a body` IS A BOOLEAN
+    conduct IS A Conduct
+
+DECLARE Person HAS
+    `is authorised` IS A BOOLEAN
+
+@export
+GIVEN p IS A Person
+      r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `may issue a community protection notice` IF
+      p's `is authorised`
+  AND    r's `is an individual aged 16 or over`
+      OR r's `is a body`
+  AND -- it is satisfied on reasonable grounds that
+          -- a.
+              `the effect`'s `is detrimental`
+          AND `the effect`'s `is of a persistent or continuing nature`
+          AND `the effect`'s `affects the quality of life of those in the locality`
+      AND -- b.
+          `the conduct`'s `is unreasonable`
+  WHERE
+    `the conduct` MEANS r's conduct
+    `the effect`  MEANS `the conduct`'s effect
+
+-- r1 all TRUE
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r2 not authorised
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS FALSE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r3 a body, not individual
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS TRUE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r4 neither individual nor body
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r5 not detrimental
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS FALSE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r6 not persistent
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS FALSE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r7 does not affect quality
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS FALSE)))
+
+-- r8 conduct reasonable
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS FALSE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- r9 individual AND body
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS TRUE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- d1 DISCRIM not authorised but a body
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS FALSE)
+        (Receiver WITH `is an individual aged 16 or over` IS FALSE,
+                       `is a body` IS TRUE,
+                       conduct IS (Conduct WITH `is unreasonable` IS TRUE,
+                                              effect IS (Effect WITH `is detrimental` IS TRUE,
+                                                                     `is of a persistent or continuing nature` IS TRUE,
+                                                                     `affects the quality of life of those in the locality` IS TRUE)))
+
+-- d2 DISCRIM authorised individual, no conduct limbs
+#EVAL `may issue a community protection notice`
+        (Person WITH `is authorised` IS TRUE)
+        (Receiver WITH `is an individual aged 16 or over` IS TRUE,
+                       `is a body` IS FALSE,
+                       conduct IS (Conduct WITH `is unreasonable` IS FALSE,
+                                              effect IS (Effect WITH `is detrimental` IS FALSE,
+                                                                     `is of a persistent or continuing nature` IS FALSE,
+                                                                     `affects the quality of life of those in the locality` IS FALSE)))

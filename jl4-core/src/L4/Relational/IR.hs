@@ -117,6 +117,7 @@ module L4.Relational.IR
   , RRecordDef (..)
   , RFieldDef (..)
   , REnumDef (..)
+  , RAbstractDef (..)
     -- * Queries (the differential harness's seeds)
   , RQuery (..)
   , RQueryKind (..)
@@ -391,6 +392,17 @@ data RSort
   | RSString
   | RSEnum   !RName      -- ^ payload-free enum type
   | RSRecord !RName
+    -- ^ __A category-shaped sort, not necessarily a declared record.__ Two
+    -- sources reach it: a @DECLARE … HAS@ record (listed in 'rpgRecords' with
+    -- its fields) and a top-level @ASSUME T IS A TYPE@ (listed in
+    -- 'rpgAbstract', which carries a name and a provenance and nothing else,
+    -- because an abstract category has no fields to carry). A consumer that
+    -- needs the field list looks the name up in 'rpgRecords' and treats an
+    -- absence as \"abstract\" rather than as a missing declaration. The two
+    -- share one constructor on purpose: every downstream use — Blawx's
+    -- category block, the category guards, the swipl leg's functor head — wants
+    -- \"a category named /n/\", and a second constructor would make each of
+    -- them re-derive that they mean the same thing.
   | RSList   !RSort
   | RSMaybe  !RSort
   | RSOpaque !Text       -- ^ the L4 type's printed form; carries a fidelity note
@@ -473,14 +485,44 @@ data RPredKind
   = RInput
     -- ^ A stored value the program reads and never defines — no clauses.
     --
-    -- __In M1 this is exactly a stored record field.__ A top-level @ASSUME@ is
-    -- /not/ lowered to one: @ASSUME@ is uninterpreted in L4 (a module in that
-    -- style typechecks but does not evaluate), so admitting it here would put a
-    -- predicate in the program that the L4 oracle cannot answer for, and the
-    -- differential harness would compare a bridge against nothing. A reference
-    -- to one is rejected by name ('LEUnsupported' @\"top-level ASSUME\"@).
-    -- Widening this is what would give BLAWX-EXPORT-SPEC §4.10\'s @#abducible@
-    -- interview test something to declare.
+    -- __Two sources reach this kind, and both are inputs in the same sense.__
+    --
+    -- 1. A __stored record field__ a lowered clause projects. Its 'rpParams' is
+    --    the owning record's sort and its 'rpResult' is the field's, so a
+    --    @BOOLEAN@ field is @'Just' 'RSBool'@ — the goal it appears in is an
+    --    'RProj' plus an 'RUnify', which an emitter peepholes to a signed unary
+    --    call.
+    -- 2. A __top-level @ASSUME@__ a lowered clause calls. Its 'rpParams' is the
+    --    arrow spine of the @ASSUME@\'s signature and its 'rpResult' follows
+    --    the ordinary boolean convention ('Nothing' for a boolean, so the goal
+    --    is a plain 'RCall' \/ 'RNotCall'). BLAWX-EXPORT-SPEC §4.10\'s
+    --    @#abducible@ interview test is what this exists for: an @ASSUME@d name
+    --    is precisely a fact the interview asks the user about.
+    --
+    -- They are told apart by identity, not by a flag: an input predicate built
+    -- from a field shares that field's 'Unique' (so it is found among the
+    -- 'rrFields' of 'rpgRecords'), and an @ASSUME@-derived one is not. A leg
+    -- that needs the distinction — Blawx declares a field's attribute block
+    -- from the record and an @ASSUME@\'s from the predicate — tests membership
+    -- there. Nothing about R5's semantics differs between them, which is why
+    -- there is no second constructor.
+    --
+    -- __Both are gated on reachability.__ A field no projection reads and an
+    -- @ASSUME@ no clause calls contribute nothing, exactly as a declared but
+    -- unused record contributes an ontology entry and no predicate.
+    --
+    -- The residue: an @ASSUME@ whose signature the fragment refuses (a
+    -- function-typed parameter, a @DATE@\/@MAYBE@ sort) is rejected by name at
+    -- its first use, with the range of the @ASSUME@ rather than of the use, and
+    -- a /local/ @ASSUME@ has no module-level identity to declare and stays out
+    -- ('LEUnsupported' @\"local ASSUME\"@).
+    --
+    -- One consequence for a differential harness: @ASSUME@ is uninterpreted in
+    -- L4, so a module in that style typechecks and does not evaluate, and the
+    -- L4 oracle cannot answer for a predicate built this way. That is a fact
+    -- about what the harness may anchor on, not a reason to withhold the
+    -- predicate — the target-side answer is still checkable against a
+    -- semantically equivalent @GIVEN@-record spelling of the same logic.
   | RComputed   -- ^ an @\@export@ decision or a reachable top-level helper
   | RAuxiliary  -- ^ lambda-lifted @WHERE@\/@LET@, a DNF factoring, a findall body
   deriving stock (Eq, Ord, Show, Generic)
@@ -569,6 +611,22 @@ data RFieldDef = MkRFieldDef
   , rfSort :: !RSort
   , rfDesc :: !(Maybe Text)
   , rfNlg  :: !(Maybe Text)   -- ^ the field's @\@nlg@ sentence, linearised (see 'rpNlg')
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | A top-level @ASSUME T IS A TYPE@: a category with no fields, and nothing
+-- else to say about it.
+--
+-- Kept apart from 'RRecordDef' rather than folded in as a zero-field record,
+-- because 'rpgRecords' is documented as \"a @DECLARE … HAS@ record\" and a
+-- consumer that reads it to find a record literal's fields (or to decide that a
+-- name may head one) must not be handed a type that has none. Emitted only when
+-- some admitted predicate's parameter or result is sorted by it — the same
+-- reachability discipline every other ontology entry follows.
+data RAbstractDef = MkRAbstractDef
+  { raName :: !RName
+  , raProv :: !RProv
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
@@ -694,6 +752,10 @@ data RelProgram = MkRelProgram
   { rpgSource   :: !Text            -- ^ source file basename, for headers
   , rpgTitle    :: !(Maybe Text)    -- ^ the module's outermost @§@ heading
   , rpgRecords  :: ![RRecordDef]
+  , rpgAbstract :: ![RAbstractDef]
+    -- ^ the @ASSUME@d types some admitted predicate's signature mentions, in
+    -- source declaration order. Category-shaped like 'rpgRecords' and
+    -- deliberately not in it (see 'RAbstractDef').
   , rpgEnums    :: ![REnumDef]
   , rpgPreds    :: ![RPred]         -- ^ inputs first, then computed, then auxiliary
   , rpgQueries  :: ![RQuery]

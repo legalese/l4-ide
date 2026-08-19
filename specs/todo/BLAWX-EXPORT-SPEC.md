@@ -527,16 +527,44 @@ block-level IR of R12 doing double duty as the pivot. Assessed construct by cons
   unaffected.
 - **Unstratified negation / multiple stable models**: L4 is deterministic. Programs whose
   meaning depends on model choice are OUT (none of the 15 shipped examples do this **[E]**).
+  The check is `L4.Blawx.Lift`'s `blawx-lift/unstratified`, and it runs over the program the
+  lift **emits**, not over the rules it read — _every_ negation in the output is introduced by
+  the unfolding (`AND NOT <defeated>`, the applicability `naf`), so a scan over
+  `attributed_rule` bodies alone cannot see it and was measurably inert on bird
+  (2026-08-19; §8.14's REVIEWED block, finding 1). Adding a second `overrules` to bird so two
+  sections defeat each other is refused by name.
 - **The event layer** (`blawx_becomes` fluents): closest L4 relatives are the state ledger and
   the bitemporal axis, neither a semantic match today. Deferred, not refused.
 - **Relational non-determinism**: a query with multiple answer substitutions lifts only under
   finite-domain enumeration (answers = filter over declared objects). RESTRICTED.
+- **Unsatisfiability as the expected result**: `logical_constraints.yaml`'s tests pass when the
+  program has _no_ stable model, which a `false :- …` constraint is written to force. L4
+  evaluation is total and has no "no model" answer, so a workspace-level constraint is OUT.
+  (Found at design time by the P5 scout, confirmed by measurement 2026-08-19 — the document
+  parses and classifies cleanly, so this is a lift-time refusal, not a parse-time one.)
 
-**Calibration against the shipped corpus**: of Blawx's 15 examples, 13 sit inside the liftable
-fragment; `life_act.yaml` (event layer) and the `Residuals`-dependent corner of
-`numerical_constraints.yaml` sit outside **[E]**. Ruled in R14; sequenced as P5; the
-`.blawx`-side _parser_ half is shared with R13's tier-2 harness, which must read run results
-anyway.
+**Calibration against the shipped corpus — MEASURED 2026-08-19, and the earlier count was
+wrong in both directions.** The claim retired here read "of Blawx's 15 examples, 13 sit inside
+the liftable fragment; `life_act.yaml` … and the `Residuals`-dependent corner of
+`numerical_constraints.yaml` sit outside". Three separate numbers were being conflated, and the
+measurement separates them (full table: `p5-design/census-results.md`):
+
+| layer                                         | count | which                                                                                                |
+| --------------------------------------------- | ----: | ---------------------------------------------------------------------------------------------------- |
+| examples with any blocks at all               | 14/15 | `wills_tutorial`'s only non-root workspace is the 61-char empty document                             |
+| parse to a **block tree** (`L4.Blawx.Blocks`) | 14/14 | total over all 47 block types the corpus uses                                                        |
+| classify to a **`BlawxDoc`** (`…Parse`)       | 10/15 | out: `covid_test` `life_act` `net30` `oasa` (date/event layer, ruling P5-1) and `r34` (three shapes) |
+| **lift to L4** (`…Lift`, v1 fragment)         |  2/15 | `bird` (the defeat-layer target) and `wills_tutorial` (title + `§§`s, no decisions)                  |
+
+The last row is the one that matters and it is much narrower than "roughly the fragment Blawx's
+own shipped corpus inhabits". P5's lift models **one flat universe of objects under unary
+predicates** — which is what the defeat layer needs and what `bird` is — so a document using
+binary attributes (`age(A,Age)`), n-ary relations, arithmetic, or a query whose free variable is
+value-sorted rather than object-sorted is refused **by name**, one diagnostic per construct.
+Widening it is ordinary work (each refusal code is a to-do list entry), not a re-architecture;
+the assessment above stands as a statement about the _approach_, not about what P5 shipped.
+Ruled in R14; sequenced as P5; the `.blawx`-side _parser_ half is shared with R13's tier-2
+harness, which must read run results anyway.
 
 ## 6. The v1 source fragment, precisely
 
@@ -544,14 +572,72 @@ anyway.
 first-order, monomorphic `GIVEN`/`GIVETH`/`MEANS`/`DECIDE` decisions over
 `BOOLEAN`/`NUMBER`/`DATE`/records/payload-free enums/`MAYBE`/lists, with ≤ 9 parameters;
 `CONSIDER`/`BRANCH`/`IF`/`WHERE`/`UNLESS`; structural list recursion and the recognised
-combinators; `STRING` literals in equality position; `ASSUME`d inputs;
-`@export`/`@desc`/`@ref`/`@nlg` annotations; `#EVAL`/`#ASSERT`.
+combinators; `STRING` literals in equality position; top-level `ASSUME`d inputs, subject to the
+arity/category condition of §6.1; `@export`/`@desc`/`@ref`/`@nlg` annotations; `#EVAL`/`#ASSERT`.
 
 Everything else — string computation, payload enums, non-structural recursion, function-typed
 parameters, `DEONTIC`/`PARTY`, `#TRACE`, ledger/effect keywords, temporal pins, `TYPICALLY`
 (dropped with a note, not an error) — is rejected with a `LowerError` naming the construct and
 its source range, all errors in one batch, following `Cli/OpenFisca.hs`'s "cannot compile these
 decisions" presentation **[E]**.
+
+### 6.1 `ASSUME`d inputs: which ones, and in which spelling
+
+Landed 2026-08-19; measured on this tree, not proposed.
+
+A top-level `ASSUME` becomes an input predicate (`RPredKind`'s `RInput`, the second source
+beside a stored record field) when a lowered clause references it. Four qualifications the
+sentence above is too short to carry:
+
+- **At total arity ≤ 2 it must be attribute-shaped** — exactly one parameter, category-sorted (a
+  `DECLARE`d record, a payload-free enum, or an `ASSUME`d `TYPE`), plus at most a result. At that
+  end Blawx's ontology is category-centric: a declaration block hangs off a subject, so neither a
+  bare proposition nor a two-place input has an attribute block, a scenario-editor row or an XML
+  image, which is precisely the R12 blank-row loss. Both of these are refused:
+
+  ```
+  ASSUME `the person is a body corporate` IS BOOLEAN              -- total arity 0
+
+  GIVEN c IS A Consequence
+        n IS A NUMBER
+  ASSUME `severity exceeds` c n IS A BOOLEAN                      -- total arity 2
+  ```
+
+  The refusal is **by this leg**, under `input predicate with no category subject (Blawx)`, and
+  _not_ by the relational middle end, which lowers them to ordinary `input …/n` predicates a
+  swipl, ASP or Logical English leg can emit (#258 §2.5 — the middle end records, each leg
+  rejects). Witnesses: `jl4/examples/relational/expected/assumed-nullary`,
+  `jl4/examples/blawx/not-ok/zero-arity.l4`, `jl4/examples/blawx/not-ok/arity-two.l4`.
+
+- **At total arity 3–10 there is no category condition at all**, and the diagnostic's name
+  notwithstanding, none is applied. The input is declared as a **relationship**, whose arguments
+  `blawxValueType` types one by one and does not require to be categories. MEASURED on this tree,
+  an `ASSUME` of `scaled by` over two `NUMBER` parameters returning a `NUMBER` is accepted, emits
+  `blawx_relationship(scaled_by,number,number,number).` with its full NLG and `:- dynamic` stack,
+  and reaches the interview as `#abducible scaled_by(A,B,C).` with non-empty `xml_content` on
+  every row. Above total arity 10 the relationship block ceiling refuses it by name (`LEArity`).
+  So the rule is a floor with a hole in it: `classifyPred`
+  (`jl4-core/src/L4/Blawx/Lower.hs`) tests `categoryOf` only in its two arity-1 arms. Pinned by
+  `jl4-core/test/BlawxAssumeSpec.hs` ("an arity-3 input needs no category at all").
+
+- **A _local_ `ASSUME` stays out** (`local ASSUME`): it is scoped to one definition, so there is
+  no module-level name to declare and nothing for an interview to abduce.
+- **Spelling matters, for a reason outside this leg.** The arrow form (an `ASSUME` whose declared
+  type is a `FUNCTION FROM … TO …`) lowers correctly, but a module that `@export`s a `DECIDE`
+  referencing it does not type-check at all: `L4.Export.validateExportInputs` raises
+  `ExportFunctionTypeInput`, because `@export` appends referenced `ASSUME`s to the web app's
+  parameter list and a function cannot cross a JSON boundary. Lowering is export-rooted, so such
+  a module has no root. A corpus for this leg must therefore use the binder form instead, whose
+  declared type is `BOOLEAN`:
+
+  ```
+  GIVEN p IS A Person
+  ASSUME `is authorised` p IS A BOOLEAN
+  ```
+
+  Both forms are admitted by the lowering, so nothing moves if that export rule is later
+  relaxed. This is why `jl4/examples/legal/anti-social.l4` — written entirely in the arrow form
+  — cannot be used as a Blawx seed as written.
 
 ## 7. Architecture
 
@@ -1018,7 +1104,10 @@ may be vendored into a test fixture with attribution. **Tier 1** (local, lightwe
 ### 8.14 R14 — import: the block IR is the pivot; lift the stratified ground fragment
 
 **Evidence.** §5.2's construct-by-construct assessment **[E]**; 13 of 15 shipped examples
-inside the fragment **[E]**; `negation-as-failure.l4` as the three-valued landing zone **[E]**;
+inside the fragment **[E]** — _as believed at proposal time; measured 2026-08-19 as 14/15 with
+blocks, 10/15 classifying and **2/15 lifting**, see §5.2's calibration table, which retires the
+count in both directions. Kept rather than deleted because the point of an Evidence block is to
+record what the ruling was made on_; `negation-as-failure.l4` as the three-valued landing zone **[E]**;
 XML is the canonical parse source (typed block trees) with `scasp_encoding` as a
 cross-check — regenerate s(CASP) from parsed XML and diff against the stored encoding, reusing
 R12's fidelity machinery in reverse to _detect_ stale or hand-edited encodings before lifting.
@@ -1038,6 +1127,110 @@ the structure the XML already carries. **Not decided.** CLI surface (`l4 blawx -
 `SUBJECT-TO-NOTWITHSTANDING` to land as structure rather than comments.
 
 **ANSWERED 2026-08-18 (Meng).** CLI surface: `l4 blawx --import`. And the dependency direction is settled: where lifted defeat structure needs a landed `SUBJECT TO`/`NOTWITHSTANDING`, the Blawx project drives that work incrementally rather than waiting on it.
+
+**EXECUTED 2026-08-19 — both directions of the bird cross-check are green.**
+`L4.Blawx.Xml` → `L4.Blawx.Blocks` → `L4.Blawx.Parse` → `L4.Blawx.Lift`, with the CLI surface
+`l4 blawx --import FILE [-o out.l4]` as ruled, plus three additive flags: `--parse-only` (parse
+and report, one `CENSUS` line to stdout), `--reemit` (write the `.blawx` regenerated from the
+parsed blocks instead of the lifted L4) and, on the export path, `--roundtrip` (emit, parse
+back, assert the IR and the bytes are unchanged).
+
+- **`lift . emit = id`, parse half**: `--roundtrip` over all four P1/P3 seeds — structural IR
+  equality modulo provenance and the stack/run distinction, _and_ byte-identical re-emission.
+  Also over a hand-built document exercising every P5-1 extension constructor
+  (`jl4-core-test/BlawxParseSpec`), because `L4.Blawx.Lower` constructs none of them.
+- **bird, the L4 engine leg**: `jl4/examples/blawx/imported/bird.l4`, produced by the pipeline
+  from upstream's own `bird.yaml` (109 blocks, 17 types, 8 workspaces, 4 tests; the stale-encoding
+  warning of P5-2 fires on 8 of its 10 rows, as expected). `l4 check` clean; its four `#EVAL`s
+  answer `LIST "pingu"`, `TRUE`, `TRUE`, `TRUE`.
+- **bird, the Blawx engine leg**: `bird.blawx`, whose `scasp_encoding` `renderScasp` regenerated
+  from the same parsed blocks, driven through `etc/blawx-tier1-harness.py` (one query per
+  `swipl` process). **20/20** — the 16 export queries plus bird's 4 — so both engines agree on
+  every bird query.
+- **the re-save fixpoint on the re-emission**: `etc/blawx-fixpoint-harness.mjs` **10/10** rows
+  byte-identical (2 empty workspaces skipped), through the real Blockly 10.1.3 restorers and the
+  real generator. Every P1/P3 golden is unchanged by the IR extension (35/35 still green).
+
+Two findings the execution produced, both recorded where they belong:
+
+1. **The `holds` block is inert for `blawx_applies` in the shipped generator** — an upstream
+   defect, not ours, and it is why the s(CASP) leg runs against a bridged program. bird's span
+   workspace asserts `holds(sec_5__span_pingu_section,-blawx_applies,sec_5_section,pingu).` and
+   **nothing consumes it**: `ldap.py` declares `#pred` NLG for `holds/4` and stops, the generator
+   emits an `L(X) :- holds(S,L,X).` bridge only from an `attributed_rule`'s third clause and only
+   for that rule's own section, and `reasoner.py` contains no occurrence of `holds` at all. So
+   `-blawx_applies(sec_5_section,pingu)` is never derivable, the closed-world default succeeds,
+   NBA 5 applies to pingu after all, and `pingu_with_jetpack_cant_fly` answers **no model** —
+   contradicting its own pinned comment and s.5's own carve-out. The single missing clause is
+   `-blawx_applies(S,X) :- holds(_Z,-blawx_applies,S,X).`; the harness adds it, names the finding
+   in one place, and a control run without it reproduces the failure exactly (3/4, the fourth
+   FAIL). The lift implements the intended semantics. File upstream beside `legalese/blawx#1`.
+2. **The recorded expectation is the L4 engine's own answer, written by the pipeline** (`-- L4
+oracle ==> …`, spliced after each `#EVAL` by re-running the module through the evaluator), and
+   the design's second herald `-- Blawx <test> ==>` is deliberately **not** emitted: the lift
+   cannot know what s(CASP) answered, and a line it cannot check is prose that drifts. The
+   cross-engine claim lives in the harness, which is the R11 posture — the oracle stays outside
+   the artifact and the comparison is made by something that ran both sides.
+
+**REVIEWED 2026-08-19 — nine findings dispositioned; four changed the answer the bridge gives.**
+The bird artifact was regenerated and every gate above re-run
+(`jl4-core-test` 368, `l4-cli-test` 276, `jl4-test` 2 581, all suites green; tier-1 **20/20**;
+fixpoint **45/45**, see below; census unchanged). What moved:
+
+1. **The stratification guard was inert on bird, the document it was written for.** It scanned
+   `attributed_rule` bodies only, and _every negation the lift emits is introduced by the lift_ —
+   the `AND NOT <defeated>` conjunct and the applicability `naf` appear in no rule body. Measured:
+   bird's edge set was six edges, all positive, so the guard was structurally incapable of firing.
+   The scan now runs over the program the lift **emits** (`according_to`/`holds`/`blawx_defeated`/
+   `blawx_applies` are nodes; every paragraph builder contributes its edges), and the goal walk is
+   total rather than falling through a catch-all that silently dropped `BGApplies`, `BGHolds` and
+   `BGAccordingTo` — the three constructors ruling P5-1 added. Witness: bird plus one mirror
+   `overrules` is refused `blawx-lift/unstratified` naming `holds(sec_3_section,-flies)` and
+   `holds(sec_4_section,flies)`; before, it emitted a module that type-checks and diverges. Pinned
+   in `jl4-core-test/BlawxLiftSpec`, both the even loop and the odd one.
+2. **Test canvases were never vetted.** `testPara` consumes a positive unary ground fact and a
+   query; everything else on the canvas was dropped with no diagnostic, while workspace canvases
+   got a full refusal pass. Not hypothetical: 11 tests across 8 shipped examples declare their own
+   objects, 3 carry `assume`, and **2 assert a negative scenario fact** — which would have made the
+   `#EVAL` answer a question the Blawx test did not ask. Now refused by name
+   (`test-block`, `scenario-undeclared`).
+3. **Two halves of the lift disagreed about who exists.** `membersOf` counted atoms introduced by
+   ground facts; `all objects` did not, so an existential `#EVAL` — the exact shape
+   `?- p(A).` lifts to — ranged over a strictly smaller universe than s(CASP) enumerates. The
+   universe is now the union, as the code comment claiming exactness already asserted.
+4. **The fact-channel asymmetry was unsound, not merely undocumented.** A concluded _category_ got
+   no `<p> fact` field while a concluded _attribute_ did; a scenario asserting `bird(x).` therefore
+   had nowhere to land and `recordFields` dropped it silently. Every declared predicate now gets a
+   channel, which is what Blawx's own `:- dynamic p/1.` means.
+5. **Ruling P5-4 was honoured for tests only.** 6 of the corpus's 18 `<comment>` elements sit on
+   `blawx.workspace` rows (`oasa` ×3, `r34` ×3) and were computed and thrown away at the
+   `MkBWorkspace` call site. `BWorkspace` gained `bwComment`, import-only and imaged by neither
+   renderer exactly as `btComment` is; the lift places it under its section's `§§` (root under
+   `§§ Ontology`) and **warns** where a workspace path has no `§`. A blank line inside a comment
+   now renders as a bare `--` rather than `"-- "` with trailing whitespace.
+6. **The tier-1 harness inspected only s(CASP)'s first model** — an if-then-else around `scasp/2`
+   — so a `LIST` oracle could pass while the engines disagreed. It now enumerates
+   (`findall` + `sort`) and compares sets. That change immediately produced **upstream finding 3**
+   below.
+7. **The fixpoint harness's default input list was `expected/` only**, so a bare run reported
+   "35 checked, 0 failed" without ever touching the import half. It now defaults to `expected/`
+   **and** `imported/`: **45/45**, 2 empty workspaces skipped.
+8. **bird.l4 now carries its own disclosure of finding 1 above**, emitted from `appliesParas` so
+   it cannot drift out of the artifact: a reader who takes the file to the shipped Blawx and runs
+   the same query gets a different answer, and until now only the harness said so.
+
+**Upstream finding 3 (s(CASP) itself, not Blawx and not our emitter).** Enumeration found one
+query on which s(CASP) reports an answer L4 does not: `benefit/q1` asks `benefit_amount(a1,X)` and
+gets both `1000` (right) and `0`. It is not our clause: put that clause's own body to the same
+program as a query and s(CASP) refuses it —
+`?- applicant(a1), not eligible_for_benefit(a1).` has **0** models while
+`?- according_to(sec_2_section,benefit_amount,a1,0).`, whose body is exactly that conjunction, has
+**1**. The model it returns says why: it contains `age(a1,70)` and `not age(a1,_)` together, and
+`-is_veteran(a1)` beside `not -is_veteran(_)` — the dual of a body with a free variable over an
+unbounded domain, satisfied by an unbound witness rather than checked over the ground instances.
+The harness keeps the agreement claim (the L4 oracle must be among s(CASP)'s answers) and **pins
+the surplus** in one named table (`KNOWN_SURPLUS`), so a divergence that grows, shrinks or wanders
+fails the run; a control run with the pin removed reproduces the FAIL exactly.
 
 ## 9. Non-goals (v1)
 
@@ -1108,10 +1301,72 @@ earmark in R10, not a deliverable).
   `§`-anchored L4 encodings) emitted with full NLG; published on a Blawx instance; the
   scenario explorer runs an interview and every answer carries a justification tree with
   citations back to sections. Exit: a screen-recorded interview over transpiled L4.
+
+  _**EXECUTED 2026-08-19 (engineering exit; recording owed)**, as a three-rung ladder per
+  Meng's steer (start with the cases the jl4-web deployment ships by default): **P4a**
+  `rodents.l4` (the classic isomorphism demo, citations lifted verbatim from the policy
+  sentence at `jl4/experiments/classic/vermin_and_rodent.l4:14`); **P4b** the
+  ASSUME→RInput widening — top-level `ASSUME`d names lower as input predicates, measured
+  additive (every pre-existing relational and Blawx golden byte-stable, full suites
+  green) — unlocking `antisocial.l4` and `alcohol.l4`, each oracle-anchored by a
+  GIVEN-record semantic twin that emits **byte-identical s(CASP)** (only the provenance
+  comment differs), and discharging P1's `#abducible`-interview earmark (a module with
+  zero `DECLARE`s now gets an interview; abduction confirmed live in the container: 2 and
+  3 answers); **P4c** `housing-grounds.l4` — Housing Act 1988 Sch 2 grounds 8, 13, 15
+  and 17 inlined into one 695-line module, 14 `@export` citations, 49 directives all
+  oracle-verified against `l4 run` (0 mismatches). The BNA was declined for P4: its three
+  `DATE` fields are fatal in v1 and pre-resolving them would delete the statute's actual
+  legal content (the commencement boundary). Verification at full width: tier-1
+  **150/150**; headless fixpoint **181/181** rows; the authoritative tier-2 UI drive over
+  all six new modules — every one of their **146** workspaces and tests opened and saved
+  through the real editor pages — **146/146 byte-identical**; run-endpoint and interview
+  spot checks green. Found en route: CLEAN's title grammar rejects an **em dash in the
+  act title** (`ParseException` in `generate_akn` during `RuleDoc.save()` → import 500;
+  hyphens/commas/parens fine, body text unaffected) — the emitter's title channel now
+  maps em/en dashes to a hyphen, beside P1's recasing guard — and a second, subtler
+  member of the same family: CLEAN gives a **mid-body em dash structural meaning**
+  (legislative sub-paragraph introduction), so a section text containing one silently
+  swallowed every following section — the housing AKN carried ONLY `sec_1` and every
+  later citation link (`/rule/sec_N/`) 500'd. The section-text channel now maps dashes
+  too; re-measured: AKN eIds ↔ workspace names agree **6/6 modules** (housing
+  `sec_1`…`sec_14`). The **screen-recorded run is delivered**: Ground 8's q6 (the
+  three-months boundary, monthly rent 800, arrears 2400/3200) driven through the real
+  test editor — transpiled blocks on the canvas, Run, and the justification tree citing
+  section 1 and section 4 with "2400 is greater than or equal to 2400" as the threshold
+  step (`housing-q6-run.webm`, session scratchpad). Two upstream limits found while
+  aiming for the scenario-explorer page and worth fork PRs: the interview endpoint's
+  `find_assumptions` crashes on classical negation in the answer tree
+  (`reasoner.py:1457`, `TypeError` on a string node — fires for our R5 `-p` encodings
+  and for `type:"false"` scenario facts), and the same endpoint's abductive search
+  grows unusable when input predicates are left unpinned (measured: rodents 2 pinned
+  facts >180 s vs 3 pruning facts 11.8 s; housing grounded >200 s). The test editor's
+  `run/` path — which the recording uses — is unaffected._
+
 - **P5 — import.** R14's `Parse`/`Lift`; `lift . emit = id` property on the v1 fragment;
   one genuine Blawx-authored example (e.g. `bird.yaml`, defeat and all) lifted to L4, its
   tests re-expressed as `#EVAL`s, and both engines agreeing on every query. Exit: the bird
   example round-trips Blawx → L4 → Blawx with the fixpoint intact.
+
+  _**EXECUTED 2026-08-19.** The IR extension (P5-1: overrules, applies/holds/according_to,
+  `brInapplicable`, path section refs, goal-list queries, object declarations, test
+  comments) landed with **every P1/P3 golden byte-stable** and both renderer images per
+  constructor, unit-pinned against bird.yaml's own stored bytes. `L4.Blawx.{Xml,Blocks,
+Parse}` + `L4.Blawx.Lift` + `l4 blawx --import/--parse-only/--reemit`; the emit→parse
+  round-trip holds over the four seeds; the 15-example census matches the corrected
+  §5.2 fragment count. **bird**: the single-command pipeline reproduces the committed
+  `jl4/examples/blawx/imported/bird.l4` byte-for-byte (stale-encoding WARNING firing as
+  ruled, P5-2); dual-engine agreement **4/4** (L4 `LIST "pingu"`, TRUE, TRUE, TRUE; the
+  s(CASP) leg through the tier-1 harness's one-clause `holds`→`-blawx_applies` bridge,
+  with a negative-control run proving the bridge is load-bearing); the re-emitted
+  `bird.blawx` imported into the container and **12/12 rows byte-identical after
+  real-UI open-and-save**. The container's own reasoner answers bird's tests **3/4** —
+  `pingu_with_jetpack_cant_fly` has no model upstream because no shipped consumer
+  bridges a `holds` block naming `blawx_applies` — a live reproduction of the gap, and
+  the second fork-PR candidate beside legalese/blawx#1. The build also surfaced and
+  pinned an upstream s(CASP) engine inconsistency (benefit/q1 admits a surplus model
+  whose own body has none; `KNOWN_SURPLUS` table with control run) and rewrote the
+  lift's stratification guard over the program the lift actually EMITS (witness: bird
+  plus one mirrored `overrules` is refused `blawx-lift/unstratified` by name)._
 
 ## Appendix A — worked example **[E — executed at both tiers; Blockly XML remains U]**
 

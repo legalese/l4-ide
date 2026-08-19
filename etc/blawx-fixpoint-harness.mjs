@@ -377,14 +377,25 @@ async function regenerate(xmlContent, siblings) {
 }
 
 // ---- inputs ----------------------------------------------------------------
-const defaultDir = join(repoRoot, "jl4", "examples", "blawx", "expected");
+// TWO directories, not one. `expected/` holds the P1/P3 export goldens;
+// `imported/` holds what `l4 blawx --import --reemit` regenerated from parsed
+// blocks (P5). Both are `.blawx` this repo produced and both owe the re-save
+// fixpoint, and leaving the import half off the default list meant a plain run
+// reported "35 checked, 0 failed" while never touching bird -- a green that
+// looked like the whole claim and was two thirds of it.
+const defaultDirs = [
+  join(repoRoot, "jl4", "examples", "blawx", "expected"),
+  join(repoRoot, "jl4", "examples", "blawx", "imported"),
+].filter(existsSync);
 let files = process.argv.slice(2);
 if (files.length === 0) {
-  if (!existsSync(defaultDir)) SKIP(`no input files and no ${defaultDir}`);
-  files = readdirSync(defaultDir)
-    .filter((f) => f.endsWith(".blawx") && !f.endsWith(".actual.blawx"))
-    .sort()
-    .map((f) => join(defaultDir, f));
+  if (defaultDirs.length === 0) SKIP("no input files and no default directory");
+  files = defaultDirs.flatMap((dir) =>
+    readdirSync(dir)
+      .filter((f) => f.endsWith(".blawx") && !f.endsWith(".actual.blawx"))
+      .sort()
+      .map((f) => join(dir, f)),
+  );
 }
 if (files.length === 0) SKIP("no input files");
 
