@@ -67,6 +67,23 @@ spec examplesRoot = describe "relational export" $ do
     -- with an invented output argument.
     it "computed.l4 — computed BOOLEAN field as a guard, both polarities" $
       goldenProgram examplesRoot "computed.l4" "computed"
+    -- The SECOND source of an input predicate. Everything the ASSUME widening
+    -- has to get right in one file: an ASSUMEd TYPE as an abstract category
+    -- (its own block, not a fieldless record), a boolean ASSUME with its output
+    -- argument dropped, a value ASSUME keeping one, NOT over an ASSUMEd boolean
+    -- as an RNotCall with a negative edge, @desc/@ref carried through, and —
+    -- the additivity gate — an ASSUME and an ASSUMEd TYPE that nothing reaches,
+    -- neither of which may appear.
+    it "assumed.l4 — top-level ASSUMEs as input predicates" $
+      goldenProgram examplesRoot "assumed.l4" "assumed"
+    -- Lowers, and is MEANT to: `input …/0` is an ordinary Horn predicate. The
+    -- Blawx leg refuses it (no category subject, hence no block), which is a
+    -- decision of that leg's block palette — this golden is what makes "the
+    -- middle end records, each leg rejects" checkable rather than asserted.
+    -- Also the only fixture with a dropped TYPICALLY default, which is a
+    -- fidelity note and not an error.
+    it "assumed-nullary.l4 — a subjectless ASSUME lowers here and is Blawx's to refuse" $
+      goldenProgram examplesRoot "assumed-nullary.l4" "assumed-nullary"
   describe "named rejections (batched)" $ do
     it "not-ok/deontic.l4" $
       goldenErrors examplesRoot ("not-ok" </> "deontic.l4") "not-ok-deontic"
@@ -88,6 +105,21 @@ spec examplesRoot = describe "relational export" $ do
     -- spellings (named decision, computed BOOLEAN field), in one batch.
     it "not-ok/bool-value-position.l4" $
       goldenErrors examplesRoot ("not-ok" </> "bool-value-position.l4") "not-ok-bool-value-position"
+    -- The residue of the ASSUME widening, batched: a function-typed parameter,
+    -- a DATE, a MAYBE. The golden's real assertion is the RANGES — each names
+    -- the ASSUME, not the reference, because one ASSUME may be referenced from
+    -- four decisions and the signature is where the reader has to go.
+    -- Named `assumed-signatures` and not `assumed`, because 'lowered' checks
+    -- each fixture under its own BASENAME as the module name and every
+    -- provenance comment prints it: two fixtures called `assumed.l4` would make
+    -- two goldens claim one origin.
+    it "not-ok/assumed-signatures.l4" $
+      goldenErrors examplesRoot ("not-ok" </> "assumed-signatures.l4") "not-ok-assumed-signatures"
+    -- The site a careless widening takes along. A local ASSUME has no
+    -- module-level name to declare and nothing to abduce, so it stays out —
+    -- under its own kind, so the rejection census can tell the two apart.
+    it "not-ok/local-assume.l4" $
+      goldenErrors examplesRoot ("not-ok" </> "local-assume.l4") "not-ok-local-assume"
 
 -- | Lower a fixture, INSISTING that L4 accepted it first.
 --

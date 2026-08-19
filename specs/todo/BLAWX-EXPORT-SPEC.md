@@ -572,14 +572,72 @@ harness, which must read run results anyway.
 first-order, monomorphic `GIVEN`/`GIVETH`/`MEANS`/`DECIDE` decisions over
 `BOOLEAN`/`NUMBER`/`DATE`/records/payload-free enums/`MAYBE`/lists, with ≤ 9 parameters;
 `CONSIDER`/`BRANCH`/`IF`/`WHERE`/`UNLESS`; structural list recursion and the recognised
-combinators; `STRING` literals in equality position; `ASSUME`d inputs;
-`@export`/`@desc`/`@ref`/`@nlg` annotations; `#EVAL`/`#ASSERT`.
+combinators; `STRING` literals in equality position; top-level `ASSUME`d inputs, subject to the
+arity/category condition of §6.1; `@export`/`@desc`/`@ref`/`@nlg` annotations; `#EVAL`/`#ASSERT`.
 
 Everything else — string computation, payload enums, non-structural recursion, function-typed
 parameters, `DEONTIC`/`PARTY`, `#TRACE`, ledger/effect keywords, temporal pins, `TYPICALLY`
 (dropped with a note, not an error) — is rejected with a `LowerError` naming the construct and
 its source range, all errors in one batch, following `Cli/OpenFisca.hs`'s "cannot compile these
 decisions" presentation **[E]**.
+
+### 6.1 `ASSUME`d inputs: which ones, and in which spelling
+
+Landed 2026-08-19; measured on this tree, not proposed.
+
+A top-level `ASSUME` becomes an input predicate (`RPredKind`'s `RInput`, the second source
+beside a stored record field) when a lowered clause references it. Four qualifications the
+sentence above is too short to carry:
+
+- **At total arity ≤ 2 it must be attribute-shaped** — exactly one parameter, category-sorted (a
+  `DECLARE`d record, a payload-free enum, or an `ASSUME`d `TYPE`), plus at most a result. At that
+  end Blawx's ontology is category-centric: a declaration block hangs off a subject, so neither a
+  bare proposition nor a two-place input has an attribute block, a scenario-editor row or an XML
+  image, which is precisely the R12 blank-row loss. Both of these are refused:
+
+  ```
+  ASSUME `the person is a body corporate` IS BOOLEAN              -- total arity 0
+
+  GIVEN c IS A Consequence
+        n IS A NUMBER
+  ASSUME `severity exceeds` c n IS A BOOLEAN                      -- total arity 2
+  ```
+
+  The refusal is **by this leg**, under `input predicate with no category subject (Blawx)`, and
+  _not_ by the relational middle end, which lowers them to ordinary `input …/n` predicates a
+  swipl, ASP or Logical English leg can emit (#258 §2.5 — the middle end records, each leg
+  rejects). Witnesses: `jl4/examples/relational/expected/assumed-nullary`,
+  `jl4/examples/blawx/not-ok/zero-arity.l4`, `jl4/examples/blawx/not-ok/arity-two.l4`.
+
+- **At total arity 3–10 there is no category condition at all**, and the diagnostic's name
+  notwithstanding, none is applied. The input is declared as a **relationship**, whose arguments
+  `blawxValueType` types one by one and does not require to be categories. MEASURED on this tree,
+  an `ASSUME` of `scaled by` over two `NUMBER` parameters returning a `NUMBER` is accepted, emits
+  `blawx_relationship(scaled_by,number,number,number).` with its full NLG and `:- dynamic` stack,
+  and reaches the interview as `#abducible scaled_by(A,B,C).` with non-empty `xml_content` on
+  every row. Above total arity 10 the relationship block ceiling refuses it by name (`LEArity`).
+  So the rule is a floor with a hole in it: `classifyPred`
+  (`jl4-core/src/L4/Blawx/Lower.hs`) tests `categoryOf` only in its two arity-1 arms. Pinned by
+  `jl4-core/test/BlawxAssumeSpec.hs` ("an arity-3 input needs no category at all").
+
+- **A _local_ `ASSUME` stays out** (`local ASSUME`): it is scoped to one definition, so there is
+  no module-level name to declare and nothing for an interview to abduce.
+- **Spelling matters, for a reason outside this leg.** The arrow form (an `ASSUME` whose declared
+  type is a `FUNCTION FROM … TO …`) lowers correctly, but a module that `@export`s a `DECIDE`
+  referencing it does not type-check at all: `L4.Export.validateExportInputs` raises
+  `ExportFunctionTypeInput`, because `@export` appends referenced `ASSUME`s to the web app's
+  parameter list and a function cannot cross a JSON boundary. Lowering is export-rooted, so such
+  a module has no root. A corpus for this leg must therefore use the binder form instead, whose
+  declared type is `BOOLEAN`:
+
+  ```
+  GIVEN p IS A Person
+  ASSUME `is authorised` p IS A BOOLEAN
+  ```
+
+  Both forms are admitted by the lowering, so nothing moves if that export rule is later
+  relaxed. This is why `jl4/examples/legal/anti-social.l4` — written entirely in the arrow form
+  — cannot be used as a Blawx seed as written.
 
 ## 7. Architecture
 
@@ -1243,6 +1301,47 @@ earmark in R10, not a deliverable).
   `§`-anchored L4 encodings) emitted with full NLG; published on a Blawx instance; the
   scenario explorer runs an interview and every answer carries a justification tree with
   citations back to sections. Exit: a screen-recorded interview over transpiled L4.
+
+  _**EXECUTED 2026-08-19 (engineering exit; recording owed)**, as a three-rung ladder per
+  Meng's steer (start with the cases the jl4-web deployment ships by default): **P4a**
+  `rodents.l4` (the classic isomorphism demo, citations lifted verbatim from the policy
+  sentence at `jl4/experiments/classic/vermin_and_rodent.l4:14`); **P4b** the
+  ASSUME→RInput widening — top-level `ASSUME`d names lower as input predicates, measured
+  additive (every pre-existing relational and Blawx golden byte-stable, full suites
+  green) — unlocking `antisocial.l4` and `alcohol.l4`, each oracle-anchored by a
+  GIVEN-record semantic twin that emits **byte-identical s(CASP)** (only the provenance
+  comment differs), and discharging P1's `#abducible`-interview earmark (a module with
+  zero `DECLARE`s now gets an interview; abduction confirmed live in the container: 2 and
+  3 answers); **P4c** `housing-grounds.l4` — Housing Act 1988 Sch 2 grounds 8, 13, 15
+  and 17 inlined into one 695-line module, 14 `@export` citations, 49 directives all
+  oracle-verified against `l4 run` (0 mismatches). The BNA was declined for P4: its three
+  `DATE` fields are fatal in v1 and pre-resolving them would delete the statute's actual
+  legal content (the commencement boundary). Verification at full width: tier-1
+  **150/150**; headless fixpoint **181/181** rows; the authoritative tier-2 UI drive over
+  all six new modules — every one of their **146** workspaces and tests opened and saved
+  through the real editor pages — **146/146 byte-identical**; run-endpoint and interview
+  spot checks green. Found en route: CLEAN's title grammar rejects an **em dash in the
+  act title** (`ParseException` in `generate_akn` during `RuleDoc.save()` → import 500;
+  hyphens/commas/parens fine, body text unaffected) — the emitter's title channel now
+  maps em/en dashes to a hyphen, beside P1's recasing guard — and a second, subtler
+  member of the same family: CLEAN gives a **mid-body em dash structural meaning**
+  (legislative sub-paragraph introduction), so a section text containing one silently
+  swallowed every following section — the housing AKN carried ONLY `sec_1` and every
+  later citation link (`/rule/sec_N/`) 500'd. The section-text channel now maps dashes
+  too; re-measured: AKN eIds ↔ workspace names agree **6/6 modules** (housing
+  `sec_1`…`sec_14`). The **screen-recorded run is delivered**: Ground 8's q6 (the
+  three-months boundary, monthly rent 800, arrears 2400/3200) driven through the real
+  test editor — transpiled blocks on the canvas, Run, and the justification tree citing
+  section 1 and section 4 with "2400 is greater than or equal to 2400" as the threshold
+  step (`housing-q6-run.webm`, session scratchpad). Two upstream limits found while
+  aiming for the scenario-explorer page and worth fork PRs: the interview endpoint's
+  `find_assumptions` crashes on classical negation in the answer tree
+  (`reasoner.py:1457`, `TypeError` on a string node — fires for our R5 `-p` encodings
+  and for `type:"false"` scenario facts), and the same endpoint's abductive search
+  grows unusable when input predicates are left unpinned (measured: rodents 2 pinned
+  facts >180 s vs 3 pruning facts 11.8 s; housing grounded >200 s). The test editor's
+  `run/` path — which the recording uses — is unaffected._
+
 - **P5 — import.** R14's `Parse`/`Lift`; `lift . emit = id` property on the v1 fragment;
   one genuine Blawx-authored example (e.g. `bird.yaml`, defeat and all) lifted to L4, its
   tests re-expressed as `#EVAL`s, and both engines agreeing on every query. Exit: the bird

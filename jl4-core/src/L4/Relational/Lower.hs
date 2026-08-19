@@ -4,7 +4,8 @@
 -- The pipeline, in the order it runs (@m1-design\/lower-plan.md@ §2):
 --
 -- > Module Resolved
--- >   ├─ buildCtx        ── ontology: records, payload-free enums, top-level DECIDEs
+-- >   ├─ buildCtx        ── ontology: records, payload-free enums, ASSUMEd types,
+-- >   │                     top-level DECIDEs, and the ASSUMEd names that are callable
 -- >   ├─ selectRoots     ── getExportedFunctions + enrichReturnTypes + enrichParamTypes
 -- >   ├─ reachable       ── transitive closure over called DECIDEs (helpers)
 -- >   ├─ per definition:  lowerSpec
@@ -14,6 +15,8 @@
 -- >   │     ├─ toBForm\/dnf       ── NOT pushed to literals, then DNF (+ aux factoring)
 -- >   │     └─ anfTerm\/anfAtom   ── goals in bind-before-use order
 -- >   ├─ lowerQueries    ── #EVAL \/ #ASSERT → RQuery + flattened RFacts
+-- >   ├─ inputPreds      ── the stored fields a projection reached  ─┐ both RInput,
+-- >   ├─ assumedInputPreds ── the ASSUMEs a clause called           ─┘ see 'RInput'
 -- >   ├─ buildDepGraph   ── signed edges
 -- >   └─ stratify        ── Apt–Blair–Walker, RECORDED not enforced
 --
@@ -124,8 +127,14 @@ data LowerOptions = MkLowerOptions
     -- Counted arity is the head's, plus one for a non-'Nothing' 'rpResult'. Note
     -- that @L4.Export.buildExportedFunction@ appends @ASSUME@-derived parameters
     -- to an /export's/ parameter list, which is not the same list as the
-    -- definition's own binders — M1 lowers the binders (see 'RInput' on why
-    -- @ASSUME@ is out of the fragment), so those never reach the count.
+    -- definition's own binders — a lowered decision's head is its binders alone,
+    -- and a referenced @ASSUME@ becomes its own 'RInput' predicate ('RInput',
+    -- 'assumedInputPreds') rather than an extra argument, so those never reach
+    -- the count. An 'RInput' predicate is not checked against the ceiling at
+    -- all — neither the field-derived nor the @ASSUME@-derived kind goes
+    -- through 'lowerSpec', which is where the check lives. The only leg with a
+    -- ceiling counts arity itself, over every predicate including the inputs
+    -- (@L4.Blawx.Lower.classifyPred@), so nothing is unchecked in practice.
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
@@ -237,8 +246,38 @@ data TopDef = MkTopDef
   , tdRange    :: !(Maybe SrcRange)
   }
 
+-- | A top-level @ASSUME@ of a /term/, normalised to the predicate it becomes.
+--
+-- @ASSUME T IS A TYPE@ does not produce one of these: a type is a sort, not a
+-- callable name, and it lives in 'ctxAbstract' \/ 'seAbstract' instead.
+--
+-- __The admit\/refuse judgement is made here, at the declaration__ ('adRefusal'
+-- carries it), not at the first use. That is the same discipline
+-- 'checkFragmentSorts' follows for a @DECIDE@ and for the same reason: the
+-- range a reader needs is the signature's, and the same @ASSUME@ may be
+-- referenced from four places.
+data AssumeDef = MkAssumeDef
+  { adName    :: !RName
+  , adParams  :: ![RSort]
+  , adResult  :: !(Maybe RSort)   -- ^ 'Nothing' = boolean, output arg dropped
+  , adDesc    :: !(Maybe Text)
+  , adNlg     :: !(Maybe Text)
+  , adRef     :: !(Maybe Text)
+  , adRange   :: !(Maybe SrcRange)
+  , adTypically :: !Bool
+    -- ^ whether a @TYPICALLY@ default was written. The value itself is
+    -- deliberately not read (BLAWX-EXPORT-SPEC §5.1 puts @TYPICALLY@ OUT,
+    -- dropped with a note): an input predicate is a fact the target asks about,
+    -- and silently seeding it with a default would answer a question the
+    -- interview was supposed to ask. Recorded so 'assemble' can emit the note.
+  , adRefusal :: !(Maybe (LowerErrorKind, Text))
+    -- ^ 'Nothing' = admitted (it gets a 'CallSig' and may become an 'RInput');
+    -- 'Just' = out of fragment, and a reference to it fails with exactly this.
+  }
+
 -- | The /only/ thing 'sortOfType' needs from the module: which type uniques
--- name a record and which name a payload-free enum.
+-- name a record, which name a payload-free enum, and which name an @ASSUME@d
+-- (abstract) type.
 --
 -- __It is a separate type so that it can be built without 'Ctx', and that is
 -- load-bearing.__ Every field of 'Ctx' is strict, so forcing a 'Ctx' to WHNF
@@ -250,8 +289,15 @@ data TopDef = MkTopDef
 -- circuits on a builtin unique before the lookup. Do not re-thread 'Ctx' through
 -- 'sortOfType'.
 data SortEnv = MkSortEnv
-  { seRecords :: !(Map Unique RName)
-  , seEnums   :: !(Map Unique RName)
+  { seRecords  :: !(Map Unique RName)
+  , seEnums    :: !(Map Unique RName)
+  , seAbstract :: !(Map Unique RName)
+    -- ^ @ASSUME T IS A TYPE@. Sorted as 'RSRecord' (see its haddock: the
+    -- constructor means \"a category named /n/\", not \"a declared record\"),
+    -- so no downstream consumer gains a case — the alternative, a new 'RSort'
+    -- constructor, would add an arm to every match in Lower, Debug and both
+    -- Blawx modules, and would be silently wrong in any that carries a
+    -- catch-all.
   }
 
 data Ctx = MkCtx
@@ -275,12 +321,19 @@ data Ctx = MkCtx
   , ctxCons    :: !(Map Unique (RName, Int))   -- ^ enum constructor unique → (enum type, arity)
   , ctxTop     :: ![TopDef]                    -- ^ declaration order
   , ctxTopByU  :: !(Map Unique TopDef)
-  , ctxAssumes :: !(Set Unique)
-    -- ^ Top-level @ASSUME@d names. M1 does not lower them (see 'RInput'), and
-    -- they are collected for one purpose: so that a reference to one is
-    -- diagnosed as the fragment decision it is, instead of as an unresolved
-    -- name. The generic message sends the reader to look for a typo, an import
-    -- or a recursion — three places the answer is not.
+  , ctxAssumeDefs :: !(Map Unique AssumeDef)
+    -- ^ Top-level @ASSUME@d terms, admitted or refused ('AssumeDef'). An
+    -- admitted one has a 'ctxSigs' entry and is reached as an ordinary call; a
+    -- refused one is reached only by 'anfTerm' \'s residue arm, which reports
+    -- 'adRefusal' — so a narrowing never surfaces as \"unbound reference\",
+    -- which would send the reader looking for a typo, an import or a recursion,
+    -- three places the answer is not.
+  , ctxAssumeOrder :: ![Unique]
+    -- ^ source declaration order for 'ctxAssumeDefs' and 'ctxAbstract'
+    -- respectively — see 'ctxRecOrder' for why a 'Unique'-keyed iteration must
+    -- not reach a golden.
+  , ctxAbstract :: !(Map Unique RAbstractDef)   -- ^ @ASSUME T IS A TYPE@
+  , ctxAbstractOrder :: ![Unique]
   , ctxSigs    :: !(Map Unique CallSig)
   , ctxEnt     :: !EntityInfo
   }
@@ -371,6 +424,10 @@ sortOfType se (Just ty) = case ty of
     | u == dateUnique    -> dateSort
     | Just r <- Map.lookup u se.seRecords -> RSRecord r
     | Just e <- Map.lookup u se.seEnums   -> RSEnum e
+    -- LAST among the lookups, and after every builtin guard above: a module
+    -- that ASSUMEs a name a DECLARE also binds must resolve to the declaration,
+    -- and an ASSUMEd name spelled like a builtin must resolve to the builtin.
+    | Just a <- Map.lookup u se.seAbstract -> RSRecord a
     | otherwise          -> RSOpaque (nameText n)
    where u = getUnique n
   TyApp _ n [t]
@@ -399,13 +456,23 @@ isBoolSort = \case RSBool -> True; _ -> False
 checkFragmentSorts :: LEnv -> Maybe SrcRange -> [RSort] -> L ()
 checkFragmentSorts env rng = mapM_ go
  where
-  go s
-    | s == dateSort = bailIn env rng LEDate
-        "date-valued parameters and results are M2 (see specs/todo/DATE-LIBRARY-SPEC.md)"
-  go (RSMaybe _) = bailIn env rng LEMaybe
-        "a MAYBE-valued parameter or result is outside the M1 fragment"
-  go (RSList inner) = go inner
-  go _ = pure ()
+  go s = forM_ (fragmentSortError s) \(k, m) -> bailIn env rng k m
+
+-- | The table behind 'checkFragmentSorts', as a pure function, because the
+-- @ASSUME@ admission pass ('assumeDefs') has to make the same judgement outside
+-- the lowering monad. One table, so the two cannot disagree about what the
+-- fragment admits — and an @ASSUME@ rejected here is rejected with its own
+-- range, not the first use's.
+fragmentSortError :: RSort -> Maybe (LowerErrorKind, Text)
+fragmentSortError s
+  | s == dateSort =
+      Just ( LEDate
+           , "date-valued parameters and results are M2 (see specs/todo/DATE-LIBRARY-SPEC.md)" )
+fragmentSortError (RSMaybe _) =
+  Just ( LEMaybe
+       , "a MAYBE-valued parameter or result is outside the M1 fragment" )
+fragmentSortError (RSList inner) = fragmentSortError inner
+fragmentSortError _ = Nothing
 
 -- ---------------------------------------------------------------------------
 -- Scanning the module
@@ -462,8 +529,11 @@ decideGivens :: Decide Resolved -> [OptionallyTypedName Resolved]
 decideGivens (MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) _ _) = gs
 
 descOf :: Decide Resolved -> Maybe Text
-descOf d = do
-  desc <- getAnno d ^. annDesc
+descOf d = descFromAnno (getAnno d)
+
+descFromAnno :: Anno -> Maybe Text
+descFromAnno ann = do
+  desc <- ann ^. annDesc
   let t = Text.strip (stripKeywords (getDesc desc))
   if Text.null t then Nothing else Just t
  where
@@ -584,6 +654,112 @@ mkTopDef ei exps outer d =
 (!!?) :: [a] -> Int -> Maybe a
 xs !!? i = case drop i xs of (a : _) -> Just a; [] -> Nothing
 
+-- | Every annotation-bearing position of an @ASSUME@, in the order a lookup
+-- should try them — the outer 'TopDecl' anno first (where an annotation written
+-- above the declaration lands), then the declaration's own, then its app form's,
+-- then the head name's. Same list and same reason as 'decideNlg': arrived at by
+-- measurement, not by reading the grammar.
+assumeAnnos :: Anno -> Assume Resolved -> [Anno]
+assumeAnnos outer (MkAssume aAnno _ (MkAppForm afAnno hd _ _) _ _) =
+  [ outer, aAnno, afAnno, getOriginal hd ^. annoOf ]
+
+-- | An @ASSUME@d term, normalised — including the judgement about whether the
+-- M1 fragment admits it ('adRefusal').
+--
+-- __Both spellings of an @ASSUME@d predicate are admitted, and they are not
+-- interchangeable upstream.__
+--
+-- > ASSUME `is authorised` IS A FUNCTION FROM Person TO BOOLEAN   -- (1)
+-- >
+-- > GIVEN p IS A Person                                           -- (2)
+-- > ASSUME `is authorised` p IS A BOOLEAN
+--
+-- (1) declares the arrow, which this function flattens along its spine:
+-- @FUNCTION FROM A AND B TO BOOLEAN@ and @FUNCTION FROM A TO FUNCTION FROM B TO
+-- BOOLEAN@ both give @[A, B]@ parameters and a boolean result. (2) binds the
+-- parameters in the app form and types them in the @GIVEN@ signature, which is
+-- authoritative; the declared type is then the /result/ alone. Both reach the
+-- same 'AssumeDef', and a mixture (app-form binders plus an arrow result) is
+-- flattened in that order.
+--
+-- __Spelling (2) is the one an @\@export@ed module can use__, and that is worth
+-- knowing before writing a corpus: @L4.Export.validateExportInputs@ makes a
+-- /function-typed/ @ASSUME@ referenced by an @\@export@ed @DECIDE@ a type
+-- error (@ExportFunctionTypeInput@ — a function cannot cross the web app's
+-- JSON boundary), and the relational lowering is export-rooted, so a module
+-- written entirely in spelling (1) has no root to lower from. Spelling (2)'s
+-- declared type is @BOOLEAN@, not an arrow, so it passes.
+--
+-- The 'LEHigherOrder' refusal below is deliberately the complement of
+-- @L4.Export.assumesFromModule@\'s filter, which __drops__ function-typed
+-- @ASSUME@s: an @ASSUME@ of a function is a /predicate/ here and a
+-- non-representable form field there. A reader who finds only one of the two
+-- will otherwise conclude the other is a bug.
+assumeDef :: SortEnv -> EntityInfo -> Anno -> Assume Resolved -> AssumeDef
+assumeDef se ei outer a@(MkAssume _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ res args _) mty mDefault) =
+  MkAssumeDef
+    { adName    = rName res
+    , adParams  = paramSorts
+    , adResult  = if isBoolSort resultSort then Nothing else Just resultSort
+    , adDesc    = listToMaybe (mapMaybe descFromAnno annos)
+    , adNlg     = linearNlg <$> listToMaybe (mapMaybe (^. annNlg) annos)
+    , adRef     = refText <$> listToMaybe (mapMaybe (^. annRef) annos)
+    , adRange   = rangeOf a
+    , adTypically = isJust mDefault
+    , adRefusal = refusal
+    }
+ where
+  annos = assumeAnnos outer a
+
+  -- With app-form binders the declared type is the RESULT, so the checker's
+  -- inferred type must not be consulted as a fallback: it is the whole arrow,
+  -- and its spine would count every binder twice.
+  declared
+    | null args = mty <|> entType ei (getUnique res)
+    | otherwise = mty
+
+  -- The GIVEN signature types the binders, as it does for a DECIDE ('mkTopDef').
+  bndrTy r = listToMaybe [ t | g <- givens, getUnique (givenName g) == getUnique r
+                             , Just t <- [givenType g] ]
+               <|> entType ei (getUnique r)
+  bndrTys = map bndrTy args
+
+  (spineTys, resultTy) = maybe ([], Nothing) (second Just . spine) declared
+  spine = \case
+    Fun _ onts ret -> let (ps, r) = spine ret in ([ t | MkOptionallyNamedType _ _ t <- onts ] <> ps, r)
+    t              -> ([], t)
+  paramSorts = map (sortOfType se) bndrTys <> map (sortOfType se . Just) spineTys
+  resultSort = sortOfType se resultTy
+
+  refusal = listToMaybe $ concat
+    [ [ ( LEUnsupported "ASSUME without a declared signature"
+        , "`" <> (rName res).rnBase <> "` has no declared or inferred type, so there is no\
+          \ signature to give the input predicate it would become" )
+      | isNothing declared ]
+      -- `ASSUME T x IS A TYPE` — a type CONSTRUCTOR. Its nullary sibling is a
+      -- category ('assumesCategory'); this one sorts nothing, because
+      -- 'sortOfType' has no application form for it.
+    , [ ( LEUnsupported "ASSUMEd TYPE constructor"
+        , "`" <> (rName res).rnBase <> "` is an ASSUMEd type constructor; only a nullary\
+          \ ASSUMEd TYPE becomes a category, and neither is a term" )
+      | resultSort == RSOpaque "TYPE" ]
+    , [ ( LEHigherOrder
+        , "`" <> (rName res).rnBase <> "` takes a function-typed parameter; the relational\
+          \ middle end is first-order Horn, so an ASSUMEd predicate's parameters must be\
+          \ values" )
+      | any isFunTy (catMaybes bndrTys <> spineTys) ]
+    , [ e | Just e <- [listToMaybe (mapMaybe fragmentSortError (paramSorts <> [resultSort]))] ]
+    ]
+  isFunTy = \case Fun{} -> True; Forall _ _ t -> isFunTy t; _ -> False
+
+-- | Whether an @ASSUME@ declares a category rather than a term: @ASSUME T IS A
+-- TYPE@, and only in its nullary spelling. @ASSUME T x IS A TYPE@ is a
+-- parameterised type constructor, which has no category image (Blawx categories
+-- take no arguments) and is left to the ordinary refusal path.
+assumesCategory :: Assume Resolved -> Bool
+assumesCategory (MkAssume _ _ (MkAppForm _ _ args _) mty _) =
+  null args && case mty of Just Type{} -> True; _ -> False
+
 buildCtx :: EntityInfo -> Map Unique ExportedFunction -> Module Resolved -> Ctx
 buildCtx ei exps m = ctx
  where
@@ -605,12 +781,30 @@ buildCtx ei exps m = ctx
   -- call and a "record has no such field" branch for one is dead code.
   storedFields fields = [ (fAnn, fRes, fTy) | MkTypedName fAnn fRes fTy _ Nothing <- fields ]
 
+  assumeDecls = [ (ann, a) | Assume ann a <- decls ]
+
+  -- ASSUME T IS A TYPE: a category with no fields ('RAbstractDef').
+  abstractPairs =
+    [ (getUnique r, rName r, rangeOf a)
+    | (_, a@(MkAssume _ _ (MkAppForm _ r _ _) _ _)) <- assumeDecls
+    , assumesCategory a
+    ]
+
+  -- Everything else an ASSUME can be: a term, admitted or refused.
+  assumeDefPairs =
+    [ (getUnique r, assumeDef sortEnv ei ann a)
+    | (ann, a@(MkAssume _ _ (MkAppForm _ r _ _) _ _)) <- assumeDecls
+    , not (assumesCategory a)
+    ]
+
   -- Built from the declaration lists ALONE, with no reference to 'ctx'. See the
   -- 'SortEnv' haddock: routing this through 'ctx' deadlocks the moment a record
-  -- field's type is another record.
+  -- field's type is another record. ('assumeDefPairs' reads it, and is in 'ctx'
+  -- — the dependency runs one way only.)
   sortEnv = MkSortEnv
-    { seRecords = Map.fromList [ (u, rName recRes) | (u, (recRes, _, _, _)) <- recPairs ]
-    , seEnums   = Map.fromList [ (u, rName tyRes)  | (u, (tyRes, _, _)) <- enumPairs ]
+    { seRecords  = Map.fromList [ (u, rName recRes) | (u, (recRes, _, _, _)) <- recPairs ]
+    , seEnums    = Map.fromList [ (u, rName tyRes)  | (u, (tyRes, _, _)) <- enumPairs ]
+    , seAbstract = Map.fromList [ (u, n) | (u, n, _) <- abstractPairs ]
     }
 
   ctx = MkCtx
@@ -655,18 +849,37 @@ buildCtx ei exps m = ctx
         ]
     , ctxTop    = tops
     , ctxTopByU = Map.fromList [ (getUnique td.tdRes, td) | td <- tops ]
-    , ctxAssumes = Set.fromList
-        [ getUnique r | Assume _ (MkAssume _ _ (MkAppForm _ r _ _) _ _) <- decls ]
-    , ctxSigs   = Map.fromList
-        [ ( getUnique td.tdRes
-          , MkCallSig
-              { csName = rName td.tdRes
-              , csPre  = []
-              , csBool = isBoolSort (sortOfType sortEnv td.tdResultTy)
-              }
+    , ctxAssumeDefs = Map.fromList assumeDefPairs
+    , ctxAssumeOrder = map fst assumeDefPairs
+    , ctxAbstract = Map.fromList
+        [ ( u
+          , MkRAbstractDef { raName = n, raProv = MkRProv { rpvUnique = u, rpvRange = rng } }
           )
-        | td <- tops
+        | (u, n, rng) <- abstractPairs
         ]
+    , ctxAbstractOrder = [ u | (u, _, _) <- abstractPairs ]
+    , ctxSigs   = Map.fromList
+        (  [ ( getUnique td.tdRes
+             , MkCallSig
+                 { csName = rName td.tdRes
+                 , csPre  = []
+                 , csBool = isBoolSort (sortOfType sortEnv td.tdResultTy)
+                 }
+             )
+           | td <- tops
+           ]
+        -- An admitted ASSUME is callable, which is the whole widening: with an
+        -- entry here 'lookupCall' resolves a reference to it and 'anfPred' /
+        -- 'anfTerm' emit an ordinary call, exactly as for a DECIDE. The map is
+        -- keyed by 'Unique', so a DECIDE and an ASSUME spelled alike cannot
+        -- collide here — the reference's own resolution already picked one.
+        <> [ ( u
+             , MkCallSig { csName = ad.adName, csPre = [], csBool = isNothing ad.adResult }
+             )
+           | (u, ad) <- assumeDefPairs
+           , isNothing ad.adRefusal
+           ]
+        )
     , ctxEnt = ei
     }
 
@@ -1075,7 +1288,10 @@ peelLocals ctx opts env = \case
     LocalDecide lann d -> pure (lann, d)
     LocalAssume _ a ->
       bailIn env (rangeOf a) (LEUnsupported "local ASSUME")
-        "a local ASSUME has no relational image (it is uninterpreted)"
+        "a local ASSUME has no relational image: unlike a top-level one — which \
+        \becomes an input predicate a target can declare and abduce — it is scoped \
+        \to a single definition, so there is no module-level name to declare and \
+        \nothing for an interview to ask about"
 
 hintOf :: Resolved -> Text
 hintOf = unqualifiedNameToText . getOriginal
@@ -1186,11 +1402,19 @@ anfTerm ctx env e0 = case e0 of
     | firstOrderCombinator (hintOf r) ->
         bailIn env (rangeOf e0) (LEUnsupported "prelude list combinator")
           ( "`" <> hintOf r <> "` is a prelude list combinator with no relational image in M1" )
-    | getUnique r `Set.member` ctx.ctxAssumes ->
-        bailIn env (rangeOf e0) (LEUnsupported "top-level ASSUME")
-          ( "`" <> hintOf r <> "` is ASSUMEd, which L4 leaves uninterpreted, so there is no"
-              <> " definition to lower and no value the L4 oracle could differentially check"
-              <> " (idiomatic L4 threads a record as one GIVEN parameter instead)" )
+    -- The RESIDUE of the ASSUME widening. An admitted ASSUME never arrives
+    -- here: it has a 'ctxSigs' entry, so 'lookupCall' above resolved it into an
+    -- ordinary call. What is left is the ASSUMEs the fragment refused, each
+    -- reported with the reason recorded at the DECLARATION and that
+    -- declaration's range — one @ASSUME@ may be referenced from four places,
+    -- and the range a reader needs is the signature's.
+    | Just ad <- Map.lookup (getUnique r) ctx.ctxAssumeDefs
+    , Just (kind, msg) <- ad.adRefusal ->
+        bailIn env (ad.adRange <|> rangeOf e0) kind msg
+    | Just ab <- Map.lookup (getUnique r) ctx.ctxAbstract ->
+        bailIn env (rangeOf e0) (LEUnsupported "ASSUMEd TYPE in value position")
+          ( "`" <> ab.raName.rnBase <> "` is an ASSUMEd TYPE — a category, which sorts values"
+              <> " but is not one; it can be a parameter's type, never a term" )
     | otherwise -> bailIn env (rangeOf e0) LEUnbound (unboundMsg r)
   AppNamed _ r _ _
     | isJust (recordOf ctx (getUnique r)) ->
@@ -2343,8 +2567,10 @@ assemble ctx opts m = do
   queries  <- lowerQueries ctx m
   aux      <- gets (.lsAux)
   notes    <- gets (.lsNotes)
-  let inputs = inputPreds ctx (computed <> aux)
+  let assumed = assumedInputPreds ctx (computed <> aux)
+      inputs = inputPreds ctx (computed <> aux) <> assumed
       preds  = inputs <> computed <> aux
+      abstract = reachableAbstract ctx preds
       deps   = buildDepGraph preds
       strata = stratify preds deps
   -- Recursion the structural check cannot see, because it is not SELF-reference:
@@ -2356,12 +2582,13 @@ assemble ctx opts m = do
     { rpgSource   = moduleSourceOf m
     , rpgTitle    = moduleTitleOf m
     , rpgRecords  = orderedRecords ctx
+    , rpgAbstract = abstract
     , rpgEnums    = [ e | u <- ctx.ctxEnumOrder, Just e <- [Map.lookup u ctx.ctxEnums] ]
     , rpgPreds    = preds
     , rpgQueries  = queries
     , rpgDeps     = deps
     , rpgStrata   = strata
-    , rpgFidelity = (emptyReport "relational") { notes = notes }
+    , rpgFidelity = (emptyReport "relational") { notes = notes <> assumedNotes ctx assumed }
     }
 
 -- | The module's records in source declaration order ('ctxRecOrder').
@@ -2472,3 +2699,105 @@ inputPreds ctx preds =
     RProj _ f _     -> [f.rnUnique]
     RFindAll _ gs _ -> concatMap fromGoal gs
     _               -> []
+
+-- | The top-level @ASSUME@s the lowered program actually calls, as 'RInput'
+-- predicates — the second source of that kind (see 'RInput').
+--
+-- Same shape and same discipline as 'inputPreds': only the names a lowered
+-- clause reached, walked in source declaration order rather than over a
+-- 'Unique'-keyed map ('ctxRecOrder' says why). An @ASSUME@ nothing calls
+-- contributes nothing and is not an error, exactly as an unprojected field is
+-- not — that reachability gate is what makes the widening additive, since a
+-- module with no @ASSUME@s cannot gain a predicate.
+--
+-- A refused @ASSUME@ ('adRefusal') can never be reached, because it has no
+-- 'ctxSigs' entry, so no clause can carry a call to it: the filter here is
+-- belt-and-braces against a future edit that adds one.
+assumedInputPreds :: Ctx -> [RPred] -> [RPred]
+assumedInputPreds ctx preds =
+  [ MkRPred
+      { rpName      = ad.adName
+      , rpKind      = RInput
+      , rpParams    = ad.adParams
+      , rpResult    = ad.adResult
+      , rpRecursion = RNonRecursive
+      , rpClauses   = []
+      , rpExported  = False
+      , rpDesc      = ad.adDesc
+      , rpNlg       = ad.adNlg
+      , rpRef       = ad.adRef
+      , rpProv      = MkRProv { rpvUnique = u, rpvRange = ad.adRange }
+      }
+  | u <- ctx.ctxAssumeOrder
+  , Just ad <- [Map.lookup u ctx.ctxAssumeDefs]
+  , isNothing ad.adRefusal
+  , u `Set.member` called
+  ]
+ where
+  called = Set.fromList (concatMap fromPred preds)
+  fromPred p = concatMap (concatMap fromGoal . (.rcBody)) p.rpClauses
+  fromGoal = \case
+    RCall n _       -> [n.rnUnique]
+    RNotCall n _    -> [n.rnUnique]
+    RFindAll _ gs _ -> concatMap fromGoal gs
+    _               -> []
+
+-- | The fidelity notes an admitted @ASSUME@ owes: one for a sort the fragment
+-- cannot name (mirroring 'lowerSpec' \'s @R-SORT@, since an input predicate does
+-- not go through it) and one for a @TYPICALLY@ default that was dropped.
+assumedNotes :: Ctx -> [RPred] -> [FidelityNote]
+assumedNotes ctx assumed =
+     [ MkFidelityNote
+         { code     = "R-SORT"
+         , severity = Lossy
+         , element  = p.rpName.rnText
+         , range    = p.rpProv.rpvRange
+         , message  = "an ASSUMEd signature has a sort the M1 fragment cannot name; it is\
+                      \ carried as opaque"
+         , lost     = "the declared value type an ontology-bearing target (Blawx) needs"
+         }
+     | p <- assumed
+     , RSOpaque _ <- p.rpParams <> maybeToList p.rpResult
+     ]
+  <> [ MkFidelityNote
+         { code     = "R-TYPICALLY"
+         , severity = Lossy
+         , element  = p.rpName.rnText
+         , range    = p.rpProv.rpvRange
+         , message  = "a TYPICALLY default on an ASSUME is dropped: the name becomes an input\
+                      \ predicate, and seeding it would answer the question the target's\
+                      \ interview exists to ask"
+         , lost     = "the default value"
+         }
+     | p <- assumed
+     , Just ad <- [Map.lookup p.rpName.rnUnique ctx.ctxAssumeDefs]
+     , ad.adTypically
+     ]
+
+-- | The @ASSUME@d types some emitted predicate's signature mentions, in source
+-- declaration order.
+--
+-- Reachability again, and for a sharper reason than tidiness: an abstract
+-- category that reached no signature has no declaration an emitter could hang
+-- anything from, and Blawx's category block would then declare a category no
+-- rule, fact or attribute ever names.
+reachableAbstract :: Ctx -> [RPred] -> [RAbstractDef]
+reachableAbstract ctx preds =
+  [ ab
+  | u <- ctx.ctxAbstractOrder
+  , Just ab <- [Map.lookup u ctx.ctxAbstract]
+  , u `Set.member` mentioned
+  ]
+ where
+  mentioned = Set.fromList
+    [ n.rnUnique
+    | p <- preds
+    , s <- p.rpParams <> maybeToList p.rpResult
+    , n <- sortRefs s
+    ]
+  sortRefs = \case
+    RSRecord n -> [n]
+    RSEnum n   -> [n]
+    RSList s   -> sortRefs s
+    RSMaybe s  -> sortRefs s
+    _          -> []
