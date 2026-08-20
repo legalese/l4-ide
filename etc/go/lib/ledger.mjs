@@ -34,7 +34,26 @@ import { join } from "node:path";
  * schema-2 row that failed to record one — which is exactly the ambiguity this
  * number exists to refuse.
  */
-export const JOURNAL_SCHEMA = 2;
+export const JOURNAL_SCHEMA = 3;
+
+/**
+ * Schemas this binary can READ. A journal declares its schema in record 0 and
+ * must be internally consistent; it does not have to match the current binary.
+ *
+ * The check this replaces was `rec.journal_schema !== JOURNAL_SCHEMA` on every
+ * record, which made every journal ever written unverifiable the moment the
+ * constant moved — including the ones committed to `legalese/canon`, silently,
+ * because nobody re-verifies an old run until they need it. Adding fields is
+ * safe for old records by construction: hashRecord canonicalises a record as
+ * PARSED, with no schema template, so a schema-2 stage_end carrying no `rel`,
+ * no `cas` and no `produced_under` hashes today to exactly what it hashed on
+ * the day it was written.
+ *
+ * Internal consistency is still enforced, and that is the real check: a journal
+ * whose record 0 says 2 and whose record 3 says 3 was written by two different
+ * binaries into one chain, which is a genuine problem.
+ */
+export const KNOWN_SCHEMAS = new Set([2, 3]);
 
 export const GENESIS =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -76,13 +95,53 @@ export function sha256Text(text) {
  * depends on and that would otherwise be re-read once per stage — without
  * pretending it is one of the stage's declared source paths.
  */
+/**
+ * The SERIALISATION digestSet hashes. Exported, because it is a document.
+ *
+ * `digestSet(paths) === sha256Text(manifestText(paths))`, by construction: this
+ * IS digestSet's body, lifted out. That identity is what makes every digest
+ * already recorded in every journal — and in the gate rows committed to
+ * `legalese/canon` — resolvable to a readable manifest rather than staying an
+ * opaque number. Two runs that disagree about whether a stage may replay can be
+ * handed both manifests and diffed; nothing else in this system offers that.
+ *
+ * THE FORMAT IS FROZEN. It names run directories (the `corpus_sha8` in every
+ * run id) and sits inside gate rows already committed. A tab moved here
+ * silently stops every existing run id and gate binding from corresponding to
+ * anything. selftest.mjs pins the identity above precisely so the lift cannot
+ * drift from the thing it was lifted out of.
+ */
+export function manifestText(paths) {
+  return [...paths]
+    .sort()
+    .map((p) => {
+      if (p.startsWith("text:")) return p;
+      if (!existsSync(p)) return `${p}\tABSENT`;
+      return `${p}\t${statSync(p).size}\t${sha256File(p)}`;
+    })
+    .join("\n");
+}
+
 export function digestSet(paths) {
-  const parts = [...paths].sort().map((p) => {
-    if (p.startsWith("text:")) return p;
-    if (!existsSync(p)) return `${p}\tABSENT`;
-    return `${p}\t${statSync(p).size}\t${sha256File(p)}`;
+  return sha256Text(manifestText(paths));
+}
+
+/**
+ * The same set, ITEMISED — one record per member, in manifestText's order.
+ *
+ * A digest is a set hash: it can say "this changed" and never "which of these
+ * did the expert review?". That question is R11's, and answering it from a
+ * digest means re-resolving the subject and re-reading the tree — both of which
+ * need the run that is being asked about to still exist. This returns the
+ * members as data, so a blessing can carry them and outlive its run.
+ */
+export function digestMembers(paths) {
+  return [...paths].sort().map((p) => {
+    if (p.startsWith("text:")) return { path: p, sha256: null, bytes: null };
+    if (!existsSync(p))
+      return { path: p, sha256: null, bytes: null, absent: true };
+    return { path: p, sha256: sha256File(p), bytes: statSync(p).size };
   });
-  return sha256Text(parts.join("\n"));
 }
 
 export function read(journalPath) {
@@ -106,10 +165,16 @@ export function verify(journalPath) {
   const problems = [];
   let prev = GENESIS;
   records.forEach((rec, i) => {
-    if (rec.journal_schema !== JOURNAL_SCHEMA)
+    if (i === 0) {
+      if (!KNOWN_SCHEMAS.has(rec.journal_schema))
+        problems.push(
+          `record 0 (${rec.stage ?? rec.kind}): journal_schema ${rec.journal_schema} is not one this binary reads (${[...KNOWN_SCHEMAS].join(", ")})`,
+        );
+    } else if (rec.journal_schema !== records[0].journal_schema) {
       problems.push(
-        `record ${i} (${rec.stage ?? rec.kind}): journal_schema ${rec.journal_schema} != ${JOURNAL_SCHEMA}`,
+        `record ${i} (${rec.stage ?? rec.kind}): journal_schema ${rec.journal_schema} != ${records[0].journal_schema} declared by record 0 — one chain, two binaries`,
       );
+    }
     if (rec.prev !== prev)
       problems.push(
         `record ${i} (${rec.stage ?? rec.kind}): prev ${rec.prev} != ${prev}`,

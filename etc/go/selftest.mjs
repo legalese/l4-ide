@@ -32,13 +32,18 @@ import { fileURLToPath } from "node:url";
 import {
   CROSS_RUN_INELIGIBLE,
   append,
+  digestMembers,
+  digestSet,
   findReplayableAcrossRuns,
   hashRecord,
+  manifestText,
   read,
   runSubject,
   sha256File as hashOf,
+  sha256Text as hashText,
   verify,
 } from "./lib/ledger.mjs";
+import * as Store from "./lib/store.mjs";
 import {
   driftFor,
   lintNarrative,
@@ -5250,6 +5255,398 @@ process.stdout.write("\n-- the standard library --\n");
   );
 }
 // ===== END the standard library =============================================
+
+// ===== the artifact store and the blessing edge (R6 + R11) ==================
+//
+// Two rulings, one structure, because both need the same thing: a fact about a
+// content hash that outlives the run that produced it. Measured 2026-08-20: of
+// 92 run directories, 16 still hold a journal and files last two to five days.
+// A blessing recorded only in a run journal has that half-life — a human
+// signature expiring in under a week for reasons nobody chose.
+process.stdout.write("\n-- the store and the blessing edge --\n");
+{
+  const mkStore = () => mkdtempSync(resolve(tmpdir(), "l4-go-store-"));
+  const mkFile = (dir, name, content) => {
+    const p = resolve(dir, name);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, content);
+    return p;
+  };
+
+  // T-1 · the lifted manifest still IS digestSet's body.
+  //
+  // digestSet's serialisation names run directories (every run id carries a
+  // corpus_sha8) and sits inside gate rows committed to legalese/canon. Lifting
+  // it out so a digest becomes a readable document is worth doing exactly once
+  // and never worth drifting: a tab moved here silently stops every existing
+  // run id and gate binding from corresponding to anything.
+  {
+    const d = mkStore();
+    const present = mkFile(d, "a.l4", "-- a\n");
+    const paths = [present, resolve(d, "gone.l4"), "text:floor=3"];
+    check(
+      "digestSet(paths) === sha256Text(manifestText(paths)) — the lift did not drift",
+      digestSet(paths) === hashText(manifestText(paths)),
+    );
+    const members = digestMembers(paths);
+    check("digestMembers itemises every member", members.length === 3);
+    check(
+      "an absent member is marked absent rather than dropped",
+      members.some((m) => m.absent === true && m.sha256 === null),
+    );
+    check(
+      "a text: literal carries no hash and is still a member",
+      members.some((m) => m.path === "text:floor=3" && m.sha256 === null),
+    );
+    check(
+      "members are in manifestText's order, so covers[] and the digest agree",
+      members.map((m) => m.path).join("\n") === [...paths].sort().join("\n"),
+    );
+    rmSync(d, { recursive: true, force: true });
+  }
+
+  // T-2 · a schema-2 journal still verifies under the schema-3 binary.
+  //
+  // The check this replaces compared every record against the CURRENT constant,
+  // so bumping it made every journal ever written unverifiable — including the
+  // ones committed to legalese/canon, silently, because nobody re-verifies an
+  // old run until they need it.
+  {
+    const d = mkStore();
+    const j = resolve(d, "journal.ndjson");
+    // Written RAW at schema 2: append() stamps the current schema, so a
+    // fixture built with it could never be an OLD journal.
+    const rows = [
+      {
+        journal_schema: 2,
+        seq: 0,
+        kind: "run_begin",
+        run_id: "r",
+        subject: "s",
+      },
+      {
+        journal_schema: 2,
+        seq: 1,
+        kind: "stage_end",
+        stage: "p3-check",
+        status: "PASS",
+      },
+    ];
+    let prev = "sha256:" + "0".repeat(64);
+    const lines = rows.map((r) => {
+      const rec = { ...r, prev };
+      rec.hash = hashRecord(rec);
+      prev = rec.hash;
+      return JSON.stringify(rec);
+    });
+    writeFileSync(j, lines.join("\n") + "\n");
+    check(
+      "a schema-2 journal verifies under the schema-3 binary",
+      verify(j).ok,
+    );
+
+    // The control: one chain, two binaries, is a genuine problem.
+    const mixed = resolve(d, "mixed.ndjson");
+    let prev2 = "sha256:" + "0".repeat(64);
+    const mrows = [
+      {
+        journal_schema: 2,
+        seq: 0,
+        kind: "run_begin",
+        run_id: "r",
+        subject: "s",
+      },
+      {
+        journal_schema: 3,
+        seq: 1,
+        kind: "stage_end",
+        stage: "p3-check",
+        status: "PASS",
+      },
+    ];
+    writeFileSync(
+      mixed,
+      mrows
+        .map((r) => {
+          const rec = { ...r, prev: prev2 };
+          rec.hash = hashRecord(rec);
+          prev2 = rec.hash;
+          return JSON.stringify(rec);
+        })
+        .join("\n") + "\n",
+    );
+    const mv = verify(mixed);
+    check("a journal mixing two schemas is REFUSED", !mv.ok);
+    check(
+      "and the refusal says one chain, two binaries",
+      mv.problems.some((p) => /one chain, two binaries/.test(p)),
+    );
+    check(
+      "an unknown schema in record 0 is refused too",
+      (() => {
+        const u = resolve(d, "u.ndjson");
+        const rec = {
+          journal_schema: 99,
+          seq: 0,
+          kind: "run_begin",
+          prev: "sha256:" + "0".repeat(64),
+        };
+        rec.hash = hashRecord(rec);
+        writeFileSync(u, JSON.stringify(rec) + "\n");
+        return !verify(u).ok;
+      })(),
+    );
+    rmSync(d, { recursive: true, force: true });
+  }
+
+  // The store proper: admit, fetch, and the subdirectory case that basename
+  // flattening would have collided.
+  {
+    const root = mkStore();
+    const work = mkStore();
+    const a = mkFile(work, "state-graphs/g.dot", "digraph A {}\n");
+    const b = mkFile(work, "p8-diff/g.dot", "digraph B {}\n");
+    const shaA = hashOf(a);
+    const shaB = hashOf(b);
+    check(
+      "two artifacts sharing a basename have different hashes",
+      shaA !== shaB,
+    );
+    Store.put(root, a, shaA, {
+      subject: "s",
+      stage: "p7-lts",
+      rel: "state-graphs/g.dot",
+    });
+    Store.put(root, b, shaB, {
+      subject: "s",
+      stage: "p8-diff",
+      rel: "p8-diff/g.dot",
+    });
+    const outA = resolve(work, "out/state-graphs/g.dot");
+    const outB = resolve(work, "out/p8-diff/g.dot");
+    check(
+      "both materialise",
+      Store.materialise(root, shaA, outA) &&
+        Store.materialise(root, shaB, outB),
+    );
+    check(
+      "to DISTINCT destinations at their own bytes — rel, not basename",
+      readFileSync(outA, "utf8") !== readFileSync(outB, "utf8"),
+    );
+    check(
+      "materialising an object the store does not have is false, not a throw",
+      Store.materialise(
+        root,
+        "sha256:" + "f".repeat(64),
+        resolve(work, "no.dot"),
+      ) === false,
+    );
+
+    // put() must never throw: a broken home directory may not turn a good
+    // legal encoding run red. The refusal belongs on the serving side.
+    check(
+      "put() over an unwritable root returns null rather than throwing",
+      Store.put("/proc/nonexistent-store", a, shaA, {}) === null,
+    );
+    rmSync(root, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  }
+
+  // T-6 · an object produced by an ungated stage is not servable. R11's
+  // operative sentence: without it, default-deny becomes default-allow the
+  // first time a caller finds it inconvenient.
+  {
+    const root = mkStore();
+    const work = mkStore();
+    const f = mkFile(work, "x.json", "{}\n");
+    const sha = hashOf(f);
+
+    Store.put(root, f, sha, {
+      subject: "s",
+      stage: "p3-check",
+      produced_under: null,
+    });
+    check(
+      "an object admitted under no gate is NOT servable",
+      Store.servability(root, sha).servable === false,
+    );
+    check(
+      "and it says why — the producing stage was ungated",
+      /ungated/.test(Store.servability(root, sha).reason ?? ""),
+    );
+
+    const waived = Store.writeBlessing(root, {
+      kind: "blessing",
+      subject: "s",
+      gate: "HG1",
+      state: "waived",
+      reason: "no domain expert has read this",
+      covers: [],
+      signer: null,
+      signature: null,
+      namespace: null,
+      payload_digest: null,
+    });
+    Store.put(root, f, sha, {
+      subject: "s",
+      stage: "p6-tests",
+      produced_under: {
+        blessing: waived.hash,
+        gate: "HG1",
+        state: "waived",
+        reason: waived.reason,
+      },
+    });
+    const w = Store.servability(root, sha);
+    check(
+      "a WAIVED grant is an edge, not an absence — it resolves",
+      w.state === "waived",
+    );
+    check("but waived is still not servable on its own", w.servable === false);
+    check(
+      "and the waiver's reason travels with it",
+      /no domain expert/.test(w.reason ?? ""),
+    );
+
+    const sat = Store.writeBlessing(root, {
+      kind: "blessing",
+      subject: "s",
+      gate: "HG1",
+      state: "satisfied",
+      reason: null,
+      covers: [{ path: "x.l4", sha256: sha, bytes: 3 }],
+      signer: "someone SHA256:abc",
+      signature: "c2ln",
+      namespace: "l4-go-gate",
+      payload_digest: "sha256:" + "1".repeat(64),
+    });
+    Store.put(root, f, sha, {
+      subject: "s",
+      stage: "p6-tests",
+      produced_under: { blessing: sat.hash, gate: "HG1", state: "satisfied" },
+    });
+    check(
+      "one satisfied admission makes the BYTES servable, whichever run produced them",
+      Store.servability(root, sha).servable === true,
+    );
+    check(
+      "an object the store never saw is unknown, not servable",
+      Store.servability(root, "sha256:" + "e".repeat(64)).servable === false,
+    );
+    rmSync(root, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  }
+
+  // T-8 · a blessing survives the deletion of the run that granted it.
+  // INVARIANT I8. Today the only record of a grant lives in $TMPDIR, and gc
+  // keeps only `satisfied` runs while every run in the store is `waived`.
+  {
+    const root = mkStore();
+    const runDir = mkStore();
+    writeFileSync(resolve(runDir, "journal.ndjson"), "{}\n");
+    const rec = Store.writeBlessing(root, {
+      kind: "blessing",
+      subject: "sg-succession",
+      gate: "HG1",
+      state: "satisfied",
+      reason: null,
+      covers: [
+        {
+          path: "jl4/examples/legal/x/a.l4",
+          sha256: "sha256:" + "a".repeat(64),
+          bytes: 10,
+        },
+        {
+          path: "jl4/examples/legal/x/b.l4",
+          sha256: "sha256:" + "b".repeat(64),
+          bytes: 20,
+        },
+      ],
+      signer: "expert@example.invalid SHA256:Zz",
+      signature: "c2lnbmF0dXJl",
+      namespace: "l4-go-gate",
+      payload_digest: "sha256:" + "2".repeat(64),
+      granted_in_run: "2026-08-20-aaaaaaaa-001",
+    });
+    rmSync(runDir, { recursive: true, force: true });
+    const back = Store.readBlessings(root).find((b) => b.hash === rec.hash);
+    check(
+      "a blessing outlives the run directory that granted it",
+      Boolean(back),
+    );
+    check(
+      "it still names the signer",
+      /expert@example/.test(back?.signer ?? ""),
+    );
+    check(
+      "it still carries the signature bytes, not a path into the run dir",
+      back?.signature === "c2lnbmF0dXJl",
+    );
+    check(
+      "it still itemises every covers[] member",
+      back?.covers?.length === 2,
+    );
+    check("the ledger verifies", Store.verifyBlessings(root).ok);
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  // A ledger record that claims more than it carries. Gate rows bypass
+  // checkReceipt today, so a `satisfied` with a null signature is written
+  // without complaint — disposable in a run directory, permanent in a ledger.
+  {
+    const ok = Store.checkClaim({
+      gate: "HG1",
+      state: "satisfied",
+      signature: "x",
+      signer: "y",
+      namespace: "l4-go-gate",
+      payload_digest: "sha256:z",
+      covers: [],
+    });
+    check("a well-formed satisfied claim passes checkClaim", ok.ok);
+    check(
+      "a satisfied claim with no signature is refused",
+      !Store.checkClaim({ gate: "HG1", state: "satisfied", covers: [] }).ok,
+    );
+    check(
+      "a waived claim with no reason is refused",
+      !Store.checkClaim({ gate: "HG1", state: "waived", covers: [] }).ok,
+    );
+    const hg2 = Store.checkClaim({
+      gate: "HG2",
+      state: "waived",
+      reason: "r",
+      covers: [],
+    });
+    check(
+      "a WAIVED HG2 is refused — unwaivability moves into the writer",
+      !hg2.ok,
+    );
+    check(
+      "and the refusal says a durable one could never be withdrawn",
+      hg2.problems.some((p) => /never be withdrawn/.test(p)),
+    );
+    check(
+      "a claim with no covers[] is refused",
+      !Store.checkClaim({ gate: "HG1", state: "waived", reason: "r" }).ok,
+    );
+  }
+
+  // The two structural rules the design rests on, asserted over the source so
+  // they cannot be undone by a well-meaning edit.
+  {
+    const src = readFileSync(resolve(HERE, "lib/store.mjs"), "utf8");
+    check(
+      "writeBlessing has no CLI verb — receipt.mjs stays the only writer of a claim",
+      !/process\.argv/.test(src),
+    );
+    check(
+      "the serving predicate is written ONCE and exported",
+      (src.match(/export function servability/g) || []).length === 1,
+    );
+  }
+}
+// ===== END the store and the blessing edge ==================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
