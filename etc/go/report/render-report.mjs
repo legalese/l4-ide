@@ -186,7 +186,15 @@ function projectionsTable() {
       r.reason ??
       r.oracle?.because ??
       (r.replayed_from
-        ? `inputs unchanged; the verdict and its evidence are the receipt ${r.replayed_from.slice(0, 23)}… on this journal`
+        ? // `replayed_from_run` is null for the ordinary resume — the borrowed
+          // receipt is a few lines up in THIS journal. When it is set, the
+          // evidence was earned in another run, and saying "on this journal"
+          // would send a reader looking for a record that is not there.
+          `inputs unchanged; the verdict and its evidence are the receipt ${r.replayed_from.slice(0, 23)}… ${
+            r.replayed_from_run
+              ? `earned in run ${r.replayed_from_run}, whose artifacts were copied into this one`
+              : "on this journal"
+          }`
         : "");
     return `| \`${s}\` | ${r.status}${label} | ${oracle} | ${esc(says)} |`;
   });
@@ -234,7 +242,9 @@ function projectionsDetail() {
       out.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
     if (r.replayed_from)
       out.push(
-        `\n*Replayed* from receipt \`${r.replayed_from}\` — the inputs were unchanged and the oracle did not run again.`,
+        r.replayed_from_run
+          ? `\n*Replayed across runs* from receipt \`${r.replayed_from}\`, earned in run \`${r.replayed_from_run}\` — the declared inputs were byte-identical, so the oracle did not run again. That run's artifacts were COPIED into this one, so every hash below is checkable from this run directory alone.`
+          : `\n*Replayed* from receipt \`${r.replayed_from}\` — the inputs were unchanged and the oracle did not run again.`,
       );
     out.push("");
   }
@@ -295,7 +305,13 @@ function sourceSection() {
     .map(([k, v]) => `| \`${k.replace(/^corpus_sha_/, "")}\` | \`${v}\` |`);
   return [
     absent(
-      "SPEC.md §P1 requires the source bundle with provenance — the SEC entry point, the eCFR retrieval, and the FR citations for the adoption and each amendment.",
+      // Subject-GENERIC. This sentence used to name "the SEC entry point, the
+      // eCFR retrieval, and the FR citations", which is Reg CF's apparatus and
+      // nobody else's: the sg-succession report told a reader that a Singapore
+      // succession corpus owed an eCFR retrieval. The requirement is the same
+      // for every subject; only the sources differ, and those are the
+      // subject's own business, not this renderer's.
+      "SPEC.md §P1 requires the source bundle with provenance — the retrieval of each source document, its integrity digest or immutable capture, the publisher's in-force statement, and the citation of the instrument and of each amendment.",
       "`p1-ingest` is not declared at this milestone: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — at `g2` it validates a deposited source bundle — but a bundle is not what this run read.)",
     ),
     "",
@@ -312,7 +328,11 @@ function sweepSection() {
   if (r) return receiptBlock(r);
   return absent(
     'SPEC.md §P2 requires the external-modification register, and requires this report to state what was SEARCHED, not only what was found — "no modification found" is a checked claim, not a default.',
-    "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts, C&DIs, no-action letters, or rules in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
+    // Also subject-generic: "C&DIs, no-action letters" is the SEC's guidance
+    // apparatus. Courts, regulator guidance and instruments in flight are the
+    // three classes every jurisdiction has; what they are CALLED is the
+    // subject's business.
+    "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
   );
 }
 

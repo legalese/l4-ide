@@ -1,0 +1,167 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-succession-domain`
+IMPORT `sg-isa`
+IMPORT `sg-succession`
+
+-- The corpus is Singapore law, so its clock is Singapore's. Declared even
+-- though nothing below reads `RULES EFFECTIVE DATE` any more, because a
+-- deployed module that ever gains a dated read should not fail at request time
+-- with a timezone error.
+TIMEZONE IS "Asia/Singapore"
+
+§ `Singapore succession — the deployable façade`
+
+-- ===========================================================================
+-- THE DEPLOYABLE SURFACE.
+--
+-- The five corpus modules carry ZERO `@export` by design: they are inert, so a
+-- domain expert can read them section by section against the Acts without
+-- presentation concerns in the way. This module is the only exported one. It
+--
+--   (a) ROUTES flat, plain-English inputs into the corpus's own record types,
+--   (b) CALLS the corpus's own predicates, and
+--   (c) PRESENTS the answer as flat records a form can render and a JSON
+--       client can read.
+--
+-- IT RE-IMPLEMENTS NO LAW. Every legal question below is delegated to
+-- sg-isa.l4 / sg-wills.l4 / sg-paa.l4 through sg-succession.l4. If you find a
+-- rule stated here, that is a defect: fix it by deleting it and calling the
+-- corpus instead.
+--
+-- FIELD NAMES STAY UNDER 60 CHARACTERS. jl4-service sanitises schema property
+-- names and TRUNCATES them at 60, so the corpus's own field names -- which are
+-- the statutes' sentences -- would reach the wire amputated. Every name below
+-- is short enough to survive intact.
+--
+-- WHAT THE FLAT SURFACE CANNOT SAY, and why that is recorded rather than
+-- hidden: the corpus's `Person` is a TREE (ISA s 7 rule 3 distributes per
+-- stirpes "to the remotest degree"), and a flat form cannot describe an
+-- arbitrary family tree. This façade covers the shapes an ordinary enquiry
+-- has -- counts per class, plus ONE level of representation for a predeceased
+-- child. A deeper tree (a predeceased grandchild) needs the corpus API
+-- directly, and `the family shape is fully described` says so rather than
+-- quietly answering a different question.
+-- ===========================================================================
+
+
+§§ `Building the corpus's records from flat counts`
+
+-- Distinct names are not attempted: L4 has no number-to-string, and the answer
+-- a form needs is the SHARE PER CLASS, not per individual. Members of a class
+-- therefore share a label, and a client that sums by taker gets the class's
+-- total -- which is the number a person actually asks for ("what do the
+-- children get between them?").
+GIVEN howMany IS A NUMBER
+      label   IS A STRING
+GIVETH A LIST OF Person
+`the` howMany `survivors called` label MEANS
+    replicate howMany (Person WITH `name`                  IS label
+                                , `survived the deceased`  IS TRUE
+                                , `issue`                  IS EMPTY)
+
+-- ISA s 7 rule 3: a child who died before the deceased is represented by their
+-- own children, who take that child's share between them.
+GIVEN howManyStocks    IS A NUMBER
+      childrenPerStock IS A NUMBER
+GIVETH A LIST OF Person
+`the` howManyStocks `predeceased children each leaving` childrenPerStock MEANS
+    replicate howManyStocks
+      (Person WITH `name`                 IS "a grandchild"
+                 , `survived the deceased` IS FALSE
+                 , `issue`                 IS (`the` childrenPerStock `survivors called` "a grandchild"))
+
+
+§§ `The question a person actually asks`
+
+DECLARE `Succession answer`
+    HAS `the law that applies`        IS A STRING
+        `what to do next`             IS A STRING
+        `the estate at death`         IS A NUMBER
+        `left after debts and expenses` IS A NUMBER
+        `divided by this Act`         IS A NUMBER
+        `who takes, and how much`     IS A LIST OF Share
+        `note`                        IS A STRING
+        `the family shape is fully described` IS A BOOLEAN
+
+-- The single entry point. Every argument is a fact a person can answer about
+-- themselves without a lawyer; every answer comes from the corpus.
+@export What happens to the estate when someone dies without a will
+GIVEN `the deceased was Muslim`             IS A BOOLEAN
+      `the deceased lived in Singapore`     IS A BOOLEAN
+      `surviving spouses`                   IS A NUMBER
+      `surviving children`                  IS A NUMBER
+      `children who died first`             IS A NUMBER
+      `children of each child who died`     IS A NUMBER
+      `surviving parents`                   IS A NUMBER
+      `surviving brothers and sisters`      IS A NUMBER
+      `surviving grandparents`              IS A NUMBER
+      `surviving uncles and aunts`          IS A NUMBER
+      `value of the home in Singapore`      IS A NUMBER
+      `value of everything else`            IS A NUMBER
+      `debts, funeral and legal costs`      IS A NUMBER
+      `year of death`                       IS A NUMBER
+      `month of death`                      IS A NUMBER
+      `day of death`                        IS A NUMBER
+GIVETH A `Succession answer`
+`the succession answer` MEANS
+    `Succession answer` WITH
+        `the law that applies`          IS (`the Act governing the distribution in` theCase)
+      , `what to do next`               IS (`what happens next in` theCase)
+      , `the estate at death`           IS (`gross estate of` theCase)
+      , `left after debts and expenses` IS (`distributable estate of` theCase)
+      , `divided by this Act`           IS (`the property this Act distributes in` theCase)
+      , `who takes, and how much`       IS (answer's `shares`)
+      , `note`                          IS (answer's `note`)
+      , `the family shape is fully described` IS shapeIsSimple
+    WHERE
+      answer  MEANS `the intestate distribution for` theCase
+      -- One level of representation only; see the header note.
+      shapeIsSimple MEANS `children who died first` EQUALS 0
+                          OR `children of each child who died` GREATER THAN 0
+      theCase MEANS
+        Case WITH
+            `deceased` IS (Deceased WITH `name` IS "the deceased"
+                                    -- A FACT about the deceased, supplied by the
+                                    -- caller. An earlier draft read `RULES
+                                    -- EFFECTIVE DATE` here, which conflates the
+                                    -- date the RULES are read at with the date the
+                                    -- person DIED -- two different axes. ISA s 5
+                                    -- turns on the latter.
+                                    , `date of death` IS (YMD `year of death` `month of death` `day of death`)
+                                    , `domiciled in Singapore` IS `the deceased lived in Singapore`
+                                    , `Muslim` IS `the deceased was Muslim`)
+          , `family` IS (Family WITH
+                `surviving spouses` IS (`the` `surviving spouses` `survivors called` "the spouse")
+              , `children`          IS (append (`the` `surviving children` `survivors called` "a child")
+                                               (`the` `children who died first` `predeceased children each leaving` `children of each child who died`))
+              , `parents`           IS (`the` `surviving parents` `survivors called` "a parent")
+              , `siblings`          IS (`the` `surviving brothers and sisters` `survivors called` "a brother or sister")
+              , `grandparents`      IS (`the` `surviving grandparents` `survivors called` "a grandparent")
+              , `uncles and aunts`  IS (`the` `surviving uncles and aunts` `survivors called` "an uncle or aunt"))
+          , `estate` IS (Estate WITH
+                `immovable property in Singapore` IS `value of the home in Singapore`
+              , `movable property in Singapore`   IS `value of everything else`
+              , `funeral, testamentary and administration expenses` IS `debts, funeral and legal costs`
+              , `debts and liabilities`           IS 0)
+          , `will` IS NOTHING
+
+
+§§ `A boolean decision, so the ladder and query-plan routes are reachable`
+
+-- jl4-service's /ladder and /query-plan render a BOOLEAN decision's structure.
+-- Without one exported, those two routes have nothing to answer for this
+-- deployment. This asks the question a person asks first, and answers it from
+-- the corpus's own s 2 / s 5 tests.
+-- DOMICILE IS DELIBERATELY NOT A CONDITION HERE. Under ISA s 4(2) a Singapore
+-- immovable is regulated by this Act "wherever he may have been domiciled", so
+-- domicile changes WHAT the Act reaches, never WHETHER it decides. An earlier
+-- draft carried a `the deceased lived in Singapore OR TRUE` conjunct, which is
+-- a vacuous guard -- exactly what `l4 verify` exists to find, and not something
+-- to ship in the same change as a linter about silent logic errors.
+@export Does the Intestate Succession Act decide who inherits
+GIVEN `the deceased was Muslim`        IS A BOOLEAN
+      `the deceased left a valid will` IS A BOOLEAN
+GIVETH A BOOLEAN
+`the Act decides this estate` MEANS
+    (NOT `the deceased was Muslim`) AND (NOT `the deceased left a valid will`)

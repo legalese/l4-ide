@@ -14,6 +14,9 @@ module ControlPlane (
   -- Version helpers (exported for testing)
   nextDeploymentVersion,
   parseVersionCounts,
+  -- Deployment-id rules (exported for testing)
+  deploymentIdError,
+  maxDeploymentIdLength,
 ) where
 
 import qualified BundleStore
@@ -566,28 +569,57 @@ stateToResponse debugMode vis fnMode (DeploymentId did) = \case
     let errorMsg = if debugMode then Just err else Just "Compilation failed"
     in mkStatus did "failed" Nothing errorMsg
 
--- | Validate a deployment ID.
--- Must be <= 36 characters (UUID length), alphanumeric + hyphens + underscores,
--- and must not contain ".." sequences.
+-- | Validate a deployment ID: see 'deploymentIdError' for the rules.
 -- | Reserved words that cannot be used as deployment IDs.
 -- These correspond to top-level route segments in the API.
 reservedWords :: [Text]
 reservedWords = ["health", "deployments", "openapi.json"]
 
-validateDeploymentId :: Text -> AppM ()
-validateDeploymentId deployId = do
-  when (deployId `elem` reservedWords) $
-    throwError err400 { errBody = jsonError "Deployment ID is a reserved word" }
-  when (Text.isPrefixOf "." deployId) $
-    throwError err400 { errBody = jsonError "Deployment ID must not start with a dot" }
-  when (Text.length deployId > 36) $
-    throwError err400 { errBody = jsonError "Deployment ID exceeds maximum length of 36 characters" }
-  when (Text.isInfixOf ".." deployId) $
-    throwError err400 { errBody = jsonError "Deployment ID contains invalid sequence" }
-  when (not $ Text.all isValidIdChar deployId) $
-    throwError err400 { errBody = jsonError "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)" }
+-- | The length bound on a deployment id, and why it is what it is.
+--
+-- It was 36, with the comment "(UUID length)" -- which sized the bound to the
+-- id the service GENERATES when a caller omits one, rather than to anything the
+-- service needs. The id is used as one path component under the store and as
+-- one URL segment, and both admit far more: POSIX caps a filename component at
+-- 255 bytes. So 36 refused perfectly serviceable ids for no reason. The `go`
+-- orchestrator names deployments `<subject>-<run-id>`; that is 29 characters
+-- for subject `regcf` and 37 for `sg-succession`, so the second subject to use
+-- the orchestrator was rejected with HTTP 400 by a healthy service.
+--
+-- 128 keeps a real bound -- an unbounded path component is still worth
+-- refusing -- while leaving room for a descriptive, traceable id. RAISING a
+-- limit is backwards compatible: every id that validated before validates now.
+--
+-- The checks that do the actual safety work are the other four, and none of
+-- them moved: the reserved-word list guards top-level route segments, and the
+-- dot-prefix, `..` and charset rules guard path traversal.
+maxDeploymentIdLength :: Int
+maxDeploymentIdLength = 128
+
+-- | The deployment-id rules, as a pure function so they can be tested without
+-- the app monad. 'Nothing' is valid; 'Just' carries the reason for refusal.
+deploymentIdError :: Text -> Maybe Text
+deploymentIdError deployId
+  | deployId `elem` reservedWords =
+      Just "Deployment ID is a reserved word"
+  | Text.isPrefixOf "." deployId =
+      Just "Deployment ID must not start with a dot"
+  | Text.length deployId > maxDeploymentIdLength =
+      Just $ "Deployment ID exceeds maximum length of "
+          <> Text.pack (show maxDeploymentIdLength) <> " characters"
+  | Text.isInfixOf ".." deployId =
+      Just "Deployment ID contains invalid sequence"
+  | not (Text.all isValidIdChar deployId) =
+      Just "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)"
+  | otherwise = Nothing
  where
   isValidIdChar c = isAlphaNum c || c == '-' || c == '_'
+
+validateDeploymentId :: Text -> AppM ()
+validateDeploymentId deployId =
+  case deploymentIdError deployId of
+    Nothing -> pure ()
+    Just msg -> throwError err400 { errBody = jsonError msg }
 
 -- | Check if a zip entry path is safe (no path traversal).
 isPathSafe :: FilePath -> Bool

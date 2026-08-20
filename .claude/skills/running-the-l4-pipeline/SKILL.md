@@ -45,6 +45,24 @@ It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative
 
 ## Core workflow
 
+### 0. Register the subject, if it does not exist yet
+
+Everything the pipeline knows about one body of law lives in a sidecar under `etc/go/subjects/<id>/`. To create one:
+
+```bash
+etc/go/go.sh new-subject sg-tax \
+  --citation "Income Tax Act 1947" \
+  --source-url "https://sso.agc.gov.sg/Act/ITA1947"
+```
+
+That is enough to make `plan --subject sg-tax` work immediately, **before any L4 exists**. The sidecar declares `encoding.state: "unwritten"`: the encoding is not written, `encoding.main` is where it _will_ live, and every stage that reads a module reports SKIPPED naming the file to deposit. The gate digest is taken over the absent path, so depositing the first module moves the digest and re-opens HG1 — a gate granted before the encoding existed cannot survive the encoding arriving.
+
+The declaration is checked in both directions. Once the file exists, `subject.mjs` refuses the sidecar until you flip the state to `"written"`, so it cannot rot into a false statement about the tree.
+
+`pins.json` and `known-defects.json` are written **empty and marked unmeasured**, and that is deliberate. Both are measurement records — pins are probed against a real binary, defects are observed on a stated date — so a scaffolder that emitted plausible contents would be manufacturing the evidence the pipeline exists to demand, and it would be believed, because a file that looks measured is indistinguishable from one that is. The stages that need them refuse loudly instead.
+
+Then: write the encoding (that is [`writing-l4-rules`](../writing-l4-rules/SKILL.md), not this skill), flip the state, measure the pins, and declare only the projection legs the subject genuinely supports — the driver declares a stage **iff** its leg is declared, so an omitted leg is an honest silence rather than a failing stage.
+
 ### 1. Run the doctor first
 
 ```bash
@@ -80,7 +98,7 @@ The declared stage set is the subject descriptor's, not the pipeline's: a projec
 etc/go/go.sh run --milestone g1 --subject regcf
 ```
 
-(`--subject regcf` here is the worked example throughout this skill.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. `regcf` is the only sidecar committed today; BNA's arrives with PR #195. The run will stop at HG1 and exit 3 — see step 5.
+(`--subject regcf` here is the worked example throughout this skill — it is **an** example, never the default. With more than one sidecar committed, `--subject` is mandatory and a bare `run`/`plan`/`doctor` refuses, because a run about an unnamed body of law is not a run about anything.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. Run `node etc/go/lib/subject.mjs --list` for what is committed rather than trusting a list written here; as at 2026-08-20 it is `regcf` and `sg-succession`. Note that a corpus under `jl4/examples/legal/` is **not** automatically a subject: `bna` and `charities-cleanroom` are committed corpora with no sidecar, so no milestone runs over them, and `etc/check-subject-ci-coverage.mjs` prints that as a note every CI run. The run will stop at HG1 and exit 3 — see step 5.
 
 **Key idioms:**
 
@@ -142,11 +160,11 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 etc/go/go.sh run --milestone g1 --subject regcf --run-id <run-id>
 ```
 
-Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact. A second run back to back re-executes only the two stages that declare no inputs.
+Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact — and since 2026-08-20 that lookup crosses run boundaries, so a stage borrows a receipt from an earlier run of the SAME subject when the digest matches. A second run back to back therefore re-executes only the two stages that declare no inputs, plus anything whose digest actually moved. (This sentence was WRONG until 2026-08-20 and is now right by accident: it survived a 2026-08-09 correction that fixed the same claim in ORCHESTRATOR.md but not here, and the cross-run change happens to have made it true.)
 
 **Key idioms:**
 
-- **Resume into the same run id.** A new run id is a new run, and it will redo everything.
+- **Resume into the same run id** when you want the same run _directory_ — that is what `--run-id` is for. A new run id is still a distinct run, but since 2026-08-20 it is no longer a redo: eligible stages replay from the earlier run's receipts. The exceptions are `p7-mcp` and `p2-sweep`, which never cross a run boundary because their results are not a function of their declared inputs (`CROSS_RUN_INELIGIBLE` in `etc/go/lib/ledger.mjs` says why), and `p9-report`/`p9-explain`, which declare no inputs and so never replay at all.
 - **`p9-report` and `p9-explain` never replay**, by design: each is a function of the journal, the journal grows while it runs, and a stale document claiming to be current is the worst possible artifact. They are the only two stages that declare an empty `--inputs` set, and `etc/go/selftest.mjs` asserts that as a named set rather than as a count.
 - **If a stage re-runs when you expected a replay, an input moved.** That is the digest doing its job. Find out what changed before assuming the driver is wrong.
 
@@ -158,7 +176,7 @@ $TMPDIR/l4-go/<run-id>/report.md
 
 It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 requires but this milestone cannot fill render as **ABSENT** with the reason and the stage that would have supplied them — never omitted. Notes you asked a phase script to record render in a block labelled _claimed, not verified_, with the author.
 
-Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most recent few **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected.
+Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most recent few **of each subject** **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected. Per subject matters once more than one exists: retention used to take the newest few across the whole store, so a burst of runs on one subject would have collected every run of another, and cross-run replay reuses receipts from exactly those older runs.
 
 ### 7b. Read the explainer, which is a different document for a different reader
 

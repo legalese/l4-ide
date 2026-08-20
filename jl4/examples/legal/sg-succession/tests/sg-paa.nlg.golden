@@ -1,0 +1,79 @@
+`the name of the grant in` with `the Alice probate` is equal to probate
+`the name of the grant in` with `the Alice estate on failure of executors` is equal to letters of administration with the will annexed
+`the name of the grant in` with `the Bernard intestacy` is equal to letters of administration
+`the name of the grant in` with `the contested Alice estate` is equal to letters of administration pending probate action
+`the Public Trustee may undertake to administer the property in` with `the small estate administered by the Public Trustee`
+`the name of the grant in` with `the small estate administered by the Public Trustee` is equal to no grant of representation is required
+not `there is a failure of executors in` with `the Alice probate`
+`there is a failure of executors in` with `the Alice estate on failure of executors`
+`count` with `those with a prior right under section 13(2) in` with `the Alice estate on failure of executors` is equal to 1
+`count` with `those who may be granted letters of administration under section 18(4) in` with `the Bernard intestacy` is equal to 1
+`map` with given `p` then `p` 's `name` and `those who may be granted letters of administration under section 18(4) in` with `the Bernard intestacy` is equal to list of Grace
+`map` with given `p` then `p` 's `name` and `those who may be granted letters of administration under section 18(4) in` with `the Bernard intestacy where only the creditor applies` is equal to list of Farid
+`map` with given `p` then `p` 's `name` and `those who may take the grant in` with `the Bernard intestacy where only the creditor applies` is equal to list of Farid
+not `a person in the section 18(4)(a) class has applied in` with `the Bernard intestacy where only the creditor applies`
+`a person in the section 18(4)(a) class has applied in` with `the Bernard intestacy`
+not `the grant complies with section 6(1) in` with `the estate with five applicants`
+`the grant complies with section 6(1) in` with `the Bernard intestacy`
+`count` with `the applicants for a grant in` with `the estate with five applicants one of whom is an infant` is equal to 4
+`the grant complies with section 6(1) in` with `the estate with five applicants one of whom is an infant`
+not `the grant complies with section 6(2) in` with `the minority with one administrator`
+`the grant complies with section 6(2) in` with `the minority with two administrators`
+`the grant complies with section 6(2) in` with `the minority with a trust company`
+`the grant complies with section 6(2) in` with `the Family Court administration`
+`the name of the grant in` with `the Alice probate where a life interest arises` is equal to probate
+`the grant complies with section 6(2) in` with `the Alice probate where a life interest arises`
+`the name of the grant in` with `the Alice estate on failure of executors, with a life interest` is equal to letters of administration with the will annexed
+not `the grant complies with section 6(2) in` with `the Alice estate on failure of executors, with a life interest`
+`section 21(1) refuses a grant to` with `Dinesh`
+not `a grant may be made to` with `Dinesh`
+not `probate may be granted to` with `Dinesh`
+`count` with `those who may take the grant in` with `the estate with an infant executor` is equal to 1
+not `security for the due administration of the estate is required in` with `the Alice probate`
+`security for the due administration of the estate is required in` with `the Bernard intestacy`
+`the number of sureties required in` with `the Bernard intestacy` is equal to 2
+`the amount of the bond in` with `the Bernard intestacy` is equal to 400000
+`security for the due administration of the estate is required in` with `the Bernard intestacy with a mortgaged flat`
+`the number of sureties required in` with `the Bernard intestacy with a mortgaged flat` is equal to 2
+`the amount of the bond in` with `the Bernard intestacy with a mortgaged flat` is equal to 250000
+not `security for the due administration of the estate is required in` with `the Family Court administration`
+`the number of sureties required in` with `the Family Court administration` is equal to 0
+`the date 6 months after the death in` with `the Bernard intestacy` is equal to `YMD` with 2026, 7 and 15
+not `section 55(1)(a) is engaged in` with `the neglected estate as at 30 June 2026`
+`section 55(1)(a) is engaged in` with `the neglected estate as at 16 July 2026`
+`letters of administration may be granted to the Public Trustee under section 55 in` with `the neglected estate as at 16 July 2026`
+`the Public Trustee may apply before the 6 months expire in` with `the neglected estate as at 30 June 2026`
+`the date one month after the grant in` with `the Alice probate` is equal to `JUST` with `YMD` with 2026, 4 and 10
+not `section 55(1)(c) is engaged in` with `the Alice probate`
+`the date 6 months after the death of the last surviving executor or administrator in` with `the stranded estate` is equal to `JUST` with `YMD` with 2026, 8 and 28
+`section 55(1)(f) is engaged in` with `the stranded estate`
+`the stranded estate` 's `an application has been made for probate or letters of administration`
+not `section 55(1)(f) is engaged in` with `the estate whose administrator died and whose family applied again`
+not `letters of administration may be granted to the Public Trustee under section 55 in` with `the estate whose administrator died and whose family applied again`
+`the last date for an application to rectify the will in` with `the Alice probate` is equal to `JUST` with `YMD` with 2026, 9 and 10
+`the last date for an application to rectify the will in` with `the Bernard intestacy` is equal to `NOTHING`
+`the deceased died intestate in` with `the Family Court administration`
+`the last date for an application to rectify the will in` with `the Family Court administration` is equal to `NOTHING`
+`the name of the grant in` with `the contested Alice estate after a limited grant` is equal to letters of administration pending probate action
+`Wills Act section 28(4) requires the grant to be disregarded in` with `the contested Alice estate after a limited grant`
+`the last date for an application to rectify the will in` with `the contested Alice estate after a limited grant` is equal to `NOTHING`
+`count` with `the timeline in` with `the Alice probate` is equal to 5
+`count` with `the timeline in` with `the Family Court administration` is equal to 4
+`count` with `the timeline in` with `the contested Alice estate after a limited grant` is equal to 4
+`count` with `the timeline in` with `the neglected estate as at 30 June 2026` is equal to 2
+`the estate vests in the Public Trustee under section 37 in` with `the neglected estate as at 30 June 2026`
+not `the estate vests in the Public Trustee under section 37 in` with `the Alice probate`
+`the schedule that applies in` with `the Alice probate` is equal to Second Schedule
+`the schedule that applies in` with `the Bernard intestacy, insolvent` is equal to First Schedule
+`count` with `the Second Schedule` is equal to 8
+`count` with `the First Schedule` is equal to 2
+`count` with `the order of application of assets in` with `the Alice probate` is equal to 8
+`the statutory order governs in` with `the Alice probate`
+`the interest charged is primarily liable in` with `the mortgaged flat`
+`the interest charged is primarily liable in` with `the mortgaged flat with a general direction to pay debts`
+not `the interest charged is primarily liable in` with `the mortgaged flat with an express direction about the mortgage`
+`the proportionate part of the charge borne by` with `the mortgaged flat`, 250000 and 300000 is equal to 150000
+`the maximum commission under section 66 in` with `the Alice probate` is equal to 10000
+`count` with `the heads of expense the court shall allow under section 67` is equal to 3
+`the registrar may exercise the court's powers in` with `the Alice probate`
+not `the registrar may exercise the court's powers in` with `the contested Alice estate`

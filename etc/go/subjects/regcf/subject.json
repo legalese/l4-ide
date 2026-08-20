@@ -29,7 +29,7 @@
   "display_name": "SEC Regulation Crowdfunding",
   "citation": "17 CFR Part 227",
   "source_url": "https://www.ecfr.gov/current/title-17/chapter-II/part-227",
-  "corpus": {
+  "encoding": {
     "main": "jl4/examples/legal/regcf/regcf.l4",
     "wizard": "jl4/examples/legal/regcf/regcf-wizard.l4"
   },
@@ -55,7 +55,8 @@
     "p7-dmn": {
       "golden": "jl4/examples/dmn/expected/regcf-corpus.dmn",
       "fidelity_golden": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
-      "cases": "jl4/examples/dmn/regcf-corpus.cases.json"
+      "cases": "jl4/examples/dmn/regcf-corpus.cases.json",
+      "engine_baseline": "jl4/examples/dmn/expected/regcf-corpus.engine-baseline.txt"
     },
     "p7-dmn-md": {
       "golden": "jl4/examples/dmn/expected/regcf-corpus.dmn.md",

@@ -42,7 +42,7 @@
 #      count to equal the function count the deployment itself reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
+  printf '%s\n' "$GO_S_ENCODING" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
   exit 0
 fi
 
@@ -52,10 +52,18 @@ ZIP="$GO_OUT/$GO_S_ID-deployable.zip"
 LOG="$GO_OUT/p7-mcp.txt"
 : >"$LOG"
 
-# The subject's module set: the corpus proper, plus the wizard companion when
-# the sidecar declares one. Both go into the deployable zip.
-declare -a MODULES=("$GO_S_CORPUS")
-[[ -n "${GO_S_WIZARD:-}" ]] && MODULES+=("$GO_S_WIZARD")
+# The subject's module set. EVERY declared module goes into the deployable zip,
+# not just the entry module and the wizard: jl4-service compiles the bundle it
+# is given, so a module the wizard IMPORTS but the zip omits makes the whole
+# deployment fail to compile -- and it fails as a 404 that never resolves
+# (a POST id "simply does not exist until its job applies", jl4-service/README),
+# which reads like a slow service rather than a missing file.
+#
+# Measured: sg-succession's wizard imports the composition, which imports three
+# statute modules and the ontology. Zipping main+wizard produced a 6,660-byte
+# bundle that polled `unreachable` for the full 120s timeout.
+declare -a MODULES
+read -ra MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
 
 # Bounds on a LOOPBACK service: how long an accepted deployment may take to
 # finish compiling, and how long any single HTTP call may take.
@@ -74,7 +82,7 @@ SERVICE_OWN_TOOLS="list_files read_file search_identifier search_text"
 # --- 1. the local half, which always runs ------------------------------------
 command -v zip >/dev/null 2>&1 || go_skip "zip is not on PATH; the deployable surface is a zip of the subject's module set (${MODULES[*]##*/})"
 rm -f "$ZIP"
-(cd "$(dirname "$GO_S_CORPUS")" && zip -q -r "$ZIP" "${MODULES[@]##*/}") >>"$LOG" 2>&1
+(cd "$(dirname "$GO_S_ENCODING")" && zip -q -r "$ZIP" "${MODULES[@]##*/}") >>"$LOG" 2>&1
 [[ -f "$ZIP" ]] || go_broken "zip reported success but produced no $ZIP"
 echo "built deployable surface: $ZIP ($(wc -c <"$ZIP" | tr -d ' ') bytes)" | tee -a "$LOG"
 
@@ -153,12 +161,52 @@ if [[ $HEALTH_RC -ne 0 ]]; then
   exit "$GO_EXIT_CLEAN"
 fi
 
-DEPLOY_ID="$GO_S_ID-$GO_RUNID"
+# THE DEPLOYMENT ID, AND THE LENGTH CAP.
+#
+# The natural id is `<subject>-<run-id>`: the subject so a human can recognise
+# the deployment, the run id so it is traceable back to a journal. jl4-service
+# USED to cap an id at 36 characters -- a bound whose own comment said "(UUID
+# length)", i.e. sized to the id the service generates when a caller omits one,
+# not to anything the service needs. `regcf-<runid>` is 29 and fit;
+# `sg-succession-<runid>` is 37 and a healthy service answered HTTP 400. The cap
+# is now 128 (jl4-service/src/ControlPlane.hs, `maxDeploymentIdLength`).
+#
+# This leg cannot ASSUME a patched service -- the operator runs whatever they
+# run -- so it asks for the full id first and only shortens if the service
+# actually refuses it for length. A current service therefore gets the readable
+# id; an older one still deploys, and says so on the record rather than quietly
+# renaming the deployment a human is about to put in an MCP client config.
+#
+# Shortening keeps the RUN id whole, because that is what carries identity: the
+# run id embeds an 8-hex digest OF THIS SUBJECT'S OWN CORPUS FILES, so two
+# different subjects cannot produce the same run id short of a digest
+# collision. The subject prefix is for human recognition, not uniqueness.
+DEPLOY_ID_FULL="$GO_S_ID-$GO_RUNID"
+DEPLOY_ID="$DEPLOY_ID_FULL"
 RESP="$GO_OUT/p7-mcp.deploy.json"
+
+go_post_bundle() {
+  set +e
+  curl -sS --max-time 30 -o "$RESP" -w '%{http_code}' \
+    -X POST "$URL/deployments" -F "id=$1" -F "sources=@$ZIP" >"$GO_OUT/p7-mcp.httpcode" 2>>"$LOG"
+  CURL_RC=$?
+  set -e
+}
+
+go_post_bundle "$DEPLOY_ID"
+if [ "$CURL_RC" -eq 0 ] && [ "$(cat "$GO_OUT/p7-mcp.httpcode" 2>/dev/null)" = "400" ] \
+   && grep -qi "maximum length" "$RESP" 2>/dev/null; then
+  _cap="$(sed -n 's/.*maximum length of \([0-9][0-9]*\) characters.*/\1/p' "$RESP" | head -1)"
+  _cap="${_cap:-36}"
+  _keep=$((_cap - ${#GO_RUNID} - 1))
+  if [ "$_keep" -lt 1 ]; then
+    go_skip "this jl4-service caps a deployment id at $_cap characters and the run id alone is ${#GO_RUNID}, leaving no room for a subject prefix. Upgrade the service (the cap is $_cap here; current jl4-service allows 128) or shorten the run id."
+  fi
+  DEPLOY_ID="$(printf '%s' "$GO_S_ID" | cut -c1-"$_keep")-$GO_RUNID"
+  echo "this jl4-service caps a deployment id at $_cap characters, so '$DEPLOY_ID_FULL' (${#DEPLOY_ID_FULL}) was refused; retrying as '$DEPLOY_ID'. The run id is kept whole -- it carries the corpus digest, and so the identity." | tee -a "$LOG"
+  go_post_bundle "$DEPLOY_ID"
+fi
 set +e
-curl -sS --max-time 30 -o "$RESP" -w '%{http_code}' \
-  -X POST "$URL/deployments" -F "id=$DEPLOY_ID" -F "sources=@$ZIP" >"$GO_OUT/p7-mcp.httpcode" 2>>"$LOG"
-CURL_RC=$?
 set -e
 CODE="$(cat "$GO_OUT/p7-mcp.httpcode" 2>/dev/null || echo 000)"
 echo "POST $URL/deployments id=$DEPLOY_ID → HTTP $CODE (curl exit $CURL_RC)" | tee -a "$LOG"
