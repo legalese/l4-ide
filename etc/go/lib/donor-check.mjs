@@ -30,7 +30,11 @@
 //         2 usage
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { has, storeRoot } from "./store.mjs";
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const sha256File = (p) =>
   "sha256:" + createHash("sha256").update(readFileSync(p)).digest("hex");
@@ -65,19 +69,48 @@ process.stdin.on("end", () => {
     byBase.set(b, a.path);
   }
 
+  // CAN THESE BYTES BE PRODUCED AT ALL? Three sources, checked in the order
+  // receipt.mjs will try them: the store by `cas`, then the donor's own
+  // directory. (`dest` in the borrowing run cannot exist yet, so it is not a
+  // source here.) A donor whose artifacts no source can produce is declined
+  // GRACEFULLY — go.sh clears $prior and the stage executes — rather than
+  // reaching receipt.mjs and exiting 4. Failing toward execution, not toward
+  // refusal, is the whole reason this check runs before the borrow instead of
+  // relying on the assertion inside the writer.
+  let store = null;
+  try {
+    store = storeRoot();
+  } catch {
+    store = null;
+  }
   for (const a of artifacts) {
     const declared = a.sha256;
+    const rel = typeof a.rel === "string" ? a.rel : null;
+    if (rel && rel.startsWith("tree:")) {
+      // A committed file the stage points at rather than produced. If it moved
+      // since the donor's receipt, the borrow describes a different file — and
+      // p7-ladder's figures are in no `--inputs` block, so nothing else notices.
+      const abs = resolve(REPO, rel.slice(5));
+      if (!existsSync(abs))
+        problems.push(`in-tree artifact '${rel}' no longer exists at ${abs}`);
+      else if (declared && sha256File(abs) !== declared)
+        problems.push(
+          `in-tree artifact '${rel}' has CHANGED since the donor's receipt:\n` +
+            `      receipt: ${declared}\n      on disk: ${sha256File(abs)}`,
+        );
+      continue;
+    }
+    if (a.cas && store && has(store, a.cas)) continue; // the store has it
     const base = basename(a.path ?? "");
-    // Same resolution order the copy path uses: the donor run's artifacts
-    // directory first, then the recorded path as an in-tree file.
     const candidates = [
-      fromDir ? resolve(fromDir, "artifacts", base) : null,
+      fromDir ? resolve(fromDir, "artifacts", rel ?? base) : null,
       a.path,
     ].filter(Boolean);
     const found = candidates.find((c) => existsSync(c) && statSync(c).isFile());
     if (!found) {
       problems.push(
-        `artifact '${a.path}' is gone: neither ${candidates.join(" nor ")} exists`,
+        `artifact '${a.path}' cannot be produced: cas ${a.cas ?? "(none)"} is not in the store, ` +
+          `and neither ${candidates.join(" nor ")} exists`,
       );
       continue;
     }

@@ -4920,7 +4920,43 @@ process.stdout.write("\n-- borrowed artifacts --\n");
   rmSync(resolve(donor, "artifacts", "b.txt"));
   const gone = run(intact);
   check("a donor artifact that is GONE refuses the borrow", gone.status === 1);
-  check("the refusal says it is gone", /is gone/.test(gone.stderr));
+  check(
+    "the refusal says the bytes cannot be produced, and from where it looked",
+    /cannot be produced/.test(gone.stderr) &&
+      /not in the store/.test(gone.stderr),
+  );
+
+  // The store is now a source, so a donor whose file is gone is STILL
+  // borrowable when the bytes were admitted — which is the point of the store:
+  // $TMPDIR reaps a run directory in two to five days and the evidence should
+  // not go with it.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-donorstore-"));
+    const src = resolve(donor, "artifacts", "a.json");
+    writeFileSync(src, "measured\n");
+    const sha = hashOf(src);
+    Store.put(store, src, sha, {
+      subject: "s",
+      stage: "p7-lts",
+      rel: "a.json",
+    });
+    rmSync(src);
+    const r = spawnSync("node", [DC], {
+      input: JSON.stringify({
+        from_dir: donor,
+        artifacts: [
+          { path: src, bytes: 9, sha256: sha, rel: "a.json", cas: sha },
+        ],
+      }),
+      env: { ...process.env, L4_GO_STORE: store },
+      encoding: "utf8",
+    });
+    check(
+      "a donor whose run directory was reaped is still borrowable from the store",
+      r.status === 0,
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
 
   // Basename collision: the copy flattens to basename, so two artifacts from
   // different subdirectories with the same name would overwrite each other.
@@ -5647,6 +5683,274 @@ process.stdout.write("\n-- the store and the blessing edge --\n");
   }
 }
 // ===== END the store and the blessing edge ==================================
+
+// ===== artifacts flow THROUGH the store (R6, step 2) ========================
+process.stdout.write("\n-- artifacts through the store --\n");
+{
+  const RECEIPT = resolve(HERE, "lib/receipt.mjs");
+  const DIG = "sha256:" + "a".repeat(64);
+  const PRIOR = "sha256:" + "b".repeat(64);
+
+  const mkRun = (store, id) => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-run-"));
+    mkdirSync(resolve(d, "artifacts"), { recursive: true });
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "run-begin",
+        "--run",
+        d,
+        "--run-id",
+        id,
+        "--milestone",
+        "g1",
+        "--subject",
+        "s",
+        "--repo-head",
+        "abc",
+        "--tree-state",
+        "clean",
+        "--fixed-now",
+        "2025-01-31T00:00:00Z",
+        "--declared-stages",
+        "p7-lts",
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    return d;
+  };
+  const lastStageEnd = (runDir) =>
+    read(resolve(runDir, "journal.ndjson"))
+      .filter((r) => r.kind === "stage_end")
+      .at(-1);
+
+  const store = mkdtempSync(resolve(tmpdir(), "l4-go-s2-"));
+  const donor = mkRun(store, "r1");
+
+  // Produce, in a SUBDIRECTORY — the shape the old basename flattening broke.
+  const art = resolve(donor, "artifacts", "state-graphs", "g.dot");
+  mkdirSync(dirname(art), { recursive: true });
+  writeFileSync(art, "digraph {}\n");
+  const produce = spawnSync(
+    "node",
+    [
+      RECEIPT,
+      "stage-end",
+      "--run",
+      donor,
+      "--stage",
+      "p7-lts",
+      "--status",
+      "PASS",
+      "--oracle-cmd",
+      "dot",
+      "--oracle-exit",
+      "0",
+      "--oracle-class",
+      "structural",
+      "--oracle-because",
+      "counted",
+      "--artifact",
+      art,
+      "--inputs-digest",
+      DIG,
+    ],
+    { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+  );
+  check("producing a receipt with an artifact succeeds", produce.status === 0);
+  const donorRec = lastStageEnd(donor);
+  check(
+    "the record carries `rel`, subdirectory included",
+    donorRec?.artifacts?.[0]?.rel === "state-graphs/g.dot",
+  );
+  check(
+    "and `cas`, the place the bytes can be re-fetched",
+    donorRec?.artifacts?.[0]?.cas === donorRec?.artifacts?.[0]?.sha256,
+  );
+  check(
+    "the bytes were admitted to the store",
+    Store.has(store, donorRec.artifacts[0].cas),
+  );
+
+  // Borrow into a fresh run WITH THE DONOR DIRECTORY DELETED. This is R6's
+  // payoff: $TMPDIR reaps a run in two to five days and the evidence stays.
+  const borrower = mkRun(store, "r2");
+  const donorsJson = resolve(borrower, "donors.json");
+  writeFileSync(donorsJson, JSON.stringify(donorRec.artifacts));
+  rmSync(donor, { recursive: true, force: true });
+  const borrow = spawnSync(
+    "node",
+    [
+      RECEIPT,
+      "stage-end",
+      "--run",
+      borrower,
+      "--stage",
+      "p7-lts",
+      "--status",
+      "PASS",
+      "--inputs-digest",
+      DIG,
+      "--replayed-from",
+      PRIOR,
+      "--replayed-from-run",
+      "r1",
+      "--artifacts-json",
+      donorsJson,
+    ],
+    { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+  );
+  check(
+    "a borrow succeeds after the donor run was deleted",
+    borrow.status === 0,
+  );
+  const borrowed = lastStageEnd(borrower);
+  check(
+    "the artifact materialised into the borrower's own subdirectory",
+    existsSync(resolve(borrower, "artifacts", "state-graphs", "g.dot")),
+  );
+  check(
+    "the recorded sha256 is the DONOR'S, verbatim — never re-derived from the copy",
+    borrowed?.artifacts?.[0]?.sha256 === donorRec.artifacts[0].sha256,
+  );
+
+  // T-4 · the laundering assertion. A donor record whose hash does not match
+  // what lands is refused, not repaired.
+  {
+    const b2 = mkRun(store, "r3");
+    const bad = resolve(b2, "bad.json");
+    writeFileSync(
+      bad,
+      JSON.stringify([
+        {
+          path: resolve(b2, "artifacts", "z.dot"),
+          bytes: 3,
+          sha256: "sha256:" + "9".repeat(64),
+          rel: "z.dot",
+          cas: null,
+        },
+      ]),
+    );
+    writeFileSync(resolve(b2, "artifacts", "z.dot"), "tampered\n");
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        b2,
+        "--stage",
+        "p7-lts",
+        "--status",
+        "PASS",
+        "--inputs-digest",
+        DIG,
+        "--replayed-from",
+        PRIOR,
+        "--artifacts-json",
+        bad,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "a materialised file that does not match the donor is REFUSED",
+      r.status === 4,
+    );
+    check(
+      "the refusal shows both hashes",
+      /receipt: sha256:/.test(r.stderr) && /on disk: sha256:/.test(r.stderr),
+    );
+    rmSync(b2, { recursive: true, force: true });
+  }
+
+  // T-5 · a replayed PASS naming no artifact. The guard it restores was
+  // vacuous — `!r.replayed_from` inside a branch where `replayed` is true is
+  // always false — so this receipt was accepted and `verify` called the
+  // milestone COMPLETE.
+  {
+    const b3 = mkRun(store, "r4");
+    const empty = resolve(b3, "none.json");
+    writeFileSync(empty, "[]");
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        b3,
+        "--stage",
+        "p7-lts",
+        "--status",
+        "PASS",
+        "--inputs-digest",
+        DIG,
+        "--replayed-from",
+        PRIOR,
+        "--artifacts-json",
+        empty,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check("a replayed PASS naming NO artifact is refused", r.status === 4);
+    check(
+      "and the refusal explains that the receipt it replays named one",
+      /naming no artifact/.test(r.stdout + r.stderr),
+    );
+    rmSync(b3, { recursive: true, force: true });
+  }
+
+  // A pre-store donor — no `rel`, no `cas` — must still be borrowable, and the
+  // bytes get back-filled so the NEXT borrow comes from the store.
+  {
+    const legacyDonor = mkdtempSync(resolve(tmpdir(), "l4-go-legacy-"));
+    mkdirSync(resolve(legacyDonor, "artifacts"), { recursive: true });
+    const lf = resolve(legacyDonor, "artifacts", "old.json");
+    writeFileSync(lf, "legacy\n");
+    const lsha = hashOf(lf);
+    const b4 = mkRun(store, "r5");
+    const lj = resolve(b4, "legacy.json");
+    writeFileSync(lj, JSON.stringify([{ path: lf, bytes: 7, sha256: lsha }]));
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        b4,
+        "--stage",
+        "p7-lts",
+        "--status",
+        "PASS",
+        "--inputs-digest",
+        DIG,
+        "--replayed-from",
+        PRIOR,
+        "--replayed-from-run",
+        "r0",
+        "--donor-dir",
+        legacyDonor,
+        "--artifacts-json",
+        lj,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "a PRE-STORE donor (no rel, no cas) is still borrowable",
+      r.status === 0,
+    );
+    check(
+      "and its bytes are back-filled, so the store heals itself from old runs",
+      Store.has(store, lsha),
+    );
+    rmSync(legacyDonor, { recursive: true, force: true });
+    rmSync(b4, { recursive: true, force: true });
+  }
+
+  rmSync(borrower, { recursive: true, force: true });
+  rmSync(store, { recursive: true, force: true });
+}
+// ===== END artifacts through the store ======================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,

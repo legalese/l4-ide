@@ -1181,21 +1181,24 @@ EOF
         # The invariant that buys is the one that makes `verify` worth anything:
         # a run directory is self-contained and checkable on its own, by someone
         # who has only that directory.
-        local from_dir arts a base copied=()
+        # THE DONOR'S ARTIFACT RECORDS, AS DATA. receipt.mjs fetches the bytes
+        # from the store by `cas` and records the donor's hash VERBATIM.
+        #
+        # What this replaces: a `cp` loop that flattened every artifact to its
+        # basename (so two artifacts from different subdirectories overwrote
+        # each other), fell back to recording ANOTHER RUN'S absolute path as
+        # this run's artifact, and then passed `--artifact`, which re-hashes the
+        # copy — precisely the laundering receipt.mjs's own comment forbids.
+        # Four defects, all of them gone with the loop.
+        local from_dir
         from_dir=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).from_dir||"")))')
-        arts=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s).artifacts||[];process.stdout.write(a.map(x=>x.path).join("\n"))})')
-        while IFS= read -r a; do
-          [[ -z "$a" ]] && continue
-          base="${a##*/}"
-          if [[ -f "$from_dir/artifacts/$base" ]]; then
-            cp -p "$from_dir/artifacts/$base" "$RUN/artifacts/$base" 2>/dev/null && copied+=(--artifact "$RUN/artifacts/$base")
-          elif [[ -f "$a" ]]; then
-            copied+=(--artifact "$a")   # an in-tree path, still valid from here
-          fi
-        done <<<"$arts"
+        printf '%s' "$prior" \
+          | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(JSON.parse(s).artifacts||[])))' \
+          > "$RUN/.replay-artifacts.json"
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
           --inputs-digest "$digest" --replayed-from "$phash" --replayed-from-run "$prior_run" \
-          "${copied[@]}" "${extra[@]}"
+          --subject "$SUBJECT" --run-id "$RUN_ID" --donor-dir "$from_dir" \
+          --artifacts-json "$RUN/.replay-artifacts.json" "${extra[@]}"
         echo "go: $s replayed from run $prior_run (inputs unchanged)"
       else
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \

@@ -104,9 +104,20 @@ export function checkReceipt(r) {
   const replayed = !!(r.replayed_from && String(r.replayed_from).trim());
 
   if (r.status === "PASS" && replayed) {
-    if (artifacts.length === 0 && !r.replayed_from)
+    // `!r.replayed_from` inside a branch guarded by `replayed` is ALWAYS false,
+    // so this rule never fired: a replayed PASS naming zero artifacts was
+    // accepted, and `verify` called the milestone COMPLETE. Its live cause is a
+    // cross-run borrow whose file copies all failed silently — `cp … 2>/dev/null
+    // &&` — which produced exactly that receipt.
+    //
+    // Under a content-addressed store it is worse rather than merely wrong:
+    // zero artifacts means zero `cas`, means nothing fetchable, means nothing
+    // servable, while the report still says PASS. The receipt it replays named
+    // an artifact — that is what let it be a PASS — so a replay of it that
+    // names none has lost the evidence it claims to carry.
+    if (artifacts.length === 0)
       push(
-        "replayed PASS naming neither an artifact nor the receipt it replays",
+        "replayed PASS naming no artifact: PASS requires one, so the receipt it replays named one, and this receipt names none",
       );
   } else if (r.status === "PASS") {
     // Rule 1 — PASS requires an oracle that ran and returned 0.
