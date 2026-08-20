@@ -5478,11 +5478,23 @@ process.stdout.write("\n-- the store and the blessing edge --\n");
       ) === false,
     );
 
-    // put() must never throw: a broken home directory may not turn a good
-    // legal encoding run red. The refusal belongs on the serving side.
+    // put() must never throw: a broken home directory may not turn a good legal
+    // encoding run red. The refusal belongs on the serving side.
+    //
+    // The unwritable root is a REGULAR FILE used as a directory, which gives
+    // ENOTDIR instantly on every platform. It was `/proc/nonexistent-store`,
+    // which is unwritable on Linux and simply absent on macOS — and that cost
+    // 48 minutes of CI: `mkdirSync("/proc/<anything>/objects", {recursive:true})`
+    // does not fail on Linux, it HANGS, forever. Reproduced in a
+    // node:24-bookworm container, where the probe prints "before" and never
+    // returns. So the check that put() cannot throw was itself the thing that
+    // wedged the suite, on a platform the author was not running.
+    //
+    // Pick unwritable paths that are unwritable for a PORTABLE reason.
+    const notADir = mkFile(work, "not-a-dir", "i am a file\n");
     check(
       "put() over an unwritable root returns null rather than throwing",
-      Store.put("/proc/nonexistent-store", a, shaA, {}) === null,
+      Store.put(notADir, a, shaA, {}) === null,
     );
     rmSync(root, { recursive: true, force: true });
     rmSync(work, { recursive: true, force: true });
