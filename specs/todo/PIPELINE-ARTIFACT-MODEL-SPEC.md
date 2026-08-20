@@ -1,6 +1,6 @@
 # The pipeline as an artifact graph: phases, witnesses, and what the labels are for
 
-_Status: **rulings recorded; four of thirteen implemented.** Written 2026-08-20 on branch
+_Status: **rulings recorded; six of thirteen implemented.** Written 2026-08-20 on branch
 `mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
 (`sg-succession`) and found that several of its central nouns name the wrong things._
 
@@ -8,9 +8,10 @@ _What IS implemented, and where: **R1** (`corpus` → `encoding`, commit `dd55a6
 **R8** (cross-run replay with a closed ineligible list, and borrowed artifacts copied rather than
 referenced, commit `41a7b5ac`), **R10** (the three senses of "corpus" deliberately retained), and
 **R12** (`encoding.state`, and `go.sh new-subject` on top of it — see §3.12 for the third closure
-that neither candidate had). Everything else on this page is a decision, not a description: there
-is no artifact store, no read-set, no per-phase comparator and no subject-level report. What would
-make the rest of the present tense true is named per ruling in §3._
+that neither candidate had), and **R6** + **R11** together (`etc/go/lib/store.mjs`, the blessing
+ledger, and `go.sh store`). Everything else on this page is a decision, not a description: there is
+no read-set and no subject-level report. What would make the rest of the present tense true is named
+per ruling in §3._
 
 _Why this document exists at all: the rulings below were reached in conversation and existed
 nowhere else. `CLAUDE.md` §4 — a decision is recorded in its owning document or it is not
@@ -55,12 +56,12 @@ something the graph answers.
 | R3     | **ANSWERED**               | phase identity is intrinsic; ordinals are extrinsic and are not schema keys, §3.3                       |
 | R4     | **ANSWERED**               | blindness is a recorded read-set, not a flag; freshness is derived from it, §3.4                        |
 | R5     | **ANSWERED**               | a diff means a different thing per phase, and an encoding diff is a fork only if upstream matched, §3.5 |
-| R6     | **ANSWERED**               | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
+| R6     | **ANSWERED · IMPLEMENTED** | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
 | R7     | **ANSWERED · IMPLEMENTED** | replay crosses run boundaries, except for a closed list of stages, §3.7                                 |
 | R8     | **ANSWERED · IMPLEMENTED** | a run directory stays self-contained; borrowed artifacts are copied, §3.8                               |
 | R9     | **ANSWERED**               | G0–G4 are capability milestones, not lifecycle phases, and should stop being run labels, §3.9           |
 | R10    | **ANSWERED · IMPLEMENTED** | three other senses of "corpus" are retained deliberately, §3.10                                         |
-| R11    | **OPEN**                   | if artifacts are equal witnesses, the HG1 blessing must become a first-class edge, §3.11                |
+| R11    | **ANSWERED · IMPLEMENTED** | the HG1 blessing is a durable ledger edge, and the serving path defaults to deny, §3.11                 |
 | R12    | ANSWERED 2026-08-20, §3.12 | a subject may declare `encoding.state: "unwritten"`; `go.sh new-subject` scaffolds one, §3.12           |
 | R13    | **OPEN**                   | reporting is run-oriented; a subject-level fold is needed, and it is not a union, §3.13                 |
 
@@ -162,7 +163,7 @@ content-addressing (R6) is a requirement and not an optimisation.
 acceptance test" and becomes the general `encode`-phase comparator, callable between any two
 encoding artifacts.
 
-### 3.6 R6 — artifacts are witnesses — ANSWERED
+### 3.6 R6 — artifacts are witnesses — ANSWERED, IMPLEMENTED 2026-08-21
 
 Make clobbers because a rebuild is deterministic and the artifact is fungible. Neither holds here:
 the producer is a non-deterministic agent, so two runs over identical inputs yield **different**
@@ -190,8 +191,24 @@ Three consequences, each of which changes a decision:
   `$TMPDIR` is not an architectural preference; it is the observation that a human signature
   currently expires in under a week, silently, for reasons no one decided.**
 
-_What would make this true: an artifact store outside `$TMPDIR`, and `gc` becoming a policy over
-references rather than a delete of the only copy._
+**IMPLEMENTED 2026-08-21.** `etc/go/lib/store.mjs`, at `$L4_GO_STORE` (default the XDG state dir,
+never `$TMPDIR`). An artifact record now carries `rel` — its identity within a run, subdirectories
+included — and `cas`, a place the original bytes can still be fetched. `sha256` remains the CLAIM
+the receipt made; `cas` is where to get them, which is what upgrades `verify`'s `CHANGED` from an
+accusation into a diff.
+
+The comparator is `go.sh store diff`, keyed on `(stage, inputs_digest, rel)`. A key holding more
+than one distinct hash is a producer that did not converge over inputs the pipeline calls
+identical — and convergence is silence, so the output is the disagreement itself. Artifacts that
+embed their own run path (`p0-preflight`'s `tripwire.json`) can never dedupe; those pairs are
+labelled `SELF-REFERENTIAL` with the exact substring that triggered the label, and never filtered,
+because filtering hides a real finding the day the heuristic is wrong.
+
+`gc` did not change. `store gc` is a separate verb over a different thing, collecting by
+reachability before age — run directories are a cache, the object store is evidence.
+
+Selftested end to end at the property that matters: **a borrow succeeds after the donor run
+directory has been deleted entirely.**
 
 ### 3.7 R7 — replay crosses run boundaries — ANSWERED, IMPLEMENTED
 
@@ -352,7 +369,7 @@ Deliberately **not** renamed by R1, each a different and legitimate sense:
 - `GO_MODULES_ORIGIN=corpus|denovo` — a two-valued sentinel whose other value is deferred under R2.
   Renaming one half of a pair is worse than renaming neither.
 
-### 3.11 R11 — the blessing must become a first-class edge — OPEN
+### 3.11 R11 — the blessing must become a first-class edge — ANSWERED, IMPLEMENTED 2026-08-21
 
 If artifacts accumulate as equal witnesses, _"which one did the domain expert review?"_ must stay
 answerable. Today HG1 binds to a digest over the files at `encoding.main`, so the blessing is an
@@ -364,6 +381,38 @@ _this signature, over this artifact digest, by this signer, at this time_ — an
 must refuse to answer from an artifact that has no such edge.
 
 _This is the ruling most likely to be got wrong by building R6 first and R11 later._
+
+**IMPLEMENTED 2026-08-21, together with R6 and for exactly that reason.** A blessing is now a record
+in `blessings/`, one file per record under `wx`, chained and never swept — carrying `covers[]` (the
+corpus itemised), the signer, the payload digest, and the signature BYTES rather than a path into a
+run directory. The reviewed bytes are admitted to the store, so "show me what was reviewed" is a
+fetch and not a name.
+
+`signer` and `payload_digest` had been declared fields since the beginning and were never once
+populated: `gate-verify.sh` computed the identity and fingerprint purely to print them at a human.
+
+The three constraints below are enforced rather than intended:
+
+1. `servability()` is written once and exported; `store cat`, `store gc` and the refusal all call it.
+2. `produced_under` is DERIVED inside `receipt.mjs` from `run_begin.gated_stages` plus the journal's
+   own gate rows — never a `--blessing` flag, which would re-open for any phase script the
+   asymmetry that makes `receipt.mjs` the only writer of a claim. Asserted over the source.
+3. `go_require_blessing` gates the act that actually serves. `p7-mcp` POSTs a deployment BEFORE it
+   writes any receipt, so no receipt-level rule can see it; the refusal sits in front of the first
+   mutating request. A waiver lets it proceed and PRINTS its reason.
+
+And `verdict.mjs` Rule 7: a gated stage may write no status but `BROKEN` while it carries no
+blessing. That converts the load-bearing safety property from an ordering into a structure — until
+now the only thing stopping a gated stage from running unblessed was that the gate check precedes
+the replay lookup in one `while` loop, with no test, and no loop at all around a phase script
+invoked directly, which `SKILL.md` tells readers to do.
+
+**What is NOT closed.** `produced_under` is stamped by the driver, which is the same party
+`verify --gates` exists to distrust, and after `gc` the run journal that corroborates it may be
+gone. `store verify` re-checks the claim against the naming run's journal while that run survives;
+after that, an admission is corroborated only by the fields the same driver wrote in the same
+breath. The honest closure is a signature over the index record itself. Stated plainly because the
+stakes rose: this is now a claim in a durable store rather than in a directory the OS deletes.
 
 **Four constraints on any implementation, from a design review run 2026-08-20** (three independent
 designs, judged against the surveyed invariants, then attacked from the safety, migration and
