@@ -53,7 +53,20 @@ export const LEG_ORDER = [
 // phase itself owns the absent-file story (p7-dmn reports NOT-EXECUTABLE when
 // the cases file is missing; that is a designed status, not a config error).
 const LEG_KEYS = {
-  "p7-dmn": { golden: "r", fidelity_golden: "r", cases: "x" },
+  // engine_baseline: the exact verdict lines the external DMN engines must
+  // print for THIS subject's golden. Optional, because a subject may declare a
+  // DMN leg before anyone has run an engine over it -- but once declared, the
+  // file must exist, and CI compares against it instead of against a string
+  // typed into the workflow. Same shape as etc/bpmn-kie-baseline.txt, which is
+  // the proven pattern here: a measurement belongs in a committed file next to
+  // the artifact it measures, not in a `grep -q` inside a YAML step where only
+  // one subject can ever be named.
+  "p7-dmn": {
+    golden: "r",
+    fidelity_golden: "r",
+    cases: "x",
+    engine_baseline: "o",
+  },
   "p7-dmn-md": { golden: "r", fidelity_golden: "r" },
   "p7-bpmn": { expected_dir: "dir", rules: "rules" },
   "p7-ladder": {
@@ -75,6 +88,7 @@ const LEG_ENV = {
     golden: "GO_S_DMN_GOLDEN",
     fidelity_golden: "GO_S_DMN_FIDELITY_GOLDEN",
     cases: "GO_S_DMN_CASES",
+    engine_baseline: "GO_S_DMN_ENGINE_BASELINE",
   },
   "p7-dmn-md": {
     golden: "GO_S_DMNMD_GOLDEN",
@@ -617,9 +631,39 @@ const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [, , idOrFlag, sub] = process.argv;
-  if (!idOrFlag) die("usage: subject.mjs <id> [bpmn-rules] | --list");
+  if (!idOrFlag) die("usage: subject.mjs <id> [bpmn-rules] | --list | --ci");
   if (idOrFlag === "--list") {
     process.stdout.write(listSubjects().join("\n") + "\n");
+    process.exit(0);
+  }
+  // --ci: every subject's CI-relevant shape, as JSON, in REPO-RELATIVE paths.
+  //
+  // CI cannot read a sidecar the way a phase script can -- a GitHub workflow
+  // step has no GO_S_* environment and a `paths:` filter is static YAML. So the
+  // one place that knows what a subject declares emits it, and the workflow
+  // consumes it, rather than the workflow keeping its own copy of the answer
+  // under a name only one subject will ever match. Paths are relative because
+  // that is what a `paths:` filter and a repo-root `run:` step both want; the
+  // GO_S_* env transport stays absolute and unchanged.
+  if (idOrFlag === "--ci") {
+    const out = listSubjects().map((id) => {
+      const { desc } = loadSubject(id);
+      const modules = desc.encoding.modules ?? [
+        desc.encoding.main,
+        ...(desc.encoding.wizard ? [desc.encoding.wizard] : []),
+      ];
+      const dirs = [
+        ...new Set(modules.map((m) => m.slice(0, m.lastIndexOf("/")))),
+      ].sort();
+      return {
+        id,
+        display_name: desc.display_name,
+        encoding_state: desc.encoding.state ?? "written",
+        encoding_dirs: dirs,
+        legs: desc.legs,
+      };
+    });
+    process.stdout.write(JSON.stringify(out, null, 2) + "\n");
     process.exit(0);
   }
   const { desc, env } = loadSubject(idOrFlag);

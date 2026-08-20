@@ -55,7 +55,8 @@
     "p7-dmn": {
       "golden": "jl4/examples/dmn/expected/regcf-corpus.dmn",
       "fidelity_golden": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
-      "cases": "jl4/examples/dmn/regcf-corpus.cases.json"
+      "cases": "jl4/examples/dmn/regcf-corpus.cases.json",
+      "engine_baseline": "jl4/examples/dmn/expected/regcf-corpus.engine-baseline.txt"
     },
     "p7-dmn-md": {
       "golden": "jl4/examples/dmn/expected/regcf-corpus.dmn.md",

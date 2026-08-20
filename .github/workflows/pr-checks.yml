@@ -148,9 +148,19 @@ jobs:
             dmn:
               - 'jl4-core/src/L4/Dmn/**'
               - 'jl4/examples/dmn/**'
-              # The corpus SOURCE: since the corpus gates on both engines
-              # (R12/R13), a regcf.l4 edit must reach them directly, not only
-              # transitively through a forced golden regen under dmn/expected.
+              # The corpus SOURCE, for every subject whose sidecar declares a
+              # p7-dmn leg: since such a corpus gates on both engines (R12/R13),
+              # an edit to it must reach them directly, not only transitively
+              # through a forced golden regen under dmn/expected.
+              #
+              # A `paths:` filter is static YAML and cannot be derived from the
+              # sidecars, so this list is MAINTAINED BY HAND and CHECKED by
+              # etc/check-subject-ci-coverage.mjs, which fails naming the exact
+              # line to add when a subject declares p7-dmn and its encoding
+              # directory matches nothing here. Add the directory, do not
+              # broaden to `jl4/examples/legal/**` — that would run both Java
+              # engines on every corpus edit in the repo, including subjects
+              # with no DMN leg at all.
               - 'jl4/examples/legal/regcf/**'
               - 'etc/kie-dmn-check/**'
               - 'etc/camunda-dmn-check/**'
@@ -203,6 +213,15 @@ jobs:
           node-version: "24.x"
       - name: Every corpus .l4 ships its four goldens
         run: node etc/check-corpus-goldens.mjs
+
+      # Same reasoning as the job above, one level up: the filters cannot see
+      # THIS failure either. A subject that declares a leg CI gates, but whose
+      # corpus directory no `paths:` filter matches, simply never triggers the
+      # job -- so the leg reports nothing, and reporting nothing looks exactly
+      # like passing. No filter, no build, no `needs`: it runs on every event
+      # precisely because the thing it checks is which events run what.
+      - name: Every subject's declared legs are exercised by CI
+        run: node etc/check-subject-ci-coverage.mjs
 
   # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
   # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
@@ -1158,7 +1177,24 @@ jobs:
       # decision population (70/70 both ways, in every case), so a decision
       # added to the corpus without a pin, or a pin left behind by a dropped
       # decision, fails here rather than passing silently.
-      - name: The Reg CF corpus -- both engines, end to end (R12/R13)
+      # EVERY subject that declares a p7-dmn leg, not one named in this file.
+      #
+      # This step used to name `regcf-corpus.dmn`, `regcf-corpus.cases.json` and
+      # two exact verdict strings inline, which made the engine gate structurally
+      # single-subject: a second subject declaring a p7-dmn leg had nowhere to
+      # put its goldens or its expected verdicts, so it would have been exercised
+      # by nothing and nothing would have said so. The sidecars already carry
+      # every path this needs; the workflow now reads them (`subject.mjs --ci`)
+      # instead of keeping a second copy of the answer under one subject's name.
+      # The verdicts moved to a committed baseline beside each golden, the same
+      # shape etc/bpmn-kie-baseline.txt already uses.
+      #
+      # A subject declaring p7-dmn with no engine_baseline is a FAILURE, not a
+      # skip: declaring the leg is the claim that this corpus is engine-checked,
+      # and a leg exercised by nothing that reports nothing is the exact silence
+      # this pipeline exists to prevent. etc/check-subject-ci-coverage.mjs says
+      # so before the job even builds.
+      - name: Every DMN-declaring subject -- both engines, end to end (R12/R13)
         env:
           KIE_CHECK_REQUIRED: "1"
           KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
@@ -1166,15 +1202,43 @@ jobs:
           CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
         run: |
           set -euo pipefail
-          ./etc/kie-dmn-check/run.sh \
-            jl4/examples/dmn/expected/regcf-corpus.dmn \
-            --cases jl4/examples/dmn/regcf-corpus.cases.json | tee kie-corpus.log
-          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s), 0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected, 330/330 service output value(s) as expected' kie-corpus.log
+          ran=0
+          while IFS=$'\t' read -r id golden cases baseline; do
+            [ -n "$id" ] || continue
+            echo "::group::$id -- KIE + Camunda over $golden"
+            ran=$((ran + 1))
 
-          ./etc/camunda-dmn-check/run.sh \
-            jl4/examples/dmn/expected/regcf-corpus.dmn \
-            --cases jl4/examples/dmn/regcf-corpus.cases.json | tee camunda-corpus.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated, 1540/1540 value(s) as expected' camunda-corpus.log
+            ./etc/kie-dmn-check/run.sh "$golden" --cases "$cases" | tee "kie-$id.log"
+            ./etc/camunda-dmn-check/run.sh "$golden" --cases "$cases" | tee "camunda-$id.log"
+
+            # Fixed-substring match, one baseline line at a time, against the
+            # union of both logs -- so a line naming either engine finds its own
+            # output and the file does not have to encode which log is which.
+            cat "kie-$id.log" "camunda-$id.log" > "engines-$id.log"
+            while IFS= read -r want; do
+              case "$want" in ''|'#'*) continue ;; esac
+              grep -qF -- "$want" "engines-$id.log" || {
+                echo "::error::$id: no engine printed the baseline line from $baseline"
+                echo "  expected: $want"
+                exit 1
+              }
+            done < "$baseline"
+            echo "ok $id: every line of $baseline was printed"
+            echo "::endgroup::"
+          done < <(node etc/go/lib/subject.mjs --ci | node -e '
+            let s = "";
+            process.stdin.on("data", (d) => (s += d)).on("end", () => {
+              for (const subj of JSON.parse(s)) {
+                const dmn = subj.legs["p7-dmn"];
+                if (!dmn) continue;
+                process.stdout.write(
+                  [subj.id, dmn.golden, dmn.cases, dmn.engine_baseline].join("\t") + "\n",
+                );
+              }
+            });
+          ')
+          [ "$ran" -gt 0 ] || { echo "::error::no subject declares a p7-dmn leg; this job should not have run"; exit 1; }
+          echo "checked $ran subject(s) against both engines"
 
       # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
       #

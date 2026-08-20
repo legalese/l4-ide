@@ -98,7 +98,7 @@ The declared stage set is the subject descriptor's, not the pipeline's: a projec
 etc/go/go.sh run --milestone g1 --subject regcf
 ```
 
-(`--subject regcf` here is the worked example throughout this skill.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. `regcf` is the only sidecar committed today; BNA's arrives with PR #195. The run will stop at HG1 and exit 3 — see step 5.
+(`--subject regcf` here is the worked example throughout this skill — it is **an** example, never the default. With more than one sidecar committed, `--subject` is mandatory and a bare `run`/`plan`/`doctor` refuses, because a run about an unnamed body of law is not a run about anything.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. Run `node etc/go/lib/subject.mjs --list` for what is committed rather than trusting a list written here; as at 2026-08-20 it is `regcf` and `sg-succession`. Note that a corpus under `jl4/examples/legal/` is **not** automatically a subject: `bna` and `charities-cleanroom` are committed corpora with no sidecar, so no milestone runs over them, and `etc/check-subject-ci-coverage.mjs` prints that as a note every CI run. The run will stop at HG1 and exit 3 — see step 5.
 
 **Key idioms:**
 
