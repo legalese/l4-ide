@@ -170,6 +170,16 @@ NEW_CITATION=""
 NEW_SOURCE_URL=""
 NEW_ENCODING=""
 NEW_FORCE=0
+declare -a STORE_ARGS=()
+
+# `store` owns its own flag vocabulary (--keep-days, --dry-run, --allow-waived,
+# --subject, --stage), so the driver hands it every argument verbatim rather
+# than parsing them here. A driver that parsed them would have to be edited
+# every time the store grows a verb.
+if [[ "$CMD" == "store" ]]; then
+  STORE_ARGS=("$@")
+  set --
+fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -240,6 +250,9 @@ while [[ $# -gt 0 ]]; do
     *)
       if [[ "$CMD" == "new-subject" && -z "$NEW_ID" && "$1" != -* ]]; then
         NEW_ID="$1"
+        shift
+      elif [[ "$CMD" == "store" ]]; then
+        STORE_ARGS+=("$1")
         shift
       else
         die_usage "unknown option $1"
@@ -729,6 +742,15 @@ cmd_new_subject() {
   echo "  4. declare the projection legs this subject supports, in subject.json's"
   echo "     'legs' — the driver declares a stage IFF the leg is there, so an omitted"
   echo "     leg is an honest silence rather than a failing stage"
+}
+
+# --- store ------------------------------------------------------------------
+# The artifact store and the blessing ledger, which outlive run directories.
+# `gc` above sweeps RUN DIRECTORIES; this sweeps the store, and the two are
+# deliberately separate verbs because they collect different things under
+# different rules — the run store is a cache, the object store is evidence.
+cmd_store() {
+  node "$LIB/store-cli.mjs" "${STORE_ARGS[@]}"
 }
 
 cmd_gc() {
@@ -1361,6 +1383,7 @@ case "$CMD" in
   verify) cmd_verify ;;
   gc) cmd_gc ;;
   new-subject) cmd_new_subject ;;
+  store) cmd_store ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;
 esac

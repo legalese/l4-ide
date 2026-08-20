@@ -6271,6 +6271,176 @@ process.stdout.write("\n-- the blessing edge --\n");
 }
 // ===== END the blessing edge ================================================
 
+// ===== the store's command surface (R6's deliverable) =======================
+//
+// `diff` is what R6 actually asked for: "the difference between two runs of the
+// same phase is cheap to compute and is itself the product". `cat` is R11's
+// operative sentence, as an exit code.
+process.stdout.write("\n-- store verbs --\n");
+{
+  const CLI = resolve(HERE, "lib/store-cli.mjs");
+  const store = mkdtempSync(resolve(tmpdir(), "l4-go-cli-"));
+  const work = mkdtempSync(resolve(tmpdir(), "l4-go-cliw-"));
+  const DIG = "sha256:" + "a".repeat(64);
+  const mk = (n, c) => {
+    const f = resolve(work, n);
+    writeFileSync(f, c);
+    return f;
+  };
+  const run = (...args) =>
+    spawnSync("node", [CLI, ...args], {
+      env: { ...process.env, L4_GO_STORE: store },
+      encoding: "utf8",
+    });
+
+  // Same witness key, two different outputs — a producer that did not converge.
+  const a = mk("a.json", '{"tools":3}\n');
+  const b = mk("b.json", '{"tools":4}\n');
+  Store.put(store, a, hashOf(a), {
+    subject: "sg",
+    stage: "p7-mcp",
+    rel: "tools.json",
+    inputs_digest: DIG,
+    run_id: "run-A",
+  });
+  Store.put(store, b, hashOf(b), {
+    subject: "sg",
+    stage: "p7-mcp",
+    rel: "tools.json",
+    inputs_digest: DIG,
+    run_id: "run-B",
+  });
+  // Same key, same output — converged, and must stay silent.
+  const c = mk("c.txt", "stable\n");
+  Store.put(store, c, hashOf(c), {
+    subject: "sg",
+    stage: "p3-check",
+    rel: "log.txt",
+    inputs_digest: DIG,
+    run_id: "run-A",
+  });
+  Store.put(store, c, hashOf(c), {
+    subject: "sg",
+    stage: "p3-check",
+    rel: "log.txt",
+    inputs_digest: DIG,
+    run_id: "run-B",
+  });
+
+  const d1 = run("diff");
+  check("store diff exits 1 when a witness key diverges", d1.status === 1);
+  check("it names the divergent stage", /DIVERGENT {2}p7-mcp/.test(d1.stdout));
+  check(
+    "a key whose runs agreed is NOT reported — convergence is silence",
+    !/p3-check/.test(d1.stdout),
+  );
+  check(
+    "and it names the runs that disagreed",
+    /run-A/.test(d1.stdout) && /run-B/.test(d1.stdout),
+  );
+
+  // Self-referential: an artifact that embeds its own run id can never dedupe.
+  const s1 = mk("t1.json", '{"path":"/tmp/run-A/x"}\n');
+  const s2 = mk("t2.json", '{"path":"/tmp/run-B/x"}\n');
+  Store.put(store, s1, hashOf(s1), {
+    subject: "sg",
+    stage: "p0-preflight",
+    rel: "tripwire.json",
+    inputs_digest: DIG,
+    run_id: "run-A",
+  });
+  Store.put(store, s2, hashOf(s2), {
+    subject: "sg",
+    stage: "p0-preflight",
+    rel: "tripwire.json",
+    inputs_digest: DIG,
+    run_id: "run-B",
+  });
+  const d2 = run("diff");
+  check(
+    "a self-referential pair is LABELLED",
+    /SELF-REFERENTIAL/.test(d2.stdout),
+  );
+  check(
+    "and names the substring that triggered the label, so a reader can overrule it",
+    /contains "run-A"/.test(d2.stdout),
+  );
+  check(
+    "it is labelled, never filtered — the real finding is still there",
+    /DIVERGENT {2}p7-mcp/.test(d2.stdout),
+  );
+
+  // cat — default deny.
+  const ung = mk("u.txt", "ungated\n");
+  Store.put(store, ung, hashOf(ung), {
+    subject: "sg",
+    stage: "p3-check",
+    rel: "u.txt",
+    produced_under: null,
+  });
+  const catUng = run("cat", hashOf(ung));
+  check(
+    "store cat REFUSES an object produced under no gate",
+    catUng.status === 3,
+  );
+  check("and says which state it is in", /unblessed/.test(catUng.stderr));
+
+  const bless = Store.writeBlessing(store, {
+    kind: "blessing",
+    subject: "sg",
+    gate: "HG1",
+    state: "waived",
+    reason: "no domain expert has read this",
+    covers: [{ path: c, sha256: hashOf(c), bytes: 7 }],
+    signer: null,
+    signature: null,
+    namespace: null,
+    payload_digest: null,
+  });
+  const wv = mk("w.txt", "waived output\n");
+  Store.put(store, wv, hashOf(wv), {
+    subject: "sg",
+    stage: "p6-tests",
+    rel: "w.txt",
+    produced_under: {
+      blessing: bless.hash,
+      gate: "HG1",
+      state: "waived",
+      reason: bless.reason,
+    },
+  });
+  const catW = run("cat", hashOf(wv));
+  check("a WAIVED object is refused without the flag", catW.status === 3);
+  const catWok = run("cat", hashOf(wv), "--allow-waived");
+  check(
+    "--allow-waived serves it",
+    catWok.status === 0 && /waived output/.test(catWok.stdout),
+  );
+  check(
+    "and PRINTS the waiver's reason, so it cannot be served unseen",
+    /no domain expert/.test(catWok.stderr),
+  );
+
+  // gc — reachability before age.
+  const g = run("gc", "--keep-days", "0");
+  check("store gc exits 0", g.status === 0);
+  check(
+    "a covers[] member survives --keep-days 0 — no age policy reaches the reviewed bytes",
+    Store.has(store, hashOf(c)),
+  );
+  check("an unblessed object is swept", !Store.has(store, hashOf(ung)));
+  check(
+    "and the output states the rule rather than only the counts",
+    /unreachable by any age policy/.test(g.stdout),
+  );
+
+  const v = run("verify");
+  check("store verify passes over a well-formed store", v.status === 0);
+  rmSync(store, { recursive: true, force: true });
+  rmSync(work, { recursive: true, force: true });
+}
+// ===== END store verbs ======================================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

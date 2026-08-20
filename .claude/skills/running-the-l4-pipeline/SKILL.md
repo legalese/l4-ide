@@ -176,7 +176,27 @@ $TMPDIR/l4-go/<run-id>/report.md
 
 It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 requires but this milestone cannot fill render as **ABSENT** with the reason and the stage that would have supplied them — never omitted. Notes you asked a phase script to record render in a block labelled _claimed, not verified_, with the author.
 
-Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most recent few **of each subject** **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected. Per subject matters once more than one exists: retention used to take the newest few across the whole store, so a burst of runs on one subject would have collected every run of another, and cross-run replay reuses receipts from exactly those older runs.
+Run directories accumulate. `etc/go/go.sh gc` prunes them — run dirs only; the object store has its own sweep, see 7a — keeping the most recent few **of each subject** **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected. Per subject matters once more than one exists: retention used to take the newest few across the whole store, so a burst of runs on one subject would have collected every run of another, and cross-run replay reuses receipts from exactly those older runs.
+
+### 7a. The store: what outlives the run
+
+Run directories are volatile — measured, files in `$TMPDIR` last about two to five days — and that used to take the evidence with them. Artifacts and blessings now also go to a durable store, `$L4_GO_STORE` (default `${XDG_STATE_HOME:-~/.local/state}/l4-go/store`).
+
+```bash
+etc/go/go.sh store ls --subject sg-succession
+etc/go/go.sh store diff              # witnesses that DISAGREE
+etc/go/go.sh store cat <sha256>      # the bytes, if they may be served
+etc/go/go.sh store gc --keep-days 90 --dry-run
+etc/go/go.sh store verify            # the blessing chain, and every claim in it
+```
+
+**`diff` is the point of the store, not `cat`.** The witness key is `(stage, inputs_digest, rel)` — same phase, same declared inputs, same slot — so a key holding two different hashes is a producer that did **not** converge over inputs the pipeline calls identical. That difference is the finding, not the waste: the producers here are agents, and two runs over identical inputs are _expected_ to differ. Exit 1 on any divergence.
+
+Some artifacts embed their own run's path (`p0-preflight`'s `tripwire.json` does), so they can never dedupe and always show as divergent. Those pairs are **labelled `SELF-REFERENTIAL` and never filtered**, with the exact substring that triggered the label — filtering would hide a real finding the day the heuristic is wrong.
+
+**`cat` is default-deny, and that is R11.** An object is servable only if some admission of those bytes was under a **satisfied** blessing. An artifact from an ungated stage, from a refused run, or from any run older than the store has no blessing and is refused. `waived` is an edge and not an absence, so it resolves — but you need `--allow-waived`, and the waiver's reason is printed to stderr, because a waiver is a verdict with a reason attached and that reason belongs in whatever you say about the result.
+
+**`store gc` is not `gc`.** `etc/go/go.sh gc` sweeps run directories, which are a cache. `store gc` sweeps the object store, which is evidence, and it collects by **reachability** before age: blessed bytes and every `covers[]` member are unreachable by any age policy, because they are the one thing R11 exists to keep fetchable.
 
 ### 7b. Read the explainer, which is a different document for a different reader
 
