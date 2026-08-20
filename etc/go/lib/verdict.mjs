@@ -72,9 +72,32 @@ const NEEDS_BLOCKER = new Set([
  * satisfy these rules is a defect in the phase script, not a finding about the
  * corpus.
  */
-export function checkReceipt(r) {
+export function checkReceipt(r, ctx = {}) {
   const bad = [];
   const push = (m) => bad.push(m);
+
+  // RULE 7 — A GATED STAGE MAY NOT WRITE A STATUS OTHER THAN BROKEN WHILE
+  // UNBLESSED.
+  //
+  // `ctx.gated` says this stage sits behind a human gate, derived from
+  // run_begin.gated_stages — which is what verify-run.mjs already trusts
+  // INSTEAD OF the driver. `r.produced_under` is the blessing the writer
+  // derived from the journal's own gate rows. Neither is a caller's assertion.
+  //
+  // Why this rule and not an ordering: today the only thing stopping a gated
+  // stage from running unblessed is that the gate check precedes the replay
+  // lookup in one `while` loop — statement order, with no test, and no loop at
+  // all around a phase script invoked directly, which SKILL.md and `go.sh plan`
+  // both tell readers to do. Putting the refusal here puts it in the module
+  // that is pure, already the chokepoint, and already what selftest attacks, so
+  // the ordering becomes an optimisation and the refusal becomes structural.
+  //
+  // BROKEN is exempt because a stage must always be able to report that it
+  // could not run. Refusing that would leave it no way to speak at all.
+  if (ctx.gated && r && r.status !== "BROKEN" && !r.produced_under)
+    push(
+      `stage '${r.stage}' is gated by ${ctx.gated} and carries no blessing: a gated stage may write no status but BROKEN until the gate is granted or waived on the record`,
+    );
 
   if (!r || typeof r !== "object") return ["receipt is not an object"];
   if (!r.stage) push("receipt has no stage id");

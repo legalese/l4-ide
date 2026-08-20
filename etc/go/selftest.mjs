@@ -5952,6 +5952,325 @@ process.stdout.write("\n-- artifacts through the store --\n");
 }
 // ===== END artifacts through the store ======================================
 
+// ===== the blessing edge (R11, step 3) ======================================
+process.stdout.write("\n-- the blessing edge --\n");
+{
+  const RECEIPT = resolve(HERE, "lib/receipt.mjs");
+  const DIG = "sha256:" + "a".repeat(64);
+  const CORPUS = "sha256:" + "9".repeat(64);
+
+  const mkRun = (store, gated) => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-bless-"));
+    mkdirSync(resolve(d, "artifacts"), { recursive: true });
+    writeFileSync(resolve(d, "artifacts", "a.txt"), "measured\n");
+    writeFileSync(
+      resolve(d, ".corpus-members.json"),
+      JSON.stringify([
+        {
+          path: resolve(HERE, "go.sh"),
+          sha256: hashOf(resolve(HERE, "go.sh")),
+          bytes: 1,
+        },
+      ]),
+    );
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "run-begin",
+        "--run",
+        d,
+        "--run-id",
+        "r",
+        "--milestone",
+        "g1",
+        "--subject",
+        "sg",
+        "--repo-head",
+        "abc",
+        "--tree-state",
+        "clean",
+        "--fixed-now",
+        "2025-01-31T00:00:00Z",
+        "--declared-stages",
+        "p6-tests",
+        "--gated-stages",
+        JSON.stringify(gated),
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    return d;
+  };
+  const grant = (store, runDir, state, extra = []) =>
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "gate",
+        "--run",
+        runDir,
+        "--gate",
+        "HG1",
+        "--state",
+        state,
+        "--subject",
+        "sg",
+        "--run-id",
+        "r",
+        "--covers-from",
+        resolve(runDir, ".corpus-members.json"),
+        "--corpus-digest",
+        CORPUS,
+        ...extra,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+  const stage = (store, runDir, status, extra = []) =>
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        runDir,
+        "--stage",
+        "p6-tests",
+        "--status",
+        status,
+        "--inputs-digest",
+        DIG,
+        ...extra,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+  const lastEnd = (runDir) =>
+    read(resolve(runDir, "journal.ndjson"))
+      .filter((r) => r.kind === "stage_end")
+      .at(-1);
+  const GATED = { HG1: ["p6-tests"], HG2: ["p10-publish"] };
+  const OK = [
+    "--oracle-cmd",
+    "t",
+    "--oracle-exit",
+    "0",
+    "--oracle-class",
+    "execution",
+    "--oracle-because",
+    "m",
+  ];
+
+  // A waiver reaches the ledger, and OUTLIVES the run it was granted in.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l1-"));
+    const run = mkRun(store, GATED);
+    const g = grant(store, run, "waived", [
+      "--reason",
+      "no domain expert has read this",
+    ]);
+    check("a waiver is recorded", g.status === 0);
+    const row = read(resolve(run, "journal.ndjson")).find(
+      (r) => r.kind === "gate",
+    );
+    check("the gate row names its ledger record", Boolean(row?.blessing));
+    rmSync(run, { recursive: true, force: true });
+    const led = Store.readBlessings(store);
+    check("the blessing outlives the run directory", led.length === 1);
+    check(
+      "it carries the waiver's reason",
+      /no domain expert/.test(led[0].reason ?? ""),
+    );
+    check("it itemises the corpus it covers", led[0].covers.length === 1);
+    check(
+      "the reviewed bytes are fetchable from the store, not merely named",
+      Store.has(store, led[0].covers[0].sha256),
+    );
+    check("the ledger verifies", Store.verifyBlessings(store).ok);
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // RULE 7, three directions.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l2-"));
+
+    const noGrant = mkRun(store, GATED);
+    const r1 = stage(store, noGrant, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(noGrant, "artifacts", "a.txt"),
+    ]);
+    check("a GATED stage with no grant may not write PASS", r1.status === 4);
+    check(
+      "and the refusal says BROKEN is the only status left to it",
+      /no status but BROKEN/.test(r1.stdout + r1.stderr),
+    );
+
+    const broken = mkRun(store, GATED);
+    const r2 = stage(store, broken, "BROKEN", [
+      "--reason",
+      "the compiler is missing",
+    ]);
+    check(
+      "but it may still report BROKEN — a stage must be able to say it could not run",
+      r2.status === 0,
+    );
+
+    const ungated = mkRun(store, { HG1: [], HG2: [] });
+    const r3 = stage(store, ungated, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(ungated, "artifacts", "a.txt"),
+    ]);
+    check("an UNGATED stage is unaffected by Rule 7", r3.status === 0);
+    check(
+      "and carries no blessing, because there is no gate to carry",
+      lastEnd(ungated)?.produced_under === null,
+    );
+
+    const waived = mkRun(store, GATED);
+    grant(store, waived, "waived", ["--reason", "not reviewed"]);
+    const r4 = stage(store, waived, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(waived, "artifacts", "a.txt"),
+    ]);
+    check(
+      "with a waiver on the record the stage may write PASS",
+      r4.status === 0,
+    );
+    const pu = lastEnd(waived)?.produced_under;
+    check(
+      "and the receipt is STAMPED with what it ran under",
+      pu?.state === "waived",
+    );
+    check(
+      "naming the gate, the ledger record and the corpus",
+      Boolean(pu?.gate && pu?.blessing && pu?.corpus_digest),
+    );
+
+    // THE DERIVATION IS NOT A FLAG. receipt.mjs is the only writer of a status
+    // precisely so no caller can assert one it did not earn; a --blessing flag
+    // would re-open that for any phase script.
+    const src = readFileSync(RECEIPT, "utf8");
+    check(
+      "produced_under is DERIVED from the journal, never accepted as a CLI flag",
+      !/args\.blessing/.test(src) && /gated_stages/.test(src),
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // checkClaim guards the ledger the way checkReceipt guards a receipt.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l3-"));
+    const run = mkRun(store, GATED);
+    const r = grant(store, run, "waived"); // no --reason
+    check("a waiver with no reason is refused at the writer", r.status === 4);
+    check("and says a ledger record is permanent", /permanent/.test(r.stderr));
+    const hg2 = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "gate",
+        "--run",
+        run,
+        "--gate",
+        "HG2",
+        "--state",
+        "waived",
+        "--subject",
+        "sg",
+        "--run-id",
+        "r",
+        "--reason",
+        "shipping anyway",
+        "--covers-from",
+        resolve(run, ".corpus-members.json"),
+        "--corpus-digest",
+        CORPUS,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "a WAIVED HG2 is refused by the writer, not merely by go.sh's prose",
+      hg2.status === 4,
+    );
+    check(
+      "no blessing was written for the refused claim",
+      Store.readBlessings(store).length === 0,
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // go_require_blessing — the gate over the ACT, which happens before any
+  // receipt exists and which a receipt-level rule therefore cannot see.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l4-"));
+    const callPrelude = (runDir) =>
+      spawnSync(
+        "bash",
+        [
+          "-c",
+          'source etc/go/lib/phase-prelude.sh; go_require_blessing "deploying" && echo ALLOWED',
+        ],
+        {
+          cwd: REPO,
+          env: {
+            ...process.env,
+            L4_GO_STORE: store,
+            GO_ROOT: REPO,
+            GO_RUN: runDir,
+            GO_STAGE: "p6-tests",
+            GO_OUT: resolve(runDir, "artifacts"),
+          },
+          encoding: "utf8",
+        },
+      );
+
+    const noGrant = mkRun(store, GATED);
+    const a = callPrelude(noGrant);
+    check(
+      "an outward-facing act with no grant is REFUSED",
+      !/ALLOWED/.test(a.stdout),
+    );
+    check(
+      "and the refusal says the act may not precede the gate",
+      /may not precede the human gate/.test(a.stdout + a.stderr),
+    );
+
+    const waived = mkRun(store, GATED);
+    grant(store, waived, "waived", ["--reason", "not reviewed"]);
+    const b = callPrelude(waived);
+    check("a waiver lets the act proceed", /ALLOWED/.test(b.stdout));
+    check(
+      "but the waiver's reason is PRINTED, so nobody deploys under one unseen",
+      /WAIVED HG1 — not reviewed/.test(b.stdout + b.stderr),
+    );
+
+    const ungated = mkRun(store, { HG1: [], HG2: [] });
+    const c = callPrelude(ungated);
+    check(
+      "a stage that performs an outward-facing act and is NOT gated is itself a defect",
+      !/ALLOWED/.test(c.stdout) &&
+        /must sit behind a gate/.test(c.stdout + c.stderr),
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // The wiring: the one live serving act calls it, before the first POST.
+  {
+    const mcp = readFileSync(resolve(HERE, "phases/p7-mcp.sh"), "utf8");
+    check("p7-mcp requires a blessing", /go_require_blessing/.test(mcp));
+    check(
+      // BEFORE the first mutating request, not merely somewhere in the file:
+      // the deployment exists the moment the POST returns, so a check after it
+      // is a check about something that has already happened.
+      "and does so BEFORE the first -X POST",
+      mcp.indexOf("go_require_blessing") > 0 &&
+        mcp.indexOf("go_require_blessing") < mcp.indexOf("-X POST"),
+    );
+  }
+}
+// ===== END the blessing edge ================================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

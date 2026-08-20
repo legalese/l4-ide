@@ -32,7 +32,13 @@ import {
 } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { append, read, sha256File } from "./ledger.mjs";
-import { materialise, put, storeRoot } from "./store.mjs";
+import {
+  checkClaim,
+  materialise,
+  put,
+  storeRoot,
+  writeBlessing,
+} from "./store.mjs";
 import { checkReceipt, EXIT } from "./verdict.mjs";
 
 function parseArgs(argv) {
@@ -318,7 +324,64 @@ switch (kind) {
       label: args.label ?? null,
     };
 
-    const violations = checkReceipt(receipt);
+    // WHICH GATE GATES THIS STAGE, and what blessing is open for it — both
+    // DERIVED, neither accepted from the caller.
+    //
+    // receipt.mjs is the only writer of a status precisely so that no caller can
+    // assert one it did not earn. A `--blessing` flag would re-open exactly that
+    // asymmetry for any phase script, debug flag or future agent. run_begin's
+    // `gated_stages` is already the field verify-run.mjs trusts instead of the
+    // driver, and the granting gate row is in the same hash-chained journal, so
+    // the derivation needs no new channel and a second party can recompute it.
+    const rows = read(journal);
+    const begin = rows.find((x) => x.kind === "run_begin");
+    let gatedBy = null;
+    try {
+      const gs =
+        typeof begin?.gated_stages === "string"
+          ? JSON.parse(begin.gated_stages)
+          : (begin?.gated_stages ?? {});
+      for (const [g, list] of Object.entries(gs))
+        if (Array.isArray(list) && list.includes(args.stage)) gatedBy = g;
+    } catch {
+      gatedBy = null;
+    }
+    if (gatedBy) {
+      const granting = rows
+        .filter(
+          (x) =>
+            x.kind === "gate" &&
+            x.gate === gatedBy &&
+            (x.state === "satisfied" || x.state === "waived"),
+        )
+        .at(-1);
+      receipt.produced_under = granting
+        ? {
+            blessing: granting.blessing ?? null,
+            gate: gatedBy,
+            state: granting.state,
+            corpus_digest: granting.corpus_digest ?? null,
+            reason: granting.reason ?? null,
+          }
+        : null;
+    } else {
+      receipt.produced_under = null;
+    }
+    // The artifacts were admitted before `produced_under` was known, so the
+    // index records carry a null. Re-admit them under the blessing: put() is
+    // idempotent on the bytes and appends a fresh index record, which is
+    // exactly the per-admission provenance the store is for.
+    if (receipt.produced_under && ctx.store)
+      for (const a of receipt.artifacts ?? [])
+        if (a.sha256 && a.path && existsSync(a.path))
+          put(ctx.store, a.path, a.sha256, {
+            ...meta,
+            rel: a.rel ?? null,
+            bytes: a.bytes ?? null,
+            produced_under: receipt.produced_under,
+          });
+
+    const violations = checkReceipt(receipt, { gated: gatedBy });
     if (violations.length) {
       process.stderr.write(
         `receipt.mjs: REFUSED the receipt for stage '${args.stage}' —\n`,
@@ -345,8 +408,93 @@ switch (kind) {
   }
 
   case "gate": {
+    // THE BLESSING GOES TO THE LEDGER FIRST, THEN THE JOURNAL.
+    //
+    // Ordering is fail-closed on purpose. A crash between the two leaves an
+    // orphan record in the ledger and NO gate row in the journal, so the gate
+    // stays shut and the run refuses. The reverse order would leave a gate row
+    // citing a blessing that does not exist — a run that believes it is blessed
+    // by nothing.
+    //
+    // Why the ledger at all, when the journal already has a gate row: the
+    // journal lives in $TMPDIR. Measured 2026-08-20 — 76 of 92 run directories
+    // are already empty shells and files last two to five days. A signature
+    // recorded only there expires in under a week, silently. The ledger is the
+    // one thing in this system that is never swept.
+    let blessingId = null;
+    if (
+      args.state === "satisfied" ||
+      args.state === "waived" ||
+      args.state === "refused"
+    ) {
+      let store = null;
+      try {
+        store = storeRoot();
+      } catch {
+        store = null;
+      }
+      const covers = args.covers_from
+        ? JSON.parse(readFileSync(args.covers_from, "utf8"))
+        : [];
+      const sigPath = args.signature_file;
+      const signature =
+        sigPath && existsSync(sigPath)
+          ? readFileSync(sigPath).toString("base64")
+          : null;
+      const rec = {
+        kind: "blessing",
+        subject: args.subject ?? process.env.GO_SUBJECT ?? null,
+        gate: args.gate,
+        state: args.state,
+        corpus_digest: args.corpus_digest ?? null,
+        covers,
+        namespace: args.namespace ?? null,
+        payload_digest: args.payload_digest ?? null,
+        signer: args.signer ?? null,
+        // EMBEDDED, not a path. signature_file points into $RUN, which gc
+        // deletes; a signature that does not survive its run directory is not
+        // a first-class edge.
+        signature,
+        reason: args.reason ?? null,
+        granted_in_run: args.run_id ?? process.env.GO_RUNID ?? null,
+        ts: new Date().toISOString(),
+      };
+      const claim = checkClaim(rec);
+      if (!claim.ok) {
+        process.stderr.write(
+          `receipt.mjs: REFUSED the ${args.gate} blessing —\n` +
+            claim.problems.map((p) => `  - ${p}\n`).join("") +
+            `A blessing record is permanent: nothing sweeps the ledger. Exit 4 (BROKEN).\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      if (store) {
+        // The reviewed BYTES are admitted, so "show me what was blessed" is a
+        // fetch and not a name — independent of git history and of the file
+        // still being at that path.
+        for (const m of covers)
+          if (m.sha256 && m.path && existsSync(m.path))
+            put(store, m.path, m.sha256, {
+              subject: rec.subject,
+              stage: "covers",
+              rel: `tree:${m.path}`,
+              bytes: m.bytes ?? null,
+            });
+        try {
+          blessingId = writeBlessing(store, rec).hash;
+        } catch (e) {
+          process.stderr.write(
+            `receipt.mjs: could not write the blessing: ${e.message}\n`,
+          );
+          process.exit(EXIT.BROKEN);
+        }
+      }
+    }
     append(journal, {
       kind: "gate",
+      // The ledger record this row corresponds to. null when the store was
+      // unavailable — the gate still works, it just is not durable.
+      blessing: blessingId,
       gate: args.gate,
       state: args.state, // satisfied | waived | refused
       namespace: args.namespace ?? null,
