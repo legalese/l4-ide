@@ -44,7 +44,13 @@ the document-assembly demo. It also repairs the inherited §8.4 defect — after
 changed answer the verdict used to go stale, not merely its citations. Two scope
 rulings the milestone had to make are recorded in the spec with the notes that
 discharge them: the payload-value match (§8.8) and the date surface (§8.12, R12).
-**M3 (the embedded query plan) remains unimplemented.**_
+**M3 (the embedded query plan) was measured on 2026-08-18 and DECLINED — not deferred.**
+Info-gain plan ordering asks 3.38% fewer questions than declaration order over the 138
+corpus decisions that have an ordering at all (0.059 of one question each), and a
+compile-time operand sort captures 100% of that, beating the adaptive planner on 0 of
+138. Most L4 legal decisions are flat AND/OR chains where every atom is equally
+informative. The harness is committed at `jl4/measure/`; the ruling, its limits and what
+would reopen it are in spec §8.5. Question order here is, and stays, L4 source order._
 
 The organising principle: **as much as possible of an L4 encoding survives, by
 name and by structure.** An L4 reader and a docassemble reader should

@@ -635,7 +635,6 @@ lowerModule side mod' =
                      , pkgGloss  = ctx.ctxGloss
                      , pkgAttach = attach
                      , pkgFresh  = if cited then Just citationSentinel else Nothing
-                     , pkgPlan   = Nothing
                      }
                  , report
                  )

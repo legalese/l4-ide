@@ -295,10 +295,6 @@ data DAPackage = MkDAPackage
     -- assemble; the driver references it BEFORE the goal, which is what makes
     -- the accumulated list the rules that fired /this/ time rather than a
     -- session-long log.
-  , pkgPlan   :: !(Maybe Text)
-    -- ^ reserved slot for M3's embedded compiled decision query (spec R1
-    -- cost: the IR anticipates M3 so M3 does not rework Emit). Always
-    -- 'Nothing' in v1; the emitter ignores it.
   }
   deriving stock (Eq, Show, Generic)
 

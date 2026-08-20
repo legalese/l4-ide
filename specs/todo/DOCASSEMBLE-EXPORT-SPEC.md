@@ -1,7 +1,7 @@
 # L4 → Docassemble: interview export and transpiler spec
 
-_Status: **M1, M2 and M4 implemented; M1 review-repaired. M3 (the embedded plan) is not
-implemented.** Designed 2026-08-16 on branch
+_Status: **M1, M2 and M4 implemented; M1 review-repaired. M3 (the embedded plan) is DECLINED on
+measurement, not deferred — see §8.5.** Designed 2026-08-16 on branch
 `mengwong/docassemble-bridge`; M1 (the static core, §10) landed the same day on branch
 `mengwong/docassemble-backend`: the `L4.Docassemble.{IR,Lower,Emit}` module triple in jl4-core
 plus the `l4 docassemble` CLI verb in jl4, mirroring the shipped OpenFisca backend. A same-day
@@ -43,7 +43,21 @@ sidecars) and by `m4_acceptance.sh`, which drives all seven examples in real `do
 `(goal, verdict, citations)` triple asserted equal across shapes. Two scope rulings the milestone
 had to make rather than drift into are recorded where they belong — the payload-value match
 (§8.8) and the date surface (§8.12, R12) — each with the implementation note that discharges it.
-**M3 (the embedded plan) remains unimplemented; `DAPackage.pkgPlan` is still `Nothing`.**_
+(This paragraph originally ended by asserting that M3 remained unimplemented and that
+`DAPackage.pkgPlan` was still `Nothing`. Both sentences are now wrong in the same direction:
+M3 was measured and declined on 2026-08-18, and the reserved field was removed with it — §8.5.)_
+
+_**M3 DECLINED 2026-08-18** on branch `mengwong/m3-decision`, on the measurement §8.5's own gate
+demanded. Info-gain plan ordering asks 3.38 % fewer questions than declaration order across the
+138 corpus decisions that have an ordering at all — 0.059 of one question each — and a
+compile-time operand sort captures **100.00 %** of that, beating the adaptive planner on 0 of 138.
+Most L4 legal decisions are flat AND/OR chains where every atom is equally informative, so
+there is nothing for a runtime plan to be clever about. The static sort is declined too: it would
+trade "operand order preserved = question order", a property a reader can verify, for a saving
+nobody can feel. The measurement harness is committed at `jl4/measure/` and reproduces
+bit-for-bit; `DAPackage.pkgPlan`, the slot the IR carried for a consumer that will now never
+arrive, is deleted in the same change. §8.5 records what the measurement cannot say — untested
+correlated priors and per-question cost — and what would reopen it._
 
 _**M4 repair pass, 2026-08-17.** Five adversarial lenses attacked the landed milestone and an
 independent skeptic tried to refute each finding. Five that survived changed behaviour and are
@@ -88,20 +102,20 @@ golden pins it.
 
 ## 0. Ruling status
 
-| ruling | state                   | detail                                                                                   |
-| ------ | ----------------------- | ---------------------------------------------------------------------------------------- |
-| R1     | **ANSWERED** 2026-08-16 | CLI surface: own verb; package placement; plan lives above core, §8.1                    |
-| R2     | **ANSWERED** 2026-08-16 | records → DAObject subclasses, one question per _field_, §8.2                            |
-| R3     | **ANSWERED** 2026-08-16 | survival: every reachable `DECIDE`/`WHERE` binding → one `code:` block, §8.3             |
-| R4     | **ANSWERED** 2026-08-16 | the verdict seam: scope-first driver, six-valued verdict, §8.4                           |
-| R5     | **ANSWERED** 2026-08-16 | question order: native backchaining v1, embedded plan M3, §8.5                           |
-| R6     | **ANSWERED** 2026-08-16 | datatype map; enums as string-valued radios; floats, §8.6                                |
-| R7     | **ANSWERED** 2026-08-16 | `TYPICALLY` → `default:`, Advisory divergence, §8.7                                      |
-| R8     | **ANSWERED** 2026-08-16 | `MAYBE` erased to optionality, as both schema paths do, §8.8                             |
-| R9     | **ANSWERED** 2026-08-16 | emission hygiene: Mako escaping, `sets:`, `id:`, `depends on:`, self-validation, §8.9    |
-| R10    | **ANSWERED** 2026-08-16 | validation harness: headless docassemble.base, proven by probe, never a build dep, §8.10 |
-| R11    | **ANSWERED** 2026-08-16 | artifact shape: bare YAML v1, installable package M2, §8.11                              |
-| R12    | **ANSWERED** 2026-08-17 | the M4 date surface: what lowers, what refuses by name, which idiom, §8.12               |
+| ruling | state                                                                   | detail                                                                                   |
+| ------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| R1     | **ANSWERED** 2026-08-16                                                 | CLI surface: own verb; package placement; plan lives above core, §8.1                    |
+| R2     | **ANSWERED** 2026-08-16                                                 | records → DAObject subclasses, one question per _field_, §8.2                            |
+| R3     | **ANSWERED** 2026-08-16                                                 | survival: every reachable `DECIDE`/`WHERE` binding → one `code:` block, §8.3             |
+| R4     | **ANSWERED** 2026-08-16                                                 | the verdict seam: scope-first driver, six-valued verdict, §8.4                           |
+| R5     | **ANSWERED** 2026-08-16; M3 half **DECLINED on measurement** 2026-08-18 | question order: native backchaining; the embedded plan measured and declined, §8.5       |
+| R6     | **ANSWERED** 2026-08-16                                                 | datatype map; enums as string-valued radios; floats, §8.6                                |
+| R7     | **ANSWERED** 2026-08-16                                                 | `TYPICALLY` → `default:`, Advisory divergence, §8.7                                      |
+| R8     | **ANSWERED** 2026-08-16                                                 | `MAYBE` erased to optionality, as both schema paths do, §8.8                             |
+| R9     | **ANSWERED** 2026-08-16                                                 | emission hygiene: Mako escaping, `sets:`, `id:`, `depends on:`, self-validation, §8.9    |
+| R10    | **ANSWERED** 2026-08-16                                                 | validation harness: headless docassemble.base, proven by probe, never a build dep, §8.10 |
+| R11    | **ANSWERED** 2026-08-16                                                 | artifact shape: bare YAML v1, installable package M2, §8.11                              |
+| R12    | **ANSWERED** 2026-08-17                                                 | the M4 date surface: what lowers, what refuses by name, which idiom, §8.12               |
 
 R12 was ANSWERED 2026-08-17 by the M4 RED phase, on the measurement recorded in §8.12; it did
 not exist on 2026-08-16 because §10's M4 bullet named an idiom without bounding a surface.
@@ -379,7 +393,7 @@ primitives; bodies drawn from the constitutive expression layer — builtin appl
 `Percent`, `Where`/`LetIn`, calls to other in-module decisions, local and top-level function
 application. Goal type: BOOLEAN, NUMBER, STRING, or enum (the planner is boolean-only —
 `translateDecide` rejects non-boolean **[E]** via `Ladder.hs` — but _emission_ is not: a numeric
-goal simply forgoes seam/verdict treatment and M3 ordering).
+goal simply forgoes seam/verdict treatment).
 
 Everything else is refused by name. This fragment is a strict superset of OpenFisca v1's (which
 refuses `Where`) and matches the shape of the existing eligibility corpus: the Housing Act
@@ -396,9 +410,8 @@ directory gets an annotated copy, as the OpenFisca examples did).
   │ L4.Docassemble.Lower   Module Resolved │──▶│  option parsing, typecheck,   │
   │   -> Either [LowerError]               │   │  lowerModule, renderPackage,  │
   │        (DAPackage, FidelityReport)     │   │  fidelity placement, --fail-on│
-  │ L4.Docassemble.Emit    DAPackage->Text │   │  (M3: + jl4-query-plan to     │
-  └────────────────────────────────────────┘   │   embed the compiled plan)    │
-                                               └───────────────────────────────┘
+  │ L4.Docassemble.Emit    DAPackage->Text │   └───────────────────────────────┘
+  └────────────────────────────────────────┘
 ```
 
 - **IR.** `DAPackage` = interview metadata + `[DABlock]` where
@@ -434,7 +447,7 @@ on jl4-core, not vice versa; today the `l4` executable does not depend on jl4-qu
 jl4-lsp, jl4-repl, jl4-service, jl4-wasm do) **[E]**.
 
 **Proposal.** Own verb `l4 docassemble` (runnable artifact), Fidelity discipline adopted from
-the `l4 export` side anyway. Backend triple in jl4-core. The M3 plan-embedding step composes in
+the `l4 export` side anyway. Backend triple in jl4-core. The (since declined, §8.5) plan-embedding step would have composed in
 `jl4/app`, which then adds a jl4-query-plan dependency, following the jl4-wasm precedent of
 depending only on jl4-core + jl4-query-plan; the `vizExprToBoolExpr` glue gets _lifted into
 jl4-query-plan_ rather than duplicated a fourth time (it exists twice today:
@@ -443,6 +456,13 @@ jl4-query-plan_ rather than duplicated a fourth time (it exists twice today:
 **Cost.** The IR must anticipate M3 (a slot for an optional embedded plan) so M3 does not
 rework Emit. **What would close it:** sign-off, plus a one-line check that `cabal build exe:l4`
 stays clean when jl4-query-plan is added in M3.
+
+**Implementation note (2026-08-18).** This cost was paid and then refunded. `DAPackage` carried
+`pkgPlan :: Maybe Text` through M1, M2 and M4, always `Nothing`; §8.5 declined the plan on
+measurement and the field is deleted, because a reserved slot with no consumer is dead weight
+that reads as a promise. Nothing else in this ruling changes: the composition point for
+jl4-query-plan is still `jl4/app`, and the measurement harness (`jl4/measure/`) demonstrates it,
+since `executable l4` already depends on both jl4-lsp and jl4-query-plan.
 
 ### 8.2 R2 — records become DAObject subclasses; questions are per _field_, not per record
 
@@ -596,7 +616,7 @@ rule's `@ref`/`@desc` text (M2), so the verdict screen's reasoning list is exact
 that fired, in order, deduplicated — the `explain.yml` pattern (§2). Non-seam boolean goals get
 `Holds`/`Fails`; every verdict value gets its own terminal `event:` screen carrying the goal's
 `@desc` and (M2) `@ref` citations. `Undetermined` cannot be reached in v1 (docassemble asks
-until defined); it becomes reachable in M3/M4 when "I don't know" answers arrive (the
+until defined); it became reachable in M4 when "I don't know" answers arrived (the
 four-state input model of `RUNTIME-INPUT-STATE-SPEC.md`, itself blocked on TYPICALLY evaluator
 semantics — noted, not depended on).
 
@@ -792,7 +812,7 @@ found by adversarial review of the landed milestone, both were measured, and bot
    recomputed). `roundtrip_check.py` therefore fires the review block LAST, after
    `change_answer`, which is also the state a review screen is for.
 
-### 8.5 R5 — question order: native backchaining v1; embedded compiled plan M3
+### 8.5 R5 — question order: native backchaining, and the embedded plan DECLINED on measurement
 
 **Evidence.** Docassemble's order = block/operand order — a `code:` block is plain `exec`
 (`parse.py:3706`, `exec_with_trap` `:10175`), so CPython short-circuit is the pruner
@@ -816,6 +836,86 @@ and the static blocks must agree on atom identity — the UUIDv5 scheme (`QueryP
 the shared key, also emitted as each block's `id:`. **What would close it:** v1 sign-off now;
 M3 gated on a measured demo where plan-driven ordering asks strictly fewer questions than
 declaration order on the Reg CF or Housing corpus.
+
+#### ANSWERED 2026-08-18: the v1 half stands; **M3 is DECLINED, and the gate above is why**
+
+The gate was honoured rather than built through. The harness is committed at `jl4/measure/`
+(`M3Measure.hs`, `README.md`, raw results in `data/`); the baseline is chained to real
+`docassemble.base` 1.10.7 by `etc/m3-baseline-check.py`. The corpus (17 files: `legal/regcf/**`,
+`legal/charities-cleanroom/**`, `legal/bna/**`, `examples/docassemble/*.l4`) and the decision rule
+were **fixed in writing before any number existed**, and every decision is reported including ties,
+losses and ladder refusals.
+
+Re-running the documented command reproduces both artifacts **bit-for-bit at the commit they were
+made at** — verified 2026-08-18 in a worktree at `origin/unstable` (`afcef88f`), `diff -q` clean on
+the CSV and the JSON. It does not reproduce on this branch, and the reason is worth recording
+rather than hiding: the corpus was pinned with a **glob**, which reads as a fixed set and is not
+one. `examples/docassemble/{,not-ok/}*.l4` matched 12 files then and matches 20 here, because M4
+added six examples and turned two refusal fixtures into supported constructs. Checked rather than
+assumed: neither deleted file (`not-ok/just-payload-pattern.l4`, `not-ok/maybe-number.l4`)
+contributes a single row to the 138-decision eligible set, and no other measured file's content
+changed — so the numbers below stand unaltered. `jl4/measure/README.md` carries the re-running
+instructions and the pin-the-paths-explicitly warning.
+
+589 top-level decisions; 339 refused by the ladder (all "can only visualize … a DECIDE that
+returns a boolean"); 250 measured, of which 31 have 0 atoms and 81 exactly 1, leaving **138 with
+≥2 atom classes**. 247 of 250 enumerated exhaustively over all 2^k worlds; 3 sampled at 2000
+worlds from a stated seed.
+
+| asker (uniform worlds, 138 decisions) | mean questions |
+| ------------------------------------- | -------------- |
+| declaration order — what v1 emits     | 1.7547         |
+| plan order — what M3 would have built | 1.6955         |
+| **static compile-time operand sort**  | **1.6955**     |
+
+Plan order asks **3.38 % fewer** — 0.059 of one question per decision, 8.18 questions across
+all 138. Per decision: plan fewer on 11, tie on 127, worse on 0.
+
+**The number that decided it is the third row.** A compile-time operand sort — no BDD, no Python
+port, no runtime plan — captures **100.00 %** of the saving, and plan order is strictly better
+than it on **0 of 138** decisions (0.09 % of pooled world-mass). Adaptivity is the only thing
+M3's runtime machinery buys over a sort, and on this corpus it buys nothing measurable.
+
+The cause is structural: **60 of the 75 decisions with ≥3 atoms sit exactly at 2 − 2^−(n−1) for
+both askers** — the closed form for a flat AND/OR chain of symmetric atoms. Most L4 legal
+decisions are flat chains, and under uniform priors every atom in a flat chain is equally
+informative, so there is no ordering to get right. §8.4's scope-first seam driver already
+harvests the one large, structural win (never ask a requirement question when the rule does not
+apply), and Python short-circuit already harvests the rest.
+
+**The static sort is declined too, and for a different reason.** It is cheap and it captures the
+whole saving, but 0.059 questions per decision does not pay for what it costs: operand order
+would stop being source order, and "operand order preserved = question order" is a survival
+property a reader can check. Trading something verifiable for something imperceptible is a bad
+trade. Recorded here so the next reader does not re-derive the option and assume nobody thought
+of it.
+
+**What review changed.** The first measurement pass reported 3.58 % and recommended declining on
+magnitude alone. Two adversarial methodology lenses (13 findings survived independent refutation)
+found (a) the declaration-order baseline walked the ladder's CNF-distributed form rather than the
+shape `L4.Docassemble.Lower` actually emits — CNF distribution can only _add_ demands, so the
+error was one-directional and **flattered the planner**, and (b) the static-sort asker had never
+been run. Repairing (a) moved the figure to 3.38 %; running (b) is what changed the finding from
+"the win is small" to "the win is not adaptive". Both arms are retained in the harness and the
+`cnf` arm reproduces the superseded run field-by-field, so the delta between the two reports is
+exactly the repair.
+
+**What this measurement cannot say, stated so it is not over-read.** The corpus carries **zero**
+`TYPICALLY` priors that `collectTypicallyDefaults` can read — it reads a `DECIDE`'s `GIVEN`
+params and module `ASSUME`s, and the corpus's one real `TYPICALLY` is a _record field_ — so
+`priorsByUnique` is empty on all 250 decisions and the uniform and prior-weighted arms coincide
+**by construction** (verified: bit-identical on all 247 exhaustive decisions). A synthetic-priors
+arm put adaptivity's contribution at 0.3 %, but it draws each atom's prior _independently_, and
+independence structurally forbids the one thing adaptivity exists for — an answer telling you
+something about the next atom. **Correlated priors are the strongest remaining argument for an
+embedded plan and they were not tested**, because `priorsByUnique` is per-atom by construction:
+testing them is a change to the planner, not to the corpus. Nor does either asker model per-question
+_cost_ (upload a document vs. one click), which is a second place adaptivity could earn its keep.
+
+**What would reopen this:** one real decision where adaptivity beats a compile-time sort by a
+material margin (the measured maximum gap is 0.040 questions); a corpus with correlated priors
+plus a ranker that consumes a joint distribution rather than per-atom marginals; or a cost model.
+Any of the three is cheap to test against the committed harness.
 
 ### 8.6 R6 — datatypes; enums ride as constructor-name strings
 
@@ -953,6 +1053,16 @@ weaker divergence than it first appears, but a divergence: L4's evaluator would 
 L4 grows presumptive evaluation (`PEVAL`), revisit whether defaults should instead become M3
 plan priors only. **What would close it:** sign-off; it is reversible by flag later.
 
+**Note (2026-08-18).** The "become plan priors only" alternative is now moot — §8.5 declined the
+embedded plan, so there is no plan for a prior to feed. Worth recording what the measurement
+found on the way past, because it bears on `TYPICALLY` rather than on docassemble:
+`collectTypicallyDefaults` reads a `DECIDE`'s `GIVEN` parameters and module `ASSUME`s, so a
+`TYPICALLY` on a **record field** — which is what the corpus actually contains, `defaults.l4:14` —
+never reaches `priorsByUnique` at all. Across the 17-file measurement corpus that map is empty
+for all 250 decisions. Whatever else is true, the info-gain ranker is presently running with no
+priors on this corpus, and any future work premised on `TYPICALLY` priors should verify they are
+being read before assuming they are.
+
 ### 8.8 R8 — `MAYBE` erased to optionality
 
 **Evidence.** Both shipped schema consumers erase `MAYBE OF T` to `T` + not-required
@@ -1077,7 +1187,8 @@ cited line:
 4. **`id:`** on every block, deterministic from the sanitised variable name in v1 — the
    variable name rides into the id _verbatim_ (dots included; docassemble ids are free-form
    strings), so distinct variables can never collide on id — switching to the UUIDv5 atom
-   identity in M3 so ids are stable across recompiles _and_ joinable to the plan. One
+   identity so ids are stable across recompiles (and would have been joinable to the plan M3
+   proposed, before §8.5 declined it). One
    documented exception (2026-08-16, proven by the round-trip harness): a `metadata:` block
    admits ONLY `metadata` and `comment` keys — any other key, `id:` included, is a hard
    `DASourceError` ("A metadata directive cannot be mixed with other directives",
@@ -1489,7 +1600,7 @@ where = ["."]` then found both, and a wheel built from that tree — declaring i
    but M4 is the milestone that makes `all`/`any` names the emitter's own generated code calls.
    Fixture: `jl4/tests-cli/fixtures/docassemble-global-shadow.l4`.
 
-   M3's compiled plan is what fills the module. Correspondingly the `modules:` block is emitted into the
+   the generated runtime module is what fills it. Correspondingly the `modules:` block is emitted into the
    **packaged** interview only: a bare YAML has no package for `.l4runtime` to resolve against,
    and `from … import *` of a missing module aborts assembly. The list holds exactly one relative
    name — naming `docassemble.base.util` or `docassemble.base.legal` sets `imports_util`
@@ -1672,7 +1783,7 @@ their absence.
   via `explain()`/`logic_explanation()` on verdict screens plus `auto terms:` glossary entries
   for L4 defined terms, push recipe (`dainstall`/API) in the README. Deferred out of M2 and named
   where they belong: the `generic object` question layer (§8.2, to M4, measured inert in v1) and
-  the embedded plan (M3, `DAPackage.pkgPlan` still `Nothing`).
+  the embedded plan (M3 — since measured and DECLINED, §8.5).
 
   **Review pass, same day.** Five adversarial lenses, each finding re-checked by an independent
   skeptic. Repaired: the runtime-module name collision (§8.11 decision 6 — the only defect that
@@ -1689,9 +1800,15 @@ their absence.
   (§8.4). Deliberately not fixed and recorded as an M1 wart: the percent-encoded interview title
   (§8.11 decision 3).
 
-- **M3 — the differentiator.** `--plan`: embedded `CompiledDecisionQuery` + Python port of
-  `queryDecision`/`verdictOf`, UUIDv5 `id:`s, info-gain ordering, measured against declaration
-  order on a real corpus. Requires the R1 packaging move and the `vizExprToBoolExpr` lift.
+- **M3 — the differentiator. MEASURED AND DECLINED 2026-08-18; see §8.5.** Proposed `--plan`:
+  embedded `CompiledDecisionQuery` + Python port of `queryDecision`/`verdictOf`, UUIDv5 `id:`s,
+  info-gain ordering. Its own gate — "strictly fewer questions than declaration order on the Reg
+  CF or Housing corpus" — was run instead of built through: 3.38 % fewer, 0.059 of one question
+  per decision, and a compile-time operand sort captures 100 % of it, beating the adaptive
+  planner on 0 of 138 decisions. Not built. (This bullet also asserted the milestone "requires
+  the R1 packaging move and the `vizExprToBoolExpr` lift" — both were already true of the tree
+  when it was written: `jl4/jl4.cabal`'s `executable l4` already depends on jl4-lsp _and_
+  jl4-query-plan, and `jl4/app/L4/Cli/Verify.hs` already builds a plan cache in `jl4/app`.)
 - **M4 — breadth. SHIPPED 2026-08-17.** `LIST OF` via
   `DAList` gathering; payload constructors via `show if`; `MAYBE NUMBER`/`DATE` via paired
   is-known questions; date arithmetic (routing every literal through `as_datetime()`; never
