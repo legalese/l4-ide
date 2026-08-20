@@ -12,6 +12,16 @@ auto terms:
   "sold through a single intermediary": "The offering is conducted exclusively through a single intermediary"
   "the intermediary is registered": "The intermediary is registered with the Commission as a funding portal"
 ---
+id: c_l4_citations_fresh
+reconsider: True
+code: |
+  # spec §8.4: one clean explanation list per assemble pass, before any
+  # rule block re-runs. The driver pulls this before it pulls the goal.
+  clear_explanations()
+  l4_citations_fresh = True
+sets:
+  - l4_citations_fresh
+---
 id: objects_main
 objects:
   - o: DAObject
@@ -41,6 +51,7 @@ fields:
     help: "Whether that intermediary is registered with the Commission as a funding portal"
 ---
 id: c_offering_exempt_within_the_annual_cap
+reconsider: True
 code: |
   # L4: `within the annual cap`
   offering_exempt_within_the_annual_cap = (o.amount_raised_in_12_months <= 5000000)
@@ -51,6 +62,7 @@ sets:
   - offering_exempt_within_the_annual_cap
 ---
 id: c_offering_exempt_sold_through_a_single_intermediary
+reconsider: True
 code: |
   # L4: `sold through a single intermediary`
   offering_exempt_sold_through_a_single_intermediary = o.sold_through_one_intermediary
@@ -61,6 +73,7 @@ sets:
   - offering_exempt_sold_through_a_single_intermediary
 ---
 id: c_offering_exempt_the_intermediary_is_registered
+reconsider: True
 code: |
   # L4: `the intermediary is registered`
   offering_exempt_the_intermediary_is_registered = o.intermediary_is_registered
@@ -71,6 +84,7 @@ sets:
   - offering_exempt_the_intermediary_is_registered
 ---
 id: c_offering_exempt
+reconsider: True
 code: |
   # L4: `offering exempt`
   offering_exempt = (offering_exempt_within_the_annual_cap and (offering_exempt_sold_through_a_single_intermediary and offering_exempt_the_intermediary_is_registered))
@@ -84,7 +98,11 @@ sets:
 ---
 id: driver_offering_exempt
 mandatory: True
+reconsider: True
 code: |
+  # spec §8.4: pull the citation reset BEFORE the goal, so the
+  # explanation list is emptied before any rule re-explains into it.
+  l4_citations_fresh
   # driver for @export `offering exempt`
   if offering_exempt:
       offering_exempt_screen_holds
@@ -120,3 +138,15 @@ subquestion: |
   % for citation in logic_explanation():
   * ${ citation }
   % endfor
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      amount raised in 12 months: ${ showifdef('o.amount_raised_in_12_months', '**not asked**') }
+  - note: |
+      sold through one intermediary: ${ showifdef('o.sold_through_one_intermediary', '**not asked**') }
+  - note: |
+      intermediary is registered: ${ showifdef('o.intermediary_is_registered', '**not asked**') }

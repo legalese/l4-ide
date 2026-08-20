@@ -1,0 +1,100 @@
+-- M4 (spec §10): the DOCUMENT-ASSEMBLY demo — a verdict screen that also
+-- assembles the letter.
+--
+-- This is the capability that justifies the backend outside the room: the
+-- citizen answers a handful of questions and leaves with a document, not just
+-- a verdict. The subject is deliberately the same domain as `seam.l4` (a
+-- landlord's notice to quit) because a landlord's notice is precisely the
+-- document a verdict screen should hand back — but it is a SEPARATE file, so
+-- that adding an attachment cannot silently rewrite `seam.l4`'s committed
+-- byte goldens and make the demo indistinguishable from a regression.
+--
+-- THREE FIELDS THE RULE DOES NOT READ. The landlord's name, the tenant's name
+-- and the property address decide nothing; they exist because the LETTER needs
+-- them. That is not a wart, it is the point: an attachment extends the
+-- interview's question set beyond what the rule alone would ask, and the
+-- emitted interview has to seek them.
+--
+-- THE HAZARD, and why `variable name:` is mandatory. A failed attachment
+-- evaluation inside a question block is caught by
+-- `except BaseException as err: logmessage("Problem with attachments block: "…)
+-- ; continue` (parse.py:9521-9526 at 1b6678384) — a log line, not an error.
+-- Probing could not make a realistic defect take that path (a raising body
+-- propagates ZeroDivisionError; an unaskable reference propagates
+-- DAErrorMissingVariable, on both the question-attached and standalone paths),
+-- so the loud failures are louder than the spec feared. The failure that is
+-- genuinely SILENT is different and worse: a SUCCESSFUL EMPTY RENDER. The
+-- interview completes, the variable is a healthy DAFileCollection, and the
+-- letter is blank. Nothing raises and nothing is logged.
+--
+-- The only defence is a post-condition on the assembled content, and the only
+-- way to have one is `variable name:` on the attachment — without it
+-- docassemble stores the document under `_internal['docvar'][n]`
+-- (parse.py:4997-5003) and there is nothing to assert about.
+--
+-- WHY THE TEMPLATE OPENS WITH AN INDENTED ADDRESS BLOCK. That is deliberate,
+-- and it is the fixture for a repair (2026-08-17). The template is spliced into
+-- a YAML block scalar, and a block scalar with no explicit indentation
+-- indicator takes its indentation from its own first non-empty line — so a
+-- template opening on ANY leading whitespace used to make the emitted YAML
+-- unparseable, in both artifact shapes, with `l4 docassemble` exiting 0. Not
+-- just the letter: `parse.Interview` raises `DASourceError` and NOT ONE
+-- QUESTION survives. `content: |2` is the fix, and this template is what proves
+-- it — strip the `2` from the emitted YAML and real docassemble 1.10.7 refuses
+-- to load the interview at all.
+--
+-- THE OTHER REPAIR THIS FILE PINS. The letter used to go stale. An attachment
+-- is assembled only when the variable it names is SOUGHT, and a variable that
+-- is already defined is never sought, so changing an answer left the verdict
+-- screen reading "fails" above a letter still saying the notice was valid.
+-- `reconsider: True` on the attachment block is the fix; `roundtrip_check.py`'s
+-- third case is what proves it, by re-checking the assembled CONTENT after the
+-- edit. No screen assertion could: `${ notice_letter }` renders headless to the
+-- literal 'None'.
+
+DECLARE Notice
+    HAS
+      @desc The name of the landlord serving the notice
+      `the landlord name`        IS A STRING
+      @desc The name of the tenant on whom the notice is served
+      `the tenant name`          IS A STRING
+      @desc The address of the let property
+      `the property address`     IS A STRING
+      @desc Whether the letting is of a dwelling occupied as a home
+      `is a residential tenancy` IS A BOOLEAN
+      @desc Whether the notice to quit was served in writing
+      `written notice was given` IS A BOOLEAN
+      @desc Length of the notice period served, in whole months
+      `months of notice given`   IS A NUMBER
+
+@export Whether the notice to quit is valid
+GIVEN n IS A Notice @desc The notice to quit under assessment
+GIVETH A BOOLEAN
+DECIDE `the notice to quit is valid` n IF
+        n's `is a residential tenancy`
+    AND n's `written notice was given`
+    AND n's `months of notice given` AT LEAST 2
+
+-- A valid notice: residential, in writing, three months.
+#EVAL `the notice to quit is valid` OF
+        Notice WITH
+            `the landlord name`        IS "Marbury Estates Ltd"
+            `the tenant name`          IS "A. Tenant"
+            `the property address`     IS "14 Chancery Lane, Flat B"
+            `is a residential tenancy` IS TRUE
+            `written notice was given` IS TRUE
+            `months of notice given`   IS 3
+-- TRUE
+
+-- Short notice: one month where two are required. The letter is still
+-- assembled — a citizen who is told "no" is exactly the citizen who needs the
+-- document explaining why.
+#EVAL `the notice to quit is valid` OF
+        Notice WITH
+            `the landlord name`        IS "Marbury Estates Ltd"
+            `the tenant name`          IS "A. Tenant"
+            `the property address`     IS "14 Chancery Lane, Flat B"
+            `is a residential tenancy` IS TRUE
+            `written notice was given` IS TRUE
+            `months of notice given`   IS 1
+-- FALSE

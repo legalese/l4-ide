@@ -36,6 +36,7 @@ fields:
     help: "${'%'} off is shown at checkout as ${'${'} discount_percent }; enter the code itself, or leave blank if none was used"
 ---
 id: c_the_consumer_may_cancel_the_consumer_waived_the_right
+reconsider: True
 code: |
   # L4: `the consumer waived the right`
   if (p.consumer_confirmed_waiver is None):
@@ -48,6 +49,7 @@ sets:
   - the_consumer_may_cancel_the_consumer_waived_the_right
 ---
 id: c_the_consumer_may_cancel_the_purchase_was_marked_final_sale
+reconsider: True
 code: |
   # L4: `the purchase was marked final sale`
   if (p.promotional_code_used == ''):
@@ -60,6 +62,7 @@ sets:
   - the_consumer_may_cancel_the_purchase_was_marked_final_sale
 ---
 id: c_the_consumer_may_cancel
+reconsider: True
 code: |
   # L4: `the consumer may cancel`
   the_consumer_may_cancel = (p.was_concluded_at_a_distance and ((not the_consumer_may_cancel_the_consumer_waived_the_right) and (not the_consumer_may_cancel_the_purchase_was_marked_final_sale)))
@@ -72,6 +75,7 @@ sets:
 ---
 id: driver_the_consumer_may_cancel
 mandatory: True
+reconsider: True
 code: |
   # driver for @export `the consumer may cancel`
   if the_consumer_may_cancel:
@@ -96,3 +100,15 @@ subquestion: |
   Whether the consumer may still cancel the purchase during the cooling-off period
 
   On the answers given, this decision evaluates FALSE.
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      was concluded at a distance: ${ showifdef('p.was_concluded_at_a_distance', '**not asked**') }
+  - note: |
+      consumer confirmed waiver: ${ showifdef('p.consumer_confirmed_waiver', '**not asked**') }
+  - note: |
+      promotional code used: ${ showifdef('p.promotional_code_used', '**not asked**') }

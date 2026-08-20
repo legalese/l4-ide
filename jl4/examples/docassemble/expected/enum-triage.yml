@@ -22,6 +22,7 @@ fields:
     help: "Triage class assigned to the personal-data breach"
 ---
 id: c_notification_deadline_in_days
+reconsider: True
 code: |
   # L4: `notification deadline in days`
   if (inc.assessed_severity == 'Critical'):
@@ -37,6 +38,7 @@ sets:
 ---
 id: driver_notification_deadline_in_days
 mandatory: True
+reconsider: True
 code: |
   # driver for @export `notification deadline in days`
   notification_deadline_in_days
@@ -52,3 +54,11 @@ subquestion: |
   On the answers given, the value of this decision is:
 
   **${ notification_deadline_in_days }**
+---
+id: review_main
+event: review_answers
+question: |
+  Every question this interview can ask, and the answer it has.
+review:
+  - note: |
+      assessed severity: ${ showifdef('inc.assessed_severity', '**not asked**') }

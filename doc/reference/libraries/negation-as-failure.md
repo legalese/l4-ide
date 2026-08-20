@@ -72,6 +72,7 @@ PROLEG, Logical English) proposes erasing `holds` / `naf` / `presumed` into each
 native negation at the eliminator, and `specs/todo/BLAWX-EXPORT-SPEC.md` (Blawx, whose
 reasoner is s(CASP)) runs the same mapping in both directions: on import, `not p` lifts back
 as `naf`, `-p` as proven falsity, and Blawx's `#abducible` hypotheses as `NOTHING`-valued
-inputs.
+inputs. For the Blawx side of that story — s(CASP)'s two negations, duals, and abducibles,
+taught from scratch — see [Blawx and s(CASP)](../../concepts/neighbours/blawx-and-scasp.md).
 
 **See [negation-as-failure.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/negation-as-failure.l4) source for the full library.**
