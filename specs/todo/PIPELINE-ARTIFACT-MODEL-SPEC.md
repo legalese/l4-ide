@@ -1,6 +1,6 @@
 # The pipeline as an artifact graph: phases, witnesses, and what the labels are for
 
-_Status: **rulings recorded; seven of thirteen implemented.** Written 2026-08-20 on branch
+_Status: **rulings recorded; nine of thirteen implemented.** Written 2026-08-20 on branch
 `mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
 (`sg-succession`) and found that several of its central nouns name the wrong things._
 
@@ -11,8 +11,10 @@ referenced, commit `41a7b5ac`), **R10** (the three senses of "corpus" deliberate
 that neither candidate had), **R6** + **R11** together (`etc/go/lib/store.mjs`, the blessing
 ledger, and `go.sh store`), and **R4** (`etc/go/lib/readset.mjs` and `go.sh readset` — the read-set
 is recorded on every `stage_end`, and journal schema 4 enforces that it re-folds to its own digest).
-Everything else on this page is a decision, not a description: there is **no subject-level report**.
-What would make the rest of the present tense true is named per ruling in §3._
+**R5** (`store diff` labels each divergence by phase class, and refuses to call an encode
+divergence a fork without evidence the sources matched) and **R13** (`go.sh subject-report`).
+What remains a decision rather than a description is the vocabulary: **R2**, **R3** and **R9**.
+What would make those present tense is named per ruling in §3._
 
 _Why this document exists at all: the rulings below were reached in conversation and existed
 nowhere else. `CLAUDE.md` §4 — a decision is recorded in its owning document or it is not
@@ -56,7 +58,7 @@ something the graph answers.
 | R2     | **ANSWERED**               | the fetched legal text is `natlang_sources`; `denovo` is deferred, not half-renamed, §3.2               |
 | R3     | **ANSWERED**               | phase identity is intrinsic; ordinals are extrinsic and are not schema keys, §3.3                       |
 | R4     | **ANSWERED · IMPLEMENTED** | blindness is a recorded read-set, not a flag; freshness is derived from it, §3.4                        |
-| R5     | **ANSWERED**               | a diff means a different thing per phase, and an encoding diff is a fork only if upstream matched, §3.5 |
+| R5     | **ANSWERED · IMPLEMENTED** | a diff means a different thing per phase, and an encoding diff is a fork only if upstream matched, §3.5 |
 | R6     | **ANSWERED · IMPLEMENTED** | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
 | R7     | **ANSWERED · IMPLEMENTED** | replay crosses run boundaries, except for a closed list of stages, §3.7                                 |
 | R8     | **ANSWERED · IMPLEMENTED** | a run directory stays self-contained; borrowed artifacts are copied, §3.8                               |
@@ -64,7 +66,7 @@ something the graph answers.
 | R10    | **ANSWERED · IMPLEMENTED** | three other senses of "corpus" are retained deliberately, §3.10                                         |
 | R11    | **ANSWERED · IMPLEMENTED** | the HG1 blessing is a durable ledger edge, and the serving path defaults to deny, §3.11                 |
 | R12    | ANSWERED 2026-08-20, §3.12 | a subject may declare `encoding.state: "unwritten"`; `go.sh new-subject` scaffolds one, §3.12           |
-| R13    | **OPEN**                   | reporting is run-oriented; a subject-level fold is needed, and it is not a union, §3.13                 |
+| R13    | **ANSWERED · IMPLEMENTED** | reporting is run-oriented; a subject-level fold is needed, and it is not a union, §3.13                 |
 
 ### 3.1 R1 — the subject's L4 is `encoding` — ANSWERED, IMPLEMENTED
 
@@ -181,7 +183,7 @@ _Measured on `sg-succession`._ Editing one corpus module (`sg-wills.l4`) turns e
 stages that read it STALE, each naming the moved member, while the projection stages that read
 only the entry module stay `current`. A digest could have said only that four stages changed.
 
-### 3.5 R5 — a diff means something different per phase — ANSWERED
+### 3.5 R5 — a diff means something different per phase — ANSWERED, IMPLEMENTED 2026-08-24
 
 A uniform "diff the artifacts" layer would mislabel three different events:
 
@@ -200,6 +202,29 @@ content-addressing (R6) is a requirement and not an optimisation.
 — by what two encodings _answer_ over a battery, never by their text. It stops being "the G2
 acceptance test" and becomes the general `encode`-phase comparator, callable between any two
 encoding artifacts.
+
+**Implemented 2026-08-24** in `go.sh store diff`, which now reads every divergence through the
+class of the phase that produced it (`readset.PHASE_CLASS`, keyed on what a stage DOES, which is
+what makes it nameable at all under §3.3).
+
+The comparability precondition needed somewhere to live that OUTLIVES THE JOURNAL. Read-sets are
+recorded on receipts, and receipts live in run directories that last two to five days — the exact
+half-life R11 exists to escape. So the fold over a witness's `natlang_sources` members rides on
+the store admission itself as `sources_digest` (store schema 1 → 2), and `store diff` can still
+refuse to call a difference a fork long after the run that produced it is gone. It is derived, but
+it is a fact about **that admission**, fixed forever, and so has the same standing as the
+`inputs_digest` beside it; what must never be stored is a fact about _history_, which is
+recomputed.
+
+`sources_digest` is **null**, never the empty fold, when a witness recorded no sources at all.
+"This witness recorded no sources" and "its sources hashed to X" are different claims, and
+conflating them would make two source-less encodings look comparable — the spurious fork this
+ruling exists to prevent.
+
+**Which is the case that holds today for every subject in the tree.** No subject has run
+`p1-ingest` for real, so no read-set contains a `natlang_sources` member, so an encode divergence
+reports `NOT ESTABLISHED as a fork: … Absence of evidence is not comparability`. That is the
+honest answer, and stating it plainly is worth more than machinery that pretends otherwise.
 
 ### 3.6 R6 — artifacts are witnesses — ANSWERED, IMPLEMENTED 2026-08-21
 
@@ -559,7 +584,7 @@ sweep and encode work. `encoding.state` gives that work a registered subject to 
 gate digest that moves when it lands, but the phases themselves remain unmilestoned — that is R4 and
 R11, and R12 was the precondition, not the substitute.
 
-### 3.13 R13 — reporting needs a subject-level fold — OPEN
+### 3.13 R13 — reporting needs a subject-level fold — ANSWERED, IMPLEMENTED 2026-08-24
 
 `p9-report` renders **one run's** journal. No single run exercises every phase, so no single report
 is the account of the subject: `sg-succession`'s `g1` report marks §P1 and §P2 **ABSENT** while its
@@ -578,6 +603,35 @@ each phase to one of three states:
 `NEVER RUN` is the state that would have caught R12's failure. Today a report says a phase is "not
 declared at this milestone" — true, and readable as "accounted for elsewhere" when nothing had
 accounted for it anywhere.
+
+**Implemented 2026-08-24** as `etc/go/lib/subject-report.mjs` and `go.sh subject-report`.
+
+**The `STALE` in the table above was re-spelled, and the change is the substantive part.** As
+first written it read _"a receipt exists, but over an older digest"_. That is not R4's staleness,
+and R4's is the better one:
+
+- a digest can differ with **no** prerequisite newer — a param changed the _question_ rather than
+  the answer;
+- a prerequisite can be newer with the digest **unmoved**: that is the whole of §3.7a, where the
+  clock, the stdlib and the `IMPORT` closure were real input changes that moved no digest;
+- a digest says only THAT something moved. A read-set says WHICH member, and the report names it.
+
+One concept, one mechanism. Shipping the digest-only spelling first would have baked the weaker
+notion into the surface everyone reads, which is why R4 was sequenced ahead of this ruling rather
+than the other way round.
+
+**The phase universe is built widest-first** — what the driver says is _declarable_, then what the
+subject has _declared_, then what the store has _recorded_. A universe built only from declared
+stages cannot contain a phase nobody ever declared, and such a phase then vanishes from the report
+entirely; an absent row reads as "accounted for elsewhere" exactly as R12's did. Measured on
+`sg-succession`: seven phases report `NEVER RUN`, none of which appeared at all before the
+declarable set was threaded through.
+
+**The evidence horizon is printed.** Journals expire; the store outlives them but records only
+stages that produced an artifact, so a SKIPPED stage leaves no trace there. A fold that quietly
+narrowed its evidence would turn "I cannot see it" into "it never happened". A journal whose chain
+does not verify is excluded and the exclusion is announced, because folding it in would let a
+hand-edited row set a phase's state for the whole subject.
 
 ---
 
