@@ -183,6 +183,15 @@ export function witnessKey(subject, stage, rel) {
  * clock-derived answer would make the verdict depend on when it was asked,
  * which is the defect §3.7a found in the pipeline's own declared inputs.
  *
+ * APPEND ORDER IS NOT PRODUCTION ORDER, and that is a deliberate choice rather
+ * than an oversight. A cross-run REPLAY re-admits the donor's bytes, appending
+ * a later index record that holds OLDER content — so the last record for a slot
+ * can carry bytes produced before ones admitted earlier. It is kept because the
+ * question freshness asks is Make's: "what IS this prerequisite now?", and the
+ * pipeline's most recent word about that slot is the answer, exactly as "the
+ * file on disk" is for a tree member. Ordering by production time instead would
+ * need a clock, and would report a replayed artifact as stale against itself.
+ *
  * Returns { state: "current" | "stale" | "unknown", moved, unknown }. `moved`
  * NAMES the members that moved, which is the whole reason a read-set beats a
  * digest: a digest can only ever say THAT something changed.
