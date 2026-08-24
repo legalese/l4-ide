@@ -117,9 +117,21 @@
     border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.2));
     border-radius: 10px;
     padding: 8px 10px;
+    /* Bleed across the message list's 10px side padding — an IDE-sidebar
+       look where the bubble spans edge to edge. */
     margin-left: -10px;
     margin-right: -10px;
     box-shadow: 0 0 16px 2px var(--sidebar-bg);
+  }
+  /* On narrow viewports the list padding IS the screen edge, so the bleed
+     would press the bubble flush against the display. Keep it inset and
+     give the text a touch more breathing room. */
+  @media (max-width: 768px) {
+    .user-bubble {
+      margin-left: 0;
+      margin-right: 0;
+      padding: 8px 12px;
+    }
   }
   /* Cap a non-sticky user bubble at half the chat's visible height
      (`cqh` resolves against the `.message-list` size container) and let
