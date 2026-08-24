@@ -269,6 +269,14 @@
   .chat-textarea::placeholder {
     color: var(--vscode-descriptionForeground);
   }
+  /* iOS Safari auto-zooms the page when a focused input renders below
+     16px, so on mobile the textarea must not inherit the box's 0.85em
+     (~13.6px) scale. Desktop keeps the compact size. */
+  @media (max-width: 768px) {
+    .chat-textarea {
+      font-size: 16px;
+    }
+  }
 
   .action-bar {
     display: flex;
