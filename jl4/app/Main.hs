@@ -31,6 +31,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxOptionsParser)
+import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
@@ -59,6 +60,7 @@ data Command
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
   | CmdBlawx      BlawxOptions
+  | CmdCatala     CatalaOptions
   | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
@@ -108,6 +110,9 @@ commandParser =
       <> command "blawx"
            (info (CmdBlawx <$> blawxOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a Blawx project (.blawx YAML + s(CASP) dump)"))
+      <> command "catala"
+           (info (helper <*> (CmdCatala <$> catalaOptionsParser))
+             (progDesc "Compile the constitutive subset of an L4 file to a literate Catala module"))
       <> command "docassemble"
            (info (CmdDocassemble <$> docassembleOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a docassemble interview (YAML), with a fidelity report"))
@@ -181,6 +186,7 @@ main = do
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
     CmdBlawx      opts -> blawxCmd      opts
+    CmdCatala     opts -> catalaCmd     opts
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
