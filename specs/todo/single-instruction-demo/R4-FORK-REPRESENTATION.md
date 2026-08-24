@@ -128,7 +128,7 @@ SPEC.md §9 R4 flips to ANSWERED citing this note; P4's deliverable language gai
 entries map 1:1 to `Interpretation` fields"; P6 gains the two property classes; no code changes
 until the demo's encode phase runs. **All discharged 2026-08-02 in the change that recorded the
 ruling** (plus the sites §6 did not anticipate: the scaffolded phase scripts' refusal texts, the
-`a deposit-path `go.sh plan`` message, the report renderer's ABSENT explanation, and the skill —
+a deposit-path `go.sh plan` message, the report renderer's ABSENT explanation, and the skill —
 each said "R4 is open" and now says what actually blocks: the tooling is unbuilt.)
 
 ## 7. The ruling (Meng, 2026-08-02)

@@ -161,7 +161,16 @@ gated_by_HG1=""
 gated_by_HG2="p10-publish"
 
 usage() {
-  sed -n '2,60p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # DERIVED, not a hardcoded last line. `sed -n '2,60p'` truncated the block the
+  # moment the header grew past 60 lines — R9's rewrite pushed it to 89, so
+  # `help` stopped printing its last five commands INCLUDING `help` itself, and
+  # ended mid-sentence. Nothing caught it: check-skill-drift skips `help` by
+  # construction, and a truncated usage still exits 0.
+  #
+  # The header is every comment line from line 2 up to the first line that is
+  # not a comment, so the block defines its own end and the next edit cannot
+  # re-break this.
+  awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
 }
 
 die_usage() {
@@ -191,6 +200,12 @@ declare -a STORE_ARGS=()
 STAGE_ONLY=""
 WANT_JSON=0
 ENCODING_ID=""
+# Whether --encoding was PASSED, which "" cannot tell you: the initializer above
+# and an explicitly empty value are the same string. Only the flag distinguishes
+# "no selection given, use the default" from "a selection was attempted and named
+# nothing", and R9 made that difference matter — --encoding is now the sole
+# selector of what a run is about.
+ENCODING_SEEN=0
 
 # `store` owns its own flag vocabulary (--keep-days, --dry-run, --allow-waived,
 # --subject, --stage), so the driver hands it every argument verbatim rather
@@ -229,6 +244,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --encoding)
       ENCODING_ID="$2"
+      ENCODING_SEEN=1
       shift 2
       ;;
     --stage)
@@ -372,6 +388,15 @@ if [[ -n "$SUBJECT" ]]; then
   # changes meaning silently as a subject's declarations grow and breaks loudly
   # the day a second one is declared. `regcf` is one edit from that. §3.2 is the
   # ruling; R9 is where the driver stops disagreeing with it.
+  # AN UNPASSED FLAG MEANS "the default"; a PASSED-BUT-EMPTY one means the caller
+  # tried to name something and named nothing. R9 made `--encoding` the sole
+  # selector of what a run is about, so silently coercing an empty selector to
+  # `primary` would quietly run a different thing than the caller asked for.
+  # `${ENCODING_ID:-primary}` alone cannot tell the two apart, because the
+  # initializer is itself the empty string — hence ENCODING_SEEN.
+  if [[ $ENCODING_SEEN -eq 1 && -z "$ENCODING_ID" ]]; then
+    die_usage "--encoding needs a value: primary, a declared encoding id, or undeclared"
+  fi
   _ENC="${ENCODING_ID:-primary}"
   _NO_ADDITIONAL_ENCODING=0
   _ENC_UNDECLARED=0
@@ -514,11 +539,16 @@ if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
   #
   # It is GO_MODULES and not GO_S_ENCODING_MODULES. The difference bites in one
   # measured case: a deposit-path run over a subject that declares no additional
-  # encoding iterates NOTHING (GO_MODULES is empty above), while
-  # GO_S_ENCODING_MODULES still holds the committed encoding's modules — so the
-  # gate bound HG1 to an encoding no stage in the run ever read, and the
-  # `text:` sentinel written for exactly that case was unreachable because the
-  # array was never empty.
+  # encoding empties GO_MODULES above, while GO_S_ENCODING_MODULES still holds
+  # the committed encoding's modules — so the gate bound HG1 to an encoding the
+  # run is not about, and the `text:` sentinel written for exactly that case was
+  # unreachable because the array was never empty.
+  #
+  # GO_MODULES IS THE ONE ANSWER, AND EVERY STAGE MUST ASK IT. p3-encode read
+  # the sidecar name directly and so typechecked those committed modules and
+  # wrote PASS for a deposit that does not exist — the same divergence, one
+  # layer down, found by the review of this change. Its four sibling
+  # measurement stages already had the fallback; it now does too.
   #
   # ITERATE THE DEPOSITS, NOT THE STAGES. manifestText sorts but does NOT
   # dedupe, so a path contributed twice renders twice and changes the hash;

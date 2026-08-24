@@ -34,6 +34,9 @@ had a document saying what the report was an account **of**._
 
 ## 1. One-line summary
 
+_Written as the diagnosis, in the present tense of 2026-08-20. All thirteen rulings have since
+landed; read it as the statement of the problem, not of the tree._
+
 The pipeline's stages already declare a dependency graph and do not use it as one; its nouns name
 positions in a history (`denovo` = "the second pass") rather than things (`natlang_sources` = "the
 fetched legal text"); and its artifacts are treated as build products to be clobbered when they
@@ -52,11 +55,15 @@ to queries over the artifact graph.
 A phase-1 download is a phase-1 download whether it is the first or the fifth. Nothing about the
 job changes; what changes is what else exists to compare it against.
 
-**The error this spec exists to stop: extrinsic labels are currently stored as intrinsic
-configuration.** `subject.json` has a `denovo` object — a schema key named after an ordinal. The
-milestone flag `--milestone g1|g2` selects a stage set by a label that denotes a tooling
-capability. Both make a subject's _position in its own history_ something you declare rather than
-something the graph answers.
+**The error this spec exists to stop: extrinsic labels stored as intrinsic configuration.**
+`subject.json` **had** a `denovo` object — a schema key named after an ordinal — and the milestone
+flag `--milestone g1|g2` **selected** a stage set by a label denoting a tooling capability. Both
+made a subject's _position in its own history_ something you declared rather than something the
+graph answers.
+
+_Past tense as of 2026-08-25, and left standing rather than rewritten because it is the diagnosis
+the thirteen rulings were reached from._ §3.2 and §3.3 split the `denovo` object; §3.9 retired the
+flag, which now refuses. The distinction above is the load-bearing part and has not changed.
 
 ## 3. Rulings
 
@@ -569,16 +576,32 @@ store are all `waived`, over two other digests.
   `1e801642…`, the 5-member deposit set. This is the concrete evidence against `--mode`: it would
   have made that incoherent state a first-class, spellable input.
 - **A deposit run over a subject with nothing deposited bound HG1 to the committed encoding.**
-  `GO_MODULES` is empty there by design — no stage iterates anything — while the digest branch
-  still folded in `GO_S_ENCODING_MODULES`, which with no `--encoding` passed resolves to the
-  PRIMARY modules. So `sg-succession` bound a gate to `11092f74…`: three deposits plus seven
-  committed modules the run never read, and the `text:no-additional-encoding-declared=` sentinel
-  written for exactly that case was unreachable because the array was never empty. Binding to
-  `GO_MODULES` makes it `5ac0d975…`, the three deposits, and the sentinel is reachable again for a
-  subject declaring no deposits at all.
+  `GO_MODULES` is empty there by design, while the digest branch still folded in
+  `GO_S_ENCODING_MODULES`, which with no `--encoding` passed resolves to the PRIMARY modules. So
+  `sg-succession` bound a gate to `11092f74…`: three deposits plus seven committed modules, and the
+  `text:no-additional-encoding-declared=` sentinel written for exactly that case was unreachable
+  because the array was never empty. Binding to `GO_MODULES` makes it `5ac0d975…`, the three
+  deposits, and the sentinel is reachable again for a subject declaring no deposits at all.
+
+  _This bullet first read "…seven committed modules **the run never read**", and the review
+  measured that clause false._ `p3-encode` was the one measurement stage of five that read
+  `GO_S_ENCODING_MODULES` directly instead of the `GO_MODULES` the driver resolved — its four
+  siblings all carried the fallback — so on this path it typechecked all seven committed modules
+  and wrote `PASS` with an oracle reading _"the deposit is L4 the toolchain accepts"_, for a
+  deposit that does not exist, while its own `plan` row said `undeclared`. The defect predates R9
+  (it is identical at `36a34a23`), but R9 made the state first-class and spellable and then
+  asserted it away, which is the failure `CLAUDE.md`'s anti-drift rules exist to catch. Repaired in
+  the same PR: the stage now reads `GO_MODULES`, reports `SKIPPED` naming a key the schema still
+  has, and two tests pin it — one on the driver-produced state the old fixture could not reach.
 
 The two unchanged selections stayed byte-identical: `regcf` primary `6b2191ee…` (26 files),
-`sg-succession` primary `c0841f89…` (7).
+`sg-succession` primary `c0841f89…` (7). Both hash **absolute** paths (`digestSet` over
+`GO_ENCODING_FILES`), so they reproduce in a checkout at this worktree's path and not elsewhere;
+what is portable is the derivation, not the number. The live `regcf` primary value is now
+`e8d030fb…`, because this change re-anchored `explainer/how-it-works.md`'s `src:etc/go/go.sh#L29`
+to `#L38` — the header rewrite moved the line it quotes verbatim — and rewrote that one provenance
+row. That is HG1 correctly re-opening over an edited deposit; with the original narrative bytes the
+derivation still yields `6b2191ee…`.
 
 #### Journal schema 5
 
@@ -959,7 +982,8 @@ are recorded because each is a trap for the next reader, and every one now has a
   classified read-sets against an **empty** store index, which made `sources_digest` structurally
   null for exactly the cross-run case it exists to serve.
 
-- **`subject-report`'s declarable universe was empty of g1 stages**, because `G1_STAGES` is
+- **`subject-report`'s declarable universe was empty of primary-path stages**, because the
+  primary stage list (then `G1_STAGES`, renamed `PRIMARY_STAGES` by R9) is
   assembled only for commands that resolve a subject and `subject-report` was not one of them. And
   it ordered runs **lexicographically by run id**, which sorts date, then a _content hash_, then
   counter — so two runs on one day over different corpora sorted arbitrarily. Runs are now ordered

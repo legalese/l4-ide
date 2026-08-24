@@ -96,18 +96,30 @@ const delegated = ["lib/store-cli.mjs"]
     }
   })
   .join("\n");
+const parserFlags = new Set(
+  [...goSrc.matchAll(/^\s*(-[-a-z][a-z-]*(?:\s*\|\s*-[-a-z][a-z-]*)*)\)/gm)]
+    .flatMap((m) => m[1].split("|").map((x) => x.trim()))
+    .filter(Boolean),
+);
+
 const flagExists = (flag) => {
   const bare = flag.slice(2);
-  // A `case` ARM, not a substring. `goSrc.includes("--foo)")` is satisfied by
-  // any PROSE that happens to contain the text — and R9 produced exactly that:
-  // the comment explaining why `--milestone` is deliberately NOT a case arm
-  // contains the literal `--milestone)`, which made this checker report the
-  // retired flag as still accepted, which would have made every stale
-  // `--milestone` line left in SKILL.md pass. Anchoring to the start of a line
-  // is what distinguishes a declaration from a mention of one.
-  const arm = new RegExp(`^\\s*(?:[^\\n)]*\\|)?\\${flag}\\)`, "m");
+  // PARSE THE ARM LABELS, do not pattern-match the flag.
+  //
+  // Two failures produced this. First, `goSrc.includes("--foo)")` is satisfied
+  // by any PROSE containing the text — R9's comment explaining why `--milestone`
+  // is deliberately NOT a case arm contains the literal `--milestone)`, so the
+  // checker reported the retired flag as still accepted and would have passed
+  // every stale `--milestone` line in SKILL.md. Second, the anchored regex that
+  // replaced it could not read `-h | --help)`: it allowed an alternation prefix
+  // but not the space after the pipe, so a real, documented flag reported as
+  // nonexistent. A regex over a shell arm keeps acquiring cases.
+  //
+  // So: collect the labels the same way the COMMAND check above does — match
+  // the arm, split on `|`, trim — and test membership. One shape, both checks,
+  // and no third spelling to drift.
   return (
-    arm.test(goSrc) ||
+    parserFlags.has(flag) ||
     // store-cli reads flags by name through flag()/bool(), so the name appears
     // as a quoted string rather than as a `case` label.
     delegated.includes(`"${bare}"`)
@@ -179,29 +191,70 @@ if (existsSync(refDir)) {
   if (existsSync(refDir))
     for (const f of readdirSync(refDir).filter((f) => f.endsWith(".md")))
       skillFiles.push(resolve(refDir, f));
-  // Scanned across ALL of etc/go, not just go.sh and the skill: the first run of
-  // this guard caught the skill and missed three prose mentions in
-  // `selftest.mjs` and `p8-verify.sh`, which are stale claims in exactly the way
-  // the guard exists to refuse. A retired name is retired everywhere.
+  // SCANNED REPO-WIDE, because a retired driver identifier gets quoted wherever
+  // somebody explains the driver — and that is where it goes stale unseen.
+  //
+  // This widened twice, each time because the narrower scope had already missed
+  // something. Scoped to go.sh + the skill, it missed three prose mentions in
+  // `selftest.mjs` and `p8-verify.sh`. Scoped to `etc/go`, it missed TWELVE in
+  // `specs/todo/` — four of them present-tense claims about what `go.sh` names
+  // today, and one a runnable recipe appending to an array that no longer
+  // exists. Both misses were found by review rather than by this check, which
+  // is the argument for the widest scope that stays cheap: ~500 files, no build,
+  // no network.
   const scanned = [...skillFiles];
+  const SKIP_DIRS = new Set([
+    ".git",
+    "node_modules",
+    "dist-newstyle",
+    ".stack-work",
+    "_build",
+  ]);
   const walk = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
+    let entries;
+    // A directory this process cannot read is not evidence of drift. Failing
+    // the whole check on one unreadable path would make the guard's verdict a
+    // function of filesystem permissions.
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
       const full = resolve(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      // This file is excluded because it is the only one that must SPELL the
-      // retired names in order to look for them. Including it makes the guard
-      // unsatisfiable, which is a guard nobody can leave green.
-      else if (/\.(mjs|sh|md)$/.test(e.name) && full !== __filename)
+      // isDirectory() is false for a symlink, so a link cycle cannot be walked
+      // into; a symlinked FILE is read, which is correct — its text is quoted
+      // prose wherever it lives.
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name)) walk(full);
+      } else if (/\.(mjs|sh|md)$/.test(e.name) && full !== __filename)
+        // This file is excluded because it is the only one that must SPELL the
+        // retired names in order to look for them. Including it makes the guard
+        // unsatisfiable, which is a guard nobody can leave green.
         scanned.push(full);
     }
   };
-  walk(HERE);
+  walk(REPO);
+  // A MENTION THAT NAMES THE REPLACEMENT ON THE SAME LINE IS ALLOWED, because a
+  // document is often obliged to say what a thing used to be called — "then
+  // spelled X, renamed Y by R9" is the honest retensing, and a guard that
+  // forbade it would push writers into silently deleting history instead.
+  //
+  // It is not a loophole worth worrying about: the whole failure this catches
+  // is a sentence asserting the OLD name as current, and such a sentence has no
+  // reason to name the new one. Requiring the pair is therefore a cheap proxy
+  // for "the writer knew about the rename".
   for (const [dead, live] of Object.entries(RETIRED))
-    for (const file of scanned)
-      if (readFileSync(file, "utf8").includes(dead))
+    for (const file of scanned) {
+      const stale = readFileSync(file, "utf8")
+        .split("\n")
+        .filter((l) => l.includes(dead) && !l.includes(live));
+      if (stale.length)
         problems.push(
-          `${file.replace(REPO + "/", "")} still names ${dead}, which R9 renamed to ${live}`,
+          `${file.replace(REPO + "/", "")} names ${dead} without naming ${live}, which R9 renamed it to ` +
+            `(${stale.length} line(s), first: ${stale[0].trim().slice(0, 80)})`,
         );
+    }
   for (const file of skillFiles) {
     const text = readFileSync(file, "utf8");
     for (const name of arrays) {

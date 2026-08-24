@@ -3828,10 +3828,15 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     void s;
     const t = stage("p2-sweep", { ...ALL, GO_S_NATLANG_REGISTER: "" });
     check(
-      "a subject that declares no denovo.register is SKIPPED naming the key and the file to add it to",
+      "a subject that declares no register is SKIPPED naming a LIVE key and the file to add it to",
       t.exit === 0 &&
         t.row?.status === "SKIPPED" &&
-        /declares no denovo\.register/.test(t.row.reason) &&
+        // The key must be one the schema still accepts. Asserting the OLD
+        // spelling is how a diagnostic survives a rename and starts pointing at
+        // nothing: `denovo.*` ceased to exist at R2/R3, and these two tests were
+        // pinning it in place for two rulings afterwards.
+        !/denovo\./.test(t.row.reason) &&
+        /declares no natlang_sources\.register/.test(t.row.reason) &&
         /subject\.json/.test(t.row.reason),
     );
   }
@@ -3944,12 +3949,45 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 7. p3-encode ---------------------------------------------------------
   {
-    const s = stage("p3-encode");
+    // GO_MODULES="" IS THE DRIVER-PRODUCED STATE, and the fixture must use it.
+    //
+    // It used to hand the stage `GO_S_ENCODING_MODULES=""` — a state go.sh
+    // cannot produce, because subject.mjs guarantees at least the entry module —
+    // and the stage read that sidecar name directly. So the test passed while
+    // the DRIVER-produced state (`--encoding undeclared`: GO_MODULES empty,
+    // GO_S_ENCODING_MODULES still holding the COMMITTED encoding) sent all seven
+    // of sg-succession's committed modules through `l4 check` and earned a PASS
+    // whose oracle read "the deposit is L4 the toolchain accepts". Measured on
+    // 4cce130b before the repair; the stage's own plan row said `undeclared` at
+    // the same moment.
+    const s = stage("p3-encode", { GO_MODULES: "" });
     check(
-      "p3-encode with no denovo.modules is SKIPPED naming the key",
+      "p3-encode with no module set is SKIPPED, naming a key the schema accepts",
       s.exit === 0 &&
         s.row?.status === "SKIPPED" &&
-        /declares no denovo\.modules/.test(s.row.reason),
+        !/denovo\./.test(s.row.reason) &&
+        /declares no encodings\.<id>\.modules|declares no encoding\.modules/.test(
+          s.row.reason,
+        ),
+    );
+    // The half the old fixture could not see: with the DRIVER's empty set the
+    // stage must reach no module at all, whatever the sidecar still declares.
+    check(
+      "…and it names no module in its inputs, even though the sidecar declares the committed encoding",
+      !/\.l4/.test(
+        spawnSync(
+          "bash",
+          [resolve(HERE, "phases", "p3-encode.sh"), "--inputs"],
+          {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              GO_MODULES: "",
+              GO_S_ENCODING_MODULES: CORPUS,
+            },
+          },
+        ).stdout ?? "",
+      ),
     );
   }
   {
@@ -4066,10 +4104,11 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // p8-diff's deposit contract is over the MAP, not the module set.
     const und = stage("p8-diff", { GO_S_COMPARISON_SURFACE_MAP: "" });
     check(
-      "p8-diff with no declared surface map is SKIPPED naming denovo.surface_map",
+      "p8-diff with no declared surface map is SKIPPED naming comparison.surface_map",
       und.exit === 0 &&
         und.row?.status === "SKIPPED" &&
-        /denovo\.surface_map/.test(und.row.reason),
+        !/denovo\./.test(und.row.reason) &&
+        /comparison\.surface_map/.test(und.row.reason),
     );
     const abs = stage("p8-diff", {
       GO_S_COMPARISON_SURFACE_MAP: resolve(DEP, "never-written-map.json"),

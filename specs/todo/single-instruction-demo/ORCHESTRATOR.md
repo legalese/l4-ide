@@ -33,7 +33,7 @@ What that means precisely, in the present tense:
   unbuilt tooling — no stage waits on an open ruling. §5.2 names the blocker.
 - **`p8-verify` was the seventh refuser, now runs, and is DECLARED — on both paths, as of
   2026-08-09.** R5's rung 1, `l4 verify`, exists; read §5.1a for what it measures and what its
-  `PASS` is worth. `go.sh` names it in `G1_STAGES` (after `p6-tests`) and in `G2_STAGES`,
+  `PASS` is worth. `go.sh` names it in `PRIMARY_STAGES` (after `p6-tests`) and in `DEPOSIT_STAGES`,
   HG1-gated at both — it verifies whichever module set the driver resolved, so at g2 it runs
   over the de novo deposit and its verdict is about the deposit. It left
   `UNIMPLEMENTED_STAGES` in the same change.
@@ -41,7 +41,7 @@ What that means precisely, in the present tense:
   module set per run (`GO_MODULES`: the committed corpus at g1, `denovo.modules` at g2) and
   `p3-check`, `p6-tests` and `p8-verify` iterate it; `p7-dmn` runs emit-only over the deposit.
   The p7 legs other than `p7-dmn` still read committed goldens the deposit does not have;
-  `a deposit-path `go.sh plan``marks each`NOT WIRED` with its own precise missing piece.
+  A deposit-path `go.sh plan` marks each `NOT WIRED` with its own precise missing piece.
 - **G2's acceptance comparator exists AND is wired**, as of 2026-08-09: `etc/go/lib/denovo-diff.mjs`
   plus `schemas/surface-map.schema.json`, designed in
   [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md), called by the declared g2 stage `p8-diff`
@@ -470,7 +470,7 @@ keeps the latest few runs **and** every run holding a granted gate.
 ### 5.1a `p8-verify` — R5 rung 1, declared on both paths
 
 This stage refused until `l4 verify` existed. It no longer refuses, and since 2026-08-09 it is
-declared: `G1_STAGES` names it after `p6-tests`, `G2_STAGES` names it too, and it runs over the
+declared: `PRIMARY_STAGES` names it after `p6-tests`, `DEPOSIT_STAGES` names it too, and it runs over the
 module set the driver resolved for the run — the committed encoding on the primary path, the de novo
 deposit at g2 (with the deposit contract: no declared or deposited module set is `SKIPPED`).
 
@@ -531,8 +531,10 @@ today's regcf the coalescing earns its keep instead of being a no-op.
 sweep → external model checker. Rung 2 needs the fork register P4 does not yet produce; rung 3
 waits on the LTS semantics.
 
-**Declared, in the present tense (2026-08-09).** `go.sh` names `p8-verify` in `G1_STAGES` and
-`G2_STAGES` and no longer lists it in `UNIMPLEMENTED_STAGES`, so `go.sh run` reaches the script
+**Declared, in the present tense (2026-08-09).** `go.sh` names `p8-verify` in
+`PRIMARY_STAGES` (`G1_STAGES` until R9) and in
+`DEPOSIT_STAGES` (`G2_STAGES` until R9),
+and no longer lists it in `UNIMPLEMENTED_STAGES`, so `go.sh run` reaches the script
 and `--only p8-verify` runs exactly it (behind its HG1 gate). The measurement above predates the
 declaration — it was taken by invoking `etc/go/phases/p8-verify.sh` directly against a real run
 directory, which writes an ordinary receipt into the ordinary hash-chained journal, and that
