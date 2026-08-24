@@ -234,13 +234,9 @@
       background: transparent;
       color: var(--vscode-foreground);
       cursor: pointer;
-      font-size: 1rem;
+      font-size: 1.25rem;
       line-height: 1;
       padding: 0.5rem;
-      border-radius: 6px;
-    }
-    .drawer-close:hover {
-      background: var(--vscode-list-hoverBackground);
     }
     /* Touch screens have no hover, so the delete icon must stay visible. */
     .hist-del {

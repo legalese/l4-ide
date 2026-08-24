@@ -123,10 +123,13 @@
     margin-right: -10px;
     box-shadow: 0 0 16px 2px var(--sidebar-bg);
   }
-  /* On narrow viewports the list padding IS the screen edge, so the bleed
-     would press the bubble flush against the display. Keep it inset and
-     give the text a touch more breathing room. */
-  @media (max-width: 768px) {
+  /* When the chat column is squeezed (narrow viewport, or the sidebar
+     eating into a mid-size window) the list padding IS the column edge, so
+     the bleed would press the bubble flush against it. Keyed on the
+     `.message-list` size container, not the viewport: the conversation
+     column caps at 800px, minus 2×10px list padding → below 780px of
+     content there is no outside whitespace left to bleed into. */
+  @container (max-width: 779px) {
     .user-bubble {
       margin-left: 0;
       margin-right: 0;
