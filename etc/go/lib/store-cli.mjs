@@ -174,9 +174,20 @@ switch (verb) {
         // diff is an interpretive fork ONLY IF the upstream read-sets matched.
         // Otherwise it is two encodings of two different texts, and calling
         // their difference a fork is spurious.
-        const digs = [...bySha.values()].map(
-          (a) => a[0].sources_digest ?? null,
-        );
+        // EVERY admission of each sha, not just the first. The same bytes can
+        // be admitted by two runs that read DIFFERENT sources — a later run
+        // re-deriving an identical encoding from revised text — and reading
+        // only `a[0]` would report whichever admission happened to be
+        // earliest, hiding a genuine disagreement about what the encoding
+        // rests on.
+        //
+        // A sha whose admissions disagree about their sources contributes no
+        // single answer, so it folds in as `null`: unknown, which forces NOT
+        // ESTABLISHED rather than a guess in either direction.
+        const digs = [...bySha.values()].map((admissions) => {
+          const seen = new Set(admissions.map((a) => a.sources_digest ?? null));
+          return seen.size === 1 ? [...seen][0] : null;
+        });
         const known = digs.filter(Boolean);
         if (known.length !== digs.length)
           process.stdout.write(

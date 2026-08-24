@@ -35,6 +35,15 @@
 #     plan    [--milestone g1|g2] [--subject ID]
 #     status  [--run-id ID] [--subject ID]
 #     verify  [--run-id ID] [--subject ID] [--gates]
+#     readset [--run-id ID] [--subject ID] [--stage S] [--json]
+#             R4: what a run READ, itemised, with each member's role and
+#             whether a newer version of it exists. Freshness is Make's — a
+#             newer prerequisite — and is derived, never stored.
+#             Exit: 0 all current · 1 something is stale.
+#     subject-report --subject ID [--json]
+#             R13: the account of a SUBJECT across every run whose evidence
+#             survives, not of one run. Each phase resolves to CURRENT, STALE
+#             or NEVER RUN. Exit: 0 none stale · 1 something is stale.
 #     gc      [--keep N]
 #     new-subject ID --citation TEXT --source-url URL [--display-name TEXT]
 #             [--encoding PATH] [--force]
@@ -291,7 +300,13 @@ FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
 # second one here would shadow it and the checker would report every real
 # command as undispatched. One dispatch table per driver is also just true.
 _NEEDS_SUBJECT=0
-[[ " run plan doctor " == *" $CMD "* ]] && _NEEDS_SUBJECT=1
+# `subject-report` is here because it needs G1_STAGES and G2_STAGES — the
+# DECLARABLE universe — and those are assembled inside the subject-dependent
+# region below. Without it the universe held only the g2 list, so every
+# g1-only phase reached the report solely via a surviving journal's
+# declared_stages, and would vanish entirely once those journals expired:
+# exactly the silence R13 exists to break.
+[[ " run plan doctor subject-report " == *" $CMD "* ]] && _NEEDS_SUBJECT=1
 
 # With no --subject, the sole sidecar under etc/go/subjects/ is the default;
 # once a second subject exists, naming one becomes mandatory — a silent
@@ -866,22 +881,38 @@ cmd_gc() {
   # "(unattributed)" rather than pooled with a real subject: it cannot be shown
   # to be redundant with any subject's latest, so it is not collected as if it
   # were.
+  # KEEP-LIST MEMBERSHIP IS BY RUN ID, NOT BY PATH STRING.
+  #
+  # It was by path string, and that DELETED EVERY RUN DIRECTORY, gate-holding
+  # ones included, while printing "kept N". macOS sets TMPDIR with a trailing
+  # slash, so `${TMPDIR:-/tmp}/l4-go` is `/var/.../T//l4-go` — a double slash.
+  # `ls -1d … | sed` preserves it; `gc-subjects.mjs` runs the path through
+  # node's resolver, which collapses it. The two spellings name the same
+  # directory and compare unequal, so nothing ever matched the keep-list. It
+  # fired by DEFAULT on macOS, and it is what destroyed three runs during the
+  # review that found it.
+  #
+  # A run id is the directory's basename, is unique within the base, and is
+  # immune to every path-form difference there is. Comparing those cannot
+  # reproduce this class of bug even if a third spelling appears tomorrow.
   local keep_ids=()
   local d
   for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
     if grep -q '"kind":"gate"' "$d/journal.ndjson" 2>/dev/null && grep -q '"state":"satisfied"' "$d/journal.ndjson" 2>/dev/null; then
-      keep_ids+=("$d")
+      keep_ids+=("$(basename "$d")")
     fi
   done
   local subj
   for subj in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE"); do
-    for d in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE" "$subj" | sort | tail -"$KEEP"); do keep_ids+=("$d"); done
+    for d in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE" "$subj" | sort | tail -"$KEEP"); do keep_ids+=("$(basename "$d")"); done
   done
   local removed=0
   for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
     local k
     local keep=0
-    for k in "${keep_ids[@]}"; do [[ "$k" == "$d" ]] && keep=1; done
+    local id
+    id="$(basename "$d")"
+    for k in "${keep_ids[@]}"; do [[ "$k" == "$id" ]] && keep=1; done
     if [[ $keep -eq 0 ]]; then
       rm -rf "$d"
       removed=$((removed + 1))

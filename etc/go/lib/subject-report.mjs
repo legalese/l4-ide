@@ -90,7 +90,24 @@ if (existsSync(base))
       rows: chain.ok ? read(journal) : [],
     });
   }
-runs.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+// ORDERED BY THE RUN'S OWN RECORDED START TIME, not by its id.
+//
+// A run id is `<date>-<corpus_sha8>-<counter>`, so a lexicographic sort orders
+// by date, then by a CONTENT HASH, then by counter. Two runs on the same day
+// over different corpora therefore sort by hash — an arbitrary order — and
+// "the most recent receipt wins" picks whichever hash sorted higher. The id
+// does not totally order runs and cannot be made to.
+//
+// This is not the clock creeping into freshness. Freshness compares CONTENT and
+// never a timestamp; that stays true. But "which run is most recent" is an
+// inherently temporal question, and the answer is a fact the journal already
+// recorded at run_begin — read back, not sampled now.
+const startedAt = (r) => r.rows.find((x) => x.kind === "run_begin")?.ts ?? r.id;
+runs.sort((a, b) => {
+  const ta = startedAt(a);
+  const tb = startedAt(b);
+  return ta < tb ? -1 : ta > tb ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+});
 
 let index = [];
 try {
@@ -140,8 +157,8 @@ for (const stage of [...universe].sort()) {
       stage,
       state: "NEVER RUN",
       note: admitted
-        ? "no surviving receipt, though the store holds artifacts from one"
-        : "no receipt at any milestone, in any surviving run",
+        ? "NO SURVIVING RECEIPT, but the store holds artifacts from a run that produced them — it ran, and the evidence of HOW has expired"
+        : "no receipt in any surviving run, and no artifact in the store",
     });
     continue;
   }

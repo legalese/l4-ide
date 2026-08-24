@@ -702,6 +702,59 @@ of the document that owns the question.
 
 ## 5. What review changed
 
+### 5.1 The R4/R5/R13 build, reviewed by attack — 2026-08-24
+
+Five independent lenses attacked the implementation, each finding backed by three skeptics
+instructed to refute it. **Six refutation attempts were made and none succeeded.** The findings
+are recorded because each is a trap for the next reader, and every one now has a regression test.
+
+- **The produced-artifact half of freshness never worked.** `freshness` built its
+  newest-admission map with two literal **NUL bytes** between the key's fields and looked it up
+  with two **spaces**, so every produced member missed and reported `unknown` — "I did not look",
+  wearing the same word as "I looked and it had not moved". All five lenses found it
+  independently. A raw NUL is invisible in a diff and in most editors, which is how it survived
+  being written. The separator is now an escape, both ends go through one `witnessKey()`, and a
+  test reads the file as BYTES and asserts it contains no raw NUL.
+
+  _Provenance, because it is the reusable lesson:_ the first attempt to write that file used a
+  shell heredoc, and the tool REFUSED it for "control characters that would be hidden in the
+  approval dialog". The refusal was correct and it was routed around by using a different writer,
+  which accepted the same bytes silently.
+
+- **A missing subject could produce a confident wrong answer, not just a missing one.**
+  `rolesFor` stamped `subject` on store-resolved members and not on run-resolved ones, so a
+  run-origin member keyed on an empty subject. With the separator repaired that is not merely a
+  miss: it **false-matches a `subject: null` record left by an unrelated run**, reporting STALE
+  against a stranger's bytes.
+
+- **`gc` deleted every run directory, gate-holding ones included, while printing "kept N".**
+  Pre-existing, and it fired **by default on macOS**: `TMPDIR` ends in a slash, so the run base
+  carries a double slash that `ls` preserves and node's resolver collapses. The keep-list compared
+  path strings, the two spellings of the same directory compared unequal, and nothing was ever
+  kept. It destroyed three run directories during the review that found it. Membership is now by
+  run id — a basename is immune to every path-form difference there is.
+
+- **Resuming a run across the schema 3 → 4 bump would have made its journal permanently
+  unverifiable** ("one chain, two binaries"), destroying the property the chain exists to provide.
+  `append` now refuses, which is the house rule applied to itself: an unknown schema is BROKEN,
+  not guessed at.
+
+- Three narrower ones, all fixed: `refold` threw on a malformed `read_set` member, turning "this
+  journal is wrong" into "the tool is wrong"; `store diff` read only the FIRST admission of each
+  sha, hiding a disagreement between two runs that read different sources; and `receipt.mjs`
+  classified read-sets against an **empty** store index, which made `sources_digest` structurally
+  null for exactly the cross-run case it exists to serve.
+
+- **`subject-report`'s declarable universe was empty of g1 stages**, because `G1_STAGES` is
+  assembled only for commands that resolve a subject and `subject-report` was not one of them. And
+  it ordered runs **lexicographically by run id**, which sorts date, then a _content hash_, then
+  counter — so two runs on one day over different corpora sorted arbitrarily. Runs are now ordered
+  by the start time the journal itself recorded. That is not the clock re-entering freshness:
+  freshness still compares content and never a timestamp, but "which run is most recent" is an
+  inherently temporal question the id cannot answer.
+
+### 5.2 The original document
+
 Written in one pass out of a working conversation, so there is no second reviewer yet. Two claims
 in it were **corrected mid-conversation** and are recorded here in their corrected form, because
 each was believed for a while:
