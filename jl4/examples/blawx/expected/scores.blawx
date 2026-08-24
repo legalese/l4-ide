@@ -1,0 +1,747 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Scores
+    rule_text: "Scores\n\n1. Definition of total score.\n2. Definition of best score.\n3. Definition of average score.\n4. Definition of passes.\n5. Definition of basket total."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">student</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a student</field><next><block type="new_category_declaration" id="l4b000003"><field name="category_name">item</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is an item</field><next><block type="new_category_declaration" id="l4b000004"><field name="category_name">basket</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a basket</field><next><block type="new_attribute_declaration" id="l4b000005"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student" attribute_type="list"></mutation><field name="category_name">student</field><field name="attribute_name">scores</field><field name="attribute_type">list</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has scores of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000006"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="item" attribute_type="number"></mutation><field name="category_name">item</field><field name="attribute_name">price</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has price of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000007"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="basket" attribute_type="list"></mutation><field name="category_name">basket</field><field name="attribute_name">items</field><field name="attribute_type">list</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has items of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000008"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student" attribute_type="number"></mutation><field name="category_name">student</field><field name="attribute_name">total_score</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has total score of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000009"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student" attribute_type="number"></mutation><field name="category_name">student</field><field name="attribute_name">best_score</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has best score of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000010"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student" attribute_type="number"></mutation><field name="category_name">student</field><field name="attribute_name">average_score</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has average score of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000011"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student" attribute_type="boolean"></mutation><field name="category_name">student</field><field name="attribute_name">passes</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">passes</field><next><block type="new_attribute_declaration" id="l4b000012"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="basket" attribute_type="number"></mutation><field name="category_name">basket</field><field name="attribute_name">basket_total</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has basket total of</field><field name="second_element">value</field><field name="postfix"></field></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(student).
+      blawx_category_nlg(student,"","is a student").
+      :- dynamic student/1.
+      #pred student(X) :: '@(X) is a student'.
+      #pred holds(user,student,X) :: 'it is provided as a fact that @(X) is a student'.
+      #pred holds(user,-student,X) :: 'it is provided as a fact that it is not the case that @(X) is a student'.
+      #pred holds(Z,student,X) :: 'the conclusion in @(Z) that @(X) is a student holds'.
+      #pred holds(Z,-student,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a student holds'.
+      #pred according_to(Z,student,X) :: 'according to @(Z), @(X) is a student'.
+      #pred according_to(Z,-student,X) :: 'according to @(Z), it is not the case that @(X) is a student'.
+      #pred blawx_defeated(Z,student,X) :: 'the conclusion in @(Z) that @(X) is a student is defeated'.
+      #pred blawx_defeated(Z,-student,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a student is defeated'.
+      #pred blawx_initially(student(X)) :: 'that @(X) is a student holds initially'.
+      #pred blawx_initially(-student(X)) :: 'that it is not the case that @(X) is a student holds initially'.
+      #pred blawx_ultimately(student(X)) :: 'that @(X) is a student holds ultimately'.
+      #pred blawx_ultimately(-student(X)) :: 'that it is not the case that @(X) is a student holds ultimately'.
+      #pred blawx_as_of(student(X),T) :: 'that @(X) is a student holds at @(T)'.
+      #pred blawx_as_of(-student(X),T) :: 'that it is not the case that @(X) is a student holds at @(T)'.
+      #pred blawx_during(T1,student(X),T2) :: 'that @(X) is a student held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-student(X),T2) :: 'that it is not the case that @(X) is a student held between @(T1) and @(T2)'.
+      #pred blawx_becomes(student(X),T) :: 'that @(X) is a student became true at @(T)'.
+      #pred blawx_becomes(-student(X),T) :: 'that it is not the case that @(X) is a student became true at @(T)'.
+      #pred blawx_not_interrupted(Start,student(X),End) :: '@(X) is a student remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-student(X),End) :: 'it is not the case that @(X) is a student remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),student(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-student(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-student(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(student(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),student(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-student(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-student(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(student(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),student(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-student(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-student(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(student(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),student(X),datetime(eot)) :- blawx_initially(student(X)), blawx_ultimately(student(X)), findall(Time,blawx_becomes(-student(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-student(X),datetime(eot)) :- blawx_initially(-student(X)), blawx_ultimately(-student(X)), findall(Time,blawx_becomes(student(X),datetime(Time)),[]).
+      blawx_as_of(student(X),datetime(Time)) :- blawx_initially(student(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),student(X),datetime(BeforeT)).
+      blawx_as_of(student(X),datetime(Time)) :- blawx_becomes(student(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),student(X),datetime(Time)).
+      blawx_as_of(-student(X),datetime(Time)) :- blawx_initially(-student(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-student(X),datetime(BeforeT)).
+      blawx_as_of(-student(X),datetime(Time)) :- blawx_becomes(-student(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-student(X),datetime(Time)).
+      blawx_during(datetime(Start),student(X),datetime(End)) :- blawx_becomes(student(X),datetime(Start)), blawx_becomes(-student(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),student(X),datetime(End)).
+      blawx_during(datetime(bot),student(X),datetime(End)) :- blawx_initially(student(X)), blawx_becomes(-student(X),datetime(End)), blawx_not_interrupted(datetime(bot),student(X),datetime(End)).
+      blawx_during(datetime(Start),student(X),datetime(eot)) :- blawx_ultimately(student(X)), blawx_becomes(-student(X),datetime(Start)), blawx_not_interrupted(datetime(Start),student(X),datetime(eot)).
+      blawx_during(datetime(bot),student(X),datetime(eot)) :- blawx_initially(student(X)), blawx_ultimately(student(X)), blawx_becomes(-student(X),datetime(Start)), blawx_not_interrupted(datetime(bot),student(X),datetime(eot)).
+      blawx_during(datetime(Start),-student(X),datetime(End)) :- blawx_becomes(-student(X),datetime(Start)), blawx_becomes(student(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-student(X),datetime(End)).
+      blawx_during(datetime(bot),-student(X),datetime(End)) :- blawx_initially(-student(X)), blawx_becomes(student(X),datetime(End)), blawx_not_interrupted(datetime(bot),-student(X),datetime(End)).
+      blawx_during(datetime(Start),-student(X),datetime(eot)) :- blawx_ultimately(-student(X)), blawx_becomes(student(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-student(X),datetime(eot)).
+      blawx_during(datetime(bot),-student(X),datetime(eot)) :- blawx_initially(-student(X)), blawx_ultimately(-student(X)), blawx_becomes(-student(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-student(X),datetime(eot)).
+      blawx_category(item).
+      blawx_category_nlg(item,"","is an item").
+      :- dynamic item/1.
+      #pred item(X) :: '@(X) is an item'.
+      #pred holds(user,item,X) :: 'it is provided as a fact that @(X) is an item'.
+      #pred holds(user,-item,X) :: 'it is provided as a fact that it is not the case that @(X) is an item'.
+      #pred holds(Z,item,X) :: 'the conclusion in @(Z) that @(X) is an item holds'.
+      #pred holds(Z,-item,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is an item holds'.
+      #pred according_to(Z,item,X) :: 'according to @(Z), @(X) is an item'.
+      #pred according_to(Z,-item,X) :: 'according to @(Z), it is not the case that @(X) is an item'.
+      #pred blawx_defeated(Z,item,X) :: 'the conclusion in @(Z) that @(X) is an item is defeated'.
+      #pred blawx_defeated(Z,-item,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is an item is defeated'.
+      #pred blawx_initially(item(X)) :: 'that @(X) is an item holds initially'.
+      #pred blawx_initially(-item(X)) :: 'that it is not the case that @(X) is an item holds initially'.
+      #pred blawx_ultimately(item(X)) :: 'that @(X) is an item holds ultimately'.
+      #pred blawx_ultimately(-item(X)) :: 'that it is not the case that @(X) is an item holds ultimately'.
+      #pred blawx_as_of(item(X),T) :: 'that @(X) is an item holds at @(T)'.
+      #pred blawx_as_of(-item(X),T) :: 'that it is not the case that @(X) is an item holds at @(T)'.
+      #pred blawx_during(T1,item(X),T2) :: 'that @(X) is an item held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-item(X),T2) :: 'that it is not the case that @(X) is an item held between @(T1) and @(T2)'.
+      #pred blawx_becomes(item(X),T) :: 'that @(X) is an item became true at @(T)'.
+      #pred blawx_becomes(-item(X),T) :: 'that it is not the case that @(X) is an item became true at @(T)'.
+      #pred blawx_not_interrupted(Start,item(X),End) :: '@(X) is an item remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-item(X),End) :: 'it is not the case that @(X) is an item remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),item(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-item(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-item(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(item(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),item(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-item(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-item(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(item(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),item(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-item(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-item(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(item(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),item(X),datetime(eot)) :- blawx_initially(item(X)), blawx_ultimately(item(X)), findall(Time,blawx_becomes(-item(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-item(X),datetime(eot)) :- blawx_initially(-item(X)), blawx_ultimately(-item(X)), findall(Time,blawx_becomes(item(X),datetime(Time)),[]).
+      blawx_as_of(item(X),datetime(Time)) :- blawx_initially(item(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),item(X),datetime(BeforeT)).
+      blawx_as_of(item(X),datetime(Time)) :- blawx_becomes(item(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),item(X),datetime(Time)).
+      blawx_as_of(-item(X),datetime(Time)) :- blawx_initially(-item(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-item(X),datetime(BeforeT)).
+      blawx_as_of(-item(X),datetime(Time)) :- blawx_becomes(-item(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-item(X),datetime(Time)).
+      blawx_during(datetime(Start),item(X),datetime(End)) :- blawx_becomes(item(X),datetime(Start)), blawx_becomes(-item(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),item(X),datetime(End)).
+      blawx_during(datetime(bot),item(X),datetime(End)) :- blawx_initially(item(X)), blawx_becomes(-item(X),datetime(End)), blawx_not_interrupted(datetime(bot),item(X),datetime(End)).
+      blawx_during(datetime(Start),item(X),datetime(eot)) :- blawx_ultimately(item(X)), blawx_becomes(-item(X),datetime(Start)), blawx_not_interrupted(datetime(Start),item(X),datetime(eot)).
+      blawx_during(datetime(bot),item(X),datetime(eot)) :- blawx_initially(item(X)), blawx_ultimately(item(X)), blawx_becomes(-item(X),datetime(Start)), blawx_not_interrupted(datetime(bot),item(X),datetime(eot)).
+      blawx_during(datetime(Start),-item(X),datetime(End)) :- blawx_becomes(-item(X),datetime(Start)), blawx_becomes(item(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-item(X),datetime(End)).
+      blawx_during(datetime(bot),-item(X),datetime(End)) :- blawx_initially(-item(X)), blawx_becomes(item(X),datetime(End)), blawx_not_interrupted(datetime(bot),-item(X),datetime(End)).
+      blawx_during(datetime(Start),-item(X),datetime(eot)) :- blawx_ultimately(-item(X)), blawx_becomes(item(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-item(X),datetime(eot)).
+      blawx_during(datetime(bot),-item(X),datetime(eot)) :- blawx_initially(-item(X)), blawx_ultimately(-item(X)), blawx_becomes(-item(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-item(X),datetime(eot)).
+      blawx_category(basket).
+      blawx_category_nlg(basket,"","is a basket").
+      :- dynamic basket/1.
+      #pred basket(X) :: '@(X) is a basket'.
+      #pred holds(user,basket,X) :: 'it is provided as a fact that @(X) is a basket'.
+      #pred holds(user,-basket,X) :: 'it is provided as a fact that it is not the case that @(X) is a basket'.
+      #pred holds(Z,basket,X) :: 'the conclusion in @(Z) that @(X) is a basket holds'.
+      #pred holds(Z,-basket,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a basket holds'.
+      #pred according_to(Z,basket,X) :: 'according to @(Z), @(X) is a basket'.
+      #pred according_to(Z,-basket,X) :: 'according to @(Z), it is not the case that @(X) is a basket'.
+      #pred blawx_defeated(Z,basket,X) :: 'the conclusion in @(Z) that @(X) is a basket is defeated'.
+      #pred blawx_defeated(Z,-basket,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a basket is defeated'.
+      #pred blawx_initially(basket(X)) :: 'that @(X) is a basket holds initially'.
+      #pred blawx_initially(-basket(X)) :: 'that it is not the case that @(X) is a basket holds initially'.
+      #pred blawx_ultimately(basket(X)) :: 'that @(X) is a basket holds ultimately'.
+      #pred blawx_ultimately(-basket(X)) :: 'that it is not the case that @(X) is a basket holds ultimately'.
+      #pred blawx_as_of(basket(X),T) :: 'that @(X) is a basket holds at @(T)'.
+      #pred blawx_as_of(-basket(X),T) :: 'that it is not the case that @(X) is a basket holds at @(T)'.
+      #pred blawx_during(T1,basket(X),T2) :: 'that @(X) is a basket held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-basket(X),T2) :: 'that it is not the case that @(X) is a basket held between @(T1) and @(T2)'.
+      #pred blawx_becomes(basket(X),T) :: 'that @(X) is a basket became true at @(T)'.
+      #pred blawx_becomes(-basket(X),T) :: 'that it is not the case that @(X) is a basket became true at @(T)'.
+      #pred blawx_not_interrupted(Start,basket(X),End) :: '@(X) is a basket remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-basket(X),End) :: 'it is not the case that @(X) is a basket remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),basket(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-basket(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-basket(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(basket(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),basket(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-basket(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-basket(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(basket(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),basket(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-basket(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-basket(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(basket(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),basket(X),datetime(eot)) :- blawx_initially(basket(X)), blawx_ultimately(basket(X)), findall(Time,blawx_becomes(-basket(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-basket(X),datetime(eot)) :- blawx_initially(-basket(X)), blawx_ultimately(-basket(X)), findall(Time,blawx_becomes(basket(X),datetime(Time)),[]).
+      blawx_as_of(basket(X),datetime(Time)) :- blawx_initially(basket(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),basket(X),datetime(BeforeT)).
+      blawx_as_of(basket(X),datetime(Time)) :- blawx_becomes(basket(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),basket(X),datetime(Time)).
+      blawx_as_of(-basket(X),datetime(Time)) :- blawx_initially(-basket(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-basket(X),datetime(BeforeT)).
+      blawx_as_of(-basket(X),datetime(Time)) :- blawx_becomes(-basket(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-basket(X),datetime(Time)).
+      blawx_during(datetime(Start),basket(X),datetime(End)) :- blawx_becomes(basket(X),datetime(Start)), blawx_becomes(-basket(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),basket(X),datetime(End)).
+      blawx_during(datetime(bot),basket(X),datetime(End)) :- blawx_initially(basket(X)), blawx_becomes(-basket(X),datetime(End)), blawx_not_interrupted(datetime(bot),basket(X),datetime(End)).
+      blawx_during(datetime(Start),basket(X),datetime(eot)) :- blawx_ultimately(basket(X)), blawx_becomes(-basket(X),datetime(Start)), blawx_not_interrupted(datetime(Start),basket(X),datetime(eot)).
+      blawx_during(datetime(bot),basket(X),datetime(eot)) :- blawx_initially(basket(X)), blawx_ultimately(basket(X)), blawx_becomes(-basket(X),datetime(Start)), blawx_not_interrupted(datetime(bot),basket(X),datetime(eot)).
+      blawx_during(datetime(Start),-basket(X),datetime(End)) :- blawx_becomes(-basket(X),datetime(Start)), blawx_becomes(basket(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-basket(X),datetime(End)).
+      blawx_during(datetime(bot),-basket(X),datetime(End)) :- blawx_initially(-basket(X)), blawx_becomes(basket(X),datetime(End)), blawx_not_interrupted(datetime(bot),-basket(X),datetime(End)).
+      blawx_during(datetime(Start),-basket(X),datetime(eot)) :- blawx_ultimately(-basket(X)), blawx_becomes(basket(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-basket(X),datetime(eot)).
+      blawx_during(datetime(bot),-basket(X),datetime(eot)) :- blawx_initially(-basket(X)), blawx_ultimately(-basket(X)), blawx_becomes(-basket(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-basket(X),datetime(eot)).
+      blawx_attribute(student,scores,list).
+      blawx_attribute_nlg(scores,ov,"","has scores of","").
+      :- dynamic scores/2.
+      #pred scores(X,Y) :: '@(X) has scores of @(Y)'.
+      #pred holds(user,scores,X,Y) :: 'it is provided as a fact that @(X) has scores of @(Y)'.
+      #pred holds(user,-scores,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has scores of @(Y)'.
+      #pred holds(Z,scores,X,Y) :: 'the conclusion in @(Z) that @(X) has scores of @(Y) holds'.
+      #pred holds(Z,-scores,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has scores of @(Y) holds'.
+      #pred according_to(Z,scores,X,Y) :: 'according to @(Z), @(X) has scores of @(Y)'.
+      #pred according_to(Z,-scores,X,Y) :: 'according to @(Z), it is not the case that @(X) has scores of @(Y)'.
+      #pred blawx_defeated(Z,scores,X,Y) :: 'the conclusion in @(Z) that @(X) has scores of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-scores,X,Y) :: 'the conclusion in @(Z) that @(X) has scores of @(Y) is defeated'.
+      #pred blawx_initially(scores(X,Y)) :: 'that @(X) has scores of @(Y) holds initially'.
+      #pred blawx_initially(-scores(X,Y)) :: 'that it is not the case that @(X) has scores of @(Y) holds initially'.
+      #pred blawx_ultimately(scores(X,Y)) :: 'that @(X) has scores of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-scores(X,Y)) :: 'that it is not the case that @(X) has scores of @(Y) holds ultimately'.
+      #pred blawx_as_of(scores(X,Y),T) :: 'that @(X) has scores of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-scores(X,Y),T) :: 'that it is not the case that @(X) has scores of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,scores(X,Y),T2) :: 'that @(X) has scores of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-scores(X,Y),T2) :: 'that it is not the case that @(X) has scores of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(scores(X,Y),T) :: 'that @(X) has scores of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-scores(X,Y),T) :: 'that it is not the case that @(X) has scores of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,scores(X,Y),End) :: '@(X) has scores of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-scores(X,Y),End) :: 'it is not the case that @(X) has scores of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),scores(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-scores(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-scores(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(scores(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),scores(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-scores(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-scores(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(scores(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),scores(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-scores(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-scores(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(scores(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),scores(X,Y),datetime(eot)) :- blawx_initially(scores(X,Y)), blawx_ultimately(scores(X,Y)), findall(Time,blawx_becomes(-scores(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-scores(X,Y),datetime(eot)) :- blawx_initially(-scores(X,Y)), blawx_ultimately(-scores(X,Y)), findall(Time,blawx_becomes(scores(X,Y),datetime(Time)),[]).
+      blawx_as_of(scores(X,Y),datetime(Time)) :- blawx_initially(scores(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),scores(X,Y),datetime(BeforeT)).
+      blawx_as_of(scores(X,Y),datetime(Time)) :- blawx_becomes(scores(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),scores(X,Y),datetime(Time)).
+      blawx_as_of(-scores(X,Y),datetime(Time)) :- blawx_initially(-scores(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-scores(X,Y),datetime(BeforeT)).
+      blawx_as_of(-scores(X,Y),datetime(Time)) :- blawx_becomes(-scores(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-scores(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),scores(X,Y),datetime(End)) :- blawx_becomes(scores(X,Y),datetime(Start)), blawx_becomes(-scores(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),scores(X,Y),datetime(End)).
+      blawx_during(datetime(bot),scores(X,Y),datetime(End)) :- blawx_initially(scores(X,Y)), blawx_becomes(-scores(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),scores(X,Y),datetime(End)).
+      blawx_during(datetime(Start),scores(X,Y),datetime(eot)) :- blawx_ultimately(scores(X,Y)), blawx_becomes(-scores(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),scores(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),scores(X,Y),datetime(eot)) :- blawx_initially(scores(X,Y)), blawx_ultimately(scores(X,Y)), blawx_becomes(-scores(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),scores(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-scores(X,Y),datetime(End)) :- blawx_becomes(-scores(X,Y),datetime(Start)), blawx_becomes(scores(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-scores(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-scores(X,Y),datetime(End)) :- blawx_initially(-scores(X,Y)), blawx_becomes(scores(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-scores(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-scores(X,Y),datetime(eot)) :- blawx_ultimately(-scores(X,Y)), blawx_becomes(scores(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-scores(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-scores(X,Y),datetime(eot)) :- blawx_initially(-scores(X,Y)), blawx_ultimately(-scores(X,Y)), blawx_becomes(-scores(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-scores(X,Y),datetime(eot)).
+      blawx_attribute(item,price,number).
+      blawx_attribute_nlg(price,ov,"","has price of","").
+      :- dynamic price/2.
+      #pred price(X,Y) :: '@(X) has price of @(Y)'.
+      #pred holds(user,price,X,Y) :: 'it is provided as a fact that @(X) has price of @(Y)'.
+      #pred holds(user,-price,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has price of @(Y)'.
+      #pred holds(Z,price,X,Y) :: 'the conclusion in @(Z) that @(X) has price of @(Y) holds'.
+      #pred holds(Z,-price,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has price of @(Y) holds'.
+      #pred according_to(Z,price,X,Y) :: 'according to @(Z), @(X) has price of @(Y)'.
+      #pred according_to(Z,-price,X,Y) :: 'according to @(Z), it is not the case that @(X) has price of @(Y)'.
+      #pred blawx_defeated(Z,price,X,Y) :: 'the conclusion in @(Z) that @(X) has price of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-price,X,Y) :: 'the conclusion in @(Z) that @(X) has price of @(Y) is defeated'.
+      #pred blawx_initially(price(X,Y)) :: 'that @(X) has price of @(Y) holds initially'.
+      #pred blawx_initially(-price(X,Y)) :: 'that it is not the case that @(X) has price of @(Y) holds initially'.
+      #pred blawx_ultimately(price(X,Y)) :: 'that @(X) has price of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-price(X,Y)) :: 'that it is not the case that @(X) has price of @(Y) holds ultimately'.
+      #pred blawx_as_of(price(X,Y),T) :: 'that @(X) has price of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-price(X,Y),T) :: 'that it is not the case that @(X) has price of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,price(X,Y),T2) :: 'that @(X) has price of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-price(X,Y),T2) :: 'that it is not the case that @(X) has price of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(price(X,Y),T) :: 'that @(X) has price of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-price(X,Y),T) :: 'that it is not the case that @(X) has price of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,price(X,Y),End) :: '@(X) has price of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-price(X,Y),End) :: 'it is not the case that @(X) has price of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),price(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-price(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-price(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(price(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),price(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-price(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-price(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(price(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),price(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-price(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-price(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(price(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),price(X,Y),datetime(eot)) :- blawx_initially(price(X,Y)), blawx_ultimately(price(X,Y)), findall(Time,blawx_becomes(-price(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-price(X,Y),datetime(eot)) :- blawx_initially(-price(X,Y)), blawx_ultimately(-price(X,Y)), findall(Time,blawx_becomes(price(X,Y),datetime(Time)),[]).
+      blawx_as_of(price(X,Y),datetime(Time)) :- blawx_initially(price(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),price(X,Y),datetime(BeforeT)).
+      blawx_as_of(price(X,Y),datetime(Time)) :- blawx_becomes(price(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),price(X,Y),datetime(Time)).
+      blawx_as_of(-price(X,Y),datetime(Time)) :- blawx_initially(-price(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-price(X,Y),datetime(BeforeT)).
+      blawx_as_of(-price(X,Y),datetime(Time)) :- blawx_becomes(-price(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-price(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),price(X,Y),datetime(End)) :- blawx_becomes(price(X,Y),datetime(Start)), blawx_becomes(-price(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),price(X,Y),datetime(End)).
+      blawx_during(datetime(bot),price(X,Y),datetime(End)) :- blawx_initially(price(X,Y)), blawx_becomes(-price(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),price(X,Y),datetime(End)).
+      blawx_during(datetime(Start),price(X,Y),datetime(eot)) :- blawx_ultimately(price(X,Y)), blawx_becomes(-price(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),price(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),price(X,Y),datetime(eot)) :- blawx_initially(price(X,Y)), blawx_ultimately(price(X,Y)), blawx_becomes(-price(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),price(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-price(X,Y),datetime(End)) :- blawx_becomes(-price(X,Y),datetime(Start)), blawx_becomes(price(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-price(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-price(X,Y),datetime(End)) :- blawx_initially(-price(X,Y)), blawx_becomes(price(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-price(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-price(X,Y),datetime(eot)) :- blawx_ultimately(-price(X,Y)), blawx_becomes(price(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-price(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-price(X,Y),datetime(eot)) :- blawx_initially(-price(X,Y)), blawx_ultimately(-price(X,Y)), blawx_becomes(-price(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-price(X,Y),datetime(eot)).
+      blawx_attribute(basket,items,list).
+      blawx_attribute_nlg(items,ov,"","has items of","").
+      :- dynamic items/2.
+      #pred items(X,Y) :: '@(X) has items of @(Y)'.
+      #pred holds(user,items,X,Y) :: 'it is provided as a fact that @(X) has items of @(Y)'.
+      #pred holds(user,-items,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has items of @(Y)'.
+      #pred holds(Z,items,X,Y) :: 'the conclusion in @(Z) that @(X) has items of @(Y) holds'.
+      #pred holds(Z,-items,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has items of @(Y) holds'.
+      #pred according_to(Z,items,X,Y) :: 'according to @(Z), @(X) has items of @(Y)'.
+      #pred according_to(Z,-items,X,Y) :: 'according to @(Z), it is not the case that @(X) has items of @(Y)'.
+      #pred blawx_defeated(Z,items,X,Y) :: 'the conclusion in @(Z) that @(X) has items of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-items,X,Y) :: 'the conclusion in @(Z) that @(X) has items of @(Y) is defeated'.
+      #pred blawx_initially(items(X,Y)) :: 'that @(X) has items of @(Y) holds initially'.
+      #pred blawx_initially(-items(X,Y)) :: 'that it is not the case that @(X) has items of @(Y) holds initially'.
+      #pred blawx_ultimately(items(X,Y)) :: 'that @(X) has items of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-items(X,Y)) :: 'that it is not the case that @(X) has items of @(Y) holds ultimately'.
+      #pred blawx_as_of(items(X,Y),T) :: 'that @(X) has items of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-items(X,Y),T) :: 'that it is not the case that @(X) has items of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,items(X,Y),T2) :: 'that @(X) has items of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-items(X,Y),T2) :: 'that it is not the case that @(X) has items of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(items(X,Y),T) :: 'that @(X) has items of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-items(X,Y),T) :: 'that it is not the case that @(X) has items of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,items(X,Y),End) :: '@(X) has items of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-items(X,Y),End) :: 'it is not the case that @(X) has items of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),items(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-items(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-items(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(items(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),items(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-items(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-items(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(items(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),items(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-items(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-items(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(items(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),items(X,Y),datetime(eot)) :- blawx_initially(items(X,Y)), blawx_ultimately(items(X,Y)), findall(Time,blawx_becomes(-items(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-items(X,Y),datetime(eot)) :- blawx_initially(-items(X,Y)), blawx_ultimately(-items(X,Y)), findall(Time,blawx_becomes(items(X,Y),datetime(Time)),[]).
+      blawx_as_of(items(X,Y),datetime(Time)) :- blawx_initially(items(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),items(X,Y),datetime(BeforeT)).
+      blawx_as_of(items(X,Y),datetime(Time)) :- blawx_becomes(items(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),items(X,Y),datetime(Time)).
+      blawx_as_of(-items(X,Y),datetime(Time)) :- blawx_initially(-items(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-items(X,Y),datetime(BeforeT)).
+      blawx_as_of(-items(X,Y),datetime(Time)) :- blawx_becomes(-items(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-items(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),items(X,Y),datetime(End)) :- blawx_becomes(items(X,Y),datetime(Start)), blawx_becomes(-items(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),items(X,Y),datetime(End)).
+      blawx_during(datetime(bot),items(X,Y),datetime(End)) :- blawx_initially(items(X,Y)), blawx_becomes(-items(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),items(X,Y),datetime(End)).
+      blawx_during(datetime(Start),items(X,Y),datetime(eot)) :- blawx_ultimately(items(X,Y)), blawx_becomes(-items(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),items(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),items(X,Y),datetime(eot)) :- blawx_initially(items(X,Y)), blawx_ultimately(items(X,Y)), blawx_becomes(-items(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),items(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-items(X,Y),datetime(End)) :- blawx_becomes(-items(X,Y),datetime(Start)), blawx_becomes(items(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-items(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-items(X,Y),datetime(End)) :- blawx_initially(-items(X,Y)), blawx_becomes(items(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-items(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-items(X,Y),datetime(eot)) :- blawx_ultimately(-items(X,Y)), blawx_becomes(items(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-items(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-items(X,Y),datetime(eot)) :- blawx_initially(-items(X,Y)), blawx_ultimately(-items(X,Y)), blawx_becomes(-items(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-items(X,Y),datetime(eot)).
+      blawx_attribute(student,total_score,number).
+      blawx_attribute_nlg(total_score,ov,"","has total score of","").
+      :- dynamic total_score/2.
+      #pred total_score(X,Y) :: '@(X) has total score of @(Y)'.
+      #pred holds(user,total_score,X,Y) :: 'it is provided as a fact that @(X) has total score of @(Y)'.
+      #pred holds(user,-total_score,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has total score of @(Y)'.
+      #pred holds(Z,total_score,X,Y) :: 'the conclusion in @(Z) that @(X) has total score of @(Y) holds'.
+      #pred holds(Z,-total_score,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has total score of @(Y) holds'.
+      #pred according_to(Z,total_score,X,Y) :: 'according to @(Z), @(X) has total score of @(Y)'.
+      #pred according_to(Z,-total_score,X,Y) :: 'according to @(Z), it is not the case that @(X) has total score of @(Y)'.
+      #pred blawx_defeated(Z,total_score,X,Y) :: 'the conclusion in @(Z) that @(X) has total score of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-total_score,X,Y) :: 'the conclusion in @(Z) that @(X) has total score of @(Y) is defeated'.
+      #pred blawx_initially(total_score(X,Y)) :: 'that @(X) has total score of @(Y) holds initially'.
+      #pred blawx_initially(-total_score(X,Y)) :: 'that it is not the case that @(X) has total score of @(Y) holds initially'.
+      #pred blawx_ultimately(total_score(X,Y)) :: 'that @(X) has total score of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-total_score(X,Y)) :: 'that it is not the case that @(X) has total score of @(Y) holds ultimately'.
+      #pred blawx_as_of(total_score(X,Y),T) :: 'that @(X) has total score of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-total_score(X,Y),T) :: 'that it is not the case that @(X) has total score of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,total_score(X,Y),T2) :: 'that @(X) has total score of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-total_score(X,Y),T2) :: 'that it is not the case that @(X) has total score of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(total_score(X,Y),T) :: 'that @(X) has total score of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-total_score(X,Y),T) :: 'that it is not the case that @(X) has total score of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,total_score(X,Y),End) :: '@(X) has total score of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-total_score(X,Y),End) :: 'it is not the case that @(X) has total score of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),total_score(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-total_score(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-total_score(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(total_score(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),total_score(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-total_score(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-total_score(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(total_score(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),total_score(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-total_score(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-total_score(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(total_score(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),total_score(X,Y),datetime(eot)) :- blawx_initially(total_score(X,Y)), blawx_ultimately(total_score(X,Y)), findall(Time,blawx_becomes(-total_score(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-total_score(X,Y),datetime(eot)) :- blawx_initially(-total_score(X,Y)), blawx_ultimately(-total_score(X,Y)), findall(Time,blawx_becomes(total_score(X,Y),datetime(Time)),[]).
+      blawx_as_of(total_score(X,Y),datetime(Time)) :- blawx_initially(total_score(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),total_score(X,Y),datetime(BeforeT)).
+      blawx_as_of(total_score(X,Y),datetime(Time)) :- blawx_becomes(total_score(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),total_score(X,Y),datetime(Time)).
+      blawx_as_of(-total_score(X,Y),datetime(Time)) :- blawx_initially(-total_score(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-total_score(X,Y),datetime(BeforeT)).
+      blawx_as_of(-total_score(X,Y),datetime(Time)) :- blawx_becomes(-total_score(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-total_score(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),total_score(X,Y),datetime(End)) :- blawx_becomes(total_score(X,Y),datetime(Start)), blawx_becomes(-total_score(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),total_score(X,Y),datetime(End)).
+      blawx_during(datetime(bot),total_score(X,Y),datetime(End)) :- blawx_initially(total_score(X,Y)), blawx_becomes(-total_score(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),total_score(X,Y),datetime(End)).
+      blawx_during(datetime(Start),total_score(X,Y),datetime(eot)) :- blawx_ultimately(total_score(X,Y)), blawx_becomes(-total_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),total_score(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),total_score(X,Y),datetime(eot)) :- blawx_initially(total_score(X,Y)), blawx_ultimately(total_score(X,Y)), blawx_becomes(-total_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),total_score(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-total_score(X,Y),datetime(End)) :- blawx_becomes(-total_score(X,Y),datetime(Start)), blawx_becomes(total_score(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-total_score(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-total_score(X,Y),datetime(End)) :- blawx_initially(-total_score(X,Y)), blawx_becomes(total_score(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-total_score(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-total_score(X,Y),datetime(eot)) :- blawx_ultimately(-total_score(X,Y)), blawx_becomes(total_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-total_score(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-total_score(X,Y),datetime(eot)) :- blawx_initially(-total_score(X,Y)), blawx_ultimately(-total_score(X,Y)), blawx_becomes(-total_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-total_score(X,Y),datetime(eot)).
+      blawx_attribute(student,best_score,number).
+      blawx_attribute_nlg(best_score,ov,"","has best score of","").
+      :- dynamic best_score/2.
+      #pred best_score(X,Y) :: '@(X) has best score of @(Y)'.
+      #pred holds(user,best_score,X,Y) :: 'it is provided as a fact that @(X) has best score of @(Y)'.
+      #pred holds(user,-best_score,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has best score of @(Y)'.
+      #pred holds(Z,best_score,X,Y) :: 'the conclusion in @(Z) that @(X) has best score of @(Y) holds'.
+      #pred holds(Z,-best_score,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has best score of @(Y) holds'.
+      #pred according_to(Z,best_score,X,Y) :: 'according to @(Z), @(X) has best score of @(Y)'.
+      #pred according_to(Z,-best_score,X,Y) :: 'according to @(Z), it is not the case that @(X) has best score of @(Y)'.
+      #pred blawx_defeated(Z,best_score,X,Y) :: 'the conclusion in @(Z) that @(X) has best score of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-best_score,X,Y) :: 'the conclusion in @(Z) that @(X) has best score of @(Y) is defeated'.
+      #pred blawx_initially(best_score(X,Y)) :: 'that @(X) has best score of @(Y) holds initially'.
+      #pred blawx_initially(-best_score(X,Y)) :: 'that it is not the case that @(X) has best score of @(Y) holds initially'.
+      #pred blawx_ultimately(best_score(X,Y)) :: 'that @(X) has best score of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-best_score(X,Y)) :: 'that it is not the case that @(X) has best score of @(Y) holds ultimately'.
+      #pred blawx_as_of(best_score(X,Y),T) :: 'that @(X) has best score of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-best_score(X,Y),T) :: 'that it is not the case that @(X) has best score of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,best_score(X,Y),T2) :: 'that @(X) has best score of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-best_score(X,Y),T2) :: 'that it is not the case that @(X) has best score of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(best_score(X,Y),T) :: 'that @(X) has best score of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-best_score(X,Y),T) :: 'that it is not the case that @(X) has best score of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,best_score(X,Y),End) :: '@(X) has best score of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-best_score(X,Y),End) :: 'it is not the case that @(X) has best score of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),best_score(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-best_score(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-best_score(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(best_score(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),best_score(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-best_score(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-best_score(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(best_score(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),best_score(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-best_score(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-best_score(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(best_score(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),best_score(X,Y),datetime(eot)) :- blawx_initially(best_score(X,Y)), blawx_ultimately(best_score(X,Y)), findall(Time,blawx_becomes(-best_score(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-best_score(X,Y),datetime(eot)) :- blawx_initially(-best_score(X,Y)), blawx_ultimately(-best_score(X,Y)), findall(Time,blawx_becomes(best_score(X,Y),datetime(Time)),[]).
+      blawx_as_of(best_score(X,Y),datetime(Time)) :- blawx_initially(best_score(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),best_score(X,Y),datetime(BeforeT)).
+      blawx_as_of(best_score(X,Y),datetime(Time)) :- blawx_becomes(best_score(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),best_score(X,Y),datetime(Time)).
+      blawx_as_of(-best_score(X,Y),datetime(Time)) :- blawx_initially(-best_score(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-best_score(X,Y),datetime(BeforeT)).
+      blawx_as_of(-best_score(X,Y),datetime(Time)) :- blawx_becomes(-best_score(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-best_score(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),best_score(X,Y),datetime(End)) :- blawx_becomes(best_score(X,Y),datetime(Start)), blawx_becomes(-best_score(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),best_score(X,Y),datetime(End)).
+      blawx_during(datetime(bot),best_score(X,Y),datetime(End)) :- blawx_initially(best_score(X,Y)), blawx_becomes(-best_score(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),best_score(X,Y),datetime(End)).
+      blawx_during(datetime(Start),best_score(X,Y),datetime(eot)) :- blawx_ultimately(best_score(X,Y)), blawx_becomes(-best_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),best_score(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),best_score(X,Y),datetime(eot)) :- blawx_initially(best_score(X,Y)), blawx_ultimately(best_score(X,Y)), blawx_becomes(-best_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),best_score(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-best_score(X,Y),datetime(End)) :- blawx_becomes(-best_score(X,Y),datetime(Start)), blawx_becomes(best_score(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-best_score(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-best_score(X,Y),datetime(End)) :- blawx_initially(-best_score(X,Y)), blawx_becomes(best_score(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-best_score(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-best_score(X,Y),datetime(eot)) :- blawx_ultimately(-best_score(X,Y)), blawx_becomes(best_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-best_score(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-best_score(X,Y),datetime(eot)) :- blawx_initially(-best_score(X,Y)), blawx_ultimately(-best_score(X,Y)), blawx_becomes(-best_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-best_score(X,Y),datetime(eot)).
+      blawx_attribute(student,average_score,number).
+      blawx_attribute_nlg(average_score,ov,"","has average score of","").
+      :- dynamic average_score/2.
+      #pred average_score(X,Y) :: '@(X) has average score of @(Y)'.
+      #pred holds(user,average_score,X,Y) :: 'it is provided as a fact that @(X) has average score of @(Y)'.
+      #pred holds(user,-average_score,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has average score of @(Y)'.
+      #pred holds(Z,average_score,X,Y) :: 'the conclusion in @(Z) that @(X) has average score of @(Y) holds'.
+      #pred holds(Z,-average_score,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has average score of @(Y) holds'.
+      #pred according_to(Z,average_score,X,Y) :: 'according to @(Z), @(X) has average score of @(Y)'.
+      #pred according_to(Z,-average_score,X,Y) :: 'according to @(Z), it is not the case that @(X) has average score of @(Y)'.
+      #pred blawx_defeated(Z,average_score,X,Y) :: 'the conclusion in @(Z) that @(X) has average score of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-average_score,X,Y) :: 'the conclusion in @(Z) that @(X) has average score of @(Y) is defeated'.
+      #pred blawx_initially(average_score(X,Y)) :: 'that @(X) has average score of @(Y) holds initially'.
+      #pred blawx_initially(-average_score(X,Y)) :: 'that it is not the case that @(X) has average score of @(Y) holds initially'.
+      #pred blawx_ultimately(average_score(X,Y)) :: 'that @(X) has average score of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-average_score(X,Y)) :: 'that it is not the case that @(X) has average score of @(Y) holds ultimately'.
+      #pred blawx_as_of(average_score(X,Y),T) :: 'that @(X) has average score of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-average_score(X,Y),T) :: 'that it is not the case that @(X) has average score of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,average_score(X,Y),T2) :: 'that @(X) has average score of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-average_score(X,Y),T2) :: 'that it is not the case that @(X) has average score of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(average_score(X,Y),T) :: 'that @(X) has average score of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-average_score(X,Y),T) :: 'that it is not the case that @(X) has average score of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,average_score(X,Y),End) :: '@(X) has average score of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-average_score(X,Y),End) :: 'it is not the case that @(X) has average score of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),average_score(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-average_score(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-average_score(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(average_score(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),average_score(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-average_score(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-average_score(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(average_score(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),average_score(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-average_score(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-average_score(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(average_score(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),average_score(X,Y),datetime(eot)) :- blawx_initially(average_score(X,Y)), blawx_ultimately(average_score(X,Y)), findall(Time,blawx_becomes(-average_score(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-average_score(X,Y),datetime(eot)) :- blawx_initially(-average_score(X,Y)), blawx_ultimately(-average_score(X,Y)), findall(Time,blawx_becomes(average_score(X,Y),datetime(Time)),[]).
+      blawx_as_of(average_score(X,Y),datetime(Time)) :- blawx_initially(average_score(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),average_score(X,Y),datetime(BeforeT)).
+      blawx_as_of(average_score(X,Y),datetime(Time)) :- blawx_becomes(average_score(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),average_score(X,Y),datetime(Time)).
+      blawx_as_of(-average_score(X,Y),datetime(Time)) :- blawx_initially(-average_score(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-average_score(X,Y),datetime(BeforeT)).
+      blawx_as_of(-average_score(X,Y),datetime(Time)) :- blawx_becomes(-average_score(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-average_score(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),average_score(X,Y),datetime(End)) :- blawx_becomes(average_score(X,Y),datetime(Start)), blawx_becomes(-average_score(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),average_score(X,Y),datetime(End)).
+      blawx_during(datetime(bot),average_score(X,Y),datetime(End)) :- blawx_initially(average_score(X,Y)), blawx_becomes(-average_score(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),average_score(X,Y),datetime(End)).
+      blawx_during(datetime(Start),average_score(X,Y),datetime(eot)) :- blawx_ultimately(average_score(X,Y)), blawx_becomes(-average_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),average_score(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),average_score(X,Y),datetime(eot)) :- blawx_initially(average_score(X,Y)), blawx_ultimately(average_score(X,Y)), blawx_becomes(-average_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),average_score(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-average_score(X,Y),datetime(End)) :- blawx_becomes(-average_score(X,Y),datetime(Start)), blawx_becomes(average_score(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-average_score(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-average_score(X,Y),datetime(End)) :- blawx_initially(-average_score(X,Y)), blawx_becomes(average_score(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-average_score(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-average_score(X,Y),datetime(eot)) :- blawx_ultimately(-average_score(X,Y)), blawx_becomes(average_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-average_score(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-average_score(X,Y),datetime(eot)) :- blawx_initially(-average_score(X,Y)), blawx_ultimately(-average_score(X,Y)), blawx_becomes(-average_score(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-average_score(X,Y),datetime(eot)).
+      blawx_attribute(student,passes,boolean).
+      blawx_attribute_nlg(passes,not_applicable,"",not_applicable,"passes").
+      :- dynamic passes/1.
+      #pred passes(X) :: '@(X) passes'.
+      #pred holds(user,passes,X) :: 'it is provided as a fact that @(X) passes'.
+      #pred holds(user,-passes,X) :: 'it is provided as a fact that it is not the case that @(X) passes'.
+      #pred holds(Z,passes,X) :: 'the conclusion in @(Z) that @(X) passes holds'.
+      #pred holds(Z,-passes,X) :: 'the conclusion in @(Z) that it is not the case that @(X) passes holds'.
+      #pred according_to(Z,passes,X) :: 'according to @(Z), @(X) passes'.
+      #pred according_to(Z,-passes,X) :: 'according to @(Z), it is not the case that @(X) passes'.
+      #pred blawx_defeated(Z,passes,X) :: 'the conclusion in @(Z) that @(X) passes is defeated'.
+      #pred blawx_defeated(Z,-passes,X) :: 'the conclusion in @(Z) that @(X) passes is defeated'.
+      #pred blawx_initially(passes(X)) :: 'that @(X) passes holds initially'.
+      #pred blawx_initially(-passes(X)) :: 'that it is not the case that @(X) passes holds initially'.
+      #pred blawx_ultimately(passes(X)) :: 'that @(X) passes holds ultimately'.
+      #pred blawx_ultimately(-passes(X)) :: 'that it is not the case that @(X) passes holds ultimately'.
+      #pred blawx_as_of(passes(X),T) :: 'that @(X) passes holds at @(T)'.
+      #pred blawx_as_of(-passes(X),T) :: 'that it is not the case that @(X) passes holds at @(T)'.
+      #pred blawx_during(T1,passes(X),T2) :: 'that @(X) passes held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-passes(X),T2) :: 'that it is not the case that @(X) passes held between @(T1) and @(T2)'.
+      #pred blawx_becomes(passes(X),T) :: 'that @(X) passes became true at @(T)'.
+      #pred blawx_becomes(-passes(X),T) :: 'that it is not the case that @(X) passes became true at @(T)'.
+      #pred blawx_not_interrupted(Start,passes(X),End) :: '@(X) passes remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-passes(X),End) :: 'it is not the case that @(X) passes remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),passes(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-passes(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-passes(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(passes(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),passes(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-passes(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-passes(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(passes(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),passes(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-passes(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-passes(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(passes(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),passes(X),datetime(eot)) :- blawx_initially(passes(X)), blawx_ultimately(passes(X)), findall(Time,blawx_becomes(-passes(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-passes(X),datetime(eot)) :- blawx_initially(-passes(X)), blawx_ultimately(-passes(X)), findall(Time,blawx_becomes(passes(X),datetime(Time)),[]).
+      blawx_as_of(passes(X),datetime(Time)) :- blawx_initially(passes(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),passes(X),datetime(BeforeT)).
+      blawx_as_of(passes(X),datetime(Time)) :- blawx_becomes(passes(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),passes(X),datetime(Time)).
+      blawx_as_of(-passes(X),datetime(Time)) :- blawx_initially(-passes(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-passes(X),datetime(BeforeT)).
+      blawx_as_of(-passes(X),datetime(Time)) :- blawx_becomes(-passes(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-passes(X),datetime(Time)).
+      blawx_during(datetime(Start),passes(X),datetime(End)) :- blawx_becomes(passes(X),datetime(Start)), blawx_becomes(-passes(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),passes(X),datetime(End)).
+      blawx_during(datetime(bot),passes(X),datetime(End)) :- blawx_initially(passes(X)), blawx_becomes(-passes(X),datetime(End)), blawx_not_interrupted(datetime(bot),passes(X),datetime(End)).
+      blawx_during(datetime(Start),passes(X),datetime(eot)) :- blawx_ultimately(passes(X)), blawx_becomes(-passes(X),datetime(Start)), blawx_not_interrupted(datetime(Start),passes(X),datetime(eot)).
+      blawx_during(datetime(bot),passes(X),datetime(eot)) :- blawx_initially(passes(X)), blawx_ultimately(passes(X)), blawx_becomes(-passes(X),datetime(Start)), blawx_not_interrupted(datetime(bot),passes(X),datetime(eot)).
+      blawx_during(datetime(Start),-passes(X),datetime(End)) :- blawx_becomes(-passes(X),datetime(Start)), blawx_becomes(passes(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-passes(X),datetime(End)).
+      blawx_during(datetime(bot),-passes(X),datetime(End)) :- blawx_initially(-passes(X)), blawx_becomes(passes(X),datetime(End)), blawx_not_interrupted(datetime(bot),-passes(X),datetime(End)).
+      blawx_during(datetime(Start),-passes(X),datetime(eot)) :- blawx_ultimately(-passes(X)), blawx_becomes(passes(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-passes(X),datetime(eot)).
+      blawx_during(datetime(bot),-passes(X),datetime(eot)) :- blawx_initially(-passes(X)), blawx_ultimately(-passes(X)), blawx_becomes(-passes(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-passes(X),datetime(eot)).
+      blawx_attribute(basket,basket_total,number).
+      blawx_attribute_nlg(basket_total,ov,"","has basket total of","").
+      :- dynamic basket_total/2.
+      #pred basket_total(X,Y) :: '@(X) has basket total of @(Y)'.
+      #pred holds(user,basket_total,X,Y) :: 'it is provided as a fact that @(X) has basket total of @(Y)'.
+      #pred holds(user,-basket_total,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has basket total of @(Y)'.
+      #pred holds(Z,basket_total,X,Y) :: 'the conclusion in @(Z) that @(X) has basket total of @(Y) holds'.
+      #pred holds(Z,-basket_total,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has basket total of @(Y) holds'.
+      #pred according_to(Z,basket_total,X,Y) :: 'according to @(Z), @(X) has basket total of @(Y)'.
+      #pred according_to(Z,-basket_total,X,Y) :: 'according to @(Z), it is not the case that @(X) has basket total of @(Y)'.
+      #pred blawx_defeated(Z,basket_total,X,Y) :: 'the conclusion in @(Z) that @(X) has basket total of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-basket_total,X,Y) :: 'the conclusion in @(Z) that @(X) has basket total of @(Y) is defeated'.
+      #pred blawx_initially(basket_total(X,Y)) :: 'that @(X) has basket total of @(Y) holds initially'.
+      #pred blawx_initially(-basket_total(X,Y)) :: 'that it is not the case that @(X) has basket total of @(Y) holds initially'.
+      #pred blawx_ultimately(basket_total(X,Y)) :: 'that @(X) has basket total of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-basket_total(X,Y)) :: 'that it is not the case that @(X) has basket total of @(Y) holds ultimately'.
+      #pred blawx_as_of(basket_total(X,Y),T) :: 'that @(X) has basket total of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-basket_total(X,Y),T) :: 'that it is not the case that @(X) has basket total of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,basket_total(X,Y),T2) :: 'that @(X) has basket total of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-basket_total(X,Y),T2) :: 'that it is not the case that @(X) has basket total of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(basket_total(X,Y),T) :: 'that @(X) has basket total of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-basket_total(X,Y),T) :: 'that it is not the case that @(X) has basket total of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,basket_total(X,Y),End) :: '@(X) has basket total of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-basket_total(X,Y),End) :: 'it is not the case that @(X) has basket total of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),basket_total(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-basket_total(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-basket_total(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(basket_total(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),basket_total(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-basket_total(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-basket_total(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(basket_total(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),basket_total(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-basket_total(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-basket_total(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(basket_total(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),basket_total(X,Y),datetime(eot)) :- blawx_initially(basket_total(X,Y)), blawx_ultimately(basket_total(X,Y)), findall(Time,blawx_becomes(-basket_total(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-basket_total(X,Y),datetime(eot)) :- blawx_initially(-basket_total(X,Y)), blawx_ultimately(-basket_total(X,Y)), findall(Time,blawx_becomes(basket_total(X,Y),datetime(Time)),[]).
+      blawx_as_of(basket_total(X,Y),datetime(Time)) :- blawx_initially(basket_total(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),basket_total(X,Y),datetime(BeforeT)).
+      blawx_as_of(basket_total(X,Y),datetime(Time)) :- blawx_becomes(basket_total(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),basket_total(X,Y),datetime(Time)).
+      blawx_as_of(-basket_total(X,Y),datetime(Time)) :- blawx_initially(-basket_total(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-basket_total(X,Y),datetime(BeforeT)).
+      blawx_as_of(-basket_total(X,Y),datetime(Time)) :- blawx_becomes(-basket_total(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-basket_total(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),basket_total(X,Y),datetime(End)) :- blawx_becomes(basket_total(X,Y),datetime(Start)), blawx_becomes(-basket_total(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),basket_total(X,Y),datetime(End)).
+      blawx_during(datetime(bot),basket_total(X,Y),datetime(End)) :- blawx_initially(basket_total(X,Y)), blawx_becomes(-basket_total(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),basket_total(X,Y),datetime(End)).
+      blawx_during(datetime(Start),basket_total(X,Y),datetime(eot)) :- blawx_ultimately(basket_total(X,Y)), blawx_becomes(-basket_total(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),basket_total(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),basket_total(X,Y),datetime(eot)) :- blawx_initially(basket_total(X,Y)), blawx_ultimately(basket_total(X,Y)), blawx_becomes(-basket_total(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),basket_total(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-basket_total(X,Y),datetime(End)) :- blawx_becomes(-basket_total(X,Y),datetime(Start)), blawx_becomes(basket_total(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-basket_total(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-basket_total(X,Y),datetime(End)) :- blawx_initially(-basket_total(X,Y)), blawx_becomes(basket_total(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-basket_total(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-basket_total(X,Y),datetime(eot)) :- blawx_ultimately(-basket_total(X,Y)), blawx_becomes(basket_total(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-basket_total(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-basket_total(X,Y),datetime(eot)) :- blawx_initially(-basket_total(X,Y)), blawx_ultimately(-basket_total(X,Y)), blawx_becomes(-basket_total(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-basket_total(X,Y),datetime(eot)).
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000013" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000014"><value name="object"><block type="variable" id="l4b000015"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000016"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000017"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000018"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000019"><field name="variable_name">Scores</field></block></value><next><block type="list_aggregation" id="l4b000020"><field name="aggregation">sum</field><value name="output"><block type="variable" id="l4b000021"><field name="variable_name">Sum</field></block></value><value name="list"><block type="variable" id="l4b000022"><field name="variable_name">Scores</field></block></value></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000023"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">S 1</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000024"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="total_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has total score of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000025"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000026"><field name="variable_name">Sum</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_1_section,total_score,S,Sum) :- student(S),
+      scores(S,Scores),
+      sum_blawx_list(Scores , Sum).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,total_score,S,Sum) :- according_to(sec_1_section,total_score,S,Sum).
+
+      % BLAWX CHECK DUPLICATES
+        total_score(S,Sum) :- holds(sec_1_section,total_score,S,Sum).
+- model: blawx.workspace
+  pk: 3
+  fields:
+    ruledoc: 1
+    workspace_name: sec_2_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000027" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000028"><value name="object"><block type="variable" id="l4b000029"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000030"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000031"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000032"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000033"><field name="variable_name">Scores</field></block></value><next><block type="list_aggregation" id="l4b000034"><field name="aggregation">max</field><value name="output"><block type="variable" id="l4b000035"><field name="variable_name">Maximum</field></block></value><value name="list"><block type="variable" id="l4b000036"><field name="variable_name">Scores</field></block></value></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000037"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">S 2</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000038"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="best_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has best score of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000039"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000040"><field name="variable_name">Maximum</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_2_section,best_score,S,Maximum) :- student(S),
+      scores(S,Scores),
+      max_blawx_list(Scores , Maximum).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,best_score,S,Maximum) :- according_to(sec_2_section,best_score,S,Maximum).
+
+      % BLAWX CHECK DUPLICATES
+        best_score(S,Maximum) :- holds(sec_2_section,best_score,S,Maximum).
+- model: blawx.workspace
+  pk: 4
+  fields:
+    ruledoc: 1
+    workspace_name: sec_3_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000041" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000042"><value name="object"><block type="variable" id="l4b000043"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000044"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000045"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000046"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000047"><field name="variable_name">Scores</field></block></value><next><block type="list_aggregation" id="l4b000048"><field name="aggregation">ave</field><value name="output"><block type="variable" id="l4b000049"><field name="variable_name">Average</field></block></value><value name="list"><block type="variable" id="l4b000050"><field name="variable_name">Scores</field></block></value></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000051"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">S 3</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000052"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="average_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has average score of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000053"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000054"><field name="variable_name">Average</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_3_section,average_score,S,Average) :- student(S),
+      scores(S,Scores),
+      average_blawx_list(Scores , Average).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_3_section,average_score,S,Average) :- according_to(sec_3_section,average_score,S,Average).
+
+      % BLAWX CHECK DUPLICATES
+        average_score(S,Average) :- holds(sec_3_section,average_score,S,Average).
+- model: blawx.workspace
+  pk: 5
+  fields:
+    ruledoc: 1
+    workspace_name: sec_4_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000055" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000056"><value name="object"><block type="variable" id="l4b000057"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000058"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000059"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="average_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has average score of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000060"><field name="variable_name">S</field></block></value><value name="second_element"><block type="variable" id="l4b000061"><field name="variable_name">Averagescore</field></block></value><next><block type="numerical_constraint" id="l4b000062"><field name="operator">gte</field><value name="first_comparator"><block type="variable" id="l4b000063"><field name="variable_name">Averagescore</field></block></value><value name="second_comparator"><block type="number_value" id="l4b000064"><field name="value">50</field></block></value></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000065"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_4_section"></mutation><field name="doc_part_name">S 4</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000066"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="passes" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">passes</field><value name="first_element"><block type="variable" id="l4b000067"><field name="variable_name">S</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_4_section,passes,S) :- student(S),
+      average_score(S,Averagescore),
+      blawx_comparison(Averagescore,gte,50).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,passes,S) :- according_to(sec_4_section,passes,S).
+
+      % BLAWX CHECK DUPLICATES
+        passes(S) :- holds(sec_4_section,passes,S).
+- model: blawx.workspace
+  pk: 6
+  fields:
+    ruledoc: 1
+    workspace_name: sec_5_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000068" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000069"><value name="object"><block type="variable" id="l4b000070"><field name="variable_name">B</field></block></value><value name="category"><block type="category_selector" id="l4b000071"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="basket"></mutation><field name="category_name">basket</field></block></value><next><block type="attribute_selector" id="l4b000072"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="items" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has items of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000073"><field name="variable_name">B</field></block></value><value name="second_element"><block type="variable" id="l4b000074"><field name="variable_name">Items</field></block></value><next><block type="collect_list" id="l4b000075"><value name="list_name"><block type="variable" id="l4b000076"><field name="variable_name">L</field></block></value><value name="variable_name"><block type="variable" id="l4b000077"><field name="variable_name">Price</field></block></value><statement name="search"><block type="attribute_selector" id="l4b000078"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="basket_total_generator" attributetype="object" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">basket_total_generator</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000079"><field name="variable_name">Items</field></block></value><value name="second_element"><block type="variable" id="l4b000080"><field name="variable_name">Price</field></block></value></block></statement><next><block type="list_aggregation" id="l4b000081"><field name="aggregation">sum</field><value name="output"><block type="variable" id="l4b000082"><field name="variable_name">Sum</field></block></value><value name="list"><block type="variable" id="l4b000083"><field name="variable_name">L</field></block></value></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000084"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">S 5</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000085"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="basket_total" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has basket total of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000086"><field name="variable_name">B</field></block></value><value name="second_element"><block type="variable" id="l4b000087"><field name="variable_name">Sum</field></block></value></block></statement></block>
+      <block type="unattributed_fact" id="l4b000088" x="40" y="748"><statement name="statements"><block type="attribute_selector" id="l4b000089"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="member" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">member</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000090"><field name="variable_name">X</field></block></value><value name="second_element"><block type="head_tail" id="l4b000091"><value name="head"><block type="variable" id="l4b000092"><field name="variable_name">X</field></block></value><value name="tail"><block type="variable" id="l4b000093"><field name="variable_name">Rest</field></block></value></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000094" x="40" y="976"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="attribute_selector" id="l4b000095"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="member" attributetype="object" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">member</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000096"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000097"><field name="variable_name">Rest</field></block></value></block></statement><value name="source"><block type="doc_selector" id="l4b000098"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">S 5</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000099"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="member" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">member</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000100"><field name="variable_name">X</field></block></value><value name="second_element"><block type="head_tail" id="l4b000101"><value name="head"><block type="variable" id="l4b000102"><field name="variable_name">Head</field></block></value><value name="tail"><block type="variable" id="l4b000103"><field name="variable_name">Rest</field></block></value></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000104" x="40" y="1384"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="attribute_selector" id="l4b000105"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="member" attributetype="object" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">member</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000106"><field name="variable_name">I</field></block></value><value name="second_element"><block type="variable" id="l4b000107"><field name="variable_name">Items</field></block></value><next><block type="attribute_selector" id="l4b000108"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="price" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has price of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000109"><field name="variable_name">I</field></block></value><value name="second_element"><block type="variable" id="l4b000110"><field name="variable_name">Price</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000111"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">S 5</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000112"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="basket_total_generator" attributetype="object" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">basket_total_generator</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000113"><field name="variable_name">Items</field></block></value><value name="second_element"><block type="variable" id="l4b000114"><field name="variable_name">Price</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_5_section,basket_total,B,Sum) :- basket(B),
+      items(B,Items),
+      findall(Price ,   basket_total_generator(Items,Price) , L),
+      sum_blawx_list(L , Sum).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_5_section,basket_total,B,Sum) :- according_to(sec_5_section,basket_total,B,Sum).
+
+      % BLAWX CHECK DUPLICATES
+        basket_total(B,Sum) :- holds(sec_5_section,basket_total,B,Sum).
+
+      member(X,[X | Rest]).
+
+      according_to(sec_5_section,member,X,[Head | Rest]) :- member(X,Rest).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_5_section,member,X,[Head | Rest]) :- according_to(sec_5_section,member,X,[Head | Rest]).
+
+      % BLAWX CHECK DUPLICATES
+        member(X,[Head | Rest]) :- holds(sec_5_section,member,X,[Head | Rest]).
+
+      according_to(sec_5_section,basket_total_generator,Items,Price) :- member(I,Items),
+      price(I,Price).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_5_section,basket_total_generator,Items,Price) :- according_to(sec_5_section,basket_total_generator,Items,Price).
+
+      % BLAWX CHECK DUPLICATES
+        basket_total_generator(Items,Price) :- holds(sec_5_section,basket_total_generator,Items,Price).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: q1
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000115" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000116"><value name="object"><block type="object_selector" id="l4b000117"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="category"><block type="category_selector" id="l4b000118"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000119"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000120"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="head_tail" id="l4b000121"><value name="head"><block type="number_value" id="l4b000122"><field name="value">80</field></block></value><value name="tail"><block type="head_tail" id="l4b000123"><value name="head"><block type="number_value" id="l4b000124"><field name="value">90</field></block></value><value name="tail"><block type="head_tail" id="l4b000125"><value name="head"><block type="number_value" id="l4b000126"><field name="value">70</field></block></value><value name="tail"><block type="empty_list" id="l4b000127"></block></value></block></value></block></value></block></value></block></next></block></statement></block>
+      <block type="query" id="l4b000128" x="40" y="478"><statement name="query"><block type="attribute_selector" id="l4b000129"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="total_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has total score of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000130"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="variable" id="l4b000131"><field name="variable_name">Totalscore</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      student(s1).
+      scores(s1,[80 | [90 | [70 | []]]]).
+
+      ?- total_score(s1,Totalscore).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 2
+  fields:
+    ruledoc: 1
+    test_name: q2
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000132" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000133"><value name="object"><block type="object_selector" id="l4b000134"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="category"><block type="category_selector" id="l4b000135"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000136"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000137"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="head_tail" id="l4b000138"><value name="head"><block type="number_value" id="l4b000139"><field name="value">80</field></block></value><value name="tail"><block type="head_tail" id="l4b000140"><value name="head"><block type="number_value" id="l4b000141"><field name="value">90</field></block></value><value name="tail"><block type="head_tail" id="l4b000142"><value name="head"><block type="number_value" id="l4b000143"><field name="value">70</field></block></value><value name="tail"><block type="empty_list" id="l4b000144"></block></value></block></value></block></value></block></value></block></next></block></statement></block>
+      <block type="query" id="l4b000145" x="40" y="478"><statement name="query"><block type="attribute_selector" id="l4b000146"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="best_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has best score of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000147"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="variable" id="l4b000148"><field name="variable_name">Bestscore</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      student(s1).
+      scores(s1,[80 | [90 | [70 | []]]]).
+
+      ?- best_score(s1,Bestscore).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 3
+  fields:
+    ruledoc: 1
+    test_name: q3
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000149" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000150"><value name="object"><block type="object_selector" id="l4b000151"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="category"><block type="category_selector" id="l4b000152"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000153"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000154"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="head_tail" id="l4b000155"><value name="head"><block type="number_value" id="l4b000156"><field name="value">80</field></block></value><value name="tail"><block type="head_tail" id="l4b000157"><value name="head"><block type="number_value" id="l4b000158"><field name="value">90</field></block></value><value name="tail"><block type="head_tail" id="l4b000159"><value name="head"><block type="number_value" id="l4b000160"><field name="value">70</field></block></value><value name="tail"><block type="empty_list" id="l4b000161"></block></value></block></value></block></value></block></value></block></next></block></statement></block>
+      <block type="query" id="l4b000162" x="40" y="478"><statement name="query"><block type="attribute_selector" id="l4b000163"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="average_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has average score of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000164"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="variable" id="l4b000165"><field name="variable_name">Averagescore</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      student(s1).
+      scores(s1,[80 | [90 | [70 | []]]]).
+
+      ?- average_score(s1,Averagescore).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 4
+  fields:
+    ruledoc: 1
+    test_name: q4
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000166" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000167"><value name="object"><block type="object_selector" id="l4b000168"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="category"><block type="category_selector" id="l4b000169"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value><next><block type="attribute_selector" id="l4b000170"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000171"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value><value name="second_element"><block type="head_tail" id="l4b000172"><value name="head"><block type="number_value" id="l4b000173"><field name="value">80</field></block></value><value name="tail"><block type="head_tail" id="l4b000174"><value name="head"><block type="number_value" id="l4b000175"><field name="value">90</field></block></value><value name="tail"><block type="head_tail" id="l4b000176"><value name="head"><block type="number_value" id="l4b000177"><field name="value">70</field></block></value><value name="tail"><block type="empty_list" id="l4b000178"></block></value></block></value></block></value></block></value></block></next></block></statement></block>
+      <block type="query" id="l4b000179" x="40" y="478"><statement name="query"><block type="unary_attribute_selector" id="l4b000180"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="passes" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">passes</field><value name="first_element"><block type="object_selector" id="l4b000181"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="s1"></mutation><field name="object_name">s1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      student(s1).
+      scores(s1,[80 | [90 | [70 | []]]]).
+
+      ?- passes(s1).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 5
+  fields:
+    ruledoc: 1
+    test_name: q5
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000182" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000183"><value name="object"><block type="object_selector" id="l4b000184"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="b1"></mutation><field name="object_name">b1</field></block></value><value name="category"><block type="category_selector" id="l4b000185"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="basket"></mutation><field name="category_name">basket</field></block></value><next><block type="object_category" id="l4b000186"><value name="object"><block type="object_selector" id="l4b000187"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="i1"></mutation><field name="object_name">i1</field></block></value><value name="category"><block type="category_selector" id="l4b000188"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="item"></mutation><field name="category_name">item</field></block></value><next><block type="object_category" id="l4b000189"><value name="object"><block type="object_selector" id="l4b000190"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="i2"></mutation><field name="object_name">i2</field></block></value><value name="category"><block type="category_selector" id="l4b000191"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="item"></mutation><field name="category_name">item</field></block></value><next><block type="attribute_selector" id="l4b000192"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="price" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has price of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000193"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="i1"></mutation><field name="object_name">i1</field></block></value><value name="second_element"><block type="number_value" id="l4b000194"><field name="value">10</field></block></value><next><block type="attribute_selector" id="l4b000195"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="price" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has price of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000196"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="i2"></mutation><field name="object_name">i2</field></block></value><value name="second_element"><block type="number_value" id="l4b000197"><field name="value">25</field></block></value><next><block type="attribute_selector" id="l4b000198"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="items" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has items of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000199"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="b1"></mutation><field name="object_name">b1</field></block></value><value name="second_element"><block type="head_tail" id="l4b000200"><value name="head"><block type="object_selector" id="l4b000201"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="i1"></mutation><field name="object_name">i1</field></block></value><value name="tail"><block type="head_tail" id="l4b000202"><value name="head"><block type="object_selector" id="l4b000203"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="i2"></mutation><field name="object_name">i2</field></block></value><value name="tail"><block type="empty_list" id="l4b000204"></block></value></block></value></block></value></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000205" x="40" y="778"><statement name="query"><block type="attribute_selector" id="l4b000206"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="basket_total" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has basket total of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000207"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="b1"></mutation><field name="object_name">b1</field></block></value><value name="second_element"><block type="variable" id="l4b000208"><field name="variable_name">Baskettotal</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      basket(b1).
+      item(i1).
+      item(i2).
+      price(i1,10).
+      price(i2,25).
+      items(b1,[i1 | [i2 | []]]).
+
+      ?- basket_total(b1,Baskettotal).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 6
+  fields:
+    ruledoc: 1
+    test_name: interview
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="assume" id="l4b000209" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000210"><value name="object"><block type="variable" id="l4b000211"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000212"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="student"></mutation><field name="category_name">student</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000213" x="40" y="208"><statement name="statements"><block type="object_category" id="l4b000214"><value name="object"><block type="variable" id="l4b000215"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000216"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="item"></mutation><field name="category_name">item</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000217" x="40" y="376"><statement name="statements"><block type="object_category" id="l4b000218"><value name="object"><block type="variable" id="l4b000219"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000220"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="basket"></mutation><field name="category_name">basket</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000221" x="40" y="544"><statement name="statements"><block type="attribute_selector" id="l4b000222"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="scores" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has scores of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000223"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000224"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000225" x="40" y="712"><statement name="statements"><block type="attribute_selector" id="l4b000226"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="price" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has price of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000227"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000228"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000229" x="40" y="880"><statement name="statements"><block type="attribute_selector" id="l4b000230"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="items" attributetype="list" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has items of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000231"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000232"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="query" id="l4b000233" x="40" y="1048"><statement name="query"><block type="attribute_selector" id="l4b000234"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="total_score" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has total score of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000235"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000236"><field name="variable_name">Y</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      #abducible student(X).
+
+      #abducible item(X).
+
+      #abducible basket(X).
+
+      #abducible scores(X,Y).
+
+      #abducible price(X,Y).
+
+      #abducible items(X,Y).
+
+      ?- total_score(X,Y).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''

@@ -24,6 +24,10 @@
 
 - [Exporting Rules for Deployment](deploying-rules/exporting-rules-for-deployment.md)
 
+## Blawx Bridge
+
+- [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)
+
 ## Legalese Cloud
 
 - [OpenAI- and Anthropic-Compatible AI APIs](legalese-cloud/openai-compatible-api.md)

@@ -30,6 +30,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
+import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
@@ -56,6 +57,7 @@ data Command
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
+  | CmdBlawx      BlawxOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
 
@@ -101,6 +103,9 @@ commandParser =
       <> command "openfisca"
            (info (CmdOpenFisca <$> openFiscaOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
+      <> command "blawx"
+           (info (CmdBlawx <$> blawxOptionsParser)
+             (progDesc "Compile the decision-rule subset of an L4 file to a Blawx project (.blawx YAML + s(CASP) dump)"))
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
              (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
@@ -170,6 +175,7 @@ main = do
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
+    CmdBlawx      opts -> blawxCmd      opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 

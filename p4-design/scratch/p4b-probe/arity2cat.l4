@@ -1,0 +1,17 @@
+§ `Arity two with a category subject`
+
+ASSUME Consequence IS A TYPE
+
+GIVEN c IS A Consequence
+ASSUME `is severe` c IS A BOOLEAN
+
+GIVEN c IS A Consequence
+      n IS A NUMBER
+ASSUME `severity exceeds` c n IS A BOOLEAN
+
+@export a probe
+GIVEN c IS A Consequence
+GIVETH A BOOLEAN
+DECIDE `qualifies` c IF
+        `is severe` c
+    AND `severity exceeds` c 10

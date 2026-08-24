@@ -1,0 +1,277 @@
+§ `Imaginary Alcohol Act (record spelling)`
+
+-- The SEMANTIC TWIN of `alcohol.l4`: the same three provisions, the same
+-- decisions under the same names, spelled with `DECLARE` records instead of
+-- top-level `ASSUME`.
+--
+-- Its job is the oracle. `ASSUME` is uninterpreted, so `l4 run` cannot evaluate
+-- a decision in `alcohol.l4`, and `lowerQuery` builds a scenario only out of a
+-- record-literal query argument — so an `#EVAL` there would lower to a query
+-- with no facts. An ASSUME-shaped seed ships no evaluable directive, and
+-- pairing its zero oracles against its zero tests is a VACUOUS green: a pass
+-- reported having executed nothing.
+--
+-- Every record below is named exactly as the corresponding `ASSUME`d TYPE in
+-- `alcohol.l4`, and every field exactly as the corresponding `ASSUME` —
+-- character for character, in the same order. The two files therefore mangle to
+-- the SAME s(CASP) atoms at the SAME arities, and `etc/blawx-tier1-harness.py`
+-- runs each `#EVAL` below twice: against this file's workspaces, and with the
+-- same fact rows replayed against `alcohol.l4`'s. The `-- L4 oracle ==>` value
+-- measured here is the single expectation for both. Do not "tidy" the field
+-- names; they are an interface.
+--
+-- Measured on this tree, the two emitted `.pl` streams are byte-identical
+-- except for the provenance comment naming the source file — so "one logic,
+-- two spellings" is a measurement here, not a claim.
+--
+-- ONE THING THE TWIN CANNOT SHOW, and it is the point of the pair: under R5 a
+-- boolean RECORD FIELD and an `ASSUME`d input both emit the signed unary goal,
+-- so the epistemics agree — but only the `ASSUME` side is a module that a
+-- lawyer could have written without inventing a data structure first. The twin
+-- exists to anchor the numbers, not to replace the seed.
+
+DECLARE Person HAS
+    `the person is a body corporate` IS A BOOLEAN
+    `the person engages in business for profit` IS A BOOLEAN
+    `the person is a public house` IS A BOOLEAN
+    `the person is a hotel` IS A BOOLEAN
+    `the person has an unspent conviction for fraud` IS A BOOLEAN
+    `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS A BOOLEAN
+    `the person has an alcohol banning order` IS A BOOLEAN
+
+DECLARE Premises HAS
+    `a price list for alcohol is displayed on the premises` IS A BOOLEAN
+    `the premises are registered as a hotel` IS A BOOLEAN
+    `the enforcement officer believes that the price list is misleading to customers` IS A BOOLEAN
+    `the enforcement officer has issued a warning to the proprietor of premises` IS A BOOLEAN
+    `the proprietor corrects the price list` IS A BOOLEAN
+    `the proprietor does so to the satisfaction of the enforcement officer` IS A BOOLEAN
+    `the proprietor does so within 5 days after the warning was issued` IS A BOOLEAN
+
+@export Imaginary Alcohol Act ss (1)-(2): a body corporate engaging in business for profit, other than a public house or a hotel, must not sell alcohol if it has an unspent conviction for fraud, or an unspent conviction for providing misleading information in relation to an application for a licence under an enactment, or an alcohol banning order.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        p's `the person is a body corporate`
+    AND p's `the person engages in business for profit`
+    AND NOT p's `the person is a public house`
+    AND NOT p's `the person is a hotel`
+    AND (    p's `the person has an unspent conviction for fraud`
+          OR p's `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment`
+          OR p's `the person has an alcohol banning order`)
+
+@export Imaginary Alcohol Act s (3): where a price list for alcohol is displayed on premises registered as a hotel and the enforcement officer believes the list is misleading to customers, the officer may issue a warning to the proprietor of the premises.
+GIVEN pr IS A Premises
+GIVETH A BOOLEAN
+DECIDE `the enforcement officer may issue a warning to the proprietor of premises` IF
+        pr's `a price list for alcohol is displayed on the premises`
+    AND pr's `the premises are registered as a hotel`
+    AND pr's `the enforcement officer believes that the price list is misleading to customers`
+
+@export Imaginary Alcohol Act s (4): where a warning has been issued and it is not the case that the proprietor corrected the price list, to the satisfaction of the enforcement officer, within 5 days after the warning was issued, the officer may cancel the registration of the hotel. All three limbs must hold for the proprietor to escape — correcting the list late, or to nobody's satisfaction, leaves the registration cancellable.
+GIVEN pr IS A Premises
+GIVETH A BOOLEAN
+DECIDE `the enforcement officer may cancel the registration of the hotel` IF
+        pr's `the enforcement officer has issued a warning to the proprietor of premises`
+    AND NOT (    pr's `the proprietor corrects the price list`
+             AND pr's `the proprietor does so to the satisfaction of the enforcement officer`
+             AND pr's `the proprietor does so within 5 days after the warning was issued`)
+
+-- q1: a body corporate trading for profit, neither pub nor hotel, with an unspent fraud conviction
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS TRUE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> TRUE
+
+-- q2: the same body, but a hotel -- ss (1)-(2) does not reach it
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS TRUE,
+                     `the person has an unspent conviction for fraud` IS TRUE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q3: the same body, but a public house -- the other carve-out
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS TRUE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS TRUE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q4: the second conviction limb -- misleading information on a licence application
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS FALSE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS TRUE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> TRUE
+
+-- q5: the third limb -- an alcohol banning order
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS FALSE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS TRUE)
+-- L4 oracle ==> TRUE
+
+-- q6: no conviction and no banning order -- none of the three limbs
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS FALSE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q7: not engaging in business for profit
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS TRUE,
+                     `the person engages in business for profit` IS FALSE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS TRUE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q8: not a body corporate
+#EVAL `the person must not sell alcohol`
+        (Person WITH `the person is a body corporate` IS FALSE,
+                     `the person engages in business for profit` IS TRUE,
+                     `the person is a public house` IS FALSE,
+                     `the person is a hotel` IS FALSE,
+                     `the person has an unspent conviction for fraud` IS TRUE,
+                     `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                     `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q9: a misleading price list on premises registered as a hotel
+#EVAL `the enforcement officer may issue a warning to the proprietor of premises`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS TRUE,
+                       `the premises are registered as a hotel` IS TRUE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS TRUE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS FALSE,
+                       `the proprietor corrects the price list` IS FALSE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS FALSE,
+                       `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> TRUE
+
+-- q10: the premises are not registered as a hotel
+#EVAL `the enforcement officer may issue a warning to the proprietor of premises`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS TRUE,
+                       `the premises are registered as a hotel` IS FALSE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS TRUE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS FALSE,
+                       `the proprietor corrects the price list` IS FALSE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS FALSE,
+                       `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q11: the officer does not believe the list is misleading
+#EVAL `the enforcement officer may issue a warning to the proprietor of premises`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS TRUE,
+                       `the premises are registered as a hotel` IS TRUE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS FALSE,
+                       `the proprietor corrects the price list` IS FALSE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS FALSE,
+                       `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q12: warned, and nothing done about it
+#EVAL `the enforcement officer may cancel the registration of the hotel`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS FALSE,
+                       `the premises are registered as a hotel` IS FALSE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS TRUE,
+                       `the proprietor corrects the price list` IS FALSE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS FALSE,
+                       `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> TRUE
+
+-- q13: warned, and corrected to the officer's satisfaction within 5 days
+#EVAL `the enforcement officer may cancel the registration of the hotel`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS FALSE,
+                       `the premises are registered as a hotel` IS FALSE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS TRUE,
+                       `the proprietor corrects the price list` IS TRUE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS TRUE,
+                       `the proprietor does so within 5 days after the warning was issued` IS TRUE)
+-- L4 oracle ==> FALSE
+
+-- q14 NEGATED-CONJUNCTION PIN: corrected, to the officer's satisfaction -- but LATE.
+-- All three limbs must hold for the proprietor to escape; two do.
+#EVAL `the enforcement officer may cancel the registration of the hotel`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS FALSE,
+                       `the premises are registered as a hotel` IS FALSE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS TRUE,
+                       `the proprietor corrects the price list` IS TRUE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS TRUE,
+                       `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> TRUE
+
+-- q15: corrected in time, but not to the officer's satisfaction
+#EVAL `the enforcement officer may cancel the registration of the hotel`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS FALSE,
+                       `the premises are registered as a hotel` IS FALSE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS TRUE,
+                       `the proprietor corrects the price list` IS TRUE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS FALSE,
+                       `the proprietor does so within 5 days after the warning was issued` IS TRUE)
+-- L4 oracle ==> TRUE
+
+-- q16: no warning was ever issued -- the precondition of s (4)
+#EVAL `the enforcement officer may cancel the registration of the hotel`
+        (Premises WITH `a price list for alcohol is displayed on the premises` IS FALSE,
+                       `the premises are registered as a hotel` IS FALSE,
+                       `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                       `the enforcement officer has issued a warning to the proprietor of premises` IS FALSE,
+                       `the proprietor corrects the price list` IS FALSE,
+                       `the proprietor does so to the satisfaction of the enforcement officer` IS FALSE,
+                       `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- q17: the #ASSERT path on ss (1)-(2)
+#ASSERT `the person must not sell alcohol`
+            (Person WITH `the person is a body corporate` IS TRUE,
+                         `the person engages in business for profit` IS TRUE,
+                         `the person is a public house` IS FALSE,
+                         `the person is a hotel` IS FALSE,
+                         `the person has an unspent conviction for fraud` IS TRUE,
+                         `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS FALSE,
+                         `the person has an alcohol banning order` IS FALSE)
+-- L4 oracle ==> assertion satisfied
+
+-- q18: the #ASSERT path on s (4)'s negated conjunction
+#ASSERT `the enforcement officer may cancel the registration of the hotel`
+            (Premises WITH `a price list for alcohol is displayed on the premises` IS FALSE,
+                           `the premises are registered as a hotel` IS FALSE,
+                           `the enforcement officer believes that the price list is misleading to customers` IS FALSE,
+                           `the enforcement officer has issued a warning to the proprietor of premises` IS TRUE,
+                           `the proprietor corrects the price list` IS TRUE,
+                           `the proprietor does so to the satisfaction of the enforcement officer` IS TRUE,
+                           `the proprietor does so within 5 days after the warning was issued` IS FALSE)
+-- L4 oracle ==> assertion satisfied

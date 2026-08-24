@@ -1,0 +1,929 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: "Anti-social Behaviour, Crime and Policing Act 2014 - section 43"
+    rule_text: "Anti-social Behaviour, Crime and Policing Act 2014 - section 43\n\n1. Anti-social Behaviour, Crime and Policing Act 2014 s.43(1): an authorised person may issue a community protection notice to an individual aged 16 or over, or to a body, if satisfied on reasonable grounds that (a) the conduct of the individual or body is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality, and (b) the conduct is unreasonable.\n2. s.43(1): the notice may be given \"to an individual aged 16 or over, or to a body\". The two limbs are alternatives, and nothing else is a permissible recipient.\n3. s.43(1)(a): the conduct of the individual or body \"is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality\".\n4. s.43(1)(a), of the effect itself: it must be \"detrimental\", \"of a persistent or continuing nature\", and on \"the quality of life of those in the locality\" - all three, of the same effect.\n5. Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)"
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">person</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a person</field><next><block type="new_category_declaration" id="l4b000003"><field name="category_name">receiver</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a receiver</field><next><block type="new_category_declaration" id="l4b000004"><field name="category_name">behaviour</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a behaviour</field><next><block type="new_category_declaration" id="l4b000005"><field name="category_name">consequence</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a consequence</field><next><block type="new_attribute_declaration" id="l4b000006"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person" attribute_type="boolean"></mutation><field name="category_name">person</field><field name="attribute_name">is_authorised</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is authorised</field><next><block type="new_attribute_declaration" id="l4b000007"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver" attribute_type="boolean"></mutation><field name="category_name">receiver</field><field name="attribute_name">is_an_individual_aged_16_or_over</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is an individual aged 16 or over</field><next><block type="new_attribute_declaration" id="l4b000008"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver" attribute_type="boolean"></mutation><field name="category_name">receiver</field><field name="attribute_name">is_a_body</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is a body</field><next><block type="new_attribute_declaration" id="l4b000009"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver" attribute_type="behaviour"></mutation><field name="category_name">receiver</field><field name="attribute_name">conduct</field><field name="attribute_type">behaviour</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has conduct of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000010"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="behaviour" attribute_type="consequence"></mutation><field name="category_name">behaviour</field><field name="attribute_name">effect</field><field name="attribute_type">consequence</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has effect of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000011"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="behaviour" attribute_type="boolean"></mutation><field name="category_name">behaviour</field><field name="attribute_name">is_unreasonable</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is unreasonable</field><next><block type="new_attribute_declaration" id="l4b000012"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="consequence" attribute_type="boolean"></mutation><field name="category_name">consequence</field><field name="attribute_name">is_detrimental</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is detrimental</field><next><block type="new_attribute_declaration" id="l4b000013"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="consequence" attribute_type="boolean"></mutation><field name="category_name">consequence</field><field name="attribute_name">is_of_a_persistent_or_continuing_nature</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">is of a persistent or continuing nature</field><next><block type="new_attribute_declaration" id="l4b000014"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="consequence" attribute_type="boolean"></mutation><field name="category_name">consequence</field><field name="attribute_name">affects_the_quality_of_life_of_those_in_the_locality</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">affects the quality of life of those in the locality</field><next><block type="new_attribute_declaration" id="l4b000015"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver" attribute_type="boolean"></mutation><field name="category_name">receiver</field><field name="attribute_name">the_recipient_is_a_person_to_whom_a_notice_may_be_given</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">the recipient is a person to whom a notice may be given</field><next><block type="new_attribute_declaration" id="l4b000016"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver" attribute_type="boolean"></mutation><field name="category_name">receiver</field><field name="attribute_name">the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">the conduct is having a detrimental effect of a persistent or continuing nature</field><next><block type="new_attribute_declaration" id="l4b000017"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="consequence" attribute_type="boolean"></mutation><field name="category_name">consequence</field><field name="attribute_name">the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">the effect is detrimental persistent and affects the quality of life in the locality</field><next><block type="new_attribute_declaration" id="l4b000018"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver" attribute_type="boolean"></mutation><field name="category_name">receiver</field><field name="attribute_name">the_conduct_is_unreasonable</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">the conduct is unreasonable</field></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(person).
+      blawx_category_nlg(person,"","is a person").
+      :- dynamic person/1.
+      #pred person(X) :: '@(X) is a person'.
+      #pred holds(user,person,X) :: 'it is provided as a fact that @(X) is a person'.
+      #pred holds(user,-person,X) :: 'it is provided as a fact that it is not the case that @(X) is a person'.
+      #pred holds(Z,person,X) :: 'the conclusion in @(Z) that @(X) is a person holds'.
+      #pred holds(Z,-person,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a person holds'.
+      #pred according_to(Z,person,X) :: 'according to @(Z), @(X) is a person'.
+      #pred according_to(Z,-person,X) :: 'according to @(Z), it is not the case that @(X) is a person'.
+      #pred blawx_defeated(Z,person,X) :: 'the conclusion in @(Z) that @(X) is a person is defeated'.
+      #pred blawx_defeated(Z,-person,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a person is defeated'.
+      #pred blawx_initially(person(X)) :: 'that @(X) is a person holds initially'.
+      #pred blawx_initially(-person(X)) :: 'that it is not the case that @(X) is a person holds initially'.
+      #pred blawx_ultimately(person(X)) :: 'that @(X) is a person holds ultimately'.
+      #pred blawx_ultimately(-person(X)) :: 'that it is not the case that @(X) is a person holds ultimately'.
+      #pred blawx_as_of(person(X),T) :: 'that @(X) is a person holds at @(T)'.
+      #pred blawx_as_of(-person(X),T) :: 'that it is not the case that @(X) is a person holds at @(T)'.
+      #pred blawx_during(T1,person(X),T2) :: 'that @(X) is a person held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-person(X),T2) :: 'that it is not the case that @(X) is a person held between @(T1) and @(T2)'.
+      #pred blawx_becomes(person(X),T) :: 'that @(X) is a person became true at @(T)'.
+      #pred blawx_becomes(-person(X),T) :: 'that it is not the case that @(X) is a person became true at @(T)'.
+      #pred blawx_not_interrupted(Start,person(X),End) :: '@(X) is a person remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-person(X),End) :: 'it is not the case that @(X) is a person remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),person(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-person(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-person(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(person(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),person(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-person(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-person(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(person(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),person(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-person(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-person(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(person(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),person(X),datetime(eot)) :- blawx_initially(person(X)), blawx_ultimately(person(X)), findall(Time,blawx_becomes(-person(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-person(X),datetime(eot)) :- blawx_initially(-person(X)), blawx_ultimately(-person(X)), findall(Time,blawx_becomes(person(X),datetime(Time)),[]).
+      blawx_as_of(person(X),datetime(Time)) :- blawx_initially(person(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),person(X),datetime(BeforeT)).
+      blawx_as_of(person(X),datetime(Time)) :- blawx_becomes(person(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),person(X),datetime(Time)).
+      blawx_as_of(-person(X),datetime(Time)) :- blawx_initially(-person(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-person(X),datetime(BeforeT)).
+      blawx_as_of(-person(X),datetime(Time)) :- blawx_becomes(-person(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-person(X),datetime(Time)).
+      blawx_during(datetime(Start),person(X),datetime(End)) :- blawx_becomes(person(X),datetime(Start)), blawx_becomes(-person(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),person(X),datetime(End)).
+      blawx_during(datetime(bot),person(X),datetime(End)) :- blawx_initially(person(X)), blawx_becomes(-person(X),datetime(End)), blawx_not_interrupted(datetime(bot),person(X),datetime(End)).
+      blawx_during(datetime(Start),person(X),datetime(eot)) :- blawx_ultimately(person(X)), blawx_becomes(-person(X),datetime(Start)), blawx_not_interrupted(datetime(Start),person(X),datetime(eot)).
+      blawx_during(datetime(bot),person(X),datetime(eot)) :- blawx_initially(person(X)), blawx_ultimately(person(X)), blawx_becomes(-person(X),datetime(Start)), blawx_not_interrupted(datetime(bot),person(X),datetime(eot)).
+      blawx_during(datetime(Start),-person(X),datetime(End)) :- blawx_becomes(-person(X),datetime(Start)), blawx_becomes(person(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-person(X),datetime(End)).
+      blawx_during(datetime(bot),-person(X),datetime(End)) :- blawx_initially(-person(X)), blawx_becomes(person(X),datetime(End)), blawx_not_interrupted(datetime(bot),-person(X),datetime(End)).
+      blawx_during(datetime(Start),-person(X),datetime(eot)) :- blawx_ultimately(-person(X)), blawx_becomes(person(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-person(X),datetime(eot)).
+      blawx_during(datetime(bot),-person(X),datetime(eot)) :- blawx_initially(-person(X)), blawx_ultimately(-person(X)), blawx_becomes(-person(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-person(X),datetime(eot)).
+      blawx_category(receiver).
+      blawx_category_nlg(receiver,"","is a receiver").
+      :- dynamic receiver/1.
+      #pred receiver(X) :: '@(X) is a receiver'.
+      #pred holds(user,receiver,X) :: 'it is provided as a fact that @(X) is a receiver'.
+      #pred holds(user,-receiver,X) :: 'it is provided as a fact that it is not the case that @(X) is a receiver'.
+      #pred holds(Z,receiver,X) :: 'the conclusion in @(Z) that @(X) is a receiver holds'.
+      #pred holds(Z,-receiver,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a receiver holds'.
+      #pred according_to(Z,receiver,X) :: 'according to @(Z), @(X) is a receiver'.
+      #pred according_to(Z,-receiver,X) :: 'according to @(Z), it is not the case that @(X) is a receiver'.
+      #pred blawx_defeated(Z,receiver,X) :: 'the conclusion in @(Z) that @(X) is a receiver is defeated'.
+      #pred blawx_defeated(Z,-receiver,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a receiver is defeated'.
+      #pred blawx_initially(receiver(X)) :: 'that @(X) is a receiver holds initially'.
+      #pred blawx_initially(-receiver(X)) :: 'that it is not the case that @(X) is a receiver holds initially'.
+      #pred blawx_ultimately(receiver(X)) :: 'that @(X) is a receiver holds ultimately'.
+      #pred blawx_ultimately(-receiver(X)) :: 'that it is not the case that @(X) is a receiver holds ultimately'.
+      #pred blawx_as_of(receiver(X),T) :: 'that @(X) is a receiver holds at @(T)'.
+      #pred blawx_as_of(-receiver(X),T) :: 'that it is not the case that @(X) is a receiver holds at @(T)'.
+      #pred blawx_during(T1,receiver(X),T2) :: 'that @(X) is a receiver held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-receiver(X),T2) :: 'that it is not the case that @(X) is a receiver held between @(T1) and @(T2)'.
+      #pred blawx_becomes(receiver(X),T) :: 'that @(X) is a receiver became true at @(T)'.
+      #pred blawx_becomes(-receiver(X),T) :: 'that it is not the case that @(X) is a receiver became true at @(T)'.
+      #pred blawx_not_interrupted(Start,receiver(X),End) :: '@(X) is a receiver remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-receiver(X),End) :: 'it is not the case that @(X) is a receiver remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),receiver(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-receiver(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-receiver(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(receiver(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),receiver(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-receiver(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-receiver(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(receiver(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),receiver(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-receiver(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-receiver(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(receiver(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),receiver(X),datetime(eot)) :- blawx_initially(receiver(X)), blawx_ultimately(receiver(X)), findall(Time,blawx_becomes(-receiver(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-receiver(X),datetime(eot)) :- blawx_initially(-receiver(X)), blawx_ultimately(-receiver(X)), findall(Time,blawx_becomes(receiver(X),datetime(Time)),[]).
+      blawx_as_of(receiver(X),datetime(Time)) :- blawx_initially(receiver(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),receiver(X),datetime(BeforeT)).
+      blawx_as_of(receiver(X),datetime(Time)) :- blawx_becomes(receiver(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),receiver(X),datetime(Time)).
+      blawx_as_of(-receiver(X),datetime(Time)) :- blawx_initially(-receiver(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-receiver(X),datetime(BeforeT)).
+      blawx_as_of(-receiver(X),datetime(Time)) :- blawx_becomes(-receiver(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-receiver(X),datetime(Time)).
+      blawx_during(datetime(Start),receiver(X),datetime(End)) :- blawx_becomes(receiver(X),datetime(Start)), blawx_becomes(-receiver(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),receiver(X),datetime(End)).
+      blawx_during(datetime(bot),receiver(X),datetime(End)) :- blawx_initially(receiver(X)), blawx_becomes(-receiver(X),datetime(End)), blawx_not_interrupted(datetime(bot),receiver(X),datetime(End)).
+      blawx_during(datetime(Start),receiver(X),datetime(eot)) :- blawx_ultimately(receiver(X)), blawx_becomes(-receiver(X),datetime(Start)), blawx_not_interrupted(datetime(Start),receiver(X),datetime(eot)).
+      blawx_during(datetime(bot),receiver(X),datetime(eot)) :- blawx_initially(receiver(X)), blawx_ultimately(receiver(X)), blawx_becomes(-receiver(X),datetime(Start)), blawx_not_interrupted(datetime(bot),receiver(X),datetime(eot)).
+      blawx_during(datetime(Start),-receiver(X),datetime(End)) :- blawx_becomes(-receiver(X),datetime(Start)), blawx_becomes(receiver(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-receiver(X),datetime(End)).
+      blawx_during(datetime(bot),-receiver(X),datetime(End)) :- blawx_initially(-receiver(X)), blawx_becomes(receiver(X),datetime(End)), blawx_not_interrupted(datetime(bot),-receiver(X),datetime(End)).
+      blawx_during(datetime(Start),-receiver(X),datetime(eot)) :- blawx_ultimately(-receiver(X)), blawx_becomes(receiver(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-receiver(X),datetime(eot)).
+      blawx_during(datetime(bot),-receiver(X),datetime(eot)) :- blawx_initially(-receiver(X)), blawx_ultimately(-receiver(X)), blawx_becomes(-receiver(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-receiver(X),datetime(eot)).
+      blawx_category(behaviour).
+      blawx_category_nlg(behaviour,"","is a behaviour").
+      :- dynamic behaviour/1.
+      #pred behaviour(X) :: '@(X) is a behaviour'.
+      #pred holds(user,behaviour,X) :: 'it is provided as a fact that @(X) is a behaviour'.
+      #pred holds(user,-behaviour,X) :: 'it is provided as a fact that it is not the case that @(X) is a behaviour'.
+      #pred holds(Z,behaviour,X) :: 'the conclusion in @(Z) that @(X) is a behaviour holds'.
+      #pred holds(Z,-behaviour,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a behaviour holds'.
+      #pred according_to(Z,behaviour,X) :: 'according to @(Z), @(X) is a behaviour'.
+      #pred according_to(Z,-behaviour,X) :: 'according to @(Z), it is not the case that @(X) is a behaviour'.
+      #pred blawx_defeated(Z,behaviour,X) :: 'the conclusion in @(Z) that @(X) is a behaviour is defeated'.
+      #pred blawx_defeated(Z,-behaviour,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a behaviour is defeated'.
+      #pred blawx_initially(behaviour(X)) :: 'that @(X) is a behaviour holds initially'.
+      #pred blawx_initially(-behaviour(X)) :: 'that it is not the case that @(X) is a behaviour holds initially'.
+      #pred blawx_ultimately(behaviour(X)) :: 'that @(X) is a behaviour holds ultimately'.
+      #pred blawx_ultimately(-behaviour(X)) :: 'that it is not the case that @(X) is a behaviour holds ultimately'.
+      #pred blawx_as_of(behaviour(X),T) :: 'that @(X) is a behaviour holds at @(T)'.
+      #pred blawx_as_of(-behaviour(X),T) :: 'that it is not the case that @(X) is a behaviour holds at @(T)'.
+      #pred blawx_during(T1,behaviour(X),T2) :: 'that @(X) is a behaviour held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-behaviour(X),T2) :: 'that it is not the case that @(X) is a behaviour held between @(T1) and @(T2)'.
+      #pred blawx_becomes(behaviour(X),T) :: 'that @(X) is a behaviour became true at @(T)'.
+      #pred blawx_becomes(-behaviour(X),T) :: 'that it is not the case that @(X) is a behaviour became true at @(T)'.
+      #pred blawx_not_interrupted(Start,behaviour(X),End) :: '@(X) is a behaviour remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-behaviour(X),End) :: 'it is not the case that @(X) is a behaviour remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),behaviour(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-behaviour(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-behaviour(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(behaviour(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),behaviour(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-behaviour(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-behaviour(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(behaviour(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),behaviour(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-behaviour(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-behaviour(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(behaviour(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),behaviour(X),datetime(eot)) :- blawx_initially(behaviour(X)), blawx_ultimately(behaviour(X)), findall(Time,blawx_becomes(-behaviour(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-behaviour(X),datetime(eot)) :- blawx_initially(-behaviour(X)), blawx_ultimately(-behaviour(X)), findall(Time,blawx_becomes(behaviour(X),datetime(Time)),[]).
+      blawx_as_of(behaviour(X),datetime(Time)) :- blawx_initially(behaviour(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),behaviour(X),datetime(BeforeT)).
+      blawx_as_of(behaviour(X),datetime(Time)) :- blawx_becomes(behaviour(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),behaviour(X),datetime(Time)).
+      blawx_as_of(-behaviour(X),datetime(Time)) :- blawx_initially(-behaviour(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-behaviour(X),datetime(BeforeT)).
+      blawx_as_of(-behaviour(X),datetime(Time)) :- blawx_becomes(-behaviour(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-behaviour(X),datetime(Time)).
+      blawx_during(datetime(Start),behaviour(X),datetime(End)) :- blawx_becomes(behaviour(X),datetime(Start)), blawx_becomes(-behaviour(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),behaviour(X),datetime(End)).
+      blawx_during(datetime(bot),behaviour(X),datetime(End)) :- blawx_initially(behaviour(X)), blawx_becomes(-behaviour(X),datetime(End)), blawx_not_interrupted(datetime(bot),behaviour(X),datetime(End)).
+      blawx_during(datetime(Start),behaviour(X),datetime(eot)) :- blawx_ultimately(behaviour(X)), blawx_becomes(-behaviour(X),datetime(Start)), blawx_not_interrupted(datetime(Start),behaviour(X),datetime(eot)).
+      blawx_during(datetime(bot),behaviour(X),datetime(eot)) :- blawx_initially(behaviour(X)), blawx_ultimately(behaviour(X)), blawx_becomes(-behaviour(X),datetime(Start)), blawx_not_interrupted(datetime(bot),behaviour(X),datetime(eot)).
+      blawx_during(datetime(Start),-behaviour(X),datetime(End)) :- blawx_becomes(-behaviour(X),datetime(Start)), blawx_becomes(behaviour(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-behaviour(X),datetime(End)).
+      blawx_during(datetime(bot),-behaviour(X),datetime(End)) :- blawx_initially(-behaviour(X)), blawx_becomes(behaviour(X),datetime(End)), blawx_not_interrupted(datetime(bot),-behaviour(X),datetime(End)).
+      blawx_during(datetime(Start),-behaviour(X),datetime(eot)) :- blawx_ultimately(-behaviour(X)), blawx_becomes(behaviour(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-behaviour(X),datetime(eot)).
+      blawx_during(datetime(bot),-behaviour(X),datetime(eot)) :- blawx_initially(-behaviour(X)), blawx_ultimately(-behaviour(X)), blawx_becomes(-behaviour(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-behaviour(X),datetime(eot)).
+      blawx_category(consequence).
+      blawx_category_nlg(consequence,"","is a consequence").
+      :- dynamic consequence/1.
+      #pred consequence(X) :: '@(X) is a consequence'.
+      #pred holds(user,consequence,X) :: 'it is provided as a fact that @(X) is a consequence'.
+      #pred holds(user,-consequence,X) :: 'it is provided as a fact that it is not the case that @(X) is a consequence'.
+      #pred holds(Z,consequence,X) :: 'the conclusion in @(Z) that @(X) is a consequence holds'.
+      #pred holds(Z,-consequence,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a consequence holds'.
+      #pred according_to(Z,consequence,X) :: 'according to @(Z), @(X) is a consequence'.
+      #pred according_to(Z,-consequence,X) :: 'according to @(Z), it is not the case that @(X) is a consequence'.
+      #pred blawx_defeated(Z,consequence,X) :: 'the conclusion in @(Z) that @(X) is a consequence is defeated'.
+      #pred blawx_defeated(Z,-consequence,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a consequence is defeated'.
+      #pred blawx_initially(consequence(X)) :: 'that @(X) is a consequence holds initially'.
+      #pred blawx_initially(-consequence(X)) :: 'that it is not the case that @(X) is a consequence holds initially'.
+      #pred blawx_ultimately(consequence(X)) :: 'that @(X) is a consequence holds ultimately'.
+      #pred blawx_ultimately(-consequence(X)) :: 'that it is not the case that @(X) is a consequence holds ultimately'.
+      #pred blawx_as_of(consequence(X),T) :: 'that @(X) is a consequence holds at @(T)'.
+      #pred blawx_as_of(-consequence(X),T) :: 'that it is not the case that @(X) is a consequence holds at @(T)'.
+      #pred blawx_during(T1,consequence(X),T2) :: 'that @(X) is a consequence held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-consequence(X),T2) :: 'that it is not the case that @(X) is a consequence held between @(T1) and @(T2)'.
+      #pred blawx_becomes(consequence(X),T) :: 'that @(X) is a consequence became true at @(T)'.
+      #pred blawx_becomes(-consequence(X),T) :: 'that it is not the case that @(X) is a consequence became true at @(T)'.
+      #pred blawx_not_interrupted(Start,consequence(X),End) :: '@(X) is a consequence remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-consequence(X),End) :: 'it is not the case that @(X) is a consequence remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),consequence(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-consequence(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-consequence(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(consequence(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),consequence(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-consequence(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-consequence(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(consequence(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),consequence(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-consequence(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-consequence(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(consequence(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),consequence(X),datetime(eot)) :- blawx_initially(consequence(X)), blawx_ultimately(consequence(X)), findall(Time,blawx_becomes(-consequence(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-consequence(X),datetime(eot)) :- blawx_initially(-consequence(X)), blawx_ultimately(-consequence(X)), findall(Time,blawx_becomes(consequence(X),datetime(Time)),[]).
+      blawx_as_of(consequence(X),datetime(Time)) :- blawx_initially(consequence(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),consequence(X),datetime(BeforeT)).
+      blawx_as_of(consequence(X),datetime(Time)) :- blawx_becomes(consequence(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),consequence(X),datetime(Time)).
+      blawx_as_of(-consequence(X),datetime(Time)) :- blawx_initially(-consequence(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-consequence(X),datetime(BeforeT)).
+      blawx_as_of(-consequence(X),datetime(Time)) :- blawx_becomes(-consequence(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-consequence(X),datetime(Time)).
+      blawx_during(datetime(Start),consequence(X),datetime(End)) :- blawx_becomes(consequence(X),datetime(Start)), blawx_becomes(-consequence(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),consequence(X),datetime(End)).
+      blawx_during(datetime(bot),consequence(X),datetime(End)) :- blawx_initially(consequence(X)), blawx_becomes(-consequence(X),datetime(End)), blawx_not_interrupted(datetime(bot),consequence(X),datetime(End)).
+      blawx_during(datetime(Start),consequence(X),datetime(eot)) :- blawx_ultimately(consequence(X)), blawx_becomes(-consequence(X),datetime(Start)), blawx_not_interrupted(datetime(Start),consequence(X),datetime(eot)).
+      blawx_during(datetime(bot),consequence(X),datetime(eot)) :- blawx_initially(consequence(X)), blawx_ultimately(consequence(X)), blawx_becomes(-consequence(X),datetime(Start)), blawx_not_interrupted(datetime(bot),consequence(X),datetime(eot)).
+      blawx_during(datetime(Start),-consequence(X),datetime(End)) :- blawx_becomes(-consequence(X),datetime(Start)), blawx_becomes(consequence(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-consequence(X),datetime(End)).
+      blawx_during(datetime(bot),-consequence(X),datetime(End)) :- blawx_initially(-consequence(X)), blawx_becomes(consequence(X),datetime(End)), blawx_not_interrupted(datetime(bot),-consequence(X),datetime(End)).
+      blawx_during(datetime(Start),-consequence(X),datetime(eot)) :- blawx_ultimately(-consequence(X)), blawx_becomes(consequence(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-consequence(X),datetime(eot)).
+      blawx_during(datetime(bot),-consequence(X),datetime(eot)) :- blawx_initially(-consequence(X)), blawx_ultimately(-consequence(X)), blawx_becomes(-consequence(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-consequence(X),datetime(eot)).
+      blawx_attribute(person,is_authorised,boolean).
+      blawx_attribute_nlg(is_authorised,not_applicable,"",not_applicable,"is authorised").
+      :- dynamic is_authorised/1.
+      #pred is_authorised(X) :: '@(X) is authorised'.
+      #pred holds(user,is_authorised,X) :: 'it is provided as a fact that @(X) is authorised'.
+      #pred holds(user,-is_authorised,X) :: 'it is provided as a fact that it is not the case that @(X) is authorised'.
+      #pred holds(Z,is_authorised,X) :: 'the conclusion in @(Z) that @(X) is authorised holds'.
+      #pred holds(Z,-is_authorised,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is authorised holds'.
+      #pred according_to(Z,is_authorised,X) :: 'according to @(Z), @(X) is authorised'.
+      #pred according_to(Z,-is_authorised,X) :: 'according to @(Z), it is not the case that @(X) is authorised'.
+      #pred blawx_defeated(Z,is_authorised,X) :: 'the conclusion in @(Z) that @(X) is authorised is defeated'.
+      #pred blawx_defeated(Z,-is_authorised,X) :: 'the conclusion in @(Z) that @(X) is authorised is defeated'.
+      #pred blawx_initially(is_authorised(X)) :: 'that @(X) is authorised holds initially'.
+      #pred blawx_initially(-is_authorised(X)) :: 'that it is not the case that @(X) is authorised holds initially'.
+      #pred blawx_ultimately(is_authorised(X)) :: 'that @(X) is authorised holds ultimately'.
+      #pred blawx_ultimately(-is_authorised(X)) :: 'that it is not the case that @(X) is authorised holds ultimately'.
+      #pred blawx_as_of(is_authorised(X),T) :: 'that @(X) is authorised holds at @(T)'.
+      #pred blawx_as_of(-is_authorised(X),T) :: 'that it is not the case that @(X) is authorised holds at @(T)'.
+      #pred blawx_during(T1,is_authorised(X),T2) :: 'that @(X) is authorised held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_authorised(X),T2) :: 'that it is not the case that @(X) is authorised held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_authorised(X),T) :: 'that @(X) is authorised became true at @(T)'.
+      #pred blawx_becomes(-is_authorised(X),T) :: 'that it is not the case that @(X) is authorised became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_authorised(X),End) :: '@(X) is authorised remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_authorised(X),End) :: 'it is not the case that @(X) is authorised remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_authorised(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_authorised(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_authorised(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_authorised(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_authorised(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_authorised(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_authorised(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_authorised(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_authorised(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_authorised(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_authorised(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_authorised(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_authorised(X),datetime(eot)) :- blawx_initially(is_authorised(X)), blawx_ultimately(is_authorised(X)), findall(Time,blawx_becomes(-is_authorised(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_authorised(X),datetime(eot)) :- blawx_initially(-is_authorised(X)), blawx_ultimately(-is_authorised(X)), findall(Time,blawx_becomes(is_authorised(X),datetime(Time)),[]).
+      blawx_as_of(is_authorised(X),datetime(Time)) :- blawx_initially(is_authorised(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_authorised(X),datetime(BeforeT)).
+      blawx_as_of(is_authorised(X),datetime(Time)) :- blawx_becomes(is_authorised(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_authorised(X),datetime(Time)).
+      blawx_as_of(-is_authorised(X),datetime(Time)) :- blawx_initially(-is_authorised(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_authorised(X),datetime(BeforeT)).
+      blawx_as_of(-is_authorised(X),datetime(Time)) :- blawx_becomes(-is_authorised(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_authorised(X),datetime(Time)).
+      blawx_during(datetime(Start),is_authorised(X),datetime(End)) :- blawx_becomes(is_authorised(X),datetime(Start)), blawx_becomes(-is_authorised(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_authorised(X),datetime(End)).
+      blawx_during(datetime(bot),is_authorised(X),datetime(End)) :- blawx_initially(is_authorised(X)), blawx_becomes(-is_authorised(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_authorised(X),datetime(End)).
+      blawx_during(datetime(Start),is_authorised(X),datetime(eot)) :- blawx_ultimately(is_authorised(X)), blawx_becomes(-is_authorised(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_authorised(X),datetime(eot)).
+      blawx_during(datetime(bot),is_authorised(X),datetime(eot)) :- blawx_initially(is_authorised(X)), blawx_ultimately(is_authorised(X)), blawx_becomes(-is_authorised(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_authorised(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_authorised(X),datetime(End)) :- blawx_becomes(-is_authorised(X),datetime(Start)), blawx_becomes(is_authorised(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_authorised(X),datetime(End)).
+      blawx_during(datetime(bot),-is_authorised(X),datetime(End)) :- blawx_initially(-is_authorised(X)), blawx_becomes(is_authorised(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_authorised(X),datetime(End)).
+      blawx_during(datetime(Start),-is_authorised(X),datetime(eot)) :- blawx_ultimately(-is_authorised(X)), blawx_becomes(is_authorised(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_authorised(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_authorised(X),datetime(eot)) :- blawx_initially(-is_authorised(X)), blawx_ultimately(-is_authorised(X)), blawx_becomes(-is_authorised(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_authorised(X),datetime(eot)).
+      blawx_attribute(receiver,is_an_individual_aged_16_or_over,boolean).
+      blawx_attribute_nlg(is_an_individual_aged_16_or_over,not_applicable,"",not_applicable,"is an individual aged 16 or over").
+      :- dynamic is_an_individual_aged_16_or_over/1.
+      #pred is_an_individual_aged_16_or_over(X) :: '@(X) is an individual aged 16 or over'.
+      #pred holds(user,is_an_individual_aged_16_or_over,X) :: 'it is provided as a fact that @(X) is an individual aged 16 or over'.
+      #pred holds(user,-is_an_individual_aged_16_or_over,X) :: 'it is provided as a fact that it is not the case that @(X) is an individual aged 16 or over'.
+      #pred holds(Z,is_an_individual_aged_16_or_over,X) :: 'the conclusion in @(Z) that @(X) is an individual aged 16 or over holds'.
+      #pred holds(Z,-is_an_individual_aged_16_or_over,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is an individual aged 16 or over holds'.
+      #pred according_to(Z,is_an_individual_aged_16_or_over,X) :: 'according to @(Z), @(X) is an individual aged 16 or over'.
+      #pred according_to(Z,-is_an_individual_aged_16_or_over,X) :: 'according to @(Z), it is not the case that @(X) is an individual aged 16 or over'.
+      #pred blawx_defeated(Z,is_an_individual_aged_16_or_over,X) :: 'the conclusion in @(Z) that @(X) is an individual aged 16 or over is defeated'.
+      #pred blawx_defeated(Z,-is_an_individual_aged_16_or_over,X) :: 'the conclusion in @(Z) that @(X) is an individual aged 16 or over is defeated'.
+      #pred blawx_initially(is_an_individual_aged_16_or_over(X)) :: 'that @(X) is an individual aged 16 or over holds initially'.
+      #pred blawx_initially(-is_an_individual_aged_16_or_over(X)) :: 'that it is not the case that @(X) is an individual aged 16 or over holds initially'.
+      #pred blawx_ultimately(is_an_individual_aged_16_or_over(X)) :: 'that @(X) is an individual aged 16 or over holds ultimately'.
+      #pred blawx_ultimately(-is_an_individual_aged_16_or_over(X)) :: 'that it is not the case that @(X) is an individual aged 16 or over holds ultimately'.
+      #pred blawx_as_of(is_an_individual_aged_16_or_over(X),T) :: 'that @(X) is an individual aged 16 or over holds at @(T)'.
+      #pred blawx_as_of(-is_an_individual_aged_16_or_over(X),T) :: 'that it is not the case that @(X) is an individual aged 16 or over holds at @(T)'.
+      #pred blawx_during(T1,is_an_individual_aged_16_or_over(X),T2) :: 'that @(X) is an individual aged 16 or over held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_an_individual_aged_16_or_over(X),T2) :: 'that it is not the case that @(X) is an individual aged 16 or over held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_an_individual_aged_16_or_over(X),T) :: 'that @(X) is an individual aged 16 or over became true at @(T)'.
+      #pred blawx_becomes(-is_an_individual_aged_16_or_over(X),T) :: 'that it is not the case that @(X) is an individual aged 16 or over became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_an_individual_aged_16_or_over(X),End) :: '@(X) is an individual aged 16 or over remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_an_individual_aged_16_or_over(X),End) :: 'it is not the case that @(X) is an individual aged 16 or over remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_an_individual_aged_16_or_over(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_an_individual_aged_16_or_over(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_an_individual_aged_16_or_over(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_an_individual_aged_16_or_over(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(eot)) :- blawx_initially(is_an_individual_aged_16_or_over(X)), blawx_ultimately(is_an_individual_aged_16_or_over(X)), findall(Time,blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(eot)) :- blawx_initially(-is_an_individual_aged_16_or_over(X)), blawx_ultimately(-is_an_individual_aged_16_or_over(X)), findall(Time,blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(Time)),[]).
+      blawx_as_of(is_an_individual_aged_16_or_over(X),datetime(Time)) :- blawx_initially(is_an_individual_aged_16_or_over(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(BeforeT)).
+      blawx_as_of(is_an_individual_aged_16_or_over(X),datetime(Time)) :- blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_an_individual_aged_16_or_over(X),datetime(Time)).
+      blawx_as_of(-is_an_individual_aged_16_or_over(X),datetime(Time)) :- blawx_initially(-is_an_individual_aged_16_or_over(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(BeforeT)).
+      blawx_as_of(-is_an_individual_aged_16_or_over(X),datetime(Time)) :- blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_an_individual_aged_16_or_over(X),datetime(Time)).
+      blawx_during(datetime(Start),is_an_individual_aged_16_or_over(X),datetime(End)) :- blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(Start)), blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_an_individual_aged_16_or_over(X),datetime(End)).
+      blawx_during(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(End)) :- blawx_initially(is_an_individual_aged_16_or_over(X)), blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(End)).
+      blawx_during(datetime(Start),is_an_individual_aged_16_or_over(X),datetime(eot)) :- blawx_ultimately(is_an_individual_aged_16_or_over(X)), blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_an_individual_aged_16_or_over(X),datetime(eot)).
+      blawx_during(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(eot)) :- blawx_initially(is_an_individual_aged_16_or_over(X)), blawx_ultimately(is_an_individual_aged_16_or_over(X)), blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_an_individual_aged_16_or_over(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_an_individual_aged_16_or_over(X),datetime(End)) :- blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Start)), blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_an_individual_aged_16_or_over(X),datetime(End)).
+      blawx_during(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(End)) :- blawx_initially(-is_an_individual_aged_16_or_over(X)), blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(End)).
+      blawx_during(datetime(Start),-is_an_individual_aged_16_or_over(X),datetime(eot)) :- blawx_ultimately(-is_an_individual_aged_16_or_over(X)), blawx_becomes(is_an_individual_aged_16_or_over(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_an_individual_aged_16_or_over(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(eot)) :- blawx_initially(-is_an_individual_aged_16_or_over(X)), blawx_ultimately(-is_an_individual_aged_16_or_over(X)), blawx_becomes(-is_an_individual_aged_16_or_over(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_an_individual_aged_16_or_over(X),datetime(eot)).
+      blawx_attribute(receiver,is_a_body,boolean).
+      blawx_attribute_nlg(is_a_body,not_applicable,"",not_applicable,"is a body").
+      :- dynamic is_a_body/1.
+      #pred is_a_body(X) :: '@(X) is a body'.
+      #pred holds(user,is_a_body,X) :: 'it is provided as a fact that @(X) is a body'.
+      #pred holds(user,-is_a_body,X) :: 'it is provided as a fact that it is not the case that @(X) is a body'.
+      #pred holds(Z,is_a_body,X) :: 'the conclusion in @(Z) that @(X) is a body holds'.
+      #pred holds(Z,-is_a_body,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a body holds'.
+      #pred according_to(Z,is_a_body,X) :: 'according to @(Z), @(X) is a body'.
+      #pred according_to(Z,-is_a_body,X) :: 'according to @(Z), it is not the case that @(X) is a body'.
+      #pred blawx_defeated(Z,is_a_body,X) :: 'the conclusion in @(Z) that @(X) is a body is defeated'.
+      #pred blawx_defeated(Z,-is_a_body,X) :: 'the conclusion in @(Z) that @(X) is a body is defeated'.
+      #pred blawx_initially(is_a_body(X)) :: 'that @(X) is a body holds initially'.
+      #pred blawx_initially(-is_a_body(X)) :: 'that it is not the case that @(X) is a body holds initially'.
+      #pred blawx_ultimately(is_a_body(X)) :: 'that @(X) is a body holds ultimately'.
+      #pred blawx_ultimately(-is_a_body(X)) :: 'that it is not the case that @(X) is a body holds ultimately'.
+      #pred blawx_as_of(is_a_body(X),T) :: 'that @(X) is a body holds at @(T)'.
+      #pred blawx_as_of(-is_a_body(X),T) :: 'that it is not the case that @(X) is a body holds at @(T)'.
+      #pred blawx_during(T1,is_a_body(X),T2) :: 'that @(X) is a body held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_a_body(X),T2) :: 'that it is not the case that @(X) is a body held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_a_body(X),T) :: 'that @(X) is a body became true at @(T)'.
+      #pred blawx_becomes(-is_a_body(X),T) :: 'that it is not the case that @(X) is a body became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_a_body(X),End) :: '@(X) is a body remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_a_body(X),End) :: 'it is not the case that @(X) is a body remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_a_body(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_a_body(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_a_body(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_a_body(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_a_body(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_a_body(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_a_body(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_a_body(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_a_body(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_a_body(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_a_body(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_a_body(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_a_body(X),datetime(eot)) :- blawx_initially(is_a_body(X)), blawx_ultimately(is_a_body(X)), findall(Time,blawx_becomes(-is_a_body(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_a_body(X),datetime(eot)) :- blawx_initially(-is_a_body(X)), blawx_ultimately(-is_a_body(X)), findall(Time,blawx_becomes(is_a_body(X),datetime(Time)),[]).
+      blawx_as_of(is_a_body(X),datetime(Time)) :- blawx_initially(is_a_body(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_a_body(X),datetime(BeforeT)).
+      blawx_as_of(is_a_body(X),datetime(Time)) :- blawx_becomes(is_a_body(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_a_body(X),datetime(Time)).
+      blawx_as_of(-is_a_body(X),datetime(Time)) :- blawx_initially(-is_a_body(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_a_body(X),datetime(BeforeT)).
+      blawx_as_of(-is_a_body(X),datetime(Time)) :- blawx_becomes(-is_a_body(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_a_body(X),datetime(Time)).
+      blawx_during(datetime(Start),is_a_body(X),datetime(End)) :- blawx_becomes(is_a_body(X),datetime(Start)), blawx_becomes(-is_a_body(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_a_body(X),datetime(End)).
+      blawx_during(datetime(bot),is_a_body(X),datetime(End)) :- blawx_initially(is_a_body(X)), blawx_becomes(-is_a_body(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_a_body(X),datetime(End)).
+      blawx_during(datetime(Start),is_a_body(X),datetime(eot)) :- blawx_ultimately(is_a_body(X)), blawx_becomes(-is_a_body(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_a_body(X),datetime(eot)).
+      blawx_during(datetime(bot),is_a_body(X),datetime(eot)) :- blawx_initially(is_a_body(X)), blawx_ultimately(is_a_body(X)), blawx_becomes(-is_a_body(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_a_body(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_a_body(X),datetime(End)) :- blawx_becomes(-is_a_body(X),datetime(Start)), blawx_becomes(is_a_body(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_a_body(X),datetime(End)).
+      blawx_during(datetime(bot),-is_a_body(X),datetime(End)) :- blawx_initially(-is_a_body(X)), blawx_becomes(is_a_body(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_a_body(X),datetime(End)).
+      blawx_during(datetime(Start),-is_a_body(X),datetime(eot)) :- blawx_ultimately(-is_a_body(X)), blawx_becomes(is_a_body(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_a_body(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_a_body(X),datetime(eot)) :- blawx_initially(-is_a_body(X)), blawx_ultimately(-is_a_body(X)), blawx_becomes(-is_a_body(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_a_body(X),datetime(eot)).
+      blawx_attribute(receiver,conduct,behaviour).
+      blawx_attribute_nlg(conduct,ov,"","has conduct of","").
+      :- dynamic conduct/2.
+      #pred conduct(X,Y) :: '@(X) has conduct of @(Y)'.
+      #pred holds(user,conduct,X,Y) :: 'it is provided as a fact that @(X) has conduct of @(Y)'.
+      #pred holds(user,-conduct,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has conduct of @(Y)'.
+      #pred holds(Z,conduct,X,Y) :: 'the conclusion in @(Z) that @(X) has conduct of @(Y) holds'.
+      #pred holds(Z,-conduct,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has conduct of @(Y) holds'.
+      #pred according_to(Z,conduct,X,Y) :: 'according to @(Z), @(X) has conduct of @(Y)'.
+      #pred according_to(Z,-conduct,X,Y) :: 'according to @(Z), it is not the case that @(X) has conduct of @(Y)'.
+      #pred blawx_defeated(Z,conduct,X,Y) :: 'the conclusion in @(Z) that @(X) has conduct of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-conduct,X,Y) :: 'the conclusion in @(Z) that @(X) has conduct of @(Y) is defeated'.
+      #pred blawx_initially(conduct(X,Y)) :: 'that @(X) has conduct of @(Y) holds initially'.
+      #pred blawx_initially(-conduct(X,Y)) :: 'that it is not the case that @(X) has conduct of @(Y) holds initially'.
+      #pred blawx_ultimately(conduct(X,Y)) :: 'that @(X) has conduct of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-conduct(X,Y)) :: 'that it is not the case that @(X) has conduct of @(Y) holds ultimately'.
+      #pred blawx_as_of(conduct(X,Y),T) :: 'that @(X) has conduct of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-conduct(X,Y),T) :: 'that it is not the case that @(X) has conduct of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,conduct(X,Y),T2) :: 'that @(X) has conduct of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-conduct(X,Y),T2) :: 'that it is not the case that @(X) has conduct of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(conduct(X,Y),T) :: 'that @(X) has conduct of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-conduct(X,Y),T) :: 'that it is not the case that @(X) has conduct of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,conduct(X,Y),End) :: '@(X) has conduct of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-conduct(X,Y),End) :: 'it is not the case that @(X) has conduct of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),conduct(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-conduct(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-conduct(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(conduct(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),conduct(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-conduct(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-conduct(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(conduct(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),conduct(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-conduct(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-conduct(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(conduct(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),conduct(X,Y),datetime(eot)) :- blawx_initially(conduct(X,Y)), blawx_ultimately(conduct(X,Y)), findall(Time,blawx_becomes(-conduct(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-conduct(X,Y),datetime(eot)) :- blawx_initially(-conduct(X,Y)), blawx_ultimately(-conduct(X,Y)), findall(Time,blawx_becomes(conduct(X,Y),datetime(Time)),[]).
+      blawx_as_of(conduct(X,Y),datetime(Time)) :- blawx_initially(conduct(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),conduct(X,Y),datetime(BeforeT)).
+      blawx_as_of(conduct(X,Y),datetime(Time)) :- blawx_becomes(conduct(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),conduct(X,Y),datetime(Time)).
+      blawx_as_of(-conduct(X,Y),datetime(Time)) :- blawx_initially(-conduct(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-conduct(X,Y),datetime(BeforeT)).
+      blawx_as_of(-conduct(X,Y),datetime(Time)) :- blawx_becomes(-conduct(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-conduct(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),conduct(X,Y),datetime(End)) :- blawx_becomes(conduct(X,Y),datetime(Start)), blawx_becomes(-conduct(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),conduct(X,Y),datetime(End)).
+      blawx_during(datetime(bot),conduct(X,Y),datetime(End)) :- blawx_initially(conduct(X,Y)), blawx_becomes(-conduct(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),conduct(X,Y),datetime(End)).
+      blawx_during(datetime(Start),conduct(X,Y),datetime(eot)) :- blawx_ultimately(conduct(X,Y)), blawx_becomes(-conduct(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),conduct(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),conduct(X,Y),datetime(eot)) :- blawx_initially(conduct(X,Y)), blawx_ultimately(conduct(X,Y)), blawx_becomes(-conduct(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),conduct(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-conduct(X,Y),datetime(End)) :- blawx_becomes(-conduct(X,Y),datetime(Start)), blawx_becomes(conduct(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-conduct(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-conduct(X,Y),datetime(End)) :- blawx_initially(-conduct(X,Y)), blawx_becomes(conduct(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-conduct(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-conduct(X,Y),datetime(eot)) :- blawx_ultimately(-conduct(X,Y)), blawx_becomes(conduct(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-conduct(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-conduct(X,Y),datetime(eot)) :- blawx_initially(-conduct(X,Y)), blawx_ultimately(-conduct(X,Y)), blawx_becomes(-conduct(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-conduct(X,Y),datetime(eot)).
+      blawx_attribute(behaviour,effect,consequence).
+      blawx_attribute_nlg(effect,ov,"","has effect of","").
+      :- dynamic effect/2.
+      #pred effect(X,Y) :: '@(X) has effect of @(Y)'.
+      #pred holds(user,effect,X,Y) :: 'it is provided as a fact that @(X) has effect of @(Y)'.
+      #pred holds(user,-effect,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has effect of @(Y)'.
+      #pred holds(Z,effect,X,Y) :: 'the conclusion in @(Z) that @(X) has effect of @(Y) holds'.
+      #pred holds(Z,-effect,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has effect of @(Y) holds'.
+      #pred according_to(Z,effect,X,Y) :: 'according to @(Z), @(X) has effect of @(Y)'.
+      #pred according_to(Z,-effect,X,Y) :: 'according to @(Z), it is not the case that @(X) has effect of @(Y)'.
+      #pred blawx_defeated(Z,effect,X,Y) :: 'the conclusion in @(Z) that @(X) has effect of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-effect,X,Y) :: 'the conclusion in @(Z) that @(X) has effect of @(Y) is defeated'.
+      #pred blawx_initially(effect(X,Y)) :: 'that @(X) has effect of @(Y) holds initially'.
+      #pred blawx_initially(-effect(X,Y)) :: 'that it is not the case that @(X) has effect of @(Y) holds initially'.
+      #pred blawx_ultimately(effect(X,Y)) :: 'that @(X) has effect of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-effect(X,Y)) :: 'that it is not the case that @(X) has effect of @(Y) holds ultimately'.
+      #pred blawx_as_of(effect(X,Y),T) :: 'that @(X) has effect of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-effect(X,Y),T) :: 'that it is not the case that @(X) has effect of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,effect(X,Y),T2) :: 'that @(X) has effect of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-effect(X,Y),T2) :: 'that it is not the case that @(X) has effect of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(effect(X,Y),T) :: 'that @(X) has effect of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-effect(X,Y),T) :: 'that it is not the case that @(X) has effect of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,effect(X,Y),End) :: '@(X) has effect of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-effect(X,Y),End) :: 'it is not the case that @(X) has effect of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),effect(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-effect(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-effect(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(effect(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),effect(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-effect(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-effect(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(effect(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),effect(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-effect(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-effect(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(effect(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),effect(X,Y),datetime(eot)) :- blawx_initially(effect(X,Y)), blawx_ultimately(effect(X,Y)), findall(Time,blawx_becomes(-effect(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-effect(X,Y),datetime(eot)) :- blawx_initially(-effect(X,Y)), blawx_ultimately(-effect(X,Y)), findall(Time,blawx_becomes(effect(X,Y),datetime(Time)),[]).
+      blawx_as_of(effect(X,Y),datetime(Time)) :- blawx_initially(effect(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),effect(X,Y),datetime(BeforeT)).
+      blawx_as_of(effect(X,Y),datetime(Time)) :- blawx_becomes(effect(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),effect(X,Y),datetime(Time)).
+      blawx_as_of(-effect(X,Y),datetime(Time)) :- blawx_initially(-effect(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-effect(X,Y),datetime(BeforeT)).
+      blawx_as_of(-effect(X,Y),datetime(Time)) :- blawx_becomes(-effect(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-effect(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),effect(X,Y),datetime(End)) :- blawx_becomes(effect(X,Y),datetime(Start)), blawx_becomes(-effect(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),effect(X,Y),datetime(End)).
+      blawx_during(datetime(bot),effect(X,Y),datetime(End)) :- blawx_initially(effect(X,Y)), blawx_becomes(-effect(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),effect(X,Y),datetime(End)).
+      blawx_during(datetime(Start),effect(X,Y),datetime(eot)) :- blawx_ultimately(effect(X,Y)), blawx_becomes(-effect(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),effect(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),effect(X,Y),datetime(eot)) :- blawx_initially(effect(X,Y)), blawx_ultimately(effect(X,Y)), blawx_becomes(-effect(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),effect(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-effect(X,Y),datetime(End)) :- blawx_becomes(-effect(X,Y),datetime(Start)), blawx_becomes(effect(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-effect(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-effect(X,Y),datetime(End)) :- blawx_initially(-effect(X,Y)), blawx_becomes(effect(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-effect(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-effect(X,Y),datetime(eot)) :- blawx_ultimately(-effect(X,Y)), blawx_becomes(effect(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-effect(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-effect(X,Y),datetime(eot)) :- blawx_initially(-effect(X,Y)), blawx_ultimately(-effect(X,Y)), blawx_becomes(-effect(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-effect(X,Y),datetime(eot)).
+      blawx_attribute(behaviour,is_unreasonable,boolean).
+      blawx_attribute_nlg(is_unreasonable,not_applicable,"",not_applicable,"is unreasonable").
+      :- dynamic is_unreasonable/1.
+      #pred is_unreasonable(X) :: '@(X) is unreasonable'.
+      #pred holds(user,is_unreasonable,X) :: 'it is provided as a fact that @(X) is unreasonable'.
+      #pred holds(user,-is_unreasonable,X) :: 'it is provided as a fact that it is not the case that @(X) is unreasonable'.
+      #pred holds(Z,is_unreasonable,X) :: 'the conclusion in @(Z) that @(X) is unreasonable holds'.
+      #pred holds(Z,-is_unreasonable,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is unreasonable holds'.
+      #pred according_to(Z,is_unreasonable,X) :: 'according to @(Z), @(X) is unreasonable'.
+      #pred according_to(Z,-is_unreasonable,X) :: 'according to @(Z), it is not the case that @(X) is unreasonable'.
+      #pred blawx_defeated(Z,is_unreasonable,X) :: 'the conclusion in @(Z) that @(X) is unreasonable is defeated'.
+      #pred blawx_defeated(Z,-is_unreasonable,X) :: 'the conclusion in @(Z) that @(X) is unreasonable is defeated'.
+      #pred blawx_initially(is_unreasonable(X)) :: 'that @(X) is unreasonable holds initially'.
+      #pred blawx_initially(-is_unreasonable(X)) :: 'that it is not the case that @(X) is unreasonable holds initially'.
+      #pred blawx_ultimately(is_unreasonable(X)) :: 'that @(X) is unreasonable holds ultimately'.
+      #pred blawx_ultimately(-is_unreasonable(X)) :: 'that it is not the case that @(X) is unreasonable holds ultimately'.
+      #pred blawx_as_of(is_unreasonable(X),T) :: 'that @(X) is unreasonable holds at @(T)'.
+      #pred blawx_as_of(-is_unreasonable(X),T) :: 'that it is not the case that @(X) is unreasonable holds at @(T)'.
+      #pred blawx_during(T1,is_unreasonable(X),T2) :: 'that @(X) is unreasonable held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_unreasonable(X),T2) :: 'that it is not the case that @(X) is unreasonable held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_unreasonable(X),T) :: 'that @(X) is unreasonable became true at @(T)'.
+      #pred blawx_becomes(-is_unreasonable(X),T) :: 'that it is not the case that @(X) is unreasonable became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_unreasonable(X),End) :: '@(X) is unreasonable remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_unreasonable(X),End) :: 'it is not the case that @(X) is unreasonable remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_unreasonable(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_unreasonable(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_unreasonable(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_unreasonable(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_unreasonable(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_unreasonable(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_unreasonable(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_unreasonable(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_unreasonable(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_unreasonable(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_unreasonable(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_unreasonable(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_unreasonable(X),datetime(eot)) :- blawx_initially(is_unreasonable(X)), blawx_ultimately(is_unreasonable(X)), findall(Time,blawx_becomes(-is_unreasonable(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_unreasonable(X),datetime(eot)) :- blawx_initially(-is_unreasonable(X)), blawx_ultimately(-is_unreasonable(X)), findall(Time,blawx_becomes(is_unreasonable(X),datetime(Time)),[]).
+      blawx_as_of(is_unreasonable(X),datetime(Time)) :- blawx_initially(is_unreasonable(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_unreasonable(X),datetime(BeforeT)).
+      blawx_as_of(is_unreasonable(X),datetime(Time)) :- blawx_becomes(is_unreasonable(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_unreasonable(X),datetime(Time)).
+      blawx_as_of(-is_unreasonable(X),datetime(Time)) :- blawx_initially(-is_unreasonable(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_unreasonable(X),datetime(BeforeT)).
+      blawx_as_of(-is_unreasonable(X),datetime(Time)) :- blawx_becomes(-is_unreasonable(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_unreasonable(X),datetime(Time)).
+      blawx_during(datetime(Start),is_unreasonable(X),datetime(End)) :- blawx_becomes(is_unreasonable(X),datetime(Start)), blawx_becomes(-is_unreasonable(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(bot),is_unreasonable(X),datetime(End)) :- blawx_initially(is_unreasonable(X)), blawx_becomes(-is_unreasonable(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(Start),is_unreasonable(X),datetime(eot)) :- blawx_ultimately(is_unreasonable(X)), blawx_becomes(-is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_unreasonable(X),datetime(eot)).
+      blawx_during(datetime(bot),is_unreasonable(X),datetime(eot)) :- blawx_initially(is_unreasonable(X)), blawx_ultimately(is_unreasonable(X)), blawx_becomes(-is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_unreasonable(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_unreasonable(X),datetime(End)) :- blawx_becomes(-is_unreasonable(X),datetime(Start)), blawx_becomes(is_unreasonable(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(bot),-is_unreasonable(X),datetime(End)) :- blawx_initially(-is_unreasonable(X)), blawx_becomes(is_unreasonable(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(Start),-is_unreasonable(X),datetime(eot)) :- blawx_ultimately(-is_unreasonable(X)), blawx_becomes(is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_unreasonable(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_unreasonable(X),datetime(eot)) :- blawx_initially(-is_unreasonable(X)), blawx_ultimately(-is_unreasonable(X)), blawx_becomes(-is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_unreasonable(X),datetime(eot)).
+      blawx_attribute(consequence,is_detrimental,boolean).
+      blawx_attribute_nlg(is_detrimental,not_applicable,"",not_applicable,"is detrimental").
+      :- dynamic is_detrimental/1.
+      #pred is_detrimental(X) :: '@(X) is detrimental'.
+      #pred holds(user,is_detrimental,X) :: 'it is provided as a fact that @(X) is detrimental'.
+      #pred holds(user,-is_detrimental,X) :: 'it is provided as a fact that it is not the case that @(X) is detrimental'.
+      #pred holds(Z,is_detrimental,X) :: 'the conclusion in @(Z) that @(X) is detrimental holds'.
+      #pred holds(Z,-is_detrimental,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is detrimental holds'.
+      #pred according_to(Z,is_detrimental,X) :: 'according to @(Z), @(X) is detrimental'.
+      #pred according_to(Z,-is_detrimental,X) :: 'according to @(Z), it is not the case that @(X) is detrimental'.
+      #pred blawx_defeated(Z,is_detrimental,X) :: 'the conclusion in @(Z) that @(X) is detrimental is defeated'.
+      #pred blawx_defeated(Z,-is_detrimental,X) :: 'the conclusion in @(Z) that @(X) is detrimental is defeated'.
+      #pred blawx_initially(is_detrimental(X)) :: 'that @(X) is detrimental holds initially'.
+      #pred blawx_initially(-is_detrimental(X)) :: 'that it is not the case that @(X) is detrimental holds initially'.
+      #pred blawx_ultimately(is_detrimental(X)) :: 'that @(X) is detrimental holds ultimately'.
+      #pred blawx_ultimately(-is_detrimental(X)) :: 'that it is not the case that @(X) is detrimental holds ultimately'.
+      #pred blawx_as_of(is_detrimental(X),T) :: 'that @(X) is detrimental holds at @(T)'.
+      #pred blawx_as_of(-is_detrimental(X),T) :: 'that it is not the case that @(X) is detrimental holds at @(T)'.
+      #pred blawx_during(T1,is_detrimental(X),T2) :: 'that @(X) is detrimental held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_detrimental(X),T2) :: 'that it is not the case that @(X) is detrimental held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_detrimental(X),T) :: 'that @(X) is detrimental became true at @(T)'.
+      #pred blawx_becomes(-is_detrimental(X),T) :: 'that it is not the case that @(X) is detrimental became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_detrimental(X),End) :: '@(X) is detrimental remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_detrimental(X),End) :: 'it is not the case that @(X) is detrimental remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_detrimental(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_detrimental(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_detrimental(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_detrimental(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_detrimental(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_detrimental(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_detrimental(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_detrimental(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_detrimental(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_detrimental(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_detrimental(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_detrimental(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_detrimental(X),datetime(eot)) :- blawx_initially(is_detrimental(X)), blawx_ultimately(is_detrimental(X)), findall(Time,blawx_becomes(-is_detrimental(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_detrimental(X),datetime(eot)) :- blawx_initially(-is_detrimental(X)), blawx_ultimately(-is_detrimental(X)), findall(Time,blawx_becomes(is_detrimental(X),datetime(Time)),[]).
+      blawx_as_of(is_detrimental(X),datetime(Time)) :- blawx_initially(is_detrimental(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_detrimental(X),datetime(BeforeT)).
+      blawx_as_of(is_detrimental(X),datetime(Time)) :- blawx_becomes(is_detrimental(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_detrimental(X),datetime(Time)).
+      blawx_as_of(-is_detrimental(X),datetime(Time)) :- blawx_initially(-is_detrimental(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_detrimental(X),datetime(BeforeT)).
+      blawx_as_of(-is_detrimental(X),datetime(Time)) :- blawx_becomes(-is_detrimental(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_detrimental(X),datetime(Time)).
+      blawx_during(datetime(Start),is_detrimental(X),datetime(End)) :- blawx_becomes(is_detrimental(X),datetime(Start)), blawx_becomes(-is_detrimental(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_detrimental(X),datetime(End)).
+      blawx_during(datetime(bot),is_detrimental(X),datetime(End)) :- blawx_initially(is_detrimental(X)), blawx_becomes(-is_detrimental(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_detrimental(X),datetime(End)).
+      blawx_during(datetime(Start),is_detrimental(X),datetime(eot)) :- blawx_ultimately(is_detrimental(X)), blawx_becomes(-is_detrimental(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_detrimental(X),datetime(eot)).
+      blawx_during(datetime(bot),is_detrimental(X),datetime(eot)) :- blawx_initially(is_detrimental(X)), blawx_ultimately(is_detrimental(X)), blawx_becomes(-is_detrimental(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_detrimental(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_detrimental(X),datetime(End)) :- blawx_becomes(-is_detrimental(X),datetime(Start)), blawx_becomes(is_detrimental(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_detrimental(X),datetime(End)).
+      blawx_during(datetime(bot),-is_detrimental(X),datetime(End)) :- blawx_initially(-is_detrimental(X)), blawx_becomes(is_detrimental(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_detrimental(X),datetime(End)).
+      blawx_during(datetime(Start),-is_detrimental(X),datetime(eot)) :- blawx_ultimately(-is_detrimental(X)), blawx_becomes(is_detrimental(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_detrimental(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_detrimental(X),datetime(eot)) :- blawx_initially(-is_detrimental(X)), blawx_ultimately(-is_detrimental(X)), blawx_becomes(-is_detrimental(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_detrimental(X),datetime(eot)).
+      blawx_attribute(consequence,is_of_a_persistent_or_continuing_nature,boolean).
+      blawx_attribute_nlg(is_of_a_persistent_or_continuing_nature,not_applicable,"",not_applicable,"is of a persistent or continuing nature").
+      :- dynamic is_of_a_persistent_or_continuing_nature/1.
+      #pred is_of_a_persistent_or_continuing_nature(X) :: '@(X) is of a persistent or continuing nature'.
+      #pred holds(user,is_of_a_persistent_or_continuing_nature,X) :: 'it is provided as a fact that @(X) is of a persistent or continuing nature'.
+      #pred holds(user,-is_of_a_persistent_or_continuing_nature,X) :: 'it is provided as a fact that it is not the case that @(X) is of a persistent or continuing nature'.
+      #pred holds(Z,is_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that @(X) is of a persistent or continuing nature holds'.
+      #pred holds(Z,-is_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is of a persistent or continuing nature holds'.
+      #pred according_to(Z,is_of_a_persistent_or_continuing_nature,X) :: 'according to @(Z), @(X) is of a persistent or continuing nature'.
+      #pred according_to(Z,-is_of_a_persistent_or_continuing_nature,X) :: 'according to @(Z), it is not the case that @(X) is of a persistent or continuing nature'.
+      #pred blawx_defeated(Z,is_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that @(X) is of a persistent or continuing nature is defeated'.
+      #pred blawx_defeated(Z,-is_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that @(X) is of a persistent or continuing nature is defeated'.
+      #pred blawx_initially(is_of_a_persistent_or_continuing_nature(X)) :: 'that @(X) is of a persistent or continuing nature holds initially'.
+      #pred blawx_initially(-is_of_a_persistent_or_continuing_nature(X)) :: 'that it is not the case that @(X) is of a persistent or continuing nature holds initially'.
+      #pred blawx_ultimately(is_of_a_persistent_or_continuing_nature(X)) :: 'that @(X) is of a persistent or continuing nature holds ultimately'.
+      #pred blawx_ultimately(-is_of_a_persistent_or_continuing_nature(X)) :: 'that it is not the case that @(X) is of a persistent or continuing nature holds ultimately'.
+      #pred blawx_as_of(is_of_a_persistent_or_continuing_nature(X),T) :: 'that @(X) is of a persistent or continuing nature holds at @(T)'.
+      #pred blawx_as_of(-is_of_a_persistent_or_continuing_nature(X),T) :: 'that it is not the case that @(X) is of a persistent or continuing nature holds at @(T)'.
+      #pred blawx_during(T1,is_of_a_persistent_or_continuing_nature(X),T2) :: 'that @(X) is of a persistent or continuing nature held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-is_of_a_persistent_or_continuing_nature(X),T2) :: 'that it is not the case that @(X) is of a persistent or continuing nature held between @(T1) and @(T2)'.
+      #pred blawx_becomes(is_of_a_persistent_or_continuing_nature(X),T) :: 'that @(X) is of a persistent or continuing nature became true at @(T)'.
+      #pred blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),T) :: 'that it is not the case that @(X) is of a persistent or continuing nature became true at @(T)'.
+      #pred blawx_not_interrupted(Start,is_of_a_persistent_or_continuing_nature(X),End) :: '@(X) is of a persistent or continuing nature remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-is_of_a_persistent_or_continuing_nature(X),End) :: 'it is not the case that @(X) is of a persistent or continuing nature remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(is_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(is_of_a_persistent_or_continuing_nature(X)), findall(Time,blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(-is_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(-is_of_a_persistent_or_continuing_nature(X)), findall(Time,blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(Time)),[]).
+      blawx_as_of(is_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_initially(is_of_a_persistent_or_continuing_nature(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)).
+      blawx_as_of(is_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),is_of_a_persistent_or_continuing_nature(X),datetime(Time)).
+      blawx_as_of(-is_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_initially(-is_of_a_persistent_or_continuing_nature(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)).
+      blawx_as_of(-is_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-is_of_a_persistent_or_continuing_nature(X),datetime(Time)).
+      blawx_during(datetime(Start),is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),is_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_initially(is_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(End)), blawx_not_interrupted(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(Start),is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_ultimately(is_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(Start),is_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_during(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(is_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(is_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(bot),is_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_during(datetime(Start),-is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-is_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_initially(-is_of_a_persistent_or_continuing_nature(X)), blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(End)), blawx_not_interrupted(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(Start),-is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_ultimately(-is_of_a_persistent_or_continuing_nature(X)), blawx_becomes(is_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-is_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_during(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(-is_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(-is_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-is_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-is_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_attribute(consequence,affects_the_quality_of_life_of_those_in_the_locality,boolean).
+      blawx_attribute_nlg(affects_the_quality_of_life_of_those_in_the_locality,not_applicable,"",not_applicable,"affects the quality of life of those in the locality").
+      :- dynamic affects_the_quality_of_life_of_those_in_the_locality/1.
+      #pred affects_the_quality_of_life_of_those_in_the_locality(X) :: '@(X) affects the quality of life of those in the locality'.
+      #pred holds(user,affects_the_quality_of_life_of_those_in_the_locality,X) :: 'it is provided as a fact that @(X) affects the quality of life of those in the locality'.
+      #pred holds(user,-affects_the_quality_of_life_of_those_in_the_locality,X) :: 'it is provided as a fact that it is not the case that @(X) affects the quality of life of those in the locality'.
+      #pred holds(Z,affects_the_quality_of_life_of_those_in_the_locality,X) :: 'the conclusion in @(Z) that @(X) affects the quality of life of those in the locality holds'.
+      #pred holds(Z,-affects_the_quality_of_life_of_those_in_the_locality,X) :: 'the conclusion in @(Z) that it is not the case that @(X) affects the quality of life of those in the locality holds'.
+      #pred according_to(Z,affects_the_quality_of_life_of_those_in_the_locality,X) :: 'according to @(Z), @(X) affects the quality of life of those in the locality'.
+      #pred according_to(Z,-affects_the_quality_of_life_of_those_in_the_locality,X) :: 'according to @(Z), it is not the case that @(X) affects the quality of life of those in the locality'.
+      #pred blawx_defeated(Z,affects_the_quality_of_life_of_those_in_the_locality,X) :: 'the conclusion in @(Z) that @(X) affects the quality of life of those in the locality is defeated'.
+      #pred blawx_defeated(Z,-affects_the_quality_of_life_of_those_in_the_locality,X) :: 'the conclusion in @(Z) that @(X) affects the quality of life of those in the locality is defeated'.
+      #pred blawx_initially(affects_the_quality_of_life_of_those_in_the_locality(X)) :: 'that @(X) affects the quality of life of those in the locality holds initially'.
+      #pred blawx_initially(-affects_the_quality_of_life_of_those_in_the_locality(X)) :: 'that it is not the case that @(X) affects the quality of life of those in the locality holds initially'.
+      #pred blawx_ultimately(affects_the_quality_of_life_of_those_in_the_locality(X)) :: 'that @(X) affects the quality of life of those in the locality holds ultimately'.
+      #pred blawx_ultimately(-affects_the_quality_of_life_of_those_in_the_locality(X)) :: 'that it is not the case that @(X) affects the quality of life of those in the locality holds ultimately'.
+      #pred blawx_as_of(affects_the_quality_of_life_of_those_in_the_locality(X),T) :: 'that @(X) affects the quality of life of those in the locality holds at @(T)'.
+      #pred blawx_as_of(-affects_the_quality_of_life_of_those_in_the_locality(X),T) :: 'that it is not the case that @(X) affects the quality of life of those in the locality holds at @(T)'.
+      #pred blawx_during(T1,affects_the_quality_of_life_of_those_in_the_locality(X),T2) :: 'that @(X) affects the quality of life of those in the locality held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-affects_the_quality_of_life_of_those_in_the_locality(X),T2) :: 'that it is not the case that @(X) affects the quality of life of those in the locality held between @(T1) and @(T2)'.
+      #pred blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),T) :: 'that @(X) affects the quality of life of those in the locality became true at @(T)'.
+      #pred blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),T) :: 'that it is not the case that @(X) affects the quality of life of those in the locality became true at @(T)'.
+      #pred blawx_not_interrupted(Start,affects_the_quality_of_life_of_those_in_the_locality(X),End) :: '@(X) affects the quality of life of those in the locality remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-affects_the_quality_of_life_of_those_in_the_locality(X),End) :: 'it is not the case that @(X) affects the quality of life of those in the locality remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- blawx_initially(affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_ultimately(affects_the_quality_of_life_of_those_in_the_locality(X)), findall(Time,blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- blawx_initially(-affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_ultimately(-affects_the_quality_of_life_of_those_in_the_locality(X)), findall(Time,blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)),[]).
+      blawx_as_of(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)) :- blawx_initially(affects_the_quality_of_life_of_those_in_the_locality(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(BeforeT)).
+      blawx_as_of(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)) :- blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)).
+      blawx_as_of(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)) :- blawx_initially(-affects_the_quality_of_life_of_those_in_the_locality(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(BeforeT)).
+      blawx_as_of(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)) :- blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Time)).
+      blawx_during(datetime(Start),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Start)), blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- blawx_initially(affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)), blawx_not_interrupted(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(Start),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- blawx_ultimately(affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(Start),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)).
+      blawx_during(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- blawx_initially(affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_ultimately(affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(bot),affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)).
+      blawx_during(datetime(Start),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Start)), blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)) :- blawx_initially(-affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)), blawx_not_interrupted(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(Start),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- blawx_ultimately(-affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_becomes(affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)).
+      blawx_during(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)) :- blawx_initially(-affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_ultimately(-affects_the_quality_of_life_of_those_in_the_locality(X)), blawx_becomes(-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-affects_the_quality_of_life_of_those_in_the_locality(X),datetime(eot)).
+      blawx_attribute(receiver,the_recipient_is_a_person_to_whom_a_notice_may_be_given,boolean).
+      blawx_attribute_nlg(the_recipient_is_a_person_to_whom_a_notice_may_be_given,not_applicable,"",not_applicable,"the recipient is a person to whom a notice may be given").
+      :- dynamic the_recipient_is_a_person_to_whom_a_notice_may_be_given/1.
+      #pred the_recipient_is_a_person_to_whom_a_notice_may_be_given(X) :: '@(X) the recipient is a person to whom a notice may be given'.
+      #pred holds(user,the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'it is provided as a fact that @(X) the recipient is a person to whom a notice may be given'.
+      #pred holds(user,-the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'it is provided as a fact that it is not the case that @(X) the recipient is a person to whom a notice may be given'.
+      #pred holds(Z,the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'the conclusion in @(Z) that @(X) the recipient is a person to whom a notice may be given holds'.
+      #pred holds(Z,-the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'the conclusion in @(Z) that it is not the case that @(X) the recipient is a person to whom a notice may be given holds'.
+      #pred according_to(Z,the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'according to @(Z), @(X) the recipient is a person to whom a notice may be given'.
+      #pred according_to(Z,-the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'according to @(Z), it is not the case that @(X) the recipient is a person to whom a notice may be given'.
+      #pred blawx_defeated(Z,the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'the conclusion in @(Z) that @(X) the recipient is a person to whom a notice may be given is defeated'.
+      #pred blawx_defeated(Z,-the_recipient_is_a_person_to_whom_a_notice_may_be_given,X) :: 'the conclusion in @(Z) that @(X) the recipient is a person to whom a notice may be given is defeated'.
+      #pred blawx_initially(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)) :: 'that @(X) the recipient is a person to whom a notice may be given holds initially'.
+      #pred blawx_initially(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)) :: 'that it is not the case that @(X) the recipient is a person to whom a notice may be given holds initially'.
+      #pred blawx_ultimately(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)) :: 'that @(X) the recipient is a person to whom a notice may be given holds ultimately'.
+      #pred blawx_ultimately(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)) :: 'that it is not the case that @(X) the recipient is a person to whom a notice may be given holds ultimately'.
+      #pred blawx_as_of(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),T) :: 'that @(X) the recipient is a person to whom a notice may be given holds at @(T)'.
+      #pred blawx_as_of(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),T) :: 'that it is not the case that @(X) the recipient is a person to whom a notice may be given holds at @(T)'.
+      #pred blawx_during(T1,the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),T2) :: 'that @(X) the recipient is a person to whom a notice may be given held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),T2) :: 'that it is not the case that @(X) the recipient is a person to whom a notice may be given held between @(T1) and @(T2)'.
+      #pred blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),T) :: 'that @(X) the recipient is a person to whom a notice may be given became true at @(T)'.
+      #pred blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),T) :: 'that it is not the case that @(X) the recipient is a person to whom a notice may be given became true at @(T)'.
+      #pred blawx_not_interrupted(Start,the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),End) :: '@(X) the recipient is a person to whom a notice may be given remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),End) :: 'it is not the case that @(X) the recipient is a person to whom a notice may be given remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- blawx_initially(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_ultimately(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), findall(Time,blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- blawx_initially(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_ultimately(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), findall(Time,blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)),[]).
+      blawx_as_of(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)) :- blawx_initially(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(BeforeT)).
+      blawx_as_of(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)) :- blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)).
+      blawx_as_of(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)) :- blawx_initially(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(BeforeT)).
+      blawx_as_of(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)) :- blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Time)).
+      blawx_during(datetime(Start),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Start)), blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)).
+      blawx_during(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- blawx_initially(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)), blawx_not_interrupted(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)).
+      blawx_during(datetime(Start),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- blawx_ultimately(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Start)), blawx_not_interrupted(datetime(Start),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)).
+      blawx_during(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- blawx_initially(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_ultimately(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Start)), blawx_not_interrupted(datetime(bot),the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)).
+      blawx_during(datetime(Start),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Start)), blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)).
+      blawx_during(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)) :- blawx_initially(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)), blawx_not_interrupted(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(End)).
+      blawx_during(datetime(Start),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- blawx_ultimately(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_becomes(the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)).
+      blawx_during(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)) :- blawx_initially(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_ultimately(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X)), blawx_becomes(-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-the_recipient_is_a_person_to_whom_a_notice_may_be_given(X),datetime(eot)).
+      blawx_attribute(receiver,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,boolean).
+      blawx_attribute_nlg(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,not_applicable,"",not_applicable,"the conduct is having a detrimental effect of a persistent or continuing nature").
+      :- dynamic the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature/1.
+      #pred the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X) :: '@(X) the conduct is having a detrimental effect of a persistent or continuing nature'.
+      #pred holds(user,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'it is provided as a fact that @(X) the conduct is having a detrimental effect of a persistent or continuing nature'.
+      #pred holds(user,-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'it is provided as a fact that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature'.
+      #pred holds(Z,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds'.
+      #pred holds(Z,-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds'.
+      #pred according_to(Z,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'according to @(Z), @(X) the conduct is having a detrimental effect of a persistent or continuing nature'.
+      #pred according_to(Z,-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'according to @(Z), it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature'.
+      #pred blawx_defeated(Z,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that @(X) the conduct is having a detrimental effect of a persistent or continuing nature is defeated'.
+      #pred blawx_defeated(Z,-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,X) :: 'the conclusion in @(Z) that @(X) the conduct is having a detrimental effect of a persistent or continuing nature is defeated'.
+      #pred blawx_initially(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)) :: 'that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds initially'.
+      #pred blawx_initially(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)) :: 'that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds initially'.
+      #pred blawx_ultimately(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)) :: 'that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds ultimately'.
+      #pred blawx_ultimately(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)) :: 'that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds ultimately'.
+      #pred blawx_as_of(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),T) :: 'that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds at @(T)'.
+      #pred blawx_as_of(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),T) :: 'that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature holds at @(T)'.
+      #pred blawx_during(T1,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),T2) :: 'that @(X) the conduct is having a detrimental effect of a persistent or continuing nature held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),T2) :: 'that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature held between @(T1) and @(T2)'.
+      #pred blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),T) :: 'that @(X) the conduct is having a detrimental effect of a persistent or continuing nature became true at @(T)'.
+      #pred blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),T) :: 'that it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature became true at @(T)'.
+      #pred blawx_not_interrupted(Start,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),End) :: '@(X) the conduct is having a detrimental effect of a persistent or continuing nature remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),End) :: 'it is not the case that @(X) the conduct is having a detrimental effect of a persistent or continuing nature remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), findall(Time,blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), findall(Time,blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)),[]).
+      blawx_as_of(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_initially(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)).
+      blawx_as_of(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)).
+      blawx_as_of(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_initially(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)).
+      blawx_as_of(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)) :- blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Time)).
+      blawx_during(datetime(Start),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_initially(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)), blawx_not_interrupted(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(Start),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_ultimately(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(Start),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_during(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(bot),the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_during(datetime(Start),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)) :- blawx_initially(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)), blawx_not_interrupted(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(End)).
+      blawx_during(datetime(Start),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_ultimately(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_becomes(the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_during(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)) :- blawx_initially(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_ultimately(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X)), blawx_becomes(-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(X),datetime(eot)).
+      blawx_attribute(consequence,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,boolean).
+      blawx_attribute_nlg(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,not_applicable,"",not_applicable,"the effect is detrimental persistent and affects the quality of life in the locality").
+      :- dynamic the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality/1.
+      #pred the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X) :: '@(X) the effect is detrimental persistent and affects the quality of life in the locality'.
+      #pred holds(user,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'it is provided as a fact that @(X) the effect is detrimental persistent and affects the quality of life in the locality'.
+      #pred holds(user,-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'it is provided as a fact that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality'.
+      #pred holds(Z,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'the conclusion in @(Z) that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds'.
+      #pred holds(Z,-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'the conclusion in @(Z) that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds'.
+      #pred according_to(Z,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'according to @(Z), @(X) the effect is detrimental persistent and affects the quality of life in the locality'.
+      #pred according_to(Z,-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'according to @(Z), it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality'.
+      #pred blawx_defeated(Z,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'the conclusion in @(Z) that @(X) the effect is detrimental persistent and affects the quality of life in the locality is defeated'.
+      #pred blawx_defeated(Z,-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,X) :: 'the conclusion in @(Z) that @(X) the effect is detrimental persistent and affects the quality of life in the locality is defeated'.
+      #pred blawx_initially(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)) :: 'that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds initially'.
+      #pred blawx_initially(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)) :: 'that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds initially'.
+      #pred blawx_ultimately(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)) :: 'that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds ultimately'.
+      #pred blawx_ultimately(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)) :: 'that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds ultimately'.
+      #pred blawx_as_of(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),T) :: 'that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds at @(T)'.
+      #pred blawx_as_of(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),T) :: 'that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality holds at @(T)'.
+      #pred blawx_during(T1,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),T2) :: 'that @(X) the effect is detrimental persistent and affects the quality of life in the locality held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),T2) :: 'that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality held between @(T1) and @(T2)'.
+      #pred blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),T) :: 'that @(X) the effect is detrimental persistent and affects the quality of life in the locality became true at @(T)'.
+      #pred blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),T) :: 'that it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality became true at @(T)'.
+      #pred blawx_not_interrupted(Start,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),End) :: '@(X) the effect is detrimental persistent and affects the quality of life in the locality remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),End) :: 'it is not the case that @(X) the effect is detrimental persistent and affects the quality of life in the locality remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- blawx_initially(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_ultimately(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), findall(Time,blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- blawx_initially(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_ultimately(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), findall(Time,blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)),[]).
+      blawx_as_of(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)) :- blawx_initially(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(BeforeT)).
+      blawx_as_of(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)) :- blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)).
+      blawx_as_of(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)) :- blawx_initially(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(BeforeT)).
+      blawx_as_of(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)) :- blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Time)).
+      blawx_during(datetime(Start),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Start)), blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- blawx_initially(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)), blawx_not_interrupted(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(Start),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- blawx_ultimately(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(Start),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)).
+      blawx_during(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- blawx_initially(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_ultimately(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(bot),the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)).
+      blawx_during(datetime(Start),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Start)), blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)) :- blawx_initially(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)), blawx_not_interrupted(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(End)).
+      blawx_during(datetime(Start),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- blawx_ultimately(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_becomes(the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)).
+      blawx_during(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)) :- blawx_initially(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_ultimately(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X)), blawx_becomes(-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(X),datetime(eot)).
+      blawx_attribute(receiver,the_conduct_is_unreasonable,boolean).
+      blawx_attribute_nlg(the_conduct_is_unreasonable,not_applicable,"",not_applicable,"the conduct is unreasonable").
+      :- dynamic the_conduct_is_unreasonable/1.
+      #pred the_conduct_is_unreasonable(X) :: '@(X) the conduct is unreasonable'.
+      #pred holds(user,the_conduct_is_unreasonable,X) :: 'it is provided as a fact that @(X) the conduct is unreasonable'.
+      #pred holds(user,-the_conduct_is_unreasonable,X) :: 'it is provided as a fact that it is not the case that @(X) the conduct is unreasonable'.
+      #pred holds(Z,the_conduct_is_unreasonable,X) :: 'the conclusion in @(Z) that @(X) the conduct is unreasonable holds'.
+      #pred holds(Z,-the_conduct_is_unreasonable,X) :: 'the conclusion in @(Z) that it is not the case that @(X) the conduct is unreasonable holds'.
+      #pred according_to(Z,the_conduct_is_unreasonable,X) :: 'according to @(Z), @(X) the conduct is unreasonable'.
+      #pred according_to(Z,-the_conduct_is_unreasonable,X) :: 'according to @(Z), it is not the case that @(X) the conduct is unreasonable'.
+      #pred blawx_defeated(Z,the_conduct_is_unreasonable,X) :: 'the conclusion in @(Z) that @(X) the conduct is unreasonable is defeated'.
+      #pred blawx_defeated(Z,-the_conduct_is_unreasonable,X) :: 'the conclusion in @(Z) that @(X) the conduct is unreasonable is defeated'.
+      #pred blawx_initially(the_conduct_is_unreasonable(X)) :: 'that @(X) the conduct is unreasonable holds initially'.
+      #pred blawx_initially(-the_conduct_is_unreasonable(X)) :: 'that it is not the case that @(X) the conduct is unreasonable holds initially'.
+      #pred blawx_ultimately(the_conduct_is_unreasonable(X)) :: 'that @(X) the conduct is unreasonable holds ultimately'.
+      #pred blawx_ultimately(-the_conduct_is_unreasonable(X)) :: 'that it is not the case that @(X) the conduct is unreasonable holds ultimately'.
+      #pred blawx_as_of(the_conduct_is_unreasonable(X),T) :: 'that @(X) the conduct is unreasonable holds at @(T)'.
+      #pred blawx_as_of(-the_conduct_is_unreasonable(X),T) :: 'that it is not the case that @(X) the conduct is unreasonable holds at @(T)'.
+      #pred blawx_during(T1,the_conduct_is_unreasonable(X),T2) :: 'that @(X) the conduct is unreasonable held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-the_conduct_is_unreasonable(X),T2) :: 'that it is not the case that @(X) the conduct is unreasonable held between @(T1) and @(T2)'.
+      #pred blawx_becomes(the_conduct_is_unreasonable(X),T) :: 'that @(X) the conduct is unreasonable became true at @(T)'.
+      #pred blawx_becomes(-the_conduct_is_unreasonable(X),T) :: 'that it is not the case that @(X) the conduct is unreasonable became true at @(T)'.
+      #pred blawx_not_interrupted(Start,the_conduct_is_unreasonable(X),End) :: '@(X) the conduct is unreasonable remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-the_conduct_is_unreasonable(X),End) :: 'it is not the case that @(X) the conduct is unreasonable remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),the_conduct_is_unreasonable(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-the_conduct_is_unreasonable(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(the_conduct_is_unreasonable(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),the_conduct_is_unreasonable(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-the_conduct_is_unreasonable(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(the_conduct_is_unreasonable(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),the_conduct_is_unreasonable(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-the_conduct_is_unreasonable(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(the_conduct_is_unreasonable(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),the_conduct_is_unreasonable(X),datetime(eot)) :- blawx_initially(the_conduct_is_unreasonable(X)), blawx_ultimately(the_conduct_is_unreasonable(X)), findall(Time,blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-the_conduct_is_unreasonable(X),datetime(eot)) :- blawx_initially(-the_conduct_is_unreasonable(X)), blawx_ultimately(-the_conduct_is_unreasonable(X)), findall(Time,blawx_becomes(the_conduct_is_unreasonable(X),datetime(Time)),[]).
+      blawx_as_of(the_conduct_is_unreasonable(X),datetime(Time)) :- blawx_initially(the_conduct_is_unreasonable(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),the_conduct_is_unreasonable(X),datetime(BeforeT)).
+      blawx_as_of(the_conduct_is_unreasonable(X),datetime(Time)) :- blawx_becomes(the_conduct_is_unreasonable(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),the_conduct_is_unreasonable(X),datetime(Time)).
+      blawx_as_of(-the_conduct_is_unreasonable(X),datetime(Time)) :- blawx_initially(-the_conduct_is_unreasonable(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-the_conduct_is_unreasonable(X),datetime(BeforeT)).
+      blawx_as_of(-the_conduct_is_unreasonable(X),datetime(Time)) :- blawx_becomes(-the_conduct_is_unreasonable(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-the_conduct_is_unreasonable(X),datetime(Time)).
+      blawx_during(datetime(Start),the_conduct_is_unreasonable(X),datetime(End)) :- blawx_becomes(the_conduct_is_unreasonable(X),datetime(Start)), blawx_becomes(-the_conduct_is_unreasonable(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),the_conduct_is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(bot),the_conduct_is_unreasonable(X),datetime(End)) :- blawx_initially(the_conduct_is_unreasonable(X)), blawx_becomes(-the_conduct_is_unreasonable(X),datetime(End)), blawx_not_interrupted(datetime(bot),the_conduct_is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(Start),the_conduct_is_unreasonable(X),datetime(eot)) :- blawx_ultimately(the_conduct_is_unreasonable(X)), blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(Start),the_conduct_is_unreasonable(X),datetime(eot)).
+      blawx_during(datetime(bot),the_conduct_is_unreasonable(X),datetime(eot)) :- blawx_initially(the_conduct_is_unreasonable(X)), blawx_ultimately(the_conduct_is_unreasonable(X)), blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(bot),the_conduct_is_unreasonable(X),datetime(eot)).
+      blawx_during(datetime(Start),-the_conduct_is_unreasonable(X),datetime(End)) :- blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Start)), blawx_becomes(the_conduct_is_unreasonable(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-the_conduct_is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(bot),-the_conduct_is_unreasonable(X),datetime(End)) :- blawx_initially(-the_conduct_is_unreasonable(X)), blawx_becomes(the_conduct_is_unreasonable(X),datetime(End)), blawx_not_interrupted(datetime(bot),-the_conduct_is_unreasonable(X),datetime(End)).
+      blawx_during(datetime(Start),-the_conduct_is_unreasonable(X),datetime(eot)) :- blawx_ultimately(-the_conduct_is_unreasonable(X)), blawx_becomes(the_conduct_is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-the_conduct_is_unreasonable(X),datetime(eot)).
+      blawx_during(datetime(bot),-the_conduct_is_unreasonable(X),datetime(eot)) :- blawx_initially(-the_conduct_is_unreasonable(X)), blawx_ultimately(-the_conduct_is_unreasonable(X)), blawx_becomes(-the_conduct_is_unreasonable(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-the_conduct_is_unreasonable(X),datetime(eot)).
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000019" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000020"><value name="object"><block type="variable" id="l4b000021"><field name="variable_name">P</field></block></value><value name="category"><block type="category_selector" id="l4b000022"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value><next><block type="object_category" id="l4b000023"><value name="object"><block type="variable" id="l4b000024"><field name="variable_name">R</field></block></value><value name="category"><block type="category_selector" id="l4b000025"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver"></mutation><field name="category_name">receiver</field></block></value><next><block type="unary_attribute_selector" id="l4b000026"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_authorised" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is authorised</field><value name="first_element"><block type="variable" id="l4b000027"><field name="variable_name">P</field></block></value><next><block type="unary_attribute_selector" id="l4b000028"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_recipient_is_a_person_to_whom_a_notice_may_be_given" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the recipient is a person to whom a notice may be given</field><value name="first_element"><block type="variable" id="l4b000029"><field name="variable_name">R</field></block></value><next><block type="unary_attribute_selector" id="l4b000030"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the conduct is having a detrimental effect of a persistent or continuing nature</field><value name="first_element"><block type="variable" id="l4b000031"><field name="variable_name">R</field></block></value><next><block type="unary_attribute_selector" id="l4b000032"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_conduct_is_unreasonable" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the conduct is unreasonable</field><value name="first_element"><block type="variable" id="l4b000033"><field name="variable_name">R</field></block></value></block></next></block></next></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000034"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">ABCPA 1</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000035"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="may_issue_a_community_protection_notice" attributetype="object" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">may_issue_a_community_protection_notice</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000036"><field name="variable_name">P</field></block></value><value name="second_element"><block type="variable" id="l4b000037"><field name="variable_name">R</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_1_section,may_issue_a_community_protection_notice,P,R) :- person(P),
+      receiver(R),
+      is_authorised(P),
+      the_recipient_is_a_person_to_whom_a_notice_may_be_given(R),
+      the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(R),
+      the_conduct_is_unreasonable(R).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,may_issue_a_community_protection_notice,P,R) :- according_to(sec_1_section,may_issue_a_community_protection_notice,P,R).
+
+      % BLAWX CHECK DUPLICATES
+        may_issue_a_community_protection_notice(P,R) :- holds(sec_1_section,may_issue_a_community_protection_notice,P,R).
+- model: blawx.workspace
+  pk: 3
+  fields:
+    ruledoc: 1
+    workspace_name: sec_2_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000038" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000039"><value name="object"><block type="variable" id="l4b000040"><field name="variable_name">R</field></block></value><value name="category"><block type="category_selector" id="l4b000041"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver"></mutation><field name="category_name">receiver</field></block></value><next><block type="unary_attribute_selector" id="l4b000042"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_an_individual_aged_16_or_over" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is an individual aged 16 or over</field><value name="first_element"><block type="variable" id="l4b000043"><field name="variable_name">R</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000044"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">ABCPA 2</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000045"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_recipient_is_a_person_to_whom_a_notice_may_be_given" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the recipient is a person to whom a notice may be given</field><value name="first_element"><block type="variable" id="l4b000046"><field name="variable_name">R</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000047" x="40" y="418"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000048"><value name="object"><block type="variable" id="l4b000049"><field name="variable_name">R</field></block></value><value name="category"><block type="category_selector" id="l4b000050"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver"></mutation><field name="category_name">receiver</field></block></value><next><block type="unary_attribute_selector" id="l4b000051"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_a_body" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is a body</field><value name="first_element"><block type="variable" id="l4b000052"><field name="variable_name">R</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000053"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_2_section"></mutation><field name="doc_part_name">ABCPA 2</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000054"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_recipient_is_a_person_to_whom_a_notice_may_be_given" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the recipient is a person to whom a notice may be given</field><value name="first_element"><block type="variable" id="l4b000055"><field name="variable_name">R</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R) :- receiver(R),
+      is_an_individual_aged_16_or_over(R).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R) :- according_to(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R).
+
+      % BLAWX CHECK DUPLICATES
+        the_recipient_is_a_person_to_whom_a_notice_may_be_given(R) :- holds(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R).
+
+      according_to(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R) :- receiver(R),
+      is_a_body(R).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R) :- according_to(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R).
+
+      % BLAWX CHECK DUPLICATES
+        the_recipient_is_a_person_to_whom_a_notice_may_be_given(R) :- holds(sec_2_section,the_recipient_is_a_person_to_whom_a_notice_may_be_given,R).
+- model: blawx.workspace
+  pk: 4
+  fields:
+    ruledoc: 1
+    workspace_name: sec_3_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000056" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000057"><value name="object"><block type="variable" id="l4b000058"><field name="variable_name">R</field></block></value><value name="category"><block type="category_selector" id="l4b000059"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver"></mutation><field name="category_name">receiver</field></block></value><next><block type="attribute_selector" id="l4b000060"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="conduct" attributetype="behaviour" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has conduct of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000061"><field name="variable_name">R</field></block></value><value name="second_element"><block type="variable" id="l4b000062"><field name="variable_name">Conduct</field></block></value><next><block type="attribute_selector" id="l4b000063"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="effect" attributetype="consequence" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has effect of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000064"><field name="variable_name">Conduct</field></block></value><value name="second_element"><block type="variable" id="l4b000065"><field name="variable_name">Effect</field></block></value><next><block type="unary_attribute_selector" id="l4b000066"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the effect is detrimental persistent and affects the quality of life in the locality</field><value name="first_element"><block type="variable" id="l4b000067"><field name="variable_name">Effect</field></block></value></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000068"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">ABCPA 3</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000069"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the conduct is having a detrimental effect of a persistent or continuing nature</field><value name="first_element"><block type="variable" id="l4b000070"><field name="variable_name">R</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_3_section,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,R) :- receiver(R),
+      conduct(R,Conduct),
+      effect(Conduct,Effect),
+      the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(Effect).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_3_section,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,R) :- according_to(sec_3_section,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,R).
+
+      % BLAWX CHECK DUPLICATES
+        the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature(R) :- holds(sec_3_section,the_conduct_is_having_a_detrimental_effect_of_a_persistent_or_continuing_nature,R).
+- model: blawx.workspace
+  pk: 5
+  fields:
+    ruledoc: 1
+    workspace_name: sec_4_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000071" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000072"><value name="object"><block type="variable" id="l4b000073"><field name="variable_name">C</field></block></value><value name="category"><block type="category_selector" id="l4b000074"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="consequence"></mutation><field name="category_name">consequence</field></block></value><next><block type="unary_attribute_selector" id="l4b000075"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_detrimental" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is detrimental</field><value name="first_element"><block type="variable" id="l4b000076"><field name="variable_name">C</field></block></value><next><block type="unary_attribute_selector" id="l4b000077"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_of_a_persistent_or_continuing_nature" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is of a persistent or continuing nature</field><value name="first_element"><block type="variable" id="l4b000078"><field name="variable_name">C</field></block></value><next><block type="unary_attribute_selector" id="l4b000079"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="affects_the_quality_of_life_of_those_in_the_locality" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">affects the quality of life of those in the locality</field><value name="first_element"><block type="variable" id="l4b000080"><field name="variable_name">C</field></block></value></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000081"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_4_section"></mutation><field name="doc_part_name">ABCPA 4</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000082"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the effect is detrimental persistent and affects the quality of life in the locality</field><value name="first_element"><block type="variable" id="l4b000083"><field name="variable_name">C</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_4_section,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,C) :- consequence(C),
+      is_detrimental(C),
+      is_of_a_persistent_or_continuing_nature(C),
+      affects_the_quality_of_life_of_those_in_the_locality(C).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,C) :- according_to(sec_4_section,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,C).
+
+      % BLAWX CHECK DUPLICATES
+        the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality(C) :- holds(sec_4_section,the_effect_is_detrimental_persistent_and_affects_the_quality_of_life_in_the_locality,C).
+- model: blawx.workspace
+  pk: 6
+  fields:
+    ruledoc: 1
+    workspace_name: sec_5_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000084" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000085"><value name="object"><block type="variable" id="l4b000086"><field name="variable_name">R</field></block></value><value name="category"><block type="category_selector" id="l4b000087"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver"></mutation><field name="category_name">receiver</field></block></value><next><block type="attribute_selector" id="l4b000088"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="conduct" attributetype="behaviour" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has conduct of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000089"><field name="variable_name">R</field></block></value><value name="second_element"><block type="variable" id="l4b000090"><field name="variable_name">Conduct</field></block></value><next><block type="unary_attribute_selector" id="l4b000091"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_unreasonable" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is unreasonable</field><value name="first_element"><block type="variable" id="l4b000092"><field name="variable_name">Conduct</field></block></value></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000093"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_5_section"></mutation><field name="doc_part_name">ABCPA 5</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000094"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="the_conduct_is_unreasonable" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">the conduct is unreasonable</field><value name="first_element"><block type="variable" id="l4b000095"><field name="variable_name">R</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_5_section,the_conduct_is_unreasonable,R) :- receiver(R),
+      conduct(R,Conduct),
+      is_unreasonable(Conduct).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_5_section,the_conduct_is_unreasonable,R) :- according_to(sec_5_section,the_conduct_is_unreasonable,R).
+
+      % BLAWX CHECK DUPLICATES
+        the_conduct_is_unreasonable(R) :- holds(sec_5_section,the_conduct_is_unreasonable,R).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: interview
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="assume" id="l4b000096" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000097"><value name="object"><block type="variable" id="l4b000098"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000099"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000100" x="40" y="208"><statement name="statements"><block type="object_category" id="l4b000101"><value name="object"><block type="variable" id="l4b000102"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000103"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="receiver"></mutation><field name="category_name">receiver</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000104" x="40" y="376"><statement name="statements"><block type="object_category" id="l4b000105"><value name="object"><block type="variable" id="l4b000106"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000107"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="behaviour"></mutation><field name="category_name">behaviour</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000108" x="40" y="544"><statement name="statements"><block type="object_category" id="l4b000109"><value name="object"><block type="variable" id="l4b000110"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000111"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="consequence"></mutation><field name="category_name">consequence</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000112" x="40" y="712"><statement name="statements"><block type="unary_attribute_selector" id="l4b000113"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_authorised" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is authorised</field><value name="first_element"><block type="variable" id="l4b000114"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000115" x="40" y="850"><statement name="statements"><block type="unary_attribute_selector" id="l4b000116"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_an_individual_aged_16_or_over" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is an individual aged 16 or over</field><value name="first_element"><block type="variable" id="l4b000117"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000118" x="40" y="988"><statement name="statements"><block type="unary_attribute_selector" id="l4b000119"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_a_body" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is a body</field><value name="first_element"><block type="variable" id="l4b000120"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000121" x="40" y="1126"><statement name="statements"><block type="attribute_selector" id="l4b000122"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="conduct" attributetype="behaviour" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has conduct of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000123"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000124"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000125" x="40" y="1294"><statement name="statements"><block type="attribute_selector" id="l4b000126"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="effect" attributetype="consequence" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has effect of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000127"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000128"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000129" x="40" y="1462"><statement name="statements"><block type="unary_attribute_selector" id="l4b000130"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_unreasonable" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is unreasonable</field><value name="first_element"><block type="variable" id="l4b000131"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000132" x="40" y="1600"><statement name="statements"><block type="unary_attribute_selector" id="l4b000133"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_detrimental" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is detrimental</field><value name="first_element"><block type="variable" id="l4b000134"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000135" x="40" y="1738"><statement name="statements"><block type="unary_attribute_selector" id="l4b000136"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_of_a_persistent_or_continuing_nature" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is of a persistent or continuing nature</field><value name="first_element"><block type="variable" id="l4b000137"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000138" x="40" y="1876"><statement name="statements"><block type="unary_attribute_selector" id="l4b000139"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="affects_the_quality_of_life_of_those_in_the_locality" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">affects the quality of life of those in the locality</field><value name="first_element"><block type="variable" id="l4b000140"><field name="variable_name">X</field></block></value></block></statement></block>
+      <block type="query" id="l4b000141" x="40" y="2014"><statement name="query"><block type="attribute_selector" id="l4b000142"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="may_issue_a_community_protection_notice" attributetype="object" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">may_issue_a_community_protection_notice</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000143"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000144"><field name="variable_name">Y</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      #abducible person(X).
+
+      #abducible receiver(X).
+
+      #abducible behaviour(X).
+
+      #abducible consequence(X).
+
+      #abducible is_authorised(X).
+
+      #abducible is_an_individual_aged_16_or_over(X).
+
+      #abducible is_a_body(X).
+
+      #abducible conduct(X,Y).
+
+      #abducible effect(X,Y).
+
+      #abducible is_unreasonable(X).
+
+      #abducible is_detrimental(X).
+
+      #abducible is_of_a_persistent_or_continuing_nature(X).
+
+      #abducible affects_the_quality_of_life_of_those_in_the_locality(X).
+
+      ?- may_issue_a_community_protection_notice(X,Y).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
