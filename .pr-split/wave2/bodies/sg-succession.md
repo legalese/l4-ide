@@ -36,7 +36,9 @@ reviewer competence:
 
 - Goldens are present for every module (the unfiltered `Corpus Goldens Present` CI check
   passes by construction — the files are taken verbatim from `unstable`).
-- On `unstable`, the full CI matrix including the golden suite is green at `bf355e79`.
+- Every file here reached `unstable` through the sequential merge queue (required checks
+  include the golden suite). The push-triggered run at `bf355e79` was still in progress
+  when this PR was opened; this line will be updated when it completes.
 
 ## Independence
 

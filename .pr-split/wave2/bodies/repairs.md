@@ -41,7 +41,9 @@ corrupts pasted code. The mode now opts out.
 ## Evidence
 
 - Each repair is self-consistent within this slice (fix + its own goldens travel together).
-- On `unstable`, the full CI matrix is green at `bf355e79`.
+- Every file here reached `unstable` through the sequential merge queue (#282 cleared it
+  minutes before the wave-2 cut). The push-triggered run at `bf355e79` was still in
+  progress when this PR was opened; this line will be updated when it completes.
 
 ## Independence
 

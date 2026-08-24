@@ -46,7 +46,9 @@ directions. All `etc/go` content in wave 2 therefore reviews as one unit. The sg
 
 - `node etc/go/selftest.mjs` is run by CI's go-orchestrator job; the selftest is
   self-contained (synthetic fixtures, no corpus reads).
-- On `unstable`, the full CI matrix is green at `bf355e79`, which contains every line here.
+- Every line here reached `unstable` through the sequential merge queue (#281 cleared it
+  minutes before the wave-2 cut). The push-triggered run at `bf355e79` was still in
+  progress when this PR was opened; this line will be updated when it completes.
 
 ## Independence
 
