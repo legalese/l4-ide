@@ -1,10 +1,10 @@
 # The pipeline as an artifact graph: phases, witnesses, and what the labels are for
 
-_Status: **rulings recorded; eleven of thirteen implemented.** Written 2026-08-20 on branch
+_Status: **rulings recorded; all thirteen implemented.** Written 2026-08-20 on branch
 `mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
 (`sg-succession`) and found that several of its central nouns name the wrong things._
 
-_What IS implemented, and where: **R1** (`corpus` → `encoding`, commit `dd55a6c8`), **R7** and
+\_What IS implemented, and where: **R1** (`corpus` → `encoding`, commit `dd55a6c8`), **R7** and
 **R8** (cross-run replay with a closed ineligible list, and borrowed artifacts copied rather than
 referenced, commit `41a7b5ac`), **R10** (the three senses of "corpus" deliberately retained), and
 **R12** (`encoding.state`, and `go.sh new-subject` on top of it — see §3.12 for the third closure
@@ -13,9 +13,16 @@ ledger, and `go.sh store`), and **R4** (`etc/go/lib/readset.mjs` and `go.sh read
 is recorded on every `stage_end`, and journal schema 4 enforces that it re-folds to its own digest).
 **R5** (`store diff` labels each divergence by phase class, and refuses to call an encode
 divergence a fork without evidence the sources matched) and **R13** (`go.sh subject-report`).
-**R2** and **R3** (the `denovo` split, and `--encoding <id>` in place of an origin sentinel).
-What remains a decision rather than a description is **R9** alone.
-What would make those present tense is named per ruling in §3._
+**R2** and **R3** (the `denovo` split, and `--encoding <id>` in place of an origin sentinel), and
+**R9** (`--milestone` retired; the stage set, the HG1 set and the gate digest all derived from the
+selected encoding — see §3.9).
+
+_The count above read "eleven of thirteen" until R9 landed, which undercounted by one: it tallied
+the **bold** markers in §3's table, and R12's row carries its date instead of the marker while
+§3.12 and this same paragraph both record it as implemented. Corrected here rather than in R12's
+row, which is not this change's to restate._
+
+What would make those present tense is named per ruling in §3.\_
 
 _Why this document exists at all: the rulings below were reached in conversation and existed
 nowhere else. `CLAUDE.md` §4 — a decision is recorded in its owning document or it is not
@@ -63,7 +70,7 @@ something the graph answers.
 | R6     | **ANSWERED · IMPLEMENTED** | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
 | R7     | **ANSWERED · IMPLEMENTED** | replay crosses run boundaries, except for a closed list of stages, §3.7                                 |
 | R8     | **ANSWERED · IMPLEMENTED** | a run directory stays self-contained; borrowed artifacts are copied, §3.8                               |
-| R9     | **ANSWERED**               | G0–G4 are capability milestones, not lifecycle phases, and should stop being run labels, §3.9           |
+| R9     | **ANSWERED · IMPLEMENTED** | G0–G4 are capability milestones, not lifecycle phases, and have stopped being run labels, §3.9          |
 | R10    | **ANSWERED · IMPLEMENTED** | three other senses of "corpus" are retained deliberately, §3.10                                         |
 | R11    | **ANSWERED · IMPLEMENTED** | the HG1 blessing is a durable ledger edge, and the serving path defaults to deny, §3.11                 |
 | R12    | ANSWERED 2026-08-20, §3.12 | a subject may declare `encoding.state: "unwritten"`; `go.sh new-subject` scaffolds one, §3.12           |
@@ -130,9 +137,14 @@ anybody editing the script.
 
 **An id names an occasion, not a position.** `encodings["cleanroom-2026-08"]` is a fact about the
 job; "de novo" was a fact about the job's place in a sequence. `primary` is reserved for the
-committed encoding, and the legacy `--milestone g2` is TRANSLATED into a selection — refusing when
-a subject declares more than one, because an ordinal cannot name one of several. That refusal is
-the clearest statement of why the rename happened.
+committed encoding.
+
+_Superseded 2026-08-25 by R9, and recorded rather than rewritten because the reasoning is what
+matters:_ this ruling left `--milestone g2` alive as a legacy spelling, TRANSLATED into a selection
+and refusing when a subject declared more than one — the refusal being, as written here, "the
+clearest statement of why the rename happened". R9 went further and retired the flag outright,
+because a translation that still works keeps the ordinal executable. `undeclared` took over the one
+case the translation was genuinely needed for. See §3.9.
 
 **And the word "de novo" is no longer needed for the thing it was reaching for.** §3.3 asked for
 the pipeline to _"stop needing either word"_, and R4 is what made that reachable: "produced without
@@ -142,8 +154,8 @@ property declared in a sidecar. That closure was not available when this ruling 
 **Three defects the build found**, each recorded because each is the same shape — a diagnostic that
 survives a rename and starts pointing at nothing:
 
-- `--milestone g2` on a subject declaring no additional encoding showed the **committed** encoding's
-  seven modules as the deposit set. A plan that confidently describes the wrong artifact is worse
+- The deposit path on a subject declaring no additional encoding showed the **committed**
+  encoding's seven modules as the deposit set. A plan that confidently describes the wrong artifact is worse
   than one that says `undeclared`.
 - The same case made every skip reason say `encoding.modules`, telling the reader to edit the
   committed encoding when what they need is to create an `encodings` entry. There are **three**
@@ -476,7 +488,7 @@ the receipt claiming a file it does not have) and a donor with two artifacts sha
 copy flattens to basename, so one would overwrite the other — `p7-lts` already writes into a
 `state-graphs/` subdirectory, so this is close to reachable rather than theoretical).
 
-### 3.9 R9 — G0–G4 are capability milestones — ANSWERED
+### 3.9 R9 — G0–G4 are capability milestones — ANSWERED, IMPLEMENTED 2026-08-25
 
 SPEC.md §6 is headed _"Gaps → milestones"_: G0 spec accepted, G1 the pipeline can replay, G2 it can
 validate-and-diff a blind re-derivation, G3 every projection executes, G4 published. They describe
@@ -486,6 +498,121 @@ They are not phases a subject passes through, and using them as run labels (`--m
 what makes _"how can G1 run before G2?"_ a reasonable question to ask — as it was asked, by the
 person who commissioned the spec. Runs should be labelled by what they do; the capability
 milestones belong in a changelog.
+
+**IMPLEMENTED 2026-08-25.** A run is about **one subject and one encoding of it**, and `--encoding`
+is the only thing that selects it. G0–G4 survive in `SPEC.md` §6, where they are capability
+descriptions and correct; nothing labels a run with them any more.
+
+#### The value space is the driver's own, in both directions
+
+`--encoding` takes exactly the three values `GO_S_ENCODING_ID` can hold, so what you type and what
+the driver reports back are the same words:
+
+| value        | means                                                                                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `primary`    | the committed encoding. The default; the flag may be omitted.                                                                                                    |
+| `<id>`       | that additional encoding, named. `subject.mjs` refuses an id the subject does not declare, and lists the ones it does.                                           |
+| `undeclared` | the deposit path over a subject that declares **none** — a forecast of what would have to be deposited. Refused, with a list, when the subject does declare one. |
+
+**A keyword meaning "the additional one" was designed and rejected.** It reads as the obvious
+convenience, and it is this ruling's own defect wearing a new word: _the additional one_ is a
+POSITION, so it changes meaning silently as a subject's declarations grow and breaks loudly the day
+a second is declared — which `regcf` is one edit away from. §3.3 is the rule; an ordinal is not a
+name however it is spelled. `--mode` beside `--encoding` was rejected for a sharper reason: two
+flags encoding one fact can disagree, and that disagreement was **already reachable** — see the
+`fbcd0470…` measurement below.
+
+#### `--milestone` refuses; it is not translated and not silently unknown
+
+A translating shim keeps the ordinal executable, which is three of the four things this ruling
+removes. A plain "unknown option" teaches nothing. So it refuses at parse time with exit 2 and the
+translation table, and the message hands over `subject.mjs <subject> --encodings` for the ids.
+
+It is deliberately **not** spelled as a `case` arm: `check-skill-drift.mjs` decides a flag exists by
+looking for its arm in `go.sh`, so an arm would make the drift guard green over any stale
+`--milestone` line left in the skill — the one sweep this ruling depends on being complete.
+
+_That guard had to be repaired to make the sentence true._ It tested `goSrc.includes("--milestone)")`,
+a bare substring, which the **comment explaining why there is no arm** satisfies. It reported the
+retired flag as still accepted. The test is now line-anchored, because a declaration and a mention
+of one are different things and only the anchor tells them apart.
+
+#### What the flag was doing, and where each job went
+
+| job                                 | now                                                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| which stages run                    | the encoding: `primary` → `PRIMARY_STAGES`, otherwise `DEPOSIT_STAGES`. Contents unchanged — R9 retires the label, not the stage sets. |
+| which module set the stages iterate | already R2/R3's: `GO_MODULES` from the selected encoding. Only the label mention was left to delete.                                   |
+| which stages HG1 gates              | **derived**: every declared stage from P6 onward, minus `gated_by_HG2`.                                                                |
+| what a gate binds to                | **derived**: `GO_MODULES`, plus every deposit a declared stage of this run reads.                                                      |
+
+The gating rule is SPEC.md §7.3's own sentence — _HG1 blocks P6 onward_ — written once and applied,
+in place of one hand-kept list per stage set. Measured byte-equal to both lists it replaces, in
+order, on every selection the tree can express. It subtracts `gated_by_HG2` rather than capping at
+`< 10`: a stage carries one gate, and `< 10` would only be a coincidence of `p10-publish`'s number.
+`verify-run.mjs` reports a finding for any gate that gates a declared stage and has no record, so a
+`p10-publish` that ever became declared would otherwise demand an HG1 record it must never have.
+
+The digest rule iterates **deposits**, not stages: `manifestText` sorts but does not dedupe, and
+`p1-ingest`, `p2-sweep`, `p4-forks` and `p5-gate` all read all three natlang and comparison
+deposits, so a stage-major union would contribute a path twice and change the hash.
+
+#### Two gate digests moved, both deliberately, and both were wrong before
+
+Neither is bound by any signature: no committed file names them, and the six blessings in the live
+store are all `waived`, over two other digests.
+
+- **`--encoding <id>` alone ran the PRIMARY stage set over the DEPOSIT module.** Measured on the
+  pre-R9 tree: `plan --subject regcf --encoding cleanroom-2026-08` printed _"milestone g1"_, the
+  primary stage list, and a 25-member gate digest `fbcd0470…` — the deposit's module beside the
+  committed encoding's narrative deposit, which is neither of the two documented sets. It is now
+  `1e801642…`, the 5-member deposit set. This is the concrete evidence against `--mode`: it would
+  have made that incoherent state a first-class, spellable input.
+- **A deposit run over a subject with nothing deposited bound HG1 to the committed encoding.**
+  `GO_MODULES` is empty there by design — no stage iterates anything — while the digest branch
+  still folded in `GO_S_ENCODING_MODULES`, which with no `--encoding` passed resolves to the
+  PRIMARY modules. So `sg-succession` bound a gate to `11092f74…`: three deposits plus seven
+  committed modules the run never read, and the `text:no-additional-encoding-declared=` sentinel
+  written for exactly that case was unreachable because the array was never empty. Binding to
+  `GO_MODULES` makes it `5ac0d975…`, the three deposits, and the sentinel is reachable again for a
+  subject declaring no deposits at all.
+
+The two unchanged selections stayed byte-identical: `regcf` primary `6b2191ee…` (26 files),
+`sg-succession` primary `c0841f89…` (7).
+
+#### Journal schema 5
+
+`run_begin.milestone` is replaced by `run_begin.encoding`. One field, not two: the mode is
+derivable (primary iff `encoding === "primary"`), and two fields encoding one fact can disagree.
+
+This also closes a gap R2/R3 left: after the split, a journal could not say WHICH additional
+encoding a run was about. `g2` named an ordinal, and no reader can recover an id from it — so
+`verify-run.mjs` and the report renderer report a schema-4 row as `legacy:g2` rather than guessing.
+`gate-payload.mjs` emits whichever identity line the journal actually carries, keyed on the field
+and not the schema number, so a signature taken over a schema-4 payload still verifies.
+
+An in-flight schema-4 run cannot be resumed by this binary: `ledger.append` refuses to put two
+schemas in one chain. That is the existing, deliberate behaviour (§5.1), not a new one.
+
+#### One silent wrong answer this shook out
+
+`gate-payload.mjs` chose its refusal ARM by `begin.milestone === "g2"`. Dropping the field flipped
+it to the other arm, which still refused — same exit code, same absence of a signable document —
+while telling the reader to _"run p0-preflight in this run"_. `p0-preflight` is not in
+`DEPOSIT_STAGES` and `--only p0-preflight` intersects to nothing, so the advice could not be
+followed: a correct refusal silently downgraded to an impossible instruction. The arm now keys on
+`declared_stages`, which every schema from 2 onward records, so both spellings resolve to the same
+advice. Pinned by three fixtures.
+
+#### R4's graph was considered for `stages_for`, and cannot answer it
+
+§4.3 says R9 must follow R4 because _"a mechanism that answers 'what should run?' cannot be removed
+before the graph can answer it instead."_ Recorded here because the sentence invites a reading it
+does not support: `readset.mjs` classifies phases and queries **recorded** read-sets, and there is
+no stage→stage prerequisite edge anywhere in the tree. It can answer _what did this stage read_ and
+_is this artifact stale_; it cannot answer _which stages should run for this selection_. R9 does not
+remove that mechanism — it **re-keys** it, from a capability label to the selected encoding — so
+the premise of §4.3's blocker never triggers. R4 still had to come first, for the other three jobs.
 
 ### 3.10 R10 — three senses of "corpus" are retained — ANSWERED, IMPLEMENTED
 
@@ -703,11 +830,12 @@ hand-edited row set a phase's state for the whole subject.
 
 ## 4. What this does not settle
 
-Two of the four questions this section opened with were **settled by building** — one on
+Three of the four questions this section opened with were **settled by building** — one on
 2026-08-21 by R6/R11, one on 2026-08-24 by noticing that the answer had already been made in code
-and written down nowhere. They are recorded here rather than deleted: the resolution is the
-interesting part, and a reader who remembers the open question deserves to find its answer where
-they left it.
+and written down nowhere, and one on 2026-08-25 by R9. They are recorded here rather than deleted:
+the resolution is the interesting part, and a reader who remembers the open question deserves to
+find its answer where they left it. Per-bullet status is what to trust below; the section heading
+does not track it.
 
 ### 4.1 Where the store lives — SETTLED 2026-08-21, and `gc` became a reference policy
 
@@ -743,17 +871,25 @@ the store's comparator shipped as a CLI verb rather than as a stage, and that ch
 ruling. `CLAUDE.md` §4 is about exactly this failure — a decision taken in one medium and left out
 of the document that owns the question.
 
-### 4.3 Still open
+### 4.3 The remaining questions
 
-- **Whether `--milestone` survives R9 at all.** No longer speculative: it is **one flag doing four
-  separable jobs**, each of which is a real question that was bundled rather than answered —
-  which files the gate digest binds to (`go.sh:337`), which module set the stages iterate
-  (`go.sh:388`), which stages are HG1-gated (`go.sh:433`), and which stages run at all
-  (`stages_for`, `go.sh:447`). Three further uses are cosmetic wording (`go.sh:550`, `1039`,
-  `1360`). The first of the four is the damaging one: same subject, same tree, different flag →
-  different gate digest → **a different thing signed**, which is R3's complaint exactly. Retiring
-  it is R9's business and must come **last**, after R4: a mechanism that answers _"what should
-  run?"_ cannot be removed before the graph can answer it instead.
+- **Whether `--milestone` survives R9 at all — SETTLED 2026-08-25: it does not.** The question was
+  posed here after measuring that it was **one flag doing four separable jobs** — which files the
+  gate digest binds to, which module set the stages iterate, which stages are HG1-gated, and which
+  stages run at all — plus three cosmetic uses. The first was the damaging one: same subject, same
+  tree, different flag → different gate digest → **a different thing signed**, which is R3's
+  complaint exactly.
+
+  All four jobs are now answered by the selected encoding, and the flag refuses. §3.9 records the
+  ruling, the two gate digests that moved and why each was wrong before, and the value space that
+  replaced it. Two notes for a reader arriving from this bullet: the line numbers it cited are long
+  stale and are left as written, because they were true when the count was taken; and its closing
+  clause — _"a mechanism that answers 'what should run?' cannot be removed before the graph can
+  answer it instead"_ — invites a reading §3.9 had to refuse. R4's graph classifies phases and
+  queries recorded read-sets; it holds no stage→stage prerequisite edge and cannot answer which
+  stages a selection should run. R9 **re-keys** that mechanism rather than removing it. R4 still
+  had to land first, for the other three jobs.
+
 - **The cost of retention** under R6 at real corpus sizes — and it is **still unmeasured**, which
   is a stronger statement than it was. The working store on 2026-08-24 holds 860 KB across 193
   objects and 312 index records, but **every one of those records carries `subject: null` and

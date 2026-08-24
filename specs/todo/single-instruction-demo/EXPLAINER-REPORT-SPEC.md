@@ -335,7 +335,7 @@ The two appends stay adjacent so they cannot drift **[M:** they are adjacent tod
 
 ### 3.2 Why declared rather than a side effect of `p9-report`
 
-A stage that is declared appears in `run_begin`'s `declared_stages`, and `milestoneVerdict`
+A stage that is declared appears in `run_begin`'s `declared_stages`, and `runVerdict`
 reports `INCOMPLETE` for any declared stage with no receipt **[G:** `verdict.mjs:177` **]**. That is
 the property we want: a run that produced no explainer says so in its verdict. Folding the render
 into `p9-report.sh` would make the explainer's absence invisible, and would put a second, riskier
@@ -391,12 +391,12 @@ Specifically it re-implements, byte-for-behaviour:
 - `begin` = **first** `run_begin`; `end` = **last** `run_end`;
 - `stageEnds` = **latest row per stage wins**, via the `new Map(rows.map(r => [r.stage, r]))`
   idiom (`render-report.mjs:106` **[M]**, matched by `verify-run.mjs:48` **[G]**);
-- `run.verdict` = `end?.verdict ?? milestoneVerdict(...).verdict` — the **recorded** verdict wins
+- `run.verdict` = `end?.verdict ?? runVerdict(...).verdict` — the **recorded** verdict wins
   over a recomputation **[G:** `render-report.mjs:464` **]**.
 
 It **imports** the things that are already real ES modules: `etc/go/lib/ledger.mjs` (`verify`,
 `read`, `sha256File`, `sha256Text`, `digestSet`) and `etc/go/lib/verdict.mjs` (`STATUSES`,
-`milestoneVerdict`) **[G]**. It never calls `ledger.append`.
+`runVerdict`) **[G]**. It never calls `ledger.append`.
 
 #### Why not the obvious refactor
 
@@ -430,7 +430,7 @@ the duplication and keep the equality test as a regression.
 | ------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `go.sh:226-235`                                   | add stage + gate                                                                          | §3.1                                                                                       |
 | `go.sh:240` (`g2` override)                       | **no change**                                                                             | not declared at g2                                                                         |
-| `cmd_plan --milestone g1` (`go.sh:321-347`)       | **no change**                                                                             | derives its table from the two lists **[G]**                                               |
+| `cmd_plan`, primary encoding (`go.sh`)            | **no change**                                                                             | derives its table from the two lists **[G]**                                               |
 | `cmd_plan_g2` (`go.sh:270-319`)                   | **no change**                                                                             | hand-written, and the stage is not declared at g2 **[G]**                                  |
 | `verify-run.mjs`                                  | **no change**                                                                             | reads `declared_stages`/`gated_stages` from the journal; no stage id is hard-coded **[G]** |
 | `selftest.mjs:877-884`                            | rewrite as set comparison                                                                 | §3.4                                                                                       |
@@ -553,7 +553,7 @@ prose. That is §6.1.
 The audit report already contains the exactly-right paragraph, and it was written with care
 **[M:** `render-report.mjs:315` **]**:
 
-> `p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as
+> `p2-sweep` is not declared for this run. Nothing was searched, so nothing may be reported as
 > searched, and this report makes no claim that the encoding is current with respect to courts,
 > C&DIs, no-action letters, or rules in flight. (At `g2` the stage validates a deposited register —
 > but note that validating a register is not performing a sweep: no procedure enumerates the
@@ -1510,7 +1510,7 @@ two-assertion shape (assert no `TEMPLATE DEFECT` **and** assert the renderer got
 check to have run):
 
 - the **explainer** template carries no transcribed measurement;
-- `go.sh plan --milestone g1` names `p9-explain` (the existing self-description step greps for
+- `a primary-path `go.sh plan``names`p9-explain` (the existing self-description step greps for
   stage names and would otherwise go stale silently **[G]**).
 
 **Formatting.** `.prettierignore` does not exclude `etc/`, and `package.json` runs

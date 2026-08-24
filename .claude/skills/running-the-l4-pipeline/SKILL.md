@@ -32,14 +32,14 @@ That spec states, in the present tense and against a named commit, which stages 
 
 Reach for this skill when the user wants to:
 
-1. **Run the demo** — "⟨body of law⟩: go" ("SEC Regulation Crowdfunding: go" is the historical example). That is a milestone-G1 replay run against the subject's committed corpus.
+1. **Run the demo** — "⟨body of law⟩: go" ("SEC Regulation Crowdfunding: go" is the historical example). That is a replay run over the subject's committed encoding.
 2. **Resume an interrupted run** — a usage limit, a killed terminal, a machine that went to sleep. Re-entry is a digest comparison, not a memory, and every stage whose inputs are unchanged replays instead of re-running.
-3. **Run the de novo path** — "encode ⟨body of law⟩ from source". That is milestone G2: you fetch, sweep, encode and fork; the stages validate what you deposited. See [the G2 runbook](#the-g2-runbook--the-de-novo-path).
-4. **Understand a verdict** — what `G1 COMPLETE` means when nine of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
+3. **Run the de novo path** — "encode ⟨body of law⟩ from source". That is the **deposit path**: you fetch, sweep, encode and fork; the stages validate what you deposited. See [the deposit runbook](#the-deposit-runbook--the-de-novo-path).
+4. **Understand a verdict** — what `COMPLETE` means when nine of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
 5. **Grant or waive a human gate** — HG1 before the projections, HG2 before anything outward-facing.
 6. **Audit a run somebody else did** — recompute every verdict from the committed artifacts, with no build, no model and no network.
 
-It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative rules, choosing between `IS`/`MEANS`/`IF` — that is [`writing-l4-rules`](../writing-l4-rules/SKILL.md). This pipeline's de novo encode stage does not write L4 either; it checks the module you deposited (see the G2 runbook). It is also the wrong tool for a one-off projection: if you want a single DMN out of a single file, run `l4 export` directly and skip all of this.
+It is the wrong tool for **writing L4**. Encoding a statute, drafting regulative rules, choosing between `IS`/`MEANS`/`IF` — that is [`writing-l4-rules`](../writing-l4-rules/SKILL.md). This pipeline's de novo encode stage does not write L4 either; it checks the module you deposited (see the deposit runbook). It is also the wrong tool for a one-off projection: if you want a single DMN out of a single file, run `l4 export` directly and skip all of this.
 
 ---
 
@@ -66,7 +66,7 @@ Then: write the encoding (that is [`writing-l4-rules`](../writing-l4-rules/SKILL
 ### 1. Run the doctor first
 
 ```bash
-etc/go/go.sh doctor --milestone g1
+etc/go/go.sh doctor --subject regcf --encoding primary
 ```
 
 This is the front-door forecast: it says which declared stages will run whole and which will not, each with its remedy, before any stage spends time. Exit 0 = every declared stage's environmental wants are met; 1 = something will not run whole; 2 = no usable `l4` anywhere. It runs no stage, writes no run directory, and sees only the environment — gates, deposit presence and oracle verdicts stay the stages' own account.
@@ -85,20 +85,20 @@ export L4=/path/to/dist-newstyle/build/<arch>/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l
 ### 2. Read the plan before running it
 
 ```bash
-etc/go/go.sh plan --milestone g1
+etc/go/go.sh plan --subject regcf --encoding primary
 ```
 
 This prints the declared stages in order, which human gate blocks each one, and — separately — the entry points that exist and refuse. Nothing is executed. Read it first when you are unsure what the run is about to touch.
 
 The declared stage set is the subject descriptor's, not the pipeline's: a projection leg runs iff the subject's `subject.json` declares it, so two subjects' plans — and their `COMPLETE` verdicts — may cover different stage sets.
 
-### 3. Run the milestone
+### 3. Run it
 
 ```bash
-etc/go/go.sh run --milestone g1 --subject regcf
+etc/go/go.sh run --subject regcf --encoding primary
 ```
 
-(`--subject regcf` here is the worked example throughout this skill — it is **an** example, never the default. With more than one sidecar committed, `--subject` is mandatory and a bare `run`/`plan`/`doctor` refuses, because a run about an unnamed body of law is not a run about anything.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. Run `node etc/go/lib/subject.mjs --list` for what is committed rather than trusting a list written here; as at 2026-08-20 it is `regcf` and `sg-succession`. Note that a corpus under `jl4/examples/legal/` is **not** automatically a subject: `bna` and `charities-cleanroom` are committed corpora with no sidecar, so no milestone runs over them, and `etc/check-subject-ci-coverage.mjs` prints that as a note every CI run. The run will stop at HG1 and exit 3 — see step 5.
+(`--subject regcf` here is the worked example throughout this skill — it is **an** example, never the default. With more than one sidecar committed, `--subject` is mandatory and a bare `run`/`plan`/`doctor` refuses, because a run about an unnamed body of law is not a run about anything.) A subject resolves iff `etc/go/subjects/<id>/` exists and validates — the sidecar carries the subject's descriptor (`subject.json`), pins, known defects and `NOTES.md`. Run `node etc/go/lib/subject.mjs --list` for what is committed rather than trusting a list written here; as at 2026-08-20 it is `regcf` and `sg-succession`. Note that a corpus under `jl4/examples/legal/` is **not** automatically a subject: `bna` and `charities-cleanroom` are committed corpora with no sidecar, so no run is ever about them, and `etc/check-subject-ci-coverage.mjs` prints that as a note every CI run. The run will stop at HG1 and exit 3 — see step 5.
 
 **Key idioms:**
 
@@ -109,7 +109,7 @@ etc/go/go.sh run --milestone g1 --subject regcf
 
 ### 4. Read the statuses, and resist the urge to make them green
 
-A G1 run reports one row per declared stage. What the regcf sidecar's G1 run measures, as a worked example:
+A run reports one row per declared stage. What the regcf sidecar's primary-encoding run measures, as a worked example:
 
 ```
 p0-preflight: PASS
@@ -121,7 +121,7 @@ p7-tnr:       PASS
 p7-akn:       UNVERIFIED
 p9-report:    PASS
 p9-explain:   DEGRADED
-go: VERDICT: g1 COMPLETE
+go: VERDICT: COMPLETE  (subject regcf, encoding primary)
 ```
 
 That is a **successful** run. `COMPLETE` means every declared stage has a receipt, nothing is `BROKEN`, every non-`PASS` receipt carries a reason that appears in the report, and every gate is signed or explicitly waived. It is completeness of accounting, not greenness. (Until 2026-08-02 the `p7-dmn` row here read `NOT-EXECUTABLE` — permitted at G1 only because the report said so in Blocking terms, per SPEC.md §6; PR #194's corpus cases file flipped it to `PASS` with oracle class `execution`. The `p7-tnr` row read `NOT-REGENERATED` until `l4 nlg` gave the leg something to regenerate; it now reproduces the committed `.nlg.golden`s and carries oracle class `differential`.)
@@ -144,8 +144,8 @@ That prints a payload derived from the journal — the run, the tree, the sha256
 If no signer is enrolled (the shipped state) the honest alternative is a recorded waiver:
 
 ```bash
-etc/go/go.sh run --milestone g1 --subject regcf \
-  --waive HG1="G1 replays the already-reviewed committed corpus; no new encoding exists for a domain expert to review"
+etc/go/go.sh run --subject regcf --encoding primary \
+  --waive HG1="this replays the already-reviewed committed encoding; no new encoding exists for a domain expert to review"
 ```
 
 **Key idioms:**
@@ -157,7 +157,7 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 ### 6. Resume, rather than restart
 
 ```bash
-etc/go/go.sh run --milestone g1 --subject regcf --run-id <run-id>
+etc/go/go.sh run --subject regcf --encoding primary --run-id <run-id>
 ```
 
 Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact — and since 2026-08-20 that lookup crosses run boundaries, so a stage borrows a receipt from an earlier run of the SAME subject when the digest matches. A second run back to back therefore re-executes only the two stages that declare no inputs, plus anything whose digest actually moved. (This sentence was WRONG until 2026-08-20 and is now right by accident: it survived a 2026-08-09 correction that fixed the same claim in ORCHESTRATOR.md but not here, and the cross-run change happens to have made it true.)
@@ -174,7 +174,7 @@ Each stage declares its own inputs; the driver digests them; an unchanged digest
 $TMPDIR/l4-go/<run-id>/report.md
 ```
 
-It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 requires but this milestone cannot fill render as **ABSENT** with the reason and the stage that would have supplied them — never omitted. Notes you asked a phase script to record render in a block labelled _claimed, not verified_, with the author.
+It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 requires but this run cannot fill render as **ABSENT** with the reason and the stage that would have supplied them — never omitted. Notes you asked a phase script to record render in a block labelled _claimed, not verified_, with the author.
 
 Run directories accumulate. `etc/go/go.sh gc` prunes them — run dirs only; the object store has its own sweep, see 7a — keeping the most recent few **of each subject** **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected. Per subject matters once more than one exists: retention used to take the newest few across the whole store, so a burst of runs on one subject would have collected every run of another, and cross-run replay reuses receipts from exactly those older runs.
 
@@ -219,7 +219,7 @@ A stage that declares **no** inputs has no read-set, and that is deliberate rath
 
 ### 7d. `subject-report`: the account of a SUBJECT, not of one run
 
-`p9-report` renders **one run's** journal, and no single run exercises every phase — `sg-succession`'s g1 report marks §P1 and §P2 ABSENT while a g2 report marks the measurement stages SKIPPED, and both are correct about their own run.
+`p9-report` renders **one run's** journal, and no single run exercises every phase — `sg-succession`'s primary-encoding report marks §P1 and §P2 ABSENT while a deposit-path report marks the measurement stages SKIPPED, and both are correct about their own run.
 
 ```bash
 etc/go/go.sh subject-report --subject sg-succession
@@ -228,7 +228,7 @@ etc/go/go.sh subject-report --subject regcf --json
 
 **The fold is not a union.** A receipt binds to the digest it ran over, so evidence from two runs is jointly meaningful only where both ran over the same inputs. Each phase resolves to exactly one state: `CURRENT`, `STALE`, `NEVER RUN`, plus `NO READ-SET` for a stage that declares no inputs and `UNKNOWN` when some prerequisite could not be evaluated.
 
-**`NEVER RUN` is the state that would have caught R12's failure.** A run report says a phase is "not declared at this milestone" — true, and readable as _"accounted for elsewhere"_ when nothing had accounted for it anywhere. So the phase universe is built widest-first: what the driver says is **declarable**, then what the subject has declared, then what the store has recorded. A universe built only from what has been declared cannot contain the phase nobody ever declared, which is precisely the phase worth naming.
+**`NEVER RUN` is the state that would have caught R12's failure.** A run report says a phase is "not declared for this run" — true, and readable as _"accounted for elsewhere"_ when nothing had accounted for it anywhere. So the phase universe is built widest-first: what the driver says is **declarable**, then what the subject has declared, then what the store has recorded. A universe built only from what has been declared cannot contain the phase nobody ever declared, which is precisely the phase worth naming.
 
 **`STALE` is R4's, not "over an older digest".** A digest can differ with no prerequisite newer, and a prerequisite can be newer with the digest unmoved — that second case is the whole class of bug where the clock, the stdlib and the `IMPORT` closure were real input changes that moved no digest. So staleness is read from read-sets, and the moved member is named.
 
@@ -257,7 +257,7 @@ $TMPDIR/l4-go/<run-id>/explainer.html   (and explainer.md)
 etc/go/go.sh verify --run-id <run-id> --gates
 ```
 
-This re-reads the journal, re-hashes every artifact a receipt names, checks that each granted gate was recorded before the first stage it gates began — counting `stage_end` as well as `stage_begin`, so gated work run outside the driver is caught — and recomputes the milestone verdict. No build, no model, no network. It is the one check the agent that did the run cannot pre-satisfy, and it is what makes the run's claims worth anything to a second party.
+This re-reads the journal, re-hashes every artifact a receipt names, checks that each granted gate was recorded before the first stage it gates began — counting `stage_end` as well as `stage_begin`, so gated work run outside the driver is caught — and recomputes the run verdict. No build, no model, no network. It is the one check the agent that did the run cannot pre-satisfy, and it is what makes the run's claims worth anything to a second party.
 
 ### 9. Validate any register you wrote by hand
 
@@ -266,11 +266,11 @@ node etc/go/lib/register-validate.mjs <fork-register|external-modifications|sour
 node etc/go/lib/register-validate.mjs --rules <schema>
 ```
 
-G2 work deposits three registers — the source bundle (P1), the external-modification register (P2), the fork register (P4) — and **you write them, because no stage does**. Their formats live in `specs/todo/single-instruction-demo/schemas/` and this validator is their oracle. Give it the peer files and the cross-file joins run; withhold one and the joins that needed it print `skip` with a reason rather than passing quietly. Fixtures under `schemas/fixtures/` show a valid and an invalid instance of each. Validate before you report anything about a register: several of the schemas' rules exist because one careful human sweep got them wrong.
+Deposit-path work deposits three registers — the source bundle (P1), the external-modification register (P2), the fork register (P4) — and **you write them, because no stage does**. Their formats live in `specs/todo/single-instruction-demo/schemas/` and this validator is their oracle. Give it the peer files and the cross-file joins run; withhold one and the joins that needed it print `skip` with a reason rather than passing quietly. Fixtures under `schemas/fixtures/` show a valid and an invalid instance of each. Validate before you report anything about a register: several of the schemas' rules exist because one careful human sweep got them wrong.
 
-Calling this validator by hand is the fast inner loop. The **fact** is the receipt the stage writes — see the G2 runbook below.
+Calling this validator by hand is the fast inner loop. The **fact** is the receipt the stage writes — see the deposit runbook below.
 
-### 10. Diff a de novo encoding against the corpus (G2 acceptance)
+### 10. Diff a de novo encoding against the corpus (SPEC.md §6's G2 acceptance)
 
 ```bash
 node etc/go/lib/denovo-diff.mjs run --map <surface-map.json> --out <dir>
@@ -282,14 +282,14 @@ Two things it will not do for you. It **never triages** — every witness reads 
 
 ---
 
-## The G2 runbook — the de novo path
+## The deposit runbook — the de novo path
 
 **The shape of every step below is the same: you produce an artifact, you deposit it where the sidecar says, you run the stage, and the receipt is the fact.** P1, P2, P3 and P4 do not fetch, search, encode or find forks — those need the network or a model, and the driver takes neither. Each of them validates a deposit and reports one of three things: `SKIPPED` because the deposit is not there (a missing prerequisite, not a defect), `DEGRADED` naming the rules that fired, or `PASS` over an artifact whose sha256 is on the row.
 
 Start by reading what the subject has and has not deposited:
 
 ```bash
-etc/go/go.sh plan --milestone g2 --subject <id>
+etc/go/go.sh plan --subject <id> --encoding <encoding-id>
 ```
 
 Every deposit row reads `present`, `absent` or `undeclared`. `undeclared` means the sidecar does not name that deposit — fix `etc/go/subjects/<id>/subject.json` first, because a stage cannot validate a file nobody named.
@@ -321,7 +321,15 @@ Those paths need not exist — that is the point.
 
 **An additional encoding's modules may not name a committed module**: SPEC.md §8 compares the two, and an additional module that _is_ the committed one makes the comparison an identity. The resolver refuses it.
 
-**Selecting one:** `--encoding <id>` names it. `--milestone g2` still works and is translated — it selects the subject's sole additional encoding, and refuses when there is more than one, because an ordinal cannot name one of several. That refusal is the clearest statement of why the rename happened.
+**Selecting one:** `--encoding` takes exactly three kinds of value, and they are the same three the driver reports back:
+
+| value        | means                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `primary`    | the committed encoding. The default; the flag may be omitted.                                                                                                                    |
+| `<id>`       | that additional encoding, named. An id the subject does not declare is refused, and the refusal lists the ones it does.                                                          |
+| `undeclared` | the deposit path over a subject that declares **no** additional encoding — a forecast of what would have to be deposited. Refused, with a list, if the subject does declare one. |
+
+`--milestone` was retired (`PIPELINE-ARTIFACT-MODEL-SPEC.md` §3.9, R9) and now refuses, naming the replacement. It labelled a run by a **capability of this tooling**, and `g2` in particular named an ordinal — "the additional one" — which stops identifying anything the moment a subject declares two. Which stages run, which of them HG1 gates, and what a gate binds to are now all derived from the selected encoding.
 
 Then run the whole thing, or one stage at a time while you iterate:
 
@@ -384,11 +392,11 @@ Two of the five checks are discharged in `p3-check` (house style, temporal closu
 
 ### §8 — the acceptance diff
 
-Write a surface map (`schemas/surface-map.schema.json`) declaring the pairing between the de novo encoding and the committed corpus, then run the oracle as in step 10 above — or read the receipt of `p8-diff`, the declared g2 stage that has run the same oracle over `denovo.surface_map` since 2026-08-09. Exit `1` means it found a divergence, which is the **better** outcome. Triage each witness yourself; neither the script nor the stage ever will.
+Write a surface map (`schemas/surface-map.schema.json`) declaring the pairing between the de novo encoding and the committed corpus, then run the oracle as in step 10 above — or read the receipt of `p8-diff`, the declared deposit-path stage that has run the same oracle over `comparison.surface_map` since 2026-08-09. Exit `1` means it found a divergence, which is the **better** outcome. Triage each witness yourself; neither the script nor the stage ever will.
 
-### Reading a g2 verdict
+### Reading a deposit-path verdict
 
-`g2 COMPLETE` means every g2 stage is accounted for. It does **not** mean a de novo run happened: a run with every deposit absent reports ten `SKIPPED` receipts — the five deposit validators plus `p3-check`, `p6-tests`, `p7-dmn`, `p8-verify` and `p8-diff`, which all follow the deposit contract since 2026-08-09 — and `COMPLETE`, which is completeness of accounting doing exactly its job. `L4_GO_REQUIRED=1` turns each of those skips into exit 5, which is what CI should want. SPEC.md §6's G2 acceptance is the §8 diff oracle, and the declared stage `p8-diff` calls it over `denovo.surface_map`: read that receipt, including its `perturbation_enabled` metric, before repeating its agreement number. The p7 legs other than DMN are the rows `plan --milestone g2` still names `NOT WIRED`, each with its own reason.
+`COMPLETE` on the deposit path means every declared deposit stage is accounted for. It does **not** mean a de novo run happened: a run with every deposit absent reports ten `SKIPPED` receipts — the five deposit validators plus `p3-check`, `p6-tests`, `p7-dmn`, `p8-verify` and `p8-diff`, which all follow the deposit contract since 2026-08-09 — and `COMPLETE`, which is completeness of accounting doing exactly its job. `L4_GO_REQUIRED=1` turns each of those skips into exit 5, which is what CI should want. SPEC.md §6's G2 acceptance is the §8 diff oracle, and the declared stage `p8-diff` calls it over `comparison.surface_map`: read that receipt, including its `perturbation_enabled` metric, before repeating its agreement number. The p7 legs other than DMN are the rows a deposit-path `plan` still names `NOT WIRED`, each with its own reason.
 
 ---
 
@@ -398,7 +406,7 @@ SPEC.md §7.1 rules that Fable or Opus conducts, delegating to Fable, Opus or So
 
 ### What needs no model at all
 
-**Milestone G1 requires zero model calls.** Every stage in it is deterministic: a binary is invoked, an oracle runs, a receipt is written. If you find yourself reasoning about what a G1 leg should report, stop — the leg reports what its oracle returned, and reasoning about it is how a status stops being a function of bytes on disk.
+**A run over the committed encoding requires zero model calls.** Every stage in it is deterministic: a binary is invoked, an oracle runs, a receipt is written. If you find yourself reasoning about what a leg should report, stop — the leg reports what its oracle returned, and reasoning about it is how a status stops being a function of bytes on disk.
 
 That is the single largest simplification in this design and the first thing a later reader will be tempted to undo. Do not.
 
@@ -411,7 +419,7 @@ That is the single largest simplification in this design and the first thing a l
 | P5 adversarial gate | its own condition is "as good as it can be", which is a judgement. Two of its five checks are joins over registers whose format landed 2026-08-02 — so those two are exit codes, and the judgement is the rest. |
 | §8 triage           | the diff is mechanical; classifying each disagreement as encoding error / genuine ambiguity / improvement over the hand corpus is not, and no diff outcome constitutes a fail.                                  |
 
-All four are **G2** work, and all four are yours rather than the driver's. The stages exist and run: each validates the deposit you produced and reports `SKIPPED`/`DEGRADED`/`PASS` over it. What they cannot do is produce it — P1 and P2 need the network, P3 and P4 need a model — so the judgement above is the work and the stage is the acceptance condition. See the G2 runbook.
+All four are **deposit** work, and all four are yours rather than the driver's. The stages exist and run: each validates the deposit you produced and reports `SKIPPED`/`DEGRADED`/`PASS` over it. What they cannot do is produce it — P1 and P2 need the network, P3 and P4 need a model — so the judgement above is the work and the stage is the acceptance condition. See the deposit runbook.
 
 ### What mid-tier models are for
 
@@ -420,8 +428,8 @@ Mechanical transforms, golden regeneration, formatting, and reading harness outp
 ### ✔ / ✘ — delegating
 
 ```
-✔  "Run etc/go/go.sh run --milestone g1 --subject regcf and report the journal's verdict."
-✘  "Run the G1 pipeline and tell me whether the DMN projection is good."
+✔  "Run etc/go/go.sh run --subject regcf --encoding primary and report the journal's verdict."
+✘  "Run the pipeline and tell me whether the DMN projection is good."
 ```
 
 The second question has no answer the run can give. The DMN leg's `PASS` proves the emitted DMN executed on both engines over the subject's committed cases and agreed; whether the artifact is _good_ — whether its lossy findings (21 of them, in the regcf run) are acceptable losses — is a judgement, not an output of this run.
@@ -457,7 +465,7 @@ Just enough to read a run's output without a round-trip. Full treatment in [refe
 
 The last two are barred by construction. "The XML parses" is not "the XML says what the statute says", and a lattice erodes not because somebody deletes a status but because somebody picks a cheap oracle.
 
-### The four milestone verdicts
+### The four run verdicts
 
 | verdict      | exit | means                                                                               |
 | ------------ | ---- | ----------------------------------------------------------------------------------- |

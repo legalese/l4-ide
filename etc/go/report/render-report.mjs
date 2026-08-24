@@ -31,7 +31,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sha256File, verify } from "../lib/ledger.mjs";
-import { milestoneVerdict } from "../lib/verdict.mjs";
+import { runVerdict } from "../lib/verdict.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = resolve(HERE, "template.md");
@@ -128,7 +128,7 @@ const gateStates = [...new Map(gateRecs.map((g) => [g.gate, g])).values()].map(
     seq: g.seq,
   }),
 );
-const mv = milestoneVerdict({
+const mv = runVerdict({
   declared,
   receipts: stageEnds,
   gates: gateStates,
@@ -164,7 +164,7 @@ function projectionsTable() {
   if (!legs.length)
     return absent(
       "SPEC.md §P7 lists seven projection legs.",
-      "no p7 stage is declared for this milestone.",
+      "no p7 stage is declared for this run.",
     );
   const rows = legs.map((s) => {
     const r = byStage.get(s);
@@ -312,7 +312,7 @@ function sourceSection() {
       // for every subject; only the sources differ, and those are the
       // subject's own business, not this renderer's.
       "SPEC.md §P1 requires the source bundle with provenance — the retrieval of each source document, its integrity digest or immutable capture, the publisher's in-force statement, and the citation of the instrument and of each amendment.",
-      "`p1-ingest` is not declared at this milestone: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — at `g2` it validates a deposited source bundle — but a bundle is not what this run read.)",
+      "`p1-ingest` is not declared for this run: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — on the deposit path it validates a deposited source bundle — but a bundle is not what this run read.)",
     ),
     "",
     "What this run did read, and its exact content:",
@@ -332,7 +332,7 @@ function sweepSection() {
     // apparatus. Courts, regulator guidance and instruments in flight are the
     // three classes every jurisdiction has; what they are CALLED is the
     // subject's business.
-    "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
+    "`p2-sweep` is not declared for this run. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (On the deposit path the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
   );
 }
 
@@ -369,7 +369,7 @@ function encodingSection() {
     out.push(
       absent(
         "SPEC.md §P3/§P4 require what the encoding decided, including every ambiguity fork and every externally-settled resolution.",
-        "`p3-encode`, `p4-forks` and `p5-gate` are not declared at this milestone — they validate de novo deposits, and this run replayed the committed corpus — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
+        "`p3-encode`, `p4-forks` and `p5-gate` are not declared for this run — they validate de novo deposits, and this run replayed the committed encoding — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
       ),
     );
   if (r) {
@@ -442,7 +442,7 @@ function otherStagesSection() {
 function comparisonSection() {
   return absent(
     "SPEC.md §P9 requires a factual note of disagreement wherever another system has published its own representation of the same rule.",
-    "no stage in this milestone reads another system's representation. Making that comparison is R2's read-only probe, and any contact is HG2's subject.",
+    "no stage in this run reads another system's representation. Making that comparison is R2's read-only probe, and any contact is HG2's subject.",
   );
 }
 
@@ -456,7 +456,7 @@ function triageSection() {
   if (!r)
     return absent(
       "SPEC.md §8's triage table classifies each disagreement between the de novo encoding and the committed corpus as encoding error / genuine ambiguity / improvement over the hand corpus.",
-      "`p8-diff` — the stage that runs the diff oracle (`etc/go/lib/denovo-diff.mjs`) over the subject's declared surface map — has no receipt in this run. It is declared at milestone `g2`; a `g1` run replays one encoding and compares nothing.",
+      "`p8-diff` — the stage that runs the diff oracle (`etc/go/lib/denovo-diff.mjs`) over the subject's declared surface map — has no receipt in this run. It is declared on the deposit path; a run about the committed encoding replays one encoding and compares nothing.",
     );
   const m = r.metrics || {};
   const head =
@@ -517,9 +517,22 @@ function artifactsTable() {
   ].join("\n");
 }
 
-const MILESTONE_GLOSS = {
-  g1: "the replay run. The existing corpus is driven through every reachable projection; nothing is encoded from source.",
-  g2: "the de novo run.",
+// WHAT THE RUN WAS ABOUT, glossed. Keyed on the three encoding cases and not on
+// a capability label (R9, §3.9): `g1`/`g2` said which of this tooling's
+// milestones was being exercised, which is a fact about this repository, while
+// the reader of a report about a body of law needs to know which ENCODING of
+// that law the run measured.
+const ENCODING_GLOSS = (id) => {
+  if (id === "primary")
+    return "the committed encoding, replayed. It is driven through every reachable projection; nothing is encoded from source.";
+  if (id === "undeclared")
+    return "the deposit path over a subject that declares no additional encoding, so every deposit stage reports SKIPPED naming what is missing.";
+  // A schema-4 journal records a capability label, and `g2` named an ordinal
+  // from which the encoding cannot be recovered. Say so rather than inventing
+  // an id: verify-run.mjs reports the same value the same way.
+  if (typeof id === "string" && id.startsWith("legacy:"))
+    return "(a journal written before journal schema 5, which recorded a capability milestone rather than an encoding)";
+  return "an additional encoding, deposited. This run validates and measures what was deposited and compares it against the committed encoding.";
 };
 const VERDICT_GLOSS = {
   COMPLETE:
@@ -533,9 +546,11 @@ const VERDICT_GLOSS = {
 
 const values = {
   "run.id": begin?.run_id ?? "(none)",
-  "run.milestone_upper": (begin?.milestone ?? "?").toUpperCase(),
-  "run.milestone_gloss":
-    MILESTONE_GLOSS[begin?.milestone] ?? "(no gloss recorded)",
+  "run.encoding":
+    begin?.encoding ?? (begin?.milestone ? `legacy:${begin.milestone}` : "?"),
+  "run.encoding_gloss": ENCODING_GLOSS(
+    begin?.encoding ?? (begin?.milestone ? `legacy:${begin.milestone}` : null),
+  ),
   "run.subject": begin?.subject ?? "(none)",
   "run.repo_head": begin?.repo_head ?? "(none)",
   "run.tree_state": begin?.tree_state ?? "(unknown)",
@@ -598,7 +613,7 @@ if (formats.includes("html")) {
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   writeFileSync(
     p,
-    `<!doctype html><meta charset="utf-8"><title>${escapeHtml(values["run.milestone_upper"])} conversion report — ${escapeHtml(values["run.subject"])}</title>` +
+    `<!doctype html><meta charset="utf-8"><title>Conversion report — ${escapeHtml(values["run.subject"])} (${escapeHtml(values["run.encoding"])})</title>` +
       `<style>body{font:14px/1.55 ui-monospace,Menlo,monospace;max-width:60rem;margin:2rem auto;padding:0 1rem}pre{white-space:pre-wrap}</style>` +
       `<p><em>This HTML is a convenience wrapper. <code>report.md</code> is the report.</em></p><pre>${escapeHtml(md)}</pre>\n`,
   );

@@ -148,5 +148,5 @@ If a non-loopback deployment is genuinely wanted, it needs its own HG2 signature
 ## See also
 
 - [phases.md](phases.md) — which stages each gate blocks
-- [status-vocabulary.md](status-vocabulary.md) — how a refused gate becomes a milestone verdict
+- [status-vocabulary.md](status-vocabulary.md) — how a refused gate becomes a run verdict
 - `specs/todo/single-instruction-demo/ORCHESTRATOR.md` — the gate machinery as built, in the present tense

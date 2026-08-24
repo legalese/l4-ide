@@ -245,7 +245,7 @@ jobs:
 
       # Proves the status lattice can still say no: every status producible, PASS
       # rejected with a null, failing, or WEAK oracle, a BROKEN receipt unable to
-      # yield a COMPLETE milestone, and every way of editing the journal caught by
+      # yield a COMPLETE run, and every way of editing the journal caught by
       # the chain. Without this the lattice is one small edit from collapsing to
       # PASS/FAIL, and nothing would notice. --with-driver is deliberately NOT
       # passed: it needs a prebuilt `l4`, which this job does not build.
@@ -294,20 +294,27 @@ jobs:
           [ -n "$subjects" ] || { echo "::error::no subjects discovered"; exit 1; }
           for s in $subjects; do
             echo "--- plan --subject $s"
-            etc/go/go.sh plan --subject "$s" --milestone g1 > /tmp/plan-$s-g1.txt
-            grep -q 'p0-preflight' /tmp/plan-$s-g1.txt
-            grep -q 'entry points that exist and refuse' /tmp/plan-$s-g1.txt
-            grep -q 'p9-explain' /tmp/plan-$s-g1.txt
-            etc/go/go.sh plan --subject "$s" --milestone g2 > /tmp/plan-$s-g2.txt
-            grep -q 'p1-ingest' /tmp/plan-$s-g2.txt
-            grep -q 'NOT WIRED' /tmp/plan-$s-g2.txt
-            grep -q 'does NOT mean a de novo run happened' /tmp/plan-$s-g2.txt
-            echo "ok $s: g1 and g2 both plan"
+            etc/go/go.sh plan --subject "$s" --encoding primary > /tmp/plan-$s-primary.txt
+            grep -q 'p0-preflight' /tmp/plan-$s-primary.txt
+            grep -q 'entry points that exist and refuse' /tmp/plan-$s-primary.txt
+            grep -q 'p9-explain' /tmp/plan-$s-primary.txt
+            # THE ENCODING ID IS ASKED FOR, NEVER HARD-CODED HERE. A subject's
+            # additional encoding is named in its own sidecar, and a workflow
+            # holding its own copy of that answer is the drift this file's
+            # subject enumeration above already refuses. `undeclared` is the
+            # third case and is what a subject declaring none resolves to.
+            enc=$(node etc/go/lib/subject.mjs "$s" --encodings | head -1)
+            enc=${enc:-undeclared}
+            etc/go/go.sh plan --subject "$s" --encoding "$enc" > /tmp/plan-$s-deposit.txt
+            grep -q 'p1-ingest' /tmp/plan-$s-deposit.txt
+            grep -q 'NOT WIRED' /tmp/plan-$s-deposit.txt
+            grep -q 'does NOT mean a de novo run happened' /tmp/plan-$s-deposit.txt
+            echo "ok $s: the primary and deposit paths both plan (deposit encoding: $enc)"
           done
           # A bare `plan` must still be a loud refusal, not a silent pick among
           # several -- a run about an unnamed body of law is the thing the
           # requirement exists to prevent.
-          if etc/go/go.sh plan --milestone g1 > /tmp/plan-bare.txt 2>&1; then
+          if etc/go/go.sh plan > /tmp/plan-bare.txt 2>&1; then
             n=$(printf '%s\n' $subjects | wc -l)
             [ "$n" = "1" ] || { echo "::error::bare plan succeeded with $n subjects"; exit 1; }
           else

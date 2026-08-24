@@ -13,7 +13,7 @@
 # nothing into the tree.
 #
 # WHY THIS IS A DECLARED STAGE rather than a second render inside p9-report.sh:
-# a declared stage appears in run_begin's declared_stages, and the milestone
+# a declared stage appears in run_begin's declared_stages, and the run
 # verdict reports INCOMPLETE for any declared stage with no receipt. A run that
 # produced no explainer therefore says so in its verdict. Folding the render
 # into p9-report would make the explainer's absence invisible, and would put a
@@ -54,7 +54,7 @@ fi
 
 # Refuse to render into a run that never declared this stage.
 #
-# `milestoneVerdict` checks declared -> receipt and never receipt -> declared,
+# `runVerdict` checks declared -> receipt and never receipt -> declared,
 # so a stage resumed into an older run directory writes a receipt and four
 # hashed artifacts that the run's own verdict cannot see, while the artifacts
 # land in the audit report's artifact table. MEASURED: run
@@ -69,7 +69,7 @@ if ! node -e '
   const b = rows.find((r) => r.kind === "run_begin");
   process.exit(!b || (b.declared_stages ?? []).includes("p9-explain") ? 0 : 1);
 ' "$GO_RUN/journal.ndjson" 2>/dev/null; then
-  go_skip "this run's own run_begin record does not declare p9-explain, so the run's milestone verdict cannot account for a receipt from it. Rendering anyway would put a document — and four hashed artifacts — into a run whose verdict is blind to them. Start a run that declares the stage instead."
+  go_skip "this run's own run_begin record does not declare p9-explain, so the run's verdict cannot account for a receipt from it. Rendering anyway would put a document — and four hashed artifacts — into a run whose verdict is blind to them. Start a run that declares the stage instead."
 fi
 
 # Preliminary render into the ARTIFACTS directory, hashed on this stage's own
