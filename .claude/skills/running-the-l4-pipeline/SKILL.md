@@ -292,23 +292,41 @@ Start by reading what the subject has and has not deposited:
 etc/go/go.sh plan --milestone g2 --subject <id>
 ```
 
-Every de novo row reads `present`, `absent` or `undeclared`. `undeclared` means the sidecar has no `denovo` section for that deposit — fix `etc/go/subjects/<id>/subject.json` first, because a stage cannot validate a file nobody named:
+Every deposit row reads `present`, `absent` or `undeclared`. `undeclared` means the sidecar does not name that deposit — fix `etc/go/subjects/<id>/subject.json` first, because a stage cannot validate a file nobody named.
+
+**There is no `denovo` object any more, and its removal is the ruling, not a tidy-up.** `denovo` is an ordinal — "the second pass" — and it bundled six keys covering four unrelated kinds of thing. Each now sits under what it _is_:
 
 ```json
-"denovo": {
-  "bundle": "jl4/examples/legal/<id>/denovo/source-bundle.json",
-  "register": "jl4/examples/legal/<id>/denovo/external-modifications.json",
-  "fork_register": "jl4/examples/legal/<id>/denovo/fork-register.json",
-  "modules": ["jl4/examples/legal/<id>/denovo/<id>-denovo.l4"]
+"natlang_sources": {
+  "bundle":   "jl4/examples/legal/<id>/sources/source-bundle.json",
+  "register": "jl4/examples/legal/<id>/sources/external-modifications.json"
+},
+"comparison": {
+  "fork_register": "jl4/examples/legal/<id>/sources/fork-register.json",
+  "surface_map":   "jl4/examples/legal/<id>/sources/surface-map.json"
+},
+"encodings": {
+  "cleanroom-2026-08": {
+    "modules": ["jl4/examples/legal/<id>/cleanroom/<id>-cleanroom.l4"],
+    "checks":  { "min_dated_arms": 0, "min_assertions": 39 }
+  }
 }
 ```
 
-Those paths need not exist — that is the point. `denovo.modules` **may not name a corpus module**: SPEC.md §8 compares the de novo encoding against the committed one, and a de novo module that _is_ the corpus makes the comparison an identity. The resolver refuses it.
+Those paths need not exist — that is the point.
+
+**An encoding id names an occasion, not a position.** `cleanroom-2026-08` is a fact about the job; "de novo" was a fact about the job's _place in a sequence_, which the graph can answer and a schema key cannot. `primary` is reserved for the committed encoding declared under `encoding`.
+
+**Floors travel with their encoding, structurally.** `encodings.<id>.checks` sits inside the encoding it measures, so a committed floor can no longer be applied to a deposit — which would fail a healthy deposit for not being the committed encoding — and a deposit floor cannot be applied to the committed one, which would let it shrink unnoticed. That used to be a convention the reader had to hold in their head.
+
+**An additional encoding's modules may not name a committed module**: SPEC.md §8 compares the two, and an additional module that _is_ the committed one makes the comparison an identity. The resolver refuses it.
+
+**Selecting one:** `--encoding <id>` names it. `--milestone g2` still works and is translated — it selects the subject's sole additional encoding, and refuses when there is more than one, because an ordinal cannot name one of several. That refusal is the clearest statement of why the rename happened.
 
 Then run the whole thing, or one stage at a time while you iterate:
 
 ```bash
-etc/go/go.sh run --milestone g2 --subject <id> --only p1-ingest
+etc/go/go.sh run --encoding <enc-id> --subject <id> --only p1-ingest
 ```
 
 ### P1 — fetch with provenance
