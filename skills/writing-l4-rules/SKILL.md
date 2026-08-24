@@ -431,6 +431,15 @@ BRANCH IF x EQUALS 1 THEN "one"
 
 The caret `^` is the **ditto** operator — "same as the cell above". See [references/gotchas.md](references/gotchas.md).
 
+**Smell: a cascade of `ELSE IF` is a `BRANCH` that wasn't written as one.** Three or more
+first-match arms written as nested `IF … THEN … ELSE IF …` bury a flat decision in a
+right-leaning staircase: each arm indents deeper, reordering means re-indenting, and the
+reader must verify the nesting to see that it IS flat. `BRANCH` states the shape directly —
+one line per arm, `OTHERWISE` for the default — and it column-aligns with `^` dittos (see
+`jl4/examples/experiments/miles-card/miles-card.l4` for a 12-row decision table in this
+style). Keep nested `IF`/`ELSE` for genuinely nested decisions, where an arm's condition only
+makes sense inside another arm's branch.
+
 ### Record construction and access
 
 ```l4
