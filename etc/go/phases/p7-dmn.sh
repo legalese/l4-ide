@@ -36,9 +36,9 @@
 
 # The milestone-scoped module set. At corpus origin this leg emits the corpus
 # MAIN module only (the wizard is not part of the DMN golden), so the g1
-# branch keeps reading GO_S_CORPUS; the resolved set drives the g2 branch.
+# branch keeps reading GO_S_ENCODING; the resolved set drives the g2 branch.
 if [[ -z "${GO_MODULES+x}" ]]; then
-  GO_MODULES="${GO_S_CORPUS:-}"
+  GO_MODULES="${GO_S_ENCODING:-}"
   GO_MODULES_ORIGIN="corpus"
 fi
 
@@ -50,7 +50,7 @@ if [[ "${1:-}" == "--inputs" ]]; then
       "$GO_ROOT/etc/kie-dmn-check/run.sh" \
       "$GO_ROOT/etc/camunda-dmn-check/run.sh"
   else
-    printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+    printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" \
       "$GO_S_DMN_GOLDEN" \
       "$GO_S_DMN_FIDELITY_GOLDEN" \
       "$GO_ROOT/etc/validate-dmn.mjs" \
@@ -223,7 +223,7 @@ DIFFLOG="$GO_OUT/p7-dmn.canon-diff.txt"
 
 # --- 1. regenerate -----------------------------------------------------------
 set +e
-"$L4" export "$GO_S_CORPUS" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
+"$L4" export "$GO_S_ENCODING" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
 EXPORT_RC=$?
 set -e
 [[ $EXPORT_RC -eq 0 ]] || go_broken "l4 export --to dmn exited $EXPORT_RC on a module that typechecks"
@@ -238,10 +238,10 @@ FID="${OUT%.dmn}.fidelity.txt"
 # canonicalisation carries its `because` (DmnExport.hs:3212) and the condition
 # for its own deletion.
 set +e
-L4_GO_SOURCE_BASENAME="$(basename "$GO_S_CORPUS")" \
+L4_GO_SOURCE_BASENAME="$(basename "$GO_S_ENCODING")" \
   node "$GO_LIB/canon-diff.mjs" "$OUT" "$GOLDEN" --report "$DIFFLOG"
 DIFF_RC=$?
-L4_GO_SOURCE_BASENAME="$(basename "$GO_S_CORPUS")" \
+L4_GO_SOURCE_BASENAME="$(basename "$GO_S_ENCODING")" \
   node "$GO_LIB/canon-diff.mjs" "$FID" "$GOLDEN_FID" --report "$GO_OUT/p7-dmn.fidelity.canon-diff.txt"
 FID_DIFF_RC=$?
 set -e

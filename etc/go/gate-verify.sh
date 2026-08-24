@@ -121,6 +121,12 @@ fi
 IDENTITY=$(awk '!/^#/ && NF {print $1; exit}' "$SIGNERS")
 if ssh-keygen -Y verify -f "$SIGNERS" -I "$IDENTITY" -n "$NAMESPACE" -s "$SIG" <"$PAYLOAD" >/dev/null 2>&1; then
   FPR=$(awk '!/^#/ && NF {$1=""; print substr($0,2); exit}' "$SIGNERS" | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')
+  # WHO signed, written where the driver can read it. `signer` has been a
+  # declared field on the gate row since the beginning and has never once been
+  # populated: this script computed the identity and the fingerprint purely to
+  # print them at a human. A blessing that cannot name its signer is not an
+  # answer to "which expert reviewed this?", which is the whole of R11.
+  printf '%s %s\n' "$IDENTITY" "${FPR:-(unreadable)}" > "$(dirname "$PAYLOAD")/$GATE.signer"
   echo "GATE $GATE: SATISFIED — signature by $IDENTITY over $PAYLOAD verifies in namespace $NAMESPACE"
   echo "  allowed-signers fingerprint: ${FPR:-(unreadable)}"
   exit 0

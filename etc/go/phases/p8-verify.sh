@@ -49,19 +49,32 @@
 # The milestone-scoped module set, resolved by the driver as GO_MODULES with
 # GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
 # documented direct-invocation route — the committed corpus set is the default,
-# preserving the pre-2026-08-09 contract.
+# preserving the pre-2026-08-09 contract. Kept byte-for-byte in step with the
+# driver's own derivation (go.sh, the g1 arm): a fallback that resolved a
+# NARROWER set than a run does would make a direct invocation measure something
+# other than what the receipt claims.
 if [[ -z "${GO_MODULES+x}" ]]; then
-  GO_MODULES="${GO_S_CORPUS:-}${GO_S_WIZARD:+ $GO_S_WIZARD}"
+  GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
   GO_MODULES_ORIGIN="corpus"
 fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
+  # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
+  # `--fixed-now` is what this stage passes to `l4` below, and it is the answer
+  # to "as at what date does the law say this". It was in NO stage's inputs: two
+  # runs of the same subject, same tree, same binary and DIFFERENT --fixed-now
+  # produced byte-identical digests, and findReplayableAcrossRuns filters on
+  # subject and digest only -- so the second run borrowed the first run's answer
+  # about a different point in legal time. Declared per stage rather than folded
+  # centrally like the l4 binary's sha, because only the stages that actually
+  # pass --fixed-now should re-run when it moves.
   printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-clean.l4" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-unsat.l4" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-dead-branch.l4" \
     "$GO_ROOT/jl4/tests-cli/fixtures/verify-vacuous-guard.l4" \
-    "$GO_ROOT/jl4/tests-cli/fixtures/verify-seam.l4"
+    "$GO_ROOT/jl4/tests-cli/fixtures/verify-seam.l4" \
+    "text:fixed_now=${GO_FIXED_NOW:-unset}"
   exit 0
 fi
 

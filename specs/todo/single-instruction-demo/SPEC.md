@@ -631,9 +631,30 @@ elsewhere should say "SI-Rn".
   the signature keeps verifying where it was made. R8's provisionality clause is unaffected and
   still stands: it yields to Thomas's model when that arrives. Two facts about the merge problem
   survive R9 and are worth keeping in view: it still binds the vendored lane in full, and the
-  reorganisation-only case is separately safe because gate payloads bind **basenames plus
-  sha256** and embed no canon path (verified in `etc/go/phases/p0-preflight.sh:91`), so moving a
-  subject between directories does not invalidate anything.
+  reorganisation-only case **used to be** separately safe because gate payloads bound
+  **basenames plus sha256** and embedded no path.
+
+  **Retracted 2026-08-18: they now bind repo-relative paths plus the files' own sha256**
+  (`etc/go/lib/corpus-metrics.mjs`, called from `etc/go/phases/p0-preflight.sh` §6), so moving a
+  subject between directories **does** invalidate its signature and the signature must be
+  re-obtained.
+
+  Two things were wrong with the retracted claim, one of them at the time it was written. The
+  basename form could not survive `encoding.modules`: metrics are last-wins, so two modules sharing
+  a basename in different directories — an ordinary shape once an encoding is an ontology module
+  plus three statute modules — collapsed to one payload line and dropped a module out of the
+  signed document silently. And the value was never the file's sha256: it was
+  `digest.mjs`, i.e. `digestSet` over a one-element set, which hashes `path\tsize\tsha256` and
+  therefore **embedded the absolute worktree path** — measured, `jl4/examples/legal/regcf/regcf.l4`
+  rendered `sha256:78529ff9…` from a relative path, `sha256:a9534ae0…` from an absolute one and
+  `sha256:1048701d…` from `shasum -a 256`. So the payload was already worktree-dependent, already
+  changed when a file moved, and could not be checked by a reviewer with `shasum`. All three are
+  fixed by the same change.
+
+  Losing reorganisation-safety is the smaller cost and it fails loudly; a signature that cannot
+  say which files it covered is the larger one and it fails quietly. Nothing else about R8
+  changes: this is the same "binds to content, not to a moment" rule already stated above, now
+  applied to the file set as well as to the file bytes.
 
 - **R9 — canon as an INDEX rather than a monorepo**: **ANSWERED 2026-08-05 (Meng), in the
   coexistence form** — canon holds vendored encodings _and_ indexes external ones through one row

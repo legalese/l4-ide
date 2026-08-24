@@ -55,6 +55,24 @@ if (!g) {
   process.exit(2);
 }
 
+// Schema check BEFORE use. `g.defects` used to be dereferenced straight into
+// `.length`, so a group written with the wrong key name threw a TypeError and
+// exited 1 -- and p7-wizard's `case` handles only 4 and 2, so exit 1 fell
+// through it and the stage carried on as though the negative controls had run.
+// MEASURED on sg-succession's catalogue, whose groups carried `entries` and
+// `why_empty` instead of `defects` and `note`: the leg emitted its receipt with
+// every negative control silently not run. A checker that crashes must say what
+// is wrong with the file, under the usage code the caller already handles.
+if (!Array.isArray(g.defects)) {
+  process.stderr.write(
+    `known-defects.mjs: group '${group}' in ${CATALOGUE} has no 'defects' array ` +
+      `(found: ${Object.keys(g).join(", ") || "no keys"}).\n` +
+      `  The schema is { measured_on, measured_by?, note, defects: [...] } -- see\n` +
+      `  etc/go/subjects/regcf/known-defects.json. An empty group states its reason in 'note'.\n`,
+  );
+  process.exit(2);
+}
+
 const text = readFileSync(artifact, "utf8");
 if (!g.defects.length) {
   process.stdout.write(

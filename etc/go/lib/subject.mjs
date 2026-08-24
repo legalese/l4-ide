@@ -53,7 +53,20 @@ export const LEG_ORDER = [
 // phase itself owns the absent-file story (p7-dmn reports NOT-EXECUTABLE when
 // the cases file is missing; that is a designed status, not a config error).
 const LEG_KEYS = {
-  "p7-dmn": { golden: "r", fidelity_golden: "r", cases: "x" },
+  // engine_baseline: the exact verdict lines the external DMN engines must
+  // print for THIS subject's golden. Optional, because a subject may declare a
+  // DMN leg before anyone has run an engine over it -- but once declared, the
+  // file must exist, and CI compares against it instead of against a string
+  // typed into the workflow. Same shape as etc/bpmn-kie-baseline.txt, which is
+  // the proven pattern here: a measurement belongs in a committed file next to
+  // the artifact it measures, not in a `grep -q` inside a YAML step where only
+  // one subject can ever be named.
+  "p7-dmn": {
+    golden: "r",
+    fidelity_golden: "r",
+    cases: "x",
+    engine_baseline: "o",
+  },
   "p7-dmn-md": { golden: "r", fidelity_golden: "r" },
   "p7-bpmn": { expected_dir: "dir", rules: "rules" },
   "p7-ladder": {
@@ -75,6 +88,7 @@ const LEG_ENV = {
     golden: "GO_S_DMN_GOLDEN",
     fidelity_golden: "GO_S_DMN_FIDELITY_GOLDEN",
     cases: "GO_S_DMN_CASES",
+    engine_baseline: "GO_S_DMN_ENGINE_BASELINE",
   },
   "p7-dmn-md": {
     golden: "GO_S_DMNMD_GOLDEN",
@@ -111,7 +125,9 @@ function refuseUnknown(id) {
     `subject.mjs: subject '${id}' has no sidecar under ${SUBJECTS_DIR}.\n` +
       `  Available subject(s): ${avail.length ? avail.join(", ") : "(none)"}\n\n` +
       `  To add one: create etc/go/subjects/<id>/ with subject.json (id, display_name,\n` +
-      `  citation, source_url, corpus.main [+ optional corpus.wizard], checks, and a 'legs'\n` +
+      `  citation, source_url, corpus (main = the entry module; optional modules = every\n` +
+      `  module of the encoding, in dependency order, main among them; optional wizard\n` +
+      `  naming which of them is the wizard), checks, and a 'legs'\n` +
       `  object declaring exactly the projection legs the subject supports, each with its\n` +
       `  committed golden/cases paths, repo-root-relative, plus an optional 'denovo' object\n` +
       `  declaring where the G2 deposits live — bundle, register, fork_register, modules,\n` +
@@ -121,8 +137,8 @@ function refuseUnknown(id) {
       `  measured against that corpus), known-defects.json (measured negative controls,\n` +
       `  empty groups say why), and NOTES.md (free-prose idiosyncrasies; scripts never\n` +
       `  read it). The driver declares a milestone stage iff 'legs' has the entry, so a\n` +
-      `  subject with no wizard and no regulative rules simply omits those legs and the\n` +
-      `  milestone verdict stays honest. Any existing sidecar under etc/go/subjects/ is\n` +
+      `  subject whose module set carries no wizard, and no regulative rules, simply omits\n` +
+      `  those legs and the milestone verdict stays honest. Any existing sidecar under etc/go/subjects/ is\n` +
       `  a worked example.\n`,
   );
   process.exit(2);
@@ -170,7 +186,7 @@ export function loadSubject(id) {
     "display_name",
     "citation",
     "source_url",
-    "corpus",
+    "encoding",
     "checks",
     "legs",
     "denovo",
@@ -183,15 +199,147 @@ export function loadSubject(id) {
   if (desc.id !== id)
     die(`subject.json: id '${desc.id}' does not match directory name '${id}'`);
 
-  if (typeof desc.corpus !== "object" || desc.corpus === null)
-    die(`subject.json: 'corpus' must be an object`);
-  checkKeys("corpus", desc.corpus, ["main", "wizard"]);
-  if (typeof desc.corpus.main !== "string")
+  if (typeof desc.encoding !== "object" || desc.encoding === null)
+    die(`subject.json: 'encoding' must be an object`);
+  checkKeys("encoding", desc.encoding, ["main", "wizard", "modules", "state"]);
+  if (typeof desc.encoding.main !== "string")
     die(`subject.json: corpus.main is required`);
-  const corpusMain = mustExist("corpus.main", desc.corpus.main);
-  const corpusWizard = desc.corpus.wizard
-    ? mustExist("corpus.wizard", desc.corpus.wizard)
+
+  // --- encoding.state: written (default) | unwritten -------------------------
+  //
+  // THE THIRD STATE. Until 2026-08-20 a sidecar could say only two things about
+  // its encoding: this file, which must exist, or nothing at all — and `main`
+  // is required, so "nothing at all" was not available either. That made the
+  // FIRST encoding of a subject homeless: you cannot register a body of law
+  // until you have already encoded it, and you cannot run `plan`, `doctor` or
+  // any stage against it to find out what encoding it would involve. This is
+  // ruling R12 in specs/todo/PIPELINE-ARTIFACT-MODEL-SPEC.md, and it is the
+  // reason `go.sh new-subject` could not exist.
+  //
+  // The fix is a DECLARED state, not a relaxed check. The existence rule a few
+  // lines below is deliberate — its own comment says a de novo module's absence
+  // is a stage's SKIPPED story while a committed module's absence is a
+  // misconfiguration — and simply permitting absence would turn a mistyped path
+  // into a silent skip, which is precisely the failure the explainer's
+  // "EXPLICIT DECLARATION, not directory discovery" comment refuses further
+  // down this file.
+  //
+  // So the declaration is checked in BOTH directions:
+  //
+  //   state written (the default, and what every existing sidecar means):
+  //     main, wizard and every module MUST exist. Byte-for-byte today's rule,
+  //     so a typo still fails loudly naming the path.
+  //
+  //   state unwritten:
+  //     they must NOT exist. Depositing the first module without flipping the
+  //     state is itself an error, naming the file and the one-line edit — which
+  //     is what stops the declaration from rotting into a lie the moment it
+  //     stops being true.
+  //
+  // Nothing downstream needs teaching. The stages already report a declared
+  // module that is not a file as SKIPPED with a named reason and the deposit
+  // instruction (p3-check, p6-tests, p8-verify, via go_skip), and digestSet
+  // records a missing path as ABSENT rather than skipping it — so an unwritten
+  // encoding has a real gate digest, and depositing the first module moves that
+  // digest and re-opens HG1, which is the property §6.3 already claims for a
+  // post-gate edit.
+  const encodingState = desc.encoding.state ?? "written";
+  if (encodingState !== "written" && encodingState !== "unwritten")
+    die(
+      `encoding.state: unknown state '${encodingState}' (expected "written" or "unwritten")`,
+    );
+  const unwritten = encodingState === "unwritten";
+
+  const encodingPath = (where, rel) => {
+    const abs = resolve(REPO, rel);
+    if (unwritten) {
+      if (existsSync(abs))
+        die(
+          `${where}: the sidecar declares encoding.state "unwritten", but ${abs} exists.\n` +
+            `  The encoding has been written, so the sidecar is now false. Set encoding.state to "written" in ${resolve(SUBJECTS_DIR, id, "subject.json")}\n` +
+            `  (or delete the key — "written" is the default). Every stage will then hold this subject to the same rules as any other.`,
+        );
+      return abs;
+    }
+    return mustExist(where, rel);
+  };
+
+  const encodingMain = encodingPath("corpus.main", desc.encoding.main);
+  const encodingWizard = desc.encoding.wizard
+    ? encodingPath("corpus.wizard", desc.encoding.wizard)
     : "";
+
+  // --- the corpus module set ------------------------------------------------
+  //
+  // A subject's encoding is not always one file. Singapore succession law is a
+  // shared ontology module plus three statute modules (Wills, Intestate
+  // Succession, Probate and Administration) plus a wizard, and every one of
+  // them has to be checked, tested, verified and — above all — DIGESTED: the
+  // corpus digest is what a human gate binds to, so a digest over the entry
+  // module alone would leave a granted HG1 open across an edit to any of the
+  // others. That is a false signature, not a cosmetic gap.
+  //
+  // `encoding.modules` declares the whole set, IN DEPENDENCY ORDER (an ontology
+  // module before the statute modules that IMPORT it), and is validated exactly
+  // the way `denovo.modules` is below — with one deliberate difference: a
+  // corpus module must EXIST. A de novo module is an agent deposit whose
+  // absence is a stage's SKIPPED story; a corpus module is committed, so a
+  // missing one is a misconfiguration and says so, naming the path.
+  //
+  // `main` stays the ENTRY module — the one every single-artifact leg exports
+  // from — and `wizard` stays the ROLE POINTER p7-wizard renders. Both are
+  // therefore required to be MEMBERS of a declared set: a set that omits one of
+  // them is a misdeclaration rather than a shorthand, and it would silently
+  // drop that file out of the digest and out of GO_MODULES.
+  //
+  // Omitting `modules` resolves to exactly the historical set — main, plus the
+  // wizard when declared — so an existing sidecar keeps meaning precisely what
+  // it meant.
+  let encodingModules;
+  if (desc.encoding.modules === undefined) {
+    encodingModules = encodingWizard
+      ? [encodingMain, encodingWizard]
+      : [encodingMain];
+  } else {
+    if (
+      !Array.isArray(desc.encoding.modules) ||
+      desc.encoding.modules.length === 0
+    )
+      die(`encoding.modules must be a non-empty array of module paths`);
+    encodingModules = [];
+    const seenAt = new Map(); // absolute path -> the declared string that got there
+    for (const m of desc.encoding.modules) {
+      if (typeof m !== "string" || !m)
+        die(`encoding.modules: every entry must be a non-empty string`);
+      // The env transport is space-separated (GO_S_ENCODING_MODULES, exactly as
+      // GO_S_DENOVO_MODULES and GO_S_LEGS). A path with whitespace would split
+      // silently into two nonexistent paths, so it is refused here rather than
+      // mis-read there.
+      if (/\s/.test(m))
+        die(
+          `encoding.modules['${m}']: a module path may not contain whitespace`,
+        );
+      const a = encodingPath(`encoding.modules['${m}']`, m);
+      if (seenAt.has(a))
+        die(
+          `encoding.modules['${m}'] duplicates '${seenAt.get(a)}': both resolve to ${a}. The set is the gate digest's file list and the list p3-check/p6-tests/p8-verify iterate, so a repeat would double-count one module's assertions and findings`,
+        );
+      seenAt.set(a, m);
+      encodingModules.push(a);
+    }
+    if (!seenAt.has(encodingMain))
+      die(
+        `encoding.modules does not contain corpus.main ('${desc.encoding.main}' -> ${encodingMain}). main is the subject's ENTRY module — the one the single-artifact legs export from — so a module set that omits it is a misdeclaration, not a shorthand`,
+      );
+    if (encodingWizard && !seenAt.has(encodingWizard))
+      die(
+        `encoding.modules does not contain corpus.wizard ('${desc.encoding.wizard}' -> ${encodingWizard}). The wizard is a ROLE POINTER into the module set, not a module beside it: leaving it out would drop it from the gate digest, so editing it could not re-open HG1`,
+      );
+  }
+  // Membership set for the de novo identity guard below. Built once, from the
+  // resolved set, so that widening the schema cannot leave that guard testing a
+  // narrower list than the one the pipeline actually runs over.
+  const encodingModuleSet = new Set(encodingModules);
 
   if (typeof desc.checks !== "object" || desc.checks === null)
     die(`subject.json: 'checks' must be an object`);
@@ -258,7 +406,7 @@ export function loadSubject(id) {
         env[envName] = kind === "dir" && key === "figures_dir" ? val : abs;
     }
   }
-  if (legs.includes("p7-wizard") && !corpusWizard)
+  if (legs.includes("p7-wizard") && !encodingWizard)
     die(
       `legs['p7-wizard'] is declared but corpus.wizard is not: the wizard leg renders the wizard module, so a subject with no wizard module omits the leg`,
     );
@@ -329,8 +477,12 @@ export function loadSubject(id) {
         // SPEC.md §8: the de novo run re-derives the subject WITHOUT reading the
         // existing corpus, and the diff oracle compares the two. A `denovo`
         // module that IS a corpus module makes that comparison an identity and
-        // the G2 milestone a restatement of G1.
-        if (a === corpusMain || (corpusWizard && a === corpusWizard))
+        // the G2 milestone a restatement of G1. Tested against the WHOLE corpus
+        // module set, not against main/wizard: with an ontology module and three
+        // statute modules, a collision with any of the others is the same defect
+        // and would otherwise make the acceptance diff a partial identity with
+        // no error anywhere.
+        if (encodingModuleSet.has(a))
           die(
             `denovo.modules['${m}'] is also a corpus module. G2 re-derives the subject from source without reading the committed encoding (SPEC.md §8), so a de novo module that is the replay corpus makes the acceptance diff an identity`,
           );
@@ -449,8 +601,19 @@ export function loadSubject(id) {
       GO_S_CITATION: desc.citation,
       GO_S_SOURCE_URL: desc.source_url,
       GO_S_DIR: dir,
-      GO_S_CORPUS: corpusMain,
-      GO_S_WIZARD: corpusWizard,
+      GO_S_ENCODING: encodingMain,
+      GO_S_WIZARD: encodingWizard,
+      // The whole encoding, space-separated, in declared (dependency) order —
+      // same transport as GO_S_DENOVO_MODULES and GO_S_LEGS. GO_S_ENCODING and
+      // GO_S_WIZARD stay exactly what they were, the entry module and the
+      // wizard role pointer, so the single-module legs read the same value they
+      // always did.
+      GO_S_ENCODING_MODULES: encodingModules.join(" "),
+      // Exported so the report and the plan can SAY "unwritten" rather than
+      // leaving the reader to infer it from a run in which every stage skipped.
+      // The stages themselves need nothing: a declared path that is not a file
+      // is already their SKIPPED story, with the deposit instruction attached.
+      GO_S_ENCODING_STATE: encodingState,
       GO_S_PINS: pins,
       GO_S_KNOWN_DEFECTS: defects,
       GO_S_MIN_DATED_ARMS: String(desc.checks.min_dated_arms),
@@ -468,9 +631,39 @@ const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [, , idOrFlag, sub] = process.argv;
-  if (!idOrFlag) die("usage: subject.mjs <id> [bpmn-rules] | --list");
+  if (!idOrFlag) die("usage: subject.mjs <id> [bpmn-rules] | --list | --ci");
   if (idOrFlag === "--list") {
     process.stdout.write(listSubjects().join("\n") + "\n");
+    process.exit(0);
+  }
+  // --ci: every subject's CI-relevant shape, as JSON, in REPO-RELATIVE paths.
+  //
+  // CI cannot read a sidecar the way a phase script can -- a GitHub workflow
+  // step has no GO_S_* environment and a `paths:` filter is static YAML. So the
+  // one place that knows what a subject declares emits it, and the workflow
+  // consumes it, rather than the workflow keeping its own copy of the answer
+  // under a name only one subject will ever match. Paths are relative because
+  // that is what a `paths:` filter and a repo-root `run:` step both want; the
+  // GO_S_* env transport stays absolute and unchanged.
+  if (idOrFlag === "--ci") {
+    const out = listSubjects().map((id) => {
+      const { desc } = loadSubject(id);
+      const modules = desc.encoding.modules ?? [
+        desc.encoding.main,
+        ...(desc.encoding.wizard ? [desc.encoding.wizard] : []),
+      ];
+      const dirs = [
+        ...new Set(modules.map((m) => m.slice(0, m.lastIndexOf("/")))),
+      ].sort();
+      return {
+        id,
+        display_name: desc.display_name,
+        encoding_state: desc.encoding.state ?? "written",
+        encoding_dirs: dirs,
+        legs: desc.legs,
+      };
+    });
+    process.stdout.write(JSON.stringify(out, null, 2) + "\n");
     process.exit(0);
   }
   const { desc, env } = loadSubject(idOrFlag);

@@ -14,7 +14,16 @@
 # verdict no matter what it reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}"
+  # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
+  # `--fixed-now` is what this stage passes to `l4` a few lines down, and it is
+  # the answer to "as at what date does the law say this". It was in NO stage's
+  # inputs: two runs of the same subject, same tree, same binary and DIFFERENT
+  # --fixed-now produced byte-identical digests, and findReplayableAcrossRuns
+  # filters on subject and digest only -- so the second run borrowed the first
+  # run's answer about a different point in legal time. Declared per stage
+  # rather than folded centrally like the l4 binary's sha, because only the
+  # stages that actually pass --fixed-now should re-run when it moves.
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" "text:fixed_now=${GO_FIXED_NOW:-unset}"
   exit 0
 fi
 
@@ -24,7 +33,7 @@ OUT="$GO_OUT/$GO_S_ID.akn.xml"
 LOG="$GO_OUT/p7-akn.txt"
 
 set +e
-"$L4" render "$GO_S_CORPUS" --format akn -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
+"$L4" render "$GO_S_ENCODING" --format akn -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$LOG" 2>&1
 RC=$?
 set -e
 if [[ $RC -ne 0 ]]; then

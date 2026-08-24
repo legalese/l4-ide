@@ -59,6 +59,58 @@ go_receipt() {
 # go_skip REASON — record SKIPPED, and honour L4_GO_REQUIRED=1 by making it fatal.
 # House convention (etc/kie-dmn-check/run.sh): a missing toolchain is forgiven
 # locally and fatal in CI; a harness that does not compile is neither.
+# go_require_blessing REASON — refuse to perform an OUTWARD-FACING act unless
+# this run holds a granting gate row.
+#
+# R11's second sentence is about the SERVING path, and the receipt-level rule
+# cannot reach it: p7-mcp POSTs to a live jl4-service BEFORE it writes any
+# receipt, so by the time verdict.mjs sees anything, the deployment exists. A
+# rule that runs after the act is not a gate over the act.
+#
+# Read from the journal, not from an environment variable the caller sets: the
+# granting row is in the same hash-chained file a second party would read, and
+# a phase script cannot manufacture one. `waived` counts, because
+# `gate-allowed-signers` ships with no key and a waiver is a verdict with a
+# reason attached rather than an absence — but the reason is PRINTED, so nobody
+# deploys under a waiver without seeing what it said.
+go_require_blessing() {
+  local what="${1:-this outward-facing act}"
+  local state
+  state=$(node -e '
+    import("'"$GO_LIB"'/ledger.mjs").then((m) => {
+      const rows = m.read(process.argv[1]);
+      const begin = rows.find((r) => r.kind === "run_begin");
+      let gate = null;
+      try {
+        const gs = typeof begin?.gated_stages === "string" ? JSON.parse(begin.gated_stages) : (begin?.gated_stages ?? {});
+        for (const [g, list] of Object.entries(gs))
+          if (Array.isArray(list) && list.includes(process.argv[2])) gate = g;
+      } catch {}
+      if (!gate) { process.stdout.write("ungated\t\t"); return; }
+      const row = rows.filter((r) => r.kind === "gate" && r.gate === gate && (r.state === "satisfied" || r.state === "waived")).at(-1);
+      process.stdout.write(`${row ? row.state : "unblessed"}\t${gate}\t${row?.reason ?? ""}`);
+    });
+  ' "$GO_RUN/journal.ndjson" "$GO_STAGE")
+  local st="${state%%$'\t'*}"
+  local rest="${state#*$'\t'}"
+  local gate="${rest%%$'\t'*}"
+  local reason="${rest#*$'\t'}"
+  case "$st" in
+    satisfied) return 0 ;;
+    waived)
+      echo "go: $GO_STAGE is proceeding with $what under a WAIVED $gate — $reason" >&2
+      return 0
+      ;;
+    ungated)
+      echo "::error::$GO_STAGE calls go_require_blessing but run_begin does not list it as gated. An outward-facing act must sit behind a gate." >&2
+      go_broken "$GO_STAGE performs $what and is not a gated stage; the gate set in run_begin must include it"
+      ;;
+    *)
+      go_broken "refusing $what: this run holds no granting $gate row. An outward-facing act may not precede the human gate that covers it (SPEC.md §7.3)."
+      ;;
+  esac
+}
+
 go_skip() {
   local reason="$1"
   shift || true
