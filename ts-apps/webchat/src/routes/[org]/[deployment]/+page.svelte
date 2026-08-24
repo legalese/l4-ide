@@ -22,11 +22,6 @@
     API_BASE,
   } from '$lib/auth/session.svelte'
   import { AiBridge } from '$lib/chat/ai-bridge'
-  import {
-    DemoBridge,
-    DEMO_ORG,
-    DEMO_INTENDED_USE,
-  } from '$lib/chat/demo-bridge'
   import { createAiChatStore } from '$lib/stores/ai-chat.svelte'
   import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
   import Sidebar from '$lib/components/sidebar.svelte'
@@ -39,24 +34,20 @@
   const deployment = $derived($page.params.deployment ?? '')
   const apiBaseUrl = $derived(`${AI_API_URL}/${org}/${deployment}`)
 
-  // Dev-only demo mode: /demo/{anything} runs against the canned DemoBridge —
-  // no auth, no network. Never active in production builds.
-  const isDemo = $derived(import.meta.env.DEV && org === DEMO_ORG)
-
   onMount(() => {
-    if (!isDemo) void auth.init()
+    void auth.init()
   })
 
   const orgMatches = $derived(
     auth.phase === 'authenticated' && auth.orgSlug === org
   )
   const hasChat = $derived(auth.hasPermission('ai:chat'))
-  const ready = $derived(isDemo || (orgMatches && hasChat))
+  const ready = $derived(orgMatches && hasChat)
 
   // ── Chat wiring ──
   // Built once the auth guard passes. The bridge is cast to the Messenger
   // shape the copied store/components expect; it implements the subset they use.
-  let bridge: AiBridge | DemoBridge | null = null
+  let bridge: AiBridge | null = null
   let store: ReturnType<typeof createAiChatStore> | null = $state(null)
   let messengerRef: InstanceType<typeof Messenger> | null = $state(null)
   let wired = false
@@ -88,18 +79,16 @@
   async function init(): Promise<void> {
     // Fetch the deployment's intended-use FIRST so the very first paint of the
     // empty-state shows the real text — no fallback flash, no re-bind race.
-    intendedUse = isDemo ? DEMO_INTENDED_USE : await fetchIntendedUse()
+    intendedUse = await fetchIntendedUse()
 
-    const b = isDemo
-      ? new DemoBridge()
-      : new AiBridge({
-          apiBaseUrl,
-          // Deployment API root — the per-function schema endpoint that powers
-          // L4-syntax rendering of rule tool-calls lives here, not on the proxy.
-          serviceBaseUrl: `${API_BASE}/${org}`,
-          deploymentId: deployment,
-          orgSlug: org,
-        })
+    const b = new AiBridge({
+      apiBaseUrl,
+      // Deployment API root — the per-function schema endpoint that powers
+      // L4-syntax rendering of rule tool-calls lives here, not on the proxy.
+      serviceBaseUrl: `${API_BASE}/${org}`,
+      deploymentId: deployment,
+      orgSlug: org,
+    })
     bridge = b
     const messenger = b as unknown as InstanceType<typeof Messenger>
     messengerRef = messenger
@@ -155,13 +144,9 @@
   }
 </script>
 
-{#if isDemo && !store}
-  <!-- Demo mode never runs auth.init(), so phase stays 'loading'; show the
-       spinner until the effect has built the DemoBridge-backed store. -->
+{#if auth.phase === 'loading'}
   <div class="splash"><span class="spinner"></span></div>
-{:else if !isDemo && auth.phase === 'loading'}
-  <div class="splash"><span class="spinner"></span></div>
-{:else if !isDemo && auth.phase === 'unauthenticated'}
+{:else if auth.phase === 'unauthenticated'}
   <div class="splash">
     <div class="login-card">
       <div class="brand">Legalese AI</div>
@@ -169,9 +154,9 @@
       <button class="login-btn" onclick={() => auth.login()}>Sign in</button>
     </div>
   </div>
-{:else if !isDemo && !orgMatches}
+{:else if !orgMatches}
   <NotFound detail="This is not a deployment in your account." />
-{:else if !isDemo && !hasChat}
+{:else if !hasChat}
   <NotFound detail="This is not a deployment in your account." />
 {:else if store}
   <div class="app">
