@@ -12,7 +12,7 @@
 # the compiler have to agree on that number. MEASURED 2026-08-02: 3 and 3.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/split-digraphs.mjs"
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/split-digraphs.mjs"
   exit 0
 fi
 
@@ -23,7 +23,7 @@ SPLITDIR="$GO_OUT/state-graphs"
 LOG="$GO_OUT/p7-lts.txt"
 
 set +e
-"$L4" state-graph "$GO_S_CORPUS" >"$DOT" 2>"$GO_OUT/p7-lts.stderr"
+"$L4" state-graph "$GO_S_ENCODING" >"$DOT" 2>"$GO_OUT/p7-lts.stderr"
 RC=$?
 set -e
 if [[ $RC -ne 0 ]]; then
@@ -35,7 +35,7 @@ if [[ $RC -ne 0 ]]; then
 fi
 
 # The independent count: the BPMN discovery call.
-mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS")
+mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_S_ENCODING")
 EXPECT=${#RULES[@]}
 
 set +e
