@@ -1,0 +1,160 @@
+cabal-version: 3.0
+name: jl4
+version: 0.1
+build-type: Simple
+tested-with: GHC==9.10.2
+
+common defaults
+  default-language: GHC2021
+  ghc-options: -Wall -Wderiving-typeable -Wunused-packages -Werror
+  default-extensions:
+    BlockArguments
+    DefaultSignatures
+    DeriveAnyClass
+    DerivingStrategies
+    DerivingVia
+    DuplicateRecordFields
+    NoFieldSelectors
+    OverloadedRecordDot
+    OverloadedStrings
+    OverloadedLabels
+    LambdaCase
+    -- This is annoying with fourmolu
+    NoImportQualifiedPost
+  build-depends:
+    base
+
+executable l4
+  import: defaults
+  hs-source-dirs: app
+  build-depends:
+    jl4-core,
+    jl4-lsp,
+    jl4-query-plan,
+    aeson,
+    bytestring,
+    cassava,
+    containers,
+    directory,
+    filepath,
+    hls-graph,
+    lsp-types,
+    optics,
+    process,
+    text,
+    time,
+    optparse-applicative,
+    pretty-simple,
+    unordered-containers,
+    vector,
+    yaml,
+  main-is: Main.hs
+  other-modules:
+    L4.Cli.Ast
+    L4.Cli.Batch
+    L4.Cli.Check
+    L4.Cli.Common
+    L4.Cli.Docassemble
+    L4.Cli.Export
+    L4.Cli.Format
+    L4.Cli.Nlg
+    L4.Cli.OpenFisca
+    L4.Cli.Render
+    L4.Cli.Run
+    L4.Cli.StateGraph
+    L4.Cli.Trace
+    L4.Cli.Verify
+
+-- The M3 gate measurement: does information-gain question ordering ask fewer
+-- questions than L4 declaration order? Its own executable rather than a mode on
+-- `l4`, because it is not a user-facing operation on a document -- it is an
+-- experiment over a corpus, it takes a seed and a sampling budget, and bolting
+-- that onto a CLI verb would put an experiment's knobs in a user's --help.
+-- It shares `app` only for L4.Cli.Common's oneshot pipeline loader.
+executable m3-measure
+  import: defaults
+  hs-source-dirs: measure app
+  build-depends:
+    jl4-core,
+    jl4-lsp,
+    jl4-query-plan,
+    aeson,
+    bytestring,
+    containers,
+    hls-graph,
+    lsp-types,
+    optparse-applicative,
+    time,
+  main-is: M3Measure.hs
+  other-modules:
+    L4.Cli.Common
+
+executable jl4-schema
+  import: defaults
+  hs-source-dirs: app
+  build-depends:
+    jl4-core,
+    jl4-lsp,
+    aeson-pretty,
+    bytestring,
+    containers,
+    directory,
+    lsp-types,
+    optparse-applicative,
+  main-is: Schema.hs
+
+test-suite jl4-test
+  import: defaults
+  ghc-options: -threaded -rtsopts
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests
+  main-is: Main.hs
+  other-modules:
+    BpmnExport
+    Hover
+    SemanticTokens
+    VizAutoRefresh
+    VizImplies
+    VizGuardedRows
+    DmnExport
+    Paths_jl4
+  autogen-modules:
+    Paths_jl4
+  build-depends:
+    aeson-pretty,
+    bytestring,
+    containers,
+    Glob,
+    filepath,
+    hspec,
+    hspec-golden,
+    jl4-core,
+    jl4-lsp,
+    parser-regex,
+    optics,
+    silently,
+    transformers,
+    time,
+    lsp-types,
+
+test-suite l4-cli-test
+  import: defaults
+  ghc-options: -threaded -rtsopts
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests-cli
+  main-is: Main.hs
+  other-modules:
+    Paths_jl4
+  autogen-modules:
+    Paths_jl4
+  build-tool-depends:
+    jl4:l4
+  build-depends:
+    aeson,
+    bytestring,
+    directory,
+    filepath,
+    hspec,
+    jl4-core,
+    process,
+    text,
