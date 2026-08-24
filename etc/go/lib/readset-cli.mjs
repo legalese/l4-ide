@@ -106,8 +106,11 @@ for (const r of rows) {
 
 if (wantJson) {
   process.stdout.write(
-    JSON.stringify({ run: runBegin.run_id ?? null, subject, stages: out }, null, 2) +
-      "\n",
+    JSON.stringify(
+      { run: runBegin.run_id ?? null, subject, stages: out },
+      null,
+      2,
+    ) + "\n",
   );
   process.exit(EXIT.CLEAN);
 }

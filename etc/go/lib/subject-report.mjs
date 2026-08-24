@@ -165,7 +165,11 @@ for (const stage of [...universe].sort()) {
   phases.push({
     stage,
     state:
-      f.state === "stale" ? "STALE" : f.state === "current" ? "CURRENT" : "UNKNOWN",
+      f.state === "stale"
+        ? "STALE"
+        : f.state === "current"
+          ? "CURRENT"
+          : "UNKNOWN",
     run,
     status: row.status,
     moved: f.moved.map((m) => m.path),
@@ -186,7 +190,9 @@ if (wantJson) {
   process.stdout.write(
     JSON.stringify({ subject, horizon, phases }, null, 2) + "\n",
   );
-  process.exit(phases.some((p) => p.state === "STALE") ? EXIT.FINDING : EXIT.CLEAN);
+  process.exit(
+    phases.some((p) => p.state === "STALE") ? EXIT.FINDING : EXIT.CLEAN,
+  );
 }
 
 const rel = (p) => (p.startsWith(REPO + "/") ? p.slice(REPO.length + 1) : p);

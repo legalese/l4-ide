@@ -6518,7 +6518,9 @@ process.stdout.write("\n-- store verbs --\n");
     [DIGEST, a, b, "--members-out", out],
     { encoding: "utf8" },
   );
-  const bare = spawnSync(process.execPath, [DIGEST, a, b], { encoding: "utf8" });
+  const bare = spawnSync(process.execPath, [DIGEST, a, b], {
+    encoding: "utf8",
+  });
   check(
     "digest.mjs --members-out prints the SAME digest it always did",
     withFlag.stdout.trim() === bare.stdout.trim() && bare.status === 0,
@@ -6625,8 +6627,11 @@ process.stdout.write("\n-- store verbs --\n");
     (() => {
       const outside = digestMembers([b])[0];
       return (
-        freshness([{ ...outside, role: "unknown", origin: "unresolved" }], [], {})
-          .state === "current"
+        freshness(
+          [{ ...outside, role: "unknown", origin: "unresolved" }],
+          [],
+          {},
+        ).state === "current"
       );
     })(),
   );
@@ -6701,7 +6706,6 @@ process.stdout.write("\n-- store verbs --\n");
     !comparability([], []).comparable,
   );
 
-
   // THE REFUSALS. A read-set is only worth recording if a false one cannot be.
   {
     const RECEIPT = resolve(HERE, "lib/receipt.mjs");
@@ -6712,7 +6716,9 @@ process.stdout.write("\n-- store verbs --\n");
     const badF = resolve(run, "bad.json");
     writeFileSync(
       badF,
-      JSON.stringify(good.map((m) => ({ ...m, sha256: `sha256:${"1".repeat(64)}` }))),
+      JSON.stringify(
+        good.map((m) => ({ ...m, sha256: `sha256:${"1".repeat(64)}` })),
+      ),
     );
     // SKIPPED-with-a-reason, deliberately: a bare PASS is REFUSED by the
     // verdict lattice ("a status may not be asserted, only measured"), and
@@ -6720,9 +6726,22 @@ process.stdout.write("\n-- store verbs --\n");
     const call = (f, digest) =>
       spawnSync(
         process.execPath,
-        [RECEIPT, "stage-end", "--run", run, "--stage", "p3-check",
-         "--status", "SKIPPED", "--reason", "read-set fixture",
-         "--inputs-digest", digest, "--read-set", f],
+        [
+          RECEIPT,
+          "stage-end",
+          "--run",
+          run,
+          "--stage",
+          "p3-check",
+          "--status",
+          "SKIPPED",
+          "--reason",
+          "read-set fixture",
+          "--inputs-digest",
+          digest,
+          "--read-set",
+          f,
+        ],
         { encoding: "utf8" },
       );
     const okCall = call(goodF, digestSet([b]));
@@ -6753,10 +6772,22 @@ process.stdout.write("\n-- store verbs --\n");
       "a --read-set naming a file that is not there is BROKEN, not an empty read-set",
       spawnSync(
         process.execPath,
-        [RECEIPT, "stage-end", "--run", run, "--stage", "p3-check",
-         "--status", "SKIPPED", "--reason", "fixture",
-         "--inputs-digest", "sha256:x",
-         "--read-set", resolve(run, "nope.json")],
+        [
+          RECEIPT,
+          "stage-end",
+          "--run",
+          run,
+          "--stage",
+          "p3-check",
+          "--status",
+          "SKIPPED",
+          "--reason",
+          "fixture",
+          "--inputs-digest",
+          "sha256:x",
+          "--read-set",
+          resolve(run, "nope.json"),
+        ],
         { encoding: "utf8" },
       ).status !== 0,
     );
@@ -6801,14 +6832,24 @@ process.stdout.write("\n-- store verbs --\n");
     writeFileSync(
       j,
       [
-        { journal_schema: 3, seq: 0, kind: "run_begin", run_id: "r", subject: "s" },
-        { journal_schema: 3, seq: 1, kind: "stage_end", stage: "p3-check",
-          status: "PASS", inputs_digest: "sha256:whatever" },
+        {
+          journal_schema: 3,
+          seq: 0,
+          kind: "run_begin",
+          run_id: "r",
+          subject: "s",
+        },
+        {
+          journal_schema: 3,
+          seq: 1,
+          kind: "stage_end",
+          stage: "p3-check",
+          status: "PASS",
+          inputs_digest: "sha256:whatever",
+        },
       ]
         .map((r, i, all) => {
-          r.prev = i === 0
-            ? "sha256:" + "0".repeat(64)
-            : all[i - 1].hash;
+          r.prev = i === 0 ? "sha256:" + "0".repeat(64) : all[i - 1].hash;
           r.hash = hashRecord(r);
           return JSON.stringify(r);
         })
@@ -6964,7 +7005,12 @@ process.stdout.write("\n-- store verbs --\n");
     });
     return dir;
   };
-  mkRun("2026-01-01-aaa-001", "p3-check", digestMembers([src]), digestSet([src]));
+  mkRun(
+    "2026-01-01-aaa-001",
+    "p3-check",
+    digestMembers([src]),
+    digestSet([src]),
+  );
 
   const run = (...a) =>
     spawnSync(process.execPath, [SR, base, "--subject", "subj", ...a], {
@@ -6973,7 +7019,10 @@ process.stdout.write("\n-- store verbs --\n");
     });
 
   const clean = run();
-  check("a fold over an unchanged prerequisite is CURRENT", /CURRENT/.test(clean.stdout));
+  check(
+    "a fold over an unchanged prerequisite is CURRENT",
+    /CURRENT/.test(clean.stdout),
+  );
   check("and exits 0", clean.status === 0);
 
   // A phase in the DECLARABLE set that no run ever declared must still appear.
@@ -6987,8 +7036,14 @@ process.stdout.write("\n-- store verbs --\n");
 
   writeFileSync(src, "CHANGED");
   const stale = run();
-  check("a moved prerequisite makes the phase STALE", /STALE/.test(stale.stdout));
-  check("and NAMES the member that moved", /MOVED .*law\.l4/.test(stale.stdout));
+  check(
+    "a moved prerequisite makes the phase STALE",
+    /STALE/.test(stale.stdout),
+  );
+  check(
+    "and NAMES the member that moved",
+    /MOVED .*law\.l4/.test(stale.stdout),
+  );
   check("and exits 1, so a caller can gate on it", stale.status === 1);
   check(
     "the footer states that STALE is Make's, not 'the digest moved'",

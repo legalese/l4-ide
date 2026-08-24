@@ -41,7 +41,9 @@ if (args.includes("--stdin")) {
       : args;
 }
 if (paths.length === 0) {
-  process.stderr.write("usage: digest.mjs FILE… | --stdin [--members-out FILE]\n");
+  process.stderr.write(
+    "usage: digest.mjs FILE… | --stdin [--members-out FILE]\n",
+  );
   process.exit(2);
 }
 

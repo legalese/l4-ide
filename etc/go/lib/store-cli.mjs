@@ -174,7 +174,9 @@ switch (verb) {
         // diff is an interpretive fork ONLY IF the upstream read-sets matched.
         // Otherwise it is two encodings of two different texts, and calling
         // their difference a fork is spurious.
-        const digs = [...bySha.values()].map((a) => a[0].sources_digest ?? null);
+        const digs = [...bySha.values()].map(
+          (a) => a[0].sources_digest ?? null,
+        );
         const known = digs.filter(Boolean);
         if (known.length !== digs.length)
           process.stdout.write(
