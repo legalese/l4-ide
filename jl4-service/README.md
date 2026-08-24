@@ -113,7 +113,7 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 
 **Validation rules:**
 
-- Deployment IDs: max 36 characters, `[a-zA-Z0-9_-]` only, no `..` sequences
+- Deployment IDs: max 128 characters, `[a-zA-Z0-9_-]` only, must not start with a dot, no `..` sequences, and not one of the reserved words `health` / `deployments` / `openapi.json`
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
 - Duplicate detection: if the uploaded sources match an existing deployment (by content hash), the existing deployment is returned instead of recompiling
