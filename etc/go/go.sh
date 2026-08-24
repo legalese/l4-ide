@@ -170,6 +170,16 @@ NEW_CITATION=""
 NEW_SOURCE_URL=""
 NEW_ENCODING=""
 NEW_FORCE=0
+declare -a STORE_ARGS=()
+
+# `store` owns its own flag vocabulary (--keep-days, --dry-run, --allow-waived,
+# --subject, --stage), so the driver hands it every argument verbatim rather
+# than parsing them here. A driver that parsed them would have to be edited
+# every time the store grows a verb.
+if [[ "$CMD" == "store" ]]; then
+  STORE_ARGS=("$@")
+  set --
+fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -240,6 +250,9 @@ while [[ $# -gt 0 ]]; do
     *)
       if [[ "$CMD" == "new-subject" && -z "$NEW_ID" && "$1" != -* ]]; then
         NEW_ID="$1"
+        shift
+      elif [[ "$CMD" == "store" ]]; then
+        STORE_ARGS+=("$1")
         shift
       else
         die_usage "unknown option $1"
@@ -731,6 +744,15 @@ cmd_new_subject() {
   echo "     leg is an honest silence rather than a failing stage"
 }
 
+# --- store ------------------------------------------------------------------
+# The artifact store and the blessing ledger, which outlive run directories.
+# `gc` above sweeps RUN DIRECTORIES; this sweeps the store, and the two are
+# deliberately separate verbs because they collect different things under
+# different rules — the run store is a cache, the object store is evidence.
+cmd_store() {
+  node "$LIB/store-cli.mjs" "${STORE_ARGS[@]}"
+}
+
 cmd_gc() {
   # Retention: keep the latest --keep runs OF EACH SUBJECT, AND any run holding
   # a granted gate verdict — a signature is expensive to obtain and must not be
@@ -945,6 +967,23 @@ EOF
       --gated-stages "{\"HG1\":[$(for x in $gated_by_HG1; do printf '"%s",' "$x"; done | sed 's/,$//')],\"HG2\":[$(for x in $gated_by_HG2; do printf '"%s",' "$x"; done | sed 's/,$//')]}"
   fi
 
+  # THE CORPUS, ITEMISED — once per invocation, fresh runs and resumes alike.
+  #
+  # `corpus_digest` is a SET hash: it can say "this changed" and never "which of
+  # these did the expert review?". That second question is R11's, and answering
+  # it from a digest means re-resolving the subject and re-reading the tree,
+  # both of which need the run being asked about to still exist. Written to a
+  # file rather than a journal row because it is the input to `covers[]`, and a
+  # blessing has to carry its members so it can outlive the run that granted it.
+  #
+  # Once per invocation is exactly right: corpus_digest is already a
+  # per-invocation constant that every gate check in the loop reuses.
+  node -e '
+    import("'"$LIB"'/ledger.mjs").then((m) => {
+      process.stdout.write(JSON.stringify(m.digestMembers(process.argv.slice(1)), null, 2));
+    });
+  ' "${GO_ENCODING_FILES[@]}" > "$RUN/.corpus-members.json"
+
   echo "go: run $RUN_ID  (milestone $MILESTONE, subject $SUBJECT)"
   echo "go: tree $head [$tree_state]   fixed-now $FIXED_NOW"
   echo "go: run dir $RUN"
@@ -994,6 +1033,7 @@ EOF
     gname="${w%%=*}"
     greason="${w#*=}"
     node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gname" --state waived \
+      --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
       --corpus-digest "$corpus_digest" --reason "$greason"
     echo "go: gate $gname WAIVED — $greason"
     if [[ "$MILESTONE" == "g2" ]]; then
@@ -1025,11 +1065,15 @@ EOF
         fi
         if bash "$GO_ROOT/etc/go/gate-verify.sh" "$gate" --run "$RUN"; then
           node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state satisfied \
+            --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
             --namespace "$([[ $gate == HG1 ]] && echo l4-go-gate || echo l4-go-gate-hg2)" \
             --corpus-digest "$corpus_digest" \
+            --signer "$(cat "$RUN/$gate.signer" 2>/dev/null || echo "")" \
+            --payload-digest "$(node "$LIB/digest.mjs" "$RUN/$gate.payload.txt" 2>/dev/null || echo "")" \
             --signature-file "$RUN/$gate.payload.txt.sig"
         else
           node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state refused \
+            --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
             --corpus-digest "$corpus_digest" \
             --reason "no verifying signature over the current corpus; see etc/go/gate-request.sh $gate --run $RUN"
           echo "go: $gate is not satisfied — refusing $s and every stage after it." >&2
@@ -1181,21 +1225,24 @@ EOF
         # The invariant that buys is the one that makes `verify` worth anything:
         # a run directory is self-contained and checkable on its own, by someone
         # who has only that directory.
-        local from_dir arts a base copied=()
+        # THE DONOR'S ARTIFACT RECORDS, AS DATA. receipt.mjs fetches the bytes
+        # from the store by `cas` and records the donor's hash VERBATIM.
+        #
+        # What this replaces: a `cp` loop that flattened every artifact to its
+        # basename (so two artifacts from different subdirectories overwrote
+        # each other), fell back to recording ANOTHER RUN'S absolute path as
+        # this run's artifact, and then passed `--artifact`, which re-hashes the
+        # copy — precisely the laundering receipt.mjs's own comment forbids.
+        # Four defects, all of them gone with the loop.
+        local from_dir
         from_dir=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).from_dir||"")))')
-        arts=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s).artifacts||[];process.stdout.write(a.map(x=>x.path).join("\n"))})')
-        while IFS= read -r a; do
-          [[ -z "$a" ]] && continue
-          base="${a##*/}"
-          if [[ -f "$from_dir/artifacts/$base" ]]; then
-            cp -p "$from_dir/artifacts/$base" "$RUN/artifacts/$base" 2>/dev/null && copied+=(--artifact "$RUN/artifacts/$base")
-          elif [[ -f "$a" ]]; then
-            copied+=(--artifact "$a")   # an in-tree path, still valid from here
-          fi
-        done <<<"$arts"
+        printf '%s' "$prior" \
+          | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(JSON.parse(s).artifacts||[])))' \
+          > "$RUN/.replay-artifacts.json"
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
           --inputs-digest "$digest" --replayed-from "$phash" --replayed-from-run "$prior_run" \
-          "${copied[@]}" "${extra[@]}"
+          --subject "$SUBJECT" --run-id "$RUN_ID" --donor-dir "$from_dir" \
+          --artifacts-json "$RUN/.replay-artifacts.json" "${extra[@]}"
         echo "go: $s replayed from run $prior_run (inputs unchanged)"
       else
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
@@ -1336,6 +1383,7 @@ case "$CMD" in
   verify) cmd_verify ;;
   gc) cmd_gc ;;
   new-subject) cmd_new_subject ;;
+  store) cmd_store ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;
 esac

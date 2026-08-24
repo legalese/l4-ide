@@ -32,13 +32,18 @@ import { fileURLToPath } from "node:url";
 import {
   CROSS_RUN_INELIGIBLE,
   append,
+  digestMembers,
+  digestSet,
   findReplayableAcrossRuns,
   hashRecord,
+  manifestText,
   read,
   runSubject,
   sha256File as hashOf,
+  sha256Text as hashText,
   verify,
 } from "./lib/ledger.mjs";
+import * as Store from "./lib/store.mjs";
 import {
   driftFor,
   lintNarrative,
@@ -4915,7 +4920,43 @@ process.stdout.write("\n-- borrowed artifacts --\n");
   rmSync(resolve(donor, "artifacts", "b.txt"));
   const gone = run(intact);
   check("a donor artifact that is GONE refuses the borrow", gone.status === 1);
-  check("the refusal says it is gone", /is gone/.test(gone.stderr));
+  check(
+    "the refusal says the bytes cannot be produced, and from where it looked",
+    /cannot be produced/.test(gone.stderr) &&
+      /not in the store/.test(gone.stderr),
+  );
+
+  // The store is now a source, so a donor whose file is gone is STILL
+  // borrowable when the bytes were admitted — which is the point of the store:
+  // $TMPDIR reaps a run directory in two to five days and the evidence should
+  // not go with it.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-donorstore-"));
+    const src = resolve(donor, "artifacts", "a.json");
+    writeFileSync(src, "measured\n");
+    const sha = hashOf(src);
+    Store.put(store, src, sha, {
+      subject: "s",
+      stage: "p7-lts",
+      rel: "a.json",
+    });
+    rmSync(src);
+    const r = spawnSync("node", [DC], {
+      input: JSON.stringify({
+        from_dir: donor,
+        artifacts: [
+          { path: src, bytes: 9, sha256: sha, rel: "a.json", cas: sha },
+        ],
+      }),
+      env: { ...process.env, L4_GO_STORE: store },
+      encoding: "utf8",
+    });
+    check(
+      "a donor whose run directory was reaped is still borrowable from the store",
+      r.status === 0,
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
 
   // Basename collision: the copy flattens to basename, so two artifacts from
   // different subdirectories with the same name would overwrite each other.
@@ -5250,6 +5291,1167 @@ process.stdout.write("\n-- the standard library --\n");
   );
 }
 // ===== END the standard library =============================================
+
+// ===== the artifact store and the blessing edge (R6 + R11) ==================
+//
+// Two rulings, one structure, because both need the same thing: a fact about a
+// content hash that outlives the run that produced it. Measured 2026-08-20: of
+// 92 run directories, 16 still hold a journal and files last two to five days.
+// A blessing recorded only in a run journal has that half-life — a human
+// signature expiring in under a week for reasons nobody chose.
+process.stdout.write("\n-- the store and the blessing edge --\n");
+{
+  const mkStore = () => mkdtempSync(resolve(tmpdir(), "l4-go-store-"));
+  const mkFile = (dir, name, content) => {
+    const p = resolve(dir, name);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, content);
+    return p;
+  };
+
+  // T-1 · the lifted manifest still IS digestSet's body.
+  //
+  // digestSet's serialisation names run directories (every run id carries a
+  // corpus_sha8) and sits inside gate rows committed to legalese/canon. Lifting
+  // it out so a digest becomes a readable document is worth doing exactly once
+  // and never worth drifting: a tab moved here silently stops every existing
+  // run id and gate binding from corresponding to anything.
+  {
+    const d = mkStore();
+    const present = mkFile(d, "a.l4", "-- a\n");
+    const paths = [present, resolve(d, "gone.l4"), "text:floor=3"];
+    check(
+      "digestSet(paths) === sha256Text(manifestText(paths)) — the lift did not drift",
+      digestSet(paths) === hashText(manifestText(paths)),
+    );
+    const members = digestMembers(paths);
+    check("digestMembers itemises every member", members.length === 3);
+    check(
+      "an absent member is marked absent rather than dropped",
+      members.some((m) => m.absent === true && m.sha256 === null),
+    );
+    check(
+      "a text: literal carries no hash and is still a member",
+      members.some((m) => m.path === "text:floor=3" && m.sha256 === null),
+    );
+    check(
+      "members are in manifestText's order, so covers[] and the digest agree",
+      members.map((m) => m.path).join("\n") === [...paths].sort().join("\n"),
+    );
+    rmSync(d, { recursive: true, force: true });
+  }
+
+  // T-2 · a schema-2 journal still verifies under the schema-3 binary.
+  //
+  // The check this replaces compared every record against the CURRENT constant,
+  // so bumping it made every journal ever written unverifiable — including the
+  // ones committed to legalese/canon, silently, because nobody re-verifies an
+  // old run until they need it.
+  {
+    const d = mkStore();
+    const j = resolve(d, "journal.ndjson");
+    // Written RAW at schema 2: append() stamps the current schema, so a
+    // fixture built with it could never be an OLD journal.
+    const rows = [
+      {
+        journal_schema: 2,
+        seq: 0,
+        kind: "run_begin",
+        run_id: "r",
+        subject: "s",
+      },
+      {
+        journal_schema: 2,
+        seq: 1,
+        kind: "stage_end",
+        stage: "p3-check",
+        status: "PASS",
+      },
+    ];
+    let prev = "sha256:" + "0".repeat(64);
+    const lines = rows.map((r) => {
+      const rec = { ...r, prev };
+      rec.hash = hashRecord(rec);
+      prev = rec.hash;
+      return JSON.stringify(rec);
+    });
+    writeFileSync(j, lines.join("\n") + "\n");
+    check(
+      "a schema-2 journal verifies under the schema-3 binary",
+      verify(j).ok,
+    );
+
+    // The control: one chain, two binaries, is a genuine problem.
+    const mixed = resolve(d, "mixed.ndjson");
+    let prev2 = "sha256:" + "0".repeat(64);
+    const mrows = [
+      {
+        journal_schema: 2,
+        seq: 0,
+        kind: "run_begin",
+        run_id: "r",
+        subject: "s",
+      },
+      {
+        journal_schema: 3,
+        seq: 1,
+        kind: "stage_end",
+        stage: "p3-check",
+        status: "PASS",
+      },
+    ];
+    writeFileSync(
+      mixed,
+      mrows
+        .map((r) => {
+          const rec = { ...r, prev: prev2 };
+          rec.hash = hashRecord(rec);
+          prev2 = rec.hash;
+          return JSON.stringify(rec);
+        })
+        .join("\n") + "\n",
+    );
+    const mv = verify(mixed);
+    check("a journal mixing two schemas is REFUSED", !mv.ok);
+    check(
+      "and the refusal says one chain, two binaries",
+      mv.problems.some((p) => /one chain, two binaries/.test(p)),
+    );
+    check(
+      "an unknown schema in record 0 is refused too",
+      (() => {
+        const u = resolve(d, "u.ndjson");
+        const rec = {
+          journal_schema: 99,
+          seq: 0,
+          kind: "run_begin",
+          prev: "sha256:" + "0".repeat(64),
+        };
+        rec.hash = hashRecord(rec);
+        writeFileSync(u, JSON.stringify(rec) + "\n");
+        return !verify(u).ok;
+      })(),
+    );
+    rmSync(d, { recursive: true, force: true });
+  }
+
+  // The store proper: admit, fetch, and the subdirectory case that basename
+  // flattening would have collided.
+  {
+    const root = mkStore();
+    const work = mkStore();
+    const a = mkFile(work, "state-graphs/g.dot", "digraph A {}\n");
+    const b = mkFile(work, "p8-diff/g.dot", "digraph B {}\n");
+    const shaA = hashOf(a);
+    const shaB = hashOf(b);
+    check(
+      "two artifacts sharing a basename have different hashes",
+      shaA !== shaB,
+    );
+    Store.put(root, a, shaA, {
+      subject: "s",
+      stage: "p7-lts",
+      rel: "state-graphs/g.dot",
+    });
+    Store.put(root, b, shaB, {
+      subject: "s",
+      stage: "p8-diff",
+      rel: "p8-diff/g.dot",
+    });
+    const outA = resolve(work, "out/state-graphs/g.dot");
+    const outB = resolve(work, "out/p8-diff/g.dot");
+    check(
+      "both materialise",
+      Store.materialise(root, shaA, outA) &&
+        Store.materialise(root, shaB, outB),
+    );
+    check(
+      "to DISTINCT destinations at their own bytes — rel, not basename",
+      readFileSync(outA, "utf8") !== readFileSync(outB, "utf8"),
+    );
+    check(
+      "materialising an object the store does not have is false, not a throw",
+      Store.materialise(
+        root,
+        "sha256:" + "f".repeat(64),
+        resolve(work, "no.dot"),
+      ) === false,
+    );
+
+    // put() must never throw: a broken home directory may not turn a good legal
+    // encoding run red. The refusal belongs on the serving side.
+    //
+    // The unwritable root is a REGULAR FILE used as a directory, which gives
+    // ENOTDIR instantly on every platform. It was `/proc/nonexistent-store`,
+    // which is unwritable on Linux and simply absent on macOS — and that cost
+    // 48 minutes of CI: `mkdirSync("/proc/<anything>/objects", {recursive:true})`
+    // does not fail on Linux, it HANGS, forever. Reproduced in a
+    // node:24-bookworm container, where the probe prints "before" and never
+    // returns. So the check that put() cannot throw was itself the thing that
+    // wedged the suite, on a platform the author was not running.
+    //
+    // Pick unwritable paths that are unwritable for a PORTABLE reason.
+    const notADir = mkFile(work, "not-a-dir", "i am a file\n");
+    check(
+      "put() over an unwritable root returns null rather than throwing",
+      Store.put(notADir, a, shaA, {}) === null,
+    );
+    rmSync(root, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  }
+
+  // T-6 · an object produced by an ungated stage is not servable. R11's
+  // operative sentence: without it, default-deny becomes default-allow the
+  // first time a caller finds it inconvenient.
+  {
+    const root = mkStore();
+    const work = mkStore();
+    const f = mkFile(work, "x.json", "{}\n");
+    const sha = hashOf(f);
+
+    Store.put(root, f, sha, {
+      subject: "s",
+      stage: "p3-check",
+      produced_under: null,
+    });
+    check(
+      "an object admitted under no gate is NOT servable",
+      Store.servability(root, sha).servable === false,
+    );
+    check(
+      "and it says why — the producing stage was ungated",
+      /ungated/.test(Store.servability(root, sha).reason ?? ""),
+    );
+
+    const waived = Store.writeBlessing(root, {
+      kind: "blessing",
+      subject: "s",
+      gate: "HG1",
+      state: "waived",
+      reason: "no domain expert has read this",
+      covers: [],
+      signer: null,
+      signature: null,
+      namespace: null,
+      payload_digest: null,
+    });
+    Store.put(root, f, sha, {
+      subject: "s",
+      stage: "p6-tests",
+      produced_under: {
+        blessing: waived.hash,
+        gate: "HG1",
+        state: "waived",
+        reason: waived.reason,
+      },
+    });
+    const w = Store.servability(root, sha);
+    check(
+      "a WAIVED grant is an edge, not an absence — it resolves",
+      w.state === "waived",
+    );
+    check("but waived is still not servable on its own", w.servable === false);
+    check(
+      "and the waiver's reason travels with it",
+      /no domain expert/.test(w.reason ?? ""),
+    );
+
+    const sat = Store.writeBlessing(root, {
+      kind: "blessing",
+      subject: "s",
+      gate: "HG1",
+      state: "satisfied",
+      reason: null,
+      covers: [{ path: "x.l4", sha256: sha, bytes: 3 }],
+      signer: "someone SHA256:abc",
+      signature: "c2ln",
+      namespace: "l4-go-gate",
+      payload_digest: "sha256:" + "1".repeat(64),
+    });
+    Store.put(root, f, sha, {
+      subject: "s",
+      stage: "p6-tests",
+      produced_under: { blessing: sat.hash, gate: "HG1", state: "satisfied" },
+    });
+    check(
+      "one satisfied admission makes the BYTES servable, whichever run produced them",
+      Store.servability(root, sha).servable === true,
+    );
+    check(
+      "an object the store never saw is unknown, not servable",
+      Store.servability(root, "sha256:" + "e".repeat(64)).servable === false,
+    );
+    rmSync(root, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  }
+
+  // T-8 · a blessing survives the deletion of the run that granted it.
+  // INVARIANT I8. Today the only record of a grant lives in $TMPDIR, and gc
+  // keeps only `satisfied` runs while every run in the store is `waived`.
+  {
+    const root = mkStore();
+    const runDir = mkStore();
+    writeFileSync(resolve(runDir, "journal.ndjson"), "{}\n");
+    const rec = Store.writeBlessing(root, {
+      kind: "blessing",
+      subject: "sg-succession",
+      gate: "HG1",
+      state: "satisfied",
+      reason: null,
+      covers: [
+        {
+          path: "jl4/examples/legal/x/a.l4",
+          sha256: "sha256:" + "a".repeat(64),
+          bytes: 10,
+        },
+        {
+          path: "jl4/examples/legal/x/b.l4",
+          sha256: "sha256:" + "b".repeat(64),
+          bytes: 20,
+        },
+      ],
+      signer: "expert@example.invalid SHA256:Zz",
+      signature: "c2lnbmF0dXJl",
+      namespace: "l4-go-gate",
+      payload_digest: "sha256:" + "2".repeat(64),
+      granted_in_run: "2026-08-20-aaaaaaaa-001",
+    });
+    rmSync(runDir, { recursive: true, force: true });
+    const back = Store.readBlessings(root).find((b) => b.hash === rec.hash);
+    check(
+      "a blessing outlives the run directory that granted it",
+      Boolean(back),
+    );
+    check(
+      "it still names the signer",
+      /expert@example/.test(back?.signer ?? ""),
+    );
+    check(
+      "it still carries the signature bytes, not a path into the run dir",
+      back?.signature === "c2lnbmF0dXJl",
+    );
+    check(
+      "it still itemises every covers[] member",
+      back?.covers?.length === 2,
+    );
+    check("the ledger verifies", Store.verifyBlessings(root).ok);
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  // A ledger record that claims more than it carries. Gate rows bypass
+  // checkReceipt today, so a `satisfied` with a null signature is written
+  // without complaint — disposable in a run directory, permanent in a ledger.
+  {
+    const ok = Store.checkClaim({
+      gate: "HG1",
+      state: "satisfied",
+      signature: "x",
+      signer: "y",
+      namespace: "l4-go-gate",
+      payload_digest: "sha256:z",
+      covers: [],
+    });
+    check("a well-formed satisfied claim passes checkClaim", ok.ok);
+    check(
+      "a satisfied claim with no signature is refused",
+      !Store.checkClaim({ gate: "HG1", state: "satisfied", covers: [] }).ok,
+    );
+    check(
+      "a waived claim with no reason is refused",
+      !Store.checkClaim({ gate: "HG1", state: "waived", covers: [] }).ok,
+    );
+    const hg2 = Store.checkClaim({
+      gate: "HG2",
+      state: "waived",
+      reason: "r",
+      covers: [],
+    });
+    check(
+      "a WAIVED HG2 is refused — unwaivability moves into the writer",
+      !hg2.ok,
+    );
+    check(
+      "and the refusal says a durable one could never be withdrawn",
+      hg2.problems.some((p) => /never be withdrawn/.test(p)),
+    );
+    check(
+      "a claim with no covers[] is refused",
+      !Store.checkClaim({ gate: "HG1", state: "waived", reason: "r" }).ok,
+    );
+  }
+
+  // The two structural rules the design rests on, asserted over the source so
+  // they cannot be undone by a well-meaning edit.
+  {
+    const src = readFileSync(resolve(HERE, "lib/store.mjs"), "utf8");
+    check(
+      "writeBlessing has no CLI verb — receipt.mjs stays the only writer of a claim",
+      !/process\.argv/.test(src),
+    );
+    check(
+      "the serving predicate is written ONCE and exported",
+      (src.match(/export function servability/g) || []).length === 1,
+    );
+  }
+}
+// ===== END the store and the blessing edge ==================================
+
+// ===== artifacts flow THROUGH the store (R6, step 2) ========================
+process.stdout.write("\n-- artifacts through the store --\n");
+{
+  const RECEIPT = resolve(HERE, "lib/receipt.mjs");
+  const DIG = "sha256:" + "a".repeat(64);
+  const PRIOR = "sha256:" + "b".repeat(64);
+
+  const mkRun = (store, id) => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-run-"));
+    mkdirSync(resolve(d, "artifacts"), { recursive: true });
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "run-begin",
+        "--run",
+        d,
+        "--run-id",
+        id,
+        "--milestone",
+        "g1",
+        "--subject",
+        "s",
+        "--repo-head",
+        "abc",
+        "--tree-state",
+        "clean",
+        "--fixed-now",
+        "2025-01-31T00:00:00Z",
+        "--declared-stages",
+        "p7-lts",
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    return d;
+  };
+  const lastStageEnd = (runDir) =>
+    read(resolve(runDir, "journal.ndjson"))
+      .filter((r) => r.kind === "stage_end")
+      .at(-1);
+
+  const store = mkdtempSync(resolve(tmpdir(), "l4-go-s2-"));
+  const donor = mkRun(store, "r1");
+
+  // Produce, in a SUBDIRECTORY — the shape the old basename flattening broke.
+  const art = resolve(donor, "artifacts", "state-graphs", "g.dot");
+  mkdirSync(dirname(art), { recursive: true });
+  writeFileSync(art, "digraph {}\n");
+  const produce = spawnSync(
+    "node",
+    [
+      RECEIPT,
+      "stage-end",
+      "--run",
+      donor,
+      "--stage",
+      "p7-lts",
+      "--status",
+      "PASS",
+      "--oracle-cmd",
+      "dot",
+      "--oracle-exit",
+      "0",
+      "--oracle-class",
+      "structural",
+      "--oracle-because",
+      "counted",
+      "--artifact",
+      art,
+      "--inputs-digest",
+      DIG,
+    ],
+    { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+  );
+  check("producing a receipt with an artifact succeeds", produce.status === 0);
+  const donorRec = lastStageEnd(donor);
+  check(
+    "the record carries `rel`, subdirectory included",
+    donorRec?.artifacts?.[0]?.rel === "state-graphs/g.dot",
+  );
+  check(
+    "and `cas`, the place the bytes can be re-fetched",
+    donorRec?.artifacts?.[0]?.cas === donorRec?.artifacts?.[0]?.sha256,
+  );
+  check(
+    "the bytes were admitted to the store",
+    Store.has(store, donorRec.artifacts[0].cas),
+  );
+
+  // Borrow into a fresh run WITH THE DONOR DIRECTORY DELETED. This is R6's
+  // payoff: $TMPDIR reaps a run in two to five days and the evidence stays.
+  const borrower = mkRun(store, "r2");
+  const donorsJson = resolve(borrower, "donors.json");
+  writeFileSync(donorsJson, JSON.stringify(donorRec.artifacts));
+  rmSync(donor, { recursive: true, force: true });
+  const borrow = spawnSync(
+    "node",
+    [
+      RECEIPT,
+      "stage-end",
+      "--run",
+      borrower,
+      "--stage",
+      "p7-lts",
+      "--status",
+      "PASS",
+      "--inputs-digest",
+      DIG,
+      "--replayed-from",
+      PRIOR,
+      "--replayed-from-run",
+      "r1",
+      "--artifacts-json",
+      donorsJson,
+    ],
+    { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+  );
+  check(
+    "a borrow succeeds after the donor run was deleted",
+    borrow.status === 0,
+  );
+  const borrowed = lastStageEnd(borrower);
+  check(
+    "the artifact materialised into the borrower's own subdirectory",
+    existsSync(resolve(borrower, "artifacts", "state-graphs", "g.dot")),
+  );
+  check(
+    "the recorded sha256 is the DONOR'S, verbatim — never re-derived from the copy",
+    borrowed?.artifacts?.[0]?.sha256 === donorRec.artifacts[0].sha256,
+  );
+
+  // T-4 · the laundering assertion. A donor record whose hash does not match
+  // what lands is refused, not repaired.
+  {
+    const b2 = mkRun(store, "r3");
+    const bad = resolve(b2, "bad.json");
+    writeFileSync(
+      bad,
+      JSON.stringify([
+        {
+          path: resolve(b2, "artifacts", "z.dot"),
+          bytes: 3,
+          sha256: "sha256:" + "9".repeat(64),
+          rel: "z.dot",
+          cas: null,
+        },
+      ]),
+    );
+    writeFileSync(resolve(b2, "artifacts", "z.dot"), "tampered\n");
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        b2,
+        "--stage",
+        "p7-lts",
+        "--status",
+        "PASS",
+        "--inputs-digest",
+        DIG,
+        "--replayed-from",
+        PRIOR,
+        "--artifacts-json",
+        bad,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "a materialised file that does not match the donor is REFUSED",
+      r.status === 4,
+    );
+    check(
+      "the refusal shows both hashes",
+      /receipt: sha256:/.test(r.stderr) && /on disk: sha256:/.test(r.stderr),
+    );
+    rmSync(b2, { recursive: true, force: true });
+  }
+
+  // T-5 · a replayed PASS naming no artifact. The guard it restores was
+  // vacuous — `!r.replayed_from` inside a branch where `replayed` is true is
+  // always false — so this receipt was accepted and `verify` called the
+  // milestone COMPLETE.
+  {
+    const b3 = mkRun(store, "r4");
+    const empty = resolve(b3, "none.json");
+    writeFileSync(empty, "[]");
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        b3,
+        "--stage",
+        "p7-lts",
+        "--status",
+        "PASS",
+        "--inputs-digest",
+        DIG,
+        "--replayed-from",
+        PRIOR,
+        "--artifacts-json",
+        empty,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check("a replayed PASS naming NO artifact is refused", r.status === 4);
+    check(
+      "and the refusal explains that the receipt it replays named one",
+      /naming no artifact/.test(r.stdout + r.stderr),
+    );
+    rmSync(b3, { recursive: true, force: true });
+  }
+
+  // A pre-store donor — no `rel`, no `cas` — must still be borrowable, and the
+  // bytes get back-filled so the NEXT borrow comes from the store.
+  {
+    const legacyDonor = mkdtempSync(resolve(tmpdir(), "l4-go-legacy-"));
+    mkdirSync(resolve(legacyDonor, "artifacts"), { recursive: true });
+    const lf = resolve(legacyDonor, "artifacts", "old.json");
+    writeFileSync(lf, "legacy\n");
+    const lsha = hashOf(lf);
+    const b4 = mkRun(store, "r5");
+    const lj = resolve(b4, "legacy.json");
+    writeFileSync(lj, JSON.stringify([{ path: lf, bytes: 7, sha256: lsha }]));
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        b4,
+        "--stage",
+        "p7-lts",
+        "--status",
+        "PASS",
+        "--inputs-digest",
+        DIG,
+        "--replayed-from",
+        PRIOR,
+        "--replayed-from-run",
+        "r0",
+        "--donor-dir",
+        legacyDonor,
+        "--artifacts-json",
+        lj,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "a PRE-STORE donor (no rel, no cas) is still borrowable",
+      r.status === 0,
+    );
+    check(
+      "and its bytes are back-filled, so the store heals itself from old runs",
+      Store.has(store, lsha),
+    );
+    rmSync(legacyDonor, { recursive: true, force: true });
+    rmSync(b4, { recursive: true, force: true });
+  }
+
+  rmSync(borrower, { recursive: true, force: true });
+  rmSync(store, { recursive: true, force: true });
+}
+// ===== END artifacts through the store ======================================
+
+// ===== the blessing edge (R11, step 3) ======================================
+process.stdout.write("\n-- the blessing edge --\n");
+{
+  const RECEIPT = resolve(HERE, "lib/receipt.mjs");
+  const DIG = "sha256:" + "a".repeat(64);
+  const CORPUS = "sha256:" + "9".repeat(64);
+
+  const mkRun = (store, gated) => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-bless-"));
+    mkdirSync(resolve(d, "artifacts"), { recursive: true });
+    writeFileSync(resolve(d, "artifacts", "a.txt"), "measured\n");
+    writeFileSync(
+      resolve(d, ".corpus-members.json"),
+      JSON.stringify([
+        {
+          path: resolve(HERE, "go.sh"),
+          sha256: hashOf(resolve(HERE, "go.sh")),
+          bytes: 1,
+        },
+      ]),
+    );
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "run-begin",
+        "--run",
+        d,
+        "--run-id",
+        "r",
+        "--milestone",
+        "g1",
+        "--subject",
+        "sg",
+        "--repo-head",
+        "abc",
+        "--tree-state",
+        "clean",
+        "--fixed-now",
+        "2025-01-31T00:00:00Z",
+        "--declared-stages",
+        "p6-tests",
+        "--gated-stages",
+        JSON.stringify(gated),
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    return d;
+  };
+  const grant = (store, runDir, state, extra = []) =>
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "gate",
+        "--run",
+        runDir,
+        "--gate",
+        "HG1",
+        "--state",
+        state,
+        "--subject",
+        "sg",
+        "--run-id",
+        "r",
+        "--covers-from",
+        resolve(runDir, ".corpus-members.json"),
+        "--corpus-digest",
+        CORPUS,
+        ...extra,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+  const stage = (store, runDir, status, extra = []) =>
+    spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "stage-end",
+        "--run",
+        runDir,
+        "--stage",
+        "p6-tests",
+        "--status",
+        status,
+        "--inputs-digest",
+        DIG,
+        ...extra,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+  const lastEnd = (runDir) =>
+    read(resolve(runDir, "journal.ndjson"))
+      .filter((r) => r.kind === "stage_end")
+      .at(-1);
+  const GATED = { HG1: ["p6-tests"], HG2: ["p10-publish"] };
+  const OK = [
+    "--oracle-cmd",
+    "t",
+    "--oracle-exit",
+    "0",
+    "--oracle-class",
+    "execution",
+    "--oracle-because",
+    "m",
+  ];
+
+  // A waiver reaches the ledger, and OUTLIVES the run it was granted in.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l1-"));
+    const run = mkRun(store, GATED);
+    const g = grant(store, run, "waived", [
+      "--reason",
+      "no domain expert has read this",
+    ]);
+    check("a waiver is recorded", g.status === 0);
+    const row = read(resolve(run, "journal.ndjson")).find(
+      (r) => r.kind === "gate",
+    );
+    check("the gate row names its ledger record", Boolean(row?.blessing));
+    rmSync(run, { recursive: true, force: true });
+    const led = Store.readBlessings(store);
+    check("the blessing outlives the run directory", led.length === 1);
+    check(
+      "it carries the waiver's reason",
+      /no domain expert/.test(led[0].reason ?? ""),
+    );
+    check("it itemises the corpus it covers", led[0].covers.length === 1);
+    check(
+      "the reviewed bytes are fetchable from the store, not merely named",
+      Store.has(store, led[0].covers[0].sha256),
+    );
+    check("the ledger verifies", Store.verifyBlessings(store).ok);
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // RULE 7, three directions.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l2-"));
+
+    const noGrant = mkRun(store, GATED);
+    const r1 = stage(store, noGrant, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(noGrant, "artifacts", "a.txt"),
+    ]);
+    check("a GATED stage with no grant may not write PASS", r1.status === 4);
+    check(
+      "and the refusal says BROKEN is the only status left to it",
+      /no status but BROKEN/.test(r1.stdout + r1.stderr),
+    );
+
+    const broken = mkRun(store, GATED);
+    const r2 = stage(store, broken, "BROKEN", [
+      "--reason",
+      "the compiler is missing",
+    ]);
+    check(
+      "but it may still report BROKEN — a stage must be able to say it could not run",
+      r2.status === 0,
+    );
+
+    const ungated = mkRun(store, { HG1: [], HG2: [] });
+    const r3 = stage(store, ungated, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(ungated, "artifacts", "a.txt"),
+    ]);
+    check("an UNGATED stage is unaffected by Rule 7", r3.status === 0);
+    check(
+      "and carries no blessing, because there is no gate to carry",
+      lastEnd(ungated)?.produced_under === null,
+    );
+
+    const waived = mkRun(store, GATED);
+    grant(store, waived, "waived", ["--reason", "not reviewed"]);
+    const r4 = stage(store, waived, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(waived, "artifacts", "a.txt"),
+    ]);
+    check(
+      "with a waiver on the record the stage may write PASS",
+      r4.status === 0,
+    );
+    const pu = lastEnd(waived)?.produced_under;
+    check(
+      "and the receipt is STAMPED with what it ran under",
+      pu?.state === "waived",
+    );
+    check(
+      "naming the gate, the ledger record and the corpus",
+      Boolean(pu?.gate && pu?.blessing && pu?.corpus_digest),
+    );
+
+    // THE DERIVATION IS NOT A FLAG. receipt.mjs is the only writer of a status
+    // precisely so no caller can assert one it did not earn; a --blessing flag
+    // would re-open that for any phase script.
+    const src = readFileSync(RECEIPT, "utf8");
+    check(
+      "produced_under is DERIVED from the journal, never accepted as a CLI flag",
+      !/args\.blessing/.test(src) && /gated_stages/.test(src),
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // checkClaim guards the ledger the way checkReceipt guards a receipt.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l3-"));
+    const run = mkRun(store, GATED);
+    const r = grant(store, run, "waived"); // no --reason
+    check("a waiver with no reason is refused at the writer", r.status === 4);
+    check("and says a ledger record is permanent", /permanent/.test(r.stderr));
+    const hg2 = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "gate",
+        "--run",
+        run,
+        "--gate",
+        "HG2",
+        "--state",
+        "waived",
+        "--subject",
+        "sg",
+        "--run-id",
+        "r",
+        "--reason",
+        "shipping anyway",
+        "--covers-from",
+        resolve(run, ".corpus-members.json"),
+        "--corpus-digest",
+        CORPUS,
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "a WAIVED HG2 is refused by the writer, not merely by go.sh's prose",
+      hg2.status === 4,
+    );
+    check(
+      "no blessing was written for the refused claim",
+      Store.readBlessings(store).length === 0,
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // go_require_blessing — the gate over the ACT, which happens before any
+  // receipt exists and which a receipt-level rule therefore cannot see.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l4-"));
+    const callPrelude = (runDir) =>
+      spawnSync(
+        "bash",
+        [
+          "-c",
+          'source etc/go/lib/phase-prelude.sh; go_require_blessing "deploying" && echo ALLOWED',
+        ],
+        {
+          cwd: REPO,
+          env: {
+            ...process.env,
+            L4_GO_STORE: store,
+            GO_ROOT: REPO,
+            GO_RUN: runDir,
+            GO_STAGE: "p6-tests",
+            GO_OUT: resolve(runDir, "artifacts"),
+          },
+          encoding: "utf8",
+        },
+      );
+
+    const noGrant = mkRun(store, GATED);
+    const a = callPrelude(noGrant);
+    check(
+      "an outward-facing act with no grant is REFUSED",
+      !/ALLOWED/.test(a.stdout),
+    );
+    check(
+      "and the refusal says the act may not precede the gate",
+      /may not precede the human gate/.test(a.stdout + a.stderr),
+    );
+
+    const waived = mkRun(store, GATED);
+    grant(store, waived, "waived", ["--reason", "not reviewed"]);
+    const b = callPrelude(waived);
+    check("a waiver lets the act proceed", /ALLOWED/.test(b.stdout));
+    check(
+      "but the waiver's reason is PRINTED, so nobody deploys under one unseen",
+      /WAIVED HG1 — not reviewed/.test(b.stdout + b.stderr),
+    );
+
+    const ungated = mkRun(store, { HG1: [], HG2: [] });
+    const c = callPrelude(ungated);
+    check(
+      "a stage that performs an outward-facing act and is NOT gated is itself a defect",
+      !/ALLOWED/.test(c.stdout) &&
+        /must sit behind a gate/.test(c.stdout + c.stderr),
+    );
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // The wiring: the one live serving act calls it, before the first POST.
+  {
+    const mcp = readFileSync(resolve(HERE, "phases/p7-mcp.sh"), "utf8");
+    check("p7-mcp requires a blessing", /go_require_blessing/.test(mcp));
+    check(
+      // BEFORE the first mutating request, not merely somewhere in the file:
+      // the deployment exists the moment the POST returns, so a check after it
+      // is a check about something that has already happened.
+      "and does so BEFORE the first -X POST",
+      mcp.indexOf("go_require_blessing") > 0 &&
+        mcp.indexOf("go_require_blessing") < mcp.indexOf("-X POST"),
+    );
+  }
+}
+// ===== END the blessing edge ================================================
+
+// ===== the store's command surface (R6's deliverable) =======================
+//
+// `diff` is what R6 actually asked for: "the difference between two runs of the
+// same phase is cheap to compute and is itself the product". `cat` is R11's
+// operative sentence, as an exit code.
+process.stdout.write("\n-- store verbs --\n");
+{
+  const CLI = resolve(HERE, "lib/store-cli.mjs");
+  const store = mkdtempSync(resolve(tmpdir(), "l4-go-cli-"));
+  const work = mkdtempSync(resolve(tmpdir(), "l4-go-cliw-"));
+  const DIG = "sha256:" + "a".repeat(64);
+  const mk = (n, c) => {
+    const f = resolve(work, n);
+    writeFileSync(f, c);
+    return f;
+  };
+  const run = (...args) =>
+    spawnSync("node", [CLI, ...args], {
+      env: { ...process.env, L4_GO_STORE: store },
+      encoding: "utf8",
+    });
+
+  // Same witness key, two different outputs — a producer that did not converge.
+  const a = mk("a.json", '{"tools":3}\n');
+  const b = mk("b.json", '{"tools":4}\n');
+  Store.put(store, a, hashOf(a), {
+    subject: "sg",
+    stage: "p7-mcp",
+    rel: "tools.json",
+    inputs_digest: DIG,
+    run_id: "run-A",
+  });
+  Store.put(store, b, hashOf(b), {
+    subject: "sg",
+    stage: "p7-mcp",
+    rel: "tools.json",
+    inputs_digest: DIG,
+    run_id: "run-B",
+  });
+  // Same key, same output — converged, and must stay silent.
+  const c = mk("c.txt", "stable\n");
+  Store.put(store, c, hashOf(c), {
+    subject: "sg",
+    stage: "p3-check",
+    rel: "log.txt",
+    inputs_digest: DIG,
+    run_id: "run-A",
+  });
+  Store.put(store, c, hashOf(c), {
+    subject: "sg",
+    stage: "p3-check",
+    rel: "log.txt",
+    inputs_digest: DIG,
+    run_id: "run-B",
+  });
+
+  const d1 = run("diff");
+  check("store diff exits 1 when a witness key diverges", d1.status === 1);
+  check("it names the divergent stage", /DIVERGENT {2}p7-mcp/.test(d1.stdout));
+  check(
+    "a key whose runs agreed is NOT reported — convergence is silence",
+    !/p3-check/.test(d1.stdout),
+  );
+  check(
+    "and it names the runs that disagreed",
+    /run-A/.test(d1.stdout) && /run-B/.test(d1.stdout),
+  );
+
+  // Self-referential: an artifact that embeds its own run id can never dedupe.
+  const s1 = mk("t1.json", '{"path":"/tmp/run-A/x"}\n');
+  const s2 = mk("t2.json", '{"path":"/tmp/run-B/x"}\n');
+  Store.put(store, s1, hashOf(s1), {
+    subject: "sg",
+    stage: "p0-preflight",
+    rel: "tripwire.json",
+    inputs_digest: DIG,
+    run_id: "run-A",
+  });
+  Store.put(store, s2, hashOf(s2), {
+    subject: "sg",
+    stage: "p0-preflight",
+    rel: "tripwire.json",
+    inputs_digest: DIG,
+    run_id: "run-B",
+  });
+  const d2 = run("diff");
+  check(
+    "a self-referential pair is LABELLED",
+    /SELF-REFERENTIAL/.test(d2.stdout),
+  );
+  check(
+    "and names the substring that triggered the label, so a reader can overrule it",
+    /contains "run-A"/.test(d2.stdout),
+  );
+  check(
+    "it is labelled, never filtered — the real finding is still there",
+    /DIVERGENT {2}p7-mcp/.test(d2.stdout),
+  );
+
+  // cat — default deny.
+  const ung = mk("u.txt", "ungated\n");
+  Store.put(store, ung, hashOf(ung), {
+    subject: "sg",
+    stage: "p3-check",
+    rel: "u.txt",
+    produced_under: null,
+  });
+  const catUng = run("cat", hashOf(ung));
+  check(
+    "store cat REFUSES an object produced under no gate",
+    catUng.status === 3,
+  );
+  check("and says which state it is in", /unblessed/.test(catUng.stderr));
+
+  const bless = Store.writeBlessing(store, {
+    kind: "blessing",
+    subject: "sg",
+    gate: "HG1",
+    state: "waived",
+    reason: "no domain expert has read this",
+    covers: [{ path: c, sha256: hashOf(c), bytes: 7 }],
+    signer: null,
+    signature: null,
+    namespace: null,
+    payload_digest: null,
+  });
+  const wv = mk("w.txt", "waived output\n");
+  Store.put(store, wv, hashOf(wv), {
+    subject: "sg",
+    stage: "p6-tests",
+    rel: "w.txt",
+    produced_under: {
+      blessing: bless.hash,
+      gate: "HG1",
+      state: "waived",
+      reason: bless.reason,
+    },
+  });
+  const catW = run("cat", hashOf(wv));
+  check("a WAIVED object is refused without the flag", catW.status === 3);
+  const catWok = run("cat", hashOf(wv), "--allow-waived");
+  check(
+    "--allow-waived serves it",
+    catWok.status === 0 && /waived output/.test(catWok.stdout),
+  );
+  check(
+    "and PRINTS the waiver's reason, so it cannot be served unseen",
+    /no domain expert/.test(catWok.stderr),
+  );
+
+  // gc — reachability before age.
+  const g = run("gc", "--keep-days", "0");
+  check("store gc exits 0", g.status === 0);
+  check(
+    "a covers[] member survives --keep-days 0 — no age policy reaches the reviewed bytes",
+    Store.has(store, hashOf(c)),
+  );
+  check("an unblessed object is swept", !Store.has(store, hashOf(ung)));
+  check(
+    "and the output states the rule rather than only the counts",
+    /unreachable by any age policy/.test(g.stdout),
+  );
+
+  const v = run("verify");
+  check("store verify passes over a well-formed store", v.status === 0);
+  rmSync(store, { recursive: true, force: true });
+  rmSync(work, { recursive: true, force: true });
+}
+// ===== END store verbs ======================================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,

@@ -161,6 +161,19 @@ if [[ $HEALTH_RC -ne 0 ]]; then
   exit "$GO_EXIT_CLEAN"
 fi
 
+# THE GATE OVER THE ACT, not over the receipt.
+#
+# Everything above this line is local: build a zip, hash it, check a URL is
+# loopback, ask a service whether it is alive. Everything below POSTS — it
+# creates a deployment other processes can call, and it does so BEFORE any
+# receipt is written. A receipt-level rule cannot see that; by the time
+# verdict.mjs runs, the deployment exists.
+#
+# So the refusal goes here, in front of the first mutating request. p7-mcp is
+# HG1-gated in run_begin, and this is where that gate stops being a fact about a
+# receipt and becomes a fact about the world.
+go_require_blessing "deploying this encoding to $URL"
+
 # THE DEPLOYMENT ID, AND THE LENGTH CAP.
 #
 # The natural id is `<subject>-<run-id>`: the subject so a human can recognise

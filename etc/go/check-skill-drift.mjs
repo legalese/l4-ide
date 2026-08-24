@@ -80,11 +80,35 @@ for (const c of driverCommands) {
 }
 
 // --- 2. every flag the skill shows must exist in the driver ------------------
+//
+// The flag surface is the UNION of the driver's own parser and the parsers it
+// delegates to. `go.sh store` hands every argument to store-cli.mjs verbatim
+// and deliberately does not parse them — a driver that parsed the store's flags
+// would need editing every time the store grew a verb — so a flag that exists
+// only there is documented correctly, not undocumented incorrectly.
+const delegated = ["lib/store-cli.mjs"]
+  .map((f) => {
+    try {
+      return readFileSync(resolve(HERE, f), "utf8");
+    } catch {
+      return "";
+    }
+  })
+  .join("\n");
+const flagExists = (flag) => {
+  const bare = flag.slice(2);
+  return (
+    goSrc.includes(`${flag})`) ||
+    // store-cli reads flags by name through flag()/bool(), so the name appears
+    // as a quoted string rather than as a `case` label.
+    delegated.includes(`"${bare}"`)
+  );
+};
 for (const m of skillSrc.matchAll(/etc\/go\/go\.sh[^\n`]*?(--[a-z][a-z-]+)/g)) {
   const flag = m[1];
-  if (!goSrc.includes(`${flag})`))
+  if (!flagExists(flag))
     problems.push(
-      `SKILL.md shows '${flag}', which go.sh's argument parser does not accept`,
+      `SKILL.md shows '${flag}', which neither go.sh's argument parser nor a delegated parser accepts`,
     );
 }
 
