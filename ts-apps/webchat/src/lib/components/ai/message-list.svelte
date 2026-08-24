@@ -231,6 +231,11 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    /* Keep the chat's own scroll from chaining into the page on touch
+       devices — without this, hitting either end of the list rubber-bands
+       the whole viewport on phones. */
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 0 10px 16px;
     display: block;
     /* Establish a size container so non-sticky user bubbles can cap
