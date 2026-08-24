@@ -42,8 +42,8 @@ corrupts pasted code. The mode now opts out.
 
 - Each repair is self-consistent within this slice (fix + its own goldens travel together).
 - Every file here reached `unstable` through the sequential merge queue (#282 cleared it
-  minutes before the wave-2 cut). The push-triggered run at `bf355e79` was still in
-  progress when this PR was opened; this line will be updated when it completes.
+  minutes before the wave-2 cut), and the push-triggered full-matrix run at `bf355e79`
+  **completed green** (24 Aug, after this PR opened).
 
 ## Independence
 

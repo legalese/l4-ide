@@ -37,8 +37,8 @@ reviewer competence:
 - Goldens are present for every module (the unfiltered `Corpus Goldens Present` CI check
   passes by construction — the files are taken verbatim from `unstable`).
 - Every file here reached `unstable` through the sequential merge queue (required checks
-  include the golden suite). The push-triggered run at `bf355e79` was still in progress
-  when this PR was opened; this line will be updated when it completes.
+  include the golden suite), and the push-triggered full-matrix run at `bf355e79`
+  **completed green** (24 Aug, after this PR opened).
 
 ## Independence
 

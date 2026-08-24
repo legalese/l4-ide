@@ -39,10 +39,9 @@ test-dependency line, the `l4 docassemble` command wiring, and the docassemble b
 
 - Built locally from this exact tree: `cabal build all` (GHC 9.10.3), then
   `jl4-core-test` and `l4-cli-test`. Results recorded in the PR conversation.
-- Every line of this PR reached `unstable` through the sequential merge queue, whose
-  required checks include the full build-and-test matrix. The push-triggered run at
-  `bf355e79` was still in progress when this PR was opened; this line will be updated
-  when it completes.
+- Every line of this PR reached `unstable` through the sequential merge queue, and the
+  push-triggered full-matrix run at `bf355e79` **completed green** (24 Aug, after this
+  PR opened).
 
 ## Independence
 
