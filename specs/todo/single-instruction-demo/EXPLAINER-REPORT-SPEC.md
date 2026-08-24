@@ -1,7 +1,7 @@
 # The Explainer Report — a lay-and-encoding companion to the conversion report
 
 _Status (2026-08-03): **BUILT at v0**, on branch `mengwong/go-explainer`. What exists in the
-tree: the stage `etc/go/phases/p9-explain.sh`, declared in `G1_STAGES` and gated by HG1; the
+tree: the stage `etc/go/phases/p9-explain.sh`, declared in `PRIMARY_STAGES` and gated by HG1; the
 renderer `etc/go/report/render-explainer.mjs` over `etc/go/report/explainer-template.md`; the
 supporting libraries `etc/go/lib/narrative.mjs` (provenance, drift, the citation checker, the
 lint), `etc/go/lib/dmn-tables.mjs` and `etc/go/report/md-lite.mjs`; and the Reg CF narrative at
@@ -320,17 +320,22 @@ links, because at that point both documents exist and are immutable. That is P10
 
 ### 3.1 The ruling
 
-The explainer is a **new phase script `etc/go/phases/p9-explain.sh`**, declared in `G1_STAGES`
+The explainer is a **new phase script `etc/go/phases/p9-explain.sh`**, declared in `PRIMARY_STAGES`
 immediately after `p9-report`, added to `gated_by_HG1` on the adjacent line, declaring **no**
 `--inputs`, and **not declared at g2**.
 
 ```sh
-# etc/go/go.sh, replacing the current :234-235
-G1_STAGES+=(p9-report p9-explain)
-gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
+# etc/go/go.sh
+PRIMARY_STAGES+=(p9-report p9-explain)
 ```
 
-The two appends stay adjacent so they cannot drift **[M:** they are adjacent today at
+_As written in 2026-08, this block appended to `gated_by_HG1` on the next line, and the paragraph
+below argued the two appends must stay adjacent so they cannot drift. R9 removed the second line:
+`gated_by_HG1` is now DERIVED from the declared list (every stage from P6 onward, minus HG2's), so
+declaring a P6+ stage gates it by construction and there is no second append to keep adjacent. The
+argument was right and its conclusion is now structural rather than a discipline._
+
+The two appends stayed adjacent so they could not drift **[M:** they were adjacent at
 `go.sh:234-235` **]**.
 
 ### 3.2 Why declared rather than a side effect of `p9-report`
@@ -480,7 +485,7 @@ The paragraph as originally written (2026-08-03), kept as history:
 > and here is where it disagreed with the humans" — is the single most compelling thing this
 > pipeline will ever have to explain, and it is a shame to leave the explainer out of it. **What
 > would change this ruling:** the first subject with a deposited de novo module and a populated
-> fork register. At that point the stage joins `G2_STAGES`, gains a row in the hand-written
+> fork register. At that point the stage joins `DEPOSIT_STAGES`, gains a row in the hand-written
 > `cmd_plan_g2` table, gains a name in `selftest.mjs:1993-2005`, and joins the g2 `gated_by_HG1`
 > override at `go.sh:240`.
 
@@ -1510,7 +1515,7 @@ two-assertion shape (assert no `TEMPLATE DEFECT` **and** assert the renderer got
 check to have run):
 
 - the **explainer** template carries no transcribed measurement;
-- `a primary-path `go.sh plan``names`p9-explain` (the existing self-description step greps for
+- a primary-path `go.sh plan` names `p9-explain` (the existing self-description step greps for
   stage names and would otherwise go stale silently **[G]**).
 
 **Formatting.** `.prettierignore` does not exclude `etc/`, and `package.json` runs

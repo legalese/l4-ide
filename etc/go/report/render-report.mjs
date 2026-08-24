@@ -312,7 +312,16 @@ function sourceSection() {
       // for every subject; only the sources differ, and those are the
       // subject's own business, not this renderer's.
       "SPEC.md §P1 requires the source bundle with provenance — the retrieval of each source document, its integrity digest or immutable capture, the publisher's in-force statement, and the citation of the instrument and of each amendment.",
-      "`p1-ingest` is not declared for this run: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — on the deposit path it validates a deposited source bundle — but a bundle is not what this run read.)",
+      // NOT-DECLARED AND DECLARED-BUT-MISSING ARE OPPOSITE CLAIMS, and only
+      // one of them is an excuse. "Not declared" says the run never owed this
+      // section; "declared, no receipt" says it owed it and did not deliver —
+      // which is what makes the verdict INCOMPLETE. Printing the first for the
+      // second converts an owed gap into a settled one, the exact inversion
+      // this file's header rule exists to refuse. `p6-tests` and `p8-diff`
+      // below already say it the right way round.
+      declared.includes("p1-ingest")
+        ? "`p1-ingest` is declared for this run and has no receipt, so no ingest is accounted for. The run owed this section and did not deliver it."
+        : "`p1-ingest` is not declared for this run: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — on the deposit path it validates a deposited source bundle — but a bundle is not what this run read.)",
     ),
     "",
     "What this run did read, and its exact content:",
@@ -332,7 +341,9 @@ function sweepSection() {
     // apparatus. Courts, regulator guidance and instruments in flight are the
     // three classes every jurisdiction has; what they are CALLED is the
     // subject's business.
-    "`p2-sweep` is not declared for this run. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (On the deposit path the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
+    declared.includes("p2-sweep")
+      ? "`p2-sweep` is declared for this run and has no receipt, so no sweep is accounted for. Nothing was searched, so nothing may be reported as searched, and the run owed this section and did not deliver it."
+      : "`p2-sweep` is not declared for this run. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (On the deposit path the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
   );
 }
 
@@ -369,7 +380,9 @@ function encodingSection() {
     out.push(
       absent(
         "SPEC.md §P3/§P4 require what the encoding decided, including every ambiguity fork and every externally-settled resolution.",
-        "`p3-encode`, `p4-forks` and `p5-gate` are not declared for this run — they validate de novo deposits, and this run replayed the committed encoding — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
+        ["p3-encode", "p4-forks", "p5-gate"].some((x) => declared.includes(x))
+          ? "`p3-encode`, `p4-forks` and `p5-gate` are declared for this run and left no receipt, so no encoding decision and no fork is accounted for. The run owed this section and did not deliver it."
+          : "`p3-encode`, `p4-forks` and `p5-gate` are not declared for this run — they validate de novo deposits, and this run replayed the committed encoding — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
       ),
     );
   if (r) {

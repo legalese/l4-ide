@@ -268,7 +268,7 @@ representation of the same rule — a factual note of where we disagree with it.
 #### P9.1 — The explainer report (a sibling, not a rewrite)
 
 **Status (2026-08-03): BUILT at v0, with one named gap.** The stage is `p9-explain`, declared in
-`G1_STAGES` and gated by HG1; the renderer is `etc/go/report/render-explainer.mjs` over
+`PRIMARY_STAGES` and gated by HG1; the renderer is `etc/go/report/render-explainer.mjs` over
 `etc/go/report/explainer-template.md`; the Reg CF narrative is checked in at
 `etc/go/subjects/regcf/explainer/`. **The gap is E17's signature verification**: the provenance
 model carries a per-section review state and derives `stale` when the text or a source moves, but
@@ -359,13 +359,13 @@ unstable now.
   with oracle class `execution` on both engines (ORCHESTRATOR.md §5.4).
 - **G2 — de novo run.** P1–P6 executed from the SEC source by agents; acceptance = the §8
   diff oracle. Entry condition satisfied 2026-08-02: fork representation ruled (R4, the
-  `Interpretation` parameter). **Half built as of 2026-08-03**: `a deposit-path `go.sh run``runs
-P1, P2, P3-encode, P4 and P5 as deposit-validating stages, each with an exit code over the
-agent's deposit and a`SKIPPED`naming the deposit it is waiting for; the sidecar's`denovo`section says where those deposits live. **The measurement wiring landed 2026-08-09**: the
-driver resolves one module set per run, so`p3-check`, `p6-tests`and`p8-verify`run
-over the deposit at g2,`p7-dmn` runs emit-only over it, and the acceptance comparator
-(`etc/go/lib/denovo-diff.mjs`, designed in
-[DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md)) **is called by the `p8-diff` stage\*\* over
+  `Interpretation` parameter). **Half built as of 2026-08-03**: a deposit-path `go.sh run` runs
+  P1, P2, P3-encode, P4 and P5 as deposit-validating stages, each with an exit code over the
+  agent's deposit and a`SKIPPED`naming the deposit it is waiting for; the sidecar's`denovo`section says where those deposits live. **The measurement wiring landed 2026-08-09**: the
+  driver resolves one module set per run, so`p3-check`, `p6-tests`and`p8-verify`run
+  over the deposit at g2,`p7-dmn` runs emit-only over it, and the acceptance comparator
+  (`etc/go/lib/denovo-diff.mjs`, designed in
+  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md)) \*\*is called by the `p8-diff` stage\*\* over
   the sidecar's declared surface map. What remains agent work, by design, is everything that
   PRODUCES a deposit (the driver takes neither the network nor a model) and the triage of any
   divergence the comparator reports.
@@ -497,9 +497,10 @@ suite.** What a fresh run must supply that _neither_ has: the authorising instru
 by §4 P1) and the background rules of construction, which no run has ever ingested — see §9.
 
 **The structural half of that gap closed on 2026-08-09.** When this section was written,
-`G2_STAGES` had no assertion stage, no projection leg, and no stage calling §8's diff oracle, so
+the deposit stage list (then spelled `G2_STAGES`, renamed `DEPOSIT_STAGES` by R9) had no
+assertion stage, no projection leg, and no stage calling §8's diff oracle, so
 every axis this table assigns to run 1 was unreachable at G2 by construction. The wiring named
-as "the first item of work" landed: `G2_STAGES` now declares `p3-check`, `p6-tests`, `p7-dmn`
+as "the first item of work" landed: `DEPOSIT_STAGES` now declares `p3-check`, `p6-tests`, `p7-dmn`
 (emit-only), `p8-verify` and `p8-diff` over the deposited module set, so a g2 run MEASURES the
 deposit's assertions (39/39 on the committed de novo module, floor `denovo.checks`), verifies it
 (2 `vacuous-guard` findings, on the record), emits its DMN (both engines refuse it — 35 blocking
