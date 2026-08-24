@@ -54,6 +54,7 @@ executable l4
     L4.Cli.Batch
     L4.Cli.Check
     L4.Cli.Common
+    L4.Cli.Docassemble
     L4.Cli.Export
     L4.Cli.Format
     L4.Cli.Nlg
@@ -63,6 +64,30 @@ executable l4
     L4.Cli.StateGraph
     L4.Cli.Trace
     L4.Cli.Verify
+
+-- The M3 gate measurement: does information-gain question ordering ask fewer
+-- questions than L4 declaration order? Its own executable rather than a mode on
+-- `l4`, because it is not a user-facing operation on a document -- it is an
+-- experiment over a corpus, it takes a seed and a sampling budget, and bolting
+-- that onto a CLI verb would put an experiment's knobs in a user's --help.
+-- It shares `app` only for L4.Cli.Common's oneshot pipeline loader.
+executable m3-measure
+  import: defaults
+  hs-source-dirs: measure app
+  build-depends:
+    jl4-core,
+    jl4-lsp,
+    jl4-query-plan,
+    aeson,
+    bytestring,
+    containers,
+    hls-graph,
+    lsp-types,
+    optparse-applicative,
+    time,
+  main-is: M3Measure.hs
+  other-modules:
+    L4.Cli.Common
 
 executable jl4-schema
   import: defaults
@@ -130,5 +155,6 @@ test-suite l4-cli-test
     directory,
     filepath,
     hspec,
+    jl4-core,
     process,
     text,
