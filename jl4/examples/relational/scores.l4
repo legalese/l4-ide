@@ -1,0 +1,80 @@
+-- The aggregate seed: a `LIST OF NUMBER` field reduced by the prelude's list
+-- combinators, plus one `map`-projected aggregate over a list of records.
+--
+-- The names here are the PRELUDE's, which are not the ones the M1 brief's IR
+-- constraint 6 names: the prelude has `count`, not `length` (prelude.l4:119),
+-- and has no `average` at all — `RAvg` exists only for the composite idiom
+-- `sum xs DIVIDED BY count xs` over one and the same list, which is what
+-- `average score` writes. `max`/`min` (prelude.l4:302,309) are the BINARY
+-- combinators and are deliberately NOT aggregates; the list forms are
+-- `maximum`/`minimum` (:336,345).
+--
+-- Two lowerings to read in the golden, because they differ on purpose:
+--
+--   * `total score`, `best score`, `average score` reduce a list that is
+--     already a term (a projected field). An L4 list is data, not an open
+--     predicate, so there is nothing to generate over and NO findall is
+--     emitted — just `Out is sum(L)`.
+--
+--   * `basket total` reduces `map (GIVEN i YIELD i's price) (b's items)`. That
+--     one does need a generator, so it becomes
+--     `findall(Price, (member(I, Items), proj(I, price, Price)), L)` over the
+--     synthesised `member` predicate — an RAuxiliary carrying RStructural on
+--     argument 1, exactly like a user's own list recursion.
+--
+-- Each directive below carries its L4-oracle value on the line after it, as a
+-- `-- L4 oracle ==>` comment produced by `l4 run scores.l4`. It is the
+-- differential harness's expectation, and it lives outside the emitted program
+-- on purpose (BLAWX-EXPORT-SPEC R11) — one copy per directive, so there is
+-- nothing here for a later edit to leave behind.
+
+IMPORT prelude
+
+DECLARE Student HAS
+    scores IS A LIST OF NUMBER
+
+DECLARE Item HAS
+    price IS A NUMBER
+
+DECLARE Basket HAS
+    items IS A LIST OF Item
+
+@export
+GIVEN s IS A Student
+GIVETH A NUMBER
+`total score` s MEANS sum (s's scores)
+
+@export
+GIVEN s IS A Student
+GIVETH A NUMBER
+`best score` s MEANS maximum (s's scores)
+
+@export
+GIVEN s IS A Student
+GIVETH A NUMBER
+`average score` s MEANS sum (s's scores) DIVIDED BY count (s's scores)
+
+@export
+GIVEN s IS A Student
+GIVETH A BOOLEAN
+DECIDE `passes` IF `average score` s AT LEAST 50
+
+@export
+GIVEN b IS A Basket
+GIVETH A NUMBER
+`basket total` b MEANS sum (map (GIVEN i YIELD i's price) (b's items))
+
+#EVAL `total score` (Student WITH scores IS LIST 80, 90, 70)
+-- L4 oracle ==> 240
+
+#EVAL `best score` (Student WITH scores IS LIST 80, 90, 70)
+-- L4 oracle ==> 90
+
+#EVAL `average score` (Student WITH scores IS LIST 80, 90, 70)
+-- L4 oracle ==> 80
+
+#EVAL `passes` (Student WITH scores IS LIST 80, 90, 70)
+-- L4 oracle ==> TRUE
+
+#EVAL `basket total` (Basket WITH items IS LIST (Item WITH price IS 10), (Item WITH price IS 25))
+-- L4 oracle ==> 35

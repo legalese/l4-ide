@@ -1,0 +1,2 @@
+lowering errors: 1
+  deontic.l4:16:3-18:12: in `no smoking`: deontic/regulative rule (PARTY/MUST/MAY): a Horn clause says what HOLDS; it has no vocabulary for what a party must do, by when, or what a breach is

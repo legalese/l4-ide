@@ -58,6 +58,16 @@ _More topics planned: Maybe and Nothing, Type Inference_
 
 ---
 
+### 🧩 Neighbours
+
+Deep dives into neighbouring rules-as-code systems, for L4 readers
+
+- **[Blawx and s(CASP)](neighbours/blawx-and-scasp.md)** - Jason Morris's block-based rules-as-code tool and the goal-directed answer set programming underneath it: justification trees, two negations, abducibles, and the according_to/holds/defeated defeat triple
+
+**Key Ideas:** s(CASP), negation as failure vs classical negation, abduction, defeasibility, the L4↔Blawx bridge
+
+---
+
 ### 🖋️ Reviewing
 
 Who checks an encoding against the law, and what their sign-off means

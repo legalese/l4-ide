@@ -1,0 +1,54 @@
+relational program — tiers.l4
+
+records:
+  Member  % tiers.l4:42:1-44:22
+    band : Band
+    years : NUMBER
+
+enums:
+  Band = bronze | silver | gold  % tiers.l4:37:1-40:9
+
+predicates:
+  input band/1 : Band  % <no source range>
+    params: Member
+    (no clauses)
+  input years/1 : NUMBER  % <no source range>
+    params: Member
+    (no clauses)
+  computed exported discount rate/1 : NUMBER  % tiers.l4:48:1-54:24
+    params: Member
+    ref: https://example.com/rules/section-3
+    discount rate(M_0, 30) :- proj(M_0, band, Band_1), match(Band_1, gold).  % tiers.l4:52:22-24
+    discount rate(M_0, 20) :- proj(M_0, band, Band_2), match(Band_2, silver).  % tiers.l4:53:22-24
+    discount rate(M_0, 10) :- [ proj(M_0, band, Band_3), Band_3 \== gold, proj(M_0, band, Band_4), Band_4 \== silver ].  % tiers.l4:54:22-24
+  computed exported loyalty bonus/1 : NUMBER  % tiers.l4:57:1-65:16
+    params: Member
+    nlg: the loyalty bonus earned by m
+    loyalty bonus(M_5, 100) :- proj(M_5, years, Years_6), Years_6 >= 10.  % tiers.l4:62:35-38
+    loyalty bonus(M_5, 50) :- [ proj(M_5, years, Years_7), Years_7 < 10 ], proj(M_5, years, Years_8), Years_8 >= 5.  % tiers.l4:63:35-37
+    loyalty bonus(M_5, 10) :- [ proj(M_5, years, Years_9), Years_9 < 10, proj(M_5, years, Years_10), Years_10 < 5 ], proj(M_5, years, Years_11), Years_11 >= 1.  % tiers.l4:64:35-37
+    loyalty bonus(M_5, 0) :- [ proj(M_5, years, Years_12), Years_12 < 10, proj(M_5, years, Years_13), Years_13 < 5, proj(M_5, years, Years_14), Years_14 < 1 ].  % tiers.l4:65:15-16
+
+queries:
+  EVAL q1: discount rate(M0_15) -> Discountrate_16 => (expectation from the L4 evaluator)  % tiers.l4:67:1-62
+    facts: band(M0_15, gold), years(M0_15, 12)
+  EVAL q2: discount rate(M0_17) -> Discountrate_18 => (expectation from the L4 evaluator)  % tiers.l4:70:1-64
+    facts: band(M0_17, bronze), years(M0_17, 12)
+  EVAL q3: loyalty bonus(M0_19) -> Loyaltybonus_20 => (expectation from the L4 evaluator)  % tiers.l4:73:1-63
+    facts: band(M0_19, silver), years(M0_19, 7)
+  EVAL q4: loyalty bonus(M0_21) -> Loyaltybonus_22 => (expectation from the L4 evaluator)  % tiers.l4:76:1-63
+    facts: band(M0_21, silver), years(M0_21, 0)
+
+dependencies:
+  discount rate -> band (+)
+  loyalty bonus -> years (+)
+
+stratification:
+  stratified
+    0  band
+    0  discount rate
+    0  loyalty bonus
+    0  years
+
+fidelity report — relational
+  (nothing lost)
