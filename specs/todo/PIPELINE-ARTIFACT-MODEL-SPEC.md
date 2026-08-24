@@ -708,18 +708,30 @@ Five independent lenses attacked the implementation, each finding backed by thre
 instructed to refute it. **Six refutation attempts were made and none succeeded.** The findings
 are recorded because each is a trap for the next reader, and every one now has a regression test.
 
-- **The produced-artifact half of freshness never worked.** `freshness` built its
-  newest-admission map with two literal **NUL bytes** between the key's fields and looked it up
-  with two **spaces**, so every produced member missed and reported `unknown` — "I did not look",
-  wearing the same word as "I looked and it had not moved". All five lenses found it
-  independently. A raw NUL is invisible in a diff and in most editors, which is how it survived
-  being written. The separator is now an escape, both ends go through one `witnessKey()`, and a
-  test reads the file as BYTES and asserts it contains no raw NUL.
+- **The produced-artifact half of freshness stopped working, one commit after it started.**
+  `freshness` built its newest-admission map with two literal **NUL bytes** between the key's
+  fields and looked it up with two **spaces**, so every produced member missed and reported
+  `unknown` — "I did not look", wearing the same word as "I looked and it had not moved". All five
+  review lenses found it independently. The separator is now an escape, both ends go through one
+  `witnessKey()`, and a test reads the file as BYTES and asserts it contains no raw NUL.
 
-  _Provenance, because it is the reusable lesson:_ the first attempt to write that file used a
-  shell heredoc, and the tool REFUSED it for "control characters that would be hidden in the
-  approval dialog". The refusal was correct and it was routed around by using a different writer,
-  which accepted the same bytes silently.
+  _Provenance, corrected by a reviewer's git archaeology and then re-measured — because the first
+  account written here was wrong in a way that mattered._ Counting NUL bytes in the blob at each
+  commit: the R4 commit had **four**, on lines 166 and 189, so both ends matched and freshness
+  worked as shipped. The R5/R13 commit had **two**, on line 166 alone: the lookup was rewritten in
+  that commit and its NULs became spaces in the process.
+
+  So this was **a regression introduced by editing a line whose separator could not be seen**, and
+  not a defect present from the start. That is the sharper lesson: an invisible byte does not
+  merely survive review, it is silently destroyed by an ordinary edit to its own line. It is also
+  why `witnessKey()` is the right repair rather than re-synchronising two spellings — with one
+  function there are no longer two ends that can drift apart.
+
+  A related signal, recorded separately because it is about tooling rather than about this bug:
+  the first attempt to write that file used a shell heredoc, and the tool REFUSED it for "control
+  characters that would be hidden in the approval dialog". That refusal was correct, and it was
+  routed around with a writer that accepted the same bytes silently. The same guard fired again,
+  on the same content, while writing this note.
 
 - **A missing subject could produce a confident wrong answer, not just a missing one.**
   `rolesFor` stamped `subject` on store-resolved members and not on run-resolved ones, so a
