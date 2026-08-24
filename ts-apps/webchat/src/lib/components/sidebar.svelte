@@ -238,10 +238,6 @@
       line-height: 1;
       padding: 0.5rem;
     }
-    /* Touch screens have no hover, so the delete icon must stay visible. */
-    .hist-del {
-      opacity: 0.8;
-    }
   }
 
   .top {
@@ -268,8 +264,10 @@
     text-align: left;
     transition: background-color 0.1s ease-out;
   }
-  .new-chat:hover {
-    background: var(--vscode-list-hoverBackground);
+  @media (hover: hover) {
+    .new-chat:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
   }
   .new-chat-icon {
     flex: 0 0 auto;
@@ -290,9 +288,6 @@
     display: flex;
     align-items: center;
     border-radius: 6px;
-  }
-  .hist-row:hover {
-    background: var(--vscode-list-hoverBackground);
   }
   .hist-row.active {
     background: var(--vscode-list-activeSelectionBackground);
@@ -322,14 +317,27 @@
     font-size: 1rem;
     line-height: 1;
     padding: 0.25rem 0.5rem;
-    opacity: 0;
-  }
-  .hist-row:hover .hist-del {
+    /* Visible by default; the hover-capable block below hides it until
+       the row is hovered. Touch devices keep it always-on — and get NO
+       :hover rules at all, because iOS Safari spends the first tap
+       applying hover styles that change appearance, forcing a second
+       tap to actually click. */
     opacity: 0.8;
   }
-  .hist-del:hover {
-    color: var(--vscode-errorForeground);
-    opacity: 1;
+  @media (hover: hover) {
+    .hist-row:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+    .hist-del {
+      opacity: 0;
+    }
+    .hist-row:hover .hist-del {
+      opacity: 0.8;
+    }
+    .hist-del:hover {
+      color: var(--vscode-errorForeground);
+      opacity: 1;
+    }
   }
   .hist-title {
     overflow: hidden;
@@ -374,8 +382,10 @@
     cursor: pointer;
     text-align: left;
   }
-  .profile:hover {
-    background: var(--vscode-list-hoverBackground);
+  @media (hover: hover) {
+    .profile:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
   }
 
   .avatar {
@@ -455,8 +465,10 @@
     cursor: pointer;
     box-sizing: border-box;
   }
-  .menu-item:hover {
-    background: var(--vscode-list-hoverBackground);
+  @media (hover: hover) {
+    .menu-item:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
   }
   .menu-item.danger {
     color: var(--vscode-errorForeground);
