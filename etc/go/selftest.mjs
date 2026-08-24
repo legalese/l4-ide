@@ -7078,6 +7078,310 @@ process.stdout.write("\n-- store verbs --\n");
 }
 // ===== END the subject fold =================================================
 
+// ===== defects the adversarial review found (2026-08-24) ====================
+//
+// Five independent lenses converged on the first of these, which is the whole
+// argument for reviewing by attack rather than by reading.
+{
+  process.stdout.write("\n-- review findings, pinned --\n");
+
+  // THE SEPARATOR MISMATCH. The map was BUILT with NUL bytes and READ with
+  // spaces, so every produced member missed and reported `unknown`. Invisible
+  // in a diff, which is exactly why the separator is now an escape and this
+  // test reads the file as BYTES.
+  check(
+    "readset.mjs contains no raw NUL byte — a separator must be visible in source",
+    !readFileSync(resolve(HERE, "lib/readset.mjs")).includes(0),
+  );
+  check(
+    "witnessKey is the ONE key builder, so the two ends cannot disagree",
+    (() => {
+      const src = readFileSync(resolve(HERE, "lib/readset.mjs"), "utf8");
+      const uses = (src.match(/witnessKey\(/g) || []).length;
+      return uses >= 3; // one definition, one build site, one lookup site
+    })(),
+  );
+  check(
+    "a produced member whose bytes are unchanged is CURRENT, not `unknown`",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "act.txt" }],
+        },
+      ];
+      const roled = rolesFor(
+        [{ path: "/w/act.txt", sha256: "sha256:aaa", bytes: 1 }],
+        rows,
+        [],
+      );
+      const idx = [
+        {
+          subject: "subj",
+          stage: "p1-ingest",
+          rel: "act.txt",
+          sha256: "sha256:aaa",
+        },
+      ];
+      return freshness(roled, idx, {}).state === "current";
+    })(),
+  );
+  check(
+    "and when a NEWER admission exists for that slot it is STALE, naming it",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "act.txt" }],
+        },
+      ];
+      const roled = rolesFor(
+        [{ path: "/w/act.txt", sha256: "sha256:aaa", bytes: 1 }],
+        rows,
+        [],
+      );
+      const idx = [
+        {
+          subject: "subj",
+          stage: "p1-ingest",
+          rel: "act.txt",
+          sha256: "sha256:aaa",
+        },
+        {
+          subject: "subj",
+          stage: "p1-ingest",
+          rel: "act.txt",
+          sha256: "sha256:bbb",
+        },
+      ];
+      const f = freshness(roled, idx, {});
+      return f.state === "stale" && f.moved[0].now === "sha256:bbb";
+    })(),
+  );
+  // rolesFor's run branch returned no subject, so the key carried an empty one
+  // while every store record carries a real one — a guaranteed miss even after
+  // the separator was fixed.
+  check(
+    "rolesFor stamps the run's own subject onto a run-origin member",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "act.txt" }],
+        },
+      ];
+      return (
+        rolesFor([{ path: "/w/act.txt", sha256: "sha256:aaa" }], rows, [])[0]
+          .subject === "subj"
+      );
+    })(),
+  );
+
+  // THE SHARPER HALF of the missing subject: an empty-subject key does not
+  // merely MISS, it can FALSE-MATCH a `subject: null` record left by an
+  // unrelated run — reporting STALE against another run's bytes, which is a
+  // confident wrong answer rather than an absent one.
+  check(
+    "a run-origin member does not match a foreign subject-null store record",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "p1-ingest-validate.txt" }],
+        },
+      ];
+      const roled = rolesFor(
+        [{ path: "/w/p1-ingest-validate.txt", sha256: "sha256:aaa", bytes: 1 }],
+        rows,
+        [],
+      );
+      // A record from somewhere else entirely, with no subject on it.
+      const foreign = [
+        {
+          subject: null,
+          stage: "p1-ingest",
+          rel: "p1-ingest-validate.txt",
+          sha256: "sha256:ffff",
+        },
+      ];
+      const f = freshness(roled, foreign, {});
+      // `unknown` is the honest answer: nothing in the index speaks for THIS
+      // subject. Reporting `stale` here would be an accusation sourced from a
+      // stranger's run.
+      return f.state === "unknown" && f.moved.length === 0;
+    })(),
+  );
+
+  // refold must REPORT a broken journal, not die on it. A verifier that throws
+  // turns "this journal is wrong" into "the tool is wrong".
+  check(
+    "refold does not throw on a malformed read_set member",
+    (() => {
+      try {
+        return typeof refold(["not-a-member", null, 42]) === "string";
+      } catch {
+        return false;
+      }
+    })(),
+  );
+  check(
+    "and verify REPORTS such a journal rather than crashing",
+    (() => {
+      const run = mkdtempSync(resolve(tmpdir(), "go-malformed-"));
+      const j = resolve(run, "journal.ndjson");
+      const rows = [
+        {
+          journal_schema: 4,
+          seq: 0,
+          kind: "run_begin",
+          run_id: "r",
+          subject: "s",
+        },
+        {
+          journal_schema: 4,
+          seq: 1,
+          kind: "stage_end",
+          stage: "p3-check",
+          status: "PASS",
+          inputs_digest: "sha256:x",
+          read_set: ["bogus"],
+        },
+      ];
+      let prev = "sha256:" + "0".repeat(64);
+      for (const r of rows) {
+        r.prev = prev;
+        r.hash = hashRecord(r);
+        prev = r.hash;
+      }
+      writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      let ok = false;
+      try {
+        ok = verify(j).problems.some((p) => /read_set re-folds/.test(p));
+      } catch {
+        ok = false;
+      }
+      rmSync(run, { recursive: true, force: true });
+      return ok;
+    })(),
+  );
+
+  // A journal's schema is fixed at creation. Resuming across a bump would put
+  // two schemas in one chain and make the run permanently unverifiable.
+  check(
+    "append REFUSES to add a row to a journal created at another schema",
+    (() => {
+      const run = mkdtempSync(resolve(tmpdir(), "go-schema-"));
+      const j = resolve(run, "journal.ndjson");
+      const r0 = {
+        journal_schema: 3,
+        seq: 0,
+        kind: "run_begin",
+        run_id: "r",
+        subject: "s",
+        prev: "sha256:" + "0".repeat(64),
+      };
+      r0.hash = hashRecord(r0);
+      writeFileSync(j, JSON.stringify(r0) + "\n");
+      let threw = false;
+      try {
+        append(j, { kind: "stage_begin", stage: "p3-check" });
+      } catch (e) {
+        threw = /permanently unverifiable|two schemas/.test(e.message);
+      }
+      const stillVerifies = verify(j).ok;
+      rmSync(run, { recursive: true, force: true });
+      return threw && stillVerifies;
+    })(),
+  );
+
+  // gc's keep-list compared PATH STRINGS. macOS TMPDIR ends in a slash, so the
+  // base carries a double slash that `ls` preserves and node's resolver
+  // collapses; nothing ever matched, and every run directory was deleted —
+  // gate-holding ones included — while the summary printed "kept N".
+  check(
+    "gc matches its keep-list by run id, never by path string",
+    (() => {
+      const src = readFileSync(resolve(HERE, "go.sh"), "utf8");
+      const body = src.slice(src.indexOf("cmd_gc()"));
+      const gc = body.slice(0, body.indexOf("\n}\n"));
+      return /basename "\$d"/.test(gc) && /"\$k" == "\$id"/.test(gc);
+    })(),
+  );
+  check(
+    "and a double-slashed base still keeps a gate-holding run",
+    (() => {
+      const base = mkdtempSync(resolve(tmpdir(), "go-gcpath-"));
+      const dir = resolve(base, "l4-go", "2026-01-01-aaa-001");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        resolve(dir, "journal.ndjson"),
+        JSON.stringify({ kind: "run_begin", subject: "regcf" }) +
+          "\n" +
+          JSON.stringify({ kind: "gate", state: "satisfied" }) +
+          "\n",
+      );
+      const r = spawnSync(resolve(HERE, "go.sh"), ["gc", "--keep", "1"], {
+        encoding: "utf8",
+        env: { ...process.env, L4_GO_RUNDIR: `${base}//l4-go` },
+      });
+      const survived = existsSync(dir);
+      rmSync(base, { recursive: true, force: true });
+      return r.status === 0 && survived;
+    })(),
+  );
+
+  // subject-report's declarable universe came from G1_STAGES, which was never
+  // assembled for that command, so every g1-only phase reached the report only
+  // via a surviving journal — and would vanish once those expired.
+  check(
+    "subject-report is in the set of commands that resolve a subject",
+    /" run plan doctor subject-report "/.test(
+      readFileSync(resolve(HERE, "go.sh"), "utf8"),
+    ),
+  );
+
+  // Run ids sort date, then CONTENT HASH, then counter — so lexicographic order
+  // is not chronological within a day.
+  check(
+    "subject-report orders runs by recorded start time, not by run id",
+    /run_begin\"\)\?\.ts/.test(
+      readFileSync(resolve(HERE, "lib/subject-report.mjs"), "utf8"),
+    ),
+  );
+
+  // store diff read only the FIRST admission of each sha, hiding a real
+  // disagreement between two runs that read different sources.
+  check(
+    "store diff folds EVERY admission's sources_digest, not just the first",
+    (() => {
+      const src = readFileSync(resolve(HERE, "lib/store-cli.mjs"), "utf8");
+      return (
+        /admissions\.map\(\(a\) => a\.sources_digest/.test(src) &&
+        !/a\[0\]\.sources_digest/.test(src)
+      );
+    })(),
+  );
+
+  // receipt.mjs passed [] as the store index, which made the store branch of
+  // rolesFor unreachable — so sources_digest was structurally null for exactly
+  // the cross-run case it exists to serve.
+  check(
+    "receipt.mjs classifies a read-set against the REAL store index",
+    /storeIndex = indexRecords\(store\)/.test(
+      readFileSync(resolve(HERE, "lib/receipt.mjs"), "utf8"),
+    ),
+  );
+}
+// ===== END review findings ==================================================
+
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
 );

@@ -35,6 +35,7 @@ import { append, read, refold, sha256File } from "./ledger.mjs";
 import { rolesFor } from "./readset.mjs";
 import {
   checkClaim,
+  indexRecords,
   materialise,
   put,
   storeRoot,
@@ -226,7 +227,20 @@ switch (kind) {
     // fact about HISTORY (role, freshness), because that is recomputed.
     let sourcesDigest = null;
     if (Array.isArray(readSet)) {
-      const roled = rolesFor(readSet, read(journal), [], repoRoot);
+      // THE REAL STORE INDEX, not []. A natlang_sources member is classified
+      // by the record of the stage that PRODUCED it, and for a member produced
+      // by an EARLIER RUN that record lives only in the store — passing an
+      // empty index made the store branch unreachable, so `sources_digest` was
+      // structurally null for every cross-run case, which is the only case it
+      // exists to serve. Read defensively: put() is fail-open, and admission
+      // must never be blocked by an unreadable index.
+      let storeIndex = [];
+      try {
+        if (store) storeIndex = indexRecords(store);
+      } catch {
+        storeIndex = [];
+      }
+      const roled = rolesFor(readSet, read(journal), storeIndex, repoRoot);
       const srcs = roled.filter((m) => m.role === "natlang_sources");
       // null, not the empty fold: "this witness recorded no sources" and "this
       // witness recorded sources that happened to hash to X" are different

@@ -170,8 +170,20 @@ export function digestMembers(paths) {
  * still re-folds; a DOCTORED one does not — which is the asymmetry wanted.
  */
 export function refold(members) {
+  // A MALFORMED MEMBER MUST NOT CRASH THE VERIFIER. `verify` exists to REPORT
+  // that a journal is wrong; if a hand-edited `read_set` containing a bare
+  // string threw here, the verifier would die with a TypeError instead of
+  // saying what it found — turning "this journal is broken" into "the tool is
+  // broken", which is the report nobody can act on. A member that is not a
+  // member object cannot re-fold to anything, so it renders as a value that
+  // will not match any real digest, and `verify` says so in its own words.
   return sha256Text(
     [...members]
+      .map((m) =>
+        m && typeof m === "object" && typeof m.path === "string"
+          ? m
+          : { path: `\u0000malformed:${JSON.stringify(m ?? null)}` },
+      )
       .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
       .map((m) =>
         m.path.startsWith("text:")
@@ -248,6 +260,19 @@ export function verify(journalPath) {
 /** Append one record. The ONLY writer of journal.ndjson. Called only by receipt.mjs. */
 export function append(journalPath, record) {
   const records = read(journalPath);
+  // A JOURNAL'S SCHEMA IS FIXED WHEN IT IS CREATED. Resuming a run that began
+  // under an older binary would otherwise stamp today's constant onto later
+  // rows, and `verify` would then report "one chain, two binaries" FOREVER —
+  // the run would be permanently unverifiable, which destroys the one property
+  // the chain exists to provide. Refusing is the house rule applied to itself:
+  // an unknown schema is BROKEN, not guessed at. The fix for the operator is to
+  // start a new run, which costs a replay and keeps the evidence intact.
+  if (records.length && records[0].journal_schema !== JOURNAL_SCHEMA)
+    throw new Error(
+      `ledger: ${journalPath} was created at journal_schema ${records[0].journal_schema}, ` +
+        `and this binary writes ${JOURNAL_SCHEMA}. Appending would put two schemas in one ` +
+        `chain and make the run permanently unverifiable. Start a new run instead.`,
+    );
   const prev = records.length ? records[records.length - 1].hash : GENESIS;
   const rec = {
     journal_schema: JOURNAL_SCHEMA,
