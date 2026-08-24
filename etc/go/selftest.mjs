@@ -1019,11 +1019,11 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
     // diff would have been a partial identity with no error anywhere.
     const r = withCorpus((desc) => {
       FIVE(desc);
-      desc.denovo = { ...(desc.denovo ?? {}), modules: [WILLS] };
+      desc.encodings = { "cleanroom-a": { modules: [WILLS] } };
     });
     check(
-      "a denovo module colliding with a corpus module that is NEITHER main NOR the wizard is refused",
-      r.status === 2 && /also a corpus module/.test(r.stderr),
+      "an additional encoding's module colliding with a committed module that is NEITHER main NOR the wizard is refused",
+      r.status === 2 && /also a committed encoding module/.test(r.stderr),
     );
   }
   {
@@ -2027,12 +2027,14 @@ if (!process.argv.includes("--with-driver")) {
       verify(j2).ok === true,
     );
     check(
-      "the g2 measurement stages ran at denovo origin — the deposit, not the corpus",
-      ["p3-check", "p6-tests", "p8-verify"].every(
-        (s) =>
-          first2.find((r) => r.stage === s)?.metrics?.module_origin ===
-          "denovo",
-      ),
+      "the deposit-run measurement stages record WHICH ENCODING they measured",
+      ["p3-check", "p6-tests", "p8-verify"].every((s) => {
+        const id = first2.find((r) => r.stage === s)?.metrics?.encoding_id;
+        // The metric names the thing measured, not the pass it belonged to.
+        // `module_origin=denovo` said "this was the second pass"; `encoding_id`
+        // says which encoding, which is the fact a later reader needs.
+        return typeof id === "string" && id !== "" && id !== "primary";
+      }),
     );
     // The after-verdict explainer render is DECLARED-STAGES-ONLY (2026-08-09).
     // RED, measured before the guard: a g2 run dir held explainer.md
@@ -3124,7 +3126,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         "the Reg CF corpus is not in this tree",
       );
     } else {
-      const out = mkdtempSync(resolve(tmpdir(), "go-denovo-diff-"));
+      const out = mkdtempSync(resolve(tmpdir(), "go-encode-diff-"));
       const r = spawnSync(
         "node",
         [
@@ -3247,7 +3249,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     rmSync,
   } = await import("node:fs");
   const REPO = resolve(HERE, "../..");
-  const T = mkdtempSync(resolve(tmpdir(), "l4-go-denovo-"));
+  const T = mkdtempSync(resolve(tmpdir(), "l4-go-deposit-"));
   const DEP = resolve(T, "deposits");
   mkd(DEP, { recursive: true });
 
@@ -3280,9 +3282,16 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
 
-  // --- 1. the sidecar's `denovo` section ------------------------------------
+  // --- 1. the sidecar's split sections (R2/R3) ------------------------------
+  //
+  // `denovo` used to be ONE object bundling six keys across four kinds of
+  // thing. It is now three: `natlang_sources` (the fetched text and the sweep),
+  // `comparison` (the declarations that only relate two encodings), and
+  // `encodings` (additional encodings, keyed by an author-chosen id). The
+  // schema's whole value is that it is CLOSED, so every positive resolution
+  // below has a refusing sibling.
   const sidecars = resolve(T, "subjects");
-  const mkSidecar = (id, denovo, corpus = CORPUS) => {
+  const mkSidecar = (id, extra, corpus = CORPUS) => {
     const d = resolve(sidecars, id);
     mkd(d, { recursive: true });
     wr(
@@ -3295,7 +3304,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         encoding: { main: corpus },
         checks: { min_dated_arms: 0, min_assertions: 0 },
         legs: {},
-        ...(denovo ? { denovo } : {}),
+        ...(extra ?? {}),
       }),
     );
     wr(resolve(d, "pins.json"), "{}");
@@ -3303,131 +3312,224 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     wr(resolve(d, "NOTES.md"), "selftest fixture\n");
     return d;
   };
-  const subjectRun = (id) =>
-    spawnSync("node", [resolve(HERE, "lib/subject.mjs"), id], {
+  const subjectRun = (id, ...args) =>
+    spawnSync("node", [resolve(HERE, "lib/subject.mjs"), id, ...args], {
       encoding: "utf8",
       env: { ...process.env, L4_GO_SUBJECTS_DIR: sidecars },
     });
 
   mkSidecar("smoke", {
-    bundle: BUNDLE,
-    register: REGISTER,
-    fork_register: FORKS,
-    modules: [resolve(DEP, "smoke.l4")],
+    natlang_sources: { bundle: BUNDLE, register: REGISTER },
+    comparison: { fork_register: FORKS },
+    encodings: { "cleanroom-a": { modules: [resolve(DEP, "smoke.l4")] } },
   });
   {
     const r = subjectRun("smoke");
     check(
-      "a sidecar's denovo section resolves to GO_S_DENOVO_* paths whose existence is NOT required",
+      "natlang_sources and comparison resolve to absolute paths under their own keys",
       r.status === 0 &&
-        r.stdout.includes(`GO_S_DENOVO_BUNDLE='${BUNDLE}'`) &&
-        r.stdout.includes(`GO_S_DENOVO_REGISTER='${REGISTER}'`) &&
-        r.stdout.includes(`GO_S_DENOVO_FORKS='${FORKS}'`) &&
-        r.stdout.includes(
-          `GO_S_DENOVO_MODULES='${resolve(DEP, "smoke.l4")}'`,
+        r.stdout.includes(`GO_S_NATLANG_BUNDLE='${BUNDLE}'`) &&
+        r.stdout.includes(`GO_S_NATLANG_REGISTER='${REGISTER}'`) &&
+        r.stdout.includes(`GO_S_COMPARISON_FORKS='${FORKS}'`),
+    );
+    // THE SELECTION IS A RUN PARAMETER, NOT A SCHEMA KEY. Unselected, the answer
+    // is about the committed encoding; that is the whole of R3 in one flag.
+    check(
+      "unselected, the committed encoding's modules are the module set",
+      r.status === 0 &&
+        r.stdout.includes(`GO_S_ENCODING_MODULES='${CORPUS}'`) &&
+        r.stdout.includes("GO_S_ENCODING_ID='primary'"),
+    );
+    const sel = subjectRun("smoke", "--encoding", "cleanroom-a");
+    check(
+      "selecting an encoding swaps the module set under the ORDINARY name",
+      sel.status === 0 &&
+        sel.stdout.includes(
+          `GO_S_ENCODING_MODULES='${resolve(DEP, "smoke.l4")}'`,
         ) &&
+        sel.stdout.includes("GO_S_ENCODING_ID='cleanroom-a'") &&
         !ex(resolve(DEP, "smoke.l4")),
     );
+    check(
+      "an undeclared encoding id is refused, and the message names what IS declared",
+      (() => {
+        const bad = subjectRun("smoke", "--encoding", "nope");
+        return (
+          bad.status === 2 &&
+          /declares no such encoding/.test(bad.stderr) &&
+          /cleanroom-a/.test(bad.stderr)
+        );
+      })(),
+    );
+    check(
+      "--encodings lists the additional encodings, which is what the driver translates g2 with",
+      subjectRun("smoke", "--encodings").stdout.trim() === "cleanroom-a",
+    );
   }
   {
-    mkSidecar("badkey", { bundle: BUNDLE, surprise: "x" });
+    mkSidecar("badkey", { natlang_sources: { bundle: BUNDLE, surprise: "x" } });
     const r = subjectRun("badkey");
     check(
-      "an unknown key inside denovo is refused, naming the allowed set",
-      r.status === 2 && /denovo: unknown key 'surprise'/.test(r.stderr),
+      "an unknown key inside natlang_sources is refused, naming the allowed set",
+      r.status === 2 &&
+        /natlang_sources: unknown key 'surprise'/.test(r.stderr),
     );
   }
-  // --- 1a. the per-origin floors, the surface map, the per-leg declarations --
-  // (D2/D4/D6, 2026-08-09). Each positive resolution has a refusing sibling,
-  // because the schema's whole value is that it is CLOSED — measured before the
-  // extension landed: every one of these sidecars was refused with
-  // "denovo: unknown key 'checks'".
   {
-    mkSidecar("dnfloors", {
-      modules: [resolve(DEP, "smoke.l4")],
-      checks: { min_dated_arms: 0, min_assertions: 39 },
-      surface_map: resolve(DEP, "never-written-map.json"),
-      legs: { "p7-dmn": { cases: resolve(DEP, "never-written.cases.json") } },
-    });
-    const r = subjectRun("dnfloors");
+    mkSidecar("badcmp", { comparison: { surprise: "x" } });
+    const r = subjectRun("badcmp");
     check(
-      "denovo.checks resolves to per-origin floor env, distinct from the corpus floors",
+      "an unknown key inside comparison is refused",
+      r.status === 2 && /comparison: unknown key 'surprise'/.test(r.stderr),
+    );
+  }
+  // FLOORS TRAVEL WITH THEIR ENCODING, and that is now STRUCTURAL rather than a
+  // convention: `encodings.<id>.checks` sits inside the encoding it measures, so
+  // a committed floor cannot be applied to a deposit and vice versa.
+  {
+    mkSidecar("floors", {
+      comparison: { surface_map: resolve(DEP, "never-written-map.json") },
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          checks: { min_dated_arms: 0, min_assertions: 39 },
+          legs: {
+            "p7-dmn": { cases: resolve(DEP, "never-written.cases.json") },
+          },
+        },
+      },
+    });
+    const r = subjectRun("floors");
+    check(
+      "unselected, the floors are the committed encoding's",
       r.status === 0 &&
-        r.stdout.includes("GO_S_DENOVO_MIN_DATED_ARMS='0'") &&
-        r.stdout.includes("GO_S_DENOVO_MIN_ASSERTIONS='39'"),
+        r.stdout.includes("GO_S_MIN_DATED_ARMS='0'") &&
+        r.stdout.includes("GO_S_MIN_ASSERTIONS='0'"),
+    );
+    const sel = subjectRun("floors", "--encoding", "cleanroom-a");
+    check(
+      "selecting an encoding swaps the FLOORS too, under the ordinary names",
+      sel.status === 0 && sel.stdout.includes("GO_S_MIN_ASSERTIONS='39'"),
     );
     check(
-      "denovo.surface_map and denovo.legs['p7-dmn'].cases resolve, and their existence is NOT required",
-      r.status === 0 &&
-        r.stdout.includes(
-          `GO_S_DENOVO_SURFACE_MAP='${resolve(DEP, "never-written-map.json")}'`,
+      "comparison.surface_map and the encoding's own p7-dmn cases resolve, existence not required",
+      sel.status === 0 &&
+        sel.stdout.includes(
+          `GO_S_COMPARISON_SURFACE_MAP='${resolve(DEP, "never-written-map.json")}'`,
         ) &&
-        r.stdout.includes(
-          `GO_S_DENOVO_DMN_CASES='${resolve(DEP, "never-written.cases.json")}'`,
+        sel.stdout.includes(
+          `GO_S_ENCODING_DMN_CASES='${resolve(DEP, "never-written.cases.json")}'`,
         ) &&
         !ex(resolve(DEP, "never-written-map.json")),
     );
   }
   {
-    mkSidecar("dnbadfloor", {
-      checks: { min_assertions: 39, surprise: 1 },
+    mkSidecar("badfloor", {
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          checks: { min_assertions: 39, surprise: 1 },
+        },
+      },
     });
-    const r = subjectRun("dnbadfloor");
+    const r = subjectRun("badfloor");
     check(
-      "an unknown key inside denovo.checks is refused, naming the two floors",
-      r.status === 2 && /denovo\.checks: unknown key 'surprise'/.test(r.stderr),
-    );
-  }
-  {
-    mkSidecar("dnbadleg", {
-      legs: { "p7-dmn": { golden: "x.dmn" } },
-    });
-    const r = subjectRun("dnbadleg");
-    check(
-      "denovo.legs does NOT reuse LEG_KEYS: a golden inside denovo.legs['p7-dmn'] is refused",
+      "an unknown key inside an encoding's checks is refused, naming the two floors",
       r.status === 2 &&
-        /denovo\.legs\['p7-dmn'\]: unknown key 'golden'/.test(r.stderr),
+        /encodings\['cleanroom-a'\]\.checks: unknown key 'surprise'/.test(
+          r.stderr,
+        ),
     );
   }
   {
-    mkSidecar("dnbadleg2", {
-      legs: { "p7-akn": { cases: "x.json" } },
+    mkSidecar("badleg", {
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          legs: { "p7-dmn": { golden: "x.dmn" } },
+        },
+      },
     });
-    const r = subjectRun("dnbadleg2");
+    const r = subjectRun("badleg");
     check(
-      "a denovo.legs entry for a leg with no de novo schema refuses every key",
+      "an additional encoding's legs do NOT reuse LEG_KEYS: a golden is refused, because it has none",
       r.status === 2 &&
-        /denovo\.legs\['p7-akn'\]: unknown key 'cases'/.test(r.stderr),
+        /encodings\['cleanroom-a'\]\.legs\['p7-dmn'\]: unknown key 'golden'/.test(
+          r.stderr,
+        ),
     );
   }
   {
-    mkSidecar("nodenovo2", null);
-    const r = subjectRun("nodenovo2");
+    mkSidecar("badleg2", {
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          legs: { "p7-akn": { cases: "x.json" } },
+        },
+      },
+    });
+    const r = subjectRun("badleg2");
     check(
-      "a subject with no denovo section resolves every new GO_S_DENOVO_* to ''",
-      r.status === 0 &&
-        r.stdout.includes("GO_S_DENOVO_MIN_DATED_ARMS=''") &&
-        r.stdout.includes("GO_S_DENOVO_MIN_ASSERTIONS=''") &&
-        r.stdout.includes("GO_S_DENOVO_SURFACE_MAP=''") &&
-        r.stdout.includes("GO_S_DENOVO_DMN_CASES=''"),
+      "a leg with no additional-encoding schema refuses every key",
+      r.status === 2 &&
+        /encodings\['cleanroom-a'\]\.legs\['p7-akn'\]: unknown key 'cases'/.test(
+          r.stderr,
+        ),
+    );
+  }
+  // AN ID NAMES AN OCCASION, NOT A SENTENCE — and 'primary' is reserved, because
+  // that is what the selector calls the committed encoding.
+  {
+    mkSidecar("badid", {
+      encodings: { "Cleanroom Two": { modules: [resolve(DEP, "smoke.l4")] } },
+    });
+    check(
+      "an encoding id that is not a slug is refused",
+      subjectRun("badid").status === 2,
+    );
+    mkSidecar("reservedid", {
+      encodings: { primary: { modules: [resolve(DEP, "smoke.l4")] } },
+    });
+    const r = subjectRun("reservedid");
+    check(
+      "'primary' may not be redeclared as an encoding id",
+      r.status === 2 && /may not be redeclared/.test(r.stderr),
     );
   }
   {
-    mkSidecar("selfdiff", { modules: ["jl4/examples/legal/regcf/regcf.l4"] });
+    mkSidecar("nomodules", { encodings: { "cleanroom-a": { checks: {} } } });
+    const r = subjectRun("nomodules");
+    check(
+      "an encoding with no modules is refused — an encoding IS its modules",
+      r.status === 2 && /modules is required/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("selfdiff", {
+      encodings: {
+        "cleanroom-a": { modules: ["jl4/examples/legal/regcf/regcf.l4"] },
+      },
+    });
     const r = subjectRun("selfdiff");
     check(
-      "a denovo module that IS the corpus is refused — SPEC.md §8's diff would be an identity",
-      r.status === 2 && /also a corpus module/.test(r.stderr),
+      "an additional module that IS the committed one is refused — the diff would be an identity",
+      r.status === 2 && /also a committed encoding module/.test(r.stderr),
     );
   }
   {
-    mkSidecar("nodenovo", null);
-    const r = subjectRun("nodenovo");
+    mkSidecar("bare", null);
+    const r = subjectRun("bare");
     check(
-      "omitting denovo entirely is legal, and every GO_S_DENOVO_* comes back empty",
+      "omitting all three sections is legal, and every new GO_S_* comes back empty",
       r.status === 0 &&
-        r.stdout.includes("GO_S_DENOVO_BUNDLE=''") &&
-        r.stdout.includes("GO_S_DENOVO_MODULES=''"),
+        r.stdout.includes("GO_S_NATLANG_BUNDLE=''") &&
+        r.stdout.includes("GO_S_NATLANG_REGISTER=''") &&
+        r.stdout.includes("GO_S_COMPARISON_FORKS=''") &&
+        r.stdout.includes("GO_S_COMPARISON_SURFACE_MAP=''"),
+    );
+    check(
+      "and a subject with no additional encoding lists none",
+      subjectRun("bare", "--encodings").stdout.trim() === "",
     );
   }
 
@@ -3449,10 +3551,10 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         GO_S_DIR: resolve(sidecars, "smoke"),
         GO_S_CITATION: "n/a",
         GO_S_ENCODING: CORPUS,
-        GO_S_DENOVO_BUNDLE: "",
-        GO_S_DENOVO_REGISTER: "",
-        GO_S_DENOVO_FORKS: "",
-        GO_S_DENOVO_MODULES: "",
+        GO_S_NATLANG_BUNDLE: "",
+        GO_S_NATLANG_REGISTER: "",
+        GO_S_COMPARISON_FORKS: "",
+        GO_S_ENCODING_MODULES: "",
         L4_GO_REQUIRED: "0",
         ...over,
       },
@@ -3469,16 +3571,16 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     return { exit: r.status, stdout: r.stdout, stderr: r.stderr, row, rows };
   };
   const ALL = {
-    GO_S_DENOVO_BUNDLE: BUNDLE,
-    GO_S_DENOVO_REGISTER: REGISTER,
-    GO_S_DENOVO_FORKS: FORKS,
+    GO_S_NATLANG_BUNDLE: BUNDLE,
+    GO_S_NATLANG_REGISTER: REGISTER,
+    GO_S_COMPARISON_FORKS: FORKS,
   };
 
   // --- 3. deposit present: the stage validates it and PASSes -----------------
   for (const [name, key] of [
-    ["p1-ingest", "GO_S_DENOVO_BUNDLE"],
-    ["p2-sweep", "GO_S_DENOVO_REGISTER"],
-    ["p4-forks", "GO_S_DENOVO_FORKS"],
+    ["p1-ingest", "GO_S_NATLANG_BUNDLE"],
+    ["p2-sweep", "GO_S_NATLANG_REGISTER"],
+    ["p4-forks", "GO_S_COMPARISON_FORKS"],
   ]) {
     const s = stage(name, ALL);
     check(
@@ -3521,7 +3623,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const s = stage("p1-ingest", {
       ...ALL,
-      GO_S_DENOVO_BUNDLE: resolve(DEP, "never-written.json"),
+      GO_S_NATLANG_BUNDLE: resolve(DEP, "never-written.json"),
     });
     check(
       "a declared-but-undeposited bundle is SKIPPED as a missing prerequisite, not refused as a defect",
@@ -3534,7 +3636,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const s = stage("p2-sweep", ALL, {});
     void s;
-    const t = stage("p2-sweep", { ...ALL, GO_S_DENOVO_REGISTER: "" });
+    const t = stage("p2-sweep", { ...ALL, GO_S_NATLANG_REGISTER: "" });
     check(
       "a subject that declares no denovo.register is SKIPPED naming the key and the file to add it to",
       t.exit === 0 &&
@@ -3546,7 +3648,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const s = stage("p4-forks", {
       ...ALL,
-      GO_S_DENOVO_FORKS: resolve(DEP, "never-written.json"),
+      GO_S_COMPARISON_FORKS: resolve(DEP, "never-written.json"),
       L4_GO_REQUIRED: "1",
     });
     check(
@@ -3557,7 +3659,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 5. deposit invalid: DEGRADED, naming the rule ------------------------
   {
-    const s = stage("p4-forks", { ...ALL, GO_S_DENOVO_FORKS: BAD_FORKS });
+    const s = stage("p4-forks", { ...ALL, GO_S_COMPARISON_FORKS: BAD_FORKS });
     check(
       "an invalid fork register is DEGRADED, and the reason NAMES the rules that fired against it",
       s.exit === 1 &&
@@ -3579,7 +3681,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // its command line, so a clean bundle beside a broken fork register exits 1
     // — and reading that as a fact about the bundle produced a measured
     // falsehood: p1-ingest naming fifteen fork-register rules as the bundle's.
-    const s = stage("p1-ingest", { ...ALL, GO_S_DENOVO_FORKS: BAD_FORKS });
+    const s = stage("p1-ingest", { ...ALL, GO_S_COMPARISON_FORKS: BAD_FORKS });
     check(
       "a clean bundle beside a broken peer is DEGRADED, but its reason does not blame the bundle",
       s.exit === 1 &&
@@ -3594,7 +3696,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     );
   }
   {
-    const s = stage("p4-forks", { ...ALL, GO_S_DENOVO_FORKS: BNA_FORKS });
+    const s = stage("p4-forks", { ...ALL, GO_S_COMPARISON_FORKS: BNA_FORKS });
     check(
       "a deposit about a different body of law is refused — nothing in the three schemas ties a register to a subject",
       s.exit === 1 &&
@@ -3607,7 +3709,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const notJson = resolve(DEP, "not.json");
     wr(notJson, "{ this is not json\n");
-    const s = stage("p1-ingest", { ...ALL, GO_S_DENOVO_BUNDLE: notJson });
+    const s = stage("p1-ingest", { ...ALL, GO_S_NATLANG_BUNDLE: notJson });
     check(
       "an unparseable deposit is a finding about the DEPOSIT (DEGRADED), never BROKEN about the harness",
       s.exit === 1 &&
@@ -3618,7 +3720,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 6. p5-gate: the joins, and the two halves it does not hold ------------
   {
-    const s = stage("p5-gate", { ...ALL, GO_S_DENOVO_FORKS: "" });
+    const s = stage("p5-gate", { ...ALL, GO_S_COMPARISON_FORKS: "" });
     const notes = (s.row?.notes ?? []).map((n) => n.text).join("\n");
     check(
       "p5-gate SKIPs when a deposit is missing rather than passing over joins that could not run",
@@ -3662,7 +3764,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   }
   {
     const s = stage("p3-encode", {
-      GO_S_DENOVO_MODULES: resolve(DEP, "never-written.l4"),
+      GO_S_ENCODING_MODULES: resolve(DEP, "never-written.l4"),
     });
     check(
       "p3-encode with a declared-but-undeposited module is SKIPPED, naming which module",
@@ -3685,7 +3787,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         good,
         "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\n`is positive` x MEANS x > 0\n",
       );
-      const s = stage("p3-encode", { GO_S_DENOVO_MODULES: good });
+      const s = stage("p3-encode", { GO_S_ENCODING_MODULES: good });
       check(
         "p3-encode over a deposited module that typechecks PASSes, and says on the row what it did not check",
         s.exit === 0 &&
@@ -3699,7 +3801,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         bad,
         "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\n`is broken` x MEANS x > \n",
       );
-      const t = stage("p3-encode", { GO_S_DENOVO_MODULES: bad });
+      const t = stage("p3-encode", { GO_S_ENCODING_MODULES: bad });
       check(
         "p3-encode is capable of red: a module that does not typecheck is DEGRADED",
         t.exit === 1 &&
@@ -3724,17 +3826,21 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const skp = stage("p3-check", {
       GO_MODULES: "",
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
     });
     check(
-      "p3-check with no de novo module set is SKIPPED naming denovo.modules",
+      "p3-check with no module set for its encoding is SKIPPED, naming the key that EXISTS",
       skp.exit === 0 &&
         skp.row?.status === "SKIPPED" &&
-        /denovo\.modules/.test(skp.row.reason),
+        // NAMES A KEY THAT EXISTS. The old message said `denovo.modules`, which
+        // the schema now refuses — a diagnostic pointing at a nonexistent key
+        // sends the reader to edit something that cannot be edited.
+        /encodings?[.[]/.test(skp.row.reason) &&
+        !/denovo/.test(skp.row.reason),
     );
     const abs = stage("p3-check", {
       GO_MODULES: resolve(DEP, "never-written.l4"),
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
       L4_GO_REQUIRED: "1",
     });
     check(
@@ -3745,28 +3851,30 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     );
     const p6u = stage("p6-tests", {
       GO_MODULES: "",
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
     });
     check(
-      "p6-tests with no de novo module set is SKIPPED naming denovo.modules",
+      "p6-tests with no module set for its encoding is SKIPPED, naming the key that EXISTS",
       p6u.exit === 0 &&
         p6u.row?.status === "SKIPPED" &&
-        /denovo\.modules/.test(p6u.row.reason),
+        /encodings?[.[]/.test(p6u.row.reason) &&
+        !/denovo/.test(p6u.row.reason),
     );
     const p8u = stage("p8-verify", {
       GO_MODULES: "",
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
     });
     check(
-      "p8-verify with no de novo module set is SKIPPED naming denovo.modules",
+      "p8-verify with no module set for its encoding is SKIPPED, naming the key that EXISTS",
       p8u.exit === 0 &&
         p8u.row?.status === "SKIPPED" &&
-        /denovo\.modules/.test(p8u.row.reason),
+        /encodings?[.[]/.test(p8u.row.reason) &&
+        !/denovo/.test(p8u.row.reason),
     );
   }
   {
     // p8-diff's deposit contract is over the MAP, not the module set.
-    const und = stage("p8-diff", { GO_S_DENOVO_SURFACE_MAP: "" });
+    const und = stage("p8-diff", { GO_S_COMPARISON_SURFACE_MAP: "" });
     check(
       "p8-diff with no declared surface map is SKIPPED naming denovo.surface_map",
       und.exit === 0 &&
@@ -3774,7 +3882,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         /denovo\.surface_map/.test(und.row.reason),
     );
     const abs = stage("p8-diff", {
-      GO_S_DENOVO_SURFACE_MAP: resolve(DEP, "never-written-map.json"),
+      GO_S_COMPARISON_SURFACE_MAP: resolve(DEP, "never-written-map.json"),
       L4_GO_REQUIRED: "1",
     });
     check(
@@ -3788,7 +3896,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // and short battery rows.
     const badMap = resolve(DEP, "bad-map.json");
     wr(badMap, "{ this is not a surface map\n");
-    const deg = stage("p8-diff", { GO_S_DENOVO_SURFACE_MAP: badMap });
+    const deg = stage("p8-diff", { GO_S_COMPARISON_SURFACE_MAP: badMap });
     check(
       "p8-diff over an unparseable map is DEGRADED naming the harness error, never PASS and never BROKEN",
       deg.exit === 1 &&
@@ -3812,7 +3920,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const FLOORS = {
         GO_MODULES: tiny,
-        GO_MODULES_ORIGIN: "denovo",
+        GO_S_ENCODING_ID: "cleanroom-a",
         // the poison: if a stage reads a corpus floor at denovo origin, these
         // make it red, so a green run PROVES per-origin selection
         GO_S_MIN_DATED_ARMS: "999",
@@ -3820,14 +3928,14 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       };
       const p3 = stage("p3-check", {
         ...FLOORS,
-        GO_S_DENOVO_MIN_DATED_ARMS: "0",
+        GO_S_MIN_DATED_ARMS: "0",
       });
       check(
-        "p3-check at denovo origin reads the denovo floor, not the poisoned corpus floor",
+        "p3-check over an additional encoding reads THAT encoding's floor, not the poisoned committed one",
         p3.exit === 0 &&
           p3.row?.status === "PASS" &&
           p3.row?.metrics?.min_dated_arms === "0" &&
-          p3.row?.metrics?.module_origin === "denovo",
+          p3.row?.metrics?.encoding_id === "cleanroom-a",
       );
       check(
         "…and a zero floor over zero matched arms is NOT CHECKED on the receipt, not a vacuous green",
@@ -3837,7 +3945,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6 = stage("p6-tests", {
         ...FLOORS,
-        GO_S_DENOVO_MIN_ASSERTIONS: "1",
+        GO_S_MIN_ASSERTIONS: "1",
       });
       check(
         "p6-tests at denovo origin reads the denovo assertion floor, not the poisoned corpus floor",
@@ -3847,7 +3955,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6red = stage("p6-tests", {
         ...FLOORS,
-        GO_S_DENOVO_MIN_ASSERTIONS: "2",
+        GO_S_MIN_ASSERTIONS: "2",
       });
       check(
         "…and the denovo floor is capable of red: floor 2 over 1 assertion is DEGRADED",
@@ -3857,7 +3965,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6undecl = stage("p6-tests", {
         GO_MODULES: tiny,
-        GO_MODULES_ORIGIN: "denovo",
+        GO_S_ENCODING_ID: "cleanroom-a",
       });
       check(
         "an UNDECLARED denovo assertion floor defaults to 0 with a toothless-guard note on the receipt",
@@ -3880,7 +3988,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6zero = stage("p6-tests", {
         GO_MODULES: empty,
-        GO_MODULES_ORIGIN: "denovo",
+        GO_S_ENCODING_ID: "cleanroom-a",
       });
       check(
         "a zero-assertion module set is DEGRADED, never a vacuous PASS/execution",
@@ -3908,14 +4016,14 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
           ...process.env,
           GO_ROOT: REPO,
           GO_MODULES: "probe.l4",
-          GO_MODULES_ORIGIN: "denovo",
-          GO_S_DENOVO_MIN_ASSERTIONS: "",
-          GO_S_DENOVO_MIN_DATED_ARMS: "",
+          GO_S_ENCODING_ID: "cleanroom-a",
+          GO_S_MIN_ASSERTIONS: "",
+          GO_S_MIN_DATED_ARMS: "",
           ...over,
         },
       }).stdout;
-    const a6 = inputsOf("p6-tests", { GO_S_DENOVO_MIN_ASSERTIONS: "1" });
-    const b6 = inputsOf("p6-tests", { GO_S_DENOVO_MIN_ASSERTIONS: "2" });
+    const a6 = inputsOf("p6-tests", { GO_S_MIN_ASSERTIONS: "1" });
+    const b6 = inputsOf("p6-tests", { GO_S_MIN_ASSERTIONS: "2" });
     check(
       "p6-tests' --inputs carries the resolved assertion floor, so a floor edit moves the digest",
       a6.includes("text:min_assertions=1") &&
@@ -3926,8 +4034,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       "…and an undeclared assertion floor is its own contributor (it changes the receipt too)",
       inputsOf("p6-tests").includes("text:min_assertions=undeclared"),
     );
-    const a3 = inputsOf("p3-check", { GO_S_DENOVO_MIN_DATED_ARMS: "0" });
-    const b3 = inputsOf("p3-check", { GO_S_DENOVO_MIN_DATED_ARMS: "2" });
+    const a3 = inputsOf("p3-check", { GO_S_MIN_DATED_ARMS: "0" });
+    const b3 = inputsOf("p3-check", { GO_S_MIN_DATED_ARMS: "2" });
     check(
       "p3-check's --inputs carries the resolved dated-arm floor, so a floor edit moves the digest",
       a3.includes("text:min_dated_arms=0") &&
@@ -4006,10 +4114,20 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         "each still-unwired p7 leg carries its own precise reason, and p7-dmn is a wired emit-only row",
         rp.status === 0 &&
           /p7-dmn\s+HG1\s+present\s+emit-only/.test(rp.stdout) &&
-          /p7-tnr\s+NOT WIRED\s+-\s+the sidecar declares no denovo\.legs\['p7-tnr'\]\.golden/.test(
+          // The reasons must name keys and things that EXIST in the new schema.
+          // They used to say `denovo.legs[...]` and "a de novo demo entry",
+          // both of which are now vocabulary the sidecar refuses.
+          /p7-tnr\s+NOT WIRED\s+-\s+the sidecar declares no legs\['p7-tnr'\]\.golden for this encoding/.test(
             rp.stdout,
           ) &&
-          /p7-ladder\s+NOT WIRED\s+-\s+needs a de novo demo entry/.test(
+          /p7-ladder\s+NOT WIRED\s+-\s+needs its own demo entry/.test(
+            rp.stdout,
+          ) &&
+          // Scoped to schema KEY references, not the bare word: the corpus
+          // directory is still literally named `denovo/`, and renaming it means
+          // moving a .l4 whose four goldens must be regenerated — a change that
+          // needs a build, and a separate one. R2/R3 is about keys.
+          !/denovo\.(legs|checks|modules|bundle|register|fork_register|surface_map)/.test(
             rp.stdout,
           ) &&
           !/compares against this subject's committed goldens, which are the replay artifacts/.test(
@@ -4030,7 +4148,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         "--milestone",
         "g2",
         "--subject",
-        "nodenovo",
+        "bare",
       ],
       {
         encoding: "utf8",
@@ -4038,7 +4156,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       },
     );
     check(
-      "a subject with no denovo section plans cleanly, every deposit reading 'undeclared'",
+      "a subject with no additional encoding still PLANS at g2, every deposit reading 'undeclared'",
       t.status === 0 && (t.stdout.match(/undeclared/g) ?? []).length >= 4,
     );
   }

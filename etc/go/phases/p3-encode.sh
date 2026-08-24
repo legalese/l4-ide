@@ -39,18 +39,18 @@ if [[ "${1:-}" == "--inputs" ]]; then
   # run's answer about a different point in legal time. Declared per stage
   # rather than folded centrally like the l4 binary's sha, because only the
   # stages that actually pass --fixed-now should re-run when it moves.
-  printf '%s\n' ${GO_S_DENOVO_MODULES:-} "${BASH_SOURCE[0]}" "text:fixed_now=${GO_FIXED_NOW:-unset}"
+  printf '%s\n' ${GO_S_ENCODING_MODULES:-} "${BASH_SOURCE[0]}" "text:fixed_now=${GO_FIXED_NOW:-unset}"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-if [[ -z "${GO_S_DENOVO_MODULES:-}" ]]; then
+if [[ -z "${GO_S_ENCODING_MODULES:-}" ]]; then
   go_skip "the '$GO_S_ID' sidecar declares no denovo.modules, so this subject has nowhere to deposit a de novo encoding. Add it to $GO_S_DIR/subject.json; the paths' existence is optional, because writing the L4 is agent work owned by the G2 section of .claude/skills/running-the-l4-pipeline/SKILL.md and by the writing-l4-rules skill."
 fi
 
 declare -a MODULES=()
-read -ra MODULES <<<"$GO_S_DENOVO_MODULES"
+read -ra MODULES <<<"$GO_S_ENCODING_MODULES"
 
 declare -a MISSING=()
 for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING+=("$m"); done
