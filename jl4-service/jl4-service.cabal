@@ -130,6 +130,7 @@ test-suite jl4-service-test
     CodeGenSpec
     CompatibilitySpec
     DecisionQueryCacheKeySpec
+    DeploymentIdSpec
     IntegrationSpec
     MaybeLiftSpec
     PutGuardSpec

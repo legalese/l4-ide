@@ -1,0 +1,19 @@
+# Expected external-engine verdicts for the Reg CF corpus DMN.
+#
+# One line per engine, matched as a FIXED SUBSTRING against that engine's stdout
+# by .github/workflows/pr-checks.yml. Lines beginning with '#' are comments and
+# blank lines are ignored.
+#
+# WHY THIS FILE EXISTS. These two strings used to be typed into `grep -q` calls
+# inside the workflow, which made the DMN engine gate structurally single-
+# subject: a second subject declaring a p7-dmn leg had nowhere to put its own
+# verdicts, so it would have been exercised by nothing. The counts here are
+# MEASURED against this corpus and belong beside it, on the same principle as
+# etc/bpmn-kie-baseline.txt.
+#
+# These numbers are a measurement, not a target. If a change moves them, do not
+# edit this file until you know WHICH decisions moved and why -- a count that
+# drifts down by one is a decision that stopped being evaluated, and blessing it
+# here is how that becomes the expected behaviour.
+KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s), 0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected, 330/330 service output value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated, 1540/1540 value(s) as expected
