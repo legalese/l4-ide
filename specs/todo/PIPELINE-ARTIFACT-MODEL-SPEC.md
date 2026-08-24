@@ -1,6 +1,6 @@
 # The pipeline as an artifact graph: phases, witnesses, and what the labels are for
 
-_Status: **rulings recorded; six of thirteen implemented.** Written 2026-08-20 on branch
+_Status: **rulings recorded; seven of thirteen implemented.** Written 2026-08-20 on branch
 `mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
 (`sg-succession`) and found that several of its central nouns name the wrong things._
 
@@ -8,10 +8,11 @@ _What IS implemented, and where: **R1** (`corpus` → `encoding`, commit `dd55a6
 **R8** (cross-run replay with a closed ineligible list, and borrowed artifacts copied rather than
 referenced, commit `41a7b5ac`), **R10** (the three senses of "corpus" deliberately retained), and
 **R12** (`encoding.state`, and `go.sh new-subject` on top of it — see §3.12 for the third closure
-that neither candidate had), and **R6** + **R11** together (`etc/go/lib/store.mjs`, the blessing
-ledger, and `go.sh store`). Everything else on this page is a decision, not a description: there is
-no read-set and no subject-level report. What would make the rest of the present tense true is named
-per ruling in §3._
+that neither candidate had), **R6** + **R11** together (`etc/go/lib/store.mjs`, the blessing
+ledger, and `go.sh store`), and **R4** (`etc/go/lib/readset.mjs` and `go.sh readset` — the read-set
+is recorded on every `stage_end`, and journal schema 4 enforces that it re-folds to its own digest).
+Everything else on this page is a decision, not a description: there is **no subject-level report**.
+What would make the rest of the present tense true is named per ruling in §3._
 
 _Why this document exists at all: the rulings below were reached in conversation and existed
 nowhere else. `CLAUDE.md` §4 — a decision is recorded in its owning document or it is not
@@ -54,7 +55,7 @@ something the graph answers.
 | R1     | **ANSWERED · IMPLEMENTED** | the subject's L4 is `encoding`, not `corpus`, §3.1                                                      |
 | R2     | **ANSWERED**               | the fetched legal text is `natlang_sources`; `denovo` is deferred, not half-renamed, §3.2               |
 | R3     | **ANSWERED**               | phase identity is intrinsic; ordinals are extrinsic and are not schema keys, §3.3                       |
-| R4     | **ANSWERED**               | blindness is a recorded read-set, not a flag; freshness is derived from it, §3.4                        |
+| R4     | **ANSWERED · IMPLEMENTED** | blindness is a recorded read-set, not a flag; freshness is derived from it, §3.4                        |
 | R5     | **ANSWERED**               | a diff means a different thing per phase, and an encoding diff is a fork only if upstream matched, §3.5 |
 | R6     | **ANSWERED · IMPLEMENTED** | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
 | R7     | **ANSWERED · IMPLEMENTED** | replay crosses run boundaries, except for a closed list of stages, §3.7                                 |
@@ -118,7 +119,7 @@ in its title and _"A cleanroom smoke test"_ in its first sentence. But see R4: e
 trying to be a flag for something that is properly an edge, so the right move is not to rename
 `denovo` to `cleanroom` — it is to stop needing either word.
 
-### 3.4 R4 — blindness is a read-set, not a flag — ANSWERED
+### 3.4 R4 — blindness is a read-set, not a flag — ANSWERED, IMPLEMENTED 2026-08-24
 
 An encoding agent **always** reads _some_ corpus — the fetched legal text. So "blind" was only ever
 meaningful against one sense of the word: blind to _prior L4 encodings of the same law_.
@@ -142,6 +143,43 @@ Only the second is blindness. The first is not a quality at all — it is the de
 - **comparability** — do two encodings share the same `natlang_sources` read-set? (See R5.)
 
 A `blind: true` flag cannot express the fourth at all, which is what settles it.
+
+**Implemented 2026-08-24.** `etc/go/lib/readset.mjs`, `etc/go/lib/readset-cli.mjs`, and
+`go.sh readset`.
+
+_The members are a PROOF of the fold, not an annotation beside it._ `ledger.manifestText`
+renders exactly the fields `ledger.digestMembers` returns, so `refold(members) === inputs_digest`
+by construction — checkable offline, with no filesystem, no store and no surviving run directory.
+`refold` lives in `ledger.mjs` beside the frozen format it inverts, so nobody edits one half
+without seeing the other. `receipt.mjs` REFUSES a read-set that does not re-fold, and
+`ledger.verify` catches one doctored and re-chained afterwards. That is what makes the read-set
+worth trusting, and it is why the members are recorded rather than a second, independently
+derived list.
+
+_Recorded on `stage_end`, and this matters._ `stage_begin` also carries `inputs_digest`, and was
+the first choice — wrongly. A REPLAYED stage writes no `stage_begin` at all, because it never
+began and a receipt may not exceed its evidence; a read-set carried only there would vanish for
+exactly the stages whose freshness R4 wants to know about. `stage_end` is the row that always
+exists, and R8 requires a run directory to be answerable by someone holding only that directory.
+
+_Nothing derived is stored._ Role, freshness, independence and comparability are all computed at
+query time. Freshness keeps Make's meaning — a newer prerequisite exists — and its ordering is
+**append order in the store index, never a timestamp**, so the verdict does not depend on when it
+was asked. A `text:` param nobody supplies reads `unknown`, never `current`: assuming one
+unchanged is precisely the §3.7a bug, where the binary and the stdlib moved and no digest noticed.
+
+_Two defects the build found, both recorded because each is a trap for the next reader._ The
+store's blessing path re-admits every `covers[]` member under the pseudo-stage `covers`, whose
+`rel` is `tree:<abs>`; letting that record outrank the tree check classified every corpus module
+of a blessed run as `unknown` — a worse answer than the filesystem gives for free. And the query
+must resolve a prerequisite **exactly as a run would**: a `command -v l4` fallback reported every
+stage of a clean run stale, because the driver had discovered a binary under a sibling worktree's
+`dist-newstyle` while the PATH held an unrelated one. Nothing had moved; two resolutions had
+disagreed, and a freshness tool that cries wolf is one nobody reads twice.
+
+_Measured on `sg-succession`._ Editing one corpus module (`sg-wills.l4`) turns exactly the four
+stages that read it STALE, each naming the moved member, while the projection stages that read
+only the entry module stay `current`. A digest could have said only that four stages changed.
 
 ### 3.5 R5 — a diff means something different per phase — ANSWERED
 
@@ -545,13 +583,68 @@ accounted for it anywhere.
 
 ## 4. What this does not settle
 
-- **Where the store lives**, and whether `gc` becomes a reference policy or is retired.
-- **Whether comparison is a phase or a query.** The argument for query: _"show me the encoding
-  divergences for this subject where the sources were identical"_ is a question, not a build step.
-- **Whether `--milestone` survives R9 at all.** Once staleness is computed from the graph, a
-  pre-cut stage set is a filter one would rarely reach for.
-- **The cost of retention** under R6 at real corpus sizes. 2.7 MB across 86 runs is not evidence
-  about a subject with a decade of sources.
+Two of the four questions this section opened with were **settled by building** — one on
+2026-08-21 by R6/R11, one on 2026-08-24 by noticing that the answer had already been made in code
+and written down nowhere. They are recorded here rather than deleted: the resolution is the
+interesting part, and a reader who remembers the open question deserves to find its answer where
+they left it.
+
+### 4.1 Where the store lives — SETTLED 2026-08-21, and `gc` became a reference policy
+
+`$L4_GO_STORE`, defaulting to `${XDG_STATE_HOME:-$HOME/.local/state}/l4-go/store`
+(`etc/go/lib/store.mjs:64`). What fixed it was not taste but a half-life: a blessing recorded only
+in a run journal under `$TMPDIR` expires in two to five days, silently, because the operating
+system reaps it. **Never `$TMPDIR`** is the whole of the ruling; the XDG state dir is merely the
+nearest conventional directory that satisfies it.
+
+`gc` was **retained, as a reference policy** — the bullet offered "reference policy or retired" and
+the answer is the first. It collects by **reachability first and age second**
+(`etc/go/lib/store-cli.mjs:165-205`): blessed bytes and every `covers[]` member are roots, and no
+age policy may reach them. Age alone would have made a signature's half-life a function of how long
+ago somebody signed it — the same defect as `$TMPDIR`, relocated to a better directory.
+
+### 4.2 Comparison is BOTH, and dependency is what separates them — SETTLED 2026-08-24
+
+The question was posed as exclusive and is not. Both exist in the tree, both are correct, and the
+rule that tells them apart is:
+
+> A comparison whose result something **depends on** is a **phase**: it consumes a declared input
+> set, earns a receipt, and sits in the graph. A comparison you **ask a question with** is a
+> **query**: it ranges over unbounded history, has no fixed input set, and produces no receipt.
+
+`p8-diff`, over `etc/go/lib/denovo-diff.mjs`, is a phase — its verdict gates acceptance, so
+something downstream depends on it. `go.sh store diff` is a query — _"show me the encoding
+divergences for this subject where the sources were identical"_ ranges over every run ever
+recorded, and nothing consumes its answer. They are not two implementations of one idea, and R5 is
+what tells a caller which of the two they are asking for.
+
+This is recorded because the decision had already been **made in code and written down nowhere**:
+the store's comparator shipped as a CLI verb rather than as a stage, and that choice _was_ the
+ruling. `CLAUDE.md` §4 is about exactly this failure — a decision taken in one medium and left out
+of the document that owns the question.
+
+### 4.3 Still open
+
+- **Whether `--milestone` survives R9 at all.** No longer speculative: it is **one flag doing four
+  separable jobs**, each of which is a real question that was bundled rather than answered —
+  which files the gate digest binds to (`go.sh:337`), which module set the stages iterate
+  (`go.sh:388`), which stages are HG1-gated (`go.sh:433`), and which stages run at all
+  (`stages_for`, `go.sh:447`). Three further uses are cosmetic wording (`go.sh:550`, `1039`,
+  `1360`). The first of the four is the damaging one: same subject, same tree, different flag →
+  different gate digest → **a different thing signed**, which is R3's complaint exactly. Retiring
+  it is R9's business and must come **last**, after R4: a mechanism that answers _"what should
+  run?"_ cannot be removed before the graph can answer it instead.
+- **The cost of retention** under R6 at real corpus sizes — and it is **still unmeasured**, which
+  is a stronger statement than it was. The working store on 2026-08-24 holds 860 KB across 193
+  objects and 312 index records, but **every one of those records carries `subject: null` and
+  `run_id: null`**, and their timestamps span a single afternoon (`2026-08-20T15:21Z` to
+  `21:05Z`) — the session that built R6 itself. **No pipeline run has ever populated this store.**
+  The number is test debris, and quoting it as a retention measurement would be measuring the
+  wrong thing; it is recorded here in that character so nobody quotes it as the right one.
+  What the same sweep _does_ establish, and much more sharply, is R11's premise: of **92 run
+  directories under `$TMPDIR/l4-go`, zero still hold a `journal.ndjson`** — four days after the
+  measurement that found sixteen of them surviving. A blessing kept only in a run journal is now
+  observed to have a half-life shorter than the week it took to write this paragraph.
 
 ## 5. What review changed
 

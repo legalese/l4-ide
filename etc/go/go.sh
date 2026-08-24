@@ -171,6 +171,8 @@ NEW_SOURCE_URL=""
 NEW_ENCODING=""
 NEW_FORCE=0
 declare -a STORE_ARGS=()
+STAGE_ONLY=""
+WANT_JSON=0
 
 # `store` owns its own flag vocabulary (--keep-days, --dry-run, --allow-waived,
 # --subject, --stage), so the driver hands it every argument verbatim rather
@@ -210,6 +212,14 @@ while [[ $# -gt 0 ]]; do
     --fixed-now)
       L4_GO_FIXED_NOW="$2"
       shift 2
+      ;;
+    --stage)
+      STAGE_ONLY="$2"
+      shift 2
+      ;;
+    --json)
+      WANT_JSON=1
+      shift
       ;;
     --keep)
       KEEP="$2"
@@ -667,6 +677,43 @@ cmd_status() {
   node "$LIB/verify-run.mjs" "$run"
 }
 
+# R4's query: what did this run READ, and does a newer version of any of it
+# exist? A QUERY and not a phase (§4.2) — it consumes no declared input set,
+# earns no receipt and nothing depends on its answer.
+#
+# The toolchain params are passed IN rather than recomputed inside the library,
+# because the driver is what owns those facts: a param nobody supplies is
+# reported UNEVALUATED, never assumed unchanged. Assuming it unchanged is
+# exactly the §3.7a bug — the binary and the stdlib moved and no digest noticed.
+cmd_readset() {
+  local run l4_path l4_sha stdlib_dir stdlib_sha
+  run="$(resolve_run)" || exit $?
+  # THE QUERY MUST RESOLVE A PREREQUISITE EXACTLY AS A RUN WOULD, or "stale"
+  # degrades into "I asked a different question". Measured: a `command -v l4`
+  # fallback reported every stage of a green run STALE on `l4-binary`, because
+  # the driver had discovered a binary under a SIBLING WORKTREE's dist-newstyle
+  # while the PATH held an unrelated `~/.local/bin/l4`. Nothing had moved; two
+  # resolutions had merely disagreed, and a freshness tool that cries wolf on a
+  # clean tree is a tool nobody reads twice. So: the same discovery the run uses.
+  go_provision_toolchain "$GO_ROOT"
+  l4_path="$(command -v "${L4:-l4}" || echo "${L4:-l4}")"
+  if [[ -x "$l4_path" ]]; then
+    l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
+  else
+    l4_sha="unset"
+  fi
+  stdlib_dir="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  stdlib_sha="$(node "$LIB/stdlib-digest.mjs" "$stdlib_dir")"
+  local extra=()
+  [[ -n "$STAGE_ONLY" ]] && extra+=(--stage "$STAGE_ONLY")
+  [[ "$WANT_JSON" == "1" ]] && extra+=(--json)
+  node "$LIB/readset-cli.mjs" "$run" \
+    --param "l4-binary=$l4_sha" \
+    --param "l4-stdlib=$stdlib_sha" \
+    --param "fixed_now=$FIXED_NOW" \
+    "${extra[@]}"
+}
+
 cmd_verify() {
   local extra=() run
   [[ $WANT_GATES -eq 1 ]] && extra+=(--gates)
@@ -1096,14 +1143,33 @@ EOF
     # and the driver folds in the one input no stage can declare — the `l4`
     # binary it was handed. `text:` entries are literal digest contributors; see
     # digestSet in lib/ledger.mjs.
-    local inputs digest
+    #
+    # R4: the SAME pass also itemises the set into a read-set, written beside
+    # the run. One `--members-out` flag rather than a second invocation, because
+    # the members must prove the digest and two passes over a tree that is being
+    # edited would produce a read-set that does not — a race indistinguishable,
+    # later, from a doctored row.
+    local inputs digest members
     inputs=$(GO_STAGE="$s" bash "$script" --inputs 2>/dev/null || true)
+    members="$RUN/.read-set-$s.json"
     if [[ -n "$inputs" ]]; then
-      digest=$(printf '%s\ntext:l4-binary=%s\ntext:l4-stdlib=%s\n' "$inputs" "$l4_sha" "$stdlib_sha" | node "$LIB/digest.mjs" --stdin)
+      digest=$(printf '%s\ntext:l4-binary=%s\ntext:l4-stdlib=%s\n' "$inputs" "$l4_sha" "$stdlib_sha" | node "$LIB/digest.mjs" --stdin --members-out "$members")
     else
       digest=""
+      rm -f "$members"
     fi
     export GO_INPUTS_DIGEST="$digest"
+    # R4: the itemised members, for go_receipt to record on the stage_end row.
+    # `rs_arg` is the same fact as an argv fragment, for the two REPLAY exits
+    # below — a replayed stage runs no phase script, so nothing would call
+    # go_receipt for it, yet its receipt must still say what it read. R8: a run
+    # directory is answerable by someone holding only that directory.
+    export GO_READ_SET=""
+    local rs_arg=()
+    if [[ -n "$digest" && -f "$members" ]]; then
+      export GO_READ_SET="$members"
+      rs_arg=(--read-set "$members")
+    fi
 
     # Resumability, in two widths.
     #
@@ -1242,11 +1308,11 @@ EOF
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
           --inputs-digest "$digest" --replayed-from "$phash" --replayed-from-run "$prior_run" \
           --subject "$SUBJECT" --run-id "$RUN_ID" --donor-dir "$from_dir" \
-          --artifacts-json "$RUN/.replay-artifacts.json" "${extra[@]}"
+          --artifacts-json "$RUN/.replay-artifacts.json" "${rs_arg[@]}" "${extra[@]}"
         echo "go: $s replayed from run $prior_run (inputs unchanged)"
       else
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
-          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${extra[@]}"
+          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${rs_arg[@]}" "${extra[@]}"
         echo "go: $s replayed (inputs unchanged)"
       fi
       [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
@@ -1383,6 +1449,7 @@ case "$CMD" in
   verify) cmd_verify ;;
   gc) cmd_gc ;;
   new-subject) cmd_new_subject ;;
+  readset) cmd_readset ;;
   store) cmd_store ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;

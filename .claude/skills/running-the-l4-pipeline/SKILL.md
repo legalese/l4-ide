@@ -198,6 +198,25 @@ Some artifacts embed their own run's path (`p0-preflight`'s `tripwire.json` does
 
 **`store gc` is not `gc`.** `etc/go/go.sh gc` sweeps run directories, which are a cache. `store gc` sweeps the object store, which is evidence, and it collects by **reachability** before age: blessed bytes and every `covers[]` member are unreachable by any age policy, because they are the one thing R11 exists to keep fetchable.
 
+### 7c. `readset`: what a stage READ, and whether any of it has moved since
+
+Every receipt now carries the **members** of the input set its digest folds, not just the digest. A digest can say _that_ something changed; a read-set says _which_ member changed, and lets three further questions be asked at all.
+
+```bash
+etc/go/go.sh readset --subject sg-succession
+etc/go/go.sh readset --run-id <run-id> --stage p6-tests --json
+```
+
+**Freshness is Make's, and it is derived — never stored.** A member is stale when a newer version of that prerequisite exists: the tree file changed on disk, or a newer artifact was admitted under the same `(subject, stage, rel)`. Recording the answer would freeze the one thing whose whole value is being recomputed. Ordering comes from append order in the store index, never from a timestamp — a clock-derived answer would make the verdict depend on when it was asked.
+
+**A param nobody supplied reads `unknown`, never `current`.** The driver owns the toolchain facts and passes them in (`--param l4-binary=…`). Assuming an unsupplied one unchanged is exactly the bug this closes: the `l4` binary and the stdlib were inputs to every stage, declared by none, and moved without any digest noticing.
+
+**The query resolves a prerequisite the same way a run would.** `readset` runs the driver's own toolchain discovery before asking. An earlier version used a bare `command -v l4` and reported every stage of a clean run stale, because the driver had discovered a binary under a sibling worktree's `dist-newstyle` while the PATH held an unrelated one. Nothing had moved; two resolutions had disagreed.
+
+**`read_set` rides on `stage_end`, including on a replay.** A replayed stage writes no `stage_begin` — it never began — so a read-set carried only there would vanish for exactly the stages whose freshness you most want. Exit 1 if any stage is stale.
+
+A stage that declares **no** inputs has no read-set, and that is deliberate rather than a gap: `p9-report` and `p9-explain` are functions of the journal they are writing into, and a stage cannot digest its own future.
+
 ### 7b. Read the explainer, which is a different document for a different reader
 
 ```
