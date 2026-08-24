@@ -1,0 +1,126 @@
+-- M2: statutory citations on the verdict screen, and a glossary of L4 defined
+-- terms.
+--
+-- Three sub-decisions, each carrying a statutory `@ref`, conjoined by AND so
+-- that a FALSE first conjunct short-circuits the other two away.  The
+-- docassemble backend must:
+--
+--   * attach each rule's citation to the `code:` block that decides it, via
+--     docassemble's `explain()` (util.py:13227), so that the verdict screen's
+--     `logic_explanation()` (util.py:13259) names EXACTLY the rules that
+--     actually fired, in evaluation order, and omits the short-circuited ones;
+--   * strip L4's own `@ref ` herald and the inline `<< >>` delimiters, so a
+--     citation reads as prose and never as L4 syntax;
+--   * escape Mako-hostile citation text — the third citation deliberately
+--     BEGINS with `%` (a Mako control line at start of line) and contains a
+--     literal `${ ... }` (a Mako expression), the same hostility the
+--     `defaults` example already applies to `@desc` (R9.1);
+--   * emit an `auto terms:` glossary block whose entries are the L4 defined
+--     terms — the `DECLARE`d type and each `MEANS`-bound sub-decision —
+--     defined by their `@desc` text.
+--
+-- HISTORY, because this file is where the defect was tracked. At M2 the claim
+-- above was bounded to the FORWARD drive: `explain()` appends to a
+-- session-scoped list that nothing cleared, and `invalidate_dependencies`
+-- deletes invalidated VARIABLES without touching that list (parse.py:8014-8060
+-- at 1b6678384), so a flow that re-defined an already-answered variable left
+-- this screen citing rules that had been short-circuited away. The M4 RED phase
+-- measured it as WORSE than that: on the undefine-and-re-ask path the VERDICT
+-- itself went stale — with the cap answer corrected from 9,000,000 to 1,000 the
+-- goal stayed FALSE — and no single flag repaired it (`depends on:` did not
+-- rescue it; `reconsider: True` alone made the citations accumulate
+-- contradictory rules; `initial: True` + `clear_explanations()` alone emptied
+-- them).
+--
+-- REPAIRED at M4 (2026-08-17), and the fourth #EVAL-less case in
+-- `roundtrip_check.py`'s fixture table asserts it: change the answer and the
+-- GOAL and the CITATIONS are what they would have been had the new answer been
+-- given first. Not the verdict: this export's goal is a plain boolean, so R4
+-- lowers it through `DABoolDriver`, which emits no verdict variable at all —
+-- `expected/citations.yml` contains the string `verdict` zero times, and the
+-- harness's verdict assertions are guarded on one existing, so they are inert
+-- here in both directions. (The fixture schema carries `verdict_candidates` and
+-- per-case `verdict` on twelve of thirteen examples that produce none; it is a
+-- uniform polymorphic schema, and a lowering that started emitting one under a
+-- name outside the candidate list still fails loudly through the harness's
+-- "neither a goal variable nor a verdict variable is defined" backstop. The
+-- sentence above said "the goal, the verdict and the citations" until
+-- 2026-08-17; the claim was true of nothing this file emits.) Two emitted
+-- things carry the repair, and neither is visible in this source — see
+-- DOCASSEMBLE-EXPORT-SPEC.md §8.4: `reconsider: True` on every derived block,
+-- and a citation-reset sentinel that the mandatory driver references BEFORE the
+-- goal, so the explanation list is emptied once per assemble pass, before any
+-- rule re-explains into it.
+--
+-- The exported decision carries a `@ref` of its own, and it is the reason the
+-- expected citation lists below are asserted AS ORDERED LISTS. Order is
+-- COMPLETION order, not declaration order: `explain()` is emitted AFTER the
+-- assignment in each `code:` block, because a block whose assignment raises on
+-- an undefined input has decided nothing and docassemble re-runs it once the
+-- input arrives — citing first would record a rule that had not fired. The goal
+-- block's assignment is what pulls on the sub-rules, so it completes LAST and
+-- its citation prints last. Move any `explain()` above its assignment and only
+-- this file's top-level `@ref` notices, which is why it is here.
+--
+-- The two #EVALs below are the round-trip oracle AND the citation oracle:
+--   * the "exempt" case fires all three sub-rules, so all three citations
+--     appear, in source order, followed by the goal's own;
+--   * the "cap exceeded" case fires only the first, so ONLY the first
+--     sub-rule's citation may appear (followed by the goal's) — the other two
+--     rules were never reached, and a verdict screen that cites them would be
+--     citing law that did not decide anything.
+
+@desc A securities offering made in reliance on the crowdfunding exemption
+DECLARE Offering
+    HAS
+      @desc The aggregate amount sold in reliance on the exemption in the preceding 12 months, in dollars
+      `amount raised in 12 months`    IS A NUMBER
+      @desc Whether the whole offering was conducted through a single intermediary
+      `sold through one intermediary` IS A BOOLEAN
+      @desc Whether that intermediary is registered with the Commission as a funding portal
+      `intermediary is registered`    IS A BOOLEAN
+
+@ref 17 CFR 227.100 — the crowdfunding exemption
+@export Whether this offering qualifies for the crowdfunding exemption
+GIVEN o IS AN Offering @desc The offering under assessment
+GIVETH A BOOLEAN
+DECIDE `offering exempt` o IF
+        `within the annual cap`
+    AND `sold through a single intermediary`
+    AND `the intermediary is registered`
+ WHERE
+    @ref 17 CFR 227.100(a)(1) — offering maximum
+    @desc The amount sold in reliance on the exemption in the preceding 12 months does not exceed $5,000,000
+    `within the annual cap` MEANS
+        o's `amount raised in 12 months` AT MOST 5000000
+
+    <<17 CFR 227.100(a)(3) — sales through one intermediary only>>
+    @desc The offering is conducted exclusively through a single intermediary
+    `sold through a single intermediary` MEANS
+        o's `sold through one intermediary`
+
+    @ref % of the proceeds retained is set out at ${ fee_schedule } — 17 CFR 227.300(a)
+    @desc The intermediary is registered with the Commission as a funding portal
+    `the intermediary is registered` MEANS
+        o's `intermediary is registered`
+
+-- Exempt: all three rules fire, so the verdict screen must cite all three,
+-- in declaration order.
+#EVAL `offering exempt` OF
+        Offering
+        WITH
+            `amount raised in 12 months`    IS 1000000
+            `sold through one intermediary` IS TRUE
+            `intermediary is registered`    IS TRUE
+-- TRUE
+
+-- Cap exceeded: the first conjunct is FALSE, so the second and third rules
+-- are short-circuited away and never decide anything. The verdict screen must
+-- cite 17 CFR 227.100(a)(1) and NOTHING ELSE.
+#EVAL `offering exempt` OF
+        Offering
+        WITH
+            `amount raised in 12 months`    IS 9000000
+            `sold through one intermediary` IS TRUE
+            `intermediary is registered`    IS TRUE
+-- FALSE
