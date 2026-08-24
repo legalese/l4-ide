@@ -22,6 +22,7 @@ import {
   statSync,
 } from "node:fs";
 import { join } from "node:path";
+import { classOf } from "./readset.mjs";
 import {
   checkClaim,
   indexRecords,
@@ -152,6 +153,46 @@ switch (verb) {
           "  SELF-REFERENTIAL: every witness embeds its own run id, so this pair is a\n" +
             `  function of the run and not of the inputs — ${marks.join("; ")}\n`,
         );
+
+      // R5. A UNIFORM "diff the artifacts" LAYER WOULD MISLABEL THREE DIFFERENT
+      // EVENTS, so each divergence is read through the class of the phase that
+      // produced it. The phase class is intrinsic — what the stage does — which
+      // is why it can be named at all (§3.3).
+      const cls = classOf(stage);
+      if (cls === "natlang_sources")
+        process.stdout.write(
+          "  CURRENCY EVENT: the fetched text moved — the law changed, or the publisher\n" +
+            "  revised it. This is NOT a fork, and nothing about the encoding is implicated.\n",
+        );
+      else if (cls === "research")
+        process.stdout.write(
+          "  SWEEP FINDING: new authority surfaced. Routes to the external-modification\n" +
+            "  register, not to the fork register.\n",
+        );
+      else if (cls === "encode") {
+        // THE LOAD-BEARING CONSTRAINT ON THE WHOLE COMPARISON LAYER: an encoding
+        // diff is an interpretive fork ONLY IF the upstream read-sets matched.
+        // Otherwise it is two encodings of two different texts, and calling
+        // their difference a fork is spurious.
+        const digs = [...bySha.values()].map((a) => a[0].sources_digest ?? null);
+        const known = digs.filter(Boolean);
+        if (known.length !== digs.length)
+          process.stdout.write(
+            "  NOT ESTABLISHED as a fork: at least one witness recorded no natlang_sources\n" +
+              "  read-set, so there is no evidence the two encodings rest on the same text.\n" +
+              "  Absence of evidence is not comparability — see R5.\n",
+          );
+        else if (new Set(known).size === 1)
+          process.stdout.write(
+            "  INTERPRETIVE FORK: identical upstream sources, different L4. This is the\n" +
+              "  fork register's actual subject.\n",
+          );
+        else
+          process.stdout.write(
+            "  NOT A FORK: the witnesses encode DIFFERENT source text (their natlang_sources\n" +
+              "  differ), so their difference is a currency event one level up.\n",
+          );
+      }
     }
     process.stdout.write(
       `\n${groups.size} witness key(s), ${divergent} divergent\n` +

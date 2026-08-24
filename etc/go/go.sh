@@ -677,6 +677,41 @@ cmd_status() {
   node "$LIB/verify-run.mjs" "$run"
 }
 
+# R13's fold: the account of a SUBJECT, across every run whose evidence survives.
+# Not a union — a receipt binds to the digest it ran over, so each phase resolves
+# to one state. STALE here is R4's (a newer prerequisite exists, named), never
+# "the digest moved": a digest cannot say WHICH member, and can miss a
+# prerequisite that moved without moving it.
+cmd_subject_report() {
+  local l4_path l4_sha stdlib_dir stdlib_sha
+  [[ -n "$SUBJECT" ]] || die_usage "subject-report needs --subject <id>"
+  go_provision_toolchain "$GO_ROOT"
+  l4_path="$(command -v "${L4:-l4}" || echo "${L4:-l4}")"
+  if [[ -x "$l4_path" ]]; then
+    l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
+  else
+    l4_sha="unset"
+  fi
+  stdlib_dir="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  stdlib_sha="$(node "$LIB/stdlib-digest.mjs" "$stdlib_dir")"
+  local extra=()
+  [[ "$WANT_JSON" == "1" ]] && extra+=(--json)
+  # THE DECLARABLE UNIVERSE, not merely the declared one. A phase that has never
+  # been declared for this subject is exactly the phase R13 must still name: the
+  # union of surviving `declared_stages` omits it, and omission reads as
+  # "accounted for elsewhere" when nothing had accounted for it anywhere. That
+  # misreading is R12's failure. The driver owns the stage sets, so the driver
+  # passes them; the library never guesses at a universe it cannot see.
+  local declarable
+  declarable="$(printf '%s\n' "${G1_STAGES[@]}" "${G2_STAGES[@]}" | sort -u | tr '\n' ' ')"
+  node "$LIB/subject-report.mjs" "$RUNDIR_BASE" --subject "$SUBJECT" \
+    --declarable "$declarable" \
+    --param "l4-binary=$l4_sha" \
+    --param "l4-stdlib=$stdlib_sha" \
+    --param "fixed_now=$FIXED_NOW" \
+    "${extra[@]}"
+}
+
 # R4's query: what did this run READ, and does a newer version of any of it
 # exist? A QUERY and not a phase (§4.2) — it consumes no declared input set,
 # earns no receipt and nothing depends on its answer.
@@ -1450,6 +1485,7 @@ case "$CMD" in
   gc) cmd_gc ;;
   new-subject) cmd_new_subject ;;
   readset) cmd_readset ;;
+  subject-report) cmd_subject_report ;;
   store) cmd_store ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;

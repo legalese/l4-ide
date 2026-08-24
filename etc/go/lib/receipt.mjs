@@ -32,6 +32,7 @@ import {
 } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { append, read, refold, sha256File } from "./ledger.mjs";
+import { rolesFor } from "./readset.mjs";
 import {
   checkClaim,
   materialise,
@@ -173,12 +174,74 @@ switch (kind) {
     } catch {
       store = null;
     }
+    // R4's read-set. It arrives as a FILE rather than on argv because a corpus
+    // read-set is routinely larger than ARG_MAX.
+    let readSet = null;
+    if (args.read_set) {
+      if (!existsSync(args.read_set)) {
+        process.stderr.write(
+          `receipt.mjs: --read-set ${args.read_set} does not exist\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      try {
+        readSet = JSON.parse(readFileSync(args.read_set, "utf8"));
+      } catch (e) {
+        process.stderr.write(
+          `receipt.mjs: --read-set is not JSON: ${e.message}\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      if (!Array.isArray(readSet)) {
+        process.stderr.write(
+          "receipt.mjs: --read-set must be an array of members\n",
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      // REFUSE A READ-SET THAT DOES NOT PROVE ITS OWN DIGEST. Same discipline
+      // as refusing a receipt whose status exceeds its evidence: a read-set
+      // that does not re-fold is not weak evidence about the inputs, it is a
+      // claim about them already known to be false — and writing it would seal
+      // that falsehood inside a hash chain, where it reads as attested.
+      const proof = refold(readSet);
+      if (args.inputs_digest && proof !== args.inputs_digest) {
+        process.stderr.write(
+          "receipt.mjs: the read-set does not re-fold to the stage's inputs digest —\n" +
+            `  digest ${args.inputs_digest}\n  refold ${proof}\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+    }
+
+    // R5's precondition, carried INTO THE STORE rather than left in the
+    // journal. Two encodings differ interpretively only if their upstream
+    // `natlang_sources` were identical; a journal answers that for about two
+    // to five days, which is exactly the half-life R11 exists to escape. So the
+    // fold over the natlang_sources members rides on every admission, and
+    // `store diff` can still refuse to call a difference a fork long after the
+    // run that produced it is gone.
+    //
+    // Derived, but a fact about THIS ADMISSION and fixed forever — the same
+    // standing as `inputs_digest` beside it. What must never be stored is a
+    // fact about HISTORY (role, freshness), because that is recomputed.
+    let sourcesDigest = null;
+    if (Array.isArray(readSet)) {
+      const roled = rolesFor(readSet, read(journal), [], repoRoot);
+      const srcs = roled.filter((m) => m.role === "natlang_sources");
+      // null, not the empty fold: "this witness recorded no sources" and "this
+      // witness recorded sources that happened to hash to X" are different
+      // claims, and conflating them would let two source-less encodings look
+      // comparable — the spurious fork R5 exists to prevent.
+      sourcesDigest = srcs.length ? refold(srcs) : null;
+    }
+
     const meta = {
       subject: args.subject ?? process.env.GO_SUBJECT ?? null,
       stage: args.stage ?? null,
       run_id: args.run_id ?? process.env.GO_RUNID ?? null,
       inputs_digest: args.inputs_digest ?? null,
       produced_under: null,
+      sources_digest: sourcesDigest,
     };
     const ctx = { runDir, repoRoot, store, meta };
 
@@ -288,45 +351,6 @@ switch (kind) {
       }
     } else {
       artifacts = args.artifact.map((p) => artifactRecord(p, ctx));
-    }
-
-    // R4's read-set. It arrives as a FILE rather than on argv because a corpus
-    // read-set is routinely larger than ARG_MAX.
-    let readSet = null;
-    if (args.read_set) {
-      if (!existsSync(args.read_set)) {
-        process.stderr.write(
-          `receipt.mjs: --read-set ${args.read_set} does not exist\n`,
-        );
-        process.exit(EXIT.BROKEN);
-      }
-      try {
-        readSet = JSON.parse(readFileSync(args.read_set, "utf8"));
-      } catch (e) {
-        process.stderr.write(
-          `receipt.mjs: --read-set is not JSON: ${e.message}\n`,
-        );
-        process.exit(EXIT.BROKEN);
-      }
-      if (!Array.isArray(readSet)) {
-        process.stderr.write(
-          "receipt.mjs: --read-set must be an array of members\n",
-        );
-        process.exit(EXIT.BROKEN);
-      }
-      // REFUSE A READ-SET THAT DOES NOT PROVE ITS OWN DIGEST. Same discipline
-      // as refusing a receipt whose status exceeds its evidence: a read-set
-      // that does not re-fold is not weak evidence about the inputs, it is a
-      // claim about them already known to be false — and writing it would seal
-      // that falsehood inside a hash chain, where it reads as attested.
-      const proof = refold(readSet);
-      if (args.inputs_digest && proof !== args.inputs_digest) {
-        process.stderr.write(
-          "receipt.mjs: the read-set does not re-fold to the stage's inputs digest —\n" +
-            `  digest ${args.inputs_digest}\n  refold ${proof}\n`,
-        );
-        process.exit(EXIT.BROKEN);
-      }
     }
 
     const receipt = {

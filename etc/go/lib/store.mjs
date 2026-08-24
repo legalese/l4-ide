@@ -57,7 +57,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { hashRecord, sha256File, sha256Text } from "./ledger.mjs";
 
-export const STORE_SCHEMA = 1;
+export const STORE_SCHEMA = 2;
 const GENESIS = "sha256:" + "0".repeat(64);
 
 /** $L4_GO_STORE, else the XDG state dir. Never $TMPDIR — that is the point. */
@@ -116,6 +116,12 @@ export function put(root, absPath, sha, meta = {}) {
       inputs_digest: meta.inputs_digest ?? null,
       run_id: meta.run_id ?? null,
       produced_under: meta.produced_under ?? null,
+      // R5's precondition, carried on the admission so it outlives the journal.
+      // null means "this witness recorded no natlang_sources", which is NOT the
+      // same claim as "its sources hashed to X" — conflating them would let two
+      // source-less encodings look comparable, which is the spurious fork R5
+      // exists to prevent.
+      sources_digest: meta.sources_digest ?? null,
     };
     appendFileSync(join(root, "objects.ndjson"), JSON.stringify(rec) + "\n");
     return sha;

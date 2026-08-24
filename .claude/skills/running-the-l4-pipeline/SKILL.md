@@ -217,6 +217,23 @@ etc/go/go.sh readset --run-id <run-id> --stage p6-tests --json
 
 A stage that declares **no** inputs has no read-set, and that is deliberate rather than a gap: `p9-report` and `p9-explain` are functions of the journal they are writing into, and a stage cannot digest its own future.
 
+### 7d. `subject-report`: the account of a SUBJECT, not of one run
+
+`p9-report` renders **one run's** journal, and no single run exercises every phase — `sg-succession`'s g1 report marks §P1 and §P2 ABSENT while a g2 report marks the measurement stages SKIPPED, and both are correct about their own run.
+
+```bash
+etc/go/go.sh subject-report --subject sg-succession
+etc/go/go.sh subject-report --subject regcf --json
+```
+
+**The fold is not a union.** A receipt binds to the digest it ran over, so evidence from two runs is jointly meaningful only where both ran over the same inputs. Each phase resolves to exactly one state: `CURRENT`, `STALE`, `NEVER RUN`, plus `NO READ-SET` for a stage that declares no inputs and `UNKNOWN` when some prerequisite could not be evaluated.
+
+**`NEVER RUN` is the state that would have caught R12's failure.** A run report says a phase is "not declared at this milestone" — true, and readable as _"accounted for elsewhere"_ when nothing had accounted for it anywhere. So the phase universe is built widest-first: what the driver says is **declarable**, then what the subject has declared, then what the store has recorded. A universe built only from what has been declared cannot contain the phase nobody ever declared, which is precisely the phase worth naming.
+
+**`STALE` is R4's, not "over an older digest".** A digest can differ with no prerequisite newer, and a prerequisite can be newer with the digest unmoved — that second case is the whole class of bug where the clock, the stdlib and the `IMPORT` closure were real input changes that moved no digest. So staleness is read from read-sets, and the moved member is named.
+
+**The evidence horizon is printed, because a narrowed view must not read as an empty world.** Run journals last about two to five days; the store outlives them but records only stages that produced an artifact, so a SKIPPED stage leaves no trace there. The footer says how many journals were visible and how many were excluded for failing to verify. Exit 1 if any phase is stale.
+
 ### 7b. Read the explainer, which is a different document for a different reader
 
 ```

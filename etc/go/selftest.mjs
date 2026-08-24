@@ -6617,6 +6617,47 @@ process.stdout.write("\n-- store verbs --\n");
     "an UNSUPPLIED param is `unknown`, never `current`",
     unevaluated.state === "unknown" && unevaluated.unknown === 1,
   );
+  // A member outside the checkout is still a prerequisite. Gating freshness on
+  // repo membership reported `unknown` for every one of them — an unevaluated
+  // prerequisite wearing the same word as an evaluated one.
+  check(
+    "a member OUTSIDE the repo is still freshness-checked, not `unknown`",
+    (() => {
+      const outside = digestMembers([b])[0];
+      return (
+        freshness([{ ...outside, role: "unknown", origin: "unresolved" }], [], {})
+          .state === "current"
+      );
+    })(),
+  );
+  check(
+    "a DELETED prerequisite is stale, and is reported with no current value",
+    (() => {
+      const ghost = {
+        path: resolve(work, "never-existed"),
+        sha256: `sha256:${"3".repeat(64)}`,
+        bytes: 1,
+        role: "tree",
+        origin: "tree",
+      };
+      const f = freshness([ghost], [], {});
+      return f.state === "stale" && f.moved[0].now === null;
+    })(),
+  );
+  check(
+    "a member recorded ABSENT and still absent has NOT moved",
+    (() => {
+      const gone = {
+        path: resolve(work, "never-existed"),
+        sha256: null,
+        bytes: null,
+        absent: true,
+        role: "tree",
+        origin: "tree",
+      };
+      return freshness([gone], [], {}).state === "current";
+    })(),
+  );
   check(
     "a supplied param that moved is stale",
     freshness(
@@ -6783,6 +6824,204 @@ process.stdout.write("\n-- store verbs --\n");
   rmSync(work, { recursive: true, force: true });
 }
 // ===== END the read-set =====================================================
+
+// ===== a diff means something different per phase (R5) ======================
+//
+// A uniform "diff the artifacts" layer would mislabel three different events.
+// These pin the labels, and the one constraint the whole comparison layer rests
+// on: an encoding diff is an interpretive fork ONLY IF the upstream read-sets
+// matched.
+{
+  process.stdout.write("\n-- per-phase diff meaning (R5) --\n");
+  const store = mkdtempSync(resolve(tmpdir(), "go-r5-store-"));
+  const work = mkdtempSync(resolve(tmpdir(), "go-r5-work-"));
+  const CLI = resolve(HERE, "lib/store-cli.mjs");
+  const runCli = (...a) =>
+    spawnSync(process.execPath, [CLI, ...a], {
+      encoding: "utf8",
+      env: { ...process.env, L4_GO_STORE: store },
+    });
+
+  // Two witnesses per key, differing, so every key is divergent.
+  const admit = (stage, rel, text, sources) => {
+    const f = resolve(work, `${stage}-${text.length}-${rel}`);
+    writeFileSync(f, text);
+    Store.put(store, f, hashOf(f), {
+      subject: "s",
+      stage,
+      rel,
+      inputs_digest: "sha256:same",
+      run_id: `r${text.length}`,
+      sources_digest: sources,
+    });
+  };
+  admit("p1-ingest", "act.txt", "one", null);
+  admit("p1-ingest", "act.txt", "two", null);
+  admit("p2-sweep", "reg.json", "one", null);
+  admit("p2-sweep", "reg.json", "twoo", null);
+  const d1 = runCli("diff");
+  check(
+    "a natlang_sources divergence is a CURRENCY EVENT, explicitly not a fork",
+    /CURRENCY EVENT/.test(d1.stdout) && /NOT a fork/.test(d1.stdout),
+  );
+  check(
+    "a research divergence is a SWEEP FINDING routed to the modification register",
+    /SWEEP FINDING/.test(d1.stdout) &&
+      /external-modification\s*\n?\s*register/.test(d1.stdout),
+  );
+
+  // encode, with the sources recorded and IDENTICAL -> a real fork.
+  admit("p3-encode", "enc.l4", "aaa", "sha256:src1");
+  admit("p3-encode", "enc.l4", "bbb", "sha256:src1");
+  check(
+    "an encode divergence over IDENTICAL sources is an INTERPRETIVE FORK",
+    /INTERPRETIVE FORK/.test(runCli("diff").stdout),
+  );
+
+  // encode, sources DIFFER -> not a fork at all.
+  const store2 = mkdtempSync(resolve(tmpdir(), "go-r5-store2-"));
+  const admit2 = (text, sources) => {
+    const f = resolve(work, `enc2-${text}`);
+    writeFileSync(f, text);
+    Store.put(store2, f, hashOf(f), {
+      subject: "s",
+      stage: "p3-encode",
+      rel: "enc.l4",
+      inputs_digest: "sha256:same",
+      run_id: `r-${text}`,
+      sources_digest: sources,
+    });
+  };
+  admit2("aaa", "sha256:src1");
+  admit2("bbb", "sha256:src2");
+  const d3 = spawnSync(process.execPath, [CLI, "diff"], {
+    encoding: "utf8",
+    env: { ...process.env, L4_GO_STORE: store2 },
+  });
+  check(
+    "an encode divergence over DIFFERENT sources is NOT A FORK — it is a currency event",
+    /NOT A FORK/.test(d3.stdout),
+  );
+
+  // encode, sources UNRECORDED -> refuse to call it either way.
+  const store3 = mkdtempSync(resolve(tmpdir(), "go-r5-store3-"));
+  for (const t of ["aaa", "bbb"]) {
+    const f = resolve(work, `enc3-${t}`);
+    writeFileSync(f, t);
+    Store.put(store3, f, hashOf(f), {
+      subject: "s",
+      stage: "p3-encode",
+      rel: "enc.l4",
+      inputs_digest: "sha256:same",
+      run_id: `r-${t}`,
+    });
+  }
+  const d4 = spawnSync(process.execPath, [CLI, "diff"], {
+    encoding: "utf8",
+    env: { ...process.env, L4_GO_STORE: store3 },
+  });
+  // ABSENCE OF EVIDENCE IS NOT COMPARABILITY. This is the case that holds for
+  // every subject in the tree today, because none has run p1-ingest for real.
+  check(
+    "an encode divergence with NO recorded sources is NOT ESTABLISHED as a fork",
+    /NOT ESTABLISHED as a fork/.test(d4.stdout),
+  );
+  check(
+    "and it says why, rather than defaulting to the interesting answer",
+    /Absence of evidence is not comparability/.test(d4.stdout),
+  );
+
+  for (const d of [store, store2, store3, work])
+    rmSync(d, { recursive: true, force: true });
+}
+// ===== END per-phase diff meaning ===========================================
+
+// ===== the subject-level fold (R13) =========================================
+{
+  process.stdout.write("\n-- the subject fold (R13) --\n");
+  const SR = resolve(HERE, "lib/subject-report.mjs");
+  const base = mkdtempSync(resolve(tmpdir(), "go-r13-"));
+  const work = mkdtempSync(resolve(tmpdir(), "go-r13-w-"));
+  const src = resolve(work, "law.l4");
+  writeFileSync(src, "ORIGINAL");
+
+  const mkRun = (id, stage, members, digest) => {
+    const dir = resolve(base, id);
+    mkdirSync(dir, { recursive: true });
+    const j = resolve(dir, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      subject: "subj",
+      declared_stages: [stage],
+    });
+    append(j, {
+      kind: "stage_end",
+      stage,
+      status: "PASS",
+      inputs_digest: digest,
+      read_set: members,
+    });
+    return dir;
+  };
+  mkRun("2026-01-01-aaa-001", "p3-check", digestMembers([src]), digestSet([src]));
+
+  const run = (...a) =>
+    spawnSync(process.execPath, [SR, base, "--subject", "subj", ...a], {
+      encoding: "utf8",
+      env: { ...process.env, L4_GO_STORE: resolve(work, "no-store") },
+    });
+
+  const clean = run();
+  check("a fold over an unchanged prerequisite is CURRENT", /CURRENT/.test(clean.stdout));
+  check("and exits 0", clean.status === 0);
+
+  // A phase in the DECLARABLE set that no run ever declared must still appear.
+  // This is R13's whole point: a phase that is absent from the report reads as
+  // "accounted for elsewhere" when nothing accounted for it anywhere.
+  const wide = run("--declarable", "p3-check p1-ingest");
+  check(
+    "a declarable phase with no receipt anywhere is NEVER RUN, not omitted",
+    /p1-ingest\s+NEVER RUN/.test(wide.stdout),
+  );
+
+  writeFileSync(src, "CHANGED");
+  const stale = run();
+  check("a moved prerequisite makes the phase STALE", /STALE/.test(stale.stdout));
+  check("and NAMES the member that moved", /MOVED .*law\.l4/.test(stale.stdout));
+  check("and exits 1, so a caller can gate on it", stale.status === 1);
+  check(
+    "the footer states that STALE is Make's, not 'the digest moved'",
+    /a newer version of some prerequisite exists/.test(stale.stdout),
+  );
+
+  // The evidence horizon must be reported, because a narrowed view must never
+  // read as an empty world.
+  check(
+    "the evidence horizon is printed",
+    /Evidence horizon: 1 surviving journal/.test(stale.stdout),
+  );
+
+  // A journal whose chain does not verify is not evidence, and its exclusion is
+  // announced rather than silent.
+  const j = resolve(base, "2026-01-01-aaa-001", "journal.ndjson");
+  const rows = read(j);
+  rows[1].status = "FORGED";
+  writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const tampered = run();
+  check(
+    "a journal that does not verify is EXCLUDED from the fold",
+    /1 journal\(s\) EXCLUDED/.test(tampered.stdout),
+  );
+  check(
+    "and its phase then reads NEVER RUN rather than inheriting a forged status",
+    !/FORGED/.test(tampered.stdout),
+  );
+
+  rmSync(base, { recursive: true, force: true });
+  rmSync(work, { recursive: true, force: true });
+}
+// ===== END the subject fold =================================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
