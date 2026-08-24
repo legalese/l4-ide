@@ -1,0 +1,37 @@
+`the share of _ in _` with Wife and `the section 7 shares of` with `widow alone` is equal to 1
+`the total of` with `the section 7 shares of` with `widow alone` is equal to 1
+`the share of _ in _` with Wife and `the section 7 shares of` with `widow and two children` is equal to the result of dividing 1 by 2
+`the share of _ in _` with Ann and `the section 7 shares of` with `widow and two children` is equal to the result of dividing 1 by 4
+`the share of _ in _` with Ben and `the section 7 shares of` with `widow and two children` is equal to the result of dividing 1 by 4
+`the total of` with `the section 7 shares of` with `widow and two children` is equal to 1
+`the share of _ in _` with Wife and `the section 7 shares of` with `widow and two parents` is equal to the result of dividing 1 by 2
+`the share of _ in _` with Mum and `the section 7 shares of` with `widow and two parents` is equal to the result of dividing 1 by 4
+`the total of` with `the section 7 shares of` with `widow and two parents` is equal to 1
+`the share of _ in _` with Ann and `the section 7 shares of` with `three children` is equal to the result of dividing 1 by 3
+`the total of` with `the section 7 shares of` with `three children` is equal to 1
+`the share of _ in _` with Ann and `the section 7 shares of` with `one child survives, one left grandchildren` is equal to the result of dividing 1 by 2
+`the share of _ in _` with Gia and `the section 7 shares of` with `one child survives, one left grandchildren` is equal to the result of dividing 1 by 4
+`the total of` with `the section 7 shares of` with `one child survives, one left grandchildren` is equal to 1
+`the share of _ in _` with Ann and `the section 7 shares of` with `one child survives, one died childless` is equal to 1
+`the share of _ in _` with the Government and `the section 7 shares of` with `no relatives` is equal to 1
+`the share of _ in _` with Sis and `the section 7 shares of` with `two siblings` is equal to the result of dividing 1 by 2
+`the total of` with `the section 7 shares of` with `two siblings` is equal to 1
+`the share of _ in _` with Gia and `F1 under R1` is equal to the result of dividing 1 by 4
+`the share of _ in _` with Hal and `F1 under R1` is equal to the result of dividing 1 by 2
+`the share of _ in _` with Gia and `F1 under R2` is equal to the result of dividing 1 by 3
+`the share of _ in _` with Hal and `F1 under R2` is equal to the result of dividing 1 by 3
+not `the share of _ in _` with Hal and `F1 under R1` is equal to `the share of _ in _` with Hal and `F1 under R2`
+`the total of` with `F1 under R1` is equal to 1
+`the total of` with `F1 under R2` is equal to 1
+`the share of _ in _` with Sis and `the section 7 shares of` with `deceased sibling with deceased child` is equal to the result of dividing 1 by 2
+`the share of _ in _` with Grandniece and `the section 7 shares of` with `deceased sibling with deceased child` is equal to the result of dividing 1 by 2
+`the share of _ in _` with HalfBloodBro and `the section 7 shares of` with `half blood and whole blood siblings` is equal to the result of dividing 1 by 2
+`the intestate distribution for` with `foreign domicile, Singapore house only` 's `governed by this Act`
+`the property this Act distributes in` with `foreign domicile, Singapore house only` is equal to 900000
+`distributable estate of` with `foreign domicile, Singapore house only` is equal to 1000000
+`the share of _ in _` with the child and `the section 7 shares of` with `child entered` is equal to 1
+`the share of _ in _` with Sis and `the section 7 shares of` with `child not entered` is equal to 1
+`the proportion this Act governs in` with `partial intestacy, half disposed` is equal to the result of dividing 1 by 2
+not `the intestate distribution for` with `a Muslim intestate` 's `governed by this Act`
+`count` with `the intestate distribution for` with `a Muslim intestate` 's `shares` is equal to 0
+not `the intestate distribution for` with `a death in 1960` 's `governed by this Act`
