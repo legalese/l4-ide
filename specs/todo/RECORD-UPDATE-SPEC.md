@@ -1306,7 +1306,9 @@ Stated so the spec is falsifiable. If any of these turns out to hold, R1 flips t
    (`:660,687,717,746,776`; the file's other two factories build `AdoptionCase`), rewrite
    the scenario block against one canonical base, and have a knowledge engineer who did not write
    either version say which they would maintain. This is cheap and should be done **before** the
-   implementation, not after.
+   implementation, not after. Materials and protocol: `RECORD-UPDATE-EXPERIMENT.md` beside this
+   spec (prepared 2026-08-24; Version A extracted verbatim, Version B to be hand-written in the
+   proposed syntax — the role assignment is recorded there).
 2. ~~**If the `LocalsSpareSelectors` switch at the `AppNamed` head regresses anything.**~~
    **RETIRED 2026-08-19 by R2.** The switch was needed only to disambiguate an overloaded `WITH`;
    `BUT WITH` has no fork to disambiguate. Reinstate this criterion if the bare-`WITH` surface is
