@@ -395,9 +395,9 @@ right throughout.)
 > **Read this table as the census of what _could_ be affected, not of what R2/R3 actually touch.**
 > It was written for the superseded bare-`WITH` surface, whose selling point was that the syntax is
 > byte-identical to construction. Under the ruled `BUT WITH` the lexer and parser **do** change (one
-> keyword, one production), and a new `Restate` constructor forces an arm in each row. But under
+> keyword, one production), and a new `Update` constructor forces an arm in each row. But under
 > **R3.1** that node is elaborated by a _late_ pass, so every row below except `Print.hs` and
-> `TypeCheck.hs` (which checks `Restate` itself and hosts §5.7's `subjectOfActionExpr` arm) still
+> `TypeCheck.hs` (which checks `Update` itself and hosts §5.7's `subjectOfActionExpr` arm) still
 > only ever _sees_ the total `AppNamed` it already handles. The arms are one-liners; the
 > behaviour is unchanged. The rightmost column is kept in the bare-`WITH` framing because that is the
 > analysis that produced R3.1, and R3.1 is the reason the radius collapses — except two cells
@@ -753,7 +753,7 @@ just the written ones. (Predicted, not measured: update does not exist yet.)
 **Disposition (2026-08-19): OPEN, and re-opened deliberately.** The first R3.1 dissolved this by
 elaborating inside the checker, so this traversal only ever saw a total `AppNamed`. The re-ruled
 R3.1 elaborates **late**, and `subjectOfActionExpr` runs **during** checking — so it will see
-`Restate` and must consult the base's declaration itself. That is the price of printer and LSP
+`Update` and must consult the base's declaration itself. That is the price of printer and LSP
 fidelity, and it is one function.
 
 ---
@@ -977,12 +977,19 @@ Also ruled: **`#438`'s second ask, "support for colons please", is already shipp
 
 - **Parser.** A new alternative beside `namedApp` (`Parser.hs:1846`). The `BUT` token decides;
   **no type information and no name resolution are consulted.** This is the whole point of R2.1.
-- **AST.** A new constructor — `Restate Anno (Expr n) [NamedExpr n]` — beside `AppNamed`
+- **AST.** A new constructor — `Update Anno (Expr n) [NamedExpr n]` — beside `AppNamed`
   (`Syntax.hs:248`). **Not a flag.** A flag would compile silently in all 18 consumers of §3; a new
   constructor makes `-Wall -Werror` turn each into a forced question. The sharpest instance is
   `Dmn/Lower.hs:1980-1984`, whose record→FEEL guard is a totality conjunction: a partial `AppNamed`
-  fails it silently and emits pretty-printed L4 inside a FEEL literal, and no test catches that.
-- **Type checker.** `Restate` gets a real `inferExpr` case — it has to, for R4's gates — and
+  fails it silently and emits pretty-printed L4 inside a FEEL literal, and no test catches that. _(Naming ruled
+  2026-08-24: earlier drafts called the node `Restate` — the judge's rejected keyword imported into
+  the compiler. R2.2's register argument applies internally too: constructor names leak into `Show`
+  output, diagnostics and contributor vocabulary, and `RESTATED WITH` is the named fallback surface,
+  which the node must not pre-commit to. `Update` matches `elaborateUpdates`, this spec's own title,
+  and #438's language. `RecordUpdate` — GHC's `RecordUpd` precedent notwithstanding — was rejected
+  because `RECORD` already carries the ledger sense in L4 and appears in traces (§5.5); a third
+  sense of "record" would compound the pun.)_
+- **Type checker.** `Update` gets a real `inferExpr` case — it has to, for R4's gates — and
   **survives into the returned module**. It is elaborated by a later pass; see R3.1, which was
   re-ruled on 2026-08-19 and is the ruling that pays for everything else.
 - **Head resolution.** The head resolves as an ordinary term, then must be a **value binding of
@@ -1005,12 +1012,12 @@ need.
 #### R3.1 — Elaborate update LATE, not in the checker. Re-ruled 2026-08-19.
 
 > **This reverses the first R3.1**, which elaborated inside `checkProgram` so that
-> `CheckResult.program` contained no `Restate` at all. That was wrong in a way the earlier draft did
+> `CheckResult.program` contained no `Update` at all. That was wrong in a way the earlier draft did
 > not notice, and the whole of Q3 was a symptom of it.
 
-**The ruling.** `Restate` **survives into `CheckResult.program`**. A dedicated pass —
+**The ruling.** `Update` **survives into `CheckResult.program`**. A dedicated pass —
 `elaborateUpdates :: Module Resolved -> Module Resolved` — produces a _second_ projection, and the
-evaluator and every backend consume **that**. The elaboration itself is unchanged: `Restate` becomes
+evaluator and every backend consume **that**. The elaboration itself is unchanged: `Update` becomes
 an ordinary, _total_ `AppNamed` whose supplied-field set equals the declaration's, with carried
 fields spelled as projections — exactly the idiom the corpus already writes by hand:
 
@@ -1050,11 +1057,11 @@ not hypothetical either: the computed-field desugar runs at that placement and i
 | `jl4-mlir` slot layout                                                      | fed a partial field list                       | fed the complete list it already assumes                           |
 | `Export/Document`, `Nlg`, `StateGraph`, `OpenFisca`, `EvaluateLazy/Machine` | each needs a partial-aware arm                 | **unchanged — the shape they see is unchanged**                    |
 
-Of §3's 18 `AppNamed` consumers, exactly **two** get real `Restate` arms: `Print.hs`, and
-`TypeCheck.hs` — which by R3's own terms checks `Restate` (`inferExpr`) and hosts §5.7's
+Of §3's 18 `AppNamed` consumers, exactly **two** get real `Update` arms: `Print.hs`, and
+`TypeCheck.hs` — which by R3's own terms checks `Update` (`inferExpr`) and hosts §5.7's
 `subjectOfActionExpr` arm. _(Corrected 2026-08-20: an earlier draft said "exactly one — `Print.hs`",
 contradicting R3 and §5.7 a few paragraphs apart.)_ The other 16 consume the elaborated projection,
-where `Restate` cannot occur, so their forced `-Werror` arms are one-liners.
+where `Update` cannot occur, so their forced `-Werror` arms are one-liners.
 
 **And it makes Q3 disappear rather than solving it.** The alternative was a printer-side
 _caramelisation_: recover `BUT WITH` by detecting, in a construction, a common base whose identity
@@ -1068,7 +1075,7 @@ differential as a hard gate. Late elaboration needs none of that, because nothin
 **The one case that killed caramelisation as the primary answer:** a head that is not a variable.
 Obligation 1 below forces a `LET`-binding there, so `(spouseOf bob) BUT WITH age IS 31` elaborates to
 a `LET`, and recovering the surface needs a fragile two-level match. Under late elaboration the
-question never arises — the printer prints the `Restate` it was given.
+question never arises — the printer prints the `Update` it was given.
 
 Caramelisation remains worth building **later, for a different payoff**: it would re-sugar the **40
 hand-written identity-copy sites** already in the corpus (§2), so `l4 batch` on `actus.l4` would emit
@@ -1082,7 +1089,7 @@ filed as such.
    `elaborateUpdates`, and demanded by the evaluator and backend entry points.
 2. **§5.7 re-opens.** `subjectOfActionExpr` (`TypeCheck.hs:1683`) recovers the deontic party from the
    fields written at the call site, and it runs **during** checking — before any elaboration. So it
-   needs a real `Restate` arm that consults the base's declaration when the party field is carried
+   needs a real `Update` arm that consults the base's declaration when the party field is carried
    rather than written. Early elaboration would have dissolved this; late elaboration does not, and
    pretending otherwise is exactly the drift CLAUDE.md §1 warns about.
 3. **Human-facing backends verbalize the elaboration, not the delta** _(added 2026-08-20)_. `Nlg`
@@ -1091,7 +1098,7 @@ filed as such.
    projection, so the same update verbalizes as "Person where name is alice's name, and age is 31,
    and email is alice's email" — the author's delta framing is lost precisely in the renderings
    meant for lawyers. **Accepted for v1.** If it grates in practice, feed those two consumers the
-   unelaborated projection instead; the price is a real `Restate` arm in each, and nothing else
+   unelaborated projection instead; the price is a real `Update` arm in each, and nothing else
    changes.
 
 **Three obligations on the check and the elaboration, all easy to miss** _(rewritten 2026-08-20: an
@@ -1109,7 +1116,7 @@ bare-`WITH` material now lives, reframed, in R3.2)_:
 2. **Re-implement the field-list checks that `supplyAppNamed` gave construction for free.**
    Construction catches a duplicate field, an unknown field name, and a supplied computed field
    because `supplyAppNamed`/`findOptionallyNamedType` consume the declaration's argument list as
-   they match (`TypeCheck.hs:2976-2986`). `Restate`'s own `inferExpr` case never calls that
+   they match (`TypeCheck.hs:2976-2986`). `Update`'s own `inferExpr` case never calls that
    machinery, so it must make the same three rejections itself: `alice BUT WITH age IS 1, age IS 2`
    (duplicate), `alice BUT WITH nosuchfield IS 1` (unknown), and R4's computed-field gate.
 3. **Fill the evaluator's argument-order slot.** The machine evaluates
@@ -1154,7 +1161,7 @@ candidates, not `Fun`-typed ones) — and R4's single-constructor gate then appl
 selects. Because no existing program parses as `BUT WITH`, no tuning of this filter can regress a
 program that compiles today.
 
-**Fail safe on `InfVar`.** When the head's type is still an inference variable at the `Restate`
+**Fail safe on `InfVar`.** When the head's type is still an inference variable at the `Update`
 check, reject with the new named diagnostic ("cannot update a value whose type is not yet known —
 annotate the head") rather than guessing a constructor. This follows the convention already in the
 file — `isPrimitiveType` has `InfVar{} -> False -- Unknown type, don't skip analysis`
@@ -1196,7 +1203,7 @@ unambiguously an update.)_
 general head was AST-shaped: `AppNamed`'s head is a `Name` (`Syntax.hs:248`), and widening it to
 `Expr` would have touched exact-printing, `prettyLayout`'s 300-file round-trip (CLAUDE.md §3.2,
 **no exclusion list permitted**), the lazy machine, `Dmn/Lower` and `OpenFisca/Lower`. R3 dissolved
-all of that: `Restate`'s head is **already `Expr n`**, and R3.1 keeps the node out of every one of
+all of that: `Update`'s head is **already `Expr n`**, and R3.1 keeps the node out of every one of
 those consumers. What actually remains is a **grammar** question — an unparenthesised general head
 (`alice's spouse BUT WITH age IS 31`) needs a precedence ruling for `'s` against `BUT WITH`, and
 nobody has designed or measured one. The restriction is therefore kept for v1 on grammar grounds,
@@ -1283,7 +1290,7 @@ someone re-checking it.
   the named-expr values positionally. Must be given the expanded field set, not the written subset.
 - **The deontic subject** (§5.7): `TypeCheck.hs:1683` recovers the party from the fields written at
   the call site, and it runs **during** checking, ahead of `elaborateUpdates`. So it needs a real
-  `Restate` arm that consults the **base value's** fields. This is the one consumer that late
+  `Update` arm that consults the **base value's** fields. This is the one consumer that late
   elaboration does _not_ spare, and the one place where "carry through silently" is not safe.
 
 ---
@@ -1319,15 +1326,15 @@ Stated so the spec is falsifiable. If any of these turns out to hold, R1 flips t
 
 Deliberately staged so the risky thing is provable before anything irreversible happens.
 
-| #   | step                                                                               | why here                                                                 |
-| --- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 0   | The §8.1 readability experiment on `bna.l4`                                        | cheapest possible falsification of R1; do it first                       |
-| 1   | Lexer: reserve `BUT`; parser: the `BUT WITH` alternative beside `namedApp`         | R2/R3 — the discriminator, before any semantics                          |
-| 2   | `Restate` AST node + the 19 forced `Expr` arms; real `inferExpr` case + R4's gates | `-Werror` turns each consumer into a read; 17 of the arms are one-liners |
-| 3   | `elaborateUpdates` + the newtype'd second `CheckResult` projection                 | R3.1 — late, so the printer and LSP keep the written form                |
-| 4   | `Restate` arm in `subjectOfActionExpr` (§5.7)                                      | runs during checking, so late elaboration does not cover it              |
-| 5   | R3.1's obligations 1–3: head `LET`-binding, field-list checks, order slot          | correctness, not polish — see R3.1's obligations                         |
-| 6   | R6 bracketing rule; R5 parenthesised head                                          | both attach to the new production only                                   |
+| #   | step                                                                              | why here                                                                 |
+| --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 0   | The §8.1 readability experiment on `bna.l4`                                       | cheapest possible falsification of R1; do it first                       |
+| 1   | Lexer: reserve `BUT`; parser: the `BUT WITH` alternative beside `namedApp`        | R2/R3 — the discriminator, before any semantics                          |
+| 2   | `Update` AST node + the 19 forced `Expr` arms; real `inferExpr` case + R4's gates | `-Werror` turns each consumer into a read; 17 of the arms are one-liners |
+| 3   | `elaborateUpdates` + the newtype'd second `CheckResult` projection                | R3.1 — late, so the printer and LSP keep the written form                |
+| 4   | `Update` arm in `subjectOfActionExpr` (§5.7)                                      | runs during checking, so late elaboration does not cover it              |
+| 5   | R3.1's obligations 1–3: head `LET`-binding, field-list checks, order slot         | correctness, not polish — see R3.1's obligations                         |
+| 6   | R6 bracketing rule; R5 parenthesised head                                         | both attach to the new production only                                   |
 
 **No step for the evaluator, and no step for any backend.** That is R3.1's dividend: elaboration
 happens before the checked module is returned, so `EvaluateLazy/Machine.hs`, `Dmn/Lower`, `jl4-mlir`,
@@ -1335,7 +1342,7 @@ happens before the checked module is returned, so `EvaluateLazy/Machine.hs`, `Dm
 handle. If R3.1 is **not** adopted, add back: an evaluator partial-rebuild path, a `jl4-mlir`
 expanded field set, DMN expansion-at-export, and the §5.7 deontic base-consultation.
 
-**One step for the printer, and it is the point.** `prettyLayout` gets a real `Restate` arm, so
+**One step for the printer, and it is the point.** `prettyLayout` gets a real `Update` arm, so
 `l4 batch` and the REPL re-emit `BUT WITH` as written; CLAUDE.md §3.2's 300-file round-trip then
 holds naturally, because the printed text is the text that parsed. `ExactPrint` is generic over the
 `Anno` (`ExactPrint.hs`, 42 lines, no per-constructor case), so `l4 format` needs no change at all.
@@ -1375,9 +1382,9 @@ place.` Delete this comment when the feature lands; it is the file's own apology
 
 ## 11. Open questions
 
-| #   | question                                                                                          | what would settle it                                                                                                                                                                                                                                                                         |
-| --- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Should update be allowed to _widen_ to a supertype, or strictly preserve the head's type?         | kosmikus's #438 comment says disallow type-changing; R4 follows, but no one has tested whether a widening case exists in the corpus                                                                                                                                                          |
-| Q2  | Does the trace/provenance layer need an explicit node for carried-through fields?                 | `inherited-fields-have-no-trace-node` was **refuted** (derived values have no ledger entry today either), but no one has looked at what `#EVALTRACE` _prints_ for a chained update                                                                                                           |
-| Q3  | Should `l4 batch`/the REPL print an update back as `BUT WITH`, or as its elaborated construction? | **RESOLVED 2026-08-19 by the re-ruled R3.1.** As `BUT WITH`: elaboration is late, so the printer is handed the `Restate` the author wrote. The alternative — a printer-side caramelisation recovering the surface from a construction — is described in R3.1 and deferred as optional sugar. |
-| Q4  | Should an unparenthesised projection head (`alice's spouse BUT WITH …`) be admitted later?        | Added 2026-08-20 (review). The AST already permits it — `Restate`'s head is `Expr n` — so this is purely a precedence ruling for `'s` against `BUT WITH`; a designed precedence plus the §5.1 slurp analysis re-run against it would settle it. R5 holds the v1 restriction.                 |
+| #   | question                                                                                          | what would settle it                                                                                                                                                                                                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Should update be allowed to _widen_ to a supertype, or strictly preserve the head's type?         | kosmikus's #438 comment says disallow type-changing; R4 follows, but no one has tested whether a widening case exists in the corpus                                                                                                                                                         |
+| Q2  | Does the trace/provenance layer need an explicit node for carried-through fields?                 | `inherited-fields-have-no-trace-node` was **refuted** (derived values have no ledger entry today either), but no one has looked at what `#EVALTRACE` _prints_ for a chained update                                                                                                          |
+| Q3  | Should `l4 batch`/the REPL print an update back as `BUT WITH`, or as its elaborated construction? | **RESOLVED 2026-08-19 by the re-ruled R3.1.** As `BUT WITH`: elaboration is late, so the printer is handed the `Update` the author wrote. The alternative — a printer-side caramelisation recovering the surface from a construction — is described in R3.1 and deferred as optional sugar. |
+| Q4  | Should an unparenthesised projection head (`alice's spouse BUT WITH …`) be admitted later?        | Added 2026-08-20 (review). The AST already permits it — `Update`'s head is `Expr n` — so this is purely a precedence ruling for `'s` against `BUT WITH`; a designed precedence plus the §5.1 slurp analysis re-run against it would settle it. R5 holds the v1 restriction.                 |
