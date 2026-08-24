@@ -41,8 +41,18 @@ import { join } from "node:path";
  * enforces it. A schema-3 row carries no read-set and cannot be distinguished
  * from a schema-4 row that failed to record one — the same ambiguity the
  * number existed to refuse at 2.
+ *
+ * 5 — `run_begin` says which ENCODING the run is about (`primary`, a declared
+ * id, or `undeclared`) instead of which CAPABILITY MILESTONE it was labelled
+ * with (R9, §3.9). This is a rename in shape only for `g1`, which always meant
+ * the committed encoding; for `g2` it is a genuine gain in information, because
+ * `g2` named an ordinal — "the additional one" — and an ordinal stops
+ * identifying anything the moment a subject declares two. A schema-4 row
+ * carries `milestone` and no `encoding`, and there is no way to recover from
+ * `g2` WHICH additional encoding a run was about; readers report it as
+ * `legacy:g2` rather than guessing an id.
  */
-export const JOURNAL_SCHEMA = 4;
+export const JOURNAL_SCHEMA = 5;
 
 /**
  * Schemas this binary can READ. A journal declares its schema in record 0 and
@@ -61,7 +71,7 @@ export const JOURNAL_SCHEMA = 4;
  * whose record 0 says 2 and whose record 3 says 3 was written by two different
  * binaries into one chain, which is a genuine problem.
  */
-export const KNOWN_SCHEMAS = new Set([2, 3, 4]);
+export const KNOWN_SCHEMAS = new Set([2, 3, 4, 5]);
 
 export const GENESIS =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -370,10 +380,10 @@ export function runSubject(journalPath) {
  *   * never the current run — that is `findReplayable`'s job, and it is
  *     checked first because a receipt from THIS run needs no artifact copy.
  *
- * Milestones are deliberately NOT filtered. A stage that ran at g1 over the
- * committed encoding and at g2 over a deposit has different inputs and so a
- * different digest; the digest discriminates, and filtering on milestone as
- * well would only mask a digest collision rather than prevent one.
+ * The ENCODING is deliberately NOT filtered on. A stage that ran over the
+ * committed encoding and over a deposit has different inputs and so a different
+ * digest; the digest discriminates, and filtering on the encoding as well would
+ * only mask a digest collision rather than prevent one.
  *
  * Newest run first, so the most recent qualifying evidence wins.
  */

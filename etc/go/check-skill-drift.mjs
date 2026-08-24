@@ -18,7 +18,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const HERE = dirname(__filename);
 const REPO = resolve(HERE, "../..");
 const SKILL_DIR = resolve(REPO, ".claude/skills/running-the-l4-pipeline");
 const SKILL = resolve(SKILL_DIR, "SKILL.md");
@@ -97,8 +98,16 @@ const delegated = ["lib/store-cli.mjs"]
   .join("\n");
 const flagExists = (flag) => {
   const bare = flag.slice(2);
+  // A `case` ARM, not a substring. `goSrc.includes("--foo)")` is satisfied by
+  // any PROSE that happens to contain the text — and R9 produced exactly that:
+  // the comment explaining why `--milestone` is deliberately NOT a case arm
+  // contains the literal `--milestone)`, which made this checker report the
+  // retired flag as still accepted, which would have made every stale
+  // `--milestone` line left in SKILL.md pass. Anchoring to the start of a line
+  // is what distinguishes a declaration from a mention of one.
+  const arm = new RegExp(`^\\s*(?:[^\\n)]*\\|)?\\${flag}\\)`, "m");
   return (
-    goSrc.includes(`${flag})`) ||
+    arm.test(goSrc) ||
     // store-cli reads flags by name through flag()/bool(), so the name appears
     // as a quoted string rather than as a `case` label.
     delegated.includes(`"${bare}"`)
@@ -143,7 +152,19 @@ if (existsSync(refDir)) {
 // this goes red and the fixer updates the quote — which is the sentence.
 // A skill file that quotes none of them asserts nothing and checks nothing.
 {
-  const arrays = ["UNIMPLEMENTED_STAGES", "G1_STAGES", "G2_STAGES"];
+  const arrays = ["UNIMPLEMENTED_STAGES", "PRIMARY_STAGES", "DEPOSIT_STAGES"];
+  // RETIRED NAMES ARE CHECKED FOR, NOT MERELY REMOVED FROM THE LIST ABOVE.
+  //
+  // The loop below only inspects names it is given, so dropping `G1_STAGES`
+  // from `arrays` would make a skill file that still quotes `G1_STAGES=(...)`
+  // pass forever — the byte-equality check that exists to catch exactly that
+  // drift goes silent at the moment the drift is introduced. Naming the retired
+  // spellings turns a rename from something the checker stops watching into
+  // something it watches FOR.
+  const RETIRED = {
+    G1_STAGES: "PRIMARY_STAGES",
+    G2_STAGES: "DEPOSIT_STAGES",
+  };
   const declared = {};
   // `^\\s*` and not `^`: a declaration is a declaration wherever it sits, and
   // these moved one indent level in when the subject-dependent file-scope block
@@ -158,6 +179,29 @@ if (existsSync(refDir)) {
   if (existsSync(refDir))
     for (const f of readdirSync(refDir).filter((f) => f.endsWith(".md")))
       skillFiles.push(resolve(refDir, f));
+  // Scanned across ALL of etc/go, not just go.sh and the skill: the first run of
+  // this guard caught the skill and missed three prose mentions in
+  // `selftest.mjs` and `p8-verify.sh`, which are stale claims in exactly the way
+  // the guard exists to refuse. A retired name is retired everywhere.
+  const scanned = [...skillFiles];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      // This file is excluded because it is the only one that must SPELL the
+      // retired names in order to look for them. Including it makes the guard
+      // unsatisfiable, which is a guard nobody can leave green.
+      else if (/\.(mjs|sh|md)$/.test(e.name) && full !== __filename)
+        scanned.push(full);
+    }
+  };
+  walk(HERE);
+  for (const [dead, live] of Object.entries(RETIRED))
+    for (const file of scanned)
+      if (readFileSync(file, "utf8").includes(dead))
+        problems.push(
+          `${file.replace(REPO + "/", "")} still names ${dead}, which R9 renamed to ${live}`,
+        );
   for (const file of skillFiles) {
     const text = readFileSync(file, "utf8");
     for (const name of arrays) {

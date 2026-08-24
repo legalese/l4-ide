@@ -150,7 +150,7 @@ for (const stage of [...universe].sort()) {
 
   if (!latest) {
     // The state that would have caught R12's failure. Today a report says a
-    // phase is "not declared at this milestone" — true, and readable as
+    // phase is "not declared for this run" — true, and readable as
     // "accounted for elsewhere" when nothing had accounted for it anywhere.
     const admitted = index.some((rec) => rec.stage === stage);
     phases.push({

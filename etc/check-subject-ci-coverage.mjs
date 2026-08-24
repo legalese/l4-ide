@@ -156,7 +156,7 @@ if (!dmnFilter) {
 //
 // A directory under jl4/examples/legal/ holding .l4 files but no sidecar is a
 // body of law the driver cannot run: `go.sh --subject <it>` refuses, no
-// milestone covers it, and no report is ever written about it. That is
+// run is ever about it, and no report is ever written about it. That is
 // sometimes correct -- `tests/` is a fixture directory, not a subject -- so
 // this is a NOTE and not a finding. It is printed because the alternative is
 // that nobody notices: the corpus is committed, its goldens are green in the
@@ -182,7 +182,7 @@ if (!dmnFilter) {
     if (l4.length === 0) continue;
     notes.push(
       `NOTE: jl4/examples/legal/${d}/ holds ${l4.length} .l4 file(s) and no sidecar under etc/go/subjects/, ` +
-        `so no milestone can run over it. If it is a body of law, \`etc/go/go.sh new-subject ${d} …\` registers it; ` +
+        `so no run can be about it. If it is a body of law, \`etc/go/go.sh new-subject ${d} …\` registers it; ` +
         `if it is fixtures, it is where it belongs.`,
     );
   }

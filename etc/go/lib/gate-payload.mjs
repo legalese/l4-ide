@@ -88,11 +88,21 @@ const corpus = Object.entries(p0?.metrics ?? {})
 // empty section, and p0-preflight.sh calls that out by name — and it simply did
 // not fire one layer up.
 //
-// This is reachable on the g2 path in EVERY run state, not just after a replay:
-// p0-preflight is not a declared g2 stage, so nothing records per-file corpus
-// hashes there at all, and the g2 gate binds to the de novo deposit set instead.
-// Every g2 HG1 payload was therefore corpus-blind. Refusing is the honest
-// outcome until a g2 stage records those digests.
+// This is reachable on the DEPOSIT path in EVERY run state, not just after a
+// replay: p0-preflight is not among that path's declared stages, so nothing
+// records per-file corpus hashes there at all, and the gate binds to the
+// deposit set instead. Every such HG1 payload was therefore corpus-blind.
+// Refusing is the honest outcome until a deposit stage records those digests.
+//
+// THE TEST IS ON THE DECLARED STAGE LIST, NOT ON A RUN LABEL. It used to read
+// `begin.milestone === "g2"`, which journal schema 5 stopped writing — and the
+// failure was silent and worse than a crash: the payload still refused, but
+// with the OTHER arm's advice, telling the reader to "run p0-preflight in this
+// run" when p0-preflight is not in the deposit stage set and `--only
+// p0-preflight` is intersected away to nothing. Advice that cannot be carried
+// out reads as a defect in the tool. `declared_stages` is written by
+// receipt.mjs at run_begin in every schema from 2 onward, so this arm is
+// correct for a legacy journal and a current one alike, with no dual spelling.
 //
 // Only the SIGNATURE route is affected: gate-payload.mjs is called from
 // gate-request.sh and gate-verify.sh alone, never from `--waive`. A waiver is
@@ -101,18 +111,17 @@ const corpus = Object.entries(p0?.metrics ?? {})
 // where a human is asked to bless something, and leaves the route where a human
 // says on the record that they did not.
 if (corpus.length === 0) {
-  const why =
-    begin.milestone === "g2"
-      ? `p0-preflight is not a declared g2 stage (go.sh's G2_STAGES), so nothing in a g2 run records per-file corpus hashes.
+  const why = !(begin.declared_stages ?? []).includes("p0-preflight")
+    ? `p0-preflight is not among this run's declared stages (go.sh's DEPOSIT_STAGES), so nothing in it
 ` +
-        `  The g2 gate binds to the DE NOVO deposit set, and no stage records its per-file digests yet, so this
+      `  records per-file corpus hashes. The gate binds to the DEPOSIT set, and no deposit stage records
 ` +
-        `  payload cannot say what it would bless. Waive HG1 with a recorded reason instead, or add a g2 stage
+      `  its per-file digests yet, so this payload cannot say what it would bless. Waive HG1 with a
 ` +
-        `  that emits corpus_sha_* metrics over the deposit set.`
-      : `no p0-preflight receipt in this journal carries corpus_sha_* metrics.
+      `  recorded reason instead, or add a deposit stage that emits corpus_sha_* metrics over that set.`
+    : `no p0-preflight receipt in this journal carries corpus_sha_* metrics.
 ` +
-        `  Run p0-preflight in this run before requesting a gate: it is the stage that states what the corpus is.`;
+      `  Run p0-preflight in this run before requesting a gate: it is the stage that states what the corpus is.`;
   process.stderr.write(
     `gate-payload.mjs: refusing to render a ${gate} payload that names no corpus file.
 ` +
@@ -130,7 +139,17 @@ const lines = [];
 lines.push(`l4-go gate payload`);
 lines.push(`gate: ${gate}`);
 lines.push(`run_id: ${begin.run_id}`);
-lines.push(`milestone: ${begin.milestone}`);
+// The run's identity line, keyed on the FIELD rather than on the schema number:
+// gate-verify.sh recomputes this payload from the same journal it was rendered
+// over, so a signature taken over a schema-4 payload still verifies against a
+// schema-4 journal, and a schema-5 journal renders the encoding it actually
+// records. Keying on the schema number would work too and would be one more
+// place for the number to have to be updated.
+lines.push(
+  typeof begin.encoding === "string"
+    ? `encoding: ${begin.encoding}`
+    : `milestone: ${begin.milestone}`,
+);
 lines.push(`subject: ${begin.subject}`);
 lines.push(`repo_head: ${begin.repo_head}`);
 lines.push(`tree_state: ${begin.tree_state}`);

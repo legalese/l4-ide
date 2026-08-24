@@ -38,7 +38,7 @@ purely to have something to diff would be theatre.
 
 What IS declared under `denovo` is the three registers — the source bundle, the
 external-modification register and the fork register — because those are genuine P1/P2/P4
-deposits regardless of whether a comparison follows. Running `--milestone g2` validates them.
+deposits regardless of whether a comparison follows. Running `--encoding undeclared` validates them.
 
 ## Two L4 traps this corpus paid for, in order of how much they cost
 

@@ -85,7 +85,7 @@ go_receipt --status PASS \
   --oracle-cmd "$ORACLE_CMD" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied here (that is p3-check, which runs over this same deposit in this same milestone)." \
+  --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied here (that is p3-check, which runs over this same deposit in this same run)." \
   --artifact "$LOG" "${METRICS[@]}" \
   --note "P3's actual deliverable — 'isomorphic: a domain expert can review it against $GO_S_CITATION section by section' — is unverified by this stage and is HG1's subject (SPEC.md §7.3). A module that typechecks and says something else entirely reaches this same PASS" \
-  --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are p3-check's half of this phase: it runs over the same resolved module set at this milestone, so read its receipt beside this one"
+  --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are p3-check's half of this phase: it runs over this run's same resolved module set, so read its receipt beside this one"

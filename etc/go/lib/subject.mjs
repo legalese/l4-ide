@@ -35,7 +35,7 @@ const SUBJECTS_DIR = process.env.L4_GO_SUBJECTS_DIR
   : resolve(HERE, "../subjects");
 
 // Canonical p7 leg order; also the closed set of declarable legs. go.sh
-// declares a milestone stage iff the descriptor's legs object has the entry.
+// declares a projection leg iff the descriptor's legs object has the entry.
 export const LEG_ORDER = [
   "p7-dmn",
   "p7-dmn-md",
@@ -137,9 +137,9 @@ function refuseUnknown(id) {
       `  pins.json (the CLI surface,\n` +
       `  measured against that corpus), known-defects.json (measured negative controls,\n` +
       `  empty groups say why), and NOTES.md (free-prose idiosyncrasies; scripts never\n` +
-      `  read it). The driver declares a milestone stage iff 'legs' has the entry, so a\n` +
+      `  read it). The driver declares a projection leg iff 'legs' has the entry, so a\n` +
       `  subject whose module set carries no wizard, and no regulative rules, simply omits\n` +
-      `  those legs and the milestone verdict stays honest. Any existing sidecar under etc/go/subjects/ is\n` +
+      `  those legs and the run verdict stays honest. Any existing sidecar under etc/go/subjects/ is\n` +
       `  a worked example.\n`,
   );
   process.exit(2);
@@ -178,7 +178,8 @@ function mustBeDir(where, rel) {
  *
  * That is the whole of R3 in one parameter. Which encoding a run is about is a
  * RUN PARAMETER; it was previously a schema key named after an ordinal
- * (`denovo`) and a capability label (`--milestone g2`), both of which made a
+ * (`denovo`) and a capability label (`--milestone g2`, since retired by R9), both
+ * of which made a
  * subject's position in its own history something you declare rather than
  * something you ask.
  */
@@ -757,9 +758,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // that is what a `paths:` filter and a repo-root `run:` step both want; the
   // GO_S_* env transport stays absolute and unchanged.
   // `--encodings`: the ids of a subject's ADDITIONAL encodings, one per line.
-  // The driver needs this to translate the legacy `--milestone g2` into a
-  // selection, and to REFUSE when the translation is ambiguous. It is a listing
-  // and not a selection, so it deliberately does not take --encoding.
+  // The driver needs it to answer `--encoding undeclared` — which is a CLAIM
+  // that the subject declares none, and is refused with this list when false —
+  // and CI needs it to name a subject's deposit encoding instead of keeping its
+  // own copy of that answer. It is a listing and not a selection, so it
+  // deliberately does not take --encoding.
   if (sub === "--encodings" || sub === "encodings") {
     const { desc } = loadSubject(idOrFlag);
     for (const k of Object.keys(desc.encodings ?? {}))
