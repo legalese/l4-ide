@@ -38,11 +38,19 @@ import {
   hashRecord,
   manifestText,
   read,
+  refold,
   runSubject,
   sha256File as hashOf,
   sha256Text as hashText,
   verify,
 } from "./lib/ledger.mjs";
+import {
+  classOf,
+  comparability,
+  freshness,
+  independence,
+  rolesFor,
+} from "./lib/readset.mjs";
 import * as Store from "./lib/store.mjs";
 import {
   driftFor,
@@ -6452,6 +6460,329 @@ process.stdout.write("\n-- store verbs --\n");
   rmSync(work, { recursive: true, force: true });
 }
 // ===== END store verbs ======================================================
+
+// ===== the read-set (R4) ====================================================
+//
+// R4's claim is that recording the MEMBERS of an input set, rather than only
+// the digest they fold into, makes four questions answerable that a digest
+// cannot answer at all. These checks pin the identity that makes the members
+// trustworthy, and then each of the four.
+{
+  process.stdout.write("\n-- the read-set (R4) --\n");
+  const work = mkdtempSync(resolve(tmpdir(), "go-readset-"));
+  const a = resolve(work, "a.txt");
+  const b = resolve(work, "b.txt");
+  writeFileSync(a, "alpha");
+  writeFileSync(b, "beta");
+  const paths = [a, b, resolve(work, "gone.txt"), "text:k=v"];
+
+  // THE CORNERSTONE. Everything else in R4 rests on the members being a proof
+  // of the digest rather than a second opinion about it.
+  check(
+    "refold(digestMembers(paths)) === digestSet(paths)",
+    refold(digestMembers(paths)) === digestSet(paths),
+  );
+  check(
+    "and the identity holds through manifestText, which is the frozen format",
+    refold(digestMembers(paths)) === hashText(manifestText(paths)),
+  );
+  check(
+    "a REORDERED read-set still re-folds — serialisation order is not evidence",
+    (() => {
+      const m = digestMembers(paths);
+      return refold([m[3], m[0], m[2], m[1]]) === digestSet(paths);
+    })(),
+  );
+  check(
+    "a DOCTORED member does NOT re-fold — which is the asymmetry that matters",
+    (() => {
+      const m = digestMembers(paths).map((x) =>
+        x.path === a ? { ...x, sha256: `sha256:${"0".repeat(64)}` } : x,
+      );
+      return refold(m) !== digestSet(paths);
+    })(),
+  );
+  check(
+    "an ABSENT member is part of the proof, not skipped from it",
+    (() => {
+      const m = digestMembers(paths);
+      return m.some((x) => x.absent) && refold(m) === digestSet(paths);
+    })(),
+  );
+
+  // digest.mjs --members-out: one pass, and the argv path must not regress.
+  const DIGEST = resolve(HERE, "lib/digest.mjs");
+  const out = resolve(work, "members.json");
+  const withFlag = spawnSync(
+    process.execPath,
+    [DIGEST, a, b, "--members-out", out],
+    { encoding: "utf8" },
+  );
+  const bare = spawnSync(process.execPath, [DIGEST, a, b], { encoding: "utf8" });
+  check(
+    "digest.mjs --members-out prints the SAME digest it always did",
+    withFlag.stdout.trim() === bare.stdout.trim() && bare.status === 0,
+  );
+  check(
+    "and the file it wrote re-folds to that digest",
+    refold(JSON.parse(readFileSync(out, "utf8"))) === withFlag.stdout.trim(),
+  );
+  // REGRESSION: the flag-stripping filter was `i !== membersIdx + 1`, and with
+  // no flag present membersIdx is -1, so it dropped argv[0] — the first real
+  // path. The bare invocation above would have digested only `b`.
+  check(
+    "digest.mjs with NO --members-out still digests every argv path",
+    bare.stdout.trim() === digestSet([a, b]),
+  );
+
+  // rolesFor — resolution order.
+  const rows = [
+    {
+      kind: "stage_end",
+      stage: "p1-ingest",
+      artifacts: [{ sha256: "sha256:aaa", rel: "src/act.txt" }],
+    },
+  ];
+  const index = [
+    { sha256: "sha256:bbb", stage: "p3-encode", rel: "enc.l4", subject: "s" },
+    // The blessing path re-admits every covers[] member under the pseudo-stage
+    // `covers`, whose rel is `tree:<abs>`. It must NOT outrank the tree check.
+    { sha256: "sha256:ccc", stage: "covers", rel: `tree:${a}`, subject: "s" },
+  ];
+  const roled = rolesFor(
+    [
+      { path: "text:l4-binary=x", sha256: null, bytes: null },
+      { path: "/w/src/act.txt", sha256: "sha256:aaa", bytes: 1 },
+      { path: "/w/enc.l4", sha256: "sha256:bbb", bytes: 1 },
+      { path: a, sha256: "sha256:ccc", bytes: 5 },
+      { path: "/elsewhere/x", sha256: "sha256:zzz", bytes: 1 },
+    ],
+    rows,
+    index,
+    work,
+  );
+  const roleOf = (p) => roled.find((m) => m.path === p)?.role;
+  check("a text: member is a param", roleOf("text:l4-binary=x") === "param");
+  check(
+    "a member produced by an earlier stage of THIS run takes that stage's class",
+    roleOf("/w/src/act.txt") === "natlang_sources",
+  );
+  check(
+    "a member found only in the store takes its record's class",
+    roleOf("/w/enc.l4") === "encode",
+  );
+  // REGRESSION: `covers` has no phase class, and letting the store hit win
+  // returned `unknown` for every corpus module of a BLESSED run — a worse
+  // answer than the filesystem was about to give for free.
+  check(
+    "a store record whose stage has no class does NOT outrank the tree check",
+    roleOf(a) === "tree",
+  );
+  check(
+    "a member resolvable nowhere is `unknown`, never guessed",
+    roleOf("/elsewhere/x") === "unknown",
+  );
+  check(
+    "classOf is total over the stages the driver declares",
+    classOf("p1-ingest") === "natlang_sources" && classOf("nope") === "unknown",
+  );
+
+  // freshness — Make's meaning, per member, derived.
+  const treeMember = digestMembers([a])[0];
+  check(
+    "an unchanged tree member is current",
+    freshness([{ ...treeMember, role: "tree", origin: "tree" }], [], {})
+      .state === "current",
+  );
+  writeFileSync(a, "alpha CHANGED");
+  const stale = freshness(
+    [{ ...treeMember, role: "tree", origin: "tree" }],
+    [],
+    {},
+  );
+  check("a moved tree member is STALE", stale.state === "stale");
+  check(
+    "and freshness NAMES the member that moved — the whole point over a digest",
+    stale.moved.length === 1 && stale.moved[0].path === a,
+  );
+  // A param nobody supplied must never be reported current. Assuming it
+  // unchanged is exactly the §3.7a bug: the binary and the stdlib moved and no
+  // digest noticed.
+  const unevaluated = freshness(
+    [{ path: "text:l4-binary=old", role: "param", origin: "declared" }],
+    [],
+    {},
+  );
+  check(
+    "an UNSUPPLIED param is `unknown`, never `current`",
+    unevaluated.state === "unknown" && unevaluated.unknown === 1,
+  );
+  check(
+    "a supplied param that moved is stale",
+    freshness(
+      [{ path: "text:l4-binary=old", role: "param", origin: "declared" }],
+      [],
+      { "l4-binary": "new" },
+    ).state === "stale",
+  );
+
+  // independence — the one sense in which `blind` was ever meaningful.
+  check(
+    "a read-set with no prior encoding is independent",
+    independence([{ path: "x", role: "natlang_sources" }]).independent,
+  );
+  check(
+    "a read-set containing a prior encoding is NOT independent, and names it",
+    (() => {
+      const r = independence([{ path: "prior.l4", role: "encode" }]);
+      return !r.independent && r.priors.length === 1;
+    })(),
+  );
+
+  // comparability — R5's precondition, and the predicate a boolean cannot express.
+  const src = (sha) => [{ path: "s", role: "natlang_sources", sha256: sha }];
+  check(
+    "two read-sets over identical natlang_sources are comparable",
+    comparability(src("sha256:1"), src("sha256:1")).comparable,
+  );
+  check(
+    "two read-sets over DIFFERENT sources are not — their diff is not a fork",
+    (() => {
+      const r = comparability(src("sha256:1"), src("sha256:2"));
+      return !r.comparable && r.reason === "upstream sources differ";
+    })(),
+  );
+  // ABSENCE OF EVIDENCE IS NOT COMPARABILITY. Returning true here would license
+  // exactly the spurious fork claim R5 exists to prevent — and it is the case
+  // that holds today for every subject in the tree.
+  check(
+    "two read-sets with NO natlang_sources at all are not comparable either",
+    !comparability([], []).comparable,
+  );
+
+
+  // THE REFUSALS. A read-set is only worth recording if a false one cannot be.
+  {
+    const RECEIPT = resolve(HERE, "lib/receipt.mjs");
+    const run = mkdtempSync(resolve(tmpdir(), "go-rs-run-"));
+    const good = digestMembers([b]);
+    const goodF = resolve(run, "good.json");
+    writeFileSync(goodF, JSON.stringify(good));
+    const badF = resolve(run, "bad.json");
+    writeFileSync(
+      badF,
+      JSON.stringify(good.map((m) => ({ ...m, sha256: `sha256:${"1".repeat(64)}` }))),
+    );
+    // SKIPPED-with-a-reason, deliberately: a bare PASS is REFUSED by the
+    // verdict lattice ("a status may not be asserted, only measured"), and
+    // borrowing an oracle here would test that rule rather than this one.
+    const call = (f, digest) =>
+      spawnSync(
+        process.execPath,
+        [RECEIPT, "stage-end", "--run", run, "--stage", "p3-check",
+         "--status", "SKIPPED", "--reason", "read-set fixture",
+         "--inputs-digest", digest, "--read-set", f],
+        { encoding: "utf8" },
+      );
+    const okCall = call(goodF, digestSet([b]));
+    check("receipt.mjs ACCEPTS a read-set that re-folds", okCall.status === 0);
+    check(
+      "and the row it wrote carries the members",
+      (() => {
+        const rows = read(resolve(run, "journal.ndjson"));
+        const r = rows.find((x) => x.kind === "stage_end");
+        return Array.isArray(r?.read_set) && r.read_set.length === good.length;
+      })(),
+    );
+    const badCall = call(badF, digestSet([b]));
+    check(
+      "receipt.mjs REFUSES a read-set that does not re-fold to its own digest",
+      badCall.status !== 0,
+    );
+    check(
+      "and says so, rather than recording an unprovable claim",
+      /does not re-fold/.test(badCall.stderr),
+    );
+    check(
+      "the refused read-set was NOT appended to the journal",
+      read(resolve(run, "journal.ndjson")).filter((x) => x.kind === "stage_end")
+        .length === 1,
+    );
+    check(
+      "a --read-set naming a file that is not there is BROKEN, not an empty read-set",
+      spawnSync(
+        process.execPath,
+        [RECEIPT, "stage-end", "--run", run, "--stage", "p3-check",
+         "--status", "SKIPPED", "--reason", "fixture",
+         "--inputs-digest", "sha256:x",
+         "--read-set", resolve(run, "nope.json")],
+        { encoding: "utf8" },
+      ).status !== 0,
+    );
+    rmSync(run, { recursive: true, force: true });
+  }
+
+  // verify() must catch a read-set doctored AFTER the fact — the chain proves
+  // nobody edited a record, and this proves the record was worth writing.
+  {
+    const run = mkdtempSync(resolve(tmpdir(), "go-rs-ver-"));
+    const j = resolve(run, "journal.ndjson");
+    append(j, { kind: "run_begin", run_id: "r", subject: "s" });
+    append(j, {
+      kind: "stage_end",
+      stage: "p3-check",
+      status: "PASS",
+      inputs_digest: digestSet([b]),
+      read_set: digestMembers([b]),
+    });
+    check("a journal with a re-folding read-set verifies", verify(j).ok);
+    // Rewrite the row AND re-chain it, so the hash check cannot be what fires.
+    const rows = read(j);
+    rows[1].read_set = rows[1].read_set.map((m) => ({
+      ...m,
+      sha256: `sha256:${"2".repeat(64)}`,
+    }));
+    rows[1].hash = hashRecord(rows[1]);
+    writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    const v = verify(j);
+    check(
+      "a read-set doctored and RE-CHAINED is still caught by the refold check",
+      !v.ok && v.problems.some((p) => /read_set re-folds to/.test(p)),
+    );
+    rmSync(run, { recursive: true, force: true });
+  }
+
+  // Backward compatibility: schema 2 and 3 carry no read-set and must verify
+  // exactly as they did. The journals in `legalese/canon` are schema 2 and 3.
+  {
+    const run = mkdtempSync(resolve(tmpdir(), "go-rs-old-"));
+    const j = resolve(run, "journal.ndjson");
+    writeFileSync(
+      j,
+      [
+        { journal_schema: 3, seq: 0, kind: "run_begin", run_id: "r", subject: "s" },
+        { journal_schema: 3, seq: 1, kind: "stage_end", stage: "p3-check",
+          status: "PASS", inputs_digest: "sha256:whatever" },
+      ]
+        .map((r, i, all) => {
+          r.prev = i === 0
+            ? "sha256:" + "0".repeat(64)
+            : all[i - 1].hash;
+          r.hash = hashRecord(r);
+          return JSON.stringify(r);
+        })
+        .join("\n") + "\n",
+    );
+    check(
+      "a schema-3 journal with no read_set verifies unchanged",
+      verify(j).ok,
+    );
+    rmSync(run, { recursive: true, force: true });
+  }
+
+  rmSync(work, { recursive: true, force: true });
+}
+// ===== END the read-set =====================================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,

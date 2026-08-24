@@ -31,7 +31,7 @@ import {
   statSync,
 } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-import { append, read, sha256File } from "./ledger.mjs";
+import { append, read, refold, sha256File } from "./ledger.mjs";
 import {
   checkClaim,
   materialise,
@@ -290,6 +290,45 @@ switch (kind) {
       artifacts = args.artifact.map((p) => artifactRecord(p, ctx));
     }
 
+    // R4's read-set. It arrives as a FILE rather than on argv because a corpus
+    // read-set is routinely larger than ARG_MAX.
+    let readSet = null;
+    if (args.read_set) {
+      if (!existsSync(args.read_set)) {
+        process.stderr.write(
+          `receipt.mjs: --read-set ${args.read_set} does not exist\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      try {
+        readSet = JSON.parse(readFileSync(args.read_set, "utf8"));
+      } catch (e) {
+        process.stderr.write(
+          `receipt.mjs: --read-set is not JSON: ${e.message}\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      if (!Array.isArray(readSet)) {
+        process.stderr.write(
+          "receipt.mjs: --read-set must be an array of members\n",
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      // REFUSE A READ-SET THAT DOES NOT PROVE ITS OWN DIGEST. Same discipline
+      // as refusing a receipt whose status exceeds its evidence: a read-set
+      // that does not re-fold is not weak evidence about the inputs, it is a
+      // claim about them already known to be false — and writing it would seal
+      // that falsehood inside a hash chain, where it reads as attested.
+      const proof = refold(readSet);
+      if (args.inputs_digest && proof !== args.inputs_digest) {
+        process.stderr.write(
+          "receipt.mjs: the read-set does not re-fold to the stage's inputs digest —\n" +
+            `  digest ${args.inputs_digest}\n  refold ${proof}\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+    }
+
     const receipt = {
       kind: "stage_end",
       stage: args.stage,
@@ -312,6 +351,14 @@ switch (kind) {
         verified: false,
       })),
       inputs_digest: args.inputs_digest || null,
+      // R4. The read-set lives HERE, on the receipt, beside the fold it proves
+      // — not on `stage_begin`, which also carries the digest. One home, and
+      // this is the row that always exists: a REPLAYED stage writes no
+      // `stage_begin` at all (it never began; claiming otherwise would be a
+      // receipt exceeding its evidence), yet its inputs are exactly as worth
+      // recording, because R8 says a run directory must be answerable on its
+      // own by someone holding only that directory.
+      read_set: readSet,
       attempt: Number(args.attempt ?? 1),
       replayed_from: args.replayed_from ?? null,
       // The RUN the borrowed receipt came from. null means the same run — the

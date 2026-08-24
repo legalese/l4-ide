@@ -33,8 +33,16 @@ import { join } from "node:path";
  * schema-1 gate row carries no such binding, and cannot be distinguished from a
  * schema-2 row that failed to record one — which is exactly the ambiguity this
  * number exists to refuse.
+ *
+ * 4 (2026-08-24): the `stage_end` record gained `read_set` — R4's itemised
+ * members of the set `inputs_digest` folds. It is a schema bump and not a free
+ * addition because it makes a NEW CHECK possible: from schema 4 on, a
+ * `stage_end` carrying a read-set must re-fold to its own digest, and `verify`
+ * enforces it. A schema-3 row carries no read-set and cannot be distinguished
+ * from a schema-4 row that failed to record one — the same ambiguity the
+ * number existed to refuse at 2.
  */
-export const JOURNAL_SCHEMA = 3;
+export const JOURNAL_SCHEMA = 4;
 
 /**
  * Schemas this binary can READ. A journal declares its schema in record 0 and
@@ -53,7 +61,7 @@ export const JOURNAL_SCHEMA = 3;
  * whose record 0 says 2 and whose record 3 says 3 was written by two different
  * binaries into one chain, which is a genuine problem.
  */
-export const KNOWN_SCHEMAS = new Set([2, 3]);
+export const KNOWN_SCHEMAS = new Set([2, 3, 4]);
 
 export const GENESIS =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -144,6 +152,38 @@ export function digestMembers(paths) {
   });
 }
 
+/**
+ * manifestText's INVERSE, and it lives here rather than beside its callers so
+ * that anyone editing the frozen format above cannot miss the other half of the
+ * identity:
+ *
+ *     refold(digestMembers(paths)) === digestSet(paths)
+ *
+ * That identity is what makes an itemised read-set a PROOF of the digest it was
+ * folded into, checkable offline with no filesystem and no surviving run
+ * directory (R4, §3.4). A `stage_end` row whose recorded read-set does not
+ * re-fold to its own `inputs_digest` is a row nothing wrote legitimately.
+ *
+ * The sort is deliberate: `manifestText` sorts before rendering, so sorting
+ * here reproduces the identity faithfully and makes the check independent of
+ * the order a journal happened to serialise the members in. A REORDERED record
+ * still re-folds; a DOCTORED one does not — which is the asymmetry wanted.
+ */
+export function refold(members) {
+  return sha256Text(
+    [...members]
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+      .map((m) =>
+        m.path.startsWith("text:")
+          ? m.path
+          : m.absent
+            ? `${m.path}\tABSENT`
+            : `${m.path}\t${m.bytes}\t${m.sha256}`,
+      )
+      .join("\n"),
+  );
+}
+
 export function read(journalPath) {
   if (!existsSync(journalPath)) return [];
   const text = readFileSync(journalPath, "utf8");
@@ -186,6 +226,20 @@ export function verify(journalPath) {
       );
     if (rec.seq !== i)
       problems.push(`record ${i}: seq ${rec.seq} out of order`);
+    // R4's integrity check, and the reason the read-set is worth recording as
+    // members rather than as prose: a recorded read-set is a PROOF of the
+    // digest beside it, and the proof is checkable here with no filesystem, no
+    // store and no surviving run directory. Guarded on the read-set being
+    // present so that schema-2 and schema-3 journals — including the ones
+    // already committed to `legalese/canon` — verify exactly as they did.
+    if (rec.kind === "stage_end" && Array.isArray(rec.read_set)) {
+      const proof = refold(rec.read_set);
+      if (rec.inputs_digest && proof !== rec.inputs_digest)
+        problems.push(
+          `record ${i} (${rec.stage}): read_set re-folds to ${proof}, not the recorded ` +
+            `inputs_digest ${rec.inputs_digest} — the row claims inputs it did not read`,
+        );
+    }
     prev = rec.hash;
   });
   return { ok: problems.length === 0, records, problems };
