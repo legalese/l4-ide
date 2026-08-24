@@ -5,9 +5,15 @@
   let {
     store,
     disabled = false,
+    onNewChat,
+    onOpenHistory,
   }: {
     store: AiChatStore
     disabled?: boolean
+    /** Mobile-only: start a fresh chat (compose icon, bottom-left). */
+    onNewChat?: () => void
+    /** Mobile-only: open past conversations as a full-screen drawer. */
+    onOpenHistory?: () => void
   } = $props()
 
   let text = $state('')
@@ -107,8 +113,57 @@
   <UsageLine used={store.usedToday} limit={store.dailyLimit} />
 
   <div class="action-bar">
-    <!-- Lower-left intentionally empty (new / history live in the sidebar). -->
-    <div class="left-actions"></div>
+    <!-- On desktop new / history live in the sidebar, so the lower-left is
+         empty. On mobile the sidebar is hidden and these two buttons take
+         over — same glyphs the VSCode extension uses in its chat input. -->
+    <div class="left-actions">
+      <button
+        class="icon-btn svg-btn mobile-only"
+        title="New chat"
+        aria-label="New chat"
+        onclick={() => onNewChat?.()}
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M10 4V4C8.13623 4 7.20435 4 6.46927 4.30448C5.48915 4.71046 4.71046 5.48915 4.30448 6.46927C4 7.20435 4 8.13623 4 10V13.6C4 15.8402 4 16.9603 4.43597 17.816C4.81947 18.5686 5.43139 19.1805 6.18404 19.564C7.03968 20 8.15979 20 10.4 20H14C15.8638 20 16.7956 20 17.5307 19.6955C18.5108 19.2895 19.2895 18.5108 19.6955 17.5307C20 16.7956 20 15.8638 20 14V14"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="square"
+          />
+          <path
+            d="M12.4393 14.5607L19.5 7.5C20.3284 6.67157 20.3284 5.32843 19.5 4.5C18.6716 3.67157 17.3284 3.67157 16.5 4.5L9.43934 11.5607C9.15804 11.842 9 12.2235 9 12.6213V15H11.3787C11.7765 15 12.158 14.842 12.4393 14.5607Z"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="square"
+          />
+        </svg>
+      </button>
+      <button
+        class="icon-btn svg-btn mobile-only"
+        title="Chat history"
+        aria-label="Chat history"
+        onclick={() => onOpenHistory?.()}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <circle
+            cx="8"
+            cy="8"
+            r="5.5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            fill="none"
+          />
+          <path
+            d="M8 5v3.2L10.1 10"
+            stroke="currentColor"
+            stroke-width="1.5"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
 
     <div class="right-actions">
       <button
@@ -150,7 +205,11 @@
     flex-direction: column;
     gap: 0.4rem;
     max-width: 800px;
-    width: 100%;
+    /* border-box + margin-compensated width: with the default content-box,
+       100% + side margins + border overflowed the centered flex column on
+       narrow viewports and produced horizontal scrolling. */
+    box-sizing: border-box;
+    width: calc(100% - 1.5rem);
     font-size: 0.85em;
     box-shadow: 0 0 10px 2px var(--sidebar-bg);
   }
@@ -218,11 +277,40 @@
   }
   .left-actions {
     min-height: 1px;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
   }
   .right-actions {
     display: flex;
     align-items: center;
     gap: 0.35rem;
+  }
+
+  .svg-btn {
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--vscode-descriptionForeground);
+  }
+  .svg-btn svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+  .svg-btn:hover:not(:disabled) {
+    color: var(--vscode-foreground);
+  }
+  /* New-chat / history buttons only appear when the sidebar is hidden. */
+  .mobile-only {
+    display: none;
+  }
+  @media (max-width: 768px) {
+    .mobile-only {
+      display: inline-flex;
+    }
   }
 
   .icon-btn {
