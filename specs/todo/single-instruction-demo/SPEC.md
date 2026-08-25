@@ -265,6 +265,64 @@ externally-settled resolution), what each projection preserved and lost (the fid
 are the raw material), test results, and — where an alternative system has published its own
 representation of the same rule — a factual note of where we disagree with it.
 
+#### P9.2 — What the run cost (added 2026-08-25)
+
+**Status (2026-08-25): BUILT.** The stage is `p9-cost`, declared in both `PRIMARY_STAGES` and
+`DEPOSIT_STAGES` immediately before `p9-report`, HG1-gated by §7.3's derivation like everything from
+P6 on. It writes `cost-ledger.json`; `render-report.mjs` renders it under **What this run cost**.
+The measuring code is `etc/go/lib/cost-ledger.mjs`, the clock is `etc/go/lib/clock.sh`, and the
+journal is at **schema 6**.
+
+A report that cannot say what a run cost cannot be compared with the next one, and the pipeline's
+own overheads stay invisible. The design question is not how to total the numbers — it is how to
+keep two different kinds of evidence from being averaged into one.
+
+- **Attested.** Every `stage_end` carries `elapsed_ms` (the phase script) and `dispatch_ms` (the
+  driver's own time before it: asking the stage for its inputs, digesting and itemising them,
+  searching for a replayable receipt). The driver took both readings, and it is the only party that
+  could: it is the process that waited. The figure is **refusable**, which is what makes it worth
+  recording — `ledger.verify` reports any `elapsed_ms` larger than the interval between its own
+  `stage_begin` and `stage_end`, so an inflated duration fails arithmetic rather than merely being
+  unlikely. A replayed row writes no `stage_begin` and is exempt by construction, not by exception.
+- **Attributed.** Tokens, tool calls and their durations are read out of the agent harness's own
+  JSONL transcripts. Nobody types them — but a transcript is an ordinary file that an agent with a
+  shell could edit, so the ledger names every one it read with its sha256 and byte count, and the
+  standing is stated in the artifact rather than left for the reader to infer.
+
+**The join is the driver's, not the transcript's.** A transcript records what a session did and
+never which run it did it for; a journal records which sessions invoked the driver and nothing
+about what they spent. So the driver writes one `session` row per invocation, observed from
+`CLAUDE_CODE_SESSION_ID` in the environment it was handed, and `p9-cost` measures exactly those
+sessions. A run driven by hand sets no such variable; the row records `null`, the stage reports
+SKIPPED naming that, and the report says a leg was unattributable — because a zero would read as a
+leg that cost nothing.
+
+Three boundaries the report states rather than papers over, each of them measured on this
+pipeline's own runs:
+
+1. **The window understates the front and the session-total overstates it.** The window opens at
+   the run's first journal record, so reading the statute and deciding what to encode fall outside
+   it. Both columns are printed; the truth is between them.
+2. **`busy_ms_lower_bound` is a floor, not an estimate.** It unions attested stage brackets with
+   measured tool-call intervals — union and never sum, since the agent is waiting while the stage
+   it launched runs — and counts nothing for the time a model spends reasoning between two tool
+   calls. The gap between it and the run's span is mostly the human gates.
+3. **The figures stop at `p9-cost` itself**, which runs before the reporting stages so that the
+   report has something to render. The report's own per-stage table, rendered after `run_end`, sees
+   all of them; the two totals differ by exactly the stages between them, and both say so.
+
+**Two populations of network activity, never added.** Calls the _model_ made are counted from the
+transcript by tool name (`WebSearch`, `WebFetch`, any `mcp__*`). Requests the _pipeline_ made are
+counted by the script that made them and carried in the source bundle as `retrieval_cost`, which
+`source-bundle.schema.json`'s `retrieval-cost-covers-its-documents` refuses to let state a total
+smaller than the sum of its own documents. A stage running `curl` is invisible to the first and a
+model's web search is invisible to the second, so one figure over both would be a number about
+nothing.
+
+**No money.** Token counts are facts about a run; prices are facts about a contract and change
+without notice. A stale rate table would put a confident wrong figure in a document whose whole
+premise is that every number has a journal row behind it.
+
 #### P9.1 — The explainer report (a sibling, not a rewrite)
 
 **Status (2026-08-03): BUILT at v0, with one named gap.** The stage is `p9-explain`, declared in
@@ -728,6 +786,30 @@ elsewhere should say "SI-Rn".
   the **vendored lane's** mechanism, and its standing yield-to-Thomas instruction is inherited
   untouched. Entries **do** pin by SHA (mandatory, per sub-ruling 1). Canon does **not** mirror
   against link rot (sub-ruling 2).
+
+- **R10 — run cost accounting**: **ANSWERED 2026-08-25, and built in the same change (§4 P9.2).**
+  What a run costs is recorded in **two kinds** and they are never merged: the driver **attests**
+  per-stage wall clock, and the harness transcripts are read to **attribute** tokens and tool calls.
+  Four sub-rulings, each of which had a cheaper wrong answer available:
+  (1) **The attested figure must be refusable.** A duration nothing could falsify is decoration, so
+  `elapsed_ms` is checked against the bracket between its own `stage_begin` and `stage_end`, and
+  that check is why this is a journal **schema bump** (to 6) rather than a free field — the same
+  test schema 4 met when it added the read-set. The cost, paid once and by design: a run begun
+  under schema 5 cannot be resumed by a schema-6 binary.
+  (2) **Attribution is OBSERVED, not declared.** The driver reads `CLAUDE_CODE_SESSION_ID` from
+  the environment it was invoked in and writes one `session` row per invocation. The rejected
+  alternative was the deposit shape used everywhere else here — the agent produces a cost record
+  and a stage validates it — which was the working assumption until the environment variable was
+  found. Observation beats validation when observation is available.
+  (3) **Dispatch is recorded separately from execution.** The driver's own pre-stage time is real,
+  is spent on every stage including the ones that then replay in milliseconds, and folding it into
+  `elapsed_ms` would make the pipeline look faster than it is while making the stage look slower.
+  (4) **Every derived figure states its bound.** `busy_ms_lower_bound` is a union and never a sum,
+  and is explicitly a floor; the window column and the session-total column are printed together
+  because one understates and the other overstates; the two network populations are counted
+  separately because neither can see the other.
+  Not ruled here and left open: whether the ledger should be **committed** alongside a published
+  run. That is R7's question (report versioning) and P10's act.
 
 ---
 

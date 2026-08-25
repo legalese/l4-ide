@@ -86,6 +86,12 @@
 
 ---
 
+## What this run cost
+
+{{sections.cost}}
+
+---
+
 ## Every artifact this run put on disk
 
 {{artifacts.table}}

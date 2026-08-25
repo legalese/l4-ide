@@ -1,6 +1,12 @@
 {
   "retrieved_from": "sso.agc.gov.sg",
   "note": "PDF is authoritative; HTML landing page is TOC-only for long Acts",
+  "retrieval_cost": {
+    "requests": 8,
+    "elapsed_ms": 295,
+    "bytes": 1393910,
+    "tool": "jl4/examples/legal/sg-succession/source/fetch-sso.py"
+  },
   "documents": [
     {
       "act_id": "ISA1967",
@@ -15,7 +21,12 @@
       "historical_versions": [
         "19870330",
         "20131231"
-      ]
+      ],
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 86,
+        "bytes": 365735
+      }
     },
     {
       "act_id": "WA1838",
@@ -35,7 +46,12 @@
         "20161201",
         "20210102",
         "20211231"
-      ]
+      ],
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 71,
+        "bytes": 294672
+      }
     },
     {
       "act_id": "PAA1934",
@@ -62,7 +78,12 @@
         "20160610",
         "20210102",
         "20211231"
-      ]
+      ],
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 71,
+        "bytes": 441336
+      }
     },
     {
       "act_id": "GIA1934",
@@ -84,7 +105,12 @@
         "20211231",
         "20240131",
         "20241015"
-      ]
+      ],
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 67,
+        "bytes": 292167
+      }
     }
   ]
 }

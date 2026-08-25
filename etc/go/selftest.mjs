@@ -30,6 +30,12 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  buildLedger,
+  networkClass,
+  pipelineFromJournal,
+  unionMs,
+} from "./lib/cost-ledger.mjs";
+import {
   CROSS_RUN_INELIGIBLE,
   append,
   digestMembers,
@@ -1533,6 +1539,7 @@ process.stdout.write("\n-- the register schemas --\n");
       "archive-method-requires-archive-url",
       "integrity-digest-or-immutable-capture",
       "assembled-digest-matches",
+      "retrieval-cost-covers-its-documents",
       "covers-or-absent-reason",
       "covers-range-ordered",
       "in-force-or-absent-reason",
@@ -1679,6 +1686,407 @@ process.stdout.write("\n-- the register schemas --\n");
   }
 }
 
+// ------------------------------------------------- 3f. cost accounting
+//
+// Two halves with two standings, and the checks below are about keeping them
+// apart. The attested half must be refusable — a driver-measured duration that
+// nothing could falsify is decoration. The attributed half must not
+// double-count, must not silently mix a whole-session figure with a
+// run-window one, and must never report a union larger than its parts.
+process.stdout.write("\n-- cost accounting --\n");
+{
+  const cdir = mkdtempSync(resolve(tmpdir(), "l4-go-cost-"));
+
+  // ---- the attested half: an elapsed_ms cannot exceed its own bracket -------
+  //
+  // Writing the rows by hand and then re-hashing is the point: this is exactly
+  // what an edit that inflates a duration would have to do, and it must still
+  // be caught by arithmetic rather than by the chain.
+  const bracketed = (elapsedMs, gapMs, { withBegin = true } = {}) => {
+    const f = resolve(cdir, `br-${elapsedMs}-${gapMs}-${withBegin}.ndjson`);
+    rmSync(f, { force: true });
+    append(f, {
+      kind: "run_begin",
+      run_id: "t",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a"],
+    });
+    if (withBegin) append(f, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(f, base({ stage: "a", elapsed_ms: elapsedMs }));
+    // Re-stamp the last row's ts so the bracket is a known width, then repair
+    // its hash and every `prev` after it — the chain must stay intact so the
+    // ONLY thing verify can complain about is the duration.
+    const rows = readFileSync(f, "utf8").trimEnd().split("\n").map(JSON.parse);
+    const beginIdx = rows.findIndex((r) => r.kind === "stage_begin");
+    const endIdx = rows.findIndex((r) => r.kind === "stage_end");
+    const t0 = Date.parse(rows[beginIdx >= 0 ? beginIdx : 0].ts);
+    rows[endIdx].ts = new Date(t0 + gapMs).toISOString();
+    let prev = rows[0].prev;
+    for (const r of rows) {
+      r.prev = prev;
+      r.hash = hashRecord(r);
+      prev = r.hash;
+    }
+    writeFileSync(f, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    return f;
+  };
+  const complains = (f) =>
+    verify(f).problems.filter((p) => /elapsed_ms/.test(p));
+
+  check(
+    "an elapsed_ms inside its own bracket verifies",
+    verify(bracketed(4000, 5000)).ok === true,
+  );
+  check(
+    "an elapsed_ms LARGER than its bracket is reported",
+    complains(bracketed(9000, 5000)).length === 1,
+  );
+  check(
+    "…and the finding names both numbers, so it can be checked by hand",
+    /9000/.test(complains(bracketed(9000, 5000))[0]) &&
+      /5000/.test(complains(bracketed(9000, 5000))[0]),
+  );
+  // The tolerance exists for the second-resolution `date` fallback in
+  // lib/clock.sh, which can overshoot a true interval by just under 1000 ms.
+  check(
+    "the clock tolerance forgives sub-second overshoot",
+    complains(bracketed(5900, 5000)).length === 0,
+  );
+  check(
+    "…but not a second and a half of it",
+    complains(bracketed(6500, 5000)).length === 1,
+  );
+  // A replay writes no stage_begin: there is no bracket, so there is nothing to
+  // check. Exempt by construction rather than by an exception in the code.
+  check(
+    "a replayed row, which has no stage_begin, is not accused",
+    complains(bracketed(99000, 1, { withBegin: false })).length === 0,
+  );
+  check(
+    "a row carrying no elapsed_ms at all is not accused either",
+    (() => {
+      const f = resolve(cdir, "noel.ndjson");
+      append(f, {
+        kind: "run_begin",
+        run_id: "t",
+        encoding: "primary",
+        subject: "t",
+        declared_stages: ["a"],
+      });
+      append(f, { kind: "stage_begin", stage: "a", attempt: 1 });
+      append(f, base({ stage: "a" }));
+      return verify(f).ok === true;
+    })(),
+  );
+
+  // ---- the union: never larger than the sum, never smaller than a part ------
+  check(
+    "unionMs merges overlapping intervals",
+    unionMs([
+      [0, 10],
+      [5, 20],
+    ]) === 20,
+  );
+  check(
+    "unionMs adds disjoint ones",
+    unionMs([
+      [0, 10],
+      [30, 40],
+    ]) === 20,
+  );
+  check(
+    "unionMs absorbs a contained interval",
+    unionMs([
+      [0, 100],
+      [10, 20],
+    ]) === 100,
+  );
+  check(
+    "unionMs does not depend on input order",
+    unionMs([
+      [30, 40],
+      [0, 10],
+    ]) === 20,
+  );
+  check(
+    "unionMs discards a zero-width or reversed interval rather than counting it",
+    unionMs([
+      [5, 5],
+      [10, 4],
+      [0, 10],
+    ]) === 10,
+  );
+  check(
+    "a union never exceeds the sum of its parts",
+    unionMs([
+      [0, 10],
+      [5, 20],
+      [30, 40],
+    ]) <=
+      10 + 15 + 10,
+  );
+
+  // ---- the attributed half, over a synthetic transcript --------------------
+  //
+  // Built to carry all three traps at once: one request split across four rows
+  // repeating the same usage, a subagent transcript in its own file, and a tool
+  // call left unpaired.
+  const projects = resolve(cdir, "cfg", "projects", "-proj");
+  const SID = "11111111-2222-3333-4444-555555555555";
+  mkdirSync(resolve(projects, SID, "subagents", "workflows", "wf_x"), {
+    recursive: true,
+  });
+  const at = (ms) => new Date(Date.UTC(2026, 0, 1, 0, 0, 0) + ms).toISOString();
+  const usage = (out) => ({
+    input_tokens: 1,
+    output_tokens: out,
+    cache_creation_input_tokens: 10,
+    cache_read_input_tokens: 100,
+    output_tokens_details: { thinking_tokens: 2 },
+    server_tool_use: { web_search_requests: 3, web_fetch_requests: 0 },
+  });
+  const rowsMain = [
+    // ONE request, four rows, identical usage. Summing rows gives 4x.
+    ...["thinking", "text", "tool_use", "tool_use"].map((kind, i) => ({
+      type: "assistant",
+      timestamp: at(1000 + i),
+      requestId: "req_A",
+      message: {
+        model: "m1",
+        usage: usage(100),
+        content:
+          kind === "tool_use"
+            ? [
+                {
+                  type: "tool_use",
+                  id: `tu${i}`,
+                  name: i === 2 ? "WebSearch" : "Bash",
+                },
+              ]
+            : [{ type: kind }],
+      },
+    })),
+    // the results, 2s and 4s later
+    {
+      type: "user",
+      timestamp: at(3002),
+      message: { content: [{ type: "tool_result", tool_use_id: "tu2" }] },
+    },
+    {
+      type: "user",
+      timestamp: at(5003),
+      message: { content: [{ type: "tool_result", tool_use_id: "tu3" }] },
+    },
+    // a second request, OUTSIDE the window used below
+    {
+      type: "assistant",
+      timestamp: at(900_000),
+      requestId: "req_B",
+      message: { model: "m1", usage: usage(7), content: [{ type: "text" }] },
+    },
+    // a tool call that never returns — counted, never timed
+    {
+      type: "assistant",
+      timestamp: at(910_000),
+      requestId: "req_C",
+      message: {
+        model: "m1",
+        usage: usage(1),
+        content: [{ type: "tool_use", id: "tu9", name: "Bash" }],
+      },
+    },
+  ];
+  writeFileSync(
+    resolve(projects, `${SID}.jsonl`),
+    rowsMain.map((r) => JSON.stringify(r)).join("\n") + "\n",
+  );
+  writeFileSync(
+    resolve(projects, SID, "subagents", "workflows", "wf_x", "agent-1.jsonl"),
+    [
+      {
+        type: "assistant",
+        timestamp: at(2000),
+        requestId: "req_S",
+        isSidechain: true,
+        message: { model: "m1", usage: usage(50), content: [{ type: "text" }] },
+      },
+      // A HALF-WRITTEN LAST LINE, which a live session always has.
+      null,
+    ]
+      .filter(Boolean)
+      .map((r) => JSON.stringify(r))
+      .join("\n") + '\n{"type":"assist',
+  );
+
+  const led = buildLedger({
+    sessions: [{ session: SID, attributed_by: "declared" }],
+    from: at(0),
+    to: at(10_000),
+    root: resolve(cdir, "cfg"),
+  });
+
+  check(
+    "a request split across four rows is counted ONCE",
+    led.totals.session_total.requests === 4, // req_A, req_B, req_C, req_S
+  );
+  check(
+    "…and its tokens are not multiplied by its row count",
+    led.totals.session_total.output_tokens === 100 + 7 + 1 + 50,
+  );
+  check(
+    "a subagent transcript is found and counted",
+    led.by_role.subagent.requests === 1 && led.by_role.main.requests === 3,
+  );
+  check(
+    "…and the roles re-sum to the total",
+    led.by_role.subagent.output_tokens + led.by_role.main.output_tokens ===
+      led.totals.session_total.output_tokens,
+  );
+  check(
+    "the harness's own sidechain marking agrees with the file-role split",
+    led.sidechain_requests === led.by_role.subagent.requests,
+  );
+  check(
+    "a truncated final line does not abort the read",
+    led.transcripts.length === 2 &&
+      led.transcripts.every((t) => typeof t.sha256 === "string"),
+  );
+  check(
+    "the window clips requests, and in-window never exceeds the total",
+    led.totals.in_window.requests === 2 &&
+      led.totals.in_window.requests < led.totals.session_total.requests,
+  );
+  {
+    const ws = led.tools.find((t) => t.name === "WebSearch");
+    const bash = led.tools.find((t) => t.name === "Bash");
+    check(
+      "a tool call is timed from its own result",
+      ws.calls === 1 && ws.ms === 2000,
+    );
+    check(
+      "an unreturned tool call is counted and left untimed",
+      bash.calls === 2 && bash.unpaired === 1 && bash.ms === 4000,
+    );
+    // THE DEFECT THIS PAIR EXISTS FOR, found by reading the first real run: a
+    // whole-session tool total sat beside a run-window token total under
+    // sibling names, and read as one measurement.
+    check(
+      "every tool's in-window duration is clipped, never the session total",
+      led.tools.every(
+        (t) => t.ms_in_window <= t.ms && t.calls_in_window <= t.calls,
+      ),
+    );
+    check(
+      "…and the same holds for the network rollup",
+      Object.keys(led.network.calls).every(
+        (k) =>
+          led.network.calls_in_window[k] <= led.network.calls[k] &&
+          led.network.ms_in_window[k] <= led.network.ms[k],
+      ),
+    );
+    check(
+      "a backgrounded tool's duration is flagged as dispatch, not as work",
+      led.tools.every(
+        (t) =>
+          t.duration_is_dispatch ===
+          ["Workflow", "Agent", "Task", "Monitor"].includes(t.name),
+      ),
+    );
+  }
+  check(
+    "a server-side search count is kept apart from the client tool count",
+    led.network.calls.web_search === 1 &&
+      led.network.server_side.web_search === 12,
+  );
+  check(
+    "the ledger names its own standing rather than leaving it to the reader",
+    led.standing === "attributed",
+  );
+  check(
+    "every transcript read is named with its sha256 and byte count",
+    led.transcripts.every(
+      (t) => /^sha256:[0-9a-f]{64}$/.test(t.sha256) && t.bytes > 0,
+    ),
+  );
+  check(
+    "the occupancy floor contains both of its parts and exceeds neither sum",
+    led.occupancy.busy_ms_lower_bound >= led.occupancy.agent_tool_ms &&
+      led.occupancy.busy_ms_lower_bound >= led.occupancy.pipeline_busy_ms &&
+      led.occupancy.busy_ms_lower_bound <=
+        led.occupancy.agent_tool_ms + led.occupancy.pipeline_busy_ms,
+  );
+  check(
+    "a session with no transcript on this machine is reported, not dropped",
+    (() => {
+      const l = buildLedger({
+        sessions: [{ session: "no-such-session", attributed_by: "declared" }],
+        root: resolve(cdir, "cfg"),
+      });
+      return l.sessions.length === 1 && l.sessions[0].transcripts === 0;
+    })(),
+  );
+  check(
+    "networkClass names the two web tools and any MCP tool",
+    () =>
+      networkClass("WebSearch") === "web_search" &&
+      networkClass("WebFetch") === "web_fetch" &&
+      networkClass("mcp__x__y") === "mcp" &&
+      networkClass("Bash") === null,
+  );
+
+  // ---- the join: which sessions belong to this run -------------------------
+  {
+    const j = resolve(cdir, "sess.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "r1",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a", "b"],
+    });
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    append(j, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(j, base({ stage: "a", elapsed_ms: 10, dispatch_ms: 3 }));
+    // a second invocation, same session — one session, two rows
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    // a third, driven by hand: no session id at all
+    append(j, { kind: "session", session: null, agent: null, cwd: "/x" });
+    append(
+      j,
+      base({ stage: "b", status: "DEGRADED", reason: "r", oracle: null }),
+    );
+    append(j, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    const p = pipelineFromJournal(j);
+    check("driver-observed sessions are deduplicated", p.sessions.length === 1);
+    check(
+      "…while the invocations that produced them are counted",
+      p.invocations === 3,
+    );
+    check(
+      "an invocation with no session is counted as unattributable, not as zero",
+      p.unattributed_invocations === 1,
+    );
+    check(
+      "a stage with no elapsed_ms is NAMED rather than averaged over",
+      p.totals.untimed === 1 && p.totals.stages === 2,
+    );
+    check(
+      "the attested half declares itself attested",
+      p.standing === "attested",
+    );
+    check(
+      "a finished run's window closes at its own run_end",
+      typeof p.ended_at === "string",
+    );
+    check(
+      "each stage contributes one bracket to the busy union",
+      p.busy_intervals.length === 1,
+    );
+  }
+  rmSync(cdir, { recursive: true, force: true });
+}
+
 // ------------------------------------------------------------- 4. the driver
 process.stdout.write("\n-- the driver --\n");
 
@@ -1686,7 +2094,7 @@ process.stdout.write("\n-- the driver --\n");
 // function of the journal, which grows while it runs. Keep this list and
 // go.sh's two `--inputs` no-op blocks in step; the idempotence checks below
 // compare against it as a SET, not as a count.
-const NEVER_REPLAY = ["p9-report", "p9-explain"];
+const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
 
 // THE ASSERTION THAT DID NOT EXIST, and whose absence is total when it bites.
 //
@@ -1984,6 +2392,53 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
           writeFileSync(p, original);
         }
       })(),
+    );
+  }
+
+  // ---- PHASE-SCRIPT HYGIENE -------------------------------------------------
+  //
+  // `bash -n` over every phase script, and it is not busywork: several of these
+  // scripts embed a JS program inside `node -e '…'`, and a single APOSTROPHE in
+  // an English word inside that block closes the shell quote and turns the rest
+  // of the file into syntax errors. It happened while p9-cost was being
+  // written — the offending word was a possessive in a code comment — and the
+  // script still looked entirely reasonable on screen.
+  //
+  // Every script, not a list: a new phase must pass this without anyone
+  // remembering to add it.
+  {
+    const bad = [];
+    for (const f of readdirSync(resolve(HERE, "phases")).sort()) {
+      if (!f.endsWith(".sh")) continue;
+      const r = spawnSync("bash", ["-n", resolve(HERE, "phases", f)], {
+        encoding: "utf8",
+      });
+      if (r.status !== 0)
+        bad.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
+    }
+    for (const f of ["go.sh", "gate-request.sh", "gate-verify.sh"]) {
+      const p = resolve(HERE, f);
+      if (!existsSync(p)) continue;
+      const r = spawnSync("bash", ["-n", p], { encoding: "utf8" });
+      if (r.status !== 0)
+        bad.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
+    }
+    for (const f of [
+      "phase-prelude.sh",
+      "deposit-prelude.sh",
+      "clock.sh",
+      "toolchain.sh",
+    ]) {
+      const p = resolve(HERE, "lib", f);
+      if (!existsSync(p)) continue;
+      const r = spawnSync("bash", ["-n", p], { encoding: "utf8" });
+      if (r.status !== 0)
+        bad.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
+    }
+    check(
+      "every shell script under etc/go parses",
+      bad.length === 0 ||
+        (process.stdout.write(bad.map((b) => `     ${b}\n`).join("")), false),
     );
   }
 

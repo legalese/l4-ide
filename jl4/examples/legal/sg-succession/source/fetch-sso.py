@@ -23,10 +23,15 @@ would be saved as a .pdf, fed to pdftotext, and land in a bundle with a real
 sha256 over the wrong bytes. Every fetch therefore checks that what came back
 is actually a PDF before it is written.
 
+Every fetch is timed and counted, per document and in total, and the figures go
+into fetch-manifest.json as `retrieval_cost`. They are the SOURCE-SIDE half of
+what the pipeline reports about network activity; the model-side half is counted
+separately from the agent transcript, and the two are never added.
+
 Usage: ./fetch-sso.py [--out DIR] [ACT_ID ...]   (default: all four Acts, here)
 Requires: curl, pdftotext (poppler).
 """
-import hashlib, html, json, re, shutil, subprocess, sys, pathlib
+import hashlib, html, json, re, shutil, subprocess, sys, time, pathlib
 
 ACTS = {
     "ISA1967": "Intestate Succession Act 1967",
@@ -38,11 +43,26 @@ HERE = pathlib.Path(__file__).parent
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
 
 
+# What the retrieval cost. The pipeline reports two SEPARATE populations of
+# network activity and must never add them: calls the MODEL made (counted from
+# the agent transcript by p9-cost, by tool name) and requests the FETCH made
+# (counted here). A curl inside a shell call is invisible to the first, so
+# without this the report has a sentence about the second and nothing behind it.
+COST = {"requests": 0, "elapsed_ms": 0, "bytes": 0}
+
+
 def curl(url: str, referer: str | None = None) -> bytes:
     cmd = ["curl", "-sS", "--fail", "--max-time", "120", "-H", f"User-Agent: {UA}"]
     if referer:
         cmd += ["-H", f"Referer: {referer}"]
-    return subprocess.run(cmd + [url], capture_output=True, check=True).stdout
+    t0 = time.monotonic()
+    out = subprocess.run(cmd + [url], capture_output=True, check=True).stdout
+    # monotonic, not wall clock: the figure is an interval and a clock step
+    # mid-fetch must not turn it into a negative one.
+    COST["requests"] += 1
+    COST["elapsed_ms"] += int((time.monotonic() - t0) * 1000)
+    COST["bytes"] += len(out)
+    return out
 
 
 def must_be_pdf(act: str, url: str, blob: bytes) -> bytes:
@@ -74,6 +94,7 @@ def main(argv):
         args = args[2:]
     out_dir.mkdir(parents=True, exist_ok=True)
     for act in args or list(ACTS):
+        before = dict(COST)
         page = f"https://sso.agc.gov.sg/Act/{act}"
         pdf = must_be_pdf(act, f"{page}?ViewType=Pdf", curl(f"{page}?ViewType=Pdf", referer=page))
         (out_dir / f"{act}.pdf").write_bytes(pdf)
@@ -98,13 +119,19 @@ def main(argv):
             "text_sha256": hashlib.sha256((out_dir / f"{act}.txt").read_bytes()).hexdigest(),
             "in_force": f"Current version as at {m.group(1)}" if m else None,
             "historical_versions": versions,
+            # Per document, so the bundle's total can be checked against the sum
+            # of its parts — schemas/source-bundle.schema.json's
+            # `retrieval-cost-covers-its-documents`.
+            "retrieval_cost": {k: COST[k] - before[k] for k in COST},
         })
         print(f"{act}: pdf {len(pdf)}B, text {(out_dir/f'{act}.txt').stat().st_size}B, "
               f"{len(versions)} historical version(s), in_force={out[-1]['in_force']}")
     (out_dir / "fetch-manifest.json").write_text(
         json.dumps({"retrieved_from": "sso.agc.gov.sg",
                     "note": "PDF is authoritative; HTML landing page is TOC-only for long Acts",
+                    "retrieval_cost": {**COST, "tool": "jl4/examples/legal/sg-succession/source/fetch-sso.py"},
                     "documents": out}, indent=2) + "\n")
+    print(f"total: {COST['requests']} request(s), {COST['elapsed_ms']} ms, {COST['bytes']} bytes")
     return 0
 
 

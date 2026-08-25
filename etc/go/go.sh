@@ -98,6 +98,8 @@ LIB="$GO_ROOT/etc/go/lib"
 # dist-newstyle when unset. Sourced here, invoked only by `run` and `doctor` —
 # `plan` and `help` must keep working with no binary anywhere (CI asserts it).
 source "$LIB/toolchain.sh"
+# One clock for the driver and the phases alike; see lib/clock.sh.
+source "$LIB/clock.sh"
 
 # --- the stage table --------------------------------------------------------
 # G1's declared stages, in order. p0-preflight, p3-check, p6-tests and
@@ -151,7 +153,7 @@ UNIMPLEMENTED_STAGES=(p10-publish)
 # than p7-dmn read committed goldens/entries the deposit does not have; the
 # plan names each one's missing piece. p9-report reads journal.ndjson and
 # nothing else, so it is correct for either stage set.
-DEPOSIT_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-report)
+DEPOSIT_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-cost p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
 # anything outward-facing, which on the primary path means the MCP deployment
@@ -537,10 +539,15 @@ if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
   for s in "${P7_LEG_ORDER[@]}"; do
     [[ " $GO_S_LEGS " == *" $s "* ]] && PRIMARY_STAGES+=("$s")
   done
+  # p9-cost precedes p9-report and p9-explain, which both read the journal and
+  # would otherwise have no cost figures to render. The consequence is stated on
+  # the receipt rather than hidden: the ledger stops at itself, so the two
+  # stages after it are not in its totals.
+  #
   # p9-explain follows p9-report: both read the journal, and the explainer also
   # reads the report's own presence. Declared, so that a run which produced no
   # explainer says so in its verdict rather than staying silent.
-  PRIMARY_STAGES+=(p9-report p9-explain)
+  PRIMARY_STAGES+=(p9-cost p9-report p9-explain)
 
   declare -a DECLARED_STAGES=()
   if [[ "$GO_S_ENCODING_ID" == "primary" ]]; then
@@ -1328,6 +1335,14 @@ EOF
     });
   ' "${GO_ENCODING_FILES[@]}" > "$RUN/.corpus-members.json"
 
+  # WHO IS DRIVING THIS INVOCATION — once per invocation, like the itemisation
+  # above and unlike run_begin. A human-gated run is driven in several sittings
+  # and the sittings are routinely different agent sessions; the set of these
+  # rows is the run's answer to "whose token spend belongs here", which is the
+  # one thing p9-cost cannot measure for itself. Observed from the environment,
+  # never declared: see the `session` case in lib/receipt.mjs.
+  node "$LIB/receipt.mjs" session --run "$RUN" --cwd "$PWD"
+
   echo "go: run $RUN_ID  (subject $SUBJECT, encoding $GO_S_ENCODING_ID)"
   echo "go: tree $head [$tree_state]   fixed-now $FIXED_NOW"
   echo "go: run dir $RUN"
@@ -1390,9 +1405,22 @@ EOF
   # --- dispatch --------------------------------------------------------------
   local overall=0
   local s
+  local _t_stage0 _t_exec0
   while read -r s; do
     [[ -n "$s" ]] || continue
     if [[ -n "$ONLY" && "$s" != "$ONLY" ]]; then continue; fi
+
+    # THE STAGE CLOCK STARTS HERE, not at `bash "$script"`.
+    #
+    # Between this line and the script running, the driver asks the stage for
+    # its inputs, digests them and itemises them, and searches this run and
+    # every sibling run for a replayable receipt. Over a corpus of hundreds of
+    # files that is seconds, it is spent on EVERY stage including the ones that
+    # then replay instantly, and attributing it to nobody is how a pipeline
+    # reports a wall clock its own stages do not add up to. It is recorded
+    # separately (`dispatch_ms`) rather than folded in, because it is the
+    # driver's cost and not the stage's work.
+    _t_stage0="$(go_now_ms)"
 
     # gate check, default-deny
     local gate=""
@@ -1605,11 +1633,13 @@ EOF
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
           --inputs-digest "$digest" --replayed-from "$phash" --replayed-from-run "$prior_run" \
           --subject "$SUBJECT" --run-id "$RUN_ID" --donor-dir "$from_dir" \
+          --elapsed-ms "$(go_since_ms "$_t_stage0")" \
           --artifacts-json "$RUN/.replay-artifacts.json" "${rs_arg[@]}" "${extra[@]}"
         echo "go: $s replayed from run $prior_run (inputs unchanged)"
       else
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
-          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${rs_arg[@]}" "${extra[@]}"
+          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" \
+          --elapsed-ms "$(go_since_ms "$_t_stage0")" "${rs_arg[@]}" "${extra[@]}"
         echo "go: $s replayed (inputs unchanged)"
       fi
       [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
@@ -1617,6 +1647,13 @@ EOF
     fi
 
     node "$LIB/receipt.mjs" stage-begin --run "$RUN" --stage "$s" --inputs-digest "$digest"
+
+    # Everything above was dispatch; everything below is the stage. The phase
+    # script closes the interval in go_receipt (lib/phase-prelude.sh) because
+    # the receipt is written before the driver regains control.
+    export GO_DISPATCH_MS="$(go_since_ms "$_t_stage0")"
+    _t_exec0="$(go_now_ms)"
+    export GO_STAGE_EXEC_T0="$_t_exec0"
 
     set +e
     bash "$script"

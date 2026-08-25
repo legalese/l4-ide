@@ -51,8 +51,20 @@ import { join } from "node:path";
  * carries `milestone` and no `encoding`, and there is no way to recover from
  * `g2` WHICH additional encoding a run was about; readers report it as
  * `legacy:g2` rather than guessing an id.
+ *
+ * 6 (2026-08-25) — `stage_end` says how long the stage TOOK (`elapsed_ms`) and
+ * how long the driver spent getting it there (`dispatch_ms`), and a `session`
+ * record says which agent session each driver invocation ran under. It is a
+ * schema bump on the same terms as 4: it makes a NEW CHECK possible, enforced
+ * in `verify` below — a stage cannot have taken longer than the wall clock
+ * between its own `stage_begin` and `stage_end`, and a row claiming otherwise
+ * was not written by a driver that ran it. A schema-5 row carries no elapsed
+ * and cannot be distinguished from a schema-6 row that failed to record one.
+ *
+ * The cost of a bump, paid once and by design: a run BEGUN under schema 5
+ * cannot be resumed by this binary (see `append` below). Start a new run.
  */
-export const JOURNAL_SCHEMA = 5;
+export const JOURNAL_SCHEMA = 6;
 
 /**
  * Schemas this binary can READ. A journal declares its schema in record 0 and
@@ -71,7 +83,7 @@ export const JOURNAL_SCHEMA = 5;
  * whose record 0 says 2 and whose record 3 says 3 was written by two different
  * binaries into one chain, which is a genuine problem.
  */
-export const KNOWN_SCHEMAS = new Set([2, 3, 4, 5]);
+export const KNOWN_SCHEMAS = new Set([2, 3, 4, 5, 6]);
 
 export const GENESIS =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -262,6 +274,44 @@ export function verify(journalPath) {
             `inputs_digest ${rec.inputs_digest} — the row claims inputs it did not read`,
         );
     }
+    // SCHEMA 6: a stage cannot have taken longer than it was running.
+    //
+    // `elapsed_ms` is measured INSIDE the window the two records bracket — the
+    // driver appends `stage_begin`, runs the script, and the script computes
+    // the figure just before the call that appends `stage_end`. So the true
+    // relation is strict, and a row claiming more time than its own bracket
+    // allows was not written by a driver that ran the stage. Same standing as
+    // the read-set check above: not a finding about the corpus, a statement
+    // that the journal is not what it says it is.
+    //
+    // The tolerance exists for one measured reason. `go_now_ms` prefers bash's
+    // EPOCHREALTIME and falls back to second-resolution `date` where that is
+    // absent (bash 4), and a difference of two second-truncated readings can
+    // exceed the true interval by just under 1000 ms. A tighter bound would
+    // fire on the clock rather than on a defect.
+    //
+    // A REPLAYED row is exempt by construction, not by exception: a replay
+    // writes no `stage_begin`, so there is no bracket, and `begin` is null.
+    if (rec.kind === "stage_end" && typeof rec.elapsed_ms === "number") {
+      let begin = null;
+      for (let j = i - 1; j >= 0; j--) {
+        const r = records[j];
+        if (r.kind === "stage_end" && r.stage === rec.stage) break;
+        if (r.kind === "stage_begin" && r.stage === rec.stage) {
+          begin = r;
+          break;
+        }
+      }
+      if (begin?.ts && rec.ts) {
+        const bracket = Date.parse(rec.ts) - Date.parse(begin.ts);
+        if (Number.isFinite(bracket) && rec.elapsed_ms > bracket + 1000)
+          problems.push(
+            `record ${i} (${rec.stage}): elapsed_ms ${rec.elapsed_ms} exceeds the ` +
+              `${bracket} ms between its own stage_begin and stage_end — the row ` +
+              `claims time the stage did not have`,
+          );
+      }
+    }
     prev = rec.hash;
   });
   return { ok: problems.length === 0, records, problems };
@@ -328,8 +378,8 @@ export function findReplayable(journalPath, stage, inputsDigest) {
  * Stages whose result is NOT determined by their declared inputs, and which
  * therefore may never borrow a receipt from a DIFFERENT run.
  *
- * The inputs digest covers files. It does not cover the world. Two stages here
- * are about the world:
+ * The inputs digest covers files. It does not cover the world. Three stages
+ * here are about the world:
  *
  *   * `p7-mcp` posts to a live jl4-service and reads the tool list back. Same
  *     inputs, different service — or no service at all — and the cached PASS
@@ -341,6 +391,16 @@ export function findReplayable(journalPath, stage, inputsDigest) {
  *     runs is close to a category error — a sweep from six months ago has
  *     unchanged inputs and a stale answer, and SPEC.md §4 P2 requires the report
  *     to state what was SEARCHED, which a borrowed row cannot honestly restate.
+ *   * `p9-cost` measures what THIS run cost, from transcripts written outside
+ *     the tree by a harness the digest cannot see. Borrowing its receipt would
+ *     report another run's hours and tokens as this one's — the single most
+ *     misleading number the pipeline could produce, because it would be
+ *     precise, sourced and about the wrong run. It declares NO inputs today,
+ *     which already makes both kinds of replay unreachable — the driver skips
+ *     the lookup entirely on an empty digest. Naming it here is defence
+ *     against the edit that gives it a digest later: that edit would otherwise
+ *     make it cross-run replayable silently, and the failure would look like a
+ *     correct report of the wrong run's cost.
  *
  * These stages still replay WITHIN a run: resuming an interrupted run must not
  * redo work the same run already did, and inside one run the world has not been
@@ -349,7 +409,7 @@ export function findReplayable(journalPath, stage, inputsDigest) {
  * This is a closed list, not a heuristic: a stage is cacheable across runs
  * unless it is named here, and adding a name is a deliberate act.
  */
-export const CROSS_RUN_INELIGIBLE = new Set(["p7-mcp", "p2-sweep"]);
+export const CROSS_RUN_INELIGIBLE = new Set(["p7-mcp", "p2-sweep", "p9-cost"]);
 
 /**
  * The subject a run is for, read from its `run_begin` record. Returns null for

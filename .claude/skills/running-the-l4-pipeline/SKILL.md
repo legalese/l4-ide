@@ -178,6 +178,22 @@ It is rendered from `journal.ndjson` and nothing else. Sections SPEC.md §P9 req
 
 Run directories accumulate. `etc/go/go.sh gc` prunes them — run dirs only; the object store has its own sweep, see 7a — keeping the most recent few **of each subject** **and** every run holding a granted gate — a signature is expensive to obtain and must never be collected. Per subject matters once more than one exists: retention used to take the newest few across the whole store, so a burst of runs on one subject would have collected every run of another, and cross-run replay reuses receipts from exactly those older runs.
 
+### 7e. What the run cost, and what you have to do about it
+
+**Nothing.** That is the design. `p9-cost` runs before `p9-report`, writes `cost-ledger.json`, and the report renders it under **What this run cost**. You do not deposit a cost record and you are not asked to state a number, because the two sources are better than anything you could report:
+
+- the **driver** measures each stage's wall clock and its own dispatch time, and `go.sh verify` refuses a duration larger than the interval between that stage's own `stage_begin` and `stage_end`;
+- the **harness transcripts** carry every request's token usage and every tool call's start and finish, and the ledger reads them, naming each file with its sha256.
+
+The join is made for you: every `go.sh run` writes a `session` row recording `CLAUDE_CODE_SESSION_ID` from the environment it was invoked in, so a run driven across several sittings — which a human-gated pipeline always is — attributes all of them.
+
+Two things worth knowing when you read the figures:
+
+- **The window opens at the run's first journal record.** Whatever you spent reading the statute before you first invoked the driver is outside it. That is why the report prints a whole-session column beside it: one understates, the other overstates.
+- **`busy_ms_lower_bound` is a floor.** Time you spend reasoning between two tool calls is real work that leaves no interval to measure, and the ledger counts none of it rather than guessing.
+
+If you ran a leg by hand, or from something that sets no session id, the row records `null` and the report says a leg was unattributable — which is the honest reading, and the reason the stage will not print a zero.
+
 ### 7a. The store: what outlives the run
 
 Run directories are volatile — measured, files in `$TMPDIR` last about two to five days — and that used to take the evidence with them. Artifacts and blessings now also go to a durable store, `$L4_GO_STORE` (default `${XDG_STATE_HOME:-~/.local/state}/l4-go/store`).
@@ -355,6 +371,8 @@ What the schema makes non-optional is what the BNA smoke run learned the hard wa
 - **The in-force banner**, in `in_force` — the "up to date with all changes known to be in force on or before ⟨date⟩" line, or a stated reason there is none. The Jersey charities fetch recorded "Showing the law from 16 October 2025 to Current" instead, which is the same field for a different jurisdiction's phrasing.
 - **The annotation inventory.** Amendment and modification markers (the UK's F1–F19 / C1–C5; a jurisdiction's endnote numbers) go in `documents[].annotations[]`, because P2 disposes of them one by one and P5 joins over them. Set `inventory_complete` honestly: `false` obliges you to say why in `inventory_note`, and `true` makes every marker something P2 must dispose of or fail.
 - **Integrity.** Either a `sha256` over the bytes you captured, with `local_path` so the validator can re-hash them, or an `archive_url` pinning an immutable capture. Neither is not an option.
+
+- **What the fetch cost**, in `retrieval_cost` — requests, elapsed milliseconds, bytes — at the bundle level and, where you can attribute it, per document. Optional, because a bundle assembled by hand cannot know it and a fabricated zero is worse than a silence; recorded when you can, because it is the only place the pipeline's _own_ network use is counted. `p9-cost` counts the calls the **model** made, by tool name, and a `curl` inside a shell call is invisible to it. The schema refuses a total smaller than the sum of the documents it totals, and never the other way round: a landing page or a retry costs a request no single document owns. `jl4/examples/legal/sg-succession/source/fetch-sso.py` is the worked instance — it times each request and writes the figures into its own manifest.
 
 Quote hygiene is yours and nothing checks it: every string you later quote in the encoding should be extracted mechanically from this fetch, never reconstructed from memory. Deposit the bundle; run the stage; the receipt is the fact.
 
