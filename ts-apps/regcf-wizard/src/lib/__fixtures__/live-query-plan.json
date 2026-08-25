@@ -1,0 +1,32 @@
+{
+  "verdict": "Undetermined",
+  "determined": null,
+  "ranked": [
+    {
+      "atomId": "a87d9b26-bfef-5b0b-9c22-d77d103f93a9",
+      "inputRefs": [],
+      "label": "`issuer is eligible` OF (`issuer profile from` OF plan)",
+      "unique": 4
+    },
+    {
+      "atomId": "6cfcd833-b7a7-5ef0-949e-01ac8c679de2",
+      "inputRefs": [],
+      "label": "`offering is within the offering limit` OF (`offering from` OF plan)",
+      "unique": 6
+    }
+  ],
+  "stillNeeded": [
+    {
+      "atomId": "a87d9b26-bfef-5b0b-9c22-d77d103f93a9",
+      "inputRefs": [],
+      "label": "`issuer is eligible` OF (`issuer profile from` OF plan)",
+      "unique": 4
+    },
+    {
+      "atomId": "6cfcd833-b7a7-5ef0-949e-01ac8c679de2",
+      "inputRefs": [],
+      "label": "`offering is within the offering limit` OF (`offering from` OF plan)",
+      "unique": 6
+    }
+  ]
+}
