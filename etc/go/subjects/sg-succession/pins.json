@@ -1,0 +1,30 @@
+{
+  "_comment": [
+    "The CLI surface the stage table reads, and nothing else. Same design as the",
+    "regcf sidecar's pins: NOT a hash of `l4 --help`, because an unrelated CLI",
+    "reflow would fire BROKEN on an otherwise fine run and a tripwire that cries",
+    "wolf gets deleted.",
+    "",
+    "Measured 2026-08-18 against the binary built in this worktree, on",
+    "jl4/examples/legal/sg-succession/sg-succession.l4.",
+    "",
+    "`regulative_rules` IS DELIBERATELY EMPTY, and that is a fact about the",
+    "corpus rather than a gap in the measurement. This encoding is entirely",
+    "CONSTITUTIVE: it decides who takes what and when a deadline falls, and it",
+    "states no MUST/MAY/SHANT. `l4 export --to bpmn` accordingly answers 'No",
+    "regulative rules found in module', so the p7-bpmn leg is not declared in",
+    "subject.json. If the corpus later encodes the personal representative's",
+    "duties as regulative rules -- s 28's oath, s 29's security, s 57's order of",
+    "application are the obvious candidates -- this list and that leg both change."
+  ],
+  "measured_on": "2026-08-18",
+  "measured_against": "jl4/examples/legal/sg-succession/sg-succession.l4",
+  "enums": {
+    "export_to": ["dmn", "dmn-md", "bpmn"],
+    "export_flavor": ["camunda", "kie"],
+    "export_fail_on": ["none", "blocking", "lossy", "advisory"],
+    "render_format": ["json", "plan", "text", "html", "akn"]
+  },
+  "regulative_rules": [],
+  "checkers_that_must_exist": ["etc/check-not-precedence.mjs"]
+}

@@ -291,7 +291,7 @@ sidecar owns every fact about one body of law.** The driver, libraries and phase
 no subject literals; everything subject-specific lives in `etc/go/subjects/<id>/`, four files:
 
 - **`subject.json`** — the machine-readable descriptor: id, display name, legal citation, source
-  entry URL, corpus module paths (`corpus.main`, optional `corpus.wizard`), per-subject check
+  entry URL, corpus module paths (`encoding.main`, optional `encoding.wizard`), per-subject check
   floors (`checks.min_dated_arms`, `checks.min_assertions` — these are _measurements_ of the
   corpus, which is why they cannot be pipeline constants), a `legs` object carrying one entry
   per projection leg with its committed golden/cases/aux paths, and an optional `denovo` object
@@ -320,7 +320,7 @@ sidecars and the recipe for adding one. Both refusals are selftest-covered.
 
 **The `legs` object is the leg declaration.** `go.sh` declares `p0-preflight`, `p3-check`,
 `p6-tests` and `p9-report` for every subject, and a p7 stage iff `legs` has its entry; the
-wizard-dependent halves of p0/p3/p6/p7-mcp engage iff `corpus.wizard` is present. This is what
+wizard-dependent halves of p0/p3/p6/p7-mcp engage iff `encoding.wizard` is present. This is what
 keeps the §3.2 milestone rule honest across subjects: a future subject with no wizard and no
 regulative rules (so no bpmn/lts legs and no NLG goldens) omits those entries, and `COMPLETE`
 still means every stage _that subject declares_ is accounted for — not that its sidecar faked
@@ -388,14 +388,36 @@ keeps the original verdict, names the earlier receipt in `replayed_from`, and co
 records **verbatim** — re-hashing would launder a file that changed after the original receipt was
 written.
 
+**Replay crosses run boundaries as of 2026-08-20.** The lookup was one run wide
+(`findReplayable` read `$RUN/journal.ndjson`), so a fresh run id redid everything even where
+nothing had moved. A stage now also borrows a receipt from an earlier run of the **same subject**
+when the inputs digest is byte-identical — which is what makes "edit one exporter, re-run, and only
+that leg re-executes" true across sessions rather than only within one run. The digest already
+folds in each stage's own script, the checkers it calls, and the `l4` binary's sha256, so a
+rebuilt toolchain still invalidates everything downstream.
+
+Two qualifications, both load-bearing:
+
+- **`lib/ledger.mjs`'s `CROSS_RUN_INELIGIBLE` is a closed list**, currently `p7-mcp` and
+  `p2-sweep`. The digest covers files, not the world: `p7-mcp` posts to a live jl4-service and
+  reads the tool list back, and `p2-sweep` exists _because_ time has passed. Both still replay
+  **within** a run, so resuming an interrupted run is unaffected.
+- **A cross-run replay COPIES the borrowed artifacts into the current run.** `--artifacts-from`
+  resolves its hash inside the current journal and structurally cannot name another run's receipt;
+  referencing another run's files would be worse, since `gc` prunes run directories and
+  `go.sh verify` re-hashes what a receipt names. The receipt records `replayed_from_run` and the
+  report names the source run instead of claiming the evidence is "on this journal".
+
 Three properties, all mechanically checked by `etc/go/selftest.mjs --with-driver`:
 
-- a run **re-entered with `--run-id`** re-executes nothing but the report. (Qualified
+- a run **re-entered with `--run-id`** re-executes nothing but the report. (Qualified twice.
   2026-08-09: a _bare_ second `go.sh run` is not that run — the driver increments the sequence
-  suffix while a directory with the id exists, so it allocates a fresh run dir, never sees the
-  prior journal, and re-executes every stage; measured, 11/11 stages fresh with `replayed_from`
-  null. Resuming is the documented route; back-to-back bare runs are independent runs by
-  design, and this bullet used to read as if the bare route replayed too);
+  suffix while a directory with the id exists, so it allocates a fresh run dir and never sees the
+  prior journal. **2026-08-20: that second half is no longer true.** A bare second run now finds
+  the prior run through the cross-run lookup above and replays every eligible stage; the measured
+  "11/11 stages fresh with `replayed_from` null" described the pre-2026-08-20 driver and would be
+  false if run today. Resuming with `--run-id` remains the route that reuses the same run
+  _directory_; a bare run is still a distinct run, it is simply no longer a redo);
 - the milestone verdict is unchanged by replay;
 - replayed receipts keep their original verdict.
 
@@ -717,6 +739,37 @@ And the driver used to satisfy a gate by grepping the journal for any granting r
 the gate for the life of the run directory: `gate-verify.sh` was never called again on a resume,
 so the signed route's own content binding stopped applying too. The gate is now open only while a
 granting row records the digest of the corpus the run is actually using.
+
+A third hole was closed on 2026-08-18. "The sha256 of every corpus file" was rendered from
+`p0-preflight`'s `corpus_sha_*` metrics, and that stage recorded exactly two — the entry module
+and the wizard — which was the whole set only while an encoding was one module plus a wizard.
+Under `encoding.modules` an encoding is N modules, and modules 3..N appeared in **no** payload in
+**any** run state: the reviewer was never shown them, and no honest re-run could produce a
+document that committed to them. `p0-preflight` now records one metric per module
+(`etc/go/lib/corpus-metrics.mjs`), keyed by repo-relative path rather than basename because
+metrics are last-wins and two modules sharing a basename would otherwise collapse to one line;
+and it declares every module as an input, so an edit to any of them re-executes the stage instead
+of replaying it.
+
+_(That clause read, until 2026-08-20: "a replayed receipt contributes no row, so the payload would
+otherwise keep describing the pre-edit corpus." The second half is no longer true — the corpus
+section now reads the last `p0-preflight` row whether it executed or replayed — and the safety
+argument no longer rests on it. It rests on the first half: every module is a declared input, so a
+replay can only occur over a corpus that has not moved, and a replayed row therefore restates the
+CURRENT corpus faithfully. Excluding replays turned out to be the more dangerous of the two, because
+it made a cross-run-replayed `p0-preflight` render a payload naming no corpus file at all — measured
+on run `2026-08-19-951d08d8-004`, whose own `p0` row carried all seven module hashes. The document
+a human signs may not be silent about what it blesses, so `gate-payload.mjs` now refuses to render
+rather than degrade to a parenthetical.)_
+
+**One residual, named rather than implied.** The payload's corpus section changes when
+`p0-preflight` re-executes, which an ordinary run does. A run resumed with `--only <a gated
+stage>` never reaches `p0-preflight` at all, so an edit made after the gate was granted moves the
+corpus digest — the grant correctly goes `stale` — but leaves the payload byte-identical, and the
+existing signature re-satisfies the gate over the new digest. This is older than `encoding.modules`
+and behaves the same way for a single-module subject. Closing it means the gate check refusing a
+`stale` grant whose payload cannot have seen the change, rather than handing it to
+`gate-verify.sh`; until that is built, `--only` past a granted gate is a route to be aware of.
 
 HG2 uses namespace `l4-go-gate-hg2`, so an HG1 signature cannot be replayed as an HG2 one.
 

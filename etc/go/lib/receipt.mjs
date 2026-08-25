@@ -12,7 +12,8 @@
 //        [--reason TEXT] [--blocker TEXT] [--note TEXT] \
 //        [--oracle-cmd CMD --oracle-exit N --oracle-class CLASS] \
 //        [--oracle-because TEXT] [--artifact PATH]... [--inputs-digest D] \
-//        [--replayed-from HASH] [--metric key=value]...
+//        [--replayed-from HASH] [--replayed-from-run RUNID]
+//        [--metric key=value]...
 //   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --milestone M --subject S ...
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
 //   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
@@ -22,9 +23,22 @@
 // Exit codes: 0 written · 2 usage · 4 the receipt violates the lattice rules
 // (a defect in the calling phase script, never a finding about the corpus).
 
-import { existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { append, read, sha256File } from "./ledger.mjs";
+import {
+  checkClaim,
+  materialise,
+  put,
+  storeRoot,
+  writeBlessing,
+} from "./store.mjs";
 import { checkReceipt, EXIT } from "./verdict.mjs";
 
 function parseArgs(argv) {
@@ -49,10 +63,49 @@ function parseArgs(argv) {
   return out;
 }
 
-function artifactRecord(p) {
+/**
+ * `rel` — the artifact's identity WITHIN a run, subdirectories included.
+ *
+ * The cross-run copy path used to flatten every artifact to its basename, so
+ * two artifacts from different subdirectories overwrote each other and the
+ * receipt named one file twice. Latent only because `p7-lts` has never got past
+ * NOT-BUILT and `p8-diff` has never run — both write into subdirectories, so
+ * the first successful `p7-lts` makes it live.
+ *
+ * An artifact that is NOT under the run directory is an in-tree file the stage
+ * points at rather than produced (p7-ladder's committed figures). Those get
+ * `tree:<repo-relative>`, so nothing tries to copy them into a run and nothing
+ * records another run's absolute path as this run's artifact.
+ */
+function relFor(p, runDir, repoRoot) {
+  const abs = resolve(p);
+  if (runDir) {
+    const out = resolve(runDir, "artifacts");
+    const r = relative(out, abs);
+    if (r && !r.startsWith("..")) return r;
+  }
+  if (repoRoot) {
+    const r = relative(repoRoot, abs);
+    if (r && !r.startsWith("..")) return `tree:${r}`;
+  }
+  return abs.slice(abs.lastIndexOf("/") + 1);
+}
+
+function artifactRecord(p, ctx = {}) {
   const abs = resolve(p);
   if (!existsSync(abs)) return { path: p, absent: true };
-  return { path: p, bytes: statSync(abs).size, sha256: sha256File(abs) };
+  const sha = sha256File(abs);
+  const bytes = statSync(abs).size;
+  const rel = relFor(p, ctx.runDir, ctx.repoRoot);
+  // `cas` is a PLACE the original bytes can still be fetched; `sha256` is the
+  // CLAIM this receipt made about them. Two fields because they answer
+  // different questions, and because that is what upgrades `verify`'s CHANGED
+  // from an accusation into a diff. null when the store was unavailable —
+  // put() never throws, so a broken home directory cannot fail a good run.
+  const cas = ctx.store
+    ? put(ctx.store, abs, sha, { ...ctx.meta, rel, bytes })
+    : null;
+  return { path: p, bytes, sha256: sha, rel, cas };
 }
 
 function metricsFrom(list) {
@@ -112,6 +165,23 @@ switch (kind) {
     // that changed after the original receipt was written; copying keeps the
     // original sha256 so `go.sh verify` still compares it against what is on
     // disk now and reports CHANGED.
+    const runDir = args.run ? resolve(args.run) : null;
+    const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
+    let store = null;
+    try {
+      store = storeRoot();
+    } catch {
+      store = null;
+    }
+    const meta = {
+      subject: args.subject ?? process.env.GO_SUBJECT ?? null,
+      stage: args.stage ?? null,
+      run_id: args.run_id ?? process.env.GO_RUNID ?? null,
+      inputs_digest: args.inputs_digest ?? null,
+      produced_under: null,
+    };
+    const ctx = { runDir, repoRoot, store, meta };
+
     let artifacts;
     if (args.artifacts_from) {
       const prior = read(journal).find((r) => r.hash === args.artifacts_from);
@@ -122,8 +192,102 @@ switch (kind) {
         process.exit(EXIT.BROKEN);
       }
       artifacts = prior.artifacts ?? [];
+    } else if (args.artifacts_json) {
+      // THE CROSS-RUN PATH. The donor's records arrive as data; the bytes are
+      // fetched from the store by `cas` and only fall back to whatever the
+      // donor left on disk. The recorded sha256 is the DONOR'S, verbatim, never
+      // re-derived from the copy — which is the rule stated a few lines above
+      // and the one the old `cp` + `--artifact` route broke, because
+      // `--artifact` re-hashes.
+      const donors = JSON.parse(readFileSync(args.artifacts_json, "utf8"));
+      artifacts = [];
+      for (let d of donors) {
+        if (d.absent) {
+          artifacts.push({ ...d });
+          continue;
+        }
+        const isTree = typeof d.rel === "string" && d.rel.startsWith("tree:");
+        const dest = isTree
+          ? resolve(repoRoot, d.rel.slice(5))
+          : resolve(
+              runDir,
+              "artifacts",
+              d.rel ?? String(d.path).split("/").pop(),
+            );
+        if (!isTree) {
+          // Three sources, in order of how much they can be trusted:
+          //
+          //   1. the store, by `cas` — the original bytes, immutable (0444);
+          //   2. a copy already at `dest` — a resumed run in its own directory;
+          //   3. the DONOR'S directory — the pre-store path.
+          //
+          // (3) is not legacy cruft to be removed later. The store starts empty,
+          // and every journal written before it existed carries neither `rel`
+          // nor `cas`, so for as long as those runs are the ones worth borrowing
+          // from — which is the first weeks after this lands — (3) is the only
+          // source there is. Dropping it would turn every cross-run replay into
+          // exit 4 on the day the store shipped, which would read as the store
+          // having broken replay rather than having been introduced.
+          let got = d.cas && store ? materialise(store, d.cas, dest) : false;
+          if (!got && !existsSync(dest) && args.donor_dir) {
+            const donorCopy = resolve(
+              args.donor_dir,
+              "artifacts",
+              d.rel && !d.rel.startsWith("tree:")
+                ? d.rel
+                : String(d.path).split("/").pop(),
+            );
+            if (existsSync(donorCopy)) {
+              mkdirSync(dirname(dest), { recursive: true });
+              copyFileSync(donorCopy, dest);
+              got = true;
+            }
+          }
+          if (!got && !existsSync(dest)) {
+            process.stderr.write(
+              `receipt.mjs: cannot materialise '${d.rel ?? d.path}' for this replay.\n` +
+                `  store cas: ${d.cas ?? "(none recorded — a pre-store donor)"}\n` +
+                `  donor dir: ${args.donor_dir ?? "(not given)"}\n` +
+                `  A borrowed receipt whose artifacts cannot be produced is not evidence; run the stage.\n`,
+            );
+            process.exit(EXIT.BROKEN);
+          }
+          // Bytes that arrived from a pre-store donor are admitted NOW, so the
+          // next borrow can come from the store rather than from a directory
+          // $TMPDIR reaps in two to five days.
+          if (!d.cas && store && existsSync(dest)) {
+            const admitted = put(store, dest, sha256File(dest), {
+              ...meta,
+              rel: d.rel ?? null,
+              bytes: d.bytes ?? null,
+            });
+            if (admitted) d = { ...d, cas: admitted };
+          }
+        }
+        // The post-materialisation assertion. If what landed is not what the
+        // donor recorded, the borrow is refused rather than repaired: recording
+        // the new hash as though it were the measured one is exactly the
+        // laundering the comment above forbids.
+        if (existsSync(dest)) {
+          const actual = sha256File(dest);
+          if (d.sha256 && actual !== d.sha256) {
+            process.stderr.write(
+              `receipt.mjs: '${d.rel}' does not match the donor receipt after materialising.\n` +
+                `  receipt: ${d.sha256}\n  on disk: ${actual}\n`,
+            );
+            process.exit(EXIT.BROKEN);
+          }
+        }
+        artifacts.push({
+          path: dest,
+          bytes: d.bytes ?? null,
+          sha256: d.sha256 ?? null,
+          rel: d.rel ?? null,
+          cas: d.cas ?? null,
+        });
+      }
     } else {
-      artifacts = args.artifact.map(artifactRecord);
+      artifacts = args.artifact.map((p) => artifactRecord(p, ctx));
     }
 
     const receipt = {
@@ -150,10 +314,74 @@ switch (kind) {
       inputs_digest: args.inputs_digest || null,
       attempt: Number(args.attempt ?? 1),
       replayed_from: args.replayed_from ?? null,
+      // The RUN the borrowed receipt came from. null means the same run — the
+      // ordinary resume case, where the evidence is a few lines up in this very
+      // journal. A value means the evidence was earned in ANOTHER run over a
+      // byte-identical inputs digest, and the report must say so rather than
+      // claim it is "on this journal": a reader who wants to check it has to be
+      // told where to look.
+      replayed_from_run: args.replayed_from_run ?? null,
       label: args.label ?? null,
     };
 
-    const violations = checkReceipt(receipt);
+    // WHICH GATE GATES THIS STAGE, and what blessing is open for it — both
+    // DERIVED, neither accepted from the caller.
+    //
+    // receipt.mjs is the only writer of a status precisely so that no caller can
+    // assert one it did not earn. A `--blessing` flag would re-open exactly that
+    // asymmetry for any phase script, debug flag or future agent. run_begin's
+    // `gated_stages` is already the field verify-run.mjs trusts instead of the
+    // driver, and the granting gate row is in the same hash-chained journal, so
+    // the derivation needs no new channel and a second party can recompute it.
+    const rows = read(journal);
+    const begin = rows.find((x) => x.kind === "run_begin");
+    let gatedBy = null;
+    try {
+      const gs =
+        typeof begin?.gated_stages === "string"
+          ? JSON.parse(begin.gated_stages)
+          : (begin?.gated_stages ?? {});
+      for (const [g, list] of Object.entries(gs))
+        if (Array.isArray(list) && list.includes(args.stage)) gatedBy = g;
+    } catch {
+      gatedBy = null;
+    }
+    if (gatedBy) {
+      const granting = rows
+        .filter(
+          (x) =>
+            x.kind === "gate" &&
+            x.gate === gatedBy &&
+            (x.state === "satisfied" || x.state === "waived"),
+        )
+        .at(-1);
+      receipt.produced_under = granting
+        ? {
+            blessing: granting.blessing ?? null,
+            gate: gatedBy,
+            state: granting.state,
+            corpus_digest: granting.corpus_digest ?? null,
+            reason: granting.reason ?? null,
+          }
+        : null;
+    } else {
+      receipt.produced_under = null;
+    }
+    // The artifacts were admitted before `produced_under` was known, so the
+    // index records carry a null. Re-admit them under the blessing: put() is
+    // idempotent on the bytes and appends a fresh index record, which is
+    // exactly the per-admission provenance the store is for.
+    if (receipt.produced_under && ctx.store)
+      for (const a of receipt.artifacts ?? [])
+        if (a.sha256 && a.path && existsSync(a.path))
+          put(ctx.store, a.path, a.sha256, {
+            ...meta,
+            rel: a.rel ?? null,
+            bytes: a.bytes ?? null,
+            produced_under: receipt.produced_under,
+          });
+
+    const violations = checkReceipt(receipt, { gated: gatedBy });
     if (violations.length) {
       process.stderr.write(
         `receipt.mjs: REFUSED the receipt for stage '${args.stage}' —\n`,
@@ -180,8 +408,93 @@ switch (kind) {
   }
 
   case "gate": {
+    // THE BLESSING GOES TO THE LEDGER FIRST, THEN THE JOURNAL.
+    //
+    // Ordering is fail-closed on purpose. A crash between the two leaves an
+    // orphan record in the ledger and NO gate row in the journal, so the gate
+    // stays shut and the run refuses. The reverse order would leave a gate row
+    // citing a blessing that does not exist — a run that believes it is blessed
+    // by nothing.
+    //
+    // Why the ledger at all, when the journal already has a gate row: the
+    // journal lives in $TMPDIR. Measured 2026-08-20 — 76 of 92 run directories
+    // are already empty shells and files last two to five days. A signature
+    // recorded only there expires in under a week, silently. The ledger is the
+    // one thing in this system that is never swept.
+    let blessingId = null;
+    if (
+      args.state === "satisfied" ||
+      args.state === "waived" ||
+      args.state === "refused"
+    ) {
+      let store = null;
+      try {
+        store = storeRoot();
+      } catch {
+        store = null;
+      }
+      const covers = args.covers_from
+        ? JSON.parse(readFileSync(args.covers_from, "utf8"))
+        : [];
+      const sigPath = args.signature_file;
+      const signature =
+        sigPath && existsSync(sigPath)
+          ? readFileSync(sigPath).toString("base64")
+          : null;
+      const rec = {
+        kind: "blessing",
+        subject: args.subject ?? process.env.GO_SUBJECT ?? null,
+        gate: args.gate,
+        state: args.state,
+        corpus_digest: args.corpus_digest ?? null,
+        covers,
+        namespace: args.namespace ?? null,
+        payload_digest: args.payload_digest ?? null,
+        signer: args.signer ?? null,
+        // EMBEDDED, not a path. signature_file points into $RUN, which gc
+        // deletes; a signature that does not survive its run directory is not
+        // a first-class edge.
+        signature,
+        reason: args.reason ?? null,
+        granted_in_run: args.run_id ?? process.env.GO_RUNID ?? null,
+        ts: new Date().toISOString(),
+      };
+      const claim = checkClaim(rec);
+      if (!claim.ok) {
+        process.stderr.write(
+          `receipt.mjs: REFUSED the ${args.gate} blessing —\n` +
+            claim.problems.map((p) => `  - ${p}\n`).join("") +
+            `A blessing record is permanent: nothing sweeps the ledger. Exit 4 (BROKEN).\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      if (store) {
+        // The reviewed BYTES are admitted, so "show me what was blessed" is a
+        // fetch and not a name — independent of git history and of the file
+        // still being at that path.
+        for (const m of covers)
+          if (m.sha256 && m.path && existsSync(m.path))
+            put(store, m.path, m.sha256, {
+              subject: rec.subject,
+              stage: "covers",
+              rel: `tree:${m.path}`,
+              bytes: m.bytes ?? null,
+            });
+        try {
+          blessingId = writeBlessing(store, rec).hash;
+        } catch (e) {
+          process.stderr.write(
+            `receipt.mjs: could not write the blessing: ${e.message}\n`,
+          );
+          process.exit(EXIT.BROKEN);
+        }
+      }
+    }
     append(journal, {
       kind: "gate",
+      // The ledger record this row corresponds to. null when the store was
+      // unavailable — the gate still works, it just is not durable.
+      blessing: blessingId,
       gate: args.gate,
       state: args.state, // satisfied | waived | refused
       namespace: args.namespace ?? null,

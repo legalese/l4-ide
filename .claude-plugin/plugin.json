@@ -1,6 +1,6 @@
 {
   "name": "l4-computational-law",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "L4 programming language for computational law - encode contracts, regulations, and policies as executable, testable, verifiable programs",
   "author": {
     "name": "Legalese",
@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/legalese/l4-ide",
   "repository": "https://github.com/legalese/l4-ide",
-  "license": "Apache 2.0",
+  "license": "Apache-2.0",
   "keywords": [
     "legal",
     "law",
@@ -19,7 +19,5 @@
     "formal-methods",
     "verification",
     "functional-programming"
-  ],
-  "skills": "./.claude/skills/",
-  "lspServers": "./.lsp.json"
+  ]
 }

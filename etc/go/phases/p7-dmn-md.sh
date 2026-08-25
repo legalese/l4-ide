@@ -9,7 +9,7 @@
 # is real; the artifact's usefulness is not what it measures.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" \
     "$GO_S_DMNMD_GOLDEN" \
     "$GO_S_DMNMD_FIDELITY_GOLDEN" \
     "$GO_ROOT/etc/go/lib/canon-diff.mjs"
@@ -26,7 +26,7 @@ OUT="$GO_OUT/$(basename "$GOLDEN")"
 DIFFLOG="$GO_OUT/p7-dmn-md.canon-diff.txt"
 
 set +e
-"$L4" export "$GO_S_CORPUS" --to dmn-md -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn-md.fidelity.stderr"
+"$L4" export "$GO_S_ENCODING" --to dmn-md -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn-md.fidelity.stderr"
 RC=$?
 set -e
 [[ $RC -eq 0 ]] || go_broken "l4 export --to dmn-md exited $RC on a module that typechecks"
@@ -39,7 +39,7 @@ FID="$STEM.md.fidelity.txt"
 [[ -f "$FID" ]] || FID="$STEM.dmn.fidelity.txt"
 
 set +e
-L4_GO_SOURCE_BASENAME="$(basename "$GO_S_CORPUS")" node "$GO_LIB/canon-diff.mjs" "$OUT" "$GOLDEN" --report "$DIFFLOG"
+L4_GO_SOURCE_BASENAME="$(basename "$GO_S_ENCODING")" node "$GO_LIB/canon-diff.mjs" "$OUT" "$GOLDEN" --report "$DIFFLOG"
 DIFF_RC=$?
 set -e
 

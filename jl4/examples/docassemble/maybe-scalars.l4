@@ -1,0 +1,157 @@
+IMPORT prelude
+IMPORT daydate
+
+-- M4 (spec §10, R8 §8.8): `MAYBE NUMBER` and `MAYBE DATE` via PAIRED
+-- IS-KNOWN QUESTIONS — and `WHEN JUST <value>`, the payload-VALUE match.
+--
+-- This file is `not-ok/maybe-number.l4` and `not-ok/just-payload-pattern.l4`
+-- flipped. Both were refused by name at M1 for the same reason, and M4 owes
+-- both an answer.
+--
+-- WHAT R8 WAS AFRAID OF. A docassemble number field that the user leaves
+-- blank does not submit as None: it submits as `0.0` (webapp
+-- interview/views.py:1413-1414), an empty integer as `'0'` (:1397-1398) and
+-- an empty date as `''` (:1374). Erase `MAYBE NUMBER` to `NUMBER` and
+-- "I did not declare any income" becomes indistinguishable from "I declared
+-- income of nothing" — two different legal positions with two different
+-- consequences, collapsed into one number by a form widget.
+--
+-- THE DESIGN. One L4 field becomes TWO docassemble questions: a boolean
+-- is-known flag, and the value itself carrying
+-- `show if: {code: <known flag>}`. The `{code: …}` spelling is load-bearing
+-- and not decorative: it is the only server-side one (parse.py:6316-6325), so
+-- on the absence path the value variable is left genuinely UNDEFINED. Probed
+-- end to end against 1.10.7; probed also is the failure mode WITHOUT the
+-- guard, where a second consumer reading the value on the absence path makes
+-- docassemble ASK the value question anyway and a blank submission arrives as
+-- 0.0 — a fabricated answer, silently.
+--
+-- THE CASES BELOW ARE PAIRED ON PURPOSE. Read #EVAL 2 against #EVAL 3 (a
+-- declared income of ZERO against no declaration at all), #EVAL 4 against
+-- #EVAL 5 (a stale work history against never having worked), and #EVAL 6
+-- against #EVAL 7 (a disclaimed declaration against an unanswered one). In
+-- each pair one side is a real value and the other is absence, and the two
+-- sides disagree about the outcome. Any lowering that conflates them fails
+-- one of the pair.
+
+DECLARE Claim
+    HAS
+      @desc Income the claimant declared for the assessment period, if any was declared at all
+      `declared income` IS A MAYBE NUMBER
+      @desc The date the claimant last worked, if they have ever worked
+      `date last worked` IS A MAYBE DATE
+      @desc The first day of the qualifying period
+      `the qualifying date` IS A DATE
+      @desc Whether the claimant confirmed the declaration, if they answered at all
+      `declaration confirmed` IS A MAYBE BOOLEAN
+
+@export Whether the claim must be referred for manual assessment
+GIVEN c IS A Claim @desc The claim under assessment
+GIVETH A BOOLEAN
+DECIDE `the claim must be referred` c IF
+       `the declared income is above the threshold`
+    OR `no income was declared at all`
+    OR `the work history is stale`
+    OR `the declaration was positively disclaimed`
+ WHERE
+    -- MAYBE NUMBER, present branch.
+    `the declared income is above the threshold` MEANS
+        CONSIDER c's `declared income`
+        WHEN JUST n  THEN n GREATER THAN 1000
+        WHEN NOTHING THEN FALSE
+
+    -- MAYBE NUMBER, absent branch: absence is itself a referral ground, and
+    -- a declared income of zero is NOT.
+    `no income was declared at all` MEANS
+        CONSIDER c's `declared income`
+        WHEN JUST n  THEN FALSE
+        WHEN NOTHING THEN TRUE
+
+    -- MAYBE DATE. Absence is not staleness: someone who has never worked has
+    -- no stale work history. If the absent path arrived as `''`, this
+    -- comparison would raise TypeError against a DADateTime — loudly, but it
+    -- would still be wrong.
+    `the work history is stale` MEANS
+        CONSIDER c's `date last worked`
+        WHEN JUST d  THEN d LESS THAN (c's `the qualifying date`)
+        WHEN NOTHING THEN FALSE
+
+    -- `WHEN JUST FALSE` — a match on the payload VALUE, not a binder. The
+    -- three states are distinct here and the rule uses all three: a
+    -- positively disclaimed declaration is a referral ground, an unanswered
+    -- one is not. M1's presence-erasure lowering could not express this and
+    -- refused it by name; before that repair it compiled to `is None` and
+    -- reported TRUE for the unanswered case.
+    `the declaration was positively disclaimed` MEANS
+        CONSIDER c's `declaration confirmed`
+        WHEN JUST FALSE THEN TRUE
+        OTHERWISE FALSE
+
+-- 1. Income declared above the threshold. The first disjunct decides;
+--    everything after it is short-circuited away.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS JUST 2500
+            `date last worked`      IS JUST (YMD 2024 6 1)
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS JUST TRUE
+-- TRUE
+
+-- 2. A REAL ZERO. Income was declared, and it was nothing. Not referable.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS JUST 0
+            `date last worked`      IS JUST (YMD 2024 6 1)
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS JUST TRUE
+-- FALSE
+
+-- 3. ABSENCE. No income was declared at all. Referable. Read against #EVAL 2:
+--    a lowering that lets a blank number field arrive as 0.0 answers this
+--    FALSE, and a lowering that erases the MAYBE answers #EVAL 2 TRUE.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS NOTHING
+            `date last worked`      IS JUST (YMD 2024 6 1)
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS JUST TRUE
+-- TRUE
+
+-- 4. A stale work history: last worked before the qualifying period opened.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS JUST 500
+            `date last worked`      IS JUST (YMD 2019 3 4)
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS JUST TRUE
+-- TRUE
+
+-- 5. ABSENT DATE: never worked. Not stale, therefore not referable on that
+--    ground. The `the qualifying date` question decides nothing here.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS JUST 500
+            `date last worked`      IS NOTHING
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS JUST TRUE
+-- FALSE
+
+-- 6. The declaration was positively disclaimed: `WHEN JUST FALSE`.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS JUST 500
+            `date last worked`      IS JUST (YMD 2024 6 1)
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS JUST FALSE
+-- TRUE
+
+-- 7. The declaration was never answered. Read against #EVAL 6: `NOTHING` is
+--    not `JUST FALSE`, and the pre-repair `is None` lowering answered this
+--    TRUE.
+#EVAL `the claim must be referred` OF
+        Claim WITH
+            `declared income`       IS JUST 500
+            `date last worked`      IS JUST (YMD 2024 6 1)
+            `the qualifying date`   IS YMD 2024 1 1
+            `declaration confirmed` IS NOTHING
+-- FALSE

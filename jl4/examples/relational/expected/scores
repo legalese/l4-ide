@@ -1,0 +1,80 @@
+relational program — scores.l4
+
+records:
+  Student  % scores.l4:33:1-34:31
+    scores : LIST OF NUMBER
+  Item  % scores.l4:36:1-37:22
+    price : NUMBER
+  Basket  % scores.l4:39:1-40:28
+    items : LIST OF Item
+
+predicates:
+  input scores/1 : LIST OF NUMBER  % <no source range>
+    params: Student
+    (no clauses)
+  input price/1 : NUMBER  % <no source range>
+    params: Item
+    (no clauses)
+  input items/1 : LIST OF Item  % <no source range>
+    params: Basket
+    (no clauses)
+  computed exported total score/1 : NUMBER  % scores.l4:43:1-45:39
+    params: Student
+    total score(S_0, Sum_2) :- proj(S_0, scores, Scores_1), Sum_2 is sum(Scores_1).  % scores.l4:45:23-39
+  computed exported best score/1 : NUMBER  % scores.l4:48:1-50:42
+    params: Student
+    best score(S_3, Maximum_5) :- proj(S_3, scores, Scores_4), Maximum_5 is maximum(Scores_4).  % scores.l4:50:22-42
+  computed exported average score/1 : NUMBER  % scores.l4:53:1-55:71
+    params: Student
+    average score(S_6, Average_8) :- proj(S_6, scores, Scores_7), Average_8 is average(Scores_7).  % scores.l4:55:25-71
+  computed exported passes/1 : (goal)  % scores.l4:58:1-60:49
+    params: Student
+    passes(S_9) :- average score(S_9, Averagescore_10), Averagescore_10 >= 50.  % scores.l4:60:20-49
+  computed exported basket total/1 : NUMBER  % scores.l4:63:1-65:71
+    params: Basket
+    basket total(B_11, Sum_22) :- proj(B_11, items, Items_12), findall(Price_14, (member(I_13, Items_12), proj(I_13, price, Price_14)), L_21), Sum_22 is sum(L_21).  % scores.l4:65:24-71
+  auxiliary member/2 : (goal)  % <no source range>
+    params: OPAQUE<polymorphic element>, LIST OF OPAQUE<polymorphic element>
+    recursion: structural on argument 1
+    desc: list membership, synthesised as the generator a findall needs
+    member(X_16, [X_16 | Rest_17]).  % <no source range>
+    member(X_18, [Head_19 | Rest_20]) :- member(X_18, Rest_20).  % <no source range>
+
+queries:
+  EVAL q1: total score(S0_23) -> Totalscore_24 => (expectation from the L4 evaluator)  % scores.l4:67:1-61
+    facts: scores(S0_23, [80, 90, 70])
+  EVAL q2: best score(S0_25) -> Bestscore_26 => (expectation from the L4 evaluator)  % scores.l4:70:1-60
+    facts: scores(S0_25, [80, 90, 70])
+  EVAL q3: average score(S0_27) -> Averagescore_28 => (expectation from the L4 evaluator)  % scores.l4:73:1-63
+    facts: scores(S0_27, [80, 90, 70])
+  EVAL q4: passes(S0_29) => (expectation from the L4 evaluator)  % scores.l4:76:1-56
+    facts: scores(S0_29, [80, 90, 70])
+  EVAL q5: basket total(B0_30) -> Baskettotal_33 => (expectation from the L4 evaluator)  % scores.l4:79:1-98
+    facts: price(I0_31, 10), price(I0_32, 25), items(B0_30, [I0_31, I0_32])
+
+dependencies:
+  total score -> scores (+)
+  best score -> scores (+)
+  average score -> scores (+)
+  passes -> average score (+)
+  basket total -> items (+)
+  basket total -> member (+)
+  basket total -> price (+)
+  member -> member (+)
+
+stratification:
+  stratified
+    0  average score
+    0  basket total
+    0  best score
+    0  items
+    0  member
+    0  passes
+    0  price
+    0  scores
+    0  total score
+
+fidelity report — relational
+  [R-SORT] advisory — member
+      the synthesised list-membership generator is polymorphic; its element sort is carried as opaque
+      lost: nothing of the source; the sort is recoverable from the call site's list

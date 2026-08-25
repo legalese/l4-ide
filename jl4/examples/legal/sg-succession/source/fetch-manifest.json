@@ -1,0 +1,68 @@
+{
+  "retrieved_from": "sso.agc.gov.sg",
+  "note": "PDF is authoritative; HTML landing page is TOC-only for long Acts",
+  "documents": [
+    {
+      "act_id": "ISA1967",
+      "short_title": "Intestate Succession Act 1967",
+      "url": "https://sso.agc.gov.sg/Act/ISA1967",
+      "pdf_url": "https://sso.agc.gov.sg/Act/ISA1967?ViewType=Pdf",
+      "retrieval_method": "direct",
+      "sha256": "f488fe5e3742d1d2f5fe7f17e67eafe7cb61a997df018367c6383665edad6c79",
+      "bytes": 273551,
+      "text_sha256": "497bf9dbade02e5a83d7d47058b872045ba3c5f8ac36164ef848d732d5ba23e4",
+      "in_force": "Current version as at 18 Aug 2026",
+      "historical_versions": [
+        "19870330",
+        "20131231"
+      ]
+    },
+    {
+      "act_id": "WA1838",
+      "short_title": "Wills Act 1838",
+      "url": "https://sso.agc.gov.sg/Act/WA1838",
+      "pdf_url": "https://sso.agc.gov.sg/Act/WA1838?ViewType=Pdf",
+      "retrieval_method": "direct",
+      "sha256": "06854af11c92d57811ba129fab8826602fa60c3ea3c195c9f269a7d2b8025e1b",
+      "bytes": 138101,
+      "text_sha256": "a4a511edf5e0ad14e032448feceffabf8fb2063bbf07da75ded0e8f2aee6d791",
+      "in_force": "Current version as at 18 Aug 2026",
+      "historical_versions": [
+        "19870330",
+        "19920626",
+        "19961227",
+        "19971001",
+        "20161201",
+        "20210102",
+        "20211231"
+      ]
+    },
+    {
+      "act_id": "PAA1934",
+      "short_title": "Probate and Administration Act 1934",
+      "url": "https://sso.agc.gov.sg/Act/PAA1934",
+      "pdf_url": "https://sso.agc.gov.sg/Act/PAA1934?ViewType=Pdf",
+      "retrieval_method": "direct",
+      "sha256": "885046361e9746d753e76c0d2b0753dd47026eddff08e8f221eef25ea3767862",
+      "bytes": 224398,
+      "text_sha256": "5438e724ce30d5764cb0dcdb85082f9c7ebea863fa5273e0f9a8c21785f178ee",
+      "in_force": "Current version as at 18 Aug 2026",
+      "historical_versions": [
+        "19870330",
+        "19971001",
+        "19990225",
+        "20000701",
+        "20040308",
+        "20060101",
+        "20060201",
+        "20100301",
+        "20140307",
+        "20141231",
+        "20150101",
+        "20160610",
+        "20210102",
+        "20211231"
+      ]
+    }
+  ]
+}

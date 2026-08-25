@@ -35,6 +35,20 @@ let problems = [];
 
 // --- 1. the command sets must agree, in both directions ----------------------
 const goSrc = readFileSync(GO, "utf8");
+// Exactly one dispatch table, checked before it is read. The match below is
+// non-greedy and anchored to the FIRST `case "$CMD" in`, so a second one --
+// added upstream of the real table for some unrelated reason -- would be read
+// AS the dispatch table, and every genuine command would be reported missing.
+// That is a wrong answer pointing at the wrong file, which is worse than no
+// answer: the fixer edits SKILL.md, which was correct.
+const dispatchCount = (goSrc.match(/^case "\$CMD" in$/gm) || []).length;
+if (dispatchCount > 1) {
+  process.stderr.write(
+    `check-skill-drift: go.sh has ${dispatchCount} \`case "$CMD" in\` blocks; the dispatch table must be the only one\n`,
+  );
+  process.exit(1);
+}
+
 const dispatch = goSrc.match(/^case "\$CMD" in$([\s\S]*?)^esac$/m);
 if (!dispatch) {
   process.stderr.write(
@@ -66,11 +80,35 @@ for (const c of driverCommands) {
 }
 
 // --- 2. every flag the skill shows must exist in the driver ------------------
+//
+// The flag surface is the UNION of the driver's own parser and the parsers it
+// delegates to. `go.sh store` hands every argument to store-cli.mjs verbatim
+// and deliberately does not parse them — a driver that parsed the store's flags
+// would need editing every time the store grew a verb — so a flag that exists
+// only there is documented correctly, not undocumented incorrectly.
+const delegated = ["lib/store-cli.mjs"]
+  .map((f) => {
+    try {
+      return readFileSync(resolve(HERE, f), "utf8");
+    } catch {
+      return "";
+    }
+  })
+  .join("\n");
+const flagExists = (flag) => {
+  const bare = flag.slice(2);
+  return (
+    goSrc.includes(`${flag})`) ||
+    // store-cli reads flags by name through flag()/bool(), so the name appears
+    // as a quoted string rather than as a `case` label.
+    delegated.includes(`"${bare}"`)
+  );
+};
 for (const m of skillSrc.matchAll(/etc\/go\/go\.sh[^\n`]*?(--[a-z][a-z-]+)/g)) {
   const flag = m[1];
-  if (!goSrc.includes(`${flag})`))
+  if (!flagExists(flag))
     problems.push(
-      `SKILL.md shows '${flag}', which go.sh's argument parser does not accept`,
+      `SKILL.md shows '${flag}', which neither go.sh's argument parser nor a delegated parser accepts`,
     );
 }
 
@@ -107,8 +145,13 @@ if (existsSync(refDir)) {
 {
   const arrays = ["UNIMPLEMENTED_STAGES", "G1_STAGES", "G2_STAGES"];
   const declared = {};
+  // `^\\s*` and not `^`: a declaration is a declaration wherever it sits, and
+  // these moved one indent level in when the subject-dependent file-scope block
+  // was wrapped in a guard (2026-08-20). Anchoring to column 0 made a purely
+  // structural edit read as "go.sh no longer declares G1_STAGES", which points
+  // the fixer at the skill — the one file that was still correct.
   for (const name of arrays) {
-    const m = goSrc.match(new RegExp(`^${name}=\\(([^)]*)\\)`, "m"));
+    const m = goSrc.match(new RegExp(`^\\s*${name}=\\(([^)]*)\\)`, "m"));
     if (m) declared[name] = m[1].trim();
   }
   const skillFiles = [SKILL];

@@ -11,7 +11,16 @@
 # outcome: "the plan parses" is not "the wizard asks the right questions".
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_WIZARD" "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS"
+  # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
+  # `--fixed-now` is what this stage passes to `l4` a few lines down, and it is
+  # the answer to "as at what date does the law say this". It was in NO stage's
+  # inputs: two runs of the same subject, same tree, same binary and DIFFERENT
+  # --fixed-now produced byte-identical digests, and findReplayableAcrossRuns
+  # filters on subject and digest only -- so the second run borrowed the first
+  # run's answer about a different point in legal time. Declared per stage
+  # rather than folded centrally like the l4 binary's sha, because only the
+  # stages that actually pass --fixed-now should re-run when it moves.
+  printf '%s\n' "$GO_S_WIZARD" "${BASH_SOURCE[0]}" "$GO_S_KNOWN_DEFECTS" "text:fixed_now=${GO_FIXED_NOW:-unset}"
   exit 0
 fi
 
@@ -41,7 +50,15 @@ case $DEFECT_RC in
     echo "::error::a defect recorded in $GO_S_KNOWN_DEFECTS no longer reproduces. Delete the entry; a stale negative control is a lie about what this leg measures." >&2
     go_broken "a known-defect negative control stopped reproducing; see $LOG"
     ;;
-  2) go_broken "known-defects.mjs usage error" ;;
+  2) go_broken "known-defects.mjs usage error; see $LOG" ;;
+  0) : ;;
+  # ANY other exit is a checker that did not answer. It used to fall through
+  # this `case` and the stage carried on as if the negative controls had run --
+  # measured, when sg-succession's catalogue used the wrong key name and the
+  # checker threw a TypeError under exit 1. Silence from a control is not a
+  # pass; it is a control that did not run, and it has to be as loud as one
+  # that failed.
+  *) go_broken "known-defects.mjs exited $DEFECT_RC, which is not one of its defined outcomes (0 held, 2 usage, 4 stopped reproducing); the negative controls for this leg did NOT run. See $LOG." ;;
 esac
 
 # Count what the plan actually offers the interview. MEASURED 2026-08-02: 406

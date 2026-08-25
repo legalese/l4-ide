@@ -2,6 +2,29 @@
 >
 > - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (`jl4-core/src/L4/Lexer.hs:230-299`) and appear nowhere in core; no priority-graph or defeater machinery.
 > - Only `UNLESS` exists as a keyword (`Lexer.hs:298`) but without the defeasibility semantics §6.1 proposes. "Next Steps" remain unstarted.
+> - §9 (`APPLIES`, added 2026-08-16) is likewise PROPOSED, not implemented — `APPLIES` is not a lexer keyword, and no per-provision applicability projections are derived anywhere in core.
+
+> **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
+> battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
+> now serve as existence proofs for the
+> semantics this spec proposes, surfaced by the transpiler bridges:
+>
+> - **Catala's `label`/`exception` DAG** over default terms — formalised in F\*, with sibling
+>   exceptions conflicting unless prioritised; Catala's own compiler flattens the priority
+>   structure into total option-typed code, which is the piggyback route for any Catala→L4
+>   import. See `CATALA-EXPORT-SPEC.md` §5.2 (draft PR #260).
+> - **Blawx's defeat triples** (`overrules`/`blawx_defeated` over s(CASP)) — override structure
+>   survives as data naming which section defeats which, i.e. exception relations without burden
+>   attribution. See `BLAWX-EXPORT-SPEC.md` §1.1/§5.2 (draft PR #261).
+> - **LegalRuleML's `Override`/`OverrideStatement` with the `StrictStrength`/`DefeasibleStrength`/`Defeater`
+>   trio** (OASIS Standard, Core v1.0 §4.2.1, 2021-08-30) — the same strict/defeasible/defeater
+>   design §5.2 below describes via Prakken & Sartor, ratified as an international standard with
+>   an XML surface syntax and worked through lex specialis/superior/posterior. This proposal is
+>   not inventing a mechanism; it is adopting the standardized one. See
+>   `specs/research/LEGALRULEML-RESEARCH.md` §B(v).
+>
+> Consolidated here by the portfolio session per the one-file-one-editor convention
+> (`specs/proposals/BACKEND-PORTFOLIO-SPEC.md` §8) while three bridge sessions were live.
 
 # SUBJECT TO / DESPITE / NOTWITHSTANDING: Taxonomic Analysis and Specification
 
@@ -9,6 +32,8 @@
 **Author:** Research compilation for L4 language design
 **Date:** 2025-01-23
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
+**Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
+**Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
 **Branch:** mengwong/spec-notwithstanding
 
 ---
@@ -445,15 +470,16 @@ The deeper lesson for `SUBJECT TO`: legal negation/override is **never neutral**
 
 The seven semantic functions identified suggest L4 needs multiple distinct constructs, not a single overloaded keyword:
 
-| Function             | Suggested L4 Construct                                |
-| -------------------- | ----------------------------------------------------- |
-| Priority declaration | `SUBJECT TO` / `NOTWITHSTANDING` as explicit priority |
-| Exception carve-out  | `EXCEPT WHEN` clause                                  |
-| Condition precedent  | `REQUIRES` or `GIVEN THAT`                            |
-| Output modification  | `QUALIFIED BY` or modifier syntax                     |
-| Preservation         | `WITHOUT AFFECTING`                                   |
-| Domain restriction   | Input type constraints                                |
-| Defeasibility        | `UNLESS` with defeater semantics                      |
+| Function               | Suggested L4 Construct                                |
+| ---------------------- | ----------------------------------------------------- |
+| Priority declaration   | `SUBJECT TO` / `NOTWITHSTANDING` as explicit priority |
+| Exception carve-out    | `EXCEPT WHEN` clause                                  |
+| Condition precedent    | `REQUIRES` or `GIVEN THAT`                            |
+| Output modification    | `QUALIFIED BY` or modifier syntax                     |
+| Preservation           | `WITHOUT AFFECTING`                                   |
+| Domain restriction     | Input type constraints                                |
+| Defeasibility          | `UNLESS` with defeater semantics                      |
+| Applicability citation | `APPLIES` — reads the woven result (§9)               |
 
 ### 6.2 Reader-Friendliness
 
@@ -531,6 +557,8 @@ Defaults, provisos, and overrides are therefore not separate features but points
 
 6. **Interoperability:** How do these map to other legal formalization languages?
 
+7. **Applicability reads:** the `APPLIES` read side raises its own set — see §9.9.
+
 ---
 
 ## 8. Next Steps
@@ -540,6 +568,263 @@ Defaults, provisos, and overrides are therefore not separate features but points
 3. **Define formal semantics:** Specify evaluation rules precisely
 4. **Implement prototype:** Add to L4 parser and evaluator
 5. **Test with real documents:** Validate against British Nationality Act, PDPA, etc.
+6. **Prototype the read side (§9):** derive per-provision `inScope` / `excluded` / `triggered` / `applies` / `satisfied` projections during elaboration, and pilot them on the Contracts (Rights of Third Parties) Act 2001 (§9.4), whose nine sections exercise every role in the design.
+
+---
+
+## 9. APPLIES: Citing Applicability (the Read Side of Override)
+
+> **Status (2026-08-16):** PROPOSED, not implemented. `APPLIES` is not a lexer keyword (zero
+> occurrences in `jl4-core/src/L4/Lexer.hs`), and no per-provision applicability projections are
+> derived anywhere in core. Recorded here because this spec's own semantic models already lean on
+> an informal `applies(section, x)` meta-predicate (§2.5, §2.6) without ever defining it — and
+> because the write side (§2.8, §6.5) and this read side are one machinery that should be designed
+> together.
+
+### 9.1 The phenomenon
+
+Legal texts routinely condition one provision on the **applicability of another provision**, cited
+by its label:
+
+> "Subsections (2) to (5) apply where proceedings for the enforcement of a term of a contract are
+> brought by a third party in reliance on section 2."
+> — Contracts (Rights of Third Parties) Act 2001 (Singapore), s 4(1)
+
+This is a mild homoiconicity: `section 2` is a term in the instrument's own domain of discourse,
+and _applies_ is a predicate **about a rule**, evaluated against the case at hand. Since L4
+renders a constitutive rule as `antecedent IMPLIES consequent`, the tempting one-line expansion is
+
+> "section A.1 applies" ≡ "the antecedent of A.1's `IMPLIES` holds"
+
+That is one of the readings drafters intend — and not the most common one. Getting `APPLIES` right
+requires a fuller expansion.
+
+### 9.2 The four-conjunct decomposition
+
+"Provision S applies to case c at time t" decomposes into up to four independently owned tests:
+
+| #   | Conjunct           | Question answered                                                | Owning machinery                                                                       |
+| --- | ------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | `inForce S t`      | Is S part of the instrument version in force at t?               | temporal axis: `EVAL … UNDER RULES EFFECTIVE AT` (`TEMPORAL_EVAL_SPEC.md`)             |
+| 2   | `inScope S c`      | Does c fall within S's own application provisions?               | von Wright's _condition of application_; explicit "Application" sections               |
+| 3   | `NOT excluded S c` | Does no carve-out, override, or disapplication displace S for c? | this spec: §2.1 priority, §2.2 exceptions, §2.6 domain restriction — i.e. woven advice |
+| 4   | `triggered S c`    | Does S's operative antecedent hold of c?                         | the `IMPLIES` antecedent                                                               |
+
+Different citation forms mean different prefixes of the conjunction:
+
+| Citation form                                     | Usual meaning                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------ |
+| "This section applies where X" (self-declaration) | S _defining_ its own conjunct 2 (often folding conjunct 4 into it) |
+| "Where section 5 applies, the person must …"      | conjuncts 1–3 — the operative antecedent is still to come          |
+| "if the exemption in section 5 applies"           | all four conjuncts                                                 |
+| "section 5 does not apply where Y"                | not a read at all — a **write** to conjunct 3 (§2.2)               |
+
+Conjunct 1 is why _applies_ is inherently time-indexed: a provision has separate temporal
+dimensions of existence, force, and applicability (Hernández Marín & Sartor 1999), a separation
+the Akoma Ntoso legislative-XML metadata model likewise hard-codes as distinct force / efficacy /
+application intervals. L4 already owns this axis through the four `EVAL` pins; `APPLIES` composes
+with it rather than re-inventing it.
+
+### 9.3 Post-weaving semantics: APPLIES reads the woven rule
+
+§2.8 models every override as advice woven around a target provision. `APPLIES` must be evaluated
+**after weaving**: when CRTPA s 4(1) says "in reliance on section 2", it means section 2 _as
+limited by_ s 7's exceptions and s 3's variation regime — never the naked text of s 2.
+
+This yields the duality this section exists to record:
+
+- `SUBJECT TO` / `NOTWITHSTANDING` / `EXCEPT WHEN` / `WITHOUT AFFECTING` (§6.5) are **writes**:
+  advice that edits conjuncts 2–3 (or wraps the output).
+- `APPLIES` is the **read**: would the woven provision fire on this case?
+
+One machinery, two ends. In advice vocabulary, conjunct 2 is the provision's own `before` guard,
+conjunct 3 is the accumulated foreign `around` advice declining to `proceed()`, conjunct 4 is the
+body's antecedent, and conjunct 1 selects _which version_ of provision-plus-advice gets woven at
+all. It follows that the applicability-citation graph and the override graph of §4.2 are the
+_same graph_, sharing one acyclicity/stratification check (§9.6).
+
+### 9.4 Drafters already write the decomposition
+
+The strongest argument that `APPLIES` deserves surface syntax: modern drafting already factors
+provisions this way. The standard two-step idiom writes the applicability predicate and the
+operative rule as separate subsections — verbatim, Companies Act 2006 (UK) s 724 (Treasury
+shares):
+
+> "(1) This section applies where– (a) a limited company makes a purchase of its own shares in
+> accordance with Chapter 4, and (b) the purchase is made out of distributable profits. \[…]
+> (3) Where this section applies the company may— (a) hold the shares (or any of them), or
+> (b) deal with any of them, at any time, in accordance with section 727 or 729."
+
+— in line with drafting guidance (OPC) that the main proposition should not be buried among its
+conditions. The same section then reads its own predicate **retrospectively**: treasury shares
+are, per s 724(5)(a), shares that "were (or are treated as having been) purchased by it in
+circumstances in which this section applies" — an evaluation of `applies` at the past time of
+purchase, which is conjunct 1 of §9.2 doing real work (and grist for §9.9.4). Human Rights Act
+1998 (UK) s 10 self-declares in the same style — "This section applies if— (a) a provision of
+legislation has been declared under section 4 to be incompatible with a Convention right …" —
+an applicability condition that cites the _exercise of another section's power_ — and s 10(4)
+extends it: "This section also applies where the provision in question is in subordinate
+legislation and has been quashed, or declared invalid, by reason of incompatibility with a
+Convention right …".
+
+The Singapore Contracts (Rights of Third Parties) Act 2001 exhibits the whole design in nine
+sections:
+
+| Provision | Text (abridged)                                                                           | Role in this design                                                |
+| --------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| s 2(1)    | "Subject to the provisions of this Act, a person who is not a party … may … enforce …"    | the operative rule, opening with a global acknowledgment of writes |
+| s 4(1)    | "Subsections (2) to (5) apply where proceedings … are brought … in reliance on section 2" | the read: an applicability gate                                    |
+| s 5       | "Section 2 does not affect any right of the promisee …"                                   | savings = identity advice (§2.5, §2.8)                             |
+| s 7       | "Section 2 does not confer any right … in the case of a contract on a bill of exchange …" | a pure write-side section: serial edits to s 2's exclusion set     |
+
+Two structural observations. First, the citable unit is any labelled node — s 4(1) gates
+_subsections_ — so the projections of §9.5 must attach to every structural node, not only `§`
+provisions. Second, isomorphic formalization (Bench-Capon & Coenen) wants each of these provisions
+represented as its own unit; the derived-projection design gives that for free, since s 7's
+clauses remain separate writes rather than being inlined into s 2's text.
+
+### 9.5 Proposed elaboration: derived projections under a closed world
+
+For every labelled provision `S`, the elaborator derives a record of projections:
+
+```l4
+-- Conceptually: every labelled provision
+§ `S`
+GIVEN c IS A Case
+DECIDE ...            -- operative rule: triggered c IMPLIES effect c
+
+-- elaborates to derived projections:
+--   `S inScope`   : Case -> BOOLEAN   -- its own Application provisions        (conjunct 2)
+--   `S excluded`  : Case -> BOOLEAN   -- accumulated from foreign advice:
+--                                     --   SUBJECT TO / NOTWITHSTANDING /
+--                                     --   EXCEPT WHEN write here              (conjunct 3)
+--   `S triggered` : Case -> BOOLEAN   -- the operative antecedent              (conjunct 4)
+--   `S applies`   : Case -> BOOLEAN   -- inScope AND NOT excluded AND triggered,
+--                                     --   under the version selected by       (conjunct 1)
+--   `S satisfied` : Case -> BOOLEAN   -- the compliance projection (§9.8)
+```
+
+with a surface citation form along the lines of:
+
+```l4
+GIVEN c IS A Case
+DECIDE `enhanced duty applies to` c IF
+      `Section 2` APPLIES TO c        -- read side: the woven, in-force Section 2
+  AND `additional condition` c
+```
+
+Design notes:
+
+- **Explicit argument passing.** S's projections are functions of S's `GIVEN`s; the citing site
+  supplies them. Implicit capture by name coincidence would be fragile and unhygienic.
+- **Projection selection.** Which prefix of the four conjuncts a bare `APPLIES` denotes is open
+  (§9.9.1); explicit qualifiers are the conservative default until the corpus survey answers.
+- **`satisfied` = complies.** For a constitutive rule, truth of the whole conditional; for a
+  regulative rule, absence of violation — the Andersonian reduction (Anderson 1958; Meyer 1988),
+  connecting to the deontic status machinery of `HOMOICONICITY-SPEC.md` R1.
+
+**Closed-world elaboration.** Within one instrument the provision universe is closed at compile
+time, so every `APPLIES` citation elaborates to ordinary first-order calls — no reification, no
+runtime rule registry. Even "anything in this Part" (§4.1) becomes a finite conjunction over known
+provisions: §4.1's recommendation of explicit references turns from a prohibition into a
+compile-time expansion. Three citation forms fall off this cliff into genuine homoiconicity
+(`HOMOICONICITY-SPEC.md` R10):
+
+1. **Open quantification across instruments** — "subject to any other written law" ranges over
+   provisions the compiler cannot enumerate.
+2. **Application with modification** — "section 5 applies as if the reference to X were a
+   reference to Y", and the whole _mutatis mutandis_ genre. This is not a predicate read but a
+   rewrite of the reified rule followed by a read of the rewrite. Under the verification boundary
+   of §2.9 it is handled as an `AMEND`-style **materialisation**: produce S′, re-typecheck it,
+   then read `S′ applies`. Within one instrument this stays static; modifying _another_
+   instrument's text requires that instrument's reified AST.
+3. **Provisions created or modified at runtime** (`HOMOICONICITY-SPEC.md` R2–R7), whose
+   applicability is a query over the runtime registry, not a static call.
+
+### 9.6 Static checks: the applicability graph must be stratified
+
+Quotation of applicability invites paradox:
+
+```
+Section A: "This section applies where section B does not apply."
+Section B: "This section applies where section A does not apply."
+```
+
+This is the non-stratified negation-as-failure shape: no unique model. Because §9.3 makes the
+read edges part of the same graph as §4.2's override edges, one compiler pass covers both: build
+the provision-citation graph (positive and negative `applies` edges plus advice edges), require
+stratification of the negative edges (the same condition §5.6 already imposes on the PROLEG
+bridge), and reject or warn on violation. Precedent: Sergot et al.'s British Nationality Act
+formalisation ran statutory cross-references through negation as failure and depended on exactly
+this discipline; the BNA's own "This section applies to a person who …" style is the two-step
+idiom of §9.4.
+
+### 9.7 Prior art
+
+The decomposition is old; the contribution here is wiring it into one language surface.
+
+- **Condition of application as a separate norm component** — von Wright (1963) distinguishes a
+  norm's _condition of application_ from its content: conjunct 2 predates us by sixty years.
+- **Applicable vs applying** — Hage's Reason-Based Logic (Hage 1996, 1997; Verheij 1996) makes
+  precisely the distinction between a rule being _applicable_ (conditions satisfied) and the rule
+  _applying_ (consequence attaching), with applicability only a **defeasible reason** for
+  application. The gap between the two is where conjunct 3 — and §2.7's defeasibility — lives.
+- **Applicability as an object of argument** — Prakken & Sartor (1996) let parties argue about
+  whether a rule applies and which rule prevails, making applicability and priority first-class
+  moves rather than fixed metadata.
+- **Temporal dimensions of validity** — Hernández Marín & Sartor (1999) separate a norm's
+  existence, force, and applicability in the event calculus; Akoma Ntoso encodes force / efficacy
+  / application as distinct intervals. Conjunct 1.
+- **Provisions that modify provisions** — Governatori, Palmirani, Riveret, Rotolo & Sartor (2005)
+  and Governatori & Rotolo (2010) give formal semantics for norm modification, abrogation, and
+  annulment: the write side taken to its limit, and the formal backdrop for §2.9 and §9.5(2).
+- **Mechanised statutory cross-reference** — Sergot et al. (1986) on the BNA is the founding
+  precedent for evaluating "applies"-style cross-references computationally.
+- **Isomorphism** — Bench-Capon & Coenen (1992): represent each source provision as its own
+  knowledge-base unit. Application provisions and exception sections earn their own projections
+  (§9.4) precisely on this principle.
+
+### 9.8 Philological note: the _-plies_ family
+
+_Applies_, _implies_, _complies_: the shared tail suggests one Latin root, and for two of the
+three it is real. _Apply_ < _applicare_ (_ad_ + _plicare_), **to fold onto** — the rule folded
+onto the facts. _Imply_ < _implicare_ (_in_ + _plicare_), **to fold in** — the consequent folded
+into the antecedent. But _comply_ is a false member of the club: it descends from _complēre_,
+**to fill up** (the root of _complete_), reaching English via Italian _complire_ / Spanish
+_cumplir_, and drifted into the _-ply_ spelling by attraction to _ply / pliant_. The near-miss is
+semantically perfect: you do not fold an obligation — you **fill** it. Performance fills the hole
+in the world that an obligation opens, which is the Andersonian reduction again: to comply is to
+stay violation-free.
+
+So the trio maps exactly onto the projections of §9.5:
+
+| Word     | Root                   | Projection                               |
+| -------- | ---------------------- | ---------------------------------------- |
+| applies  | _applicare_, fold onto | `S applies` — the rule reaches this case |
+| implies  | _implicare_, fold in   | the connective inside the rule           |
+| complies | _complēre_, fill up    | `S satisfied` — the obligation is filled |
+
+And the evaluator's trace output is the family's fourth member: _explicate_ (_ex_ + _plicare_),
+to **unfold**.
+
+### 9.9 Open questions specific to the read side
+
+1. **Default projection:** which prefix of the four conjuncts does a bare `APPLIES` denote?
+   Needs the corpus survey of §8.1; explicit qualifiers are the conservative interim answer.
+2. **Defeasible reads:** Reason-Based Logic says applicability is only a _reason_ for
+   application. Should `S APPLIES` return the defeasible Boolean of §6.4 rather than a plain one,
+   so a later defeater can rebut the read itself?
+3. **Stable labels:** reads must survive renumbering of the cited provision — ties into
+   exactprint and the `AMEND` materialisation story (§2.9).
+4. **Reading events, not predicates:** HRA s 10 triggers on a declaration _made under_ section 4
+   — a read of another provision's **output event** in the regulative trace, not of a static
+   predicate. How does `APPLIES` interact with the ledger (`RECORD`/`ATTEST`) and the LTS?
+   CA 2006 s 724(5)(a) is the temporal form of the same question: shares "purchased by it in
+   circumstances in which this section applies" evaluates `applies` **as of the past purchase**,
+   i.e. a conjunct-1-pinned read against the trace.
+5. **Cross-instrument reads:** "applies for the purposes of this Act" versus reading another
+   instrument entirely — is that an `IMPORT` of the other instrument's projections, pinned to a
+   version via conjunct 1?
 
 ---
 
@@ -584,11 +869,40 @@ Defaults, provisos, and overrides are therefore not separate features but points
 - "PROLEG: Practical Legal Reasoning System." _Springer_ (2023). [Link](https://link.springer.com/chapter/10.1007/978-3-031-35254-6_23)
 - "Can Legislation Be Made Machine-Readable in PROLEG?" _arXiv_ (2026). [Link](https://arxiv.org/html/2601.01477)
 
+### Applicability of Norms (§9)
+
+- von Wright, G.H. _Norm and Action: A Logical Enquiry_. Routledge & Kegan Paul (1963) — the _condition of application_ as a component of a norm distinct from its content.
+- Hage, J. "A Theory of Legal Reasoning and a Logic to Match." _Artificial Intelligence and Law_ 4 (1996) 199–273 — Reason-Based Logic's distinction between a rule being _applicable_ and the rule _applying_.
+- Hage, J. _Reasoning with Rules: An Essay on Legal Reasoning and Its Underlying Logic_. Kluwer (1997).
+- Verheij, B. _Rules, Reasons, Arguments: Formal Studies of Argumentation and Defeat_. PhD thesis, Universiteit Maastricht (1996).
+- Prakken, H. & Sartor, G. "A Dialectical Model of Assessing Conflicting Arguments in Legal Reasoning." _Artificial Intelligence and Law_ 4 (1996) 331–368 — applicability and priority as objects of argument.
+- Sergot, M.J., Sadri, F., Kowalski, R.A., Kriwaczek, F., Hammond, P. & Cory, H.T. "The British Nationality Act as a Logic Program." _Communications of the ACM_ 29(5) (1986) 370–386 — mechanised statutory cross-reference; negation as failure over provisions.
+- Hernández Marín, R. & Sartor, G. "Time and Norms: A Formalisation in the Event-Calculus." _Proceedings of ICAIL 1999_, 90–100 — separating a norm's existence, force, and applicability in time.
+- Palmirani, M. & Vitali, F. "Akoma-Ntoso for Legal Documents." In _Legislative XML for the Semantic Web_, Springer (2011) — force / efficacy / application as distinct metadata intervals.
+- Governatori, G., Palmirani, M., Riveret, R., Rotolo, A. & Sartor, G. "Norm Modifications in Defeasible Logic." _JURIX 2005_ — formal semantics for provisions that modify other provisions.
+- Governatori, G. & Rotolo, A. "Changing Legal Systems: Legal Abrogation and Annulment in Defeasible Logic." _Logic Journal of the IGPL_ 18(1) (2010) 157–194.
+- Bench-Capon, T. & Coenen, F. "Isomorphism and Legal Knowledge Based Systems." _Artificial Intelligence and Law_ 1(1) (1992) 65–86 — one source provision, one representation unit.
+- Anderson, A.R. "A Reduction of Deontic Logic to Alethic Modal Logic." _Mind_ 67 (1958) 100–103 — obligation as violation-freedom: the `satisfied` / complies projection.
+- Meyer, J.-J.Ch. "A Different Approach to Deontic Logic: Deontic Logic Viewed as a Variant of Dynamic Logic." _Notre Dame Journal of Formal Logic_ 29(1) (1988) — the dynamic-logic form of the Andersonian reduction.
+
+### Statutes and Drafting Guidance Cited in §9
+
+- Contracts (Rights of Third Parties) Act 2001 (Singapore). [SSO](https://sso.agc.gov.sg/Act/CRTPA2001) — s 2 (operative rule), s 4(1) (applicability gate), s 5 (savings), s 7 (write-side "Exceptions" section). Verified against the current revised edition via the lawplain corpus, 2026-08-16.
+- Companies Act 2006 (UK), s 724 (Treasury shares). [legislation.gov.uk](https://www.legislation.gov.uk/ukpga/2006/46/section/724) — the two-step idiom verbatim in (1)/(3); (5)(a) reads the applicability predicate retrospectively. Quotes verified against the current revision via legislation.gov.uk, 2026-08-19.
+- Human Rights Act 1998 (UK), s 10. [legislation.gov.uk](https://www.legislation.gov.uk/ukpga/1998/42/section/10) — "This section applies if …" self-declaration whose trigger (1)(a) cites a declaration made under s 4; s 10(4) is the "also applies" extension. Quotes verified against the current revision via legislation.gov.uk, 2026-08-19.
+- Office of the Parliamentary Counsel (UK). _Drafting Guidance_ (March 2024). [PDF](https://assets.publishing.service.gov.uk/media/660407d091a320001a82b06b/2024.03.19.Drafting-guidance.pdf) — clause structure: conditions versus the main proposition.
+
+### Philology (§9.8)
+
+- Etymonline: [apply](https://www.etymonline.com/word/apply), [imply](https://www.etymonline.com/word/imply), [comply](https://www.etymonline.com/word/comply); OED "comply, v.²" — _apply_ / _imply_ < Latin _plicare_ (fold); _comply_ < Latin _complēre_ (fill up), the _-ply_ spelling by attraction to "ply".
+
 ### Related L4 Documentation
 
 - `doc/default-logic.md` - L4's treatment of default reasoning
 - `doc/regulative.md` - Regulative rule semantics
 - `jl4/experiments/Singapore-Data-Protection-Act.l4` - Example using "subject to" informally
+- `specs/todo/TEMPORAL_EVAL_SPEC.md` - the `EVAL … UNDER RULES EFFECTIVE AT` axis (§9.2 conjunct 1)
+- `specs/todo/HOMOICONICITY-SPEC.md` - R10 owns the citation forms that escape §9.5's closed world
 
 ---
 

@@ -14,7 +14,7 @@
 # serve as the pass oracle.)
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" \
     "$GO_S_LADDER_DEMO_ENTRY" \
     "$GO_S_LADDER_NPM_DIR/package.json"
   exit 0
@@ -38,7 +38,7 @@ PRE_DIRTY="$(git -C "$GO_ROOT" status --porcelain -- "$FIGURES" || true)"
 if [[ -n "$PRE_DIRTY" ]]; then
   go_receipt --status UNVERIFIED \
     --reason "the figures directory already had uncommitted changes before this stage ran, so a post-run diff cannot distinguish generator drift from a pre-existing local edit. Commit or stash $FIGURES and re-run." \
-    --artifact "$GO_S_CORPUS"
+    --artifact "$GO_S_ENCODING"
   exit "$GO_EXIT_FINDING"
 fi
 
@@ -72,7 +72,7 @@ for f in "$GO_ROOT/$FIGURES"/*.svg; do [[ -f "$f" ]] && ARTS+=(--artifact "$f");
 
 if [[ -n "$DRIFT" ]]; then
   go_receipt --status DEGRADED \
-    --reason "regenerating the ladder figures changed committed files, so the figures in the tree were STALE relative to $(basename "$GO_S_CORPUS"). See $DIFFOUT. This orchestrator does not commit; regenerate and commit the figures in their own change." \
+    --reason "regenerating the ladder figures changed committed files, so the figures in the tree were STALE relative to $(basename "$GO_S_ENCODING"). See $DIFFOUT. This orchestrator does not commit; regenerate and commit the figures in their own change." \
     "${ARTS[@]}"
   exit "$GO_EXIT_FINDING"
 fi
@@ -81,6 +81,6 @@ go_receipt --status PASS \
   --oracle-cmd "JL4_LSP_CMD=… npm run $GO_S_LADDER_NPM_SCRIPT && git diff --quiet -- $FIGURES" \
   --oracle-exit 0 \
   --oracle-class differential \
-  --oracle-because "the committed SVG figures were regenerated from the current $(basename "$GO_S_CORPUS") and reproduced byte for byte; a non-empty diff would mean the committed figures were stale, which this leg treats as a FAIL and never as a pass" \
+  --oracle-because "the committed SVG figures were regenerated from the current $(basename "$GO_S_ENCODING") and reproduced byte for byte; a non-empty diff would mean the committed figures were stale, which this leg treats as a FAIL and never as a pass" \
   "${ARTS[@]}" \
   --note "the generator writes into the committed figures directory; this stage never commits and never stages"

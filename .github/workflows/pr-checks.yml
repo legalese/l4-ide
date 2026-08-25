@@ -148,9 +148,19 @@ jobs:
             dmn:
               - 'jl4-core/src/L4/Dmn/**'
               - 'jl4/examples/dmn/**'
-              # The corpus SOURCE: since the corpus gates on both engines
-              # (R12/R13), a regcf.l4 edit must reach them directly, not only
-              # transitively through a forced golden regen under dmn/expected.
+              # The corpus SOURCE, for every subject whose sidecar declares a
+              # p7-dmn leg: since such a corpus gates on both engines (R12/R13),
+              # an edit to it must reach them directly, not only transitively
+              # through a forced golden regen under dmn/expected.
+              #
+              # A `paths:` filter is static YAML and cannot be derived from the
+              # sidecars, so this list is MAINTAINED BY HAND and CHECKED by
+              # etc/check-subject-ci-coverage.mjs, which fails naming the exact
+              # line to add when a subject declares p7-dmn and its encoding
+              # directory matches nothing here. Add the directory, do not
+              # broaden to `jl4/examples/legal/**` — that would run both Java
+              # engines on every corpus edit in the repo, including subjects
+              # with no DMN leg at all.
               - 'jl4/examples/legal/regcf/**'
               - 'etc/kie-dmn-check/**'
               - 'etc/camunda-dmn-check/**'
@@ -203,6 +213,15 @@ jobs:
           node-version: "24.x"
       - name: Every corpus .l4 ships its four goldens
         run: node etc/check-corpus-goldens.mjs
+
+      # Same reasoning as the job above, one level up: the filters cannot see
+      # THIS failure either. A subject that declares a leg CI gates, but whose
+      # corpus directory no `paths:` filter matches, simply never triggers the
+      # job -- so the leg reports nothing, and reporting nothing looks exactly
+      # like passing. No filter, no build, no `needs`: it runs on every event
+      # precisely because the thing it checks is which events run what.
+      - name: Every subject's declared legs are exercised by CI
+        run: node etc/check-subject-ci-coverage.mjs
 
   # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
   # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
@@ -259,17 +278,43 @@ jobs:
       # The driver must be able to describe itself without a binary, a run
       # directory, or a network. If `plan` needs any of those, resumability and
       # dry-running are both broken.
+      #
+      # EVERY subject, not one: this step used to call `plan` bare, which worked
+      # only while exactly one sidecar existed -- go.sh defaults to the sole
+      # subject and refuses once there are two, so adding sg-succession turned
+      # this step red for a reason that had nothing to do with the change that
+      # tripped it. Enumerating from `subject.mjs --list` fixes that failure and
+      # buys the check a subject-independence property it did not have: a new
+      # sidecar whose `plan` cannot be printed fails here, on the PR that adds
+      # it, instead of on the next person's branch.
       - name: The driver can describe itself with no L4 and no run dir
         run: |
           etc/go/go.sh help > /dev/null
-          etc/go/go.sh plan --milestone g1 | tee /tmp/plan.txt
-          grep -q 'p0-preflight' /tmp/plan.txt
-          grep -q 'entry points that exist and refuse' /tmp/plan.txt
-          grep -q 'p9-explain' /tmp/plan.txt
-          etc/go/go.sh plan --milestone g2 | tee /tmp/plan-g2.txt
-          grep -q 'p1-ingest' /tmp/plan-g2.txt
-          grep -q 'NOT WIRED' /tmp/plan-g2.txt
-          grep -q 'does NOT mean a de novo run happened' /tmp/plan-g2.txt
+          subjects=$(node etc/go/lib/subject.mjs --list)
+          [ -n "$subjects" ] || { echo "::error::no subjects discovered"; exit 1; }
+          for s in $subjects; do
+            echo "--- plan --subject $s"
+            etc/go/go.sh plan --subject "$s" --milestone g1 > /tmp/plan-$s-g1.txt
+            grep -q 'p0-preflight' /tmp/plan-$s-g1.txt
+            grep -q 'entry points that exist and refuse' /tmp/plan-$s-g1.txt
+            grep -q 'p9-explain' /tmp/plan-$s-g1.txt
+            etc/go/go.sh plan --subject "$s" --milestone g2 > /tmp/plan-$s-g2.txt
+            grep -q 'p1-ingest' /tmp/plan-$s-g2.txt
+            grep -q 'NOT WIRED' /tmp/plan-$s-g2.txt
+            grep -q 'does NOT mean a de novo run happened' /tmp/plan-$s-g2.txt
+            echo "ok $s: g1 and g2 both plan"
+          done
+          # A bare `plan` must still be a loud refusal, not a silent pick among
+          # several -- a run about an unnamed body of law is the thing the
+          # requirement exists to prevent.
+          if etc/go/go.sh plan --milestone g1 > /tmp/plan-bare.txt 2>&1; then
+            n=$(printf '%s\n' $subjects | wc -l)
+            [ "$n" = "1" ] || { echo "::error::bare plan succeeded with $n subjects"; exit 1; }
+          else
+            grep -q 'subject is required' /tmp/plan-bare.txt \
+              || { echo "::error::bare plan failed without naming the reason"; cat /tmp/plan-bare.txt; exit 1; }
+            echo "ok a bare plan refuses and names --subject"
+          fi
 
       # Every stage that is STILL scaffolded must refuse with exit 3 and name its
       # blocker. A stage that exits 0 while doing nothing is the failure this
@@ -503,8 +548,10 @@ jobs:
       # created — written once, never read. Against a 10 GB cap the store was at
       # 10.65 GB and LRU-evicting continuously, which is the same mechanism the
       # prune step in the Haskell job below exists to fight (it once cost the
-      # repo 40-minute PRs). The warm caches that smucclaw/l4-ide#911's fix
-      # depends on live in that same 10 GB.
+      # repo 40-minute PRs). The base caches that smucclaw/l4-ide#911's fix
+      # protects live in that same 10 GB. (The merge queue no longer depends
+      # on any of them — since 2026-08-09 it warms from an artifact; see the
+      # Haskell job's warm-start note.)
       #
       # So: restore on every event, save on every event EXCEPT merge_group.
       # pull_request keeps saving — refs/pull/N/merge IS readable by later runs
@@ -720,57 +767,137 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
+      # ---- Merge-queue warm start (artifact route, 2026-08-09) ---------------
+      # GitHub scopes cache READS to {the run's own ref, the default branch},
+      # plus the base branch for pull_request events only. A merge_group run's
+      # own ref is the ephemeral gh-readonly-queue/... ref, and our queue
+      # targets `unstable`, which is NOT the default branch — so the fresh
+      # push-to-unstable caches saved at the foot of this job are structurally
+      # invisible to every queue entry, and the cache API offers no escape that
+      # does not involve a workflow running ON main (measured: a cache saved by
+      # a tag-triggered run is scoped to refs/tags/<tag>, which is in nobody's
+      # read set; GitHub's documented scoping — this specific case is not
+      # locally measured). The previous escape, cache-warmup.yml's cron on
+      # main, died when main deleted it (8917dc3f); its frozen mq-warmup-*
+      # entries were dropped from the restore-keys below in the same change as
+      # this block, because a stale cache that still prefix-matches would
+      # overwrite the fresh store this block extracts.
+      #
+      # ARTIFACTS are not ref-scoped. The push-to-unstable run of this very job
+      # uploads its cabal store + dist-newstyle as `mq-warmup-haskell` (foot of
+      # this job); each queue entry downloads the newest one from a successful
+      # push and unpacks it. The cache restores below are SKIPPED outright on
+      # merge_group — not merely expected to miss: a push to MAIN saves the
+      # same pr-checks-* keys into default-branch scope, which merge_group CAN
+      # read, and that restore would extract main's stale store over the warm
+      # start (mixed package.db = a red queue entry, the worst outcome
+      # available). Each Haskell-building landing re-warms the artifact
+      # (docs-only landings upload nothing and the locator walks back up to 15
+      # pushes; the artifact lands at the END of the push run, so under a busy
+      # queue entry N+1 is typically warmed by N-1's landing). Freshness still
+      # tracks dependency drift, which the 6-hourly cron never did. Every
+      # producer and consumer step is best-effort (`continue-on-error`) — any
+      # failure means a cold build for a queue entry, never a red check. The
+      # round-trip is deliberately unkeyed on cabal-version (`latest` above):
+      # producer and consumer derive the store path from the same setup output
+      # in the same container, and a cabal release between them degrades to a
+      # cold or partially-warm build, never an error. Storage is free (public
+      # repo); retention 7 days does the cleanup no delete step has to.
+      - name: Locate the newest merge-queue warm-up artifact
+        id: warmup
+        if: github.event_name == 'merge_group'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'pr-checks.yml', branch: 'unstable',
+              event: 'push', status: 'success', per_page: 15,
+            });
+            for (const run of runs.data.workflow_runs) {
+              const arts = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner, repo: context.repo.repo, run_id: run.id,
+              });
+              const art = arts.data.artifacts.find(
+                (a) => a.name === 'mq-warmup-haskell' && !a.expired,
+              );
+              if (art) {
+                const ageDays = (Date.now() - Date.parse(art.created_at)) / 86400000;
+                core.info(`warm start: ${art.name} from run ${run.id} (${run.head_sha.slice(0, 7)}), ${Math.round(art.size_in_bytes / 1048576)} MB, ${ageDays.toFixed(1)} d old`);
+                if (ageDays > 7)
+                  core.warning(`The newest warm-up artifact is ${ageDays.toFixed(0)} days old. Pushes to unstable upload a fresh one on every green haskell job; check the recent push runs of pr-checks.yml.`);
+                core.setOutput('run-id', String(run.id));
+                core.setOutput('found', 'true');
+                return;
+              }
+            }
+            core.setOutput('found', 'false');
+            core.warning('No mq-warmup-haskell artifact on any of the last 15 successful pushes to unstable; this queue entry cold-builds (~28 min). The push path of this job uploads the artifact — check whether recent pushes skipped the haskell job or failed.');
+
+      - name: Download the warm-up artifact
+        id: warmup-download
+        if: github.event_name == 'merge_group' && steps.warmup.outputs.found == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: mq-warmup-haskell
+          run-id: ${{ steps.warmup.outputs.run-id }}
+          github-token: ${{ github.token }}
+          path: /tmp/mq-warmup
+
+      # A partial extraction is worse than none — cabal trusts what it finds —
+      # so each tar cleans its own target on failure.
+      - name: Unpack the warm start
+        if: github.event_name == 'merge_group' && steps.warmup-download.outcome == 'success'
+        continue-on-error: true
+        env:
+          STORE: ${{ steps.setup.outputs.cabal-store }}
+        run: |
+          mkdir -p "$(dirname "$STORE")"
+          tar -xf /tmp/mq-warmup/cabal-store.tar -C "$(dirname "$STORE")" || { rm -rf "$STORE"; echo "::warning::cabal-store unpack failed; cold-building dependencies"; }
+          tar -xf /tmp/mq-warmup/dist-newstyle.tar || { rm -rf dist-newstyle; echo "::warning::dist-newstyle unpack failed; cold-building first-party packages"; }
+          rm -rf /tmp/mq-warmup
+
       # Restore caches BEFORE configure so cabal can plan incrementally
       # on top of existing build state rather than starting fresh.
       #
-      # The `mq-warmup-` line applies to dist-newstyle the same trick the
-      # dependency step below documents at length. A merge_group run cannot read
-      # the unstable-scoped `pr-checks-*-dist-*` entry, so until now BOTH its
-      # restore keys missed and it recompiled every first-party package from
-      # nothing. Measured on 2026-08-02, all three events within 31 minutes of
-      # each other and all asking for the identical key
-      # `pr-checks-Linux-ghc-9.10.2-dist-14bfce8b…`:
+      # Both restore steps are gated OFF merge_group: the warm-start artifact
+      # is a queue entry's only input, and the reason is in the warm-start note
+      # above — a main push saves these same pr-checks-* keys into
+      # default-branch scope, which merge_group CAN read, and that restore
+      # would extract main's stale store over the warm start. Skipped steps
+      # yield empty outputs, so the push-only prune and save steps below, and
+      # the `cache-hit != 'true'` install gate — true on merge_group, where
+      # installing over the warm store is a seconds-long no-op — all behave.
+      # The measured cost of the scope rule this design routes around,
+      # 2026-08-02, all three events within 31 minutes of each other and all
+      # asking for the identical key `pr-checks-Linux-ghc-9.10.2-dist-14bfce8b…`:
       #
       #   merge_group  (pr-197)  `Cache not found for input keys: …`   build 514.9 s
       #   pull_request (#206)    `Cache restored from key: …`          build  16.1 s
       #   push         (unstable) `Cache restored from key: …`         build  19.1 s
       #
       # …i.e. ~8 min per queued PR spent rebuilding what was sitting in a cache
-      # the run was not allowed to read. cache-warmup.yml now also saves
-      # unstable's dist-newstyle in MAIN's cache scope, under `mq-warmup-*-dist-*`,
-      # which is a scope merge_group CAN read. merge_group only, so PRs into main
-      # never match it and keep restoring the `pr-checks-` namespace alone.
-      #
-      # This does not weaken the gate: the restore step already ran on
-      # merge_group and was already *meant* to hit — it simply always missed.
-      # A merge_group build now starts from the same kind of prefix-matched dist
-      # a pull_request build has always started from, and cabal's recompilation
-      # check governs reuse exactly as it does there. No step is skipped; the
-      # build and the full `cabal test all` run unchanged.
+      # the run was not allowed to read — now supplied by the warm-start
+      # artifact instead.
       - name: Restore cached build artifacts
         uses: actions/cache/restore@v5
         id: build-cache
+        if: github.event_name != 'merge_group'
         with:
           path: dist-newstyle
           key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-${{ hashFiles('**/*.hs', '**/*.cabal') }}
           restore-keys: |
             pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
-            ${{ github.event_name == 'merge_group' && format('mq-warmup-{0}-ghc-{1}-dist-', runner.os, steps.setup.outputs.ghc-version) || '' }}
 
-      # merge_group runs canNOT read the unstable-scoped cache: GitHub scopes
-      # cache reads to {own ref, default branch}, plus the base branch for
-      # pull_request only. A merge_group run's own ref is the ephemeral
-      # gh-readonly-queue/... ref, and unstable is NOT the default branch (main
-      # is) — so the fresh push-to-unstable cache is invisible to it, and it
-      # cold-builds deps (~20 min) every time. The cache-warmup.yml workflow
-      # runs ON main (default branch) and saves unstable's dep set under the
-      # dedicated `mq-warmup-` prefix, which IS in a scope merge_group can read.
-      # We add that prefix as a restore-key ONLY for merge_group, so pull_request
-      # runs into main never match it (they keep restoring pr-checks-* only) —
-      # main PRs are thus completely unaffected by the warm-up cache.
+      # Also gated off merge_group, same reason as above. On pull_request and
+      # push it works as it always has; the warm-start artifact, not a cache
+      # key, is what makes queue entries warm.
       - name: Restore cached dependencies
         uses: actions/cache/restore@v5
         id: deps-cache
+        if: github.event_name != 'merge_group'
         env:
           key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
@@ -778,48 +905,6 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/*.cabal', 'cabal.project') }}
           restore-keys: |
             ${{ env.key }}-
-            ${{ github.event_name == 'merge_group' && format('mq-warmup-{0}-ghc-{1}-cabal-', runner.os, steps.setup.outputs.ghc-version) || '' }}
-
-      # Both warm caches above are written by cache-warmup.yml, and a scheduled
-      # workflow can only fire from the DEFAULT branch. That file was deleted
-      # from main on 2026-07-13 by #112 — a blanket "revert direct-to-main
-      # changes pending review", not a decision about caching — and the cron has
-      # not run since. Nothing said so. merge_group kept restoring a 24-day-old
-      # store that happened to still satisfy the plan (`Up to date`, 0.4 s, on
-      # 10/10 queue runs), and the first dependency bump would have reinstated
-      # the ~22 min cold install of smucclaw/l4-ide#911 with no signal at all.
-      #
-      # This step is that signal. It warns, it does not fail: a stale cache is a
-      # maintenance problem, and blocking the merge queue over one would be a
-      # worse outcome than the slow build it is warning about.
-      - name: The merge-queue warm cache must be fresh
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prefix = `mq-warmup-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-`;
-            const caches = await github.paginate(
-              github.rest.actions.getActionsCacheList,
-              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 },
-            );
-            const warm = caches.filter((c) => c.key.startsWith(prefix));
-            if (warm.length === 0) {
-              core.warning(`No ${prefix}* cache exists. Every merge_group run will cold-build the cabal store AND all of dist-newstyle. Fix: land .github/workflows/cache-warmup.yml on the DEFAULT branch (main) so its cron can fire, then dispatch it once.`);
-              return;
-            }
-            const newest = warm.reduce((a, b) => (a.created_at > b.created_at ? a : b));
-            const ageDays = (Date.now() - Date.parse(newest.created_at)) / 86400000;
-            const families = new Set(warm.map((c) => c.key.slice(prefix.length).split('-')[0]));
-            core.info(`Warm caches: ${warm.length} entr(ies), families [${[...families].join(', ')}], newest ${newest.key} created ${newest.created_at} (${ageDays.toFixed(1)} d ago).`);
-            for (const want of ['cabal', 'dist']) {
-              if (!families.has(want)) {
-                core.warning(`No ${prefix}${want}-* cache. merge_group runs will cold-build that half. Check that cache-warmup.yml is on main (default branch) and that its last run succeeded.`);
-              }
-            }
-            if (ageDays > 14) {
-              core.warning(`The merge-queue warm cache is ${ageDays.toFixed(0)} days old (${newest.key}). cache-warmup.yml runs on a 6h cron FROM THE DEFAULT BRANCH; if it is stale this long the workflow is not on main, is disabled, or is failing. Check: gh run list -R legalese/l4-ide --workflow cache-warmup.yml`);
-            }
 
       - name: Configure the build
         run: |
@@ -938,6 +1023,34 @@ jobs:
         with:
           path: dist-newstyle
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+      # ---- Merge-queue warm-up artifact (push to unstable only) --------------
+      # The consumer half is the warm-start block after "Set up GHC". This half
+      # runs only after build+test went green — a failing push never warms the
+      # queue — and only on unstable, whose queue is the consumer; a main push
+      # uploading under the same name would waste storage warming nobody.
+      # Plain tar, no compression: upload-artifact compresses the whole
+      # artifact itself, and double-compressing ~500 MB just burns push-run
+      # minutes. retention-days 7 keeps a quiet week warm; storage is free on a
+      # public repo, and expiry does the cleanup no delete step has to.
+      - name: Package the warm-up artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/unstable'
+        continue-on-error: true
+        env:
+          STORE: ${{ steps.setup.outputs.cabal-store }}
+        run: |
+          mkdir -p /tmp/mq-warmup
+          tar -cf /tmp/mq-warmup/cabal-store.tar -C "$(dirname "$STORE")" "$(basename "$STORE")"
+          tar -cf /tmp/mq-warmup/dist-newstyle.tar dist-newstyle
+
+      - name: Upload the warm-up artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/unstable'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: mq-warmup-haskell
+          path: /tmp/mq-warmup/
+          retention-days: 7
 
   # ============================================
   # DMN: both engines, over the committed goldens
@@ -1064,7 +1177,24 @@ jobs:
       # decision population (70/70 both ways, in every case), so a decision
       # added to the corpus without a pin, or a pin left behind by a dropped
       # decision, fails here rather than passing silently.
-      - name: The Reg CF corpus -- both engines, end to end (R12/R13)
+      # EVERY subject that declares a p7-dmn leg, not one named in this file.
+      #
+      # This step used to name `regcf-corpus.dmn`, `regcf-corpus.cases.json` and
+      # two exact verdict strings inline, which made the engine gate structurally
+      # single-subject: a second subject declaring a p7-dmn leg had nowhere to
+      # put its goldens or its expected verdicts, so it would have been exercised
+      # by nothing and nothing would have said so. The sidecars already carry
+      # every path this needs; the workflow now reads them (`subject.mjs --ci`)
+      # instead of keeping a second copy of the answer under one subject's name.
+      # The verdicts moved to a committed baseline beside each golden, the same
+      # shape etc/bpmn-kie-baseline.txt already uses.
+      #
+      # A subject declaring p7-dmn with no engine_baseline is a FAILURE, not a
+      # skip: declaring the leg is the claim that this corpus is engine-checked,
+      # and a leg exercised by nothing that reports nothing is the exact silence
+      # this pipeline exists to prevent. etc/check-subject-ci-coverage.mjs says
+      # so before the job even builds.
+      - name: Every DMN-declaring subject -- both engines, end to end (R12/R13)
         env:
           KIE_CHECK_REQUIRED: "1"
           KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
@@ -1072,15 +1202,43 @@ jobs:
           CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
         run: |
           set -euo pipefail
-          ./etc/kie-dmn-check/run.sh \
-            jl4/examples/dmn/expected/regcf-corpus.dmn \
-            --cases jl4/examples/dmn/regcf-corpus.cases.json | tee kie-corpus.log
-          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s), 0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected, 330/330 service output value(s) as expected' kie-corpus.log
+          ran=0
+          while IFS=$'\t' read -r id golden cases baseline; do
+            [ -n "$id" ] || continue
+            echo "::group::$id -- KIE + Camunda over $golden"
+            ran=$((ran + 1))
 
-          ./etc/camunda-dmn-check/run.sh \
-            jl4/examples/dmn/expected/regcf-corpus.dmn \
-            --cases jl4/examples/dmn/regcf-corpus.cases.json | tee camunda-corpus.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated, 1540/1540 value(s) as expected' camunda-corpus.log
+            ./etc/kie-dmn-check/run.sh "$golden" --cases "$cases" | tee "kie-$id.log"
+            ./etc/camunda-dmn-check/run.sh "$golden" --cases "$cases" | tee "camunda-$id.log"
+
+            # Fixed-substring match, one baseline line at a time, against the
+            # union of both logs -- so a line naming either engine finds its own
+            # output and the file does not have to encode which log is which.
+            cat "kie-$id.log" "camunda-$id.log" > "engines-$id.log"
+            while IFS= read -r want; do
+              case "$want" in ''|'#'*) continue ;; esac
+              grep -qF -- "$want" "engines-$id.log" || {
+                echo "::error::$id: no engine printed the baseline line from $baseline"
+                echo "  expected: $want"
+                exit 1
+              }
+            done < "$baseline"
+            echo "ok $id: every line of $baseline was printed"
+            echo "::endgroup::"
+          done < <(node etc/go/lib/subject.mjs --ci | node -e '
+            let s = "";
+            process.stdin.on("data", (d) => (s += d)).on("end", () => {
+              for (const subj of JSON.parse(s)) {
+                const dmn = subj.legs["p7-dmn"];
+                if (!dmn) continue;
+                process.stdout.write(
+                  [subj.id, dmn.golden, dmn.cases, dmn.engine_baseline].join("\t") + "\n",
+                );
+              }
+            });
+          ')
+          [ "$ran" -gt 0 ] || { echo "::error::no subject declares a p7-dmn leg; this job should not have run"; exit 1; }
+          echo "checked $ran subject(s) against both engines"
 
       # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
       #
@@ -1711,10 +1869,12 @@ jobs:
       #
       # Cost: `Build native jl4-mlir + jl4-service` cold-builds every run — 1583 s
       # on pull_request, 1688 s on merge_group. Installing zstd in the Haskell
-      # container would unify (1) in one line, but it also re-versions EVERY
-      # `pr-checks-*` and `mq-warmup-*` entry at once, and the warm caches
-      # merge_group depends on would be unreadable until the next cron. Do that
-      # only once cache-warmup.yml is confirmed alive on main — not before.
+      # container would unify (1) in one line, at the price of re-versioning
+      # every `pr-checks-*` entry at once (one cold rebuild per family as they
+      # re-key). Until 2026-08-09 that also threatened the merge queue's warm
+      # caches; the queue now warms from an artifact, not from any cache (see
+      # the Haskell job's warm-start note), so the re-version is safe for the
+      # queue and this unification is unblocked whenever someone wants the win.
       - name: Restore cabal store cache
         uses: actions/cache/restore@v5
         with:

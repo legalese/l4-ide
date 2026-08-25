@@ -125,6 +125,18 @@ Reference encodings, all zero-`ASSUME`:
 
 ### ✅ RESOLVED 2026-07-09/10 — merge-queue cabal cache now WARM (Tier-1 warm-up shipped)
 
+> **Superseded 2026-08-09.** The mechanism below died twice with the file it depended on:
+> cache-warmup.yml was deleted from main by #112 (2026-07-13, restored later) and again by
+> `8917dc3f` (2026-08-07, deliberately), and a scheduled workflow only fires from the default
+> branch — so the cron is dead and the `mq-warmup-*` cache entries froze at their last save.
+> The replacement needs no file on main at all: the push-to-unstable run of pr-checks.yml's
+> haskell job uploads its cabal store + dist-newstyle as an **artifact** (`mq-warmup-haskell`,
+> retention 7 d), and each merge_group entry downloads the newest one — artifacts are not
+> ref-scoped, which is the escape the cache API does not offer. Each Haskell-building landing
+> re-warms the queue (docs-only landings keep the previous artifact; the locator walks back
+> 15 pushes), covering BOTH halves (the Tier-1.5 dist-newstyle gap below included).
+> cache-warmup.yml is deleted from unstable in the same change; the account below is history.
+
 The "WON'T FIX" decision below was **reversed and fixed**. A `main`-scoped scheduled warm-up (`.github/workflows/cache-warmup.yml`, cron every 6h) builds `unstable`'s cabal deps and saves the store under an `mq-warmup-*` key; because the run's ref is `main` (the default branch), the save lands in the one scope merge_group runs can read. `pr-checks.yml` restores that key **only** on the merge_group path, so pull_request→main runs are unaffected. Shipped: **PR #107** (unstable) + **#108** (main copy) + **#109** (prettier fix / first validation).
 
 - **Measured:** cold baseline (#102) Install-deps = **21m37s** → warm (#109, #110) = **1 second**. HIT on `mq-warmup-Linux-ghc-9.10.2-cabal-…`.

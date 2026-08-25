@@ -331,6 +331,8 @@ PARTY Commissioner
 
 This is a deeper level of reflection than the obligation registry (R2) - it operates on the _structure of the contract_ rather than just the _active obligations_ created by executing that structure.
 
+**Relation to the `APPLIES` read side (2026-08-16).** The commonest homoiconic idiom in legal text — "if section A.1 applies" — does _not_ require this requirement: within a single instrument the provision universe is closed at compile time, so applicability citation elaborates to first-order calls on per-provision derived projections. That design lives in `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §9, which owns it. Three citation forms do land here: open quantification over provisions outside the instrument ("subject to any other written law"); application-with-modification ("section 5 applies as if the reference to X were a reference to Y" — the _mutatis mutandis_ genre), which is QUOTE → transform → materialise → EVAL under the verification boundary of that spec's §2.9; and provisions created or modified at runtime (R2–R7), whose applicability is a query over the runtime registry rather than a static call.
+
 ## Proposed Syntax
 
 ### Deontic Type Declaration

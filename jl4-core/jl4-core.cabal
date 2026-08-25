@@ -110,10 +110,22 @@ library
     Base.Text
     Paths_jl4_core
     L4.Annotation
+    L4.Blawx.IR
+    L4.Blawx.Lower
+    L4.Blawx.Emit
+    L4.Blawx.EmitXml
+    L4.Blawx.Xml
+    L4.Blawx.Blocks
+    L4.Blawx.Parse
+    L4.Blawx.Lift
     L4.Bpmn.IR
     L4.Bpmn.Lower
     L4.Bpmn.Emit
     L4.Bpmn.Wiring
+    L4.Catala.IR
+    L4.Catala.Lower
+    L4.Catala.Emit
+    L4.Catala.Equivalence
     L4.Citations
     L4.Desugar
     L4.Diagnostic
@@ -123,6 +135,9 @@ library
     L4.Dmn.Lower
     L4.Dmn.Emit
     L4.Dmn.Markdown
+    L4.Docassemble.IR
+    L4.Docassemble.Lower
+    L4.Docassemble.Emit
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON
@@ -151,6 +166,9 @@ library
     L4.OpenFisca.IR
     L4.OpenFisca.Lower
     L4.OpenFisca.Emit
+    L4.Relational.IR
+    L4.Relational.Lower
+    L4.Relational.Debug
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry
@@ -203,6 +221,7 @@ test-suite jl4-core-test
     BulletParserSpec
     UUID5Spec
     ExportValidationSpec
+    CatalaLowerSpec
     NumberLiteralSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
@@ -222,6 +241,11 @@ test-suite jl4-core-test
     BitemporalRecallSpec
     TraceOrderingSpec
     StateGraphSpec
+    RelationalSpec
+    BlawxAssumeSpec
+    BlawxImportImageSpec
+    BlawxLiftSpec
+    BlawxParseSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

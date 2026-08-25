@@ -8,7 +8,25 @@
 # nonsense rather than a finding.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" ${GO_S_WIZARD:+"$GO_S_WIZARD"} "${BASH_SOURCE[0]}" "$GO_S_PINS"
+  # EVERY module of the encoding, not just the entry module and the wizard.
+  #
+  # Section 6 records one sha256 metric per module, and those metrics ARE the
+  # corpus section of the HG1 payload — gate-payload.mjs builds it from them and
+  # from nothing else. A REPLAYED p0-preflight contributes no row to that
+  # payload (replays are excluded by design, so that resuming a run does not
+  # invalidate a signature), which means the payload keeps the ORIGINAL
+  # receipt's metrics. So if an edit to a non-entry module did not change this
+  # stage's inputs digest, the stage would replay, the signed document would go
+  # on describing the pre-edit corpus, and the run would proceed over the
+  # post-edit one. Declaring the whole set is what makes the payload a function
+  # of the whole encoding.
+  #
+  # Same derivation as go.sh's g1 arm and as p3-check/p6-tests/p8-verify's
+  # direct-invocation fallback, deliberately: a narrower set here would
+  # under-declare the digest.
+  declare -a _INPUT_MODULES=()
+  read -ra _INPUT_MODULES <<<"${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  printf '%s\n' "${_INPUT_MODULES[@]}" "${BASH_SOURCE[0]}" "$GO_S_PINS"
   exit 0
 fi
 
@@ -28,6 +46,19 @@ PINLOG="$GO_OUT/cli-surface.txt"
 L4_PATH="${GO_L4_PATH:-$(command -v "$L4" || echo "$L4")}"
 L4_SHA="${GO_L4_SHA:-$(node "$GO_LIB/digest.mjs" "$L4_PATH")}"
 
+# The standard library, on the same footing as the binary. Every module of every
+# subject opens with IMPORT prelude and IMPORT daydate, so these files are inputs
+# to every `l4` invocation the pipeline makes -- and until 2026-08-20 they were
+# in no digest, no receipt and no payload, while JL4_LIBRARY_PATH let the caller
+# choose them. Measured: one word changed in daydate.l4's DATE comparison left
+# all 79 sg-paa assertions passing byte-identically and moved a boundary EVAL
+# from TRUE to FALSE. Recorded here because the gate payload builds its
+# toolchain section from this receipt's metrics, on the same contract as the
+# corpus section: what is not on the receipt is not in the document a human
+# signs.
+STDLIB_DIR="${GO_STDLIB_DIR:-${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}}"
+STDLIB_SHA="${GO_STDLIB_SHA:-$(node "$GO_LIB/stdlib-digest.mjs" "$STDLIB_DIR")}"
+
 # --- 2. toolchain probes; every miss carries a named reason ------------------
 node "$GO_LIB/probe.mjs" >"$PROBES"
 
@@ -37,7 +68,7 @@ node "$GO_LIB/probe.mjs" >"$PROBES"
 # unrelated reflow, and a tripwire that cries wolf gets deleted. The pin file
 # is the subject's own: it was measured against that subject's corpus.
 set +e
-node "$GO_LIB/discover.mjs" check "$GO_S_CORPUS" "$GO_S_PINS" >"$PINLOG" 2>&1
+node "$GO_LIB/discover.mjs" check "$GO_S_ENCODING" "$GO_S_PINS" >"$PINLOG" 2>&1
 PIN_EXIT=$?
 set -e
 cat "$PINLOG"
@@ -87,22 +118,47 @@ EOF
 fi
 
 # --- 6. record ---------------------------------------------------------------
-CORPUS_SHA="$(node "$GO_LIB/digest.mjs" "$GO_S_CORPUS")"
-METRICS=(--metric "corpus_sha_$(basename "$GO_S_CORPUS")=$CORPUS_SHA")
-if [[ -n "${GO_S_WIZARD:-}" ]]; then
-  WIZARD_SHA="$(node "$GO_LIB/digest.mjs" "$GO_S_WIZARD")"
-  METRICS+=(--metric "corpus_sha_$(basename "$GO_S_WIZARD")=$WIZARD_SHA")
+# One sha256 metric PER MODULE of the encoding, keyed by repo-relative path.
+#
+# This is not bookkeeping. gate-payload.mjs builds the HG1 payload's `corpus
+# (sha256 of every file this gate blesses)` section from exactly these metrics,
+# so a module with no metric here is a module that appears nowhere in the
+# document a human signs: the reviewer is never shown it, and the signature has
+# no content binding to it. While a subject's encoding was one module plus a
+# wizard, recording those two was the whole set. `corpus.modules` makes an
+# N-module encoding ordinary — the ontology module plus three statute modules
+# plus a wizard — and recording two of five would have left the heading above a
+# false statement and modules 3..N unsignable.
+#
+# The keying (repo-relative path, not basename) and its cost are argued in
+# etc/go/lib/corpus-metrics.mjs, which is also where a selftest can measure the
+# coverage instead of trusting this comment.
+declare -a CORPUS_MODULES=()
+read -ra CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+if [[ ${#CORPUS_MODULES[@]} -eq 0 ]]; then
+  go_broken "no corpus module resolved: GO_S_ENCODING_MODULES and GO_S_ENCODING are both empty, so this receipt would record no corpus sha256 at all and the HG1 payload would commit to nothing"
 fi
+set +e
+CORPUS_METRICS="$(node "$GO_LIB/corpus-metrics.mjs" "${CORPUS_MODULES[@]}" 2>&1)"
+CM_EXIT=$?
+set -e
+if [[ $CM_EXIT -ne 0 ]]; then
+  go_broken "the per-module corpus sha256 metrics could not be derived, so the HG1 payload would under-describe the encoding: $CORPUS_METRICS"
+fi
+METRICS=()
+while IFS= read -r kv; do
+  [[ -n "$kv" ]] && METRICS+=(--metric "$kv")
+done <<<"$CORPUS_METRICS"
 # The rule-name discovery only applies to a subject whose sidecar pins
 # regulative rules; a purely constitutive corpus has none to discover.
 if node -e 'process.exit(require("'"$GO_S_PINS"'").regulative_rules ? 0 : 1)'; then
-  RULES="$(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS" | tr '\n' ';')"
+  RULES="$(node "$GO_LIB/discover.mjs" rules "$GO_S_ENCODING" | tr '\n' ';')"
   METRICS+=(--metric "regulative_rules=$RULES")
 fi
 
 go_receipt \
   --status PASS \
-  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_CORPUS") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire still exits 0" \
+  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_ENCODING") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire still exits 0" \
   --oracle-exit 0 \
   --oracle-class structural \
   --oracle-because "the four CLI enumerations and the module's regulative rule names are recovered by discovery calls and compared as SETS against the subject's pins.json, so a rename fails loudly naming the exact strings; the tripwire independently confirms the l4-run workaround is still needed" \
@@ -112,4 +168,6 @@ go_receipt \
   "${METRICS[@]}" \
   --metric "l4_binary=$L4_PATH" \
   --metric "l4_binary_sha=$L4_SHA" \
+  --metric "l4_stdlib=$STDLIB_DIR" \
+  --metric "l4_stdlib_sha=$STDLIB_SHA" \
   --metric "fixed_now=$GO_FIXED_NOW"

@@ -1,0 +1,61 @@
+-- The relational middle-end's reference seed.
+--
+-- This module is BLAWX-EXPORT-SPEC.md Appendix A verbatim, and the Catala
+-- study's Appendix A before that, so the three bridges can be compared on one
+-- source. The Debug golden beside it (expected/benefit) should be recognisably
+-- the same program as the Prolog in that appendix: two clauses for
+-- `eligible for benefit` (the OR split, with the UNLESS as a complemented
+-- comparison copied into both), the WHERE helper as its own predicate under its
+-- own name, and the value-position IF as a guarded clause pair whose second arm
+-- carries a materialised negation.
+--
+-- ONE DEVIATION FROM THE APPENDIX, and it is not cosmetic: both `@export`
+-- annotations were moved ABOVE their `GIVEN`. The appendix writes them between
+-- GIVETH and the definition head, and measured on this tree that placement does
+-- not reliably attach: with the appendix's exact text
+-- `L4.Export.getExportedFunctions` returns ONE of the two decisions, not both,
+-- so half the appendix's Prolog would be unreachable from any entry point and a
+-- golden taken from it would silently pin half a program. Every `@export` in the
+-- in-tree corpus (jl4/examples/openfisca/*.l4) sits above `GIVEN`, which is what
+-- this file does. Reported as a conflict against BLAWX-EXPORT-SPEC Appendix A.
+--
+-- Each directive below carries its L4-oracle value on the line after it, as a
+-- `-- L4 oracle ==>` comment produced by `l4 run benefit.l4`. That is the
+-- differential harness's expectation and it lives HERE rather than in the
+-- emitted program, because BLAWX-EXPORT-SPEC R11 keeps the oracle outside the
+-- artifact: a bridge bug that moved actual and expected together would
+-- otherwise pass silently. One place, not two — a second copy in this header
+-- would be a claim nobody re-checks.
+
+DECLARE Applicant HAS
+    age       IS A NUMBER
+    income    IS A NUMBER
+    isVeteran IS A BOOLEAN
+
+@export
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `eligible for benefit` IF
+       a's age AT LEAST 65
+    OR a's isVeteran
+    UNLESS a's income GREATER THAN 100000
+
+@export
+GIVEN a IS AN Applicant
+GIVETH A NUMBER
+`benefit amount` a MEANS
+    IF `eligible for benefit` a THEN 1000 PLUS bonus ELSE 0
+    WHERE bonus MEANS IF a's isVeteran THEN 250 ELSE 0
+
+#EVAL `benefit amount` (Applicant WITH age IS 70, income IS 50000, isVeteran IS FALSE)
+-- L4 oracle ==> 1000
+
+-- The two #ASSERT directives below are the committed witnesses for the R11
+-- ruling's other half: an #ASSERT emits BOTH a test (like #EVAL) and a
+-- `false :- not goal(...).` constraint inside that test, runtime-checked on
+-- the Blawx side. One exercises the boolean shape, one the EQUALS shape.
+#ASSERT `eligible for benefit` (Applicant WITH age IS 70, income IS 50000, isVeteran IS FALSE)
+-- L4 oracle ==> assertion satisfied
+
+#ASSERT `benefit amount` (Applicant WITH age IS 30, income IS 50000, isVeteran IS TRUE) EQUALS 1250
+-- L4 oracle ==> assertion satisfied

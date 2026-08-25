@@ -4,8 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - ".claude/skills/writing-l4-rules/**"
+      - "skills/writing-l4-rules/**"
       - ".claude-plugin/**"
+      - "plugin.json"
       - "PLUGIN.md"
   workflow_dispatch:
 
@@ -25,29 +26,35 @@ jobs:
       - name: Get version
         id: version
         run: |
-          # Build number from the Actions run → 0.1.{build}
+          # Build number from the Actions run → 0.2.{build}
           BUILD="${{ github.run_number }}"
           # Get short hash of latest commit touching plugin directories
-          SHORT_SHA=$(git log -1 --format=%h -- .claude/skills/writing-l4-rules/ .claude-plugin/ skill/ l4/)
+          SHORT_SHA=$(git log -1 --format=%h -- skills/writing-l4-rules/ .claude-plugin/ plugin.json skill/ l4/)
           # Create version string
-          VERSION="v0.1.${BUILD}"
+          VERSION="v0.2.${BUILD}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "Release version will be: ${VERSION}-${SHORT_SHA}"
 
       - name: Update plugin version
         run: |
-          # Update version in plugin.json
+          # Update version in both manifests — the Claude Code one and the
+          # portable Agent Plugins 1.0 one at the plugin root.
           VERSION="${{ steps.version.outputs.version }}"
-          jq --arg ver "${VERSION#v}" '.version = $ver' .claude-plugin/plugin.json > .claude-plugin/plugin.json.tmp
-          mv .claude-plugin/plugin.json.tmp .claude-plugin/plugin.json
+          for m in .claude-plugin/plugin.json plugin.json; do
+            jq --arg ver "${VERSION#v}" '.version = $ver' "$m" > "$m.tmp"
+            mv "$m.tmp" "$m"
+          done
 
-          # Update version in marketplace.json
+          # Update version in the marketplace catalog. Published at both
+          # well-known paths: .claude-plugin/ (Claude Code) and .github/plugin/
+          # (Copilot CLI, VS Code). Keep them byte-identical.
           jq --arg ver "${VERSION#v}" '
             .metadata.version = $ver |
             .plugins[0].version = $ver
           ' .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
           mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
+          cp .claude-plugin/marketplace.json .github/plugin/marketplace.json
 
       - name: Create plugin packages
         run: |
@@ -56,7 +63,7 @@ jobs:
 
           # Create skill-only package (for users who just want the SKILL.md + references)
           (
-            cd .claude/skills/writing-l4-rules
+            cd skills/writing-l4-rules
             zip -r "$GITHUB_WORKSPACE/writing-l4-rules.skill" \
               assets/ \
               references/ \
@@ -67,10 +74,12 @@ jobs:
               -x "*/node_modules/.cache/*"
           )
 
-          # Create full plugin package (includes .claude-plugin/ manifest + skill + PLUGIN.md)
+          # Create full plugin package: both manifests (Claude Code's
+          # .claude-plugin/ and the portable root plugin.json) + skill + docs.
           zip -r l4-plugin.zip \
             .claude-plugin/ \
-            .claude/skills/writing-l4-rules/ \
+            plugin.json \
+            skills/writing-l4-rules/ \
             PLUGIN.md \
             -x "*.DS_Store" \
             -x "*/__pycache__/*" \

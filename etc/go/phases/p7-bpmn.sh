@@ -40,7 +40,7 @@
 # which is what makes CI's verdict apply to it.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "$GO_S_CORPUS" "${BASH_SOURCE[0]}" \
+  printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" \
     "$GO_ROOT/etc/check-bpmn-soundness.mjs" "$GO_ROOT/etc/validate-bpmn.mjs" \
     "$GO_ROOT/etc/check-bpmn-dmn-refs.mjs" ${GO_S_DMN_GOLDEN:+"$GO_S_DMN_GOLDEN"}
   while IFS=$'\t' read -r _rule stem; do
@@ -62,7 +62,7 @@ done < <(node "$GO_LIB/subject.mjs" "$GO_SUBJECT" bpmn-rules)
 [[ ${#RULE_FILE[@]} -gt 0 ]] || go_broken "the subject sidecar declares the p7-bpmn leg but its rules map came back empty"
 
 # --- 0. discovery, then set-equality against the sidecar's map --------------
-mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_S_CORPUS")
+mapfile -t RULES < <(node "$GO_LIB/discover.mjs" rules "$GO_S_ENCODING")
 [[ ${#RULES[@]} -gt 0 ]] || go_broken "the BPMN discovery call enumerated no regulative rules; the CLI's discovery shape changed"
 
 DISCOVERED="$(printf '%s\n' "${RULES[@]}" | sort)"
@@ -79,7 +79,7 @@ for rule in "${RULES[@]}"; do
   stem="${RULE_FILE[$rule]}"
   out="$GO_OUT/$stem.bpmn"
   set +e
-  "$L4" export "$GO_S_CORPUS" --to bpmn --rule "$rule" -o "$out" --fidelity-report >>"$LOG" 2>&1
+  "$L4" export "$GO_S_ENCODING" --to bpmn --rule "$rule" -o "$out" --fidelity-report >>"$LOG" 2>&1
   rc=$?
   set -e
   [[ $rc -eq 0 ]] || go_broken "l4 export --to bpmn --rule '$rule' exited $rc"

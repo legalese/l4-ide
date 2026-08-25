@@ -1,0 +1,27 @@
+-- Named rejection: recursion that is not SELF-reference.
+--
+-- Both self-reference checks are local — the structural recogniser certifies a
+-- decreasing list argument within one definition, and the generic path rejects
+-- any other call to the definition's own name — so neither can see a cycle that
+-- runs through a second definition. Two decisions that call each other lowered
+-- cleanly, reported `stratified`, and looped forever in every Prolog-family
+-- target: an out-of-fragment construct that lowers, which the M1 brief calls a
+-- bug in the same breath as an in-fragment one that does not.
+--
+-- Read this beside ../unstratified.l4, which is the same SHAPE and lowers
+-- successfully on purpose. The difference is the sign: that cycle runs through
+-- a negation, so the Apt-Blair-Walker result already records it and each leg
+-- decides for itself (ASP wants it, swipl and Blawx reject it). This one is
+-- purely positive, so stratification says nothing about it and there would be
+-- no other warning anywhere. The middle-end reports exactly the cycles nothing
+-- else reports, and no others.
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `p holds` IF `q holds` n
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `q holds` IF `p holds` n

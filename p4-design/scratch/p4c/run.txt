@@ -1,0 +1,834 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    317:1-323:65
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  assertion satisfied
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    326:1-331:13
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    334:1-338:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  1300
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    341:1-345:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    350:1-354:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  2400
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    357:1-361:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    368:1-373:13
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    376:1-380:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    385:1-390:13
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    393:1-397:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    404:1-408:79
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    411:1-415:79
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    421:1-425:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    429:1-434:13
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    437:1-441:77
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    448:1-453:144
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  assertion satisfied
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    456:1-459:157
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    462:1-465:157
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    470:1-473:156
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    480:1-483:157
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    486:1-489:157
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    494:1-497:157
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    500:1-503:157
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    511:1-514:156
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    517:1-520:156
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    525:1-530:174
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  assertion satisfied
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    533:1-536:187
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    539:1-542:187
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    547:1-550:186
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    555:1-558:187
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    561:1-564:187
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    569:1-572:187
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    575:1-578:187
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    583:1-586:186
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    589:1-592:186
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    597:1-603:103
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  assertion satisfied
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    606:1-610:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    613:1-617:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    620:1-624:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    629:1-633:115
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    636:1-640:115
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    645:1-649:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    652:1-656:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    661:1-665:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    668:1-672:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    679:1-683:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    686:1-690:116
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  FALSE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    697:1-701:115
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+File:     housing-grounds.l4
+  Hidden:   no
+  Range:    704:1-708:115
+  Source:   eval
+  Severity: DiagnosticSeverity_Information
+  Code:     <none>
+  Message:  TRUE
+Evaluation[1] @ housing-grounds.l4:317:1-323:65
+
+Result:
+  assertion satisfied
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[2] @ housing-grounds.l4:326:1-331:13
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[3] @ housing-grounds.l4:334:1-338:77
+
+Result:
+  1300
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[4] @ housing-grounds.l4:341:1-345:77
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[5] @ housing-grounds.l4:350:1-354:77
+
+Result:
+  2400
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[6] @ housing-grounds.l4:357:1-361:77
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[7] @ housing-grounds.l4:368:1-373:13
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[8] @ housing-grounds.l4:376:1-380:77
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[9] @ housing-grounds.l4:385:1-390:13
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[10] @ housing-grounds.l4:393:1-397:77
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[11] @ housing-grounds.l4:404:1-408:79
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[12] @ housing-grounds.l4:411:1-415:79
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[13] @ housing-grounds.l4:421:1-425:77
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[14] @ housing-grounds.l4:429:1-434:13
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[15] @ housing-grounds.l4:437:1-441:77
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[16] @ housing-grounds.l4:448:1-453:144
+
+Result:
+  assertion satisfied
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[17] @ housing-grounds.l4:456:1-459:157
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[18] @ housing-grounds.l4:462:1-465:157
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[19] @ housing-grounds.l4:470:1-473:156
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[20] @ housing-grounds.l4:480:1-483:157
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[21] @ housing-grounds.l4:486:1-489:157
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[22] @ housing-grounds.l4:494:1-497:157
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[23] @ housing-grounds.l4:500:1-503:157
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[24] @ housing-grounds.l4:511:1-514:156
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[25] @ housing-grounds.l4:517:1-520:156
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[26] @ housing-grounds.l4:525:1-530:174
+
+Result:
+  assertion satisfied
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[27] @ housing-grounds.l4:533:1-536:187
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[28] @ housing-grounds.l4:539:1-542:187
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[29] @ housing-grounds.l4:547:1-550:186
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[30] @ housing-grounds.l4:555:1-558:187
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[31] @ housing-grounds.l4:561:1-564:187
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[32] @ housing-grounds.l4:569:1-572:187
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[33] @ housing-grounds.l4:575:1-578:187
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[34] @ housing-grounds.l4:583:1-586:186
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[35] @ housing-grounds.l4:589:1-592:186
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[36] @ housing-grounds.l4:597:1-603:103
+
+Result:
+  assertion satisfied
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[37] @ housing-grounds.l4:606:1-610:116
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[38] @ housing-grounds.l4:613:1-617:116
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[39] @ housing-grounds.l4:620:1-624:116
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[40] @ housing-grounds.l4:629:1-633:115
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[41] @ housing-grounds.l4:636:1-640:115
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[42] @ housing-grounds.l4:645:1-649:116
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[43] @ housing-grounds.l4:652:1-656:116
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[44] @ housing-grounds.l4:661:1-665:116
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[45] @ housing-grounds.l4:668:1-672:116
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[46] @ housing-grounds.l4:679:1-683:116
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[47] @ housing-grounds.l4:686:1-690:116
+
+Result:
+  FALSE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[48] @ housing-grounds.l4:697:1-701:115
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
+Evaluation[49] @ housing-grounds.l4:704:1-708:115
+
+Result:
+  TRUE
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
