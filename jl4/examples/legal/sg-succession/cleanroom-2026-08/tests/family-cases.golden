@@ -1,0 +1,471 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+family-cases.l4:566:1-59:
+  assertion satisfied
+family-cases.l4:573:1-94:
+  assertion satisfied
+family-cases.l4:574:1-67:
+  assertion satisfied
+family-cases.l4:575:1-92:
+  assertion satisfied
+family-cases.l4:576:1-81:
+  assertion satisfied
+family-cases.l4:577:1-578:110:
+  assertion satisfied
+family-cases.l4:582:1-79:
+  assertion satisfied
+family-cases.l4:583:1-584:26:
+  assertion satisfied
+family-cases.l4:590:1-100:
+  assertion satisfied
+family-cases.l4:591:1-118:
+  assertion satisfied
+family-cases.l4:592:1-126:
+  assertion satisfied
+family-cases.l4:593:1-168:
+  assertion satisfied
+family-cases.l4:594:1-595:109:
+  assertion satisfied
+family-cases.l4:596:1-81:
+  assertion satisfied
+family-cases.l4:600:1-141:
+  assertion satisfied
+family-cases.l4:601:1-141:
+  assertion satisfied
+family-cases.l4:602:1-141:
+  assertion satisfied
+family-cases.l4:609:1-610:50:
+  assertion satisfied
+family-cases.l4:617:1-76:
+  assertion satisfied
+family-cases.l4:621:1-622:77:
+  assertion satisfied
+family-cases.l4:623:1-104:
+  assertion satisfied
+family-cases.l4:624:1-104:
+  assertion satisfied
+family-cases.l4:625:1-105:
+  assertion satisfied
+family-cases.l4:635:1-141:
+  assertion satisfied
+family-cases.l4:636:1-141:
+  assertion satisfied
+family-cases.l4:637:1-141:
+  assertion satisfied
+family-cases.l4:645:1-121:
+  assertion satisfied
+family-cases.l4:646:1-87:
+  assertion satisfied
+family-cases.l4:647:1-147:
+  assertion satisfied
+family-cases.l4:648:1-175:
+  assertion satisfied
+family-cases.l4:649:1-169:
+  assertion satisfied
+family-cases.l4:653:1-185:
+  assertion satisfied
+family-cases.l4:654:1-185:
+  assertion satisfied
+family-cases.l4:655:1-185:
+  assertion satisfied
+family-cases.l4:663:1-664:135:
+  assertion satisfied
+family-cases.l4:665:1-666:66:
+  assertion satisfied
+family-cases.l4:667:1-162:
+  assertion satisfied
+family-cases.l4:668:1-669:98:
+  assertion satisfied
+family-cases.l4:670:1-237:
+  assertion satisfied
+family-cases.l4:671:1-229:
+  assertion satisfied
+family-cases.l4:681:1-231:
+  assertion satisfied
+family-cases.l4:682:1-169:
+  assertion satisfied
+family-cases.l4:692:1-115:
+  assertion satisfied
+family-cases.l4:693:1-115:
+  assertion satisfied
+family-cases.l4:694:1-116:
+  assertion satisfied
+family-cases.l4:695:1-119:
+  assertion satisfied
+family-cases.l4:700:1-701:103:
+  assertion satisfied
+family-cases.l4:706:1-707:108:
+  assertion satisfied
+family-cases.l4:708:1-709:103:
+  assertion satisfied
+family-cases.l4:714:1-127:
+  assertion satisfied
+family-cases.l4:726:1-114:
+  assertion satisfied
+family-cases.l4:738:1-133:
+  assertion satisfied
+family-cases.l4:739:1-129:
+  assertion satisfied
+family-cases.l4:740:1-742:105:
+  assertion satisfied
+family-cases.l4:760:1-133:
+  assertion satisfied
+family-cases.l4:761:1-125:
+  assertion satisfied
+family-cases.l4:762:1-127:
+  assertion satisfied
+family-cases.l4:767:1-144:
+  assertion satisfied
+family-cases.l4:768:1-136:
+  assertion satisfied
+family-cases.l4:769:1-134:
+  assertion satisfied
+family-cases.l4:773:1-139:
+  assertion satisfied
+family-cases.l4:774:1-775:128:
+  assertion satisfied
+family-cases.l4:790:1-791:46:
+  assertion satisfied
+family-cases.l4:792:1-139:
+  assertion satisfied
+family-cases.l4:886:1-113:
+  assertion satisfied
+family-cases.l4:887:1-167:
+  assertion satisfied
+family-cases.l4:888:1-83:
+  assertion satisfied
+family-cases.l4:889:1-115:
+  assertion satisfied
+family-cases.l4:890:1-152:
+  assertion satisfied
+family-cases.l4:891:1-892:171:
+  assertion satisfied
+family-cases.l4:896:1-115:
+  assertion satisfied
+family-cases.l4:897:1-102:
+  assertion satisfied
+family-cases.l4:898:1-129:
+  assertion satisfied
+family-cases.l4:899:1-98:
+  assertion satisfied
+family-cases.l4:900:1-901:103:
+  assertion satisfied
+family-cases.l4:902:1-97:
+  assertion satisfied
+family-cases.l4:903:1-145:
+  assertion satisfied
+family-cases.l4:904:1-146:
+  assertion satisfied
+family-cases.l4:909:1-108:
+  assertion satisfied
+family-cases.l4:910:1-95:
+  assertion satisfied
+family-cases.l4:911:1-912:111:
+  assertion satisfied
+family-cases.l4:913:1-95:
+  assertion satisfied
+family-cases.l4:914:1-90:
+  assertion satisfied
+family-cases.l4:915:1-146:
+  assertion satisfied
+family-cases.l4:916:1-917:79:
+  assertion satisfied
+family-cases.l4:995:1-81:
+  assertion satisfied
+family-cases.l4:996:1-98:
+  assertion satisfied
+family-cases.l4:997:1-96:
+  assertion satisfied
+family-cases.l4:998:1-84:
+  assertion satisfied
+family-cases.l4:1005:1-133:
+  assertion satisfied
+family-cases.l4:1006:1-121:
+  assertion satisfied
+family-cases.l4:1007:1-131:
+  assertion satisfied
+family-cases.l4:1012:1-117:
+  assertion satisfied
+family-cases.l4:1013:1-104:
+  assertion satisfied
+family-cases.l4:1014:1-100:
+  assertion satisfied
+family-cases.l4:1015:1-99:
+  assertion satisfied
+family-cases.l4:1021:1-110:
+  assertion satisfied
+family-cases.l4:1022:1-97:
+  assertion satisfied
+family-cases.l4:1023:1-1024:73:
+  assertion satisfied
+family-cases.l4:1025:1-92:
+  assertion satisfied
+family-cases.l4:1026:1-1027:109:
+  assertion satisfied
+family-cases.l4:1036:1-103:
+  assertion satisfied
+family-cases.l4:1146:1-163:
+  assertion satisfied
+family-cases.l4:1147:1-114:
+  assertion satisfied
+family-cases.l4:1150:1-170:
+  assertion satisfied
+family-cases.l4:1151:1-86:
+  assertion satisfied
+family-cases.l4:1156:1-70:
+  assertion satisfied
+family-cases.l4:1157:1-162:
+  assertion satisfied
+family-cases.l4:1158:1-115:
+  assertion satisfied
+family-cases.l4:1159:1-1160:172:
+  assertion satisfied
+family-cases.l4:1165:1-159:
+  assertion satisfied
+family-cases.l4:1166:1-1167:26:
+  assertion satisfied
+family-cases.l4:1176:1-1177:26:
+  assertion satisfied
+family-cases.l4:1178:1-1179:142:
+  assertion satisfied
+family-cases.l4:1195:1-156:
+  assertion satisfied
+family-cases.l4:1203:1-181:
+  assertion satisfied
+family-cases.l4:1204:1-1205:76:
+  assertion satisfied
+family-cases.l4:1209:1-95:
+  assertion satisfied
+family-cases.l4:1210:1-114:
+  assertion satisfied
+family-cases.l4:1211:1-1212:114:
+  assertion satisfied
+family-cases.l4:1218:1-83:
+  assertion satisfied
+family-cases.l4:1219:1-67:
+  assertion satisfied
+family-cases.l4:1220:1-101:
+  assertion satisfied
+family-cases.l4:1221:1-110:
+  assertion satisfied
+family-cases.l4:1222:1-95:
+  assertion satisfied
+family-cases.l4:1223:1-94:
+  assertion satisfied
+family-cases.l4:1224:1-1225:38:
+  assertion satisfied
+family-cases.l4:1226:1-1227:106:
+  assertion satisfied
+family-cases.l4:1228:1-1229:38:
+  assertion satisfied
+family-cases.l4:1278:1-101:
+  assertion satisfied
+family-cases.l4:1279:1-196:
+  assertion satisfied
+family-cases.l4:1280:1-1281:89:
+  assertion satisfied
+family-cases.l4:1282:1-193:
+  assertion satisfied
+family-cases.l4:1283:1-169:
+  assertion satisfied
+family-cases.l4:1288:1-1289:26:
+  assertion satisfied
+family-cases.l4:1294:1-156:
+  assertion satisfied
+family-cases.l4:1295:1-181:
+  assertion satisfied
+family-cases.l4:1296:1-114:
+  assertion satisfied
+family-cases.l4:1380:1-84:
+  assertion satisfied
+family-cases.l4:1381:1-65:
+  assertion satisfied
+family-cases.l4:1382:1-79:
+  assertion satisfied
+family-cases.l4:1383:1-89:
+  assertion satisfied
+family-cases.l4:1384:1-86:
+  assertion satisfied
+family-cases.l4:1385:1-106:
+  assertion satisfied
+family-cases.l4:1386:1-70:
+  assertion satisfied
+family-cases.l4:1387:1-75:
+  assertion satisfied
+family-cases.l4:1388:1-103:
+  assertion satisfied
+family-cases.l4:1392:1-1393:130:
+  assertion satisfied
+family-cases.l4:1397:1-108:
+  assertion satisfied
+family-cases.l4:1398:1-1399:99:
+  assertion satisfied
+family-cases.l4:1400:1-1401:106:
+  assertion satisfied
+family-cases.l4:1410:1-152:
+  assertion satisfied
+family-cases.l4:1411:1-189:
+  assertion satisfied
+family-cases.l4:1412:1-70:
+  assertion satisfied
+family-cases.l4:1413:1-1414:67:
+  assertion satisfied
+family-cases.l4:1415:1-75:
+  assertion satisfied
+family-cases.l4:1416:1-142:
+  assertion satisfied
+family-cases.l4:1420:1-109:
+  assertion satisfied
+family-cases.l4:1421:1-118:
+  assertion satisfied
+family-cases.l4:1450:1-97:
+  assertion satisfied
+family-cases.l4:1451:1-1452:130:
+  assertion satisfied
+family-cases.l4:1527:1-1528:118:
+  assertion satisfied
+family-cases.l4:1529:1-115:
+  assertion satisfied
+family-cases.l4:1530:1-152:
+  assertion satisfied
+family-cases.l4:1531:1-1532:112:
+  assertion satisfied
+family-cases.l4:1536:1-97:
+  assertion satisfied
+family-cases.l4:1537:1-180:
+  assertion satisfied
+family-cases.l4:1538:1-78:
+  assertion satisfied
+family-cases.l4:1541:1-138:
+  assertion satisfied
+family-cases.l4:1542:1-1543:152:
+  assertion satisfied
+family-cases.l4:1552:1-64:
+  assertion satisfied
+family-cases.l4:1553:1-66:
+  assertion satisfied
+family-cases.l4:1554:1-109:
+  assertion satisfied
+family-cases.l4:1555:1-110:
+  assertion satisfied
+family-cases.l4:1596:1-149:
+  assertion satisfied
+family-cases.l4:1597:1-1598:105:
+  assertion satisfied
+family-cases.l4:1599:1-163:
+  assertion satisfied
+family-cases.l4:1600:1-161:
+  assertion satisfied
+family-cases.l4:1603:1-128:
+  assertion satisfied
+family-cases.l4:1604:1-126:
+  assertion satisfied
+family-cases.l4:1605:1-1606:113:
+  assertion satisfied
+family-cases.l4:1631:1-133:
+  assertion satisfied
+family-cases.l4:1632:1-1633:67:
+  assertion satisfied
+family-cases.l4:1634:1-157:
+  assertion satisfied
+family-cases.l4:1635:1-1636:114:
+  assertion satisfied
+family-cases.l4:1637:1-143:
+  assertion satisfied
+family-cases.l4:1684:1-112:
+  assertion satisfied
+family-cases.l4:1688:1-1689:110:
+  assertion satisfied
+family-cases.l4:1694:1-1695:94:
+  assertion satisfied
+family-cases.l4:1737:1-121:
+  assertion satisfied
+family-cases.l4:1738:1-142:
+  assertion satisfied
+family-cases.l4:1739:1-147:
+  assertion satisfied
+family-cases.l4:1740:1-168:
+  assertion satisfied
+family-cases.l4:1745:1-93:
+  assertion satisfied
+family-cases.l4:1746:1-137:
+  assertion satisfied
+family-cases.l4:1747:1-132:
+  assertion satisfied
+family-cases.l4:1748:1-90:
+  assertion satisfied
+family-cases.l4:1749:1-100:
+  assertion satisfied
+family-cases.l4:1750:1-101:
+  assertion satisfied
+family-cases.l4:1751:1-104:
+  assertion satisfied
+family-cases.l4:1792:1-126:
+  assertion satisfied
+family-cases.l4:1793:1-134:
+  assertion satisfied
+family-cases.l4:1798:1-104:
+  assertion satisfied
+family-cases.l4:1799:1-125:
+  assertion satisfied
+family-cases.l4:1800:1-150:
+  assertion satisfied
+family-cases.l4:1801:1-139:
+  assertion satisfied
+family-cases.l4:1813:1-282:
+  assertion satisfied
+family-cases.l4:1814:1-233:
+  assertion satisfied
+family-cases.l4:1899:1-77:
+  assertion satisfied
+family-cases.l4:1900:1-84:
+  assertion satisfied
+family-cases.l4:1901:1-94:
+  assertion satisfied
+family-cases.l4:1906:1-90:
+  assertion satisfied
+family-cases.l4:1907:1-1908:103:
+  assertion satisfied
+family-cases.l4:1913:1-118:
+  assertion satisfied
+family-cases.l4:1914:1-162:
+  assertion satisfied
+family-cases.l4:1921:1-152:
+  assertion satisfied
+family-cases.l4:1922:1-186:
+  assertion satisfied
+family-cases.l4:1927:1-119:
+  assertion satisfied
+family-cases.l4:1928:1-190:
+  assertion satisfied
+family-cases.l4:1933:1-96:
+  assertion satisfied
+family-cases.l4:1934:1-186:
+  assertion satisfied
+family-cases.l4:1935:1-176:
+  assertion satisfied
+family-cases.l4:1940:1-214:
+  assertion satisfied
+family-cases.l4:1941:1-238:
+  assertion satisfied
+family-cases.l4:1945:1-111:
+  assertion satisfied
+family-cases.l4:1946:1-119:
+  assertion satisfied
+family-cases.l4:1947:1-114:
+  assertion satisfied
+family-cases.l4:1953:1-133:
+  assertion satisfied
+family-cases.l4:1954:1-141:
+  assertion satisfied
+family-cases.l4:1955:1-139:
+  assertion satisfied
+family-cases.l4:1956:1-1957:122:
+  assertion satisfied
+family-cases.l4:1964:1-1965:103:
+  assertion satisfied
+family-cases.l4:1966:1-1967:108:
+  assertion satisfied
+family-cases.l4:1968:1-142:
+  assertion satisfied

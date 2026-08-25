@@ -1,0 +1,443 @@
+`s 18(1) — the person has died intestate` with `the Tan intestacy`
+`the persons entitled under section 18(4)(a)` with `the Tan intestacy` is equal to list of `Lim Mei Ling`, `Tan Wei` and `Tan Xin`
+`s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy` and lim
+`s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy` and wei
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy` and stranger
+`a “child” within the meaning of section 3 of the Intestate Succession Act 1967` with `a PAA legitimate child` with `Tan Wei`
+`a “child” within the meaning of section 3 of the Intestate Succession Act 1967` with `a PAA adopted child` with `Tan Hui, adopted by order of court`
+not `a “child” within the meaning of section 3 of the Intestate Succession Act 1967` with `a PAA child neither legitimate nor adopted` with `Tan Bao, whose own son is legitimate`
+`the next of kin of the deceased` with `the Tan intestacy, one child unadopted and illegitimate and one adopted` is equal to list of `Tan Hui, adopted by order of court`
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, one child unadopted and illegitimate and one adopted` and bao
+`s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, one child unadopted and illegitimate and one adopted` and hui
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, one child unadopted and illegitimate and one adopted` and feng
+`the next of kin of the deceased` with `the Tan intestacy, the same child being legitimate` is equal to list of `Tan Bao, whose own son is legitimate` and `Tan Feng, the son of Tan Bao`
+not `s 6(4) — this person is a beneficiary` with `the Tan intestacy, the infant daughter neither legitimate nor adopted` and `Tan Xin`
+not `s 6(4) — there is a minority of a beneficiary` with `the Tan intestacy, the infant daughter neither legitimate nor adopted` and `the date of the hearing`
+`s 6(2) — there is a minority` with `the Tan intestacy, the infant daughter neither legitimate nor adopted` and `the date of the hearing`
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, the wife having predeceased` and lim
+`the persons entitled under section 18(4)(a)` with `the Tan intestacy, the wife having predeceased` is equal to list of `Tan Wei` and `Tan Xin`
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, the marriage dissolved` and lim
+`the next of kin of the deceased` with `the Tan intestacy, the son having predeceased` is equal to list of `Tan Xin, so desiring`
+`the persons entitled under section 18(4)(a)` with `the Tan intestacy, the son having predeceased` is equal to list of `Lim Mei Ling` and `Tan Xin, so desiring`
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, the son having predeceased` and wei
+`s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, the son having predeceased` and xin
+`s 18(4) — the classes to which letters of administration may be granted` with `the Tan intestacy` is equal to list of `the husband or widow or next of kin or any of them` and `such person as the court thinks fit`
+`s 18(4) — the classes to which letters of administration may be granted` with `the Tan intestacy, with a creditor` is equal to list of `the husband or widow or next of kin or any of them`, `a creditor of the deceased, no such person having applied` and `such person as the court thinks fit`
+`the persons entitled under section 18(4)(a)` with `the Tan intestacy, nobody surviving to take` is equal to `EMPTY`
+`s 18(4) — the classes to which letters of administration may be granted` with `the Tan intestacy, nobody surviving to take` is equal to list of `such person as the court thinks fit`
+`s 18(4)(b) — such persons apply for letters of administration` with `the Tan intestacy, the widow having applied`
+not `s 18(4)(b) — such persons apply for letters of administration` with `the Tan intestacy`
+not `s 18(4)(c) — no such person applies, and letters of administration may be granted to a creditor of the deceased` with `the Tan intestacy, the widow having applied`
+`s 18(4)(c) — no such person applies, and letters of administration may be granted to a creditor of the deceased` with `the Tan intestacy`
+`s 18(4) — the classes to which letters of administration may be granted` with `the Tan intestacy, the widow having applied` is equal to list of `the husband or widow or next of kin or any of them`
+`s 18(4)(d)(ii) — no next of kin or creditor or other person appears and makes out a claim to letters of administration` with `the Tan intestacy`
+not `s 18(4)(d)(ii) — no next of kin or creditor or other person appears and makes out a claim to letters of administration` with `the Tan intestacy, the widow having applied`
+not `s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire` with `the Tan intestacy`
+`s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire` with `the Tan intestacy, the children so desiring`
+not `s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire` with `the Tan intestacy, one child so desiring`
+`s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire` with `the Tan intestacy, the son having predeceased`
+not `s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire` with `the Tan intestacy, nobody surviving to take`
+not `s 18(4)(d)(ii) — no next of kin or creditor or other person appears and makes out a claim to letters of administration` with `the Tan intestacy, the children so desiring, a claim having been made out`
+`s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire` with `the Tan intestacy, the children so desiring, a claim having been made out`
+`s 18(4)(d) — letters of administration may be granted to such person as the court thinks fit` with `the Tan intestacy, the children so desiring, a claim having been made out`
+not `s 18(4)(d) — letters of administration may be granted to such person as the court thinks fit` with `the Tan intestacy, nobody desiring, a claim having been made out`
+`s 18(4)(d) — letters of administration may be granted to such person as the court thinks fit` with `the Tan intestacy`
+`s 6(2) — there is a minority` with `the Tan intestacy` and `the date of the hearing`
+not `s 6(2) — a life interest arises under the will` with `the Tan intestacy`
+`s 6(2) — the requirement as to the grantees is engaged` with `the Tan intestacy` and `the date of the hearing`
+not `s 6(2) — the requirement as to the grantees is engaged` with `the Ong estate with` with `NOTHING` and `EMPTY` and `the date of the hearing`
+not `s 6(1) — granted to more than 4 persons in respect of the same property` with `a grant to the widow and the son`
+not `s 6(1) — granted to more than 4 persons in respect of the same property` with `a grant to four persons`
+`s 6(1) — granted to more than 4 persons in respect of the same property` with `a grant to five persons`
+not `s 6(2) — the grant complies with section 6(2)` with `the Tan intestacy`, `a grant to the widow alone` and `the date of the hearing`
+`s 6(2) — the grant complies with section 6(2)` with `the Tan intestacy`, `a grant to the widow and the son` and `the date of the hearing`
+`s 6(2) — the grant complies with section 6(2)` with `the Tan intestacy`, `a grant to the widow and a trust company` and `the date of the hearing`
+not `s 6(2) — granted either to a trust corporation, with or without an individual, or to not less than 2 individuals` with `a grant to the widow alone`
+`s 6(2) — granted either to a trust corporation, with or without an individual, or to not less than 2 individuals` with `a grant to the widow and the son`
+not `s 6(2) — there is a minority` with `the Tan intestacy` and `YMD` with 2033, 1 and 1
+`s 6(2) — the grant complies with section 6(2)` with `the Tan intestacy`, `a grant to the widow alone` and `YMD` with 2033, 1 and 1
+`s 6(2) — the grant is one of the grants section 6(2) governs` with `a grant to the widow alone`
+not `s 6(2) — the grant is one of the grants section 6(2) governs` with `a grant of probate to Chan alone`
+`s 6(6) — a trust corporation` with `Public Trustee as grantee`
+`s 6(6) — a trust corporation` with `Acme Trust Company`
+not `s 6(6) — a trust corporation` with `an individual` with `Lim Mei Ling`
+not `s 6(6) — a trust corporation` with `the Government`
+`s 6(4) — this person is a beneficiary` with `the Tan intestacy, the widow having taken a grant` and `Tan Xin`
+`s 6(4) — there is a minority of a beneficiary` with `the Tan intestacy, the widow having taken a grant` and `the date of the hearing`
+`s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, the widow having taken a grant` and `the date of the hearing`
+not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, the widow having taken a grant` and `YMD` with 2033, 1 and 1
+not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, two administrators having taken a grant` and `the date of the hearing`
+not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, fully administered` and `the date of the hearing`
+`s 6(4) — there is a minority of a beneficiary` with `the Tan intestacy, a trust company having taken a grant` and `the date of the hearing`
+`count` with `the personal representatives of the estate still living` with `the Tan intestacy, a trust company having taken a grant` is equal to 1
+not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, a trust company having taken a grant` and `the date of the hearing`
+`count` with `the personal representatives of the estate` with `the Tan intestacy, one of two administrators having died` is equal to 2
+`count` with `the personal representatives of the estate still living` with `the Tan intestacy, one of two administrators having died` is equal to 1
+`s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, one of two administrators having died` and `the date of the hearing`
+`s 6(5) — this section applies to the grant` with `a grant to the widow alone`
+not `s 6(5) — this section applies to the grant` with `a grant made on 1 January 1935`
+`s 6(5) — this section applies to the grant` with `a grant made on 2 January 1935`
+not `s 6(5) — this section applies to the grant` with `a grant of no recorded date`
+`s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Tan Xin` and `the date of the hearing`
+not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Tan Wei` and `the date of the hearing`
+not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `a PAA person of unknown age` with Unknown and unk and `the date of the hearing`
+`s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Tan Xin` and `YMD` with 2032, 5 and 31
+not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Tan Xin` and `YMD` with 2032, 6 and 1
+`s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration` with `the Tan intestacy`, `a PAA infant concerned in the estate` with `Tan Xin` and `the date of the hearing`
+not `s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration` with `the Tan intestacy`, `a PAA infant concerned in the estate` with `a PAA minor` with Unrelated Infant and uri and `the date of the hearing`
+not `s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration` with `the Tan intestacy`, `a PAA infant concerned in the estate` with `Tan Wei` and `the date of the hearing`
+`s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as guardian, not limited` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as administrator, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as guardian, for the use and benefit of the adult son` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy`, `a grant to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the property only`, `a grant to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow having been removed from her guardianship`, `a grant to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the son being guardian of the infant`, `a grant to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as guardian and four others` and `the date of the hearing`
+`s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as guardian and three others` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `probate to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy`, `a grant to five persons` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Ong estate with` with `NOTHING` and `EMPTY`, `a grant to the widow alone` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy`, `a grant of probate to Chan alone` and `the date of the hearing`
+`s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Ong testacy, an infant executor with a guardian, Goh administering`, `letters with the will annexed to Goh as guardian of the infant executor` and `the date of the hearing`
+not `s 21(3) — there are 2 or more infant executors or persons so entitled` with `the Tan intestacy` and `the date of the hearing`
+`s 21 — the limitation on a grant made under subsection (2)` with `the Tan intestacy` and `the date of the hearing` is equal to `limited in some other way` with limited until the infant obtains a grant to himself
+`s 21(3) — there are 2 or more infant executors or persons so entitled` with `the Tan intestacy, two infants entitled` and `the date of the hearing`
+`s 21 — the limitation on a grant made under subsection (2)` with `the Tan intestacy, two infants entitled` and `the date of the hearing` is equal to `limited in some other way` with limited until any of them obtains a grant
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, two infants entitled, the widow being guardian of one`, `a grant to the widow as guardian, limited until the infant obtains a grant` and `the date of the hearing`
+`s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, two infants entitled, the widow being guardian of one`, `a grant to the widow as guardian, limited until any of them obtains a grant` and `the date of the hearing`
+not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Tan intestacy, the widow being guardian of the infant`, `a grant to the widow as guardian, limited until any of them obtains a grant` and `the date of the hearing`
+`s 19 — letters of administration may be granted to an authorised attorney of the absent person` with `the Tan intestacy, the widow abroad and the children unwilling` and `Lim Mei Ling, abroad`
+not `s 19 — letters of administration may be granted to an authorised attorney of the absent person` with `the Tan intestacy, the widow abroad` and `Lim Mei Ling, abroad`
+not `s 19 — letters of administration may be granted to an authorised attorney of the absent person` with `the Tan intestacy, the widow abroad and the children unwilling` and `a stranger abroad`
+not `s 19 — letters of administration may be granted to an authorised attorney of the absent person` with `the Tan intestacy, the widow abroad and the children unwilling` and `Lim Mei Ling`
+`s 19 — letters of administration may be granted to an authorised attorney of the absent person` with `the Tan intestacy, nobody entitled being willing to act` and `Lim Mei Ling, abroad and unwilling`
+not `s 19 — letters of administration may be granted to an authorised attorney of the absent person` with `the Tan intestacy, nobody entitled being willing to act` and `a stranger abroad and unwilling`
+not `s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, nobody entitled being willing to act` and str
+`s 19 — the limitation on a grant to the attorney of an absent person entitled` is equal to `limited in some other way` with limited until he obtains a grant to himself
+`s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` with `the Tan intestacy, the deceased being a Muslim`
+not `s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` with `the Tan intestacy`
+`s 20 — letters of administration may be granted pending a probate action` with `TRUE`
+not `s 20 — letters of administration may be granted pending a probate action` with `FALSE`
+`s 20 — the limitation on a grant pending a probate action` is equal to `a grant that does not permit the distribution of the testator’s estate`
+`s 17 — letters of administration may be granted, limited until the will is produced` with `TRUE` and `TRUE`
+not `s 17 — letters of administration may be granted, limited until the will is produced` with `TRUE` and `FALSE`
+not `s 17 — letters of administration may be granted, limited until the will is produced` with `FALSE` and `TRUE`
+`s 17 — the limitation on a grant until the will is produced` is equal to `limited in some other way` with limited until the will or an authenticated copy thereof is produced
+not `s 18(1) — the person has died intestate` with `the Ong estate with` with `JUST` with `the will whose executors have all extracted probate` and `EMPTY`
+`s 13(1)(a) — no executor is appointed by a will` with `the will appointing no executor`
+not `s 13(1)(a) — no executor is appointed by a will` with `the will whose executors have not extracted probate`
+`s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will whose executors are disqualified` and `the date of the hearing`
+`s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will whose sole executor lacks mental capacity` and `the date of the hearing`
+not `s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will one of whose executors is disqualified` and `the date of the hearing`
+not `s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will whose executors have all extracted probate` and `the date of the hearing`
+`s 13(1)(c) — no executor survives the testator` with `the will whose executor predeceased the testator`
+not `s 13(1)(c) — no executor survives the testator` with `the will whose executor died after the testator`
+`s 13(1)(e) — the executors appointed by any will do not appear and extract probate` with `the will whose executors have not extracted probate`
+not `s 13(1)(e) — the executors appointed by any will do not appear and extract probate` with `the will whose executors have all extracted probate`
+`s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and `EMPTY` and `the will whose executor died after the testator`
+not `s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Chan, in his lifetime` and `the will whose executor died after the testator`
+`s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executor died having proved but not administered` and list of `a grant of probate to Chan, in his lifetime` and `the will whose executor died having proved but not administered`
+not `s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY` and `the will whose executors have not extracted probate`
+`s 13(1) — letters of administration with the will annexed may be granted on failure of executors` with `the Ong estate with` with `JUST` with `the will whose executors are disqualified` and `EMPTY`, `the will whose executors are disqualified` and `the date of the hearing`
+not `s 13(1) — letters of administration with the will annexed may be granted on failure of executors` with `the Ong estate with` with `JUST` with `the will whose executors have all extracted probate` and `EMPTY`, `the will whose executors have all extracted probate` and `the date of the hearing`
+`s 13(1) — letters of administration with the will annexed may be granted on failure of executors` with `the Ong estate with` with `JUST` with `the will appointing no executor` and `EMPTY`, `the will appointing no executor` and `the date of the hearing`
+`s 13(1)(d) — this executor obtained probate` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Chan, in his lifetime` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `s 13(1)(d) — this executor obtained probate` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Chan, since revoked` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `s 13(1)(d) — this executor obtained probate` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Goh, in Chan’s lifetime` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `s 13(1)(d) — this executor obtained probate` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant to Chan as administrator, in his lifetime` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `s 13(1)(d) — this executor obtained probate` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Chan, made after his death` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+`s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Chan, since revoked` and `the will whose executor died after the testator`
+`s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and list of `a grant of probate to Chan, made after his death` and `the will whose executor died after the testator`
+`this grantee is this executor, taking as executor` with `a PAA grantee` with `an individual` with `Chan, dying after the testator`, `as executor` and `NOTHING` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `this grantee is this executor, taking as executor` with `a PAA grantee` with `an individual` with `Chan, dying after the testator`, `as administrator` and `NOTHING` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `this grantee is this executor, taking as executor` with `a PAA grantee` with `an individual` with `Goh Siew Lan`, `as executor` and `NOTHING` and `a PAA executor` with `Chan, dying after the testator`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+`s 13(1)(b) — this executor is legally incapable of acting as such` with `a PAA executor` with `Ng Wei Jie, an infant executor`, `FALSE`, `FALSE`, `FALSE` and `FALSE` and `the date of the hearing`
+not `s 13(1)(b) — this executor is legally incapable of acting as such` with `a PAA executor` with `Ng Wei Jie, an infant executor`, `FALSE`, `FALSE`, `FALSE` and `FALSE` and `YMD` with 2033, 1 and 1
+`s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will appointing an infant executor` and `the date of the hearing`
+not `s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will appointing an infant executor` and `YMD` with 2033, 1 and 1
+`s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will whose executors are disqualified, both having proved` and `the date of the hearing`
+not `s 13(1)(a) — no executor is appointed by a will` with `the will whose executors are disqualified, both having proved`
+not `s 13(1)(c) — no executor survives the testator` with `the will whose executors are disqualified, both having proved`
+not `s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased` with `the Ong estate with` with `JUST` with `the will whose executors are disqualified, both having proved` and `EMPTY` and `the will whose executors are disqualified, both having proved`
+not `s 13(1)(e) — the executors appointed by any will do not appear and extract probate` with `the will whose executors are disqualified, both having proved`
+`s 13(1) — letters of administration with the will annexed may be granted on failure of executors` with `the Ong estate with` with `JUST` with `the will whose executors are disqualified, both having proved` and `EMPTY`, `the will whose executors are disqualified, both having proved` and `the date of the hearing`
+not `s 13(1)(a) — no executor is appointed by a will` with `the will whose executor died after the testator`
+not `s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will whose executor died after the testator` and `the date of the hearing`
+not `s 13(1)(e) — the executors appointed by any will do not appear and extract probate` with `the will whose executor died after the testator`
+`s 13(1) — letters of administration with the will annexed may be granted on failure of executors` with `the Ong estate with` with `JUST` with `the will whose executor died after the testator` and `EMPTY`, `the will whose executor died after the testator` and `the date of the hearing`
+not `s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` with `the will whose executors have not extracted probate` and `the date of the hearing`
+not `s 13(1)(c) — no executor survives the testator` with `the will whose executors have not extracted probate`
+`s 13(1) — letters of administration with the will annexed may be granted on failure of executors` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY`, `the will whose executors have not extracted probate` and `the date of the hearing`
+`s 8(1) — probate may be granted to this person as an executor appointed by a will` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY` and chan
+not `s 8(1) — probate may be granted to this person as an executor appointed by a will` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY` and stranger
+not `s 8(1) — probate may be granted to this person as an executor appointed by a will` with `the Tan intestacy` and wei
+`s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY` and `a grant of probate to Chan alone`
+not `s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY` and `a grant of probate to a stranger`
+`s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` with `the Ong estate with` with `JUST` with `the will appointing five executors` and `EMPTY` and `probate to four of the five executors`
+not `s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` with `the Ong estate with` with `JUST` with `the will appointing five executors` and `EMPTY` and `probate to all five executors`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy with a creditor`, chan and `FALSE` is equal to `JUST` with `a universal or residuary legatee`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy with a creditor`, goh and `FALSE` is equal to `JUST` with `a legatee having a beneficial interest`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy with a creditor`, lim and `FALSE` is equal to `JUST` with `a creditor of the deceased`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy with a creditor`, stranger and `FALSE` is equal to `NOTHING`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy with a creditor`, stranger and `TRUE` is equal to `JUST` with `a legal personal representative of a deceased universal or residuary legatee`
+`s 13(2)(c) — a beneficiary under the will who would have been entitled to a grant on intestacy` with `the Ong testacy, the daughter taking a legacy` and ping
+not `s 13(2)(c) — a beneficiary under the will who would have been entitled to a grant on intestacy` with `the Ong testacy, the daughter taking a legacy` and chan
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy, the daughter taking a legacy`, ping and `FALSE` is equal to `JUST` with `such person or persons, being beneficiaries under the will, as would have been entitled to a grant of letters of administration if the deceased had died intestate`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy, the daughter taking a legacy`, chan and `FALSE` is equal to `JUST` with `a universal or residuary legatee`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy with a creditor`, chan and `TRUE` is equal to `JUST` with `a universal or residuary legatee`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy, the daughter taking a legacy`, ping and `TRUE` is equal to `JUST` with `a legal personal representative of a deceased universal or residuary legatee`
+`s 13(2)(e) — a creditor of the deceased` with `the Ong testacy, the creditor also taking a legacy` and lim
+`s 13(2)(d) — a legatee having a beneficial interest` with `the Ong testacy, the creditor also taking a legacy` and lim
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy, the creditor also taking a legacy`, lim and `FALSE` is equal to `JUST` with `a legatee having a beneficial interest`
+`s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor` with `the will whose executor is abroad, the other unwilling` and `a PAA executor` with `Chan, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+not `s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor` with `the will whose executor is abroad, the other willing` and `a PAA executor` with `Chan, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor` with `the will whose sole executor is abroad` and `a PAA executor` with `Chan, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+not `s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor` with `the will whose executors have not extracted probate` and `a PAA executor` with `Chan Kok Wai`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+not `s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor` with `the will whose sole executor is within Singapore` and `a PAA executor` with `Chan Kok Wai`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor` with `the will whose executors are both abroad` and `a PAA executor` with `Chan, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+not `another executor within Singapore willing to act` with `a PAA executor` with `Chan, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE` and `a PAA executor` with `Goh, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`another executor within Singapore willing to act` with `a PAA executor` with `Chan, abroad`, `FALSE`, `FALSE`, `FALSE` and `FALSE` and `a PAA executor` with `Goh Siew Lan`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`s 14 — the limitation on a grant to the attorney of an absent executor` is equal to `limited in some other way` with limited until he obtains probate for himself, and in the meantime to any purpose to which the attorney’s authority is limited
+`s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled` with `the Ong testacy with a creditor`, `the will with a residue and a legacy`, `Chan, abroad`, `FALSE` and `the date of the hearing`
+not `s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled` with `the Ong testacy with a creditor`, `the will with a residue and a legacy`, `a stranger abroad`, `FALSE` and `the date of the hearing`
+not `s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled` with `the Ong testacy with a creditor`, `the will with a residue and a legacy`, `Chan Kok Wai`, `FALSE` and `the date of the hearing`
+not `s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled` with `the Ong testacy whose executor has proved`, `the will with a residue, the executor having extracted probate`, `Goh, abroad`, `FALSE` and `the date of the hearing`
+`s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled` with `the Ong testacy with a creditor`, `the will with a residue and a legacy`, `a stranger abroad`, `TRUE` and `the date of the hearing`
+`s 22(1) — no probate or letters of administration are to be granted to a person who lacks mental capacity` with `Chan, lacking capacity`
+not `s 22(1) — no probate or letters of administration are to be granted to a person who lacks mental capacity` with `Chan Kok Wai`
+`s 22(2) — this person would, if he or she did not lack mental capacity, be entitled to probate or letters of administration` with `the Ong estate with` with `JUST` with `the will whose sole executor lacks mental capacity` and `EMPTY` and `Chan, lacking capacity`
+not `s 22(2) — this person would, if he or she did not lack mental capacity, be entitled to probate or letters of administration` with `the Ong estate with` with `JUST` with `the will whose executors have not extracted probate` and `EMPTY` and `Chan Kok Wai`
+not `s 22(2) — this person would, if he or she did not lack mental capacity, be entitled to probate or letters of administration` with `the Ong estate with` with `JUST` with `the will whose sole executor lacks mental capacity` and `EMPTY` and `a stranger lacking capacity`
+not `s 8(1) — probate may be granted to this person as an executor appointed by a will` with `the Tan intestacy, the widow lacking capacity` and lim
+`s 18(4)(a) — one of the husband or widow or next of kin` with `the Tan intestacy, the widow lacking capacity` and lim
+`s 22(2) — this person would, if he or she did not lack mental capacity, be entitled to probate or letters of administration` with `the Tan intestacy, the widow lacking capacity` and `Lim Mei Ling, lacking capacity`
+`s 22(2) — the limitation on a grant made for the use and benefit of a person who lacks mental capacity` is equal to `limited in some other way` with until that person ceases to lack mental capacity and obtains a grant to himself or herself
+`s 12 — codicil propounded after probate` with `FALSE` and `FALSE` is equal to `nothing follows under section 12`
+`s 12 — codicil propounded after probate` with `FALSE` and `TRUE` is equal to `nothing follows under section 12`
+`s 12 — codicil propounded after probate` with `TRUE` and `FALSE` is equal to `separate probate may be granted of the codicil`
+`s 12 — codicil propounded after probate` with `TRUE` and `TRUE` is equal to `the probate shall be revoked, and a new probate shall be granted of the will and codicil together`
+`s 16 — codicil propounded after grant of letters of administration` with `TRUE` and `TRUE` is equal to `the probate shall be revoked, and a new probate shall be granted of the will and codicil together`
+`s 16 — codicil propounded after grant of letters of administration` with `TRUE` and `FALSE` is equal to `separate probate may be granted of the codicil`
+`s 9 — probate of copy or draft, or of contents` with `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE` is equal to `no probate may be granted under section 9`
+`s 9 — probate of copy or draft, or of contents` with `TRUE`, `FALSE`, `TRUE`, `TRUE` and `FALSE` is equal to `probate of that copy or draft, limited until the original is admitted to probate`
+`s 9 — probate of copy or draft, or of contents` with `TRUE`, `FALSE`, `FALSE`, `FALSE` and `TRUE` is equal to `probate of the contents of the will, limited until the original is admitted to probate`
+`s 9 — probate of copy or draft, or of contents` with `TRUE`, `FALSE`, `TRUE`, `FALSE` and `FALSE` is equal to `no probate may be granted under section 9`
+`s 9 — probate of copy or draft, or of contents` with `FALSE`, `TRUE`, `TRUE`, `TRUE` and `FALSE` is equal to `probate of that copy or draft, limited until the original is admitted to probate`
+`s 9 — probate of copy or draft, or of contents` with `TRUE`, `FALSE`, `FALSE`, `FALSE` and `FALSE` is equal to `no probate may be granted under section 9`
+`s 10 — probate may be granted of a copy or draft thereof, or of the contents thereof` with `TRUE`, `FALSE` and `TRUE`
+not `s 10 — probate may be granted of a copy or draft thereof, or of the contents thereof` with `TRUE`, `TRUE` and `TRUE`
+not `s 10 — probate may be granted of a copy or draft thereof, or of the contents thereof` with `TRUE`, `FALSE` and `FALSE`
+not `s 10 — probate may be granted of a copy or draft thereof, or of the contents thereof` with `FALSE`, `FALSE` and `TRUE`
+`s 11 — administration with copy annexed of authenticated copy of will proved abroad` with `TRUE` and `TRUE` is equal to list of `probate` and `letters of administration with the will annexed`
+`s 11 — administration with copy annexed of authenticated copy of will proved abroad` with `TRUE` and `FALSE` is equal to `EMPTY`
+`s 11 — administration with copy annexed of authenticated copy of will proved abroad` with `FALSE` and `TRUE` is equal to `EMPTY`
+`s 6(2) — a life interest arises under the will` with `the Ong testacy with a life interest`
+`s 6(2) — a life interest arises under the will` with `the Ong testacy, the life tenant having died`
+`s 6(4) — a life interest subsists` with `the Ong testacy with a life interest`
+not `s 6(4) — a life interest subsists` with `the Ong testacy, the life tenant having died`
+not `s 6(2) — there is a minority` with `the Ong testacy with a life interest` and `the date of the hearing`
+`s 6(2) — the requirement as to the grantees is engaged` with `the Ong testacy with a life interest` and `the date of the hearing`
+not `s 6(2) — the grant complies with section 6(2)` with `the Ong testacy with a life interest`, `letters with the will annexed to Chan alone` and `the date of the hearing`
+`s 6(4) — the window in which the court may appoint an additional personal representative` with `the Ong testacy with a life interest, Chan administering` and `the date of the hearing`
+`s 6(2) — there is a minority` with `the Ong testacy, an infant executor, Chan administering` and `the date of the hearing`
+not `s 6(4) — there is a minority of a beneficiary` with `the Ong testacy, an infant executor, Chan administering` and `the date of the hearing`
+not `s 6(4) — this person is a beneficiary` with `the Ong testacy, an infant executor, Chan administering` and `Ng Wei Jie, an infant executor`
+`s 6(4) — this person is a beneficiary` with `the Ong testacy, an infant executor, Chan administering` and `Chan Kok Wai`
+not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Ong testacy, an infant executor, Chan administering` and `the date of the hearing`
+`s 6(4) — this person is a beneficiary` with `the Ong testacy with a life interest` and `Goh Siew Lan`
+not `s 6(4) — this person is a beneficiary` with `the Ong testacy, the infant daughter taking only a charge, Chan administering` and `Ong Li Ping, an infant`
+`s 6(4) — this person is a beneficiary` with `the Ong testacy, the infant daughter taking a beneficial legacy, Chan administering` and `Ong Li Ping, an infant`
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy, the infant daughter taking only a charge, Chan administering`, ping and `FALSE` is equal to `NOTHING`
+not `s 6(4) — there is a minority of a beneficiary` with `the Ong testacy, the infant daughter taking only a charge, Chan administering` and `the date of the hearing`
+`s 6(4) — there is a minority of a beneficiary` with `the Ong testacy, the infant daughter taking a beneficial legacy, Chan administering` and `the date of the hearing`
+not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Ong testacy, the infant daughter taking only a charge, Chan administering` and `the date of the hearing`
+`s 6(4) — the window in which the court may appoint an additional personal representative` with `the Ong testacy, the infant daughter taking a beneficial legacy, Chan administering` and `the date of the hearing`
+`s 6(2) — there is a minority` with `the Ong testacy, the infant daughter taking only a charge, Chan administering` and `the date of the hearing`
+`s 6(2) — there is a minority` with `the Ong testacy, the infant daughter taking a beneficial legacy, Chan administering` and `the date of the hearing`
+`s 25(1) — death of one of several executors or administrators` with `the Ong estate with` with `JUST` with `the will whose executors have all extracted probate` and `EMPTY`, `a grant of probate to Chan and Goh, Goh having died` and `the date of the hearing` is equal to `the representation of the estate accrues to the surviving executor or executors`
+`s 25(1) — death of one of several executors or administrators` with `the Ong estate with` with `NOTHING` and `EMPTY`, `letters to two administrators, one having died` and `the date of the hearing` is equal to `the representation of the estate accrues to the surviving administrator or administrators`
+`s 25(1) — death of one of several executors or administrators` with `the Tan intestacy`, `letters to two administrators, one having died` and `the date of the hearing` is equal to `the representation does not accrue, this being a case to which section 6 applies`
+`s 25(1) — death of one of several executors or administrators` with `the Tan intestacy`, `a grant to the widow and the son` and `the date of the hearing` is equal to `section 25(1) does not apply`
+`s 25(1) — death of one of several executors or administrators` with `the Ong estate with` with `NOTHING` and `EMPTY`, `letters to a sole administrator, since deceased` and `the date of the hearing` is equal to `section 25(1) does not apply`
+`s 25(2) — letters of administration may be granted in respect of any estate not fully administered` with `the Tan intestacy` and `letters to two administrators, one having died`
+not `s 25(2) — letters of administration may be granted in respect of any estate not fully administered` with `the Tan intestacy` and `a grant to the widow and the son`
+not `s 25(2) — letters of administration may be granted in respect of any estate not fully administered` with `the Tan intestacy, fully administered` and `letters to two administrators, one having died`
+not `s 25(2) — letters of administration may be granted in respect of any estate not fully administered` with `the Ong estate with` with `JUST` with `the will whose executors have all extracted probate` and `EMPTY` and `a grant of probate to Chan and Goh, Goh having died`
+`s 27 — letters of administration shall be granted to those persons to whom original grants might have been made` with `the Tan intestacy` and `an expired limited grant`
+not `s 27 — letters of administration shall be granted to those persons to whom original grants might have been made` with `the Tan intestacy` and `a grant to the widow alone`
+not `s 27 — letters of administration shall be granted to those persons to whom original grants might have been made` with `the Tan intestacy` and `an unlimited grant recorded as expired`
+not `s 27 — letters of administration shall be granted to those persons to whom original grants might have been made` with `the Tan intestacy` and `a limited grant that has not expired`
+not `s 27 — letters of administration shall be granted to those persons to whom original grants might have been made` with `the Tan intestacy, fully administered` and `an expired limited grant`
+`s 62 — the value of the property in Singapore for the purposes of section 62` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and `EMPTY` is equal to 35000
+`s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+not `s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 120000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+`s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 55000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+not `s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 55001, 5000, 0, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+`s 62(2)(b) — the deceased died on or after 17 September 2005` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 20000, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+`s 62(2)(b) — the deceased died on or after 17 September 2005` with `the Wong estate of` with `Wong Ah Moi, dying on 17 September 2005`, `a PAA estate` with 40000, 5000, 20000, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+not `s 62(2)(b) — the deceased died on or after 17 September 2005` with `the Wong estate of` with `Wong Ah Moi, dying on 16 September 2005`, `a PAA estate` with 40000, 5000, 20000, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+not `s 62(2)(b) — the deceased died on or after 17 September 2005` with `the Wong estate of` with `Wong Ah Moi, dying in 2000`, `a PAA estate` with 40000, 5000, 20000, 0, 0, `EMPTY` and `FALSE` and `EMPTY`
+`s 62 — the value of the property in Singapore for the purposes of section 62` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 20000, 0, 0, `EMPTY` and `FALSE` and `EMPTY` is equal to 15000
+`s 62 — the value of the property in Singapore for the purposes of section 62` with `the Wong estate of` with `Wong Ah Moi, dying in 2000`, `a PAA estate` with 40000, 5000, 20000, 0, 0, `EMPTY` and `FALSE` and `EMPTY` is equal to 35000
+not `s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and list of `a PAA application by` with `an individual` with `Lim Mei Ling`, `letters of administration`, `JUST` with `YMD` with 2025, 4 and 1 and `still pending`
+`s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and list of `a PAA application by` with `an individual` with `Lim Mei Ling`, `letters of administration`, `JUST` with `YMD` with 2025, 4 and 1 and `refused`
+`s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and list of `a PAA application by` with `an individual` with `Lim Mei Ling`, `probate`, `JUST` with `YMD` with 2025, 4 and 1 and `still pending`
+not `s 62(1) — the Public Trustee may declare that he undertakes to administer the property` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 0, 0, `EMPTY` and `FALSE` and list of `a PAA application by` with `an individual` with `Lim Mei Ling`, `letters of administration with the will annexed`, `JUST` with `YMD` with 2025, 4 and 1 and `still pending`
+not `s 62(3) — the Public Trustee is empowered to administer the property as though letters of administration had been granted to him` with `the further facts, nothing being made out`
+`s 62(3) — the Public Trustee is empowered to administer the property as though letters of administration had been granted to him` with `the further facts, the Public Trustee having declared`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 0, 0, 20000, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `payments of the whole or such part of the income and capital money of such property as may in all the circumstances be reasonable`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 0, 0, 25000, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `payments of the whole or such part of the income and capital money of such property as may in all the circumstances be reasonable`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 0, 0, 25001, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `payments of capital money to the extent of $25,000`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 60000, 0, 0, 40000, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `payments of capital money to the extent of $25,000`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 60000, 0, 0, 50000, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `payments of capital money to the extent of $25,000`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 60000, 0, 0, 50001, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `no payment may be made under section 63`
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 80000, 0, 0, 60000, 0, `EMPTY` and `FALSE` and `EMPTY` and `the date of the hearing` is equal to `no payment may be made under section 63`
+not `s 63(1) — the property is held upon trust for a person during whose minority payments may be made` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 0, 0, 20000, 0, `EMPTY` and `FALSE` and `EMPTY` and `YMD` with 2033, 1 and 1
+`s 63 — the payments the Public Trustee may make` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 0, 0, 20000, 0, `EMPTY` and `FALSE` and `EMPTY` and `YMD` with 2033, 1 and 1 is equal to `no payment may be made under section 63`
+`s 64(1) — the total value of the property administered by the Public Trustee` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 12000, 0, `EMPTY` and `FALSE` and `EMPTY` is equal to 7000
+`s 64(1) — it shall not be necessary for the Public Trustee to give notice of his intention to distribute the estate` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 12000, 0, `EMPTY` and `FALSE` and `EMPTY`
+`s 64(1) — it shall not be necessary for the Public Trustee to give notice of his intention to distribute the estate` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 15000, 0, `EMPTY` and `FALSE` and `EMPTY`
+not `s 64(1) — it shall not be necessary for the Public Trustee to give notice of his intention to distribute the estate` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 15001, 0, `EMPTY` and `FALSE` and `EMPTY`
+not `s 64(1) — it shall not be necessary for the Public Trustee to give notice of his intention to distribute the estate` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 40000, 5000, 0, 20000, 0, `EMPTY` and `FALSE` and `EMPTY`
+`s 56(2) — the assets of the deceased, including the funds directed to be paid` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 200, 0, 0, 0, 250, `EMPTY` and `FALSE` and `EMPTY` is equal to 450
+`s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 200, 0, 0, 0, 250, `EMPTY` and `FALSE` and `EMPTY` and kim
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 200, 0, 0, 0, 250, `EMPTY` and `FALSE` and `EMPTY` and stranger
+`s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 250, 0, 0, 0, 250, `EMPTY` and `FALSE` and `EMPTY` and kim
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 251, 0, 0, 0, 250, `EMPTY` and `FALSE` and `EMPTY` and kim
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate of` with `Wong Ah Moi`, `a PAA estate` with 600, 0, 0, 0, 0, `EMPTY` and `FALSE` and `EMPTY` and kim
+`s 18(4)(a) — one of the husband or widow or next of kin` with `the Wong estate, with a grandfather` and kong
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate, with a grandfather` and kong
+`s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate, with a grandfather` and kim
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate, the child having predeceased` and kim
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate, administration having been taken out` and kim
+not `s 56(2) — the funds may be paid to this person on a declaration in the prescribed form` with `the Wong estate, the deceased having left a will` and kim
+`s 18(1) — the person has died intestate` with `the Wong estate, administration having been taken out`
+not `s 18(1) — the person has died intestate` with `the Wong estate, the deceased having left a will`
+`s 56(2) — the assets of the deceased, including the funds directed to be paid` with `the Wong estate, administration having been taken out` is equal to 450
+`s 56(2) — the assets of the deceased, including the funds directed to be paid` with `the Wong estate, the deceased having left a will` is equal to 450
+`s 29(2) — the amount at which the estate within the jurisdiction is sworn` with `the Tan estate, with a mortgage debt` is equal to 100000
+`s 29(2) — the amount at which the estate within the jurisdiction is sworn` with `the Tan intestacy` is equal to 120000
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a grant to the widow and the son`, `the widow as administrator`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `security by bond in the prescribed form by the grantee and 2 sureties` with 100000
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a grant to the widow and the son`, `the widow as administrator`, `the further facts, the administrator taking the whole` and `the date of the hearing` is equal to `security by bond in the prescribed form by the grantee, sureties being dispensed with` with 100000
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a grant to the Public Trustee and the widow`, `the Public Trustee as administrator`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `no security is required`
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a grant to the Public Trustee and the widow`, `the widow as administrator`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `security by bond in the prescribed form by the grantee and 2 sureties` with 100000
+`s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a Family Court grant to the widow`, `the widow as administrator`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a Family Court grant for the use and benefit of the infant`, `the widow as guardian of the infant`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a Family Court grant to the widow`, `the widow as administrator`, `the further facts, the Family Court requiring security` and `the date of the hearing`
+not `s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a grant to the widow alone`, `the widow as administrator`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a Family Court grant for the use and benefit of the infant`, `the widow as guardian of the infant`, `the further facts, nothing being made out` and `YMD` with 2033, 1 and 1
+`s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a Family Court grant with the will annexed to Chan`, `a PAA grantee` with `an individual` with `Chan Kok Wai`, `as administrator` and `NOTHING`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a Family Court grant with the will annexed to Chan`, `a PAA grantee` with `an individual` with `Chan Kok Wai`, `as administrator` and `NOTHING`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `no security is required`
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a Family Court grant to the widow`, `the widow as administrator`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `no security is required`
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a Family Court grant for the use and benefit of the infant`, `the widow as guardian of the infant`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `security by bond in the prescribed form by the grantee and 2 sureties` with 100000
+`s 29 — the security ordinarily required of this grantee` with `the Tan estate, with a mortgage debt`, `a grant of probate to Chan and Goh, Goh having died`, `a PAA grantee` with `an individual` with `Chan Kok Wai`, `as executor` and `NOTHING`, `the further facts, nothing being made out` and `the date of the hearing` is equal to `no security is required`
+`security is lawfully required of some grantee` with `the Tan estate, with a mortgage debt`, `a grant to the Public Trustee and the widow`, `the further facts, nothing being made out` and `the date of the hearing`
+not `security is lawfully required of some grantee` with `the Tan estate, with a mortgage debt`, `a Family Court grant to the widow`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 55(1)(a) — six months have expired from the death and no application has been made` with `the Tan intestacy` and `the date of the hearing`
+not `s 55(1)(a) — six months have expired from the death and no application has been made` with `the Tan intestacy` and `YMD` with 2025, 5 and 1
+not `s 55(1)(a) — six months have expired from the death and no application has been made` with `the Tan intestacy` and `YMD` with 2025, 7 and 15
+`s 55(1)(a) — six months have expired from the death and no application has been made` with `the Tan intestacy` and `YMD` with 2025, 7 and 16
+not `s 55(1)(a) — six months have expired from the death and no application has been made` with `the Tan intestacy, the widow having applied` and `the date of the hearing`
+`s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, an application refused`
+`s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, an application not proceeded with`
+`s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, an application withdrawn`
+not `s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, an application proceeded with`
+not `s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, the widow having applied`
+`s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, an application refused on the last day`
+not `s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused` with `the Tan intestacy, an application refused a day late`
+`s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a grant to the widow alone`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a grant to the widow alone`, `the further facts, nothing being made out` and `YMD` with 2025, 6 and 15
+not `s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a grant to the widow alone`, `the further facts, nothing being made out` and `YMD` with 2025, 7 and 1
+`s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a grant to the widow alone`, `the further facts, nothing being made out` and `YMD` with 2025, 7 and 2
+not `s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a grant to the widow, the security given`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a Family Court grant to the widow`, `the further facts, nothing being made out` and `YMD` with 2026, 6 and 15
+`s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `letters with the will annexed to the widow, the security not given`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish` with `the Tan estate, with a mortgage debt`, `a grant of probate to Chan, the security not given`, `the further facts, nothing being made out` and `the date of the hearing`
+not `security is lawfully required of some grantee` with `the Tan estate, with a mortgage debt`, `a grant of probate to Chan, the security not given`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection` with `the Tan intestacy` and `the further facts, a receiver being insufficient`
+not `s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection` with `the Tan intestacy` and `the further facts, a danger of waste only`
+not `s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection` with `the Tan intestacy` and `the further facts, a receiver insufficient but no danger of waste`
+not `s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection` with `the Tan intestacy` and `the further facts, nothing being made out`
+not `s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection` with `the Tan intestacy, nothing in Singapore` and `the further facts, a receiver being insufficient`
+`s 55(1)(e) — an administrator has failed to extract the grant of letters of administration` with `the Tan intestacy, the grant not extracted`
+not `s 55(1)(e) — an administrator has failed to extract the grant of letters of administration` with `the Tan intestacy, the widow having taken a grant`
+not `s 55(1)(e) — an administrator has failed to extract the grant of letters of administration` with `the Ong estate with` with `NOTHING` and list of `a grant of probate not extracted`
+`s 55(1)(e) — an administrator has failed to extract the grant of letters of administration` with `the Ong estate with` with `NOTHING` and list of `letters with the will annexed to Chan, not extracted`
+`s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the administrator having died` and `the date of the hearing`
+not `s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the administrator having died` and `YMD` with 2025, 9 and 1
+not `s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the administrator having died` and `YMD` with 2025, 12 and 1
+`s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the administrator having died` and `YMD` with 2025, 12 and 2
+not `s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the administrator having died, an application made` and `the date of the hearing`
+not `s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the widow having taken a grant` and `the date of the hearing`
+not `s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy` and `the date of the hearing`
+not `s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, one of two administrators having died` and `the date of the hearing`
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy`, `a grant to the widow alone`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy, the widow having taken a grant`, `a Family Court grant to the widow`, `the further facts, nothing being made out` and `YMD` with 2025, 5 and 1
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy`, `a grant to the widow, the security given`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy, an application refused`, `a grant to the widow, the security given`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy, an application proceeded with`, `a grant to the widow alone`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy, an application proceeded with`, `a grant to the widow, the security given`, `the further facts, a receiver being insufficient` and `the date of the hearing`
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy, the grant not extracted, an application proceeded with`, `a grant to the widow, the security given`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 55(1)(a) — six months have expired from the death and no application has been made` with `the Tan intestacy, the date of death not known, the administrator having died` and `the date of the hearing`
+`s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made` with `the Tan intestacy, the date of death not known, the administrator having died` and `the date of the hearing`
+`s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay` with `the Tan intestacy, the date of death not known, the administrator having died`, `a grant to the widow, the security given`, `the further facts, nothing being made out` and `the date of the hearing`
+`s 18(2) — letters of administration may be granted to the trustees of the settlement` with `the Tan estate, with settled land`
+not `s 18(2) — letters of administration may be granted to the trustees of the settlement` with `the Tan estate, with settled land and no trustees`
+not `s 18(2) — letters of administration may be granted to the trustees of the settlement` with `the Tan estate, with trustees but no settled land`
+not `s 18(2) — letters of administration may be granted to the trustees of the settlement` with `the Tan intestacy`
+`s 23 — letters of administration limited to trust property may be granted` with `the Tan estate, with settled land` and `the date of the hearing`
+not `s 23 — letters of administration limited to trust property may be granted` with `the Tan intestacy` and `the date of the hearing`
+not `s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, an executor standing` and `the date of the hearing`
+`s 23 — the deceased leaves a representative who is able and willing to act` with `the Ong estate holding trust property, an executor standing` and `the date of the hearing`
+`s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, no representative` and `the date of the hearing`
+`s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, the executor having renounced` and `the date of the hearing`
+`s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, the executor unwilling` and `the date of the hearing`
+not `s 23 — the deceased leaves a representative who is able and willing to act` with `the Ong estate holding trust property, the executor having predeceased` and `the date of the hearing`
+`s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, the executor having predeceased` and `the date of the hearing`
+not `s 23 — the deceased leaves a representative who is able and willing to act` with `the Ong estate holding trust property, the executor having died` and `the date of the hearing`
+`s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, the executor having died` and `the date of the hearing`
+not `s 23 — the deceased leaves a representative who is able and willing to act` with `the Ong estate holding trust property, the administrator having died` and `the date of the hearing`
+`s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, the administrator having died` and `the date of the hearing`
+`s 23 — the deceased leaves a representative who is able and willing to act` with `the Ong estate holding trust property, an administrator standing` and `the date of the hearing`
+not `s 23 — letters of administration limited to trust property may be granted` with `the Ong estate holding trust property, an administrator standing` and `the date of the hearing`
+`s 23 — the limitation on a grant of trust property` is equal to `limited to settled land or to trust property`
+`s 24 — the limitation on a grant to collect and preserve property` is equal to `a grant that does not permit the distribution of the testator’s estate`
+`s 26(2) — a further grant may be made of the part of the estate excepted` with `a grant excepting part of the estate`
+not `s 26(2) — a further grant may be made of the part of the estate excepted` with `a grant to the widow alone`
+`s 30 — letters of administration are granted to a creditor` with `the Ong testacy with a creditor` and `letters of administration to the creditor Lim`
+`s 30 — letters of administration are granted to a creditor` with `the Ong testacy with a creditor` and `letters with the will annexed to the creditor Lim`
+not `s 30 — letters of administration are granted to a creditor` with `the Ong testacy with a creditor` and `probate to the creditor Lim`
+not `s 30 — letters of administration are granted to a creditor` with `the Tan intestacy` and `letters of administration to the creditor Lim`
+`s 35(1) — the saving in section 35(1) applies to this grant` with `the Tan estate, worth more than three million` and `a District Court grant made in 2014`
+not `s 35(1) — the saving in section 35(1) applies to this grant` with `the Tan estate, worth more than three million` and `a grant to the widow alone`
+not `s 35(1) — the saving in section 35(1) applies to this grant` with `the Tan intestacy` and `a District Court grant made in 2014`
+not `s 35(1) — the saving in section 35(1) applies to this grant` with `the Tan estate, worth exactly three million` and `a District Court grant made in 2014`
+`s 35(1) — the saving in section 35(1) applies to this grant` with `the Tan estate, worth a dollar more than three million` and `a District Court grant made in 2014`
+`s 5(1) — the person so renouncing is precluded from applying thereafter for probate or letters of administration` with `TRUE`
+not `s 5(1) — the person so renouncing is precluded from applying thereafter for probate or letters of administration` with `FALSE`
+`s 5(1) — precluded from applying thereafter for probate or letters of administration` with `a PAA executor` with `Goh Siew Lan`, `FALSE`, `TRUE`, `FALSE` and `FALSE`
+not `s 5(1) — precluded from applying thereafter for probate or letters of administration` with `a PAA executor` with `Goh Siew Lan`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
+`ss 34 and 36 — repealed, and therefore not encoded`
+`s 2 — the definitions the grant machinery reads`
+`s 6(3) — prima facie evidence of a minority or life interest (not encoded)`
+`s 55(2) — the six-month periods do not prevent the Public Trustee from applying sooner`
+not `s 28(2) — the grantee is the Public Trustee or a trust company` with `an individual` with `Lim Mei Ling`
+`s 28(2) — the grantee is the Public Trustee or a trust company` with `Public Trustee as grantee`
+`s 28(2) — the grantee is the Public Trustee or a trust company` with `Acme Trust Company`
+not `s 28(2) — the grantee is the Public Trustee or a trust company` with `the Government`
+`s 28 — the grantee shall take an oath` with `a PAA grantee` with `an individual` with `Lim Mei Ling`, `as administrator` and `NOTHING`
+`s 28 — the grantee shall take an oath` with `a PAA grantee` with `Public Trustee as grantee`, `as administrator` and `NOTHING`
+executing contract `s 29(7) — the grantee shall give security for the due administration of the estate` with `TRUE` at 0 with the following events:  party `the grantee` did `give security for the due administration of the estate` at 10
+executing contract `s 29(7) — the grantee shall give security for the due administration of the estate` with `TRUE` at 0 with the following events:  party `the court` did `grant letters of administration with or without the will annexed to the Public Trustee` at 40
+`s 29(7) — the grantee shall give security for the due administration of the estate` with `FALSE`
+`s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `TRUE`
+`s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `FALSE`
+executing contract `s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `TRUE` at 0 with the following events:  party `the court` did `revoke the probate and grant a new probate of the will and codicil together` at 5
+`s 27 — letters of administration shall be granted` with `the Tan intestacy` and `an expired limited grant`
+`s 27 — letters of administration shall be granted` with `the Tan intestacy` and `a grant to the widow alone`
+not `s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` with `the Ong estate with` with `JUST` with `the will whose executor is willing` and `EMPTY` and `a grant of probate to Chan alone`
+not `s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security` with `the Tan estate, with a mortgage debt`, `a Family Court grant of probate to Chan`, `a PAA grantee` with `an individual` with `Chan Kok Wai`, `as executor` and `NOTHING`, `the further facts, nothing being made out` and `the date of the hearing`
+not `s 13(2)(c) — a beneficiary under the will who would have been entitled to a grant on intestacy` with `the Ong testacy, the will charging a debt in the daughter’s favour` and ping
+`s 13(2) — the rung of the prior-right class in which this person stands` with `the Ong testacy, the will charging a debt in the daughter’s favour`, ping and `FALSE` is equal to `NOTHING`

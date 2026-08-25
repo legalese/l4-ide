@@ -1,0 +1,2180 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `family-domain`
+IMPORT `wills-act`
+IMPORT `intestate-succession-act`
+IMPORT `probate-administration-act`
+IMPORT `guardianship-of-infants-act`
+
+§ `Singapore family and succession — whole families, carried through all four Acts`
+
+-- WHAT THIS FILE IS. Each of the four Act modules beside it encodes ONE Act
+-- against ONE text, and each answers its own questions well. Nobody dies one
+-- Act at a time. A death in a family raises the four Acts' questions in one
+-- breath — my father died without a will, my brother is 16, who gets the
+-- flat, who can apply for the grant, and who looks after my brother's share
+-- — and the answer to each question is the input to the next. This file is
+-- the composition: whole families, each carried through all four Acts in the
+-- order the family meets them, with the HAND-OFFS asserted.
+--
+-- NOTHING HERE IS A RULE OF ANY ACT. Everything below is either a fixture, an
+-- assertion about what the four modules say on that fixture, or one of the
+-- three composition-level readings in `What this corpus can and cannot say`
+-- — and those three are labelled as this file's own and not as any Act's. If
+-- a reader wants the law, the four Act modules are where it is; this file is
+-- the regression test for the seams between them, which nothing else tests.
+--
+-- WHY IT HAS TO EXIST, measured rather than asserted. The cross-module audit
+-- of 2026-08-26 found that every join in this corpus was TYPED and none was
+-- EXERCISED: each Act module's own constructors zeroed out the other three
+-- Acts' fields, so no assertion anywhere could disagree with a neighbour.
+-- `guardianship-of-infants-act.l4`'s own closing section says it in terms —
+-- "NOTHING HERE IS YET EXERCISED ON A SHARED FILE ... The file that would
+-- test them, `family-cases.l4` ... does not exist". This is that file.
+--
+-- WHAT HAS CHANGED SINCE THAT AUDIT, checked here rather than repeated from
+-- it. `wills-act.l4` has since built a case file with facts on both sides of
+-- its s 27(3) hand-off and asserts that the two agree — its
+-- "THE JOIN, EXERCISED (CROSS-MODULE ROUND, X4)" block. That is a check of
+-- the Wills Act's own two halves against each other, and it is as far as any
+-- ONE module can go: each of the four imports `prelude`, `daydate` and
+-- `family-domain` and nothing else, so no Act module can call a neighbour's
+-- decision at all. Every assertion in this file that names two Acts is
+-- therefore something none of them could have written.
+--
+-- WHAT A HAND-OFF LOOKS LIKE WHEN IT WORKS, and what it looks like when it
+-- does not. Three of the joins run over objects the four modules share, so an
+-- assertion here can put a value on both sides at once and check that the two
+-- agree. The rest cannot be made at all, because no field carries the answer
+-- from one module to the other; where that is so this file says which module
+-- and which fact, asserts what CAN be asserted, and does not invent a bridge.
+-- The closing section `Hand-offs that could not be made` lists all of them.
+--
+-- THE FIXTURES ARE THIS FILE'S OWN, and that is the point rather than a
+-- duplication. Each Act module's person constructor fills the other Acts'
+-- fields with the neutral value — `a WA person` writes
+-- `the date on which the person attains the age of majority` IS NOTHING,
+-- `a PAA person in full` writes `date of birth` IS NOTHING, `an ISA person`
+-- writes both the majority date and the three section 27 fields away. A
+-- person built by any one of them therefore cannot answer all four Acts'
+-- questions. The constructors below fill every field, so that ONE record
+-- goes to all four modules and a disagreement between them is a disagreement
+-- about the law and not about the file.
+--
+-- THE PEOPLE ARE INVENTED. No person is named in any of the four Acts.
+
+§§ `What this corpus can and cannot say`
+
+-- THIS FILE'S OWN READING, NOT ANY ACT'S, and the reason it is a value rather
+-- than a comment: the most important thing a composition can do is DECLINE.
+-- Only one of the four modules has a gate that switches a whole Act off —
+-- `intestate-succession-act.l4`'s section 2, for the estate of a Muslim — and
+-- a consumer that put the four modules side by side and read whichever one
+-- answered would report a distribution for an estate the Act does not reach.
+-- The three members below are the three things this corpus is in a position
+-- to say about the distribution of an estate, and the middle one is a stop.
+DECLARE `What this corpus can say about the distribution of an estate` IS ONE OF
+    `the Intestate Succession Act 1967 governs the distribution, and its rules have been applied`
+    `nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it`
+    `the Intestate Succession Act 1967 applies to the estate but has no effect on these facts`
+
+@ref Intestate Succession Act 1967 s 2, s 5
+-- NOT A RULE OF ANY ACT. It reads two decisions of `intestate-succession-act.l4`
+-- and reports which of the three cases the estate is in. The order matters:
+-- section 2 is asked FIRST, because where it bites there is no Act left to have
+-- an effect, and reporting that the Act applies but has no effect on these
+-- facts would suggest that other facts might have produced one.
+GIVEN `the deceased person` IS A `Deceased person`
+GIVETH A `What this corpus can say about the distribution of an estate`
+`what this corpus can say about the distribution of the estate` MEANS
+    BRANCH IF NOT (`this Act applies to the estate` `the deceased person`)
+           THEN `nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it`
+           IF `this Act has effect in respect of the estate` `the deceased person`
+           THEN `the Intestate Succession Act 1967 governs the distribution, and its rules have been applied`
+           OTHERWISE `the Intestate Succession Act 1967 applies to the estate but has no effect on these facts`
+
+@ref Guardianship of Infants Act 1934 s 17; Intestate Succession Act 1967 s 5; Probate and Administration Act 1934 s 21(2)
+-- NOT A RULE OF ANY ACT, AND THE ONE THIS FILE WAS BUILT FOR. Every other
+-- legal tool will tell a family what the infant is ENTITLED to. The question
+-- they actually face is whether anybody can hand it over, and that is
+-- `guardianship-of-infants-act.l4`'s section 17: a guardian of the property
+-- of an infant is not empowered to give a good discharge for a legacy or
+-- other capital moneys payable to the infant unless the court otherwise
+-- orders. This decision reports, for one infant, whether ANY of the guardians
+-- recorded for him could give a good discharge for the share the Intestate
+-- Succession Act gives him.
+--
+-- IT IS A CONJUNCTION OF TWO MODULES' ANSWERS AND NOT A THIRD OPINION. The
+-- entitlement side is `intestate-succession-act.l4`'s and the discharge side
+-- is `guardianship-of-infants-act.l4`'s; this decision only puts them in one
+-- sentence. See `Hand-offs that could not be made` for why the two cannot be
+-- joined by a field: the ontology declares `Entitlement` and no record has one.
+GIVEN `the infant concerned in the estate` IS AN Infant
+GIVETH A BOOLEAN
+DECIDE `some guardian of this infant could give a good discharge for the infant’s share` IF
+    any (GIVEN `the guardian` YIELD
+             NOT (`section 17 denies the guardian power to give a good discharge` `the guardian`))
+        (`the infant concerned in the estate`'s `the guardians of the infant`)
+
+
+§§ `Constructors — one record, four Acts`
+
+-- FIXTURES, NOT LAW. L4 has no record-update operator, so a scenario is
+-- either a fully spelled literal or a constructor partially applied. These
+-- take the fields the four Acts between them vary and default the rest.
+--
+-- WHY THEY ARE HERE AND NOT BORROWED. See the header: each Act module's own
+-- constructor writes the OTHER Acts' fields away, which is exactly why no
+-- assertion in any of them could ever exercise a join. These fill every field
+-- that any of the four reads, so that one `Deceased person` can be put to all
+-- four modules unchanged.
+
+GIVEN `the name of the person`                     IS A STRING
+      `the reference`                              IS A STRING
+      `when he was born`                           IS A MAYBE DATE
+      `when he attains the age of majority`        IS A MAYBE DATE
+      `whether he is living`                       IS A `Vital status`
+      `his children`                               IS A LIST OF Child
+      `he is a soldier being in actual military service` IS A BOOLEAN
+      `he is a mariner or seaman being at sea`     IS A BOOLEAN
+      `he is so circumstanced`                     IS A BOOLEAN
+      `he lacks mental capacity`                   IS A BOOLEAN
+      `he is absent from Singapore`                IS A BOOLEAN
+      `he is willing to act`                       IS A BOOLEAN
+      `he so desires`                              IS A BOOLEAN
+GIVETH A Person
+-- THE DATE OF BIRTH AND THE MAJORITY DATE ARE BOTH PARAMETERS, and that is
+-- the whole reason this constructor exists. `wills-act.l4` computes its own
+-- age bar from `date of birth`, because Wills Act section 4 states a number —
+-- "No will made by any person under 21 years of age shall be valid." — and
+-- section 27(1) disapplies it. `probate-administration-act.l4` and
+-- `guardianship-of-infants-act.l4` both read
+-- `the date on which the person attains the age of majority`, which
+-- `family-domain.l4` declares as an already-construed input. A person who
+-- carries only one of the two answers only some of the four Acts.
+`a person in the case file, in full` MEANS Person WITH
+    `name`                                            IS `the name of the person`
+    `the reference for this person`                   IS `the reference`
+    `date of birth`                                   IS `when he was born`
+    `vital status`                                    IS `whether he is living`
+    `children`                                        IS `his children`
+    `at the date of the death only conceived in the womb but subsequently born alive` IS FALSE
+    `money or other property given, paid or settled by the intestate during his life to or for the advancement of the person` IS 0
+    `the date on which the person attains the age of majority` IS `when he attains the age of majority`
+    `a soldier being in actual military service`      IS `he is a soldier being in actual military service`
+    `a mariner or seaman being at sea`                IS `he is a mariner or seaman being at sea`
+    `a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service` IS `he is so circumstanced`
+    `so desires that letters of administration be granted to such person as the court thinks fit` IS `he so desires`
+    `lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs` IS `he lacks mental capacity`
+    `absent from Singapore`                           IS `he is absent from Singapore`
+    `willing to act`                                  IS `he is willing to act`
+
+GIVEN `the name of the person`              IS A STRING
+      `the reference`                       IS A STRING
+      `when he was born`                    IS A MAYBE DATE
+      `when he attains the age of majority` IS A MAYBE DATE
+      `whether he is living`                IS A `Vital status`
+      `his children`                        IS A LIST OF Child
+GIVETH A Person
+-- The ordinary member of a family: no privilege under Wills Act section 27,
+-- mental capacity not in issue, present in Singapore and willing to act.
+`a person in the case file` MEANS
+    `a person in the case file, in full` `the name of the person` `the reference`
+        `when he was born` `when he attains the age of majority` `whether he is living`
+        `his children` FALSE FALSE FALSE FALSE FALSE TRUE FALSE
+
+GIVEN `when he was born` IS A DATE
+GIVETH A MAYBE DATE
+-- NOT A RULE OF ANY ACT, and it is the only place in this file where the age
+-- of majority enters as a number. None of the four Acts fixes one:
+-- `family-domain.l4` says so at `the date on which the person attains the age
+-- of majority` and `guardianship-of-infants-act.l4` says so again at
+-- `The infant, and the age this Act does not fix`. Twenty-one is used here
+-- because Wills Act section 4 is the only number any of the four contains and
+-- a case file whose two age answers came from different numbers would
+-- manufacture a disagreement the Acts do not have. Leap-safe by construction:
+-- the year is incremented and the calendar does the rest.
+`twenty-one years after` MEANS
+    JUST (Date (DATE_DAY `when he was born`) (DATE_MONTH `when he was born`)
+               (DATE_YEAR `when he was born` PLUS 21))
+
+GIVEN `the offspring` IS A Person
+GIVETH A Child
+`a legitimate child in the case file` MEANS Child WITH
+    `the child`                                          IS `the offspring`
+    `a legitimate child of the person whose child he is` IS TRUE
+    `adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam` IS FALSE
+
+GIVEN `the offspring` IS A Person
+GIVETH A Child
+-- The third corner of Intestate Succession Act section 3, kept because two of
+-- the four modules decide the same question about it and the composition has
+-- to be able to put them side by side.
+`a child in the case file neither legitimate nor adopted` MEANS Child WITH
+    `the child`                                          IS `the offspring`
+    `a legitimate child of the person whose child he is` IS FALSE
+    `adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam` IS FALSE
+
+GIVEN `the other party`        IS A Person
+      `when it was solemnised` IS A MAYBE DATE
+      `it subsists`            IS A BOOLEAN
+GIVETH A Marriage
+`a marriage in the case file` MEANS Marriage WITH
+    `the spouse`                                    IS `the other party`
+    `the date of the solemnisation of the marriage` IS `when it was solemnised`
+    `subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death` IS `it subsists`
+
+GIVEN `the marriages` IS A LIST OF Marriage
+      `the father`    IS A MAYBE Person
+      `the mother`    IS A MAYBE Person
+GIVETH A Family
+-- No collateral relatives: every scenario in this file is decided in the
+-- first or second degree, and an invented uncle would be an invented fact.
+`a family in the case file` MEANS Family WITH
+    `the marriages of the deceased`            IS `the marriages`
+    `the father of the deceased`               IS `the father`
+    `the mother of the deceased`               IS `the mother`
+    `the brothers and sisters of the deceased` IS EMPTY
+    `the grandparents of the deceased`         IS EMPTY
+    `the uncles and aunts of the deceased`     IS EMPTY
+
+GIVEN `movable property in Singapore`                IS A Money
+      `immovable property in Singapore`              IS A Money
+      `the expenses of due administration`           IS A Money
+      `the debts and liabilities`                    IS A Money
+      `the value beneficially disposed of by the will` IS A Money
+GIVETH AN Estate
+-- THE DEBTS ARE A PARAMETER AND NOTHING READS THEM, which is one of the
+-- findings this file is here to make visible. See scenario 5.
+`an estate in the case file` MEANS Estate WITH
+    `the value of the movable property situated in Singapore`        IS `movable property in Singapore`
+    `the value of the immovable property situated in Singapore`      IS `immovable property in Singapore`
+    `the value of the movable property situated outside Singapore`   IS 0
+    `the value of the immovable property situated outside Singapore` IS 0
+    `the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore` IS 0
+    `the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore` IS 0
+    `the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board` IS 0
+    `the value of the property administered by the Public Trustee`   IS 0
+    `the amount of the funds in court directed to be paid, transferred or delivered to him` IS 0
+    `the value of land settled previously to the death of the deceased` IS 0
+    `the trustees of the settlement`                                 IS EMPTY
+    `the value of the interest in property which at the time of his death is charged with the payment of money` IS 0
+    `the amount of the charge on that interest`                      IS 0
+    `the deceased has by will, deed or other document signified a contrary or other intention` IS FALSE
+    `the debts and liabilities of the deceased`                      IS `the debts and liabilities`
+    `the funeral, testamentary and administration expenses`          IS `the expenses of due administration`
+    `the creditors of the deceased`                                  IS EMPTY
+    `fully administered`                                             IS FALSE
+    `the value of the property beneficially disposed of by the will` IS `the value beneficially disposed of by the will`
+
+GIVEN `the appointee`                     IS A Person
+      `the reference for the infant`      IS A STRING
+      `how he was appointed`              IS A `How the guardian was appointed`
+      `of the person or of the property`  IS A `Kind of guardianship`
+      `alone, or jointly with`            IS AN `Alone or jointly`
+      `he has been removed by the court`  IS A BOOLEAN
+      `he purported to give a discharge`  IS A BOOLEAN
+      `the court has otherwise ordered as to the discharge` IS A BOOLEAN
+GIVETH A Guardian
+-- THE KIND OF GUARDIANSHIP AND THE TWO SECTION 17 FACTS ARE ALL PARAMETERS,
+-- and no constructor in the four Act modules varies all three.
+-- `guardianship-of-infants-act.l4`'s property-case constructor fixes the kind
+-- at `guardian of the property of the infant`, which a surviving parent under
+-- section 6 is not; its ordinary constructor fixes both discharge facts FALSE.
+-- Scenario 1 needs a guardian who is both — the mother, guardian of the person
+-- and property by force of section 6(1), who has purported to discharge the
+-- infant's share.
+`a guardian in the case file` MEANS Guardian WITH
+    `the guardian`                       IS `the appointee`
+    `the reference for the infant`       IS `the reference for the infant`
+    `how the guardian was appointed`     IS `how he was appointed`
+    `of the person or of the property`   IS `of the person or of the property`
+    `alone or jointly`                   IS `alone, or jointly with`
+    `refuses to act`                     IS FALSE
+    `the mother or father objects to his so acting` IS FALSE
+    `considers that the mother or father is unfit to have the custody of the infant` IS FALSE
+    `removed from his guardianship by the court` IS `he has been removed by the court`
+    `has given security`                 IS TRUE
+    `the court has otherwise ordered as to security` IS FALSE
+    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `has leased land belonging to the infant` IS FALSE
+    `the term of the lease, in years`    IS NOTHING
+    `has the permission of the court to deal with the property of the infant` IS FALSE
+    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS `he purported to give a discharge`
+    `the court has otherwise ordered as to giving a good discharge` IS `the court has otherwise ordered as to the discharge`
+    `the provision made out of the income of the property of the infant for his maintenance and education`
+        IS (`A periodical sum` WITH `the sum` IS 0, `the period` IS `monthly`)
+    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+
+GIVEN `the child`                     IS A Person
+      `the father, if in evidence`    IS A MAYBE Person
+      `the mother, if in evidence`    IS A MAYBE Person
+      `his guardians`                 IS A LIST OF Guardian
+      `the capital of his property`   IS A Money
+GIVETH AN Infant
+`an infant in the case file` MEANS Infant WITH
+    `the infant`                                                IS `the child`
+    `the father of the infant`                                  IS `the father, if in evidence`
+    `the mother of the infant`                                  IS `the mother, if in evidence`
+    `the guardians of the infant`                               IS `his guardians`
+    `some other person has parental rights with respect to him` IS FALSE
+    `the income of the property of the infant`                  IS 0
+    `the capital of the property of the infant`                 IS `the capital of his property`
+    `of an age to express an independent opinion`               IS FALSE
+
+GIVEN `the person or corporation` IS A `Person or corporation`
+      `the capacity`              IS A `Capacity in which the grant is made`
+      `for whose use and benefit` IS A MAYBE STRING
+GIVETH A Grantee
+`a grantee in the case file` MEANS Grantee WITH
+    `the grantee`                             IS `the person or corporation`
+    `the capacity in which the grant is made` IS `the capacity`
+    `the reference for the person for whose use and benefit the grant is made` IS `for whose use and benefit`
+
+GIVEN `what kind`      IS A `Kind of grant`
+      `the grantees`   IS A LIST OF Grantee
+      `when it was made` IS A MAYBE DATE
+      `the limitation on it` IS A `Limitation on the grant`
+GIVETH A Grant
+`a grant in the case file` MEANS Grant WITH
+    `the kind of grant`             IS `what kind`
+    `the grantees`                  IS `the grantees`
+    `the date of the grant`         IS `when it was made`
+    `the limitation`                IS `the limitation on it`
+    `the court that made the grant` IS `a court within the meaning of these Acts` `the General Division of the High Court`
+    `the exception subject to which the grant is made` IS NOTHING
+    `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
+    `revoked`                       IS FALSE
+    `has given such security as is lawfully required to be furnished` IS TRUE
+    `has been extracted`            IS TRUE
+    `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
+    `the date of the sealing`       IS NOTHING
+
+GIVEN `the person who died` IS A Person
+      `his family`          IS A Family
+      `his estate`          IS AN Estate
+      `his will`            IS A MAYBE Will
+      `he was a Muslim`     IS A BOOLEAN
+      `the grants`          IS A LIST OF Grant
+      `the infants concerned in the estate` IS A LIST OF Infant
+GIVETH A `Deceased person`
+`a deceased person in the case file` MEANS `Deceased person` WITH
+    `the deceased`                                    IS `the person who died`
+    `the family`                                      IS `his family`
+    `the estate`                                      IS `his estate`
+    `the will`                                        IS `his will`
+    `domiciled in Singapore at the time of his death` IS TRUE
+    `carried on business or resided in Singapore within 12 months of his death` IS TRUE
+    `a Muslim`                                        IS `he was a Muslim`
+    `the grants made in respect of the estate`        IS `the grants`
+    `the probate applications made in respect of the estate` IS EMPTY
+    `a next of kin, creditor or other person has appeared and made out a claim to letters of administration` IS FALSE
+    `the infants concerned in the estate`             IS `the infants concerned in the estate`
+
+GIVEN `the deceased person`             IS A `Deceased person`
+      `the will and its further facts`  IS A `A will, with the facts about it that only this Act asks`
+GIVETH A `A case under this Act`
+-- `wills-act.l4` takes a case rather than a will, because its section 28 asks
+-- about an application for rectification and about the grants. No scenario
+-- here is a section 28 case, so all four of those facts are the neutral value.
+`the Wills Act case of` MEANS
+    `a case` `the deceased person` `the will and its further facts` FALSE NOTHING FALSE FALSE
+
+
+§§ `Reading the answers — helpers that decide nothing`
+
+@ref Intestate Succession Act 1967 s 5, s 7 rules 1-9
+GIVEN `the entitlements` IS A LIST OF Entitlement
+      `the reference`    IS A STRING
+GIVETH A Share
+-- NOT A RULE OF ANY ACT. `intestate-succession-act.l4` returns the whole
+-- distribution as a list; a scenario wants one person's fraction out of it.
+-- Summed rather than picked, so that a person who appears twice is not
+-- silently reported at his first share; nil for a person who takes nothing,
+-- which is the same thing the Act says by not naming him.
+`the fraction taken by the person whose reference is` MEANS
+    sum (map (GIVEN `the entitlement` YIELD
+                  `the entitlement`'s `the fraction of the property distributable under this Act`)
+             (filter (GIVEN `the entitlement` YIELD
+                          `the reference for the person entitled` (`the entitlement`'s `the person entitled`) EQUALS
+                                  JUST `the reference`)
+                     `the entitlements`))
+
+@ref Intestate Succession Act 1967 s 5, s 7
+GIVEN `the deceased person` IS A `Deceased person`
+      `the reference`       IS A STRING
+GIVETH A Money
+-- NOT A RULE OF ANY ACT. The fraction, applied to the fund the fraction is a
+-- fraction of — `intestate-succession-act.l4`'s
+-- `the property of which every share under section 7 is a fraction`. It is
+-- what a family asks for and the Act never states: a sum of money.
+`the sum taken under the Intestate Succession Act by the person whose reference is` MEANS
+        `the fraction taken by the person whose reference is`
+            (`the persons entitled to succeed beneficially, and their shares` `the deceased person`)
+            `the reference`
+    TIMES `the property of which every share under section 7 is a fraction` `the deceased person`
+
+
+§ `Scenario 1 — the intestacy with an infant child`
+
+-- THE FAMILY. Sivakumar Ramanathan died on 15 March 2025 without a will,
+-- leaving a widow, an adult son and a daughter of twelve. The flat comes to
+-- $500,000 and the bank balances to $700,000; the funeral, testamentary and
+-- administration expenses come to $200,000. Letters of administration are
+-- applied for on 15 January 2026.
+--
+-- THE FAMILY'S FOUR QUESTIONS, and the Act that answers each:
+--   is there an operative will?                Wills Act 1838
+--   who takes, and in what shares?             Intestate Succession Act 1967 s 7
+--   who may take the grant, and does the
+--     daughter's minority force a second
+--     administrator?                           Probate and Administration Act 1934 ss 6, 21
+--   who is the daughter's guardian, and can
+--     that guardian give a good discharge for
+--     her share?                               Guardianship of Infants Act 1934 ss 6, 17
+--
+-- THE LAST ONE IS WHY THIS FILE EXISTS. Every other tool will tell this
+-- family that Divya is entitled to a quarter of a million dollars. What they
+-- face on the day is whether anybody can hand it over.
+
+§§ `Scenario 1 — the people, the estate and the grant`
+
+`the day letters of administration are applied for` MEANS YMD 2026 1 15
+
+`Meera Sivakumar` MEANS
+    `a person in the case file` "Meera Sivakumar" "meera" (JUST (YMD 1968 7 22))
+        (`twenty-one years after` (YMD 1968 7 22)) `living` EMPTY
+
+`Arjun Sivakumar` MEANS
+    `a person in the case file` "Arjun Sivakumar" "arjun" (JUST (YMD 2000 4 10))
+        (`twenty-one years after` (YMD 2000 4 10)) `living` EMPTY
+
+`Divya Sivakumar` MEANS
+    `a person in the case file` "Divya Sivakumar" "divya" (JUST (YMD 2012 11 2))
+        (`twenty-one years after` (YMD 2012 11 2)) `living` EMPTY
+
+`Sivakumar Ramanathan` MEANS
+    `a person in the case file` "Sivakumar Ramanathan" "sivakumar" (JUST (YMD 1965 2 10))
+        (`twenty-one years after` (YMD 1965 2 10)) (`died on` (YMD 2025 3 15))
+        (LIST `a legitimate child in the case file` `Arjun Sivakumar`
+            , `a legitimate child in the case file` `Divya Sivakumar`)
+
+-- THE MOTHER'S OWN GUARDIAN RECORD. Guardianship of Infants Act 1934 s 6(1)
+-- makes her guardian BY FORCE OF THE SECTION — "On the death of the father of
+-- an infant, the mother, if surviving, shall, subject to the provisions of
+-- this Act, be guardian of the infant" — so no appointment and no record is
+-- needed to make her one. The record exists because two other things have to
+-- be written down somewhere: whether the court has removed her under s 10,
+-- and, for s 17, whether she has purported to give a discharge for her
+-- daughter's share.
+`Meera, guardian of Divya by virtue of surviving the father` MEANS
+    `a guardian in the case file` `Meera Sivakumar` "divya"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE FALSE
+
+`Meera, having purported to discharge Divya’s share` MEANS
+    `a guardian in the case file` `Meera Sivakumar` "divya"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` FALSE TRUE FALSE
+
+`Meera, the court having authorised the discharge` MEANS
+    `a guardian in the case file` `Meera Sivakumar` "divya"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` FALSE TRUE TRUE
+
+`Meera, since removed from her guardianship by the court` MEANS
+    `a guardian in the case file` `Meera Sivakumar` "divya"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` TRUE FALSE FALSE
+
+GIVEN `the mother’s guardianship` IS A Guardian
+GIVETH AN Infant
+`Divya, an infant concerned in the estate, the mother holding` MEANS
+    `an infant in the case file` `Divya Sivakumar` (JUST `Sivakumar Ramanathan`) (JUST `Meera Sivakumar`)
+        (LIST `the mother’s guardianship`) 250_000
+
+`the estate of Sivakumar Ramanathan` MEANS `an estate in the case file` 700_000 500_000 200_000 0 0
+
+`the family of Sivakumar Ramanathan` MEANS
+    `a family in the case file`
+        (LIST `a marriage in the case file` `Meera Sivakumar` (JUST (YMD 1994 6 4)) TRUE)
+        NOTHING NOTHING
+
+-- THE GRANT. Letters of administration to the widow and the adult son: the
+-- widow taking `as the guardian of the person and property of the infant` for
+-- Divya's use and benefit, which is the capacity Probate and Administration
+-- Act 1934 s 21(2) opens to her, and the son as administrator. Two
+-- individuals, which is what s 6(2) requires where there is a minority.
+`the grant to the widow and the son` MEANS
+    `a grant in the case file` `letters of administration`
+        (LIST `a grantee in the case file` (`an individual` `Meera Sivakumar`)
+                  `as the guardian of the person and property of the infant` (JUST "divya")
+            , `a grantee in the case file` (`an individual` `Arjun Sivakumar`) `as administrator` NOTHING)
+        (JUST (YMD 2026 1 15))
+        (`limited in some other way` "limited until the infant obtains a grant to himself")
+
+-- THE SAME GRANT TO THE WIDOW ALONE, which is the counterfactual s 6(2) is
+-- about. Nothing else about it differs.
+`the grant to the widow alone` MEANS
+    `a grant in the case file` `letters of administration`
+        (LIST `a grantee in the case file` (`an individual` `Meera Sivakumar`)
+                  `as the guardian of the person and property of the infant` (JUST "divya"))
+        (JUST (YMD 2026 1 15))
+        (`limited in some other way` "limited until the infant obtains a grant to himself")
+
+-- A GRANT TO THE SON ALONE, IN NO SPECIAL CAPACITY. Neither s 21(2) nor
+-- s 6(2) is satisfied by it, and it is here so that each of those two
+-- failures has a fixture that fails only it.
+`the grant to the son alone` MEANS
+    `a grant in the case file` `letters of administration`
+        (LIST `a grantee in the case file` (`an individual` `Arjun Sivakumar`) `as administrator` NOTHING)
+        (JUST (YMD 2026 1 15)) `not limited`
+
+GIVEN `the mother’s guardianship` IS A Guardian
+      `the grants`                IS A LIST OF Grant
+GIVETH A `Deceased person`
+`the Sivakumar intestacy, with` MEANS
+    `a deceased person in the case file` `Sivakumar Ramanathan` `the family of Sivakumar Ramanathan`
+        `the estate of Sivakumar Ramanathan` NOTHING FALSE `the grants`
+        (LIST `Divya, an infant concerned in the estate, the mother holding` `the mother’s guardianship`)
+
+`the Sivakumar intestacy` MEANS
+    `the Sivakumar intestacy, with` `Meera, guardian of Divya by virtue of surviving the father`
+        (LIST `the grant to the widow and the son`)
+
+`Divya as an infant concerned in the estate` MEANS
+    `Divya, an infant concerned in the estate, the mother holding`
+        `Meera, guardian of Divya by virtue of surviving the father`
+
+
+§§ `Scenario 1, step 1 — is there an operative will? (Wills Act 1838)`
+
+-- AND THIS IS THE FIRST HAND-OFF THAT CANNOT BE MADE, at the very first step.
+-- `wills-act.l4`'s entry point is `the formal validity of the will`, which
+-- takes a `A case under this Act`, which holds a
+-- `A will, with the facts about it that only this Act asks`, which holds a
+-- `Will`. Where the deceased left no will there is no `Will` to build one
+-- from, so THE WILLS ACT CANNOT BE ASKED THE QUESTION AT ALL. What answers it
+-- is the shared ontology's `Deceased person`'s `the will` being NOTHING, read
+-- directly — which is what the other two Acts do:
+-- `intestate-succession-act.l4`'s section 3 and
+-- `probate-administration-act.l4`'s s 18(1) both read that field themselves
+-- and neither consults the Wills Act.
+--
+-- SO THE STEP IS REAL AND THE JOIN IS NOT. Recorded here rather than papered
+-- over with a Wills Act call that would have to invent a will to make.
+#ASSERT isNothing (`the Sivakumar intestacy`'s `the will`)
+
+§§ `Scenario 1, step 2 — who takes, and in what shares? (Intestate Succession Act 1967 s 7)`
+
+-- s 3 — "“intestate” includes any person who leaves a will but dies intestate
+-- as to some beneficial interest in his property". No will at all is the
+-- plainest case of it.
+#ASSERT `section 3 — an “intestate” within the meaning of this Act` `the Sivakumar intestacy`
+#ASSERT `this Act applies to the estate` `the Sivakumar intestacy`
+#ASSERT `section 5 — the person dies intestate after 2 June 1967` `the Sivakumar intestacy`
+#ASSERT `this Act has effect in respect of the estate` `the Sivakumar intestacy`
+#ASSERT `what this corpus can say about the distribution of the estate` `the Sivakumar intestacy` EQUALS
+                `the Intestate Succession Act 1967 governs the distribution, and its rules have been applied`
+
+-- s 5 — the property "after payment thereout of the expenses of due
+-- administration": $1,200,000 less $200,000.
+#ASSERT `section 5 — that property` `the Sivakumar intestacy` EQUALS 1_200_000
+#ASSERT `the property of which every share under section 7 is a fraction` `the Sivakumar intestacy` EQUALS
+                1_000_000
+
+-- s 7 rule 2 — "If an intestate dies leaving a surviving spouse and issue, the
+-- spouse shall be entitled to one-half of the estate." Rule 3 then divides the
+-- other half "by equal portions per stirpes to and amongst the children of the
+-- person dying intestate": two children, a quarter each.
+#ASSERT `rule 2 — an intestate dies leaving a surviving spouse and issue` `the Sivakumar intestacy`
+#ASSERT NOT `rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` `the Sivakumar intestacy`
+#ASSERT `the share of the estate to which the surviving spouse is entitled` `the Sivakumar intestacy` EQUALS (1 DIVIDED BY 2)
+#ASSERT `rule 3 — the share of the estate distributed among the issue, subject to the rights of the surviving spouse` `the Sivakumar intestacy` EQUALS (1 DIVIDED BY 2)
+#ASSERT `the distribution, read out` `the Sivakumar intestacy` EQUALS
+                LIST "Meera Sivakumar takes 0.5", "Arjun Sivakumar takes 0.25", "Divya Sivakumar takes 0.25"
+#ASSERT `the total of the shares distributed` `the Sivakumar intestacy` EQUALS 1
+
+-- THE SAME ANSWER AS A SUM OF MONEY, which is what the family asked for and
+-- what the Act never states.
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy` "meera" EQUALS 500_000
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy` "arjun" EQUALS 250_000
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy` "divya" EQUALS 250_000
+
+-- THE FIRST HAND-OFF THAT WORKS. `intestate-succession-act.l4` filters its own
+-- answer down to the entitlements of a person the case file records as an
+-- infant concerned in the estate, matching by `the reference for this person`.
+-- It is the ISA's half of the Guardianship Act's s 17 join, and until this
+-- file existed nothing anywhere put a value on the other side of it.
+#ASSERT `the shares taken by an infant concerned in the estate, read out` `the Sivakumar intestacy` EQUALS
+                LIST "Divya Sivakumar takes 0.25"
+
+§§ `Scenario 1, step 3 — who may take the grant? (Probate and Administration Act 1934 ss 6, 18, 21)`
+
+-- s 18(1) — "When a person has died intestate, the court may grant letters of
+-- administration of his estate." AMBIGUITY A7 of `probate-administration-act.l4`
+-- reads "intestate" here as no will at all, which is this case either way.
+#ASSERT `s 18(1) — the person has died intestate` `the Sivakumar intestacy`
+
+-- s 18(4)(a) — "the husband or widow or next of kin or any of them". The widow
+-- first, then the next of kin in the order the classes are built.
+#ASSERT `the persons entitled under section 18(4)(a)` `the Sivakumar intestacy` EQUALS
+                LIST `Meera Sivakumar`, `Arjun Sivakumar`, `Divya Sivakumar`
+#ASSERT     `s 18(4)(a) — one of the husband or widow or next of kin` `the Sivakumar intestacy` "meera"
+#ASSERT     `s 18(4)(a) — one of the husband or widow or next of kin` `the Sivakumar intestacy` "divya"
+#ASSERT NOT `s 18(4)(a) — one of the husband or widow or next of kin` `the Sivakumar intestacy` "nobody"
+
+-- A HAND-OFF THAT WORKS, AND THE HALF OF THE AUDIT'S DISAGREEMENT ROW THAT HAS
+-- SINCE BEEN REPAIRED. The Probate Act's "next of kin" and the Intestate
+-- Succession Act's takers are the same three people on these facts. That is not a coincidence of the
+-- fixture: `probate-administration-act.l4` builds the class through
+-- `a “child” within the meaning of section 3 of the Intestate Succession Act
+-- 1967`, so the two modules apply the same definition of "child". Scenario 5
+-- asserts the case where they part company, which is a difference about the
+-- LADDER and not about the definition.
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy` "meera" GREATER THAN 0
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy` "arjun" GREATER THAN 0
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy` "divya" GREATER THAN 0
+
+-- s 6(2) — "Letters of administration shall, if there is a minority or if a
+-- life interest arises under the will, be granted either to a trust
+-- corporation, with or without an individual, or to not less than 2
+-- individuals." The minority is Divya's, and it is the FIRST place in this
+-- scenario where a fact found under one Act changes an answer under another:
+-- her age decides the number of administrators.
+#ASSERT     `s 6(2) — there is a minority` `the Sivakumar intestacy` `the day letters of administration are applied for`
+#ASSERT NOT `s 6(2) — a life interest arises under the will` `the Sivakumar intestacy`
+#ASSERT     `s 6(2) — the requirement as to the grantees is engaged` `the Sivakumar intestacy` `the day letters of administration are applied for`
+#ASSERT     `s 6(2) — the grant complies with section 6(2)` `the Sivakumar intestacy` `the grant to the widow and the son` `the day letters of administration are applied for`
+#ASSERT NOT `s 6(2) — the grant complies with section 6(2)` `the Sivakumar intestacy` `the grant to the widow alone` `the day letters of administration are applied for`
+
+-- s 21(1) — "No probate or letters of administration shall be granted to a
+-- person while he is an infant." The daughter is barred; her brother is not.
+#ASSERT     `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Divya Sivakumar` `the day letters of administration are applied for`
+#ASSERT NOT `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Arjun Sivakumar` `the day letters of administration are applied for`
+#ASSERT NOT `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Meera Sivakumar` `the day letters of administration are applied for`
+
+-- s 21(2) — "Where an infant would, but for his infancy, be entitled to
+-- probate or letters of administration, letters of administration with or
+-- without the will annexed may, subject to section 6(1), be granted to the
+-- guardian of the person and property of the infant". She would be entitled
+-- but for her infancy BECAUSE she is one of the s 18(4)(a) persons — which is
+-- the previous step's answer being used as this step's input.
+#ASSERT `s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration`
+            `the Sivakumar intestacy` `Divya as an infant concerned in the estate` `the day letters of administration are applied for`
+#ASSERT `the infant executors or persons so entitled` `the Sivakumar intestacy` `the day letters of administration are applied for` EQUALS
+                LIST `Divya as an infant concerned in the estate`
+#ASSERT NOT `s 21(3) — there are 2 or more infant executors or persons so entitled` `the Sivakumar intestacy` `the day letters of administration are applied for`
+#ASSERT `s 21 — the limitation on a grant made under subsection (2)` `the Sivakumar intestacy` `the day letters of administration are applied for` EQUALS
+                `limited in some other way` "limited until the infant obtains a grant to himself"
+#ASSERT     `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` `the Sivakumar intestacy` `the grant to the widow and the son` `the day letters of administration are applied for`
+#ASSERT NOT `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` `the Sivakumar intestacy` `the grant to the son alone` `the day letters of administration are applied for`
+
+-- THE TENSION BETWEEN s 21(2) AND s 6(2), WHICH IS INSIDE ONE ACT AND IS
+-- VISIBLE ONLY WHEN THE WHOLE FAMILY IS CARRIED THROUGH. s 21(2) opens the
+-- grant to the guardian and makes it "subject to section 6(1)" — s 6(1)
+-- alone, the four-person cap, and NOT s 6(2). So a grant to the guardian
+-- ALONE satisfies s 21(2) in terms and still breaches s 6(2), because the
+-- same infancy that opened s 21(2) is the minority that engages s 6(2). The
+-- family's answer is that the widow may take the grant as guardian but not by
+-- herself. Both halves are asserted on the identical grant.
+#ASSERT     `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` `the Sivakumar intestacy` `the grant to the widow alone` `the day letters of administration are applied for`
+#ASSERT NOT `s 6(2) — the grant complies with section 6(2)` `the Sivakumar intestacy` `the grant to the widow alone` `the day letters of administration are applied for`
+
+§§ `Scenario 1, step 4 — who is the infant's guardian? (Guardianship of Infants Act 1934 ss 6, 10)`
+
+-- s 6(1) — "On the death of the father of an infant, the mother, if surviving,
+-- shall, subject to the provisions of this Act, be guardian of the infant,
+-- either alone or jointly with any guardian appointed by the father." The
+-- father here is the intestate, so his death is the same fact the Intestate
+-- Succession Act read to open its distribution and the Probate Act read to
+-- open its grant. One death, three Acts.
+#ASSERT     `the mother is guardian of the infant under section 6(1)` `Divya as an infant concerned in the estate`
+#ASSERT NOT `the father is guardian of the infant under section 6(2)` `Divya as an infant concerned in the estate`
+#ASSERT     `the mother holds the guardianship section 6(1) gives her` `Divya as an infant concerned in the estate`
+#ASSERT `the persons who are guardians of the infant` `Divya as an infant concerned in the estate` EQUALS LIST "meera"
+
+-- THE ACT'S OWN GATE OVER THE ANSWER, which is where
+-- `guardianship-of-infants-act.l4` puts the infancy test it deliberately does
+-- not thread through its sections.
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Divya as an infant concerned in the estate` `the day letters of administration are applied for` EQUALS
+            `the person is an infant on that date, and the guardians of the infant are` (LIST "meera")
+
+-- AND THE SAME QUESTION AFTER SHE COMES OF AGE. Divya attains majority on
+-- 2 November 2033; on that day this Act has no infant to govern, and the
+-- answer is not "no guardians" but "no infant".
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Divya as an infant concerned in the estate` (YMD 2033 11 2) EQUALS
+            `the person has attained the age of majority on that date, so this Act has no infant to govern`
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Divya as an infant concerned in the estate` (YMD 2033 11 1) EQUALS
+            `the person is an infant on that date, and the guardians of the infant are` (LIST "meera")
+
+-- THE INTEGRITY CHECK ON THE FILE, which `guardianship-of-infants-act.l4`
+-- writes as a check and not as a rule: every guardian recorded in this
+-- infant's list names this infant in his own back-reference.
+#ASSERT `every guardian recorded for this infant is recorded against this infant` `Divya as an infant concerned in the estate`
+
+-- THE SECOND HAND-OFF THAT WORKS, AND THE AUDIT'S THIRD `one-side-silent`
+-- ROW EXERCISED. `probate-administration-act.l4` records that it "can decide
+-- WHETHER a grant may be made to the infant's guardian and cannot decide WHO
+-- that guardian is"; `guardianship-of-infants-act.l4` answers WHO. The grant
+-- above was made to Meera in the capacity `as the guardian of the person and
+-- property of the infant` for the use and benefit of `divya`, and the
+-- Guardianship Act, asked independently, names `meera`. The two Acts agree
+-- about the same woman on the same day — which nothing in the corpus could
+-- have checked before, because no Act module imports another and neither of
+-- these two can call the other's decision.
+#ASSERT elem "meera" (`the persons who are guardians of the infant` `Divya as an infant concerned in the estate`)
+
+-- AND THE TWO AGREE WHEN THEY BOTH SAY NO. The court removes Meera under
+-- s 10. The Guardianship Act stops naming her; the Probate Act stops opening
+-- s 21(2) to her, because its `is this guardian of the person and property of
+-- the infant` reads the same removal field. Nothing but this file has ever put
+-- the two answers side by side.
+`Divya, her mother having been removed from the guardianship` MEANS
+    `Divya, an infant concerned in the estate, the mother holding` `Meera, since removed from her guardianship by the court`
+`the Sivakumar intestacy, the widow having been removed from the guardianship` MEANS
+    `the Sivakumar intestacy, with` `Meera, since removed from her guardianship by the court`
+        (LIST `the grant to the widow and the son`)
+#ASSERT NOT `the mother holds the guardianship section 6(1) gives her` `Divya, her mother having been removed from the guardianship`
+#ASSERT `the persons who are guardians of the infant` `Divya, her mother having been removed from the guardianship` EQUALS EMPTY
+#ASSERT NOT `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant`
+                `the Sivakumar intestacy, the widow having been removed from the guardianship`
+                `the grant to the widow and the son` `the day letters of administration are applied for`
+
+§§ `Scenario 1, step 5 — can the guardian give a good discharge? (Guardianship of Infants Act 1934 s 17)`
+
+-- s 17 — "A guardian of the property of an infant shall not, unless in any
+-- case the court otherwise orders, be empowered to give a good discharge for
+-- any legacy or other capital moneys payable to or receivable by an infant."
+--
+-- THIS IS THE STEP THE FILE WAS BUILT FOR. The Intestate Succession Act made
+-- Divya entitled to $250,000. The Probate and Administration Act put the
+-- grant in her mother's hands as guardian of her person and property. The
+-- Guardianship of Infants Act now says that the mother is NOT EMPOWERED to
+-- give a good discharge for that quarter of a million — so the personal
+-- representative who pays it to her remains accountable — unless the court
+-- has ordered otherwise in this case.
+--
+-- THE DEFAULT IS NO POWER, which is why the assertion is positive: a guardian
+-- about whom nothing is recorded is one about whom no order has been made.
+#ASSERT `section 17 denies the guardian power to give a good discharge` `Meera, guardian of Divya by virtue of surviving the father`
+#ASSERT `section 17 denies the guardian power to give a good discharge` `Meera, having purported to discharge Divya’s share`
+#ASSERT NOT `section 17 denies the guardian power to give a good discharge` `Meera, the court having authorised the discharge`
+
+-- AND WHAT FOLLOWS FROM HER HAVING PAID HERSELF ANYWAY. The ontology's field
+-- records that she PURPORTED to discharge; s 17 decides whether the discharge
+-- is good.
+#ASSERT NOT `the discharge the guardian purported to give is not a good discharge` `Meera, guardian of Divya by virtue of surviving the father`
+#ASSERT     `the discharge the guardian purported to give is not a good discharge` `Meera, having purported to discharge Divya’s share`
+#ASSERT NOT `the discharge the guardian purported to give is not a good discharge` `Meera, the court having authorised the discharge`
+
+-- THE COMPOSITION'S OWN SENTENCE, over the whole family: nobody can hand
+-- Divya's share over until the court says so.
+#ASSERT NOT `some guardian of this infant could give a good discharge for the infant’s share` `Divya as an infant concerned in the estate`
+#ASSERT `some guardian of this infant could give a good discharge for the infant’s share`
+            (`Divya, an infant concerned in the estate, the mother holding` `Meera, the court having authorised the discharge`)
+
+-- WHAT THE ENTITLEMENT AND THE DISCHARGE HAVE IN COMMON IN THIS CORPUS:
+-- NOTHING BUT THIS FILE. The two are joined here by the reference "divya"
+-- appearing on both sides — in `the infants concerned in the estate` that
+-- `intestate-succession-act.l4` filters its distribution by, and in the
+-- `Infant` record `guardianship-of-infants-act.l4` reads. No field carries the
+-- SHARE from one module to the other, because `family-domain.l4` declares
+-- `Entitlement` and gives no record a field of that type. See
+-- `Hand-offs that could not be made` below; both other modules report the same
+-- gap from their own side.
+--
+-- THE TWO ANSWERS, SIDE BY SIDE. The second of these restates an assertion
+-- made above and is kept because the pair IS the answer this family came for:
+-- what she is entitled to, and whether anyone can hand it over.
+#ASSERT `the shares taken by an infant concerned in the estate, read out` `the Sivakumar intestacy` EQUALS
+            LIST "Divya Sivakumar takes 0.25"
+#ASSERT NOT `some guardian of this infant could give a good discharge for the infant’s share` `Divya as an infant concerned in the estate`
+
+
+§ `Scenario 2 — the will that fails, and what takes over`
+
+-- TWO WAYS A WILL STOPS OPERATING, and the Wills Act treats them quite
+-- differently. One is a defect in its EXECUTION (s 6), which means it was
+-- never a valid will; the other is REVOCATION by a later marriage (s 13),
+-- which unmakes a will that was validly made. `wills-act.l4` answers the two
+-- with different decisions, and its aggregate verdict
+-- `the formal validity of the will` answers only the first — a revoked will
+-- is still formally valid, and the reader who stops at the aggregate is told
+-- the wrong thing about the family's position.
+--
+-- AND THE THING THE COMPOSITION FINDS, WHICH IS THE POINT OF THE SCENARIO:
+-- NEITHER ANSWER TRAVELS. `intestate-succession-act.l4` and
+-- `probate-administration-act.l4` both read `Deceased person`'s `the will`
+-- field and neither of them asks the Wills Act anything. A will that the
+-- Wills Act has just declared not valid still counts, in the other two
+-- modules, as a will that beneficially disposes of the whole estate — so the
+-- Intestate Succession Act reports that its own rules have no effect, and the
+-- Probate Act reports that the deceased did not die intestate. Both are
+-- wrong, and both are wrong for the same reason: no field in
+-- `family-domain.l4` carries a Wills Act verdict.
+--
+-- WHAT THIS FILE DOES ABOUT IT. It asserts the answers on BOTH case files —
+-- with the will in the record, and with the will struck out — and names the
+-- gap. It does NOT invent a bridge: writing a decision here that struck the
+-- will out on the Wills Act's say-so would be putting a rule in the
+-- composition that belongs in the ontology, and it would be believed.
+
+§§ `Scenario 2A — a will bad for want of execution (Wills Act 1838 s 6)`
+
+`Anthony Alphonso` MEANS
+    `a person in the case file` "Anthony Alphonso" "anthony" (JUST (YMD 1955 3 12))
+        (`twenty-one years after` (YMD 1955 3 12)) `living` EMPTY
+
+`Marianne Alphonso` MEANS
+    `a person in the case file` "Marianne Alphonso" "marianne" (JUST (YMD 1985 8 1))
+        (`twenty-one years after` (YMD 1985 8 1)) `living` EMPTY
+
+`Josephine Alphonso` MEANS
+    `a person in the case file` "Josephine Alphonso" "josephine" (JUST (YMD 1988 2 14))
+        (`twenty-one years after` (YMD 1988 2 14)) `living` EMPTY
+
+`Chiam Lai Fong` MEANS
+    `a person in the case file` "Chiam Lai Fong" "laifong" (JUST (YMD 1958 1 30))
+        (`twenty-one years after` (YMD 1958 1 30)) (`died on` (YMD 2024 9 4))
+        (LIST `a legitimate child in the case file` `Marianne Alphonso`
+            , `a legitimate child in the case file` `Josephine Alphonso`)
+
+-- THE DEFECT IS s 6(2)'s THIRD LIMB AND NOTHING ELSE. The will is in writing;
+-- the testatrix signed it at the foot; two witnesses subscribed in her
+-- presence. What never happened is the middle limb — "the signature shall be
+-- made or acknowledged by the testator as the signature to his will or codicil
+-- in the presence of 2 or more witnesses present at the same time". She signed
+-- at home and took the paper to the witnesses one at a time.
+`the will of Chiam Lai Fong, the signature never acknowledged before the witnesses` MEANS
+    `a will, in full` `Chiam Lai Fong` (JUST (YMD 2015 5 20)) TRUE TRUE FALSE FALSE
+        (LIST `an attesting witness` `Marianne Alphonso` TRUE FALSE FALSE FALSE FALSE
+            , `an attesting witness` `Josephine Alphonso` TRUE FALSE FALSE FALSE FALSE)
+        (LIST `a gift` `Marianne Alphonso` `a residuary gift` 800_000 TRUE TRUE)
+        EMPTY FALSE NOTHING FALSE FALSE TRUE
+        (LIST `an executor appointed by the will` `Anthony Alphonso`)
+
+`the family of Chiam Lai Fong` MEANS
+    `a family in the case file`
+        (LIST `a marriage in the case file` `Anthony Alphonso` (JUST (YMD 1983 12 3)) TRUE)
+        NOTHING NOTHING
+
+`the estate of Chiam Lai Fong, the will counted` MEANS `an estate in the case file` 800_000 0 0 0 800_000
+`the estate of Chiam Lai Fong, the will disregarded` MEANS `an estate in the case file` 800_000 0 0 0 0
+
+-- THE SAME FAMILY, TWICE. The first file is what the registry holds before
+-- anybody has applied the Wills Act to the paper; the second is what it holds
+-- after the will has been rejected. Everything else about them is identical.
+`the Chiam estate, the will in the record` MEANS
+    `a deceased person in the case file` `Chiam Lai Fong` `the family of Chiam Lai Fong`
+        `the estate of Chiam Lai Fong, the will counted`
+        (JUST `the will of Chiam Lai Fong, the signature never acknowledged before the witnesses`)
+        FALSE EMPTY EMPTY
+
+`the Chiam estate, the will struck out` MEANS
+    `a deceased person in the case file` `Chiam Lai Fong` `the family of Chiam Lai Fong`
+        `the estate of Chiam Lai Fong, the will disregarded` NOTHING FALSE EMPTY EMPTY
+
+`the Chiam will, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Chiam estate, the will in the record`
+        (`the plain facts about` `the will of Chiam Lai Fong, the signature never acknowledged before the witnesses`)
+
+-- THE WILLS ACT'S ANSWER. s 6(1) — "No will shall be valid unless it is in
+-- writing and executed in the manner mentioned in subsection (2)." The
+-- prohibition-with-an-exception is encoded that way round, so the propounder
+-- fails on the limb he cannot make out.
+#ASSERT NOT `s 6(2) — the manner of execution` (`the Chiam will, put to the Wills Act`'s `the will in question`)
+#ASSERT NOT `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` (`the Chiam will, put to the Wills Act`'s `the will in question`)
+#ASSERT NOT `the will is properly executed` `the Chiam will, put to the Wills Act`
+#ASSERT NOT `s 4 — will of infant invalid` (`the will under consideration` `the Chiam will, put to the Wills Act`)
+#ASSERT     `s 4 — the testator is proved to have been 21 years of age or over` (`the will under consideration` `the Chiam will, put to the Wills Act`)
+#ASSERT `the formal validity of the will` `the Chiam will, put to the Wills Act` EQUALS
+            `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+
+-- THE OTHER TWO ACTS, ON THE FILE THAT STILL HOLDS THE WILL. Both answer as
+-- though the will were good, because neither of them asks.
+#ASSERT NOT `section 3 — an “intestate” within the meaning of this Act` `the Chiam estate, the will in the record`
+#ASSERT NOT `this Act has effect in respect of the estate` `the Chiam estate, the will in the record`
+#ASSERT `the persons entitled to succeed beneficially, and their shares` `the Chiam estate, the will in the record` EQUALS EMPTY
+#ASSERT `the total of the shares distributed` `the Chiam estate, the will in the record` EQUALS 0
+#ASSERT `what this corpus can say about the distribution of the estate` `the Chiam estate, the will in the record` EQUALS
+            `the Intestate Succession Act 1967 applies to the estate but has no effect on these facts`
+#ASSERT NOT `s 18(1) — the person has died intestate` `the Chiam estate, the will in the record`
+#ASSERT `s 8(1) — probate may be granted to this person as an executor appointed by a will` `the Chiam estate, the will in the record` "anthony"
+#ASSERT NOT `s 13(1)(a) — no executor is appointed by a will` `the will of Chiam Lai Fong, the signature never acknowledged before the witnesses`
+
+-- AND THE SAME TWO ACTS ONCE THE WILL IS OUT. s 7 rule 2 gives the husband
+-- one-half and rule 3 divides the other half between the two daughters; s 18
+-- opens letters of administration instead of probate.
+#ASSERT `section 3 — an “intestate” within the meaning of this Act` `the Chiam estate, the will struck out`
+#ASSERT `this Act has effect in respect of the estate` `the Chiam estate, the will struck out`
+#ASSERT `the distribution, read out` `the Chiam estate, the will struck out` EQUALS
+            LIST "Anthony Alphonso takes 0.5", "Marianne Alphonso takes 0.25", "Josephine Alphonso takes 0.25"
+#ASSERT `the total of the shares distributed` `the Chiam estate, the will struck out` EQUALS 1
+#ASSERT `s 18(1) — the person has died intestate` `the Chiam estate, the will struck out`
+#ASSERT NOT `s 8(1) — probate may be granted to this person as an executor appointed by a will` `the Chiam estate, the will struck out` "anthony"
+#ASSERT `the persons entitled under section 18(4)(a)` `the Chiam estate, the will struck out` EQUALS
+            LIST `Anthony Alphonso`, `Marianne Alphonso`, `Josephine Alphonso`
+
+-- THE GAP, STATED AS A MEASUREMENT AND NOT AS AN OPINION. The two case files
+-- above differ in exactly one field — `Deceased person`'s `the will` — and
+-- nothing anywhere in the four modules computes that field from the Wills
+-- Act's verdict. Which of the two files a user is shown is therefore decided
+-- by whoever built the file, not by any Act.
+
+§§ `Scenario 2B — a will revoked by marriage (Wills Act 1838 s 13)`
+
+-- s 13(1) — "Every will made by a man or woman shall be revoked by his or her
+-- marriage, except a will made in exercise of a power of appointment, when the
+-- real or personal estate thereby appointed would not in default of such
+-- appointment pass to his or her heir, executor or administrator or the person
+-- entitled under the Intestate Succession Act 1967."
+--
+-- Lucas Pereira made a will in 2012 leaving everything to his daughter by his
+-- first marriage, married Carmen in 2018, and died in 2025 without making
+-- another. The will is impeccably executed and it is gone.
+
+`Carmen Pereira` MEANS
+    `a person in the case file` "Carmen Pereira" "carmen" (JUST (YMD 1975 9 9))
+        (`twenty-one years after` (YMD 1975 9 9)) `living` EMPTY
+
+`Vanessa Pereira` MEANS
+    `a person in the case file` "Vanessa Pereira" "vanessa" (JUST (YMD 1998 4 17))
+        (`twenty-one years after` (YMD 1998 4 17)) `living` EMPTY
+
+`Lucas Pereira` MEANS
+    `a person in the case file` "Lucas Pereira" "lucas" (JUST (YMD 1970 6 15))
+        (`twenty-one years after` (YMD 1970 6 15)) (`died on` (YMD 2025 2 20))
+        (LIST `a legitimate child in the case file` `Vanessa Pereira`)
+
+`the will of Lucas Pereira, made in 2012` MEANS
+    `a will, in full` `Lucas Pereira` (JUST (YMD 2012 3 8)) TRUE TRUE FALSE TRUE
+        (LIST `an attesting witness` `Marianne Alphonso` TRUE FALSE FALSE FALSE FALSE
+            , `an attesting witness` `Josephine Alphonso` TRUE FALSE FALSE FALSE FALSE)
+        (LIST `a gift` `Vanessa Pereira` `a residuary gift` 600_000 TRUE TRUE)
+        EMPTY FALSE NOTHING FALSE FALSE TRUE EMPTY
+
+`the family of Lucas Pereira, having married Carmen in 2018` MEANS
+    `a family in the case file`
+        (LIST `a marriage in the case file` `Carmen Pereira` (JUST (YMD 2018 11 11)) TRUE)
+        NOTHING NOTHING
+
+`the family of Lucas Pereira, having married Carmen in 2009` MEANS
+    `a family in the case file`
+        (LIST `a marriage in the case file` `Carmen Pereira` (JUST (YMD 2009 1 5)) TRUE)
+        NOTHING NOTHING
+
+`the estate of Lucas Pereira, the will counted` MEANS `an estate in the case file` 600_000 0 0 0 600_000
+`the estate of Lucas Pereira, the will disregarded` MEANS `an estate in the case file` 600_000 0 0 0 0
+
+`the Pereira estate, the will in the record` MEANS
+    `a deceased person in the case file` `Lucas Pereira` `the family of Lucas Pereira, having married Carmen in 2018`
+        `the estate of Lucas Pereira, the will counted` (JUST `the will of Lucas Pereira, made in 2012`)
+        FALSE EMPTY EMPTY
+
+`the Pereira estate, the will struck out` MEANS
+    `a deceased person in the case file` `Lucas Pereira` `the family of Lucas Pereira, having married Carmen in 2018`
+        `the estate of Lucas Pereira, the will disregarded` NOTHING FALSE EMPTY EMPTY
+
+`the Pereira estate, the marriage having preceded the will` MEANS
+    `a deceased person in the case file` `Lucas Pereira` `the family of Lucas Pereira, having married Carmen in 2009`
+        `the estate of Lucas Pereira, the will counted` (JUST `the will of Lucas Pereira, made in 2012`)
+        FALSE EMPTY EMPTY
+
+`the Pereira will, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Pereira estate, the will in the record`
+        (`the plain facts about` `the will of Lucas Pereira, made in 2012`)
+
+`the Pereira will, the marriage having preceded it, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Pereira estate, the marriage having preceded the will`
+        (`the plain facts about` `the will of Lucas Pereira, made in 2012`)
+
+-- THE WILL IS FORMALLY VALID AND IT IS REVOKED, and both halves have to be
+-- read. A consumer that asked `wills-act.l4` only for its aggregate verdict
+-- would be told `valid` about a will that has no operation at all.
+#ASSERT `the will is properly executed` `the Pereira will, put to the Wills Act`
+#ASSERT `the formal validity of the will` `the Pereira will, put to the Wills Act` EQUALS `valid`
+#ASSERT `s 13 — the will has been revoked by marriage` `the Pereira will, put to the Wills Act`
+#ASSERT `s 15 — the will has been revoked` `the Pereira will, put to the Wills Act`
+
+-- THE ORDER OF THE TWO EVENTS IS WHAT DOES IT, and it is a gloss and not the
+-- subsection's own words — `wills-act.l4` says so at
+-- `the marriage was solemnised after the will was made`. The minimal pair:
+-- the identical will and the identical marriage, solemnised three years
+-- BEFORE the will instead of six years after.
+#ASSERT NOT `s 13 — the will has been revoked by marriage` `the Pereira will, the marriage having preceded it, put to the Wills Act`
+#ASSERT NOT `s 15 — the will has been revoked` `the Pereira will, the marriage having preceded it, put to the Wills Act`
+#ASSERT `the formal validity of the will` `the Pereira will, the marriage having preceded it, put to the Wills Act` EQUALS `valid`
+
+-- AND THE SAME SILENCE AS IN 2A, from a different direction. The Wills Act
+-- has revoked the will; the other two modules still read it out of the record
+-- and answer as though it stood.
+#ASSERT NOT `section 3 — an “intestate” within the meaning of this Act` `the Pereira estate, the will in the record`
+#ASSERT NOT `this Act has effect in respect of the estate` `the Pereira estate, the will in the record`
+#ASSERT `the total of the shares distributed` `the Pereira estate, the will in the record` EQUALS 0
+#ASSERT NOT `s 18(1) — the person has died intestate` `the Pereira estate, the will in the record`
+
+-- ONCE THE REVOCATION IS GIVEN EFFECT IN THE FILE, the answer is the one the
+-- family actually gets: rule 2 halves the estate between the widow and the
+-- daughter the will was written for, and the Probate Act routes to letters of
+-- administration.
+#ASSERT `section 3 — an “intestate” within the meaning of this Act` `the Pereira estate, the will struck out`
+#ASSERT `this Act has effect in respect of the estate` `the Pereira estate, the will struck out`
+#ASSERT `the distribution, read out` `the Pereira estate, the will struck out` EQUALS
+            LIST "Carmen Pereira takes 0.5", "Vanessa Pereira takes 0.5"
+#ASSERT `s 18(1) — the person has died intestate` `the Pereira estate, the will struck out`
+#ASSERT `s 18(4) — the classes to which letters of administration may be granted` `the Pereira estate, the will struck out` EQUALS
+            LIST `the husband or widow or next of kin or any of them`, `such person as the court thinks fit`
+
+-- THE CROSS-REFERENCE THAT IS IN THE WILLS ACT'S OWN TEXT, and the only one
+-- there is. s 13(1)'s exception names "the person entitled under the Intestate
+-- Succession Act 1967" — but it asks whether the appointed estate would pass
+-- to that person "in default of such appointment", which is a question about a
+-- counterfactual instrument and not about this estate. `family-domain.l4`
+-- records it as a proved fact for that reason, so even the one place where one
+-- of these Acts cites another by name is not a computation across the join.
+#ASSERT NOT (`the will of Lucas Pereira, made in 2012`'s `made in exercise of a power of appointment`)
+
+
+§ `Scenario 3 — the privileged will that appoints a guardian`
+
+-- s 27(1) — "Notwithstanding anything in this Act, any soldier being in actual
+-- military service, or any mariner or seaman being at sea, may dispose of his
+-- personal estate as he might have done before the making of this Act and may
+-- do so even though under 21 years of age."
+-- s 27(3) — "Where any person dies after 29 August 1938 having made a will
+-- which is, or which, if it had been a disposition of property, would have
+-- been rendered valid by this section, any appointment contained in that will
+-- of any person as guardian of the infant children of the testator shall be of
+-- full force and effect."
+--
+-- Danial Iskandar was nineteen, a serving soldier, and had a year-old son. He
+-- wrote out a will on operations, unwitnessed, leaving what he had to the boy
+-- and asking his sister Zarina to look after him. He was killed on 10 June
+-- 2025.
+--
+-- THIS IS THE ONE JOIN IN THE CORPUS THAT ONE SIDE STATES IN TERMS.
+-- `wills-act.l4` marks its s 27(3) rule "***** A JOIN TO THE GUARDIANSHIP OF
+-- INFANTS ACT 1934. *****" and writes the hand-off contract out: "So what
+-- guardianship-of-infants-act.l4 must read from here is: which of the
+-- appointments the will contains are in the list below."
+-- `guardianship-of-infants-act.l4` never picks
+-- it up — its s 7(1)-(2) treats `appointed by the father by will` exactly as
+-- it treats `appointed by the father by deed` and imposes no condition on the
+-- instrument at all. The hand-off is TYPED on both sides and taken on
+-- neither: `wills-act.l4` can and does check its own two halves against each
+-- other, and nothing anywhere can put the Wills Act's answer beside the
+-- Guardianship Act's, because no Act module imports another. That is what
+-- step 3 below does, and what it finds.
+
+§§ `Scenario 3 — the soldier, his son, and the two appointments`
+
+`Adam Iskandar` MEANS
+    `a person in the case file` "Adam Iskandar" "adam" (JUST (YMD 2024 2 20))
+        (`twenty-one years after` (YMD 2024 2 20)) `living` EMPTY
+
+`Zarina Iskandar` MEANS
+    `a person in the case file` "Zarina Iskandar" "zarina" (JUST (YMD 1996 5 5))
+        (`twenty-one years after` (YMD 1996 5 5)) `living` EMPTY
+
+`Nadhirah Kamarudin` MEANS
+    `a person in the case file` "Nadhirah Kamarudin" "nadhirah" (JUST (YMD 1990 10 10))
+        (`twenty-one years after` (YMD 1990 10 10)) `living` EMPTY
+
+`Aisyah Kamarudin` MEANS
+    `a person in the case file` "Aisyah Kamarudin" "aisyah" (JUST (YMD 2004 7 1))
+        (`twenty-one years after` (YMD 2004 7 1)) `living`
+        (LIST `a legitimate child in the case file` `Adam Iskandar`)
+
+`Aisyah Kamarudin, having died after the father` MEANS
+    `a person in the case file` "Aisyah Kamarudin" "aisyah" (JUST (YMD 2004 7 1))
+        (`twenty-one years after` (YMD 2004 7 1)) (`died on` (YMD 2025 12 1))
+        (LIST `a legitimate child in the case file` `Adam Iskandar`)
+
+-- THE TESTATOR IS NINETEEN, and that is the point of s 27: born 3 October
+-- 2005, dead on 10 June 2025 having made the will on 15 January that year.
+`Danial Iskandar` MEANS
+    `a person in the case file, in full` "Danial Iskandar" "danial" (JUST (YMD 2005 10 3))
+        (`twenty-one years after` (YMD 2005 10 3)) (`died on` (YMD 2025 6 10))
+        (LIST `a legitimate child in the case file` `Adam Iskandar`)
+        TRUE FALSE FALSE FALSE FALSE TRUE FALSE
+
+`Zarina, appointed guardian of Adam by his father’s will` MEANS
+    `a guardian in the case file` `Zarina Iskandar` "adam" `appointed by the father by will`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE FALSE
+
+`Nadhirah, appointed guardian of Adam by his mother’s will` MEANS
+    `a guardian in the case file` `Nadhirah Kamarudin` "adam" `appointed by the mother by will`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE FALSE
+
+-- THE WILL. Unwitnessed and unacknowledged, so s 6(2) is not satisfied in any
+-- particular; the only thing that carries it is s 27.
+`the will of Danial Iskandar, written on operations` MEANS
+    `a will, in full` `Danial Iskandar` (JUST (YMD 2025 1 15)) TRUE TRUE FALSE FALSE
+        EMPTY (LIST `a gift` `Adam Iskandar` `a residuary gift` 40_000 TRUE TRUE)
+        (LIST `Zarina, appointed guardian of Adam by his father’s will`)
+        FALSE NOTHING FALSE FALSE TRUE EMPTY
+
+GIVEN `the mother` IS A MAYBE Person
+      `the guardians of Adam` IS A LIST OF Guardian
+GIVETH AN Infant
+`Adam, an infant concerned in his father’s estate` MEANS
+    `an infant in the case file` `Adam Iskandar` (JUST `Danial Iskandar`) `the mother`
+        `the guardians of Adam` 40_000
+
+`the estate of Danial Iskandar` MEANS `an estate in the case file` 40_000 0 0 0 40_000
+
+`the family of Danial Iskandar` MEANS `a family in the case file` EMPTY NOTHING NOTHING
+
+`the Iskandar estate` MEANS
+    `a deceased person in the case file` `Danial Iskandar` `the family of Danial Iskandar`
+        `the estate of Danial Iskandar` (JUST `the will of Danial Iskandar, written on operations`)
+        FALSE EMPTY
+        (LIST `Adam, an infant concerned in his father’s estate` (JUST `Aisyah Kamarudin`)
+                  (LIST `Zarina, appointed guardian of Adam by his father’s will`))
+
+`the Iskandar will, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Iskandar estate`
+        (`the facts about a will` `the will of Danial Iskandar, written on operations`
+             `no conformity to any law outside this Act` `not revoked in any of those ways` `no revival`
+             FALSE FALSE FALSE FALSE TRUE)
+
+§§ `Scenario 3, step 1 — the Wills Act saves the will and the appointment`
+
+-- s 4 WOULD HAVE VOIDED IT. "No will made by any person under 21 years of age
+-- shall be valid." He was nineteen when he made it, and the decision says so.
+#ASSERT `the age of the testator when the will was made` (`the will under consideration` `the Iskandar will, put to the Wills Act`) EQUALS `under 21 years of age`
+#ASSERT `s 4 — will of infant invalid` (`the will under consideration` `the Iskandar will, put to the Wills Act`)
+
+-- AND s 6 WOULD HAVE VOIDED IT TOO: nobody witnessed it.
+#ASSERT NOT `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` (`the Iskandar will, put to the Wills Act`'s `the will in question`)
+#ASSERT NOT `the will is properly executed` `the Iskandar will, put to the Wills Act`
+
+-- s 27(1) OPENS "Notwithstanding anything in this Act", and the aggregate
+-- tests it FIRST for that reason. Two provisions that would each defeat the
+-- will are both displaced by one subsection.
+#ASSERT `s 27 — this section applies to the person` `Danial Iskandar`
+#ASSERT `s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` `the Iskandar will, put to the Wills Act`
+#ASSERT `s 27(2) — the testamentary disposition of real estate is valid` `the Iskandar will, put to the Wills Act`
+#ASSERT `the formal validity of the will` `the Iskandar will, put to the Wills Act` EQUALS
+            `valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1))`
+
+-- s 27(3) — the appointment of Zarina is "of full force and effect". The
+-- decision returns the appointments themselves, and the boolean is their
+-- non-emptiness.
+#ASSERT `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` `the Iskandar will, put to the Wills Act`
+#ASSERT `the references for the guardians whose appointment this Act has made good` `the Iskandar will, put to the Wills Act` EQUALS
+            LIST "zarina"
+
+-- THE JOIN, EXECUTED. The Wills Act names the guardians it has made good; the
+-- estate names the guardians recorded against the infants concerned in it.
+-- `wills-act.l4` provides both halves expressly so that a case file can be
+-- checked against itself, and runs the check on one fixture of its own. What
+-- is new here is the FAMILY: this file runs it on a case that then goes on to
+-- the Guardianship Act in step 2 and is measured against it in step 3. The two
+-- lists are equal.
+#ASSERT `the references for the guardians recorded against the infants concerned in the estate` `the Iskandar will, put to the Wills Act` EQUALS
+            LIST "zarina"
+#ASSERT `the references for the guardians whose appointment this Act has made good` `the Iskandar will, put to the Wills Act` EQUALS
+            `the references for the guardians recorded against the infants concerned in the estate` `the Iskandar will, put to the Wills Act`
+
+§§ `Scenario 3, step 2 — what the Guardianship of Infants Act does with the appointment`
+
+`Adam, his mother surviving` MEANS
+    `Adam, an infant concerned in his father’s estate` (JUST `Aisyah Kamarudin`)
+        (LIST `Zarina, appointed guardian of Adam by his father’s will`)
+
+`Adam, both parents dead, each having appointed a guardian` MEANS
+    `Adam, an infant concerned in his father’s estate` (JUST `Aisyah Kamarudin, having died after the father`)
+        (LIST `Zarina, appointed guardian of Adam by his father’s will`
+            , `Nadhirah, appointed guardian of Adam by his mother’s will`)
+
+-- s 7(1) — "The father of an infant may by deed or will appoint any person to
+-- be guardian of the infant after his death." The appointment takes effect on
+-- the father's death, which has happened.
+#ASSERT `the appointment under section 7(1) or (2) has taken effect` `Zarina, appointed guardian of Adam by his father’s will` `Adam, his mother surviving`
+
+-- s 7(3) — "Any guardian so appointed shall act jointly with the mother or
+-- father, as the case may be, of the infant so long as the mother or father
+-- remains alive, unless the mother or father objects to his so acting."
+-- Aisyah is alive and has not objected, so Zarina acts WITH her and not
+-- instead of her. The default is joint action and the objection is the
+-- exception, which is the way round the subsection puts it.
+#ASSERT `the guardian so appointed acts jointly with the mother or father under section 7(3)` `Zarina, appointed guardian of Adam by his father’s will` `Adam, his mother surviving`
+#ASSERT `the standing of the guardian under this Act` `Zarina, appointed guardian of Adam by his father’s will` `Adam, his mother surviving` EQUALS
+            `he acts jointly with the mother or father, as the case may be`
+
+-- WHO THE GUARDIANS ARE, all together: the mother by force of s 6(1), and
+-- Zarina by the appointment the Wills Act made good.
+#ASSERT `the mother is guardian of the infant under section 6(1)` `Adam, his mother surviving`
+#ASSERT `the persons who are guardians of the infant` `Adam, his mother surviving` EQUALS LIST "aisyah", "zarina"
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Adam, his mother surviving` (YMD 2026 1 15) EQUALS
+            `the person is an infant on that date, and the guardians of the infant are` (LIST "aisyah", "zarina")
+
+-- s 7(5) — "Where guardians are appointed by both parents, the guardians so
+-- appointed shall after the death of the surviving parent act jointly." Aisyah
+-- dies on 1 December 2025, six months after Danial, having appointed Nadhirah
+-- by her own will. Now both appointees act together.
+#ASSERT NOT `guardians are appointed by both parents` `Adam, his mother surviving`
+#ASSERT NOT `section 7(5) is engaged` `Adam, his mother surviving`
+#ASSERT `the guardians who act jointly under section 7(5)` `Adam, his mother surviving` EQUALS EMPTY
+#ASSERT `guardians are appointed by both parents` `Adam, both parents dead, each having appointed a guardian`
+#ASSERT `the infant has no parent` `Adam, both parents dead, each having appointed a guardian`
+#ASSERT `section 7(5) is engaged` `Adam, both parents dead, each having appointed a guardian`
+#ASSERT `the guardians who act jointly under section 7(5)` `Adam, both parents dead, each having appointed a guardian` EQUALS
+            LIST "zarina", "nadhirah"
+#ASSERT `the standing of the guardian under this Act` `Zarina, appointed guardian of Adam by his father’s will` `Adam, both parents dead, each having appointed a guardian` EQUALS
+            `after the death of the surviving parent the guardians appointed by both parents act jointly`
+#ASSERT `the persons who are guardians of the infant` `Adam, both parents dead, each having appointed a guardian` EQUALS
+            LIST "zarina", "nadhirah"
+
+§§ `Scenario 3, step 3 — the hand-off that is typed on both sides and taken on neither`
+
+-- THE MEASUREMENT. Take the identical family and remove one fact: Danial was
+-- not a soldier. Everything else — the will, its date, its want of witnesses,
+-- the appointment of Zarina, the boy, his mother — is unchanged, and the
+-- `Infant` record put to the Guardianship Act below is LITERALLY THE SAME
+-- VALUE as the one used above.
+--
+-- THE WILLS ACT'S ANSWER FLIPS. Without s 27 the will is void under s 4, and
+-- s 27(3) makes no appointment good: `the references for the guardians whose
+-- appointment this Act has made good` goes from LIST "zarina" to EMPTY.
+--
+-- THE GUARDIANSHIP ACT'S ANSWER DOES NOT MOVE. It still makes Zarina a
+-- guardian of Adam acting jointly with his mother, because its s 7(1)-(2)
+-- reads `How the guardian was appointed`'s `appointed by the father by will`
+-- and asks nothing about the will. Nothing in the shared ontology carries a
+-- Wills Act verdict, so there is no field it COULD read.
+--
+-- THAT IS THE `one-side-silent` ROW, EXHIBITED RATHER THAN DESCRIBED: two
+-- modules, one family, one fact changed, and the two answers part company.
+-- `guardianship-of-infants-act.l4` says at its s 7(1)-(2) that
+-- `appointed by the father by will` is "to be set only where the Wills Act
+-- decision has answered TRUE" — which is a discipline on whoever writes the
+-- case file, and the file below breaks it without anything objecting.
+
+`Danial Iskandar, had he not been a soldier` MEANS
+    `a person in the case file` "Danial Iskandar" "danial" (JUST (YMD 2005 10 3))
+        (`twenty-one years after` (YMD 2005 10 3)) (`died on` (YMD 2025 6 10))
+        (LIST `a legitimate child in the case file` `Adam Iskandar`)
+
+`the will of Danial Iskandar, had he not been a soldier` MEANS
+    `a will, in full` `Danial Iskandar, had he not been a soldier` (JUST (YMD 2025 1 15)) TRUE TRUE FALSE FALSE
+        EMPTY (LIST `a gift` `Adam Iskandar` `a residuary gift` 40_000 TRUE TRUE)
+        (LIST `Zarina, appointed guardian of Adam by his father’s will`)
+        FALSE NOTHING FALSE FALSE TRUE EMPTY
+
+`the Iskandar estate, he not having been a soldier` MEANS
+    `a deceased person in the case file` `Danial Iskandar, had he not been a soldier` `the family of Danial Iskandar`
+        `the estate of Danial Iskandar` (JUST `the will of Danial Iskandar, had he not been a soldier`)
+        FALSE EMPTY (LIST `Adam, his mother surviving`)
+
+`the Iskandar will, he not having been a soldier, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Iskandar estate, he not having been a soldier`
+        (`the facts about a will` `the will of Danial Iskandar, had he not been a soldier`
+             `no conformity to any law outside this Act` `not revoked in any of those ways` `no revival`
+             FALSE FALSE FALSE FALSE TRUE)
+
+#ASSERT NOT `s 27 — this section applies to the person` `Danial Iskandar, had he not been a soldier`
+#ASSERT NOT `s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` `the Iskandar will, he not having been a soldier, put to the Wills Act`
+#ASSERT `the formal validity of the will` `the Iskandar will, he not having been a soldier, put to the Wills Act` EQUALS
+            `not valid, being a will made by a person under 21 years of age (section 4)`
+#ASSERT NOT `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` `the Iskandar will, he not having been a soldier, put to the Wills Act`
+#ASSERT `the references for the guardians whose appointment this Act has made good` `the Iskandar will, he not having been a soldier, put to the Wills Act` EQUALS EMPTY
+
+-- AND THE ESTATE STILL RECORDS ZARINA AS ADAM'S GUARDIAN, so the two halves
+-- of the join now DISAGREE on one file — the check `wills-act.l4` built, run
+-- on a case where it fails.
+#ASSERT `the references for the guardians recorded against the infants concerned in the estate` `the Iskandar will, he not having been a soldier, put to the Wills Act` EQUALS
+            LIST "zarina"
+
+-- THE GUARDIANSHIP ACT, ASKED THE SAME QUESTION ABOUT THE SAME BOY, IS
+-- UNMOVED. These are the same three assertions made in step 2, on the same
+-- `Infant` value, and they hold whichever answer the Wills Act gave.
+#ASSERT `the appointment under section 7(1) or (2) has taken effect` `Zarina, appointed guardian of Adam by his father’s will` `Adam, his mother surviving`
+#ASSERT `the guardian so appointed acts jointly with the mother or father under section 7(3)` `Zarina, appointed guardian of Adam by his father’s will` `Adam, his mother surviving`
+#ASSERT `the persons who are guardians of the infant` `Adam, his mother surviving` EQUALS LIST "aisyah", "zarina"
+
+
+§ `Scenario 4 — the Muslim estate: where the corpus must stop`
+
+-- s 2 — "Nothing in this Act shall apply to the estate of any Muslim or shall
+-- affect any rules of the Muslim law in respect of the distribution of the
+-- estate of any such person."
+--
+-- Muhammad Faizal died on 2 August 2025 leaving a widow, an adult son and a
+-- daughter of fourteen, and $900,000 in Singapore. The Intestate Succession Act
+-- does not reach a line of it.
+--
+-- WHERE IT GOES INSTEAD, and the Act that says so is not one of the four. The
+-- Administration of Muslim Law Act 1966 s 112(1): "In the case of any Muslim
+-- person domiciled in Singapore dying intestate, the estate and effects must
+-- be distributed according to the Muslim law as modified, where applicable, by
+-- Malay custom." (Quoted from source/AMLA1966.txt, which is in this
+-- directory and is NOT encoded anywhere in this cleanroom.) So the honest
+-- answer for this family is a pointer out of the corpus, and the composition's
+-- job is to give the pointer rather than an arithmetic.
+--
+-- WHY A TOOL THAT ANSWERS HERE IS WORSE THAN ONE THAT DECLINES. Three of the
+-- four modules keep running on this estate, and they are RIGHT to: the Probate
+-- and Administration Act still governs the grant (its own s 18(5) merely saves
+-- the other law, and AMLA s 113 assumes that Muslims apply for probate and
+-- letters of administration), and the Guardianship of Infants Act still
+-- appoints the daughter's guardian. Only the DISTRIBUTION is switched off.
+-- A consumer that put the four modules side by side and read whichever one
+-- answered would report a distribution the Act expressly does not make.
+-- `what this corpus can say about the distribution of the estate` exists so
+-- that the stop is a value the consumer has to look at.
+
+§§ `Scenario 4 — the family, and the four answers`
+
+`Rohani Sulaiman` MEANS
+    `a person in the case file` "Rohani Sulaiman" "rohani" (JUST (YMD 1980 4 4))
+        (`twenty-one years after` (YMD 1980 4 4)) `living` EMPTY
+
+`Hafiz Faizal` MEANS
+    `a person in the case file` "Hafiz Faizal" "hafiz" (JUST (YMD 2001 3 3))
+        (`twenty-one years after` (YMD 2001 3 3)) `living` EMPTY
+
+`Sofea Faizal` MEANS
+    `a person in the case file` "Sofea Faizal" "sofea" (JUST (YMD 2010 12 12))
+        (`twenty-one years after` (YMD 2010 12 12)) `living` EMPTY
+
+`Muhammad Faizal` MEANS
+    `a person in the case file` "Muhammad Faizal" "faizal" (JUST (YMD 1978 1 1))
+        (`twenty-one years after` (YMD 1978 1 1)) (`died on` (YMD 2025 8 2))
+        (LIST `a legitimate child in the case file` `Hafiz Faizal`
+            , `a legitimate child in the case file` `Sofea Faizal`)
+
+`Rohani, guardian of Sofea by virtue of surviving the father` MEANS
+    `a guardian in the case file` `Rohani Sulaiman` "sofea"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE FALSE
+
+`Sofea, an infant concerned in the estate` MEANS
+    `an infant in the case file` `Sofea Faizal` (JUST `Muhammad Faizal`) (JUST `Rohani Sulaiman`)
+        (LIST `Rohani, guardian of Sofea by virtue of surviving the father`) 0
+
+`the family of Muhammad Faizal` MEANS
+    `a family in the case file`
+        (LIST `a marriage in the case file` `Rohani Sulaiman` (JUST (YMD 1999 8 8)) TRUE)
+        NOTHING NOTHING
+
+`the estate of Muhammad Faizal` MEANS `an estate in the case file` 900_000 0 0 0 0
+
+`the Faizal estate` MEANS
+    `a deceased person in the case file` `Muhammad Faizal` `the family of Muhammad Faizal`
+        `the estate of Muhammad Faizal` NOTHING TRUE EMPTY (LIST `Sofea, an infant concerned in the estate`)
+
+-- THE SAME FAMILY, NOT MUSLIM. It exists so that every assertion below has a
+-- minimal pair: one field differs, `Deceased person`'s `a Muslim`, and it is
+-- the only thing that could be producing the difference.
+`the Faizal estate, the deceased not being a Muslim` MEANS
+    `a deceased person in the case file` `Muhammad Faizal` `the family of Muhammad Faizal`
+        `the estate of Muhammad Faizal` NOTHING FALSE EMPTY (LIST `Sofea, an infant concerned in the estate`)
+
+-- THE INTESTATE SUCCESSION ACT STOPS, AND STOPS COMPLETELY. Not "distributes
+-- nothing" — has no application. In particular rule 9 does NOT fire: a
+-- Muslim's estate does not escheat to the Government by way of an Act that
+-- does not apply to it.
+#ASSERT `section 2 — nothing in this Act applies to the estate` `the Faizal estate`
+#ASSERT NOT `this Act applies to the estate` `the Faizal estate`
+#ASSERT NOT `this Act has effect in respect of the estate` `the Faizal estate`
+#ASSERT NOT `rule 9 — in default of distribution under rules 1 to 8` `the Faizal estate`
+#ASSERT `rule 9 — the entitlement of the Government` `the Faizal estate` EQUALS EMPTY
+#ASSERT `the persons entitled to succeed beneficially, and their shares` `the Faizal estate` EQUALS EMPTY
+#ASSERT `the distribution, read out` `the Faizal estate` EQUALS EMPTY
+#ASSERT `the total of the shares distributed` `the Faizal estate` EQUALS 0
+#ASSERT `the property of which every share under section 7 is a fraction` `the Faizal estate` EQUALS 0
+
+-- THE COMPOSITION SAYS SO IN WORDS, and this is the assertion a consumer of
+-- this corpus should be made to read before it reports anything at all.
+#ASSERT `what this corpus can say about the distribution of the estate` `the Faizal estate` EQUALS
+            `nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it`
+
+-- THE MINIMAL PAIR. Change nothing but s 2's fact and the same family takes
+-- one-half and a quarter each under rules 2 and 3.
+#ASSERT `this Act has effect in respect of the estate` `the Faizal estate, the deceased not being a Muslim`
+#ASSERT `the distribution, read out` `the Faizal estate, the deceased not being a Muslim` EQUALS
+            LIST "Rohani Sulaiman takes 0.5", "Hafiz Faizal takes 0.25", "Sofea Faizal takes 0.25"
+#ASSERT `what this corpus can say about the distribution of the estate` `the Faizal estate, the deceased not being a Muslim` EQUALS
+            `the Intestate Succession Act 1967 governs the distribution, and its rules have been applied`
+
+-- THE OTHER THREE ACTS DO NOT STOP, AND SHOULD NOT. The Probate and
+-- Administration Act's own saving is narrower than the Intestate Succession
+-- Act's exclusion — s 18(5), "Nothing in this section shall affect any law by
+-- which special provision is made regarding the estates of persons of a
+-- particular religion or race", leaves the other law unaffected rather than
+-- switching this one off — and `probate-administration-act.l4` says so in
+-- terms. So the grant machinery runs on identical facts.
+#ASSERT `s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` `the Faizal estate`
+#ASSERT NOT `s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` `the Faizal estate, the deceased not being a Muslim`
+#ASSERT `s 18(1) — the person has died intestate` `the Faizal estate`
+#ASSERT `the persons entitled under section 18(4)(a)` `the Faizal estate` EQUALS
+            LIST `Rohani Sulaiman`, `Hafiz Faizal`, `Sofea Faizal`
+#ASSERT `s 6(2) — there is a minority` `the Faizal estate` (YMD 2026 1 15)
+#ASSERT `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Sofea Faizal` (YMD 2026 1 15)
+
+-- AND THE GUARDIANSHIP ACT IS INDIFFERENT TO THE WHOLE QUESTION: it contains
+-- no analogue of s 2, and the daughter's guardian is her mother either way.
+#ASSERT `the mother is guardian of the infant under section 6(1)` `Sofea, an infant concerned in the estate`
+#ASSERT `the persons who are guardians of the infant` `Sofea, an infant concerned in the estate` EQUALS LIST "rohani"
+
+-- THE ONE PLACE THE CORPUS ANSWERS WHERE IT HAS NO BUSINESS ANSWERING, and it
+-- is recorded rather than repaired, because repairing it would mean encoding
+-- the Administration of Muslim Law Act 1966 and this cleanroom encodes four
+-- Acts. AMLA s 111(1): "Despite anything in the provisions of the English law
+-- or in any other written law, no Muslim domiciled in Singapore may, after
+-- 1 July 1968, dispose of his or her property by will except in accordance
+-- with the provisions of and subject to the restrictions imposed by the school
+-- of Muslim law professed by him or her." (Quoted from source/AMLA1966.txt.)
+-- `wills-act.l4` has no gate for it — the Wills Act 1838 contains none, and
+-- the module is right not to invent one — so a Muslim's will that satisfies
+-- s 6 comes out of this corpus as `valid` with nothing said about s 111.
+`the will of Muhammad Faizal` MEANS
+    `a will, in full` `Muhammad Faizal` (JUST (YMD 2020 5 5)) TRUE TRUE FALSE TRUE
+        (LIST `an attesting witness` `Marianne Alphonso` TRUE FALSE FALSE FALSE FALSE
+            , `an attesting witness` `Josephine Alphonso` TRUE FALSE FALSE FALSE FALSE)
+        (LIST `a gift` `Hafiz Faizal` `a residuary gift` 900_000 TRUE TRUE)
+        EMPTY FALSE NOTHING FALSE FALSE TRUE EMPTY
+
+`the Faizal estate, a will having been left` MEANS
+    `a deceased person in the case file` `Muhammad Faizal` `the family of Muhammad Faizal`
+        (`an estate in the case file` 900_000 0 0 0 900_000) (JUST `the will of Muhammad Faizal`)
+        TRUE EMPTY (LIST `Sofea, an infant concerned in the estate`)
+
+`the Faizal will, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Faizal estate, a will having been left`
+        (`the plain facts about` `the will of Muhammad Faizal`)
+
+#ASSERT `the formal validity of the will` `the Faizal will, put to the Wills Act` EQUALS `valid`
+#ASSERT `what this corpus can say about the distribution of the estate` `the Faizal estate, a will having been left` EQUALS
+            `nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it`
+
+
+§ `Scenario 5 — where the four Acts disagree, and where one of them runs out`
+
+-- SEAMS, EXHIBITED RATHER THAN DESCRIBED. The cross-module audit of
+-- 2026-08-26 mapped seven joins between the four modules — one on which they
+-- agree, five on which one side is silent, and one on which they disagree.
+-- Three of the silent five are exercised where the families meet them:
+-- Guardianship of Infants Act s 17 against entitlement in scenario 1,
+-- Wills Act s 27(3) against Guardianship of Infants Act s 7 in scenario 3, and
+-- Probate and Administration Act s 21(2) against the office of guardian in
+-- scenarios 1 and 6. §§5A to 5E take the rest — the agreement, the
+-- disagreement from both its ends, and the two remaining silences — and each
+-- is asserted on a family rather than argued in a comment, so that a later
+-- change to any of the four modules moves an assertion in this file rather
+-- than moving silently. §5F is a sixth seam, which was not on the audit's map
+-- and was found by building this file.
+--
+-- ONE OF THE FIVE IS NO LONGER A DISAGREEMENT, and §5E says so: the audit's
+-- disagreement row about the Intestate Succession Act's "child" travelling
+-- into the Probate Act's "next of kin" was repaired in
+-- `probate-administration-act.l4` after the audit ran. The assertions there
+-- record the agreement, which is what a regression test is for.
+
+§§ `Scenario 5A — one silence, three shapes: the age that is not in evidence`
+
+-- THREE OF THE FOUR MODULES ASK WHETHER A PERSON IS UNDER AGE, AND ALL THREE
+-- RESOLVE THE NOT-IN-EVIDENCE CASE DIFFERENTLY. Each argues its answer at its
+-- own site; `wills-act.l4`'s AMBIGUITY A1 sets all three out side by side.
+-- What no module could do is put a single person to all three at once.
+--
+--   WILLS ACT               a THIRD VALUE. `Whether the testator had attained
+--                           21 years of age when the will was made` has a
+--                           member for it and the aggregate verdict carries a
+--                           matching one: neither limb is made out.
+--   PROBATE ACT             FALSE. `is an infant on` folds a missing majority
+--                           date to FALSE, so the s 21(1) bar does not bite.
+--   GUARDIANSHIP ACT        NOTHING. Its predicate returns `MAYBE BOOLEAN`
+--                           and propagates the absence.
+--
+-- NONE OF THE THREE IS WRONG, and this file does not repair any of them. What
+-- it does is make the divergence a fact of record: on ONE person, the Probate
+-- Act reports that he is not an infant and the Guardianship Act reports that
+-- it cannot be determined, about the same day.
+
+`Gerald Menon, whose age is nowhere in evidence` MEANS
+    `a person in the case file` "Gerald Menon" "gerald" NOTHING NOTHING `living` EMPTY
+
+`Gerald Menon, guardian of nobody` MEANS
+    `a guardian in the case file` `Gerald Menon, whose age is nowhere in evidence` "gerald"
+        `appointed by the court where the infant has no parent`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE FALSE
+
+`Gerald Menon, put forward as an infant` MEANS
+    `an infant in the case file` `Gerald Menon, whose age is nowhere in evidence` NOTHING NOTHING EMPTY 0
+
+`the will of Gerald Menon, undated` MEANS
+    `a will, in full` `Gerald Menon, whose age is nowhere in evidence` NOTHING TRUE TRUE FALSE TRUE
+        (LIST `an attesting witness` `Marianne Alphonso` TRUE FALSE FALSE FALSE FALSE
+            , `an attesting witness` `Josephine Alphonso` TRUE FALSE FALSE FALSE FALSE)
+        (LIST `a gift` `Marianne Alphonso` `a residuary gift` 1_000 TRUE TRUE)
+        EMPTY FALSE NOTHING FALSE FALSE TRUE EMPTY
+
+`the Menon estate` MEANS
+    `a deceased person in the case file` `Gerald Menon, whose age is nowhere in evidence`
+        (`a family in the case file` EMPTY NOTHING NOTHING)
+        (`an estate in the case file` 1_000 0 0 0 1_000) (JUST `the will of Gerald Menon, undated`)
+        FALSE EMPTY (LIST `Gerald Menon, put forward as an infant`)
+
+`the Menon will, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Menon estate` (`the plain facts about` `the will of Gerald Menon, undated`)
+
+-- THE WILLS ACT: a third value, and a verdict that says the section could not
+-- be applied rather than that it was applied and passed.
+#ASSERT `the age of the testator when the will was made` (`the will under consideration` `the Menon will, put to the Wills Act`) EQUALS
+            `not in evidence, the date of birth of the testator or the date of execution of the will not being known`
+#ASSERT NOT `s 4 — will of infant invalid` (`the will under consideration` `the Menon will, put to the Wills Act`)
+#ASSERT NOT `s 4 — the testator is proved to have been 21 years of age or over` (`the will under consideration` `the Menon will, put to the Wills Act`)
+#ASSERT `the formal validity of the will` `the Menon will, put to the Wills Act` EQUALS
+            `the age of the testator when the will was made not being in evidence, section 4 cannot be applied`
+
+-- THE PROBATE ACT: FALSE, so the s 21(1) bar does not bite and nothing is
+-- said about the doubt.
+#ASSERT NOT (`Gerald Menon, whose age is nowhere in evidence` `is an infant on` (YMD 2026 1 15))
+#ASSERT NOT `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Gerald Menon, whose age is nowhere in evidence` (YMD 2026 1 15)
+#ASSERT NOT `s 6(2) — there is a minority` `the Menon estate` (YMD 2026 1 15)
+
+-- THE GUARDIANSHIP ACT: NOTHING, and a named outcome for it downstream.
+#ASSERT `the person is an infant on the date in question` `Gerald Menon, whose age is nowhere in evidence` (YMD 2026 1 15) EQUALS NOTHING
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Gerald Menon, put forward as an infant` (YMD 2026 1 15) EQUALS
+            `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
+
+-- AND WHERE THE DATE IS IN EVIDENCE THE TWO THAT SHARE THE FIELD AGREE
+-- EXACTLY, BOUNDARY INCLUDED. Divya attains majority on 2 November 2033. Both
+-- modules read `family-domain.l4`'s
+-- `the date on which the person attains the age of majority` and both compare
+-- it strictly; the Probate Act writes the comparison `is before` and the
+-- Guardianship Act writes it `LESS THAN`. Each pins its own half; this is the
+-- first place both halves are pinned on one person.
+#ASSERT     `Divya Sivakumar` `is an infant on` (YMD 2033 11 1)
+#ASSERT NOT (`Divya Sivakumar` `is an infant on` (YMD 2033 11 2))
+#ASSERT `the person is an infant on the date in question` `Divya Sivakumar` (YMD 2033 11 1) EQUALS JUST TRUE
+#ASSERT `the person is an infant on the date in question` `Divya Sivakumar` (YMD 2033 11 2) EQUALS JUST FALSE
+
+§§ `Scenario 5B — the Probate Act's flat class against the Intestate Succession Act's ladder`
+
+-- THE AUDIT'S DISAGREEMENT ROW, IN THE FORM IT SURVIVES IN. The Probate Act
+-- takes "next of kin" as, in `probate-administration-act.l4`'s own words,
+-- "the classes to whom the Intestate Succession Act 1967
+-- distributes on an intestacy — issue, parents, brothers and sisters and
+-- their issue, grandparents, uncles and aunts — taken as a flat class" — its
+-- AMBIGUITY A3, reading (i) — while the Intestate Succession Act's rules 4 to
+-- 8 are a LADDER: rule 5 gives the parents the estate only "If there are no
+-- descendants".
+--
+-- SO ON A FAMILY WITH A SPOUSE, ISSUE AND SURVIVING PARENTS THE TWO ACTS PART
+-- COMPANY, and both are right on their own subject matter: a grant may be made
+-- to a person who takes nothing. The composition's job is to make sure nobody
+-- reads the Probate Act's class as a list of beneficiaries.
+
+`Ramanathan Pillai` MEANS
+    `a person in the case file` "Ramanathan Pillai" "ramanathan" (JUST (YMD 1940 1 1))
+        (`twenty-one years after` (YMD 1940 1 1)) `living` EMPTY
+
+`Kamatchi Pillai` MEANS
+    `a person in the case file` "Kamatchi Pillai" "kamatchi" (JUST (YMD 1943 6 6))
+        (`twenty-one years after` (YMD 1943 6 6)) `living` EMPTY
+
+`the family of Sivakumar Ramanathan, his parents surviving` MEANS
+    `a family in the case file`
+        (LIST `a marriage in the case file` `Meera Sivakumar` (JUST (YMD 1994 6 4)) TRUE)
+        (JUST `Ramanathan Pillai`) (JUST `Kamatchi Pillai`)
+
+`the Sivakumar intestacy, his parents surviving` MEANS
+    `a deceased person in the case file` `Sivakumar Ramanathan`
+        `the family of Sivakumar Ramanathan, his parents surviving`
+        `the estate of Sivakumar Ramanathan` NOTHING FALSE
+        (LIST `the grant to the widow and the son`)
+        (LIST `Divya as an infant concerned in the estate`)
+
+-- THE INTESTATE SUCCESSION ACT PAYS THE PARENTS NOTHING. Rule 2 gives the
+-- spouse one-half and rule 3 gives the issue the other half; rule 5's
+-- antecedent — "If there are no descendants" — is not made out.
+#ASSERT NOT `rule 5 — there are no descendants, and there are a parent or parents of the intestate` `the Sivakumar intestacy, his parents surviving`
+#ASSERT `the distribution, read out` `the Sivakumar intestacy, his parents surviving` EQUALS
+            LIST "Meera Sivakumar takes 0.5", "Arjun Sivakumar takes 0.25", "Divya Sivakumar takes 0.25"
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy, his parents surviving` "ramanathan" EQUALS 0
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy, his parents surviving` "kamatchi" EQUALS 0
+
+-- THE PROBATE ACT PUTS THEM IN THE CLASS TO WHICH A GRANT MAY BE MADE.
+#ASSERT `s 18(4)(a) — one of the husband or widow or next of kin` `the Sivakumar intestacy, his parents surviving` "ramanathan"
+#ASSERT `s 18(4)(a) — one of the husband or widow or next of kin` `the Sivakumar intestacy, his parents surviving` "kamatchi"
+#ASSERT `the persons entitled under section 18(4)(a)` `the Sivakumar intestacy, his parents surviving` EQUALS
+            LIST `Meera Sivakumar`, `Arjun Sivakumar`, `Divya Sivakumar`, `Ramanathan Pillai`, `Kamatchi Pillai`
+
+§§ `Scenario 5C — the debts nobody reads`
+
+-- THE AUDIT'S `one-side-silent` ROW ABOUT THE EXPENSES SEAM, MEASURED. The
+-- Intestate Succession Act s 5 distributes the property "after payment thereout
+-- of the expenses of due administration as prescribed by the Probate and
+-- Administration Act 1934", and `intestate-succession-act.l4` deducts exactly
+-- that — `Estate`'s `the funeral, testamentary and administration expenses` —
+-- and says at its own site why it does not deduct the debts. The Act that
+-- would apply the debts is the Probate and Administration Act, whose ss 57-58
+-- and both Schedules `probate-administration-act.l4` puts out of scope.
+--
+-- SO `the debts and liabilities of the deceased` HAS NO READER IN THE CORPUS.
+-- The pair below differs in that one field alone — nil against $900,000 on a
+-- $1,000,000 fund — and every answer in every module is identical.
+
+`the estate of Sivakumar Ramanathan, owing $900,000` MEANS `an estate in the case file` 700_000 500_000 200_000 900_000 0
+
+`the Sivakumar intestacy, owing $900,000` MEANS
+    `a deceased person in the case file` `Sivakumar Ramanathan` `the family of Sivakumar Ramanathan`
+        `the estate of Sivakumar Ramanathan, owing $900,000` NOTHING FALSE
+        (LIST `the grant to the widow and the son`)
+        (LIST `Divya as an infant concerned in the estate`)
+
+#ASSERT `the property of which every share under section 7 is a fraction` `the Sivakumar intestacy, owing $900,000` EQUALS 1_000_000
+#ASSERT `the distribution, read out` `the Sivakumar intestacy, owing $900,000` EQUALS
+            `the distribution, read out` `the Sivakumar intestacy`
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Sivakumar intestacy, owing $900,000` "divya" EQUALS 250_000
+#ASSERT `s 29(2) — the amount at which the estate within the jurisdiction is sworn` `the Sivakumar intestacy, owing $900,000` EQUALS
+            `s 29(2) — the amount at which the estate within the jurisdiction is sworn` `the Sivakumar intestacy`
+#ASSERT `s 29(2) — the amount at which the estate within the jurisdiction is sworn` `the Sivakumar intestacy, owing $900,000` EQUALS 1_200_000
+
+-- WHAT THAT MEANS FOR A FAMILY, and it is not a rounding error: the corpus
+-- will tell Divya she is entitled to $250,000 out of an estate that owes
+-- $900,000 against $1,200,000 of assets. The figure is right as far as the
+-- Intestate Succession Act goes — that Act deducts the expenses of
+-- administration and nothing else — and it is not what she will receive.
+-- Neither module is wrong; the corpus is incomplete, and this is where a
+-- reader is owed the fact.
+
+§§ `Scenario 5D — one fact under two names: the administrator who "is entitled to the whole"`
+
+-- THE AUDIT'S LAST `one-side-silent` ROW, AND THE ONE WITH A PRICE ON IT.
+-- Probate and Administration Act s 29(5) — "When the administrator is entitled
+-- to the whole of the estate after payment of the debts, sureties in the bond
+-- may ordinarily be dispensed with." Whether the administrator IS so entitled
+-- is a statement about the distribution, which is the Intestate Succession
+-- Act's subject; `intestate-succession-act.l4` computes it and offers it, at
+-- `one person takes the whole of the property distributable under this Act`.
+--
+-- THE TWO MEET NOWHERE. `family-domain.l4` declares `Entitlement` and no
+-- record anywhere has a field of that type, so `probate-administration-act.l4`
+-- takes s 29(5)'s antecedent as a SWORN BOOLEAN on its own
+-- `The further facts on which the grant machinery turns`, and reports the gap
+-- from its own side in as many words. Nothing checks the oath against the
+-- computation.
+--
+-- SO THE FILE BELOW CONTRADICTS ITSELF AND NOTHING OBJECTS. On the Sivakumar
+-- estate the Intestate Succession Act divides the fund three ways; the further
+-- facts swear that the administrator takes the whole; and the sureties on the
+-- administration bond are dispensed with on an estate where s 29(5) does not
+-- permit it. Both assertions below hold, together, on one family.
+
+`the widow as grantee` MEANS
+    `a grantee in the case file` (`an individual` `Meera Sivakumar`)
+        `as the guardian of the person and property of the infant` (JUST "divya")
+
+`the further facts, the administrator swearing he takes the whole` MEANS
+    `The further facts on which the grant machinery turns` WITH
+        `the administrator is entitled to the whole of the estate after payment of the debts` IS TRUE
+        `the Family Court thinks fit to require such security` IS FALSE
+        `there is danger that the property may be wasted` IS FALSE
+        `it appears that such appointment would not be a sufficient protection for the estate` IS FALSE
+        `the Public Trustee has by writing signed by him declared that he undertakes to administer such property` IS FALSE
+
+-- THE INTESTATE SUCCESSION ACT'S ANSWER: three people take, so no one person
+-- takes the whole.
+#ASSERT NOT `one person takes the whole of the property distributable under this Act` `the Sivakumar intestacy`
+
+-- THE PROBATE ACT'S ANSWER, ON THE SAME ESTATE, ON THE SWORN BOOLEAN: the
+-- sureties go.
+#ASSERT `s 29 — the security ordinarily required of this grantee` `the Sivakumar intestacy` `the grant to the widow and the son` `the widow as grantee` `the further facts, the administrator swearing he takes the whole` `the day letters of administration are applied for` EQUALS
+            `security by bond in the prescribed form by the grantee, sureties being dispensed with` 1_200_000
+
+-- AND WHAT IT WOULD HAVE BEEN HAD THE OATH MATCHED THE COMPUTATION. The
+-- difference between the two assertions is two sureties on a $1,200,000 bond,
+-- and the only thing standing between them is a boolean nobody checks.
+#ASSERT `s 29 — the security ordinarily required of this grantee` `the Sivakumar intestacy` `the grant to the widow and the son` `the widow as grantee` `the further facts, nothing being made out` `the day letters of administration are applied for` EQUALS
+            `security by bond in the prescribed form by the grantee and 2 sureties` 1_200_000
+
+§§ `Scenario 5E — a row the audit called a disagreement, which no longer is one`
+
+-- THE AUDIT OF 2026-08-26 RECORDED THAT the Probate Act's "next of kin"
+-- walked the raw `children` edge and ignored Intestate Succession Act s 3's
+-- definition of "child", so that a grant could be opened to, and a s 6(4)
+-- beneficiary found in, a person the Intestate Succession Act pays nothing.
+-- That was repaired in
+-- `probate-administration-act.l4` after the audit ran: its
+-- `the child and his descendants` now gates on
+-- `a “child” within the meaning of section 3 of the Intestate Succession Act
+-- 1967`, which is its AMBIGUITY A12.
+--
+-- ASSERTED HERE BECAUSE A REPAIR NOBODY TESTS ACROSS THE JOIN IS A REPAIR THAT
+-- CAN BE UNDONE SILENTLY. Priyanka Devan leaves two children: Kiran, her
+-- legitimate son, and Nithya, who is neither legitimate nor adopted. On
+-- s 3's definition Nithya is not a "child", and BOTH modules now say so.
+
+`Kiran Devan` MEANS
+    `a person in the case file` "Kiran Devan" "kiran" (JUST (YMD 1995 2 2))
+        (`twenty-one years after` (YMD 1995 2 2)) `living` EMPTY
+
+`Nithya Devan` MEANS
+    `a person in the case file` "Nithya Devan" "nithya" (JUST (YMD 1997 3 3))
+        (`twenty-one years after` (YMD 1997 3 3)) `living` EMPTY
+
+`Priyanka Devan` MEANS
+    `a person in the case file` "Priyanka Devan" "priyanka" (JUST (YMD 1970 7 7))
+        (`twenty-one years after` (YMD 1970 7 7)) (`died on` (YMD 2025 4 1))
+        (LIST `a legitimate child in the case file` `Kiran Devan`
+            , `a child in the case file neither legitimate nor adopted` `Nithya Devan`)
+
+`the Devan intestacy` MEANS
+    `a deceased person in the case file` `Priyanka Devan`
+        (`a family in the case file` EMPTY NOTHING NOTHING)
+        (`an estate in the case file` 400_000 0 0 0 0) NOTHING FALSE EMPTY EMPTY
+
+-- s 3 — "“child” means a legitimate child and includes any child adopted by
+-- virtue of an order of court under any written law for the time being in
+-- force in Singapore, Malaysia or Brunei Darussalam". Asserted on the
+-- definition itself, in both modules, over the same `Child` value.
+#ASSERT     `section 3 — a “child” within the meaning of this Act` (`a legitimate child in the case file` `Kiran Devan`)
+#ASSERT NOT `section 3 — a “child” within the meaning of this Act` (`a child in the case file neither legitimate nor adopted` `Nithya Devan`)
+#ASSERT     `a “child” within the meaning of section 3 of the Intestate Succession Act 1967` (`a legitimate child in the case file` `Kiran Devan`)
+#ASSERT NOT `a “child” within the meaning of section 3 of the Intestate Succession Act 1967` (`a child in the case file neither legitimate nor adopted` `Nithya Devan`)
+
+-- AND ON THE ESTATE. The Intestate Succession Act pays Kiran the whole and
+-- Nithya nothing; the Probate Act opens the grant to Kiran and not to Nithya.
+-- The two Acts name the same person.
+#ASSERT `the distribution, read out` `the Devan intestacy` EQUALS LIST "Kiran Devan takes 1"
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Devan intestacy` "kiran" EQUALS 400_000
+#ASSERT `the sum taken under the Intestate Succession Act by the person whose reference is` `the Devan intestacy` "nithya" EQUALS 0
+#ASSERT `the next of kin of the deceased` `the Devan intestacy` EQUALS LIST `Kiran Devan`
+#ASSERT     `s 18(4)(a) — one of the husband or widow or next of kin` `the Devan intestacy` "kiran"
+#ASSERT NOT `s 18(4)(a) — one of the husband or widow or next of kin` `the Devan intestacy` "nithya"
+#ASSERT `one person takes the whole of the property distributable under this Act` `the Devan intestacy`
+
+
+§§ `Scenario 5F — the field that decides whether section 17 bites, and nothing computes it`
+
+-- FOUND BY BUILDING THE COMPOSITION, AND NOT IN THE AUDIT. Guardianship of
+-- Infants Act s 6(1) makes the surviving mother "guardian of the infant" —
+-- unqualified. It does not say guardian OF THE PERSON, or OF THE PROPERTY, or
+-- of both. Every provision that could bite on her property powers is
+-- qualified: ss 16(1), 17 and 18(1) each open "A guardian of the property of
+-- an infant", and s 15(1) speaks of "the guardian of an infant’s property".
+--
+-- SO `family-domain.l4`'s `Kind of guardianship` IS AN INPUT ON THE `Guardian`
+-- RECORD, and for a parent who becomes guardian by force of s 6 there is no
+-- appointment anywhere to fix it. Nothing in `guardianship-of-infants-act.l4`
+-- derives it: its s 6 decisions answer WHETHER she is guardian and its
+-- `a guardian of the property of the infant` reads the field it is given.
+--
+-- THE CONSEQUENCE, MEASURED BELOW: whether the mother can hand over her
+-- daughter's quarter of a million turns on which of three enum members
+-- whoever typed the case file chose. The identical woman, the identical
+-- infant, the identical share — recorded as guardian of the PERSON only, and
+-- s 17 does not reach her at all.
+--
+-- WHAT WOULD CLOSE IT is not this file's to write, and it is not obviously the
+-- ontology's either: it may be that the Act leaves the kind to the court, in
+-- which case the honest fix is a fourth member of `Kind of guardianship`
+-- meaning that no appointment fixed it, and a ruling in
+-- `guardianship-of-infants-act.l4` about what ss 15 to 18 do with it. Recorded
+-- here as a question for that module rather than answered here.
+
+`Meera, recorded as guardian of the person only` MEANS
+    `a guardian in the case file` `Meera Sivakumar` "divya"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person of the infant` `alone` FALSE FALSE FALSE
+
+`Divya, her mother recorded as guardian of the person only` MEANS
+    `Divya, an infant concerned in the estate, the mother holding` `Meera, recorded as guardian of the person only`
+
+-- THE GUARDIANSHIP ACT STILL MAKES HER GUARDIAN. s 6(1) does not care which
+-- kind, so the answer to "who is the guardian" is unchanged.
+#ASSERT `the mother is guardian of the infant under section 6(1)` `Divya, her mother recorded as guardian of the person only`
+#ASSERT `the persons who are guardians of the infant` `Divya, her mother recorded as guardian of the person only` EQUALS LIST "meera"
+
+-- AND s 17 NOW HAS NOTHING TO BITE ON, so the composition reports that
+-- somebody CAN give a good discharge for the share — on facts that differ from
+-- scenario 1 in one enum member.
+#ASSERT NOT `a guardian of the property of the infant` `Meera, recorded as guardian of the person only`
+#ASSERT NOT `section 17 denies the guardian power to give a good discharge` `Meera, recorded as guardian of the person only`
+#ASSERT `some guardian of this infant could give a good discharge for the infant’s share` `Divya, her mother recorded as guardian of the person only`
+#ASSERT NOT `some guardian of this infant could give a good discharge for the infant’s share` `Divya as an infant concerned in the estate`
+
+-- AND THE PROBATE ACT MOVES THE OTHER WAY ON THE SAME FIELD, which is what
+-- makes it worth a section of its own rather than a footnote: s 21(2) names
+-- "the guardian of the person and property of the infant", and
+-- `probate-administration-act.l4` tests the conjunction expressly. So the one
+-- unfixed enum member decides BOTH whether the mother may take the grant and
+-- whether she may give a discharge — and it decides them in opposite
+-- directions.
+`the Sivakumar intestacy, the widow being guardian of the person only` MEANS
+    `the Sivakumar intestacy, with` `Meera, recorded as guardian of the person only`
+        (LIST `the grant to the widow and the son`)
+#ASSERT NOT `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` `the Sivakumar intestacy, the widow being guardian of the person only` `the grant to the widow and the son` `the day letters of administration are applied for`
+#ASSERT `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` `the Sivakumar intestacy` `the grant to the widow and the son` `the day letters of administration are applied for`
+
+
+§ `Scenario 6 — the testate estate whose executor is a child`
+
+-- THE SAME FOUR-ACT CHAIN AS SCENARIO 1, TAKEN BY THE OTHER ROUTE. There the
+-- estate was intestate and s 21(2)'s counterfactual — "would, but for his
+-- infancy, be entitled" — was made out through s 18(4)(a); here there is a
+-- valid will and it is made out through s 8(1), "Probate may be granted to any
+-- executor appointed by a will". And where scenario 1 exercised the "other
+-- capital moneys" limb of Guardianship of Infants Act s 17 on an intestate
+-- share, this one exercises the word s 17 uses first — "any legacy".
+--
+-- Bernard Sim died on 5 May 2025 leaving a properly executed will that
+-- appointed his son Ethan, then sixteen, sole executor and left him the
+-- residue, $600,000. Ethan's mother Grace survives.
+
+`Grace Sim` MEANS
+    `a person in the case file` "Grace Sim" "grace" (JUST (YMD 1974 2 2))
+        (`twenty-one years after` (YMD 1974 2 2)) `living` EMPTY
+
+`Ethan Sim` MEANS
+    `a person in the case file` "Ethan Sim" "ethan" (JUST (YMD 2008 9 9))
+        (`twenty-one years after` (YMD 2008 9 9)) `living` EMPTY
+
+`Bernard Sim` MEANS
+    `a person in the case file` "Bernard Sim" "bernard" (JUST (YMD 1970 11 11))
+        (`twenty-one years after` (YMD 1970 11 11)) (`died on` (YMD 2025 5 5))
+        (LIST `a legitimate child in the case file` `Ethan Sim`)
+
+`Grace, guardian of Ethan by virtue of surviving the father` MEANS
+    `a guardian in the case file` `Grace Sim` "ethan"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE FALSE
+
+`Grace, the court having authorised her to discharge the legacy` MEANS
+    `a guardian in the case file` `Grace Sim` "ethan"
+        `guardian by virtue of surviving the other parent`
+        `guardian of the person and property of the infant` `alone` FALSE FALSE TRUE
+
+GIVEN `the mother’s guardianship` IS A Guardian
+GIVETH AN Infant
+`Ethan, an infant concerned in the estate` MEANS
+    `an infant in the case file` `Ethan Sim` (JUST `Bernard Sim`) (JUST `Grace Sim`)
+        (LIST `the mother’s guardianship`) 600_000
+
+`Ethan as an infant concerned in the estate` MEANS
+    `Ethan, an infant concerned in the estate` `Grace, guardian of Ethan by virtue of surviving the father`
+
+-- THE EXECUTOR IS BUILT WITH THE PROBATE ACT'S OWN CONSTRUCTOR, so that the
+-- five facts s 13(1) reads off him can be set. He is not otherwise incapable,
+-- has not renounced, has not extracted probate (he cannot: s 21(1) bars the
+-- grant) and has not administered the estate.
+`Ethan Sim, appointed sole executor` MEANS `a PAA executor` `Ethan Sim` FALSE FALSE FALSE FALSE
+
+`the will of Bernard Sim` MEANS
+    `a will, in full` `Bernard Sim` (JUST (YMD 2021 6 1)) TRUE TRUE FALSE TRUE
+        (LIST `an attesting witness` `Marianne Alphonso` TRUE FALSE FALSE FALSE FALSE
+            , `an attesting witness` `Josephine Alphonso` TRUE FALSE FALSE FALSE FALSE)
+        (LIST `a gift` `Ethan Sim` `a residuary gift` 600_000 TRUE TRUE)
+        EMPTY FALSE NOTHING FALSE FALSE TRUE
+        (LIST `Ethan Sim, appointed sole executor`)
+
+`the grant with the will annexed to Grace and a trust company` MEANS
+    `a grant in the case file` `letters of administration with the will annexed`
+        (LIST `a grantee in the case file` (`an individual` `Grace Sim`)
+                  `as the guardian of the person and property of the infant` (JUST "ethan")
+            , `a grantee in the case file` `Acme Trust Company` `as administrator` NOTHING)
+        (JUST (YMD 2026 2 2))
+        (`limited in some other way` "limited until the infant obtains a grant to himself")
+
+`the Sim testacy` MEANS
+    `a deceased person in the case file` `Bernard Sim`
+        (`a family in the case file` (LIST `a marriage in the case file` `Grace Sim` (JUST (YMD 1999 4 4)) TRUE)
+             NOTHING NOTHING)
+        (`an estate in the case file` 600_000 0 0 0 600_000) (JUST `the will of Bernard Sim`)
+        FALSE (LIST `the grant with the will annexed to Grace and a trust company`)
+        (LIST `Ethan as an infant concerned in the estate`)
+
+`the Sim will, put to the Wills Act` MEANS
+    `the Wills Act case of` `the Sim testacy` (`the plain facts about` `the will of Bernard Sim`)
+
+`the day the Sim grant is applied for` MEANS YMD 2026 2 2
+
+-- STEP 1, THE WILLS ACT: the will is good.
+#ASSERT `the will is properly executed` `the Sim will, put to the Wills Act`
+#ASSERT NOT `s 15 — the will has been revoked` `the Sim will, put to the Wills Act`
+#ASSERT `the formal validity of the will` `the Sim will, put to the Wills Act` EQUALS `valid`
+
+-- STEP 2, THE INTESTATE SUCCESSION ACT: it has nothing to do here, and says
+-- so. A residuary gift of the whole means the testator is not an "intestate"
+-- within s 3.
+#ASSERT NOT `section 3 — an “intestate” within the meaning of this Act` `the Sim testacy`
+#ASSERT `what this corpus can say about the distribution of the estate` `the Sim testacy` EQUALS
+            `the Intestate Succession Act 1967 applies to the estate but has no effect on these facts`
+
+-- STEP 3, THE PROBATE ACT: s 8(1) would give Ethan probate, and s 21(1) will
+-- not let him have it. Both are true of the same boy on the same day, and the
+-- pair is the whole of s 21(2)'s antecedent.
+#ASSERT `s 8(1) — probate may be granted to this person as an executor appointed by a will` `the Sim testacy` "ethan"
+#ASSERT `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Ethan Sim` `the day the Sim grant is applied for`
+
+-- s 13(1)(b) — "the executor or all the executors appointed by will are
+-- legally incapable of acting as such". His incapacity is s 21(1)'s and is
+-- computed by this module rather than sworn: `family-domain.l4` carries only
+-- the residue of "legally incapable", precisely so that a file cannot say a
+-- man is an infant and not incapable.
+#ASSERT `s 13(1)(b) — this executor is legally incapable of acting as such` `Ethan Sim, appointed sole executor` `the day the Sim grant is applied for`
+#ASSERT `s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such` `the will of Bernard Sim` `the day the Sim grant is applied for`
+-- OVER-DETERMINED, AND SAID SO. Limb (e) also fires on these facts — he has
+-- not appeared and extracted probate, because s 21(1) stops him — so the gate
+-- below does not by itself test limb (b). Limb (b) is tested on its own,
+-- immediately above.
+#ASSERT `s 13(1)(e) — the executors appointed by any will do not appear and extract probate` `the will of Bernard Sim`
+#ASSERT `s 13(1) — letters of administration with the will annexed may be granted on failure of executors` `the Sim testacy` `the will of Bernard Sim` `the day the Sim grant is applied for`
+
+-- s 6(2) — the minority is Ethan's, and it is satisfied here by the OTHER
+-- limb of the subsection: a trust corporation, "with or without an
+-- individual". Scenario 1 satisfied it by counting two individuals.
+#ASSERT `s 6(2) — there is a minority` `the Sim testacy` `the day the Sim grant is applied for`
+#ASSERT `s 6(2) — granted either to a trust corporation, with or without an individual, or to not less than 2 individuals` `the grant with the will annexed to Grace and a trust company`
+#ASSERT `s 6(2) — the grant complies with section 6(2)` `the Sim testacy` `the grant with the will annexed to Grace and a trust company` `the day the Sim grant is applied for`
+
+-- s 21(2), REACHED THROUGH s 8(1) AND NOT THROUGH s 18(4)(a). This is the
+-- limb scenario 1 could not exercise, because on an intestacy there is no
+-- will to appoint an executor.
+#ASSERT `s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration` `the Sim testacy` `Ethan as an infant concerned in the estate` `the day the Sim grant is applied for`
+#ASSERT `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` `the Sim testacy` `the grant with the will annexed to Grace and a trust company` `the day the Sim grant is applied for`
+
+-- STEP 4, THE GUARDIANSHIP ACT: who the guardian the Probate Act just granted
+-- to actually is. The same two-module agreement as scenario 1, on a testacy.
+#ASSERT `the mother is guardian of the infant under section 6(1)` `Ethan as an infant concerned in the estate`
+#ASSERT `the persons who are guardians of the infant` `Ethan as an infant concerned in the estate` EQUALS LIST "grace"
+#ASSERT elem "grace" (`the persons who are guardians of the infant` `Ethan as an infant concerned in the estate`)
+
+-- STEP 5, s 17 ON THE WORD IT USES FIRST — "any legacy". Ethan's $600,000
+-- comes to him under a will and not on an intestacy, and s 17 is in the same
+-- terms about both. His mother holds the grant, and she cannot give a good
+-- discharge for his legacy unless the court orders otherwise.
+#ASSERT `section 17 denies the guardian power to give a good discharge` `Grace, guardian of Ethan by virtue of surviving the father`
+#ASSERT NOT `section 17 denies the guardian power to give a good discharge` `Grace, the court having authorised her to discharge the legacy`
+#ASSERT NOT `some guardian of this infant could give a good discharge for the infant’s share` `Ethan as an infant concerned in the estate`
+#ASSERT `some guardian of this infant could give a good discharge for the infant’s share`
+            (`Ethan, an infant concerned in the estate` `Grace, the court having authorised her to discharge the legacy`)
+
+-- AND THE ANSWER FOR THIS FAMILY, IN ONE SENTENCE: the will is valid, the boy
+-- is the executor and the residuary legatee, nobody may grant him probate
+-- until 9 September 2029, his mother may take letters of administration with
+-- the will annexed limited until he obtains a grant to himself — and she
+-- cannot give a good discharge for his legacy in the meantime.
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Ethan as an infant concerned in the estate` (YMD 2029 9 8) EQUALS
+            `the person is an infant on that date, and the guardians of the infant are` (LIST "grace")
+#ASSERT `who are the guardians of the infant, if this Act has an infant to govern` `Ethan as an infant concerned in the estate` (YMD 2029 9 9) EQUALS
+            `the person has attained the age of majority on that date, so this Act has no infant to govern`
+#ASSERT NOT `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` `Ethan Sim` (YMD 2029 9 9)
+
+
+§ `Hand-offs that could not be made`
+
+-- THE PART OF THIS FILE WORTH READING HARDEST. Each entry names the MODULE and
+-- the FACT that is missing, says what the composition asserted instead, and
+-- says what would close it. Nothing below is worked around: where a bridge
+-- does not exist this file does not build one, because a bridge built in the
+-- composition is a rule of law written where no lawyer would look for it.
+--
+-- G1. THE WILLS ACT'S VERDICT DOES NOT REACH THE OTHER THREE ACTS.
+--     MISSING: any field, anywhere in `family-domain.l4`, that records whether
+--     a will is formally valid or has been revoked. `Deceased person`'s
+--     `the will` is a `MAYBE Will` and it is a FACT — the document exists or
+--     it does not — while `wills-act.l4`'s `the formal validity of the will`
+--     and `s 15 — the will has been revoked` are CONCLUSIONS about that
+--     document. `intestate-succession-act.l4`'s
+--     `section 3 — an “intestate” within the meaning of this Act` and
+--     `probate-administration-act.l4`'s `s 18(1) — the person has died
+--     intestate` each read the fact and neither consults the conclusion.
+--     ASSERTED INSTEAD: scenarios 2A and 2B assert the answers on BOTH case
+--     files — the will in the record and the will struck out — and the pair
+--     differs in exactly one field.
+--     WHAT WOULD CLOSE IT: a `Deceased person` field of the shape
+--     "the will admitted to probate", computed rather than recorded, or a
+--     ruling in the shared ontology that `the will` means the operative will
+--     and that whoever builds a case file must apply the Wills Act first. The
+--     second is cheaper and is a discipline, not a computation; the first is
+--     the only one a machine can check.
+--
+-- G2. THE WILLS ACT CANNOT BE ASKED ABOUT AN ESTATE WITH NO WILL.
+--     MISSING: nothing, strictly — this is a consequence of the module's
+--     shape. `the formal validity of the will` takes a `A case under this Act`
+--     which contains a `Will`, so on an intestacy there is no value to pass
+--     it. The composition's very first step is therefore answered by reading
+--     the ontology and not by asking the Act.
+--     ASSERTED INSTEAD: scenario 1 step 1 asserts `isNothing` of the field,
+--     and says in terms that this is not a Wills Act answer.
+--
+-- G3. WILLS ACT s 27(3) IS WRITTEN AS A HAND-OFF AND THE GUARDIANSHIP ACT
+--     CANNOT TAKE IT.
+--     MISSING: any link from a `Guardian` to the instrument that appointed
+--     him. `How the guardian was appointed` has members
+--     `appointed by the father by will` and `appointed by the mother by will`
+--     and neither carries a will. Measured: `guardianship-of-infants-act.l4`
+--     contains no decision whose parameter is a `Will` or a `MAYBE Will` — the
+--     count of `IS A Will` and `IS A MAYBE Will` in that file is zero — so
+--     there is no shape in which it could read `wills-act.l4`'s answer even if
+--     it wanted to.
+--     ASSERTED INSTEAD: scenario 3 step 3 changes ONE fact about the testator,
+--     shows the Wills Act's answer flipping from LIST "zarina" to EMPTY, and
+--     shows all three Guardianship Act answers on the identical `Infant` value
+--     standing unmoved.
+--     WHAT WOULD CLOSE IT: `Guardian` would need a field naming the will —
+--     `Will` has no identity in this ontology either, so the honest minimum is
+--     a `MAYBE STRING` reference to the instrument, or a boolean recording the
+--     Wills Act's own conclusion. Either is a change to `family-domain.l4`,
+--     which is why neither is made here.
+--
+-- G4. `Entitlement` IS COMPUTED AND NEVER STORED, AND TWO PROVISIONS PAY FOR
+--     IT. `family-domain.l4:1853` declares `Entitlement`; no field anywhere in
+--     that file has its type. `intestate-succession-act.l4` returns
+--     `LIST OF Entitlement` from twelve decisions and nothing can carry the
+--     answer anywhere.
+--     WHAT IT COSTS, TWICE OVER:
+--       (a) Guardianship of Infants Act s 17 governs the payment of "any
+--           legacy or other capital moneys payable to or receivable by an
+--           infant", and the legacy is exactly what cannot be carried to it.
+--           This file joins the two by the REFERENCE STRING alone — "divya"
+--           appears both in the distribution and in `the infants concerned in
+--           the estate` — which is a join over identity and not over the
+--           money.
+--       (b) Probate and Administration Act s 29(5) takes its antecedent as a
+--           sworn boolean on `The further facts on which the grant machinery
+--           turns`, and `probate-administration-act.l4` reports the gap from
+--           its own side. Scenario 5D exhibits a file where the oath and the
+--           computation contradict each other and the sureties on a $1,200,000
+--           bond are dispensed with anyway.
+--     WHAT WOULD CLOSE IT: `Deceased person` needs a `LIST OF Entitlement`,
+--     and s 29(5)'s antecedent needs to become a computation over it.
+--
+-- G5. THE DEBTS HAVE NO READER ANYWHERE IN THE CORPUS.
+--     MEASURED: `the debts and liabilities of the deceased`, `the value of the
+--     interest in property which at the time of his death is charged with the
+--     payment of money`, `the amount of the charge on that interest` and
+--     `the deceased has by will, deed or other document signified a contrary
+--     or other intention` occur in the four Act modules only in fixture
+--     assignments and in comments. No rule reads any of them, because
+--     `probate-administration-act.l4` puts ss 57-58 and both Schedules out of
+--     scope and the Intestate Succession Act deducts the expenses of due
+--     administration and not the debts.
+--     ASSERTED INSTEAD: scenario 5C runs the same family twice, owing nil and
+--     owing $900,000 against $1,200,000 of assets, and every answer in every
+--     module is identical.
+--     WHAT WOULD CLOSE IT: the Probate and Administration Act's ss 57-58 and
+--     its Second Schedule, which is a decision for that module and not a
+--     defect in the ontology.
+--
+-- G6. THE THREE INFANCY SHAPES ARE NOT A GAP AND CANNOT BE JOINED AWAY.
+--     `wills-act.l4` yields a third value, `probate-administration-act.l4`
+--     folds to FALSE, `guardianship-of-infants-act.l4` yields NOTHING, and all
+--     three are argued at their own sites. Scenario 5A asserts all three on
+--     one person, and asserts that the two which share the ontology's field
+--     agree exactly, boundary included, wherever the date IS in evidence. A
+--     consumer of this corpus must choose its own fold and say which; this
+--     file does not choose one.
+--
+-- G7. THE PROBATE ACT'S "NEXT OF KIN" IS DELIBERATELY WIDER THAN THE INTESTATE
+--     SUCCESSION ACT'S TAKERS, and scenario 5B asserts the divergence rather
+--     than smoothing it. A grant may be made to a person who takes nothing.
+--     Nothing needs closing; what needs saying is that the Probate Act's class
+--     must never be presented to a family as a list of beneficiaries.
+--
+-- G8. NO ACT IN THIS CORPUS DISTRIBUTES A MUSLIM ESTATE. Intestate Succession
+--     Act s 2 switches its own Act off and points at "any rules of the Muslim
+--     law"; the Act that supplies them, the Administration of Muslim Law Act
+--     1966, is not encoded here. Scenario 4 asserts the stop and asserts that
+--     the other three Acts go on running, which is correct.
+--
+-- G9. WHAT KIND OF GUARDIAN THE SURVIVING PARENT IS, NOBODY DECIDES. Found by
+--     building this file rather than by the audit; scenario 5F sets it out and
+--     measures it. The one unfixed enum member decides both whether the mother
+--     may take the grant under Probate and Administration Act s 21(2) and
+--     whether Guardianship of Infants Act s 17 stops her giving a discharge,
+--     and it decides them in opposite directions.
+
+
+§ `What is deliberately not asserted, and why`
+
+-- DEONTIC OUTCOMES. `probate-administration-act.l4` states four of its
+-- provisions as regulative rules with parties and acts, and a `DEONTIC` cannot
+-- be `EQUALS`-compared. Nothing in this file asserts one. The composition's
+-- questions are all constitutive — who takes, who may be granted, who is
+-- guardian, who may discharge — and the duties that follow a grant are within
+-- one Act and are exercised in that Act's own file.
+--
+-- THE COURT'S DISCRETIONS. Every scenario stops where the four modules stop.
+-- "such person as the court thinks fit" (Probate and Administration Act
+-- s 18(4)(d)), "if it thinks fit appoint a guardian" (Guardianship of Infants
+-- Act s 6(1)), "may order that a will be rectified" (Wills Act s 28(1)) and
+-- the rest are named as out of scope in the modules that own them, and a
+-- composition that guessed at them would be inventing law at the one point
+-- where the Acts have declined to state it.
+--
+-- MONEY THE ACTS DO NOT COMPUTE. `the sum taken under the Intestate Succession
+-- Act by the person whose reference is` multiplies a fraction the Act does
+-- state by a fund the Act does define, and it is labelled as not being a rule
+-- of any Act. Nothing else here turns a fraction into a dollar figure, and in
+-- particular no scenario reports what an infant will actually RECEIVE — see
+-- G5: the corpus cannot subtract the debts.
+--
+-- A SECOND OPINION ON ANY ACT. Where two modules answer differently this file
+-- asserts both answers and names the divergence. It never picks a winner, and
+-- the three decisions it does define — the two reading helpers and
+-- `what this corpus can say about the distribution of the estate` — decide
+-- nothing that any of the four Acts decides.
+
+
+§ `Conventions in this file`
+
+-- NAMES. Every fixture and constructor introduced here is named so that it
+-- could not collide with the four Act modules, which were de-collided from one
+-- another before this file could be written at all. The constructors carry
+-- "in the case file"; the people are named for families that appear nowhere
+-- else in the corpus. No decision here carries a tag, because none of them is
+-- a rule and none of them shares a name with anything.
+--
+-- FIXTURES BORROWED RATHER THAN REBUILT. Where an Act module's own constructor
+-- fills only fields that Act reads, this file uses its own; where the
+-- constructor is complete for the purpose, the Act module's is called
+-- directly. From `wills-act.l4`: `a case`, `a will, in full`,
+-- `an attesting witness`, `a gift`, `an executor appointed by the will`,
+-- `the plain facts about`, `the facts about a will`,
+-- `no conformity to any law outside this Act`,
+-- `not revoked in any of those ways` and `no revival`. From
+-- `probate-administration-act.l4`: `a PAA executor`, `Acme Trust Company`,
+-- `the further facts, nothing being made out` and the record type
+-- `The further facts on which the grant machinery turns`. That is deliberate:
+-- a composition that rebuilt everything would not be evidence that the four
+-- modules compose.
+--
+-- ASSERTIONS, NOT EVALUATIONS. Every directive in this file is an `#ASSERT`.
+-- The expected answer was written down from the section first and the file run
+-- afterwards, which is the only order in which an assertion can find anything.
+-- Where a scenario turns on a threshold — a date of majority, a count of
+-- administrators, a fraction — both sides of the boundary are asserted.
+--
+-- MINIMAL PAIRS ARE THE METHOD. Six of the findings in this file are made by
+-- running one family twice with one field changed: the will in the record
+-- against the will struck out (2A, 2B), the soldier against the civilian (3),
+-- the Muslim against the non-Muslim (4), the debts against no debts (5C), and
+-- the guardian of the person against the guardian of the person and property
+-- (5F). A single case file can only show that a module answers; a pair shows
+-- WHICH FACT the answer turned on, and therefore which fact a neighbouring
+-- module is failing to read.
+--
+-- WHAT WAS MEASURED, AND WHEN. On 2026-08-26, with all four Act modules and
+-- the shared ontology imported into this one file, `l4 check` succeeds and
+-- `l4 run` exits 0 with 234 assertions satisfied and none failing. Every
+-- member of every type this file declares is reached by an assertion: all
+-- three members of `What this corpus can say about the distribution of an
+-- estate` (the stop in scenario 4, the governed case in scenario 1, the
+-- no-effect case in scenarios 2A and 6), and both answers of
+-- `some guardian of this infant could give a good discharge for the infant’s
+-- share` (scenarios 1, 5F and 6). The two reading helpers are asserted at a
+-- nil fraction and at a positive one.
+--
+-- WHAT WAS NOT MEASURED: mutation coverage. The four Act modules report having
+-- been mutation-tested conjunct by conjunct; this file has not been, and its
+-- assertions should be read as evidence that the joins hold on the families
+-- below and not as evidence that every conjunct of every joined rule has a
+-- failing case here.
