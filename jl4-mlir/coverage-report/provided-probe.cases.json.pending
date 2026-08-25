@@ -1,0 +1,19 @@
+{
+  "demo": [
+    {
+      "arguments": { "allowed": false },
+      "startTime": 0,
+      "events": [ { "party": "alice", "action": "pay", "at": 5 } ]
+    },
+    {
+      "arguments": { "allowed": true },
+      "startTime": 0,
+      "events": [ { "party": "alice", "action": "pay", "at": 5 } ]
+    },
+    {
+      "arguments": { "allowed": false },
+      "startTime": 0,
+      "events": []
+    }
+  ]
+}

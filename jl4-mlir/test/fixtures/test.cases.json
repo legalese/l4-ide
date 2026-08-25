@@ -1,0 +1,324 @@
+{
+  "calculate-bonus": [
+    { "years of service": 5, "performance rating": 9 },
+    { "years of service": 2, "performance rating": 5 },
+    { "years of service": 3, "performance rating": 4 }
+  ],
+  "is-eligible": [
+    { "years of service": 5, "performance rating": 4 },
+    { "years of service": 2, "performance rating": 5 },
+    { "years of service": 3, "performance rating": 4 }
+  ],
+  "calculate-tax": [
+    {
+      "tp": {
+        "name": "Alice",
+        "annual income": 95000,
+        "filing status": "Single",
+        "deductions": 14600,
+        "tax credits": 2000
+      }
+    },
+    {
+      "tp": {
+        "name": "Bob",
+        "annual income": 250000,
+        "filing status": "Married",
+        "deductions": 29200,
+        "tax credits": 0,
+        "foreign income": 45000
+      }
+    },
+    {
+      "tp": {
+        "name": "Carol",
+        "annual income": 8000,
+        "filing status": "Single",
+        "deductions": 14600,
+        "tax credits": 0
+      }
+    }
+  ],
+  "effective-tax-rate": [
+    {
+      "tp": {
+        "name": "Alice",
+        "annual income": 95000,
+        "filing status": "Single",
+        "deductions": 14600,
+        "tax credits": 2000
+      }
+    },
+    {
+      "tp": {
+        "name": "Bob",
+        "annual income": 250000,
+        "filing status": "Married",
+        "deductions": 29200,
+        "tax credits": 0,
+        "foreign income": 45000
+      }
+    }
+  ],
+  "requires-foreign-income-disclosure": [
+    {
+      "tp": {
+        "name": "Alice",
+        "annual income": 95000,
+        "filing status": "Single",
+        "deductions": 14600,
+        "tax credits": 2000
+      }
+    },
+    {
+      "tp": {
+        "name": "Bob",
+        "annual income": 250000,
+        "filing status": "Married",
+        "deductions": 29200,
+        "tax credits": 0,
+        "foreign income": 45000
+      }
+    },
+    {
+      "tp": {
+        "name": "Dave",
+        "annual income": 50000,
+        "filing status": "Single",
+        "deductions": 12000,
+        "tax credits": 0,
+        "foreign income": 5000
+      }
+    }
+  ],
+  "loan-is-approved": [
+    {
+      "req": {
+        "applicant": {
+          "credit score": 780,
+          "monthly income": 8000,
+          "monthly debts": 1200,
+          "employment months": 48,
+          "bankruptcy history": false
+        },
+        "loan amount": 320000,
+        "term in months": 360,
+        "collateral value": 420000
+      }
+    },
+    {
+      "req": {
+        "applicant": {
+          "credit score": 780,
+          "monthly income": 8000,
+          "monthly debts": 1200,
+          "employment months": 48,
+          "bankruptcy history": false
+        },
+        "loan amount": 15000,
+        "term in months": 36
+      }
+    },
+    {
+      "req": {
+        "applicant": {
+          "credit score": 550,
+          "monthly income": 3500,
+          "monthly debts": 1800,
+          "employment months": 3,
+          "bankruptcy history": false
+        },
+        "loan amount": 25000,
+        "term in months": 24
+      }
+    },
+    {
+      "req": {
+        "applicant": {
+          "credit score": 620,
+          "monthly income": 5000,
+          "monthly debts": 500,
+          "employment months": 24,
+          "bankruptcy history": true
+        },
+        "loan amount": 200000,
+        "term in months": 360,
+        "collateral value": 250000
+      }
+    }
+  ],
+  "denial-reason": [
+    {
+      "req": {
+        "applicant": {
+          "credit score": 780,
+          "monthly income": 8000,
+          "monthly debts": 1200,
+          "employment months": 48,
+          "bankruptcy history": false
+        },
+        "loan amount": 320000,
+        "term in months": 360,
+        "collateral value": 420000
+      }
+    },
+    {
+      "req": {
+        "applicant": {
+          "credit score": 620,
+          "monthly income": 5000,
+          "monthly debts": 500,
+          "employment months": 24,
+          "bankruptcy history": true
+        },
+        "loan amount": 200000,
+        "term in months": 360,
+        "collateral value": 250000
+      }
+    },
+    {
+      "req": {
+        "applicant": {
+          "credit score": 550,
+          "monthly income": 3500,
+          "monthly debts": 1800,
+          "employment months": 3,
+          "bankruptcy history": false
+        },
+        "loan amount": 25000,
+        "term in months": 24
+      }
+    }
+  ],
+  "monthly-loan-payment": [
+    {
+      "req": {
+        "applicant": {
+          "credit score": 780,
+          "monthly income": 8000,
+          "monthly debts": 1200,
+          "employment months": 48,
+          "bankruptcy history": false
+        },
+        "loan amount": 320000,
+        "term in months": 360,
+        "collateral value": 420000
+      }
+    },
+    {
+      "req": {
+        "applicant": {
+          "credit score": 780,
+          "monthly income": 8000,
+          "monthly debts": 1200,
+          "employment months": 48,
+          "bankruptcy history": false
+        },
+        "loan amount": 15000,
+        "term in months": 36
+      }
+    }
+  ],
+  "total-interest-paid": [
+    {
+      "req": {
+        "applicant": {
+          "credit score": 780,
+          "monthly income": 8000,
+          "monthly debts": 1200,
+          "employment months": 48,
+          "bankruptcy history": false
+        },
+        "loan amount": 320000,
+        "term in months": 360,
+        "collateral value": 420000
+      }
+    }
+  ],
+  "order-total": [
+    {
+      "order": {
+        "attendees": [
+          { "attendee name": "Dana", "is member": true, "age": 35 },
+          { "attendee name": "Eli", "is member": false, "age": 9 },
+          { "attendee name": "Fran", "is member": false, "age": 70 }
+        ],
+        "tier": "VIP",
+        "event capacity": 500,
+        "tickets sold": 200
+      }
+    },
+    {
+      "order": {
+        "attendees": [
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Dana", "is member": true, "age": 35 },
+          { "attendee name": "Eli", "is member": false, "age": 9 }
+        ],
+        "tier": "Standard",
+        "event capacity": 1000,
+        "tickets sold": 50,
+        "promo code": "SAVE20"
+      }
+    }
+  ],
+  "tickets-available": [
+    {
+      "order": {
+        "attendees": [
+          { "attendee name": "Dana", "is member": true, "age": 35 },
+          { "attendee name": "Eli", "is member": false, "age": 9 },
+          { "attendee name": "Fran", "is member": false, "age": 70 }
+        ],
+        "tier": "VIP",
+        "event capacity": 500,
+        "tickets sold": 200
+      }
+    },
+    {
+      "order": {
+        "attendees": [
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 }
+        ],
+        "tier": "EarlyBird",
+        "event capacity": 100,
+        "tickets sold": 100
+      }
+    }
+  ],
+  "waitlist-position": [
+    {
+      "order": {
+        "attendees": [
+          { "attendee name": "Dana", "is member": true, "age": 35 },
+          { "attendee name": "Eli", "is member": false, "age": 9 },
+          { "attendee name": "Fran", "is member": false, "age": 70 }
+        ],
+        "tier": "VIP",
+        "event capacity": 500,
+        "tickets sold": 200
+      }
+    },
+    {
+      "order": {
+        "attendees": [
+          { "attendee name": "Gus", "is member": false, "age": 28 },
+          { "attendee name": "Gus", "is member": false, "age": 28 }
+        ],
+        "tier": "EarlyBird",
+        "event capacity": 100,
+        "tickets sold": 100
+      }
+    }
+  ]
+}

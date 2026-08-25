@@ -96,9 +96,9 @@ This is a working compiler, not a finished one. Out of 431 `.l4` files in this r
 
 Known gaps:
 
-- String operations (`__l4_str_concat`, `__l4_str_len`, `__l4_to_string`) are stubbed at runtime — good for passing strings through, not for heavy string work.
-- No DEONTIC evaluator — trace evaluation still lives in `jl4-service`.
-- No state graphs, no GraphViz, no reasoning traces in the response — the envelope is `SimpleResponse` only.
+- String operations are real, not stubs: `__l4_str_concat`, `__l4_str_len`, `__l4_to_string`, plus `TOUPPER`/`TOLOWER`/`TRIM`/`CONTAINS`/`SUBSTRING`/`REPLACE`/`INDEXOF` are implemented in `runtime/jl4-runtime.mjs` and wired through `Lower.hs`. The remaining string limitations are narrower: lengths and indices are JS UTF-16 code units (not Unicode code points), and there is no `SPLIT`.
+- DEONTIC functions are evaluated, but not as compiled wasm: the wasm body of a regulative/deontic function is an inert `0.0` placeholder ([Lower.hs:1831-1840](src/L4/MLIR/Lower.hs)), and the actual deontic interpreter (`runDeonticInternal`, M6) runs in the JS runtime, walking the schema-baked `deonticContract` tree against the request's `events` stream.
+- State graphs and reasoning traces both exist. State graphs (M3) are baked at compile time via jl4-core's `stateGraphToDot` into the `.schema.json`; reasoning traces (M5) are produced by the JS runtime when the request asks for `?trace=full`, returning a `ResponseWithReason` envelope (otherwise the envelope is `SimpleResponse`).
 - Only the Node.js wasm runtime is wired end-to-end for marshaling. `--wasmtime` / `--wasmer` flags exist but are not yet connected to the schema-driven marshaler.
 
 ## Performance

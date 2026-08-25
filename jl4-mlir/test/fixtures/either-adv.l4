@@ -1,0 +1,76 @@
+-- Adversarial genuine-builtin EITHER probes (silent-wrong hunt for ledger #10).
+-- These stress the UNCHANGED builtin LEFT/RIGHT slot-record path with the
+-- traps the review brief names: branch-order swap, nested EITHER-of-EITHER,
+-- payload value equal to the tag constant, payload bound then compared, and
+-- both branches carrying the SAME runtime class (NUMBER) so only the TAG can
+-- distinguish them (a tag-vs-payload confusion misroutes).
+IMPORT prelude
+
+-- Both branches carry a NUMBER payload; only the TAG distinguishes them.
+-- If the tag test ever read slot 1 (payload) instead of slot 0 (tag), a
+-- LEFT with a nonzero payload would misroute to RIGHT.
+GIVEN n IS A NUMBER
+GIVETH AN EITHER NUMBER NUMBER
+`split` MEANS
+  IF n GREATER THAN 0
+  THEN RIGHT n
+  ELSE LEFT n
+
+-- LEFT-first WHEN order (reversed vs the 0.0/1.0 tag order). RIGHT returns
+-- payload; LEFT returns payload minus 1000 — branch-crossing.
+@export order swap LEFT branch first
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`dispatch left first` MEANS
+  CONSIDER `split` n
+    WHEN LEFT  v THEN v MINUS 1000
+    WHEN RIGHT v THEN v
+
+-- Payload bound then COMPARED inside the arm.
+@export payload compared after bind
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`dispatch compare` MEANS
+  CONSIDER `split` n
+    WHEN RIGHT v THEN IF v GREATER THAN 10 THEN 1 ELSE 2
+    WHEN LEFT  v THEN IF 0 GREATER THAN v THEN 3 ELSE 4
+
+-- Payload value equal to a tag constant: RIGHT carries 0 (its tag is 1.0),
+-- LEFT carries 1 (its tag is 0.0). A read of slot 0 (tag) instead of slot 1
+-- (payload) flips both answers.
+GIVEN n IS A NUMBER
+GIVETH AN EITHER NUMBER NUMBER
+`split tagvals` MEANS
+  IF n GREATER THAN 0
+  THEN RIGHT 0
+  ELSE LEFT 1
+
+@export payload equals tag constant
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`dispatch tagvals` MEANS
+  CONSIDER `split tagvals` n
+    WHEN RIGHT v THEN v PLUS 500
+    WHEN LEFT  v THEN v PLUS 700
+
+-- Nested EITHER of EITHER. RIGHT carries an inner EITHER; a nested CONSIDER
+-- destructures it. Exercises a compound (EITHER-handle) payload in slot 1.
+GIVEN n IS A NUMBER
+GIVETH AN EITHER STRING (EITHER STRING NUMBER)
+`split nested` MEANS
+  IF n GREATER THAN 100
+  THEN RIGHT (RIGHT n)
+  ELSE IF n GREATER THAN 0
+       THEN RIGHT (LEFT "small")
+       ELSE LEFT "neg"
+
+@export nested EITHER of EITHER
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`dispatch nested either` MEANS
+  CONSIDER `split nested` n
+    WHEN RIGHT inner THEN
+      CONSIDER inner
+        WHEN RIGHT v THEN v TIMES 2
+        WHEN LEFT  s THEN 0 MINUS STRINGLENGTH s
+    WHEN LEFT s THEN 0 MINUS 999
