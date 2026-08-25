@@ -6,8 +6,10 @@
 #
 #   ATTESTED    what the driver measured. Every stage's `elapsed_ms` and
 #               `dispatch_ms` were taken by the process that did the waiting,
-#               and `ledger.verify` refuses a figure larger than the bracket
-#               between the row's own stage_begin and stage_end.
+#               and `ledger.verify` refuses a figure more than a second longer
+#               than the bracket between the row's own stage_begin and
+#               stage_end — a second of slack, for the whole-second clock
+#               fallback in lib/clock.sh, and not a rounding convenience.
 #   ATTRIBUTED  what the agent sessions spent, read out of the harness's own
 #               JSONL transcripts. Nobody typed these numbers — but the
 #               transcript is an ordinary file, so every one read is recorded
@@ -58,7 +60,24 @@ case $RC in
   # --session, no CLAUDE_CODE_SESSION_ID. That is the pipeline driven by a
   # human at a terminal, which is a legitimate way to drive it and not a
   # defect. SKIPPED names it; a zero would read as "this run cost nothing".
-  3) go_skip "no agent session is attributable to this run: the driver recorded no session row and CLAUDE_CODE_SESSION_ID is unset, which is what a run driven by hand looks like. The attested stage timings are still on every stage_end row." ;;
+  3)
+    # DELIBERATELY NOT go_skip, which is fatal under L4_GO_REQUIRED=1.
+    #
+    # That variable means "a named PREREQUISITE is missing from this machine",
+    # and it is right for a toolchain: a run that skipped its DMN engine is not
+    # a run. An agent session is not a prerequisite of measuring a run — CI has
+    # none by construction, and a pipeline driven by a human at a terminal has
+    # none either. Making it fatal would kill every CI run at the second-to-last
+    # stage, before p9-report, so the run would produce no report at all in
+    # exactly the setting that most needs one.
+    #
+    # The receipt is still SKIPPED with its reason, and the attested stage
+    # timings are unaffected: the driver writes those on every stage_end.
+    go_receipt --status SKIPPED \
+      --reason "no agent session is attributable to this run: the driver recorded no session row and CLAUDE_CODE_SESSION_ID is unset, which is what a run driven by hand or by CI looks like. The attested stage timings are still on every stage_end row." \
+      --note "Not fatal under L4_GO_REQUIRED=1, unlike an ordinary SKIPPED: that flag is about a missing prerequisite, and an agent session is not one. A run with nobody to attribute has no token cost to report, which is a fact about the run rather than a gap in the machine."
+    exit "$GO_EXIT_CLEAN"
+    ;;
   *) go_broken "cost-ledger.mjs exited $RC building $LEDGER; see $GO_OUT/p9-cost.txt" ;;
 esac
 
@@ -66,10 +85,19 @@ esac
 
 # --- the oracle: the ledger must add up ---------------------------------------
 #
-# `structural` and not `presence`, and this is what earns it: the parts are
-# re-summed and checked against the totals the artifact states. An artifact
-# whose own arithmetic disagrees is not a weak measurement, it is a wrong one,
-# and the pipeline's rule is that a wrong number is worse than a missing one.
+# `structural` and not `presence`, and here is exactly what earns it — stated
+# precisely, because "the parts are folded independently" would overclaim.
+#
+# The two accumulations being compared come from ONE pass over the transcripts,
+# so this is a REGRESSION guard rather than an independent derivation: it cannot
+# catch a transcript that lies, and it will catch the day an edit makes two
+# accumulations of the same population disagree. That is worth having and it is
+# not the same thing, so the receipt says which it is.
+#
+# The one check that is NOT of that kind, and the strongest here: the
+# per-segment figures are attributed by TIMESTAMP against the journal's stage
+# brackets, by different code from the totals, and must re-sum to them exactly.
+# A request placed in no segment, or in two, breaks it.
 set +e
 METRICS="$(node -e '
   const j = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
@@ -104,11 +132,19 @@ METRICS="$(node -e '
     if (j.network.calls_in_window[k] > j.network.calls[k]) bad.push(`network.${k}: in-window calls exceed the total`);
     if (j.network.ms_in_window[k] > j.network.ms[k]) bad.push(`network.${k}: in-window ms exceed the total`);
   }
-  // 6. a transcript that could not be read takes a whole session out of the
-  //    totals; the ledger records it and the stage must not report PASS over it.
-  // 7. every transcript named must have been readable.
+  // 6. the transcript count must agree with the per-session counts. (Whether a
+  //    transcript could be READ is handled below, as a DEGRADED condition
+  //    rather than here: an unreadable file makes the totals short, which is a
+  //    caveat about coverage, not an artifact whose arithmetic disagrees.)
   const nt = j.transcripts.length;
   if (nt !== j.sessions.reduce((a, x) => a + x.transcripts, 0)) bad.push("transcript count disagrees with the per-session counts");
+  // 7. THE INDEPENDENT ONE. Every in-window event is attributed to exactly one
+  //    segment, by timestamp against the journal brackets, by code that does
+  //    not share an accumulator with the totals. The sums must match exactly.
+  for (const k of KEYS) {
+    const s = j.by_segment.reduce((a, x) => a + x[k], 0);
+    if (s !== j.totals.in_window[k]) bad.push(`by_segment.${k} sums to ${s}, not the in-window total ${j.totals.in_window[k]} — an event was placed in no segment or in two`);
+  }
 
   if (bad.length) { console.error("cost-ledger does not add up:\n  " + bad.join("\n  ")); process.exit(1); }
 
@@ -138,9 +174,15 @@ METRICS="$(node -e '
     cost_cache_read_tokens: w.cache_read_input_tokens,
     cost_requests_session_total: all.requests,
     cost_output_tokens_session_total: all.output_tokens,
-    cost_subagent_requests: j.by_role.subagent?.requests ?? 0,
-    cost_subagent_output_tokens: j.by_role.subagent?.output_tokens ?? 0,
-    cost_workflows: j.workflows.length,
+    // SESSION TOTALS, and they carry the suffix this stage uses for session
+    // totals. Without it they sat unlabelled among window-clipped siblings —
+    // the same conflation this change had to repair twice elsewhere.
+    cost_subagent_requests_session_total: j.by_role.subagent?.requests ?? 0,
+    cost_subagent_output_tokens_session_total: j.by_role.subagent?.output_tokens ?? 0,
+    cost_workflows_session_total: j.workflows.length,
+    cost_segments: j.by_segment.length,
+    cost_transcripts_measuring_self: j.transcripts.filter((t) => t.measuring_self).length,
+    cost_transcripts_unreadable: j.transcripts.filter((t) => t.unreadable).length,
     cost_tool_calls: tool.calls, cost_tool_ms: tool.ms,
     cost_tool_calls_session_total: tool.calls_all,
     cost_web_search: j.network.calls_in_window.web_search,
@@ -173,7 +215,7 @@ if [[ "$UNATTR" != "0" ]]; then
 fi
 if [[ "$UNTIMED" != "0" ]]; then
   STATUS=DEGRADED
-  NOTES+=("$UNTIMED stage(s) carry no elapsed_ms. A row written before journal schema 6, or a stage that ended without going through go_receipt; either way the stage-time total is short by an unknown amount.")
+  NOTES+=("$UNTIMED stage(s) carry no elapsed_ms, so the stage-time total is short by an unmeasured amount. The reachable cause is a phase script run DIRECTLY rather than through go.sh — which SKILL.md and 'go.sh plan' both tell readers to do: the driver is what starts the clock, so a directly-invoked stage has no start to measure from.")
 fi
 if [[ -n "$NOSCRIPT" ]]; then
   STATUS=DEGRADED
@@ -193,5 +235,5 @@ go_receipt --status "$STATUS" \
   --oracle-class structural \
   --oracle-because "the per-session figures, the by-role split and the in-window clip are each folded independently and checked against the totals the artifact states, and the interval unions are checked against the bounds a union must satisfy; an artifact whose arithmetic disagrees with itself is refused as BROKEN rather than recorded" \
   --artifact "$LEDGER" --artifact "$GO_OUT/p9-cost.txt" \
-  --note "The stage timings are ATTESTED — measured by the driver, and ledger.verify refuses any elapsed_ms larger than the bracket its own row sits in. The token and tool figures are ATTRIBUTED: read from the harness's transcripts, which are named with their sha256 so the derivation can be repeated, but which are ordinary files. Figures stop at this stage; p9-report and p9-explain run after it. What each figure covers, and what it cannot, is stated in the report section that renders them, so it is written once." \
+  --note "The stage timings are ATTESTED — measured by the driver, and ledger.verify refuses any elapsed_ms more than a second longer than the bracket its own row sits in (the second of slack is for the whole-second clock fallback in lib/clock.sh). The token and tool figures are ATTRIBUTED: read from the harness's transcripts, which are named with their sha256 so the derivation can be repeated, but which are ordinary files. Figures stop at this stage; p9-report and p9-explain run after it. What each figure covers, and what it cannot, is stated in the report section that renders them, so it is written once." \
   "${METRIC_ARGS[@]}" "${NOTE_ARGS[@]}"

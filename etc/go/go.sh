@@ -781,6 +781,7 @@ cmd_plan_deposit() {
     smwhat="(no comparison.surface_map in subject.json)"
   fi
   printf '  %-14s %-9s %-11s %s\n' "p8-diff" "$(gate_for p8-diff)" "$(deposit_state "$sm")" "$smwhat"
+  printf '  %-14s %-9s %-11s %s\n' "p9-cost" "$(gate_for p9-cost)" "-" "what the run cost: driver-measured stage wall clock off the journal, plus the agent sessions' tokens and tool calls off the transcripts the session rows name"
   printf '  %-14s %-9s %-11s %s\n' "p9-report" "$(gate_for p9-report)" "-" "reads journal.ndjson and nothing else"
   echo
   # WHAT A GATE WOULD BIND TO, printed here for the same reason `cmd_plan`

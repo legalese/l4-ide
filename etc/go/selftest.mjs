@@ -30,9 +30,12 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  bracketsFrom,
   buildLedger,
+  labelAt,
   networkClass,
   pipelineFromJournal,
+  segKey,
   unionMs,
 } from "./lib/cost-ledger.mjs";
 import {
@@ -2084,6 +2087,165 @@ process.stdout.write("\n-- cost accounting --\n");
       p.busy_intervals.length === 1,
     );
   }
+
+  // ---- WHAT THE ADVERSARIAL REVIEW OF THIS MACHINERY FOUND ------------------
+  //
+  // Each block below is a defect that shipped and a check that would have
+  // stopped it. They are grouped because they share one shape: a figure that
+  // was correct on the path it was written for and wrong on a path nobody
+  // re-read it against.
+  {
+    // 1. THE WINDOW ON A RESUMED RUN.
+    //
+    // go.sh writes a `run_end` on EVERY exit, including the `--verdict GATE`
+    // exit it takes when a human gate is not yet satisfied — and the journal is
+    // reused across sittings. Closing the cost window at "the last run_end row"
+    // therefore closed it in the MIDDLE of a gated run's history, clipping out
+    // the whole sitting that granted the gate and did the work. Nothing caught
+    // it: every other check in the oracle is a one-directional bound that a
+    // too-small window satisfies trivially.
+    const j = resolve(cdir, "resumed.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "r",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a", "b"],
+    });
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    append(j, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(j, base({ stage: "a", elapsed_ms: 5 }));
+    append(j, { kind: "run_end", verdict: "GATE", exit: 3 }); // <- the sitting ends at a gate
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    append(j, { kind: "stage_begin", stage: "b", attempt: 1 });
+    append(j, base({ stage: "b", elapsed_ms: 5 }));
+    const mid = pipelineFromJournal(j);
+    check(
+      "a run_end from an earlier sitting does NOT close a resumed run's window",
+      mid.ended_at === null,
+    );
+
+    const done = resolve(cdir, "finished.ndjson");
+    append(done, {
+      kind: "run_begin",
+      run_id: "r",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a"],
+    });
+    append(done, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(done, base({ stage: "a", elapsed_ms: 5 }));
+    append(done, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    check(
+      "…while a journal that ENDS with a run_end reports the run finished",
+      typeof pipelineFromJournal(done).ended_at === "string",
+    );
+  }
+
+  {
+    // 2. THE ORPHANED stage_begin.
+    //
+    // "A replay is exempt by construction, because it writes no stage_begin"
+    // was false in the one case that matters. A run killed after a stage_begin
+    // leaves an ORPHAN; if that stage is later satisfied by a cross-run replay,
+    // a backward scan pairs the replay with the orphan. The bracket is then
+    // enormous, no impossible-duration finding can fire inside it, and those
+    // idle hours are reported as attested stage execution.
+    const j = resolve(cdir, "orphan.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "r",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a"],
+    });
+    append(j, { kind: "stage_begin", stage: "a", attempt: 1 }); // killed here
+    append(j, base({ stage: "a", elapsed_ms: 40, replayed_from: "sha256:x" }));
+    const rows = readFileSync(j, "utf8").trimEnd().split("\n").map(JSON.parse);
+    // Stamp the replay row four hours after the orphan, chain intact, so the
+    // ONLY thing anything could complain about is the pairing.
+    rows[rows.length - 1].ts = new Date(
+      Date.parse(rows[1].ts) + 4 * 3600_000,
+    ).toISOString();
+    let prev = rows[0].prev;
+    for (const r of rows) {
+      r.prev = prev;
+      r.hash = hashRecord(r);
+      prev = r.hash;
+    }
+    writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    // The observable damage was in the BRACKET, not in `verify`: an orphan's
+    // bracket is always at least as long as the replay's own elapsed, so no
+    // impossible-duration finding would have fired either way. Assert the
+    // thing that actually went wrong, and assert that the journal still
+    // verifies — a guard that started reporting findings on legitimate
+    // journals would be its own defect.
+    check(
+      "a replayed row contributes no bracket, so four idle hours are not attested stage time",
+      bracketsFrom(rows).length === 0 &&
+        pipelineFromJournal(j).busy_intervals.length === 0,
+    );
+    check(
+      "…and the journal still verifies clean, so the guard invents no findings",
+      verify(j).ok === true,
+    );
+  }
+
+  {
+    // 3. SEGMENTS — where the cost went.
+    const rows = [
+      { kind: "stage_begin", stage: "a", ts: "2026-01-01T00:00:10.000Z" },
+      {
+        kind: "stage_end",
+        stage: "a",
+        ts: "2026-01-01T00:00:20.000Z",
+        elapsed_ms: 9000,
+      },
+      { kind: "stage_begin", stage: "b", ts: "2026-01-01T00:00:40.000Z" },
+      {
+        kind: "stage_end",
+        stage: "b",
+        ts: "2026-01-01T00:00:50.000Z",
+        elapsed_ms: 9000,
+      },
+    ];
+    const br = bracketsFrom(rows);
+    check("bracketsFrom pairs each executed stage once", br.length === 2);
+    const at = (sec) =>
+      Date.parse(`2026-01-01T00:00:${String(sec).padStart(2, "0")}.000Z`);
+    check(
+      "labelAt is total over the timeline",
+      segKey(labelAt(at(5), br)) === "before:a" &&
+        segKey(labelAt(at(15), br)) === "during:a" &&
+        segKey(labelAt(at(30), br)) === "between:a:b" &&
+        segKey(labelAt(at(45), br)) === "during:b" &&
+        segKey(labelAt(at(59), br)) === "after:b",
+    );
+    check(
+      "…including the exact boundary instants, which belong to the stage",
+      segKey(labelAt(at(10), br)) === "during:a" &&
+        segKey(labelAt(at(20), br)) === "during:a",
+    );
+    check(
+      "a stage re-run inside one journal contributes two brackets, not one",
+      bracketsFrom([
+        ...rows,
+        { kind: "stage_begin", stage: "a", ts: "2026-01-01T00:01:00.000Z" },
+        {
+          kind: "stage_end",
+          stage: "a",
+          ts: "2026-01-01T00:01:10.000Z",
+          elapsed_ms: 9000,
+        },
+      ]).length === 3,
+    );
+    check(
+      "a journal with no brackets still labels every moment",
+      segKey(labelAt(at(5), [])) === "whole-run",
+    );
+  }
+
   rmSync(cdir, { recursive: true, force: true });
 }
 
@@ -2281,6 +2443,8 @@ const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
       );
   }
 
+  const goSrcOf = () => readFileSync(resolve(HERE, "go.sh"), "utf8");
+
   // ---- ARGUMENT-PARSER HYGIENE ----------------------------------------------
   //
   // Two defects the R9 review found, both of which `bash -n` is structurally
@@ -2439,6 +2603,32 @@ const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
       "every shell script under etc/go parses",
       bad.length === 0 ||
         (process.stdout.write(bad.map((b) => `     ${b}\n`).join("")), false),
+    );
+  }
+
+  // ---- THE ROLE TABLE MUST BE TOTAL OVER THE STAGES THAT EXIST --------------
+  //
+  // readset.mjs says its entries exist "so role derivation is total, because a
+  // member whose role is `unknown` silently weakens every predicate built on
+  // top of it" — and nothing enforced it. `p9-cost` landed without an entry and
+  // classified `unknown`. DERIVED from the driver's own lists, not a second
+  // copy of them: a stage added tomorrow fails this without anyone remembering.
+  {
+    const declared = new Set();
+    for (const m of goSrcOf().matchAll(
+      /^(?:PRIMARY_STAGES|DEPOSIT_STAGES)\+?=\(([^)]*)\)/gm,
+    ))
+      for (const w of m[1].split(/\s+/).filter(Boolean)) declared.add(w);
+    for (const f of readdirSync(resolve(HERE, "phases")))
+      if (f.endsWith(".sh")) declared.add(f.slice(0, -3));
+    const missing = [...declared]
+      .filter((s) => classOf(s) === "unknown")
+      .sort();
+    check(
+      "every stage that exists has a PHASE_CLASS entry, so role derivation is total",
+      missing.length === 0 ||
+        (process.stdout.write(`     unclassified: ${missing.join(", ")}\n`),
+        false),
     );
   }
 

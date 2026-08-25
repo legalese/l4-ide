@@ -219,6 +219,7 @@ function readTranscript(file, { from, to, seen }) {
       tools: [],
       server: { web_search: 0, web_fetch: 0 },
       intervals: [],
+      events: [],
       sidechain_requests: 0,
     };
   }
@@ -234,6 +235,12 @@ function readTranscript(file, { from, to, seen }) {
   // model thinking for four minutes between two Bash calls leaves no interval,
   // so the figure understates and is labelled as understating.
   const intervals = [];
+  // In-window events, kept so the caller can attribute them to a SEGMENT of the
+  // run. One entry per counted request and per counted tool call — the same
+  // populations the totals are folded from, which is what lets the per-segment
+  // figures be CHECKED against the in-window totals rather than merely printed
+  // beside them.
+  const events = [];
   let records = 0;
   let first = null;
   let last = null;
@@ -262,12 +269,33 @@ function readTranscript(file, { from, to, seen }) {
     if (Array.isArray(rec.message?.content)) {
       for (const c of rec.message.content) {
         if (c.type === "tool_use")
+          // `within` is kept for the UNPAIRED tail below, where there is no
+          // result and therefore no interval to overlap — a call still running
+          // when the transcript was read counts if it started in the window.
           pending.set(c.id, { name: c.name, ts, within });
         else if (c.type === "tool_result") {
           const u = pending.get(c.tool_use_id);
           if (!u) continue;
           pending.delete(c.tool_use_id);
           const ms = ts && u.ts ? Date.parse(ts) - Date.parse(u.ts) : null;
+          // THE IN-WINDOW SHARE IS THE OVERLAP, and a call is "in" the window
+          // if it overlaps at all. Keying both on whether the call STARTED
+          // in-window made two figures disagree about the same seconds: a
+          // 60-second call beginning one second before the edge contributed its
+          // whole minute to the tool total and one second to the union in
+          // `occupancy`, while a call already running when the window opened
+          // contributed nothing to the first and its overlap to the second.
+          // Measured on the first real run: zero requests in-window sitting
+          // beside seven seconds of in-window tool time.
+          const a = u.ts ? Date.parse(u.ts) : null;
+          const b = ts ? Date.parse(ts) : null;
+          const lo = from ? Date.parse(from) : -Infinity;
+          const hi = to ? Date.parse(to) : Infinity;
+          const overlap =
+            a != null && b != null && b >= a
+              ? Math.max(0, Math.min(b, hi) - Math.max(a, lo))
+              : 0;
+          const touches = overlap > 0 || (a != null && a >= lo && a <= hi);
           const t = tools.get(u.name) ?? {
             name: u.name,
             calls: 0,
@@ -278,7 +306,7 @@ function readTranscript(file, { from, to, seen }) {
             unpaired: 0,
           };
           t.calls += 1;
-          if (u.within) t.calls_in_window += 1;
+          if (touches) t.calls_in_window += 1;
           // A NEGATIVE OR ABSENT GAP IS DISCARDED, NOT CLAMPED. Clamping to
           // zero would fold a clock anomaly into the total silently; leaving it
           // out and counting it as unpaired keeps the arithmetic checkable.
@@ -289,7 +317,15 @@ function readTranscript(file, { from, to, seen }) {
             // the run window is two different questions answered under sibling
             // names — measured on this pipeline's own first run, where a
             // 4.2-hour tool total sat next to a 7-second window.
-            if (u.within) t.ms_in_window += ms;
+            t.ms_in_window += overlap;
+            if (touches)
+              events.push({
+                t: a,
+                kind: "tool",
+                name: u.name,
+                ms: overlap,
+                dispatch: BACKGROUNDED.has(u.name),
+              });
             if (ms > t.max_ms) t.max_ms = ms;
             // A backgrounded tool returns at once and its work happens
             // elsewhere; its 300 ms of dispatch is not 300 ms of activity, and
@@ -311,7 +347,10 @@ function readTranscript(file, { from, to, seen }) {
     }
     if (rec.isSidechain) sidechain += 1;
     addUsage(total, u);
-    if (within) addUsage(win, u);
+    if (within) {
+      addUsage(win, u);
+      events.push({ t: Date.parse(ts), kind: "request", usage: u });
+    }
     const model = rec.message?.model || "unknown";
     addUsage((byModel[model] ??= ZERO()), u);
     server.web_search += u.server_tool_use?.web_search_requests || 0;
@@ -358,6 +397,7 @@ function readTranscript(file, { from, to, seen }) {
     tools: [...tools.values()],
     server,
     intervals,
+    events,
     sidechain_requests: sidechain,
   };
 }
@@ -400,6 +440,7 @@ export function buildLedger({ sessions, from, to, label, root, pipeline }) {
   const groups = new Map();
   const byRole = { main: ZERO(), subagent: ZERO() };
   const activity = [];
+  const allEvents = [];
   let sidechain = 0;
 
   for (const s of sessions) {
@@ -420,6 +461,7 @@ export function buildLedger({ sessions, from, to, label, root, pipeline }) {
       mergeUsage(byRole[f.role] ?? (byRole[f.role] = ZERO()), m.total);
       mergeTools(tools, m.tools);
       for (const iv of m.intervals) activity.push(iv);
+      for (const ev of m.events) allEvents.push(ev);
       server.web_search += m.server.web_search;
       server.web_fetch += m.server.web_fetch;
       sidechain += m.sidechain_requests;
@@ -504,6 +546,52 @@ export function buildLedger({ sessions, from, to, label, root, pipeline }) {
       "and measured tool-call intervals, and counts nothing for model generation between calls.",
   };
 
+  // --- WHERE THE COST WENT, not just how much --------------------------------
+  //
+  // The journal's stage brackets cut the run into segments and `labelAt` is
+  // total over them, so every in-window event lands in exactly one — which is
+  // why `sum(by_segment) === totals.in_window` is an invariant p9-cost checks
+  // rather than a coincidence.
+  //
+  // The result is usually lopsided in a way that is itself the finding: a phase
+  // script CALLS NO MODEL, so a `during <stage>` row can only be work the
+  // session was doing concurrently with the driver, never the stage's own cost.
+  // The `between` rows are where a pipeline's tokens actually go.
+  const brackets = pipeline?.brackets ?? [];
+  const segs = new Map();
+  for (const ev of allEvents) {
+    if (!Number.isFinite(ev.t)) continue;
+    const l = labelAt(ev.t, brackets);
+    const key = segKey(l);
+    const seg = segs.get(key) ?? {
+      key,
+      title: segTitle(l),
+      kind: l.kind,
+      stage: l.stage,
+      after: l.after,
+      before: l.before,
+      first: ev.t,
+      last: ev.t,
+      tool_calls: 0,
+      tool_ms: 0,
+      ...ZERO(),
+    };
+    if (ev.t < seg.first) seg.first = ev.t;
+    if (ev.t > seg.last) seg.last = ev.t;
+    if (ev.kind === "request") addUsage(seg, ev.usage);
+    else {
+      seg.tool_calls += 1;
+      // A backgrounded tool contributes a call and no time here, for the reason
+      // BACKGROUNDED gives: its duration is dispatch, and the work it launched
+      // is counted through the subagent transcripts instead.
+      if (!ev.dispatch) seg.tool_ms += ev.ms;
+    }
+    segs.set(key, seg);
+  }
+  const by_segment = [...segs.values()]
+    .sort((a, b) => a.first - b.first)
+    .map((x) => ({ ...x, ms: x.last - x.first }));
+
   return {
     kind: "cost-ledger",
     schema: 1,
@@ -528,6 +616,7 @@ export function buildLedger({ sessions, from, to, label, root, pipeline }) {
     // turns differently. `sidechain_requests` is the harness's own marking of
     // the same split, kept as an independent cross-check.
     by_role: byRole,
+    by_segment,
     sidechain_requests: sidechain,
     workflows: [...groups.values()]
       .map((g) => ({
@@ -581,6 +670,111 @@ export function unionMs(intervals) {
 }
 
 /**
+ * WHEN EACH STAGE WAS RUNNING — one bracket per executed stage, in time order.
+ *
+ * A REPLAYED row is skipped. The claim that a replay is exempt "by
+ * construction, because it writes no stage_begin" is wrong in one reachable
+ * case, and it is the dangerous one: a run killed after a `stage_begin` was
+ * written leaves an ORPHAN, and if that stage is later satisfied by a cross-run
+ * replay, a backward scan pairs the replay with an orphan from hours earlier.
+ * The bracket is then enormous, and those hours of idle would be reported as
+ * attested stage execution. A replay did not run, so it has no bracket.
+ *
+ * A stage re-run within one journal yields TWO brackets, which is right: a
+ * stage run twice occupied the machine twice.
+ */
+export function bracketsFrom(rows) {
+  const out = [];
+  const open = new Map();
+  for (const r of rows) {
+    if (!r.ts) continue;
+    const t = Date.parse(r.ts);
+    if (!Number.isFinite(t)) continue;
+    if (r.kind === "stage_begin") open.set(r.stage, t);
+    else if (r.kind === "stage_end") {
+      const b = open.get(r.stage);
+      open.delete(r.stage);
+      if (b !== undefined && !r.replayed_from && t >= b)
+        out.push({ stage: r.stage, from: b, to: t });
+    }
+  }
+  return out.sort((a, b) => a.from - b.from);
+}
+
+/**
+ * WHICH SEGMENT OF THE RUN A MOMENT BELONGS TO. Total over the timeline, which
+ * is what makes `sum(by_segment) === in_window` a checkable invariant rather
+ * than an approximation.
+ *
+ * Two kinds, and the second is where the money is:
+ *
+ *   during <stage>        the driver was running a phase script.
+ *   between <a> and <b>   the driver was not running. This is the agent's own
+ *                         working time — reading the statute, writing the
+ *                         encoding, deciding whether to grant the gate — and on
+ *                         a human-gated pipeline it is nearly all of the token
+ *                         cost, because a phase script calls no model.
+ *
+ * The gaps before the first bracket and after the last are segments too, named
+ * for the one stage they touch.
+ */
+export function labelAt(t, brackets) {
+  for (let i = 0; i < brackets.length; i++) {
+    if (t < brackets[i].from)
+      return i === 0
+        ? {
+            kind: "before",
+            stage: null,
+            after: null,
+            before: brackets[0].stage,
+          }
+        : {
+            kind: "between",
+            stage: null,
+            after: brackets[i - 1].stage,
+            before: brackets[i].stage,
+          };
+    if (t <= brackets[i].to)
+      return {
+        kind: "during",
+        stage: brackets[i].stage,
+        after: null,
+        before: null,
+      };
+  }
+  return brackets.length
+    ? {
+        kind: "after",
+        stage: null,
+        after: brackets[brackets.length - 1].stage,
+        before: null,
+      }
+    : { kind: "whole-run", stage: null, after: null, before: null };
+}
+
+export const segKey = (l) =>
+  l.kind === "during"
+    ? `during:${l.stage}`
+    : l.kind === "before"
+      ? `before:${l.before}`
+      : l.kind === "after"
+        ? `after:${l.after}`
+        : l.kind === "whole-run"
+          ? "whole-run"
+          : `between:${l.after}:${l.before}`;
+
+export const segTitle = (l) =>
+  l.kind === "during"
+    ? `during ${l.stage}`
+    : l.kind === "before"
+      ? `before ${l.before}`
+      : l.kind === "after"
+        ? `after ${l.after}`
+        : l.kind === "whole-run"
+          ? "the whole run (no stage bracket on this journal)"
+          : `between ${l.after} and ${l.before}`;
+
+/**
  * The ATTESTED half: what the driver itself measured, read back off the journal.
  *
  * Separate from everything above and labelled `attested` in the artifact,
@@ -617,19 +811,11 @@ export function pipelineFromJournal(journalPath) {
     .sort();
   const intervals = [];
   // A stage's OCCUPIED interval is its bracket, not its elapsed: dispatch
-  // happens inside it too, and the union below needs real endpoints.
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].kind !== "stage_end" || !rows[i].ts) continue;
-    for (let j = i - 1; j >= 0; j--) {
-      if (rows[j].kind === "stage_end" && rows[j].stage === rows[i].stage)
-        break;
-      if (rows[j].kind === "stage_begin" && rows[j].stage === rows[i].stage) {
-        if (rows[j].ts)
-          intervals.push([Date.parse(rows[j].ts), Date.parse(rows[i].ts)]);
-        break;
-      }
-    }
-  }
+  // happens inside it too, and the union needs real endpoints. ONE definition,
+  // in `bracketsFrom`, used both for the union here and for the per-segment
+  // attribution in buildLedger — two would drift.
+  const brackets = bracketsFrom(rows);
+  for (const b of brackets) intervals.push([b.from, b.to]);
   return {
     standing: "attested",
     run_id: begin?.run_id ?? null,
@@ -657,10 +843,24 @@ export function pipelineFromJournal(journalPath) {
       last: ts[ts.length - 1] ?? null,
       ms: ts.length ? Date.parse(ts[ts.length - 1]) - Date.parse(ts[0]) : null,
     },
-    // The last `run_end`, or null while the run is still going. It is what the
-    // window's upper edge should be for a ledger rebuilt AFTER the fact — see
-    // cmdBuild. A resumed run writes several; the last one is the boundary.
-    ended_at: rows.filter((r) => r.kind === "run_end").at(-1)?.ts ?? null,
+    // WHEN THE RUN ENDED, or null if it has not.
+    //
+    // "The last run_end row" is the WRONG test, and the difference was the
+    // whole defect: go.sh writes a `run_end` every time it exits, INCLUDING the
+    // `--verdict GATE` exit it takes whenever a human gate is not yet
+    // satisfied. The journal is reused across sittings, so a gated pipeline —
+    // which is every real one — carries a `run_end` in the middle of its own
+    // history. Closing the cost window there clipped out the entire sitting
+    // that granted the gate and did the work, and nothing caught it: every
+    // check in p9-cost's oracle is a one-directional bound that a too-small
+    // window satisfies trivially.
+    //
+    // The run is over only if the journal ENDS with a run_end. Rows after one
+    // mean it was resumed, which means it is in flight.
+    ended_at:
+      rows[rows.length - 1]?.kind === "run_end"
+        ? (rows[rows.length - 1].ts ?? null)
+        : null,
     stages,
     totals: {
       stages: stages.length,
@@ -677,6 +877,7 @@ export function pipelineFromJournal(journalPath) {
     // because a total that silently stops short reads as a total.
     measured_through: stages.length ? stages[stages.length - 1].stage : null,
     busy_intervals: intervals,
+    brackets,
   };
 }
 
