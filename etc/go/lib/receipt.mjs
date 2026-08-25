@@ -13,8 +13,9 @@
 //        [--oracle-cmd CMD --oracle-exit N --oracle-class CLASS] \
 //        [--oracle-because TEXT] [--artifact PATH]... [--inputs-digest D] \
 //        [--replayed-from HASH] [--replayed-from-run RUNID]
-//        [--metric key=value]...
+//        [--metric key=value]... [--elapsed-ms N] [--dispatch-ms N]
 //   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --encoding E --subject S ...
+//   node etc/go/lib/receipt.mjs session    --run DIR [--session UUID] [--agent NAME] [--cwd DIR]
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
 //   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
 //        [--namespace NS] [--payload-digest D] [--corpus-digest D] \
@@ -412,6 +413,27 @@ switch (kind) {
       // told where to look.
       replayed_from_run: args.replayed_from_run ?? null,
       label: args.label ?? null,
+      // SCHEMA 6: WHAT THIS STAGE COST IN WALL CLOCK.
+      //
+      // Two numbers because they are two different things, and rolling them
+      // into one would make the pipeline look faster than it is:
+      //
+      //   elapsed_ms   the phase script — the work the stage names.
+      //   dispatch_ms  what the DRIVER spent before the script started:
+      //                asking the script for its inputs, digesting them, and
+      //                looking for a replayable receipt. Over a corpus of
+      //                hundreds of files that is not rounding error, and it is
+      //                spent on every stage including the ones that then
+      //                replay in milliseconds.
+      //
+      // Both arrive from the caller, and unlike a STATUS that is fine: this
+      // file's asymmetry exists because a status must be earned from evidence,
+      // while a duration is an observation only the process that waited can
+      // make. It is not unchecked, either — ledger.verify refuses an
+      // elapsed_ms larger than the bracket between this row and its own
+      // stage_begin, which is the arithmetic a fabricated figure fails.
+      elapsed_ms: args.elapsed_ms == null ? null : Number(args.elapsed_ms),
+      dispatch_ms: args.dispatch_ms == null ? null : Number(args.dispatch_ms),
     };
 
     // WHICH GATE GATES THIS STAGE, and what blessing is open for it — both
@@ -494,6 +516,34 @@ switch (kind) {
     process.stdout.write(
       `${rec.stage}: ${rec.status}${rec.replayed_from ? " (replayed)" : ""}\n`,
     );
+    break;
+  }
+
+  case "session": {
+    // WHO DROVE THIS INVOCATION — OBSERVED FROM THE ENVIRONMENT, NOT DECLARED.
+    //
+    // One row per `go.sh run`, not one per run: a human-gated pipeline is
+    // driven in several sittings, and the sittings are routinely different
+    // agent sessions. The set of rows is therefore the answer to "whose token
+    // spend belongs to this run", which is the question the cost ledger needs
+    // and the only one it cannot measure for itself — a transcript says what a
+    // session did, never which run it did it for.
+    //
+    // `CLAUDE_CODE_SESSION_ID` is set by the harness in the environment the
+    // driver is invoked in, so this is an observation rather than a claim. A
+    // human at a terminal sets nothing and the row records null, which is the
+    // honest answer and not a defect: the run had no agent cost to attribute.
+    const sid = args.session || process.env.CLAUDE_CODE_SESSION_ID || null;
+    append(journal, {
+      kind: "session",
+      session: sid,
+      // WHAT KIND OF THING drove it. Recorded so that a report can say "this
+      // leg was run by hand" instead of silently attributing zero tokens to it
+      // and letting the reader assume the leg was free.
+      agent: args.agent || process.env.AI_AGENT || null,
+      entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT || null,
+      cwd: args.cwd || process.cwd(),
+    });
     break;
   }
 

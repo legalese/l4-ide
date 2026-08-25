@@ -874,6 +874,31 @@ const RULES = {
             "digest-matches-local-file",
           );
       }),
+    "retrieval-cost-covers-its-documents": (ctx) => {
+      // NO SKIP HERE, deliberately. `joins_skipped` counts cross-file joins
+      // that could not run because a peer deposit is absent, and the report
+      // surfaces that count as a caveat about coverage. An OPTIONAL field that
+      // this bundle simply did not use is not that: it is the same situation as
+      // `archive-method-requires-archive-url` over a bundle with no archived
+      // document, which does its work and says nothing.
+      const top = ctx.doc.retrieval_cost;
+      if (!top) return;
+      // Whichever documents state a cost. A partial sum is still a valid lower
+      // bound, because the rule is one-directional: a total larger than the sum
+      // is ordinary (a landing page, a redirect, a retry), while a total
+      // SMALLER than the sum is a number nothing produced.
+      const parts = ctx.doc.documents.filter((d) => d.retrieval_cost);
+      if (!parts.length) return;
+      for (const k of ["requests", "elapsed_ms"]) {
+        const sum = parts.reduce((a, d) => a + (d.retrieval_cost[k] ?? 0), 0);
+        if ((top[k] ?? 0) < sum)
+          ctx.f(
+            `retrieval_cost.${k}`,
+            `stated ${top[k] ?? 0}, but ${parts.length} document(s) sum to ${sum}`,
+            "retrieval-cost-covers-its-documents",
+          );
+      }
+    },
     "assembled-digest-matches": (ctx) => {
       const a = ctx.doc.assembled;
       if (!a) {

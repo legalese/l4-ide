@@ -291,17 +291,18 @@ subject resolver refuses an unknown subject (listing the available sidecars), a
 descriptor naming a nonexistent golden, and a descriptor carrying an unknown
 key. `--with-driver` also
 drives the whole G1 pipeline twice and asserts that the second run re-executes
-nothing but the two stages that declare no inputs (`p9-report`, `p9-explain`) —
-the only mechanical check that `replayed` means anything. It also asserts that
+nothing but the stages that declare no inputs (`p9-cost`, `p9-report`,
+`p9-explain`) — the only mechanical check that `replayed` means anything. It also asserts that
 every declared g1 stage sequenced at or after `p6-tests` is gated by HG1, which
 is the one invariant whose violation is silent in every other direction.
 
 ## The two documents a run produces
 
-| file             | what it is                                                                                                                                                                                         |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `report.md`      | the AUDIT account, rendered by `p9-report` from `journal.ndjson` and nothing else. Its template may not contain a two-digit number; every figure is a placeholder resolved from a journal row.     |
-| `explainer.html` | the READER-facing sibling, rendered by `p9-explain`. It explains the body of law and, interleaved with that, what happened when somebody made it executable. `explainer.md` carries the same text. |
+| file               | what it is                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `report.md`        | the AUDIT account, rendered by `p9-report` from `journal.ndjson` and nothing else. Its template may not contain a two-digit number; every figure is a placeholder resolved from a journal row.                                                                                                                                                                                                |
+| `cost-ledger.json` | what the run COST, written by `p9-cost`. Two standings in one file, never merged: the driver's own per-stage wall clock (attested, and refusable — `verify` rejects a duration larger than the bracket it sits in), and the agent sessions' tokens and tool calls read from the harness transcripts the journal's `session` rows name (attributed, each transcript recorded with its sha256). |
+| `explainer.html`   | the READER-facing sibling, rendered by `p9-explain`. It explains the body of law and, interleaved with that, what happened when somebody made it executable. `explainer.md` carries the same text.                                                                                                                                                                                            |
 
 Both are written into the run directory and never into the tree; copying either
 anywhere a third party can see it is publication, which is P10, which is HG2's.

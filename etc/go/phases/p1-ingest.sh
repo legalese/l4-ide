@@ -50,6 +50,32 @@ go_deposit_check source-bundle || RC=$?
 METRICS=(--metric "deposit=$GO_DEPOSIT" --metric "peers_present=$GO_DEPOSIT_PEERS"
   --metric "rules_checked=$GO_DEPOSIT_RULES" --metric "joins_skipped=$GO_DEPOSIT_SKIPS")
 
+# WHAT THE RETRIEVAL COST, where the fetch measured itself.
+#
+# This is the SOURCE-SIDE half of what the run reports about network activity;
+# p9-cost counts the MODEL-side half from the agent transcript, by tool name.
+# The two are never added: a stage running `curl` is invisible to p9-cost, and a
+# model's web search is invisible here. Reported from the bundle rather than
+# recomputed, because the requests happened before this stage existed — the
+# bundle is the record, and the schema's `retrieval-cost-covers-its-documents`
+# is what stops it stating a total smaller than its own parts.
+#
+# Absent is left absent. A bundle assembled by hand cannot know these figures,
+# and a zero would read as "the source cost nothing to fetch".
+COUNTS="$(node -e '
+  const fs = require("node:fs");
+  let b; try { b = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { process.exit(0); }
+  const n = (b.documents || []).length;
+  if (n) console.log(`documents_retrieved=${n}`);
+  const c = b.retrieval_cost;
+  if (c) {
+    if (c.requests !== undefined) console.log(`retrieval_requests=${c.requests}`);
+    if (c.elapsed_ms !== undefined) console.log(`retrieval_ms=${c.elapsed_ms}`);
+    if (c.bytes !== undefined) console.log(`retrieval_bytes=${c.bytes}`);
+  }
+' "$GO_DEPOSIT" 2>/dev/null || true)"
+while IFS= read -r kv; do [[ -n "$kv" ]] && METRICS+=(--metric "$kv"); done <<<"$COUNTS"
+
 # A join that could not run is stated on the receipt, not left to the artifact:
 # the journal names the artifact by sha256, and a sha256 is not invertible.
 declare -a SKIPNOTE=()

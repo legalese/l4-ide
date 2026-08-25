@@ -42,9 +42,27 @@ The corpus modules, cases files and goldens named below are the subject's declar
 | `p3-check`     | typechecks the subject's declared corpus modules and runs the two mechanisable P3 house-style rules                                                                                                  | `p3-check.txt`                                                                                                             |
 | `p6-tests`     | evaluates the corpus's own `#ASSERT` directives and reads `results[]` — **not** the exit code                                                                                                        | one `<module>.run.json` per declared corpus module (regcf: `regcf.run.json`, `regcf-wizard.run.json`), `p6-assertions.txt` |
 | `p7-*`         | one script per projection leg, all read-only, each with its own oracle                                                                                                                               | the emitted artifacts and their fidelity reports                                                                           |
+| `p9-cost`      | measures what the run cost: the driver's own per-stage wall clock off the journal, and the agent sessions' tokens and tool calls off the harness transcripts the `session` rows name                 | `cost-ledger.json`                                                                                                         |
 | `p9-report`    | renders the conversion report from the journal and checks that every section SPEC.md §P9 requires is present                                                                                         | `report.md`, `report.html`                                                                                                 |
 
 `p0-preflight` and `p3-check` are ungated. Everything from `p6-tests` on is behind HG1.
+
+### What `p9-cost` can measure, and what it can only bound
+
+Two halves, and they are evidence of different kinds:
+
+- **Attested.** Every `stage_end` carries `elapsed_ms` (the phase script) and `dispatch_ms` (the driver's own time before it — declaring inputs, digesting them, looking for a replayable receipt). The driver took both readings, and `go.sh verify` refuses a row claiming more time than the bracket between its own `stage_begin` and `stage_end`.
+- **Attributed.** Tokens, tool calls and their durations come from the agent harness's own JSONL transcripts. Nobody types them — but a transcript is an ordinary file, so the ledger names every one it read with its sha256 and the derivation can be repeated.
+
+Which sessions belong to a run is the join neither half makes alone: a transcript says what a session did and never which run it did it for. So the driver writes one `session` row per invocation, observed from `CLAUDE_CODE_SESSION_ID`, and `p9-cost` measures exactly those sessions, clipped to the run's own window.
+
+Three boundaries the report states rather than papers over:
+
+1. **The window understates the front.** It opens at the run's first journal record, so reading the statute and deciding what to encode — which happen before the driver is first invoked — fall outside it. The whole-session column is the matching upper bound; the truth is between them.
+2. **`busy_ms_lower_bound` is a floor, not an estimate.** It unions attested stage brackets with measured tool-call intervals and counts nothing for the time a model spends reasoning between two calls.
+3. **The figures stop at `p9-cost` itself.** It runs before `p9-report` so the report has something to render, and therefore cannot count the reporting stages. The report's own per-stage table, rendered after `run_end`, can — so the two totals differ by exactly the stages between them.
+
+A run driven by hand sets no `CLAUDE_CODE_SESSION_ID`; `p9-cost` then reports SKIPPED naming that, because a zero would read as "this run cost nothing".
 
 ### The two checks `p3-check` can make, and the one it cannot
 
@@ -66,7 +84,7 @@ The `@ref` check is scoped narrowly on purpose: a dated arm is a line comparing 
 | `p4-forks`  | R4's 1:1 map between a materialised fork and an `Interpretation` field, in both directions; the reading taken is one of the register's live readings; a live reading cites its licence and a non-live one explains itself; cross-references into P2 resolve                                               | **finding the forks**, and **completeness** — unfalsifiable in principle, and carried by HG1                                                                                                                                                    |
 | `p5-gate`   | the cross-file joins over all three deposits at once, which is SPEC.md §4 P5's third check ("disposition of every P2 entry") as an exit code. It **SKIPs** rather than passing when a deposit is missing, because a join whose peer is absent reports `skip` and would leave a green receipt over nothing | **two of the five checks** — fork-register completeness and isomorphism spot-checks — which ride as notes on every receipt it writes, `PASS` included                                                                                           |
 
-Since 2026-08-09, `p3-check`, `p6-tests`, `p8-verify`, an emit-only `p7-dmn` and `p8-diff` **are** wired on the deposit path — the driver's declared list is `DEPOSIT_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-report)` — running over the run's resolved module set (`encodings.<id>.modules`) with the floors that travel with that encoding (`encodings.<id>.checks`), so a deposit run measures the deposit and never the committed encoding. `p8-diff` alone reads both encodings; that comparison is its whole job. The p7 legs other than DMN remain `NOT WIRED`, and a deposit-path `plan` names each with its own precise reason.
+Since 2026-08-09, `p3-check`, `p6-tests`, `p8-verify`, an emit-only `p7-dmn` and `p8-diff` **are** wired on the deposit path — the driver's declared list is `DEPOSIT_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-cost p9-report)` — running over the run's resolved module set (`encodings.<id>.modules`) with the floors that travel with that encoding (`encodings.<id>.checks`), so a deposit run measures the deposit and never the committed encoding. `p8-diff` alone reads both encodings; that comparison is its whole job. The p7 legs other than DMN remain `NOT WIRED`, and a deposit-path `plan` names each with its own precise reason.
 
 ## What still refuses, and why
 
