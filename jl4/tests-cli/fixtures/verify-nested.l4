@@ -1,0 +1,24 @@
+§ `VerifyNestedFixture`
+
+-- Accounting control: a WHERE-local definition is a DECIDE, and `l4 verify`
+-- does not descend into one — "LSP.L4.Viz.Ladder"'s entry point does not
+-- either, and a verifier that disagreed with the ladder about what a rule is
+-- would be reporting on a program the wizard never shows anyone.
+--
+-- The point of this fixture is that the exclusion is COUNTED. `analysed +
+-- skipped` does not total the file, and `summary.nestedNotVisited` says by how
+-- much. Without the count, a reader cannot tell whether the remainder is two
+-- definitions or two hundred — and in the Reg CF corpus a hand-count of the
+-- source got it wrong (5 and 0, against the AST's 5 and 2).
+--
+-- `the inner one` is deliberately CONTRADICTORY. If verify ever starts
+-- descending, this fixture goes red on a finding rather than silently changing
+-- meaning, which is the failure a bare count would not catch.
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the outer one` IS
+  x AND `the inner one`
+  WHERE
+    `the inner one` MEANS y AND NOT y

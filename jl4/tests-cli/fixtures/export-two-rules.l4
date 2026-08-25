@@ -1,0 +1,26 @@
+-- Fixture for the `l4 export --to=bpmn` rule-selection tests.
+--
+-- A BPMN document holds exactly one process, and `L4.Bpmn.Emit.renderBpmn`
+-- writes its own `<?xml ...?>` prolog, so two of them concatenated is not a
+-- well-formed document. This file therefore has TWO regulative rules:
+--
+--   * `l4 export --to=bpmn` with no --rule must refuse and name both rules;
+--   * `--rule "the fee"` must pick one of them.
+
+DECLARE Party IS ONE OF Filer, Registrar
+
+DECLARE Step IS ONE OF
+  `file the return`
+  `acknowledge the return`
+  `pay the fee`
+
+`the filing` MEANS
+  PARTY Filer
+  MUST `file the return`
+  WITHIN 30
+  HENCE PARTY Registrar MUST `acknowledge the return` WITHIN 7
+
+`the fee` MEANS
+  PARTY Filer
+  MUST `pay the fee`
+  WITHIN 14

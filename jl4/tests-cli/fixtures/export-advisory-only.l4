@@ -1,0 +1,28 @@
+-- Fixture for the `l4 export --fail-on=SEVERITY` threshold tests.
+--
+-- `--fail-on` means "exit non-zero when the report holds a note THIS SEVERE OR
+-- WORSE", and FidelitySeverity is ordered Blocking < Lossy < Advisory, so the
+-- gate compares `<=`. Testing that on a report whose notes are all Blocking
+-- only pins one end: every threshold trips, so an implementation that trips on
+-- any note at all, or one whose comparison runs the other way, still passes.
+--
+-- This module is the other end. Its DMN export carries exactly one note, and
+-- that note is ADVISORY (D-ORDERDEPENDENT: hit policy First over more than one
+-- row is order-dependent). So `--fail-on=advisory` must exit non-zero while
+-- `--fail-on=lossy` and `--fail-on=blocking` must exit 0 — with notes present
+-- the whole time, which is what makes "no note is severe enough" observable
+-- rather than indistinguishable from "no notes".
+--
+-- Kept to a guarded chain deliberately: a formula-shaped decision would draw a
+-- Blocking D-LITERALEXPR and destroy the property this fixture exists for.
+
+DECLARE Band IS ONE OF Low, Mid, High
+
+GIVEN income IS A NUMBER
+GIVETH A Band
+`band` MEANS
+       IF   income AT MOST 1000
+       THEN Low
+       ELSE IF   income AT MOST 5000
+            THEN Mid
+            ELSE High

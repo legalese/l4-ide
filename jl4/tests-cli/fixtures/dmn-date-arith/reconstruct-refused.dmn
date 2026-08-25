@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  THE DATE ARITHMETIC AXIS, negative half. THIS FILE IS SUPPOSED TO FAIL.
+
+  Its sibling `clamp.dmn` shows that FEEL's `date + duration("P1Y")` clamps. On
+  its own that is only half an argument, because the obvious way to write an
+  anniversary is not a duration at all: increment the YEAR and rebuild the date
+  from its components. If that worked, the exporter would need no duration
+  lowering and `daydate` would need no `add years`.
+
+  It does not work. `date(2025, 2, 29)` is not a date, and both engines answer
+  NULL rather than clamping or rolling. So an anniversary written by
+  reconstruction has NO correct lowering to give it, and the decision that
+  depends on it goes null too, which is the second decision here.
+
+  Worse, the three implementations disagree in three directions, which is why
+  the corpus fixes the idiom rather than leaving it to the author:
+
+    L4 `Date 29 2 2025`        -> 2025-03-01   (lenient; ROLLS FORWARD)
+    FEEL `date(2025, 2, 29)`   -> null         (both engines, measured)
+    FEEL `d + duration("P1Y")` -> 2025-02-28   (both engines, measured)
+
+  The `expect` block therefore asks for the CLAMPED answer, the one the corpus
+  actually means, and this file is red precisely because reconstruction cannot
+  produce it. A green run here would mean an engine had started accepting an
+  impossible date, and the standing advice in `daydate` and in L4.Dmn.Lower
+  against reconstructing components would need rechecking.
+
+  Driven as HarnessMustFail, the same construction as `dmn-xsd-order`'s negative
+  and `date-axis-badannotation.dmn`: a gate that has only ever been seen green is
+  not evidence that it is connected to anything.
+
+  NOT AN EMITTED GOLDEN. Never regenerate.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_reconstruct_refused" name="reconstruction refused" namespace="https://legalese.com/l4/dmn/reconstruct_refused">
+  <inputData id="in_issued" name="issued">
+    <variable id="in_issued_var" name="issued" typeRef="date"/>
+  </inputData>
+  <decision id="d_anniv_reconstruct" name="anniv_reconstruct">
+    <variable id="v_anniv_reconstruct" name="anniv_reconstruct" typeRef="date"/>
+    <informationRequirement id="ir_anniv_reconstruct"><requiredInput href="#in_issued"/></informationRequirement>
+    <literalExpression id="l_anniv_reconstruct">
+      <text>date(issued.year + 1, issued.month, issued.day)</text>
+    </literalExpression>
+  </decision>
+  <decision id="d_anniv_duration" name="anniv_duration">
+    <variable id="v_anniv_duration" name="anniv_duration" typeRef="date"/>
+    <informationRequirement id="ir_anniv_duration"><requiredInput href="#in_issued"/></informationRequirement>
+    <literalExpression id="l_anniv_duration">
+      <text>issued + duration("P1Y")</text>
+    </literalExpression>
+  </decision>
+</definitions>

@@ -1,0 +1,18 @@
+-- Regression fixture for smucclaw/l4-ide#906.
+--
+-- A DIAMOND over the embedded-library fallback:
+--
+--     main  ->  { actus-daycount, actus-schedule }  ->  daydate
+--
+-- Both `actus-daycount` and `actus-schedule` `IMPORT daydate`, and
+-- `actus-schedule` uses `Days in month` (defined in `daydate`). This file lives
+-- alone in its directory, so none of these modules resolve on disk; with
+-- JL4_LIBRARY_PATH unset and an empty XDG store the whole closure is served by
+-- the LSP/Shake embedded-library fallback (jl4-lsp/src/LSP/L4/Rules.hs).
+--
+-- Under the pre-fix resolver the second sibling was type-checked against a
+-- starved dependency environment — `daydate`'s exports never reached
+-- `actus-schedule` — so `Days in month` was reported out of scope and the whole
+-- check failed. See the CLI test in jl4/tests-cli/Main.hs.
+IMPORT `actus-daycount`
+IMPORT `actus-schedule`
