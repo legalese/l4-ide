@@ -1872,6 +1872,62 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
         wrong.status === 2 && wrong.stderr.includes(FIXTURE_ENCODING),
       );
   }
+
+  // ---- ARGUMENT-PARSER HYGIENE ----------------------------------------------
+  //
+  // Two defects the R9 review found, both of which `bash -n` is structurally
+  // unable to see.
+  {
+    const goSrc = readFileSync(resolve(HERE, "go.sh"), "utf8");
+
+    // 1. NO DUPLICATE `case` LABEL. A repeated label is legal shell — the first
+    //    arm wins and the second is dead — so the symptom is a documented flag
+    //    that parses, sets a variable nobody reads, and exits 0. That is what
+    //    happened when R2/R3 gave `--encoding` a second, unrelated meaning:
+    //    `new-subject … --encoding path/x.l4` silently wrote the default path
+    //    instead. Measured before the repair; `new-subject` and a control run
+    //    with no flag at all produced byte-identical sidecars.
+    const labels = [
+      ...goSrc.matchAll(/^\s*(-[-a-z][a-z-]*(?:\s*\|\s*-[-a-z][a-z-]*)*)\)/gm),
+    ].flatMap((m) => m[1].split("|").map((x) => x.trim()));
+    const dupes = labels.filter((f, i) => labels.indexOf(f) !== i);
+    check(
+      "no flag is declared twice in go.sh's argument parser",
+      dupes.length === 0 ||
+        (process.stdout.write(`     duplicated: ${dupes.join(", ")}\n`), false),
+    );
+
+    // 2. EVERY VALUE-TAKING FLAG REFUSES A MISSING VALUE, with exit 2 and its
+    //    own name. Without the guard, `$2` is unbound under `set -u` and bash
+    //    aborts with a line number and exit 1 — an interpreter stack trace
+    //    where a usage error belongs, and the wrong code: 2 is this driver's
+    //    usage exit, 1 means a real finding about the corpus.
+    //
+    //    Derived from the parser, not listed here: a flag added without the
+    //    guard must fail this, which a hand-kept list cannot make happen.
+    const valueTaking = [
+      ...goSrc.matchAll(
+        /^\s*(--[a-z][a-z-]*)\)\n(?:\s*#[^\n]*\n)*\s*([^\n]*)/gm,
+      ),
+    ]
+      .filter(([, , body]) => /"\$2"/.test(body) || /need_val/.test(body))
+      .map(([, flag]) => flag);
+    const unguarded = [];
+    for (const flag of [...new Set(valueTaking)]) {
+      const r = spawnSync("bash", [resolve(HERE, "go.sh"), "plan", flag], {
+        encoding: "utf8",
+      });
+      if (r.status !== 2 || !r.stderr.includes(`${flag} needs a value`))
+        unguarded.push(`${flag} (exit ${r.status})`);
+    }
+    check(
+      `all ${new Set(valueTaking).size} value-taking flags refuse a missing value with exit 2`,
+      valueTaking.length > 0 &&
+        (unguarded.length === 0 ||
+          (process.stdout.write(`     unguarded: ${unguarded.join(", ")}\n`),
+          false)),
+    );
+  }
   // HG1 MUST RE-OPEN WHEN THE NARRATIVE MOVES.
   //
   // `p9-explain` is HG1-gated because it publishes narrative prose, but the
