@@ -1,0 +1,198 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-child-support-domain`
+IMPORT `sg-csp`
+IMPORT `sg-childcare-leave`
+
+§ `Singapore child support — the composition, and the questions worth asking of it`
+
+-- Required by the rule-version axis: an unpinned `RULES EFFECTIVE DATE`
+-- read resolves to the localized current day, and localization needs a
+-- timezone. Singapore's clock, for Singapore's commencement dates.
+TIMEZONE IS "Asia/Singapore"
+
+§§ `What a caller supplies, and what they get back`
+
+DECLARE ChildFacts
+    HAS `date of birth`                IS A DATE
+        `is a Singapore citizen`       IS A BOOLEAN
+        `birth order`                  IS A NUMBER
+        `co-matching already received` IS A NUMBER
+
+GIVEN facts IS A ChildFacts
+GIVETH A Child
+`the child described by` facts MEANS
+    Child WITH
+        `name`                     IS "this child"
+        `date of birth`            IS facts's `date of birth`
+        `is a Singapore citizen`   IS facts's `is a Singapore citizen`
+        `birth order`              IS facts's `birth order`
+        `parents lawfully married` IS TRUE
+
+DECLARE Entitlement
+    HAS `Baby Gift cash`                 IS A NUMBER
+        `Child Credits`                  IS A NUMBER
+        `CDA First Step Grant`           IS A NUMBER
+        `CDA co-matching cap`            IS A NUMBER
+        `PSEA top-up`                    IS A NUMBER
+        `Large Family MediSave Grant`    IS A NUMBER
+        `Large Family LifeSG Credits`    IS A NUMBER
+        `the five Package lines`         IS A NUMBER
+        `maximum support in total`       IS A NUMBER
+
+-- Non-citizens are outside every scheme in this subject. The Package,
+-- the Baby Bonus Scheme and the Large Families Scheme are all confined to
+-- Singapore Citizen children, and childcare leave under CDCSA s 12B turns
+-- on a "qualifying child", which s 2 likewise confines to citizens. A
+-- breakdown of zeroes is the right answer, not an error.
+GIVEN facts IS A ChildFacts
+GIVETH AN Entitlement
+`the entitlement of` facts MEANS
+    IF   NOT facts's `is a Singapore citizen`
+    THEN `nothing at all`
+    ELSE Entitlement WITH
+            `Baby Gift cash`              IS `the cash actually paid as a Gift to` child
+            `Child Credits`               IS `Child Credits for` child
+            `CDA First Step Grant`        IS `the First Step Grant for` child
+            `CDA co-matching cap`         IS `the co-matching cap for` child
+            `PSEA top-up`                 IS `the PSEA top-up for` child
+            `Large Family MediSave Grant` IS `Large Family MediSave Grant for` child
+            `Large Family LifeSG Credits` IS `Large Family LifeSG Credits paid to` child
+            `the five Package lines`      IS `the five Package lines for` child
+            `maximum support in total`    IS `maximum support under the Package for` child
+    WHERE
+        child MEANS `the child described by` facts
+        `nothing at all` MEANS
+            Entitlement WITH
+                `Baby Gift cash`              IS 0
+                `Child Credits`               IS 0
+                `CDA First Step Grant`        IS 0
+                `CDA co-matching cap`         IS 0
+                `PSEA top-up`                 IS 0
+                `Large Family MediSave Grant` IS 0
+                `Large Family LifeSG Credits` IS 0
+                `the five Package lines`      IS 0
+                `maximum support in total`    IS 0
+
+§§ `The exported surface`
+
+@export What a Singapore Citizen child receives in government child-support money, line by line, under the rules in force on a chosen date. Use a rule date before 2027-04-01 for the Baby Bonus Scheme and Large Families Scheme as they stand today, and on or after it for the SG Child Support Package announced at the 2026 National Day Rally. The announced Package is policy, not law: no Bill has been introduced.
+GIVEN `rule date` IS A DATE @desc Apply the rules as they stood, or are announced to stand, on this date. ISO 8601, e.g. 2027-04-01.
+      facts IS A ChildFacts @desc The child's date of birth, citizenship, birth order among the mother's living children, and how much CDA co-matching the family has already received.
+GIVETH AN Entitlement
+`child support under the rules effective on` `rule date` facts MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` `rule date` (`the entitlement of` facts)
+
+DECLARE TransitionEffect
+    HAS `change to the cash line`        IS A NUMBER
+        `change to the co-matching cap`  IS A NUMBER
+        `change to maximum support`      IS A NUMBER
+        `the cash line is cut`           IS A BOOLEAN
+        `the co-matching cap is cut`     IS A BOOLEAN
+
+@export What the SG Child Support Package does to one child's entitlement, line by line, against the Baby Bonus and Large Families Schemes it replaces. Answers the question the headline does not: which lines go DOWN. Positive numbers are gains, negative are cuts.
+GIVEN facts IS A ChildFacts @desc The child's date of birth, citizenship and birth order among the mother's living children.
+GIVETH A TransitionEffect
+`what the transition does to` facts MEANS
+    TransitionEffect WITH
+        `change to the cash line`       IS cash
+        `change to the co-matching cap` IS cap
+        `change to maximum support`     IS total
+        `the cash line is cut`          IS cash LESS THAN 0
+        `the co-matching cap is cut`    IS cap LESS THAN 0
+    WHERE
+        child MEANS `the child described by` facts
+        cash  MEANS `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 4 1) (`the change to the cash line for` child)
+        cap   MEANS `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 10 1) (`the change to the co-matching cap for` child)
+        total MEANS `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 10 1) (`the change to maximum support for` child)
+
+-- The actionable one. A family whose child was born before commencement
+-- keeps the outgoing co-matching cap until 30 September 2027 and then
+-- drops to $5,000. Where the outgoing cap is the higher of the two, every
+-- dollar of headroom not used by that date is lost — and the outgoing cap
+-- is higher for every second and subsequent child.
+DECLARE CoMatchingWindow
+    HAS `the cap until 30 September 2027`  IS A NUMBER
+        `the cap from 1 October 2027`      IS A NUMBER
+        `headroom that lapses on that day` IS A NUMBER
+        `there is something to do`         IS A BOOLEAN
+
+@export How much Child Development Account co-matching a family stands to lose on 30 September 2027, when every co-matching cap becomes $5,000. Tells a family with a child born before 1 April 2027 whether saving into the CDA before that date is worth money to them, and how much.
+GIVEN facts IS A ChildFacts @desc The child's date of birth, birth order, and how much CDA co-matching the family has already received.
+GIVETH A CoMatchingWindow
+`the co-matching window for` facts MEANS
+    CoMatchingWindow WITH
+        `the cap until 30 September 2027`  IS before
+        `the cap from 1 October 2027`      IS after
+        `headroom that lapses on that day` IS lapsing
+        `there is something to do`         IS lapsing GREATER THAN 0
+    WHERE
+        child   MEANS `the child described by` facts
+        got     MEANS facts's `co-matching already received`
+        before  MEANS `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 9 30) (`the co-matching cap for` child)
+        after   MEANS `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 10 1)  (`the co-matching cap for` child)
+        lapsing MEANS
+            LET  headroom MEANS before MINUS (IF got AT LEAST before THEN before ELSE got)
+                 kept     MEANS after  MINUS (IF got AT LEAST after  THEN after  ELSE got)
+            IN   IF headroom AT MOST kept THEN 0 ELSE headroom MINUS kept
+
+DECLARE LeaveFacts
+    HAS `children aged under seven`       IS A NUMBER
+        `children aged seven to twelve`   IS A NUMBER
+        `months served this period`       IS A NUMBER
+        `gross daily rate`                IS A NUMBER
+        `is the natural father`           IS A BOOLEAN
+
+-- The leave module counts children out of a list, because CDCSA s 12B
+-- bands on the ages of actual children. A caller who has only the counts
+-- gets a list of stand-ins with the right ages: born on the reference day
+-- less n years, so each one lands in the band the caller named.
+GIVEN facts IS A LeaveFacts, day IS A DATE
+GIVETH A Parent
+`the parent described by` facts `on` day MEANS
+    Parent WITH
+        `name`                      IS "this parent"
+        `is the natural father`     IS facts's `is the natural father`
+        `months served this period` IS facts's `months served this period`
+        `gross daily rate`          IS facts's `gross daily rate`
+        `children`                  IS append (`stand-ins` (facts's `children aged under seven`) 3)
+                                            (`stand-ins` (facts's `children aged seven to twelve`) 9)
+    WHERE
+        GIVEN n IS A NUMBER, age IS A NUMBER
+        GIVETH A LIST OF Child
+        `stand-ins` n age MEANS
+            IF   n AT MOST 0
+            THEN EMPTY
+            ELSE (Child WITH
+                    `name`                     IS "a child"
+                    `date of birth`            IS Date (DATE_DAY day) (DATE_MONTH day) (DATE_YEAR day MINUS age)
+                    `is a Singapore citizen`   IS TRUE
+                    `birth order`              IS 1
+                    `parents lawfully married` IS TRUE)
+                 FOLLOWED BY `stand-ins` (n MINUS 1) age
+
+DECLARE LeaveAnswer
+    HAS `days of leave`                     IS A NUMBER
+        `days under the Act as it stands`   IS A NUMBER
+        `days under the announced scheme`   IS A NUMBER
+        `the employer's cost today`         IS A NUMBER
+        `the employer's cost as announced`  IS A NUMBER
+        `the reform costs this employer more` IS A BOOLEAN
+
+@export How many days of childcare leave a working parent is entitled to, and who pays for them, under the rules in force on a chosen date. Compares the Child Development Co-Savings Act 2001 as it stands (2 to 6 days, graduated by months served) against the merged 8/10/12-day scheme announced at the 2026 National Day Rally, and shows what each costs the employer. The announced scheme needs an amendment that has not been introduced and has no announced start date.
+GIVEN `rule date` IS A DATE @desc Apply the rules as they stood, or are announced to stand, on this date. ISO 8601, e.g. 2027-04-01.
+      facts IS A LeaveFacts @desc How many Singapore Citizen children the parent has in each age band, how many months they have served this employer this calendar year, their gross daily rate of pay in dollars, and whether the bar in s 12B(1B) could apply to them.
+GIVETH A LeaveAnswer
+`childcare leave under the rules effective on` `rule date` facts MEANS
+    LeaveAnswer WITH
+        `days of leave`                       IS `EVAL UNDER RULES EFFECTIVE AT` `rule date` selected
+        `days under the Act as it stands`     IS `days of leave under the Act for` parent `on` `rule date`
+        `days under the announced scheme`     IS announced
+        `the employer's cost today`           IS `the employer's cost under the Act for` parent `on` `rule date`
+        `the employer's cost as announced`    IS `the employer's cost as announced for` parent `on` `rule date` `under` `the live reading`
+        `the reform costs this employer more` IS  `the employer's cost as announced for` parent `on` `rule date` `under` `the live reading`
+                                              GREATER THAN `the employer's cost under the Act for` parent `on` `rule date`
+    WHERE
+        parent    MEANS `the parent described by` facts `on` `rule date`
+        selected  MEANS `days of childcare leave for` parent `on` `rule date` `under` `the live reading`
+        announced MEANS `days of leave as announced for` parent `on` `rule date` `under` `the live reading`

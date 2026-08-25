@@ -1,0 +1,123 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "sg-child-support",
+  "citation": "SG Child Support Package and merged childcare leave, announced at the Singapore National Day Rally on 23 August 2026; Child Development Co-Savings Act 2001 (Singapore)",
+  "retrieved": "2026-08-25",
+  "note": "THIS SUBJECT'S PRIMARY SOURCE IS AN ANNOUNCEMENT, NOT AN ENACTMENT, and the bundle is shaped to say so. The Rally speech and the administrative pages that elaborate it state a policy the Government intends to implement from 1 April 2027; no Bill has been introduced and the Child Development Co-Savings Act 2001 is unamended. So the ANNOUNCEMENT is the 'current' document for the money, and the ACT is the 'instrument' -- the thing that would have to be amended for any of it to take legal effect, and the thing that today actually governs childcare leave. Reading the two against each other is what produced forks F2, F3 and F5: the announcement is silent on three mechanisms the Act already contains, and silence is not repeal. Re-run source/fetch.sh to reproduce the HTML fetches; the Act was retrieved through the lawplain MCP corpus rather than from Singapore Statutes Online, which returns HTTP 403 to non-browser clients.\n\nPER-DOCUMENT NOTES (the schema keeps documents to fixed keys, so they live here):\n\n[ndr-2026-speech] The announcement itself. Source of the childcare-leave figures (8/10/12 days), the '$150 a month' childcare fee target, the BTO ballot-chance change and the framing of the Package. It states policy, not law.\n\n[lifesg-csp] The administrative elaboration, and the ONLY source that states the scheme cohort by cohort. Its six-row birth-cohort table is what the case suite's first assertion group reproduces row for row -- see report/CONVERSION-REPORT.md section 3.\n\n[population-ndr-2026] Corroborates the component amounts and the 30 April 2027 / 30 September 2027 transition dates independently of life.gov.sg.\n\n[mff-baby-bonus] The OUTGOING scheme, needed because the transition rule is arithmetic over it: the Baby Gift top-up is the shortfall between the Cash Gift already disbursed on 31 March 2027 and $10,000, and that depends on the enhanced disbursement schedule recorded here ($3,000/$4,000 at birth, $1,500/$2,000 at six and twelve months, $1,000 at eighteen, then $400 every six months to age six and a half).\n\n[mff-large-families] The other outgoing scheme: the doubled CDA First Step Grant, the $5,000 Large Family MediSave Grant and the $1,000-a-year Large Family LifeSG Credits, all for a third or subsequent child born on or after 18 February 2025.\n\n[cdcsa-2001] THE INSTRUMENT, and the reason P1 requires one. The Rally announced a merged childcare-leave entitlement of 8, 10 or 12 days. Read alone that is simply the new policy. Read against s 12B it is something narrower: s 12B(1) does not give six days to every parent of a young child, it gives TWO to SIX graduated by months served; s 12B(2)(a)(iii) caps the combined entitlement at six days per relevant period however many children there are; s 12B(1B) bars a natural father in defined circumstances; and ss 12C and 12CA reimburse the employer for only the fourth to sixth days of childcare leave and two days of extended childcare leave, at $500 a day. The announcement addresses NONE of those four mechanisms. Each silence is a fork, not a repeal -- which is exactly the 'a word looks compelled until you read the instrument' failure the P1 instrument requirement exists to catch. Singapore Statutes Online answers HTTP 403 to non-browser clients, so the text came from the lawplain MCP statutes corpus (act_id CDCSA2001, kind act_current). The digest is over the JSON document that fetch returned, which is the artifact the encoding was read from.",
+  "in_force": {
+    "statement": "The Child Development Co-Savings Act 2001 as published in the lawplain statutes corpus, kind 'act_current', retrieved 2026-08-25. The corpus record carries no in-force banner of its own; this bundle records that absence rather than inventing a date.",
+    "as_of": "2026-08-25",
+    "document": "cdcsa-2001"
+  },
+  "retrieval_cost": {
+    "requests": 6,
+    "bytes": 1258049,
+    "tool": "jl4/examples/legal/sg-child-support/source/fetch.sh",
+    "elapsed_ms": 532
+  },
+  "documents": [
+    {
+      "id": "ndr-2026-speech",
+      "role": "current",
+      "title": "Prime Minister Lawrence Wong, National Day Rally 2026 (English), 23 August 2026",
+      "citation": "NDR 2026 (Singapore), 23 August 2026",
+      "url": "https://www.pmo.gov.sg/newsroom/ndr2026/",
+      "retrieved": "2026-08-25",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "16236f776d9e3288db9a7e7015e2150bbce94da3f5aa9e42ce3b1da84855e624",
+        "local_path": "jl4/examples/legal/sg-child-support/source/raw/ndr2026-speech.html"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    },
+    {
+      "id": "lifesg-csp",
+      "role": "current",
+      "title": "SG Child Support Package - LifeSG benefits and support",
+      "citation": "life.gov.sg, SG Child Support Package",
+      "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package",
+      "retrieved": "2026-08-25",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "a8b42bc91da7b8b946bd47766305c667c60c95cefd0ff4e79de202369bc75abd",
+        "local_path": "jl4/examples/legal/sg-child-support/source/raw/lifesg-csp.html"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    },
+    {
+      "id": "population-ndr-2026",
+      "role": "corroboration",
+      "title": "Marriage & Parenthood Measures at National Day Rally 2026 - National Population and Talent Division",
+      "citation": "population.gov.sg, M&P measures at NDR 2026",
+      "url": "https://www.population.gov.sg/marriage-parenthood-measures-at-national-day-rally-2026/",
+      "retrieved": "2026-08-25",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "814cc86d71d9a90d87082a8488734568bc2fee15abdfda4bb0e0bac609e4ba11",
+        "local_path": "jl4/examples/legal/sg-child-support/source/raw/population-ndr2026.html"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    },
+    {
+      "id": "mff-baby-bonus",
+      "role": "historical",
+      "title": "Baby Bonus Scheme - Made For Families",
+      "citation": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+      "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme",
+      "retrieved": "2026-08-25",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "741ce2052d8ac59e4f2a001a392d28eeb81d84acd21e079351da73c299d07c1b",
+        "local_path": "jl4/examples/legal/sg-child-support/source/raw/mff-baby-bonus.html"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    },
+    {
+      "id": "mff-large-families",
+      "role": "historical",
+      "title": "Large Families Scheme - Made For Families",
+      "citation": "madeforfamilies.gov.sg, Large Families Scheme",
+      "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/large-families-scheme",
+      "retrieved": "2026-08-25",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "7b7e40c2a61d760bc83da06635e6a63a1800b96ddcea46676fcb3ba99d25a2cd",
+        "local_path": "jl4/examples/legal/sg-child-support/source/raw/mff-large-families.html"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    },
+    {
+      "id": "cdcsa-2001",
+      "role": "instrument",
+      "title": "Child Development Co-Savings Act 2001 (Singapore) - full text, current version",
+      "citation": "Child Development Co-Savings Act 2001 (Act 13 of 2001), ss 12B, 12C, 12CA",
+      "url": "https://sso.agc.gov.sg/Act/CDCSA2001",
+      "retrieved": "2026-08-25",
+      "retrieval_method": "manual",
+      "integrity": {
+        "sha256": "f85fd4a958cf3ac1411c217f3b0a621d2c29d76d159f2ba7b222afa9a3798de9",
+        "local_path": "jl4/examples/legal/sg-child-support/source/raw/cdcsa2001.json"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    }
+  ]
+}

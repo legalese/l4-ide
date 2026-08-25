@@ -1,0 +1,106 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Singapore child support — the shared ontology`
+
+-- The nouns shared by the two regimes encoded in this subject: the money
+-- (sg-csp.l4) and the leave (sg-childcare-leave.l4). They are two views of
+-- ONE family and they share their nouns: the same human being is the child
+-- whose birth date decides a Baby Gift cohort, and the "qualifying child"
+-- whose age decides a parent's childcare leave. Encoding them separately
+-- would duplicate the family and let the copies disagree.
+
+§§ `The child`
+
+-- `birth order` is the child's order among the LIVING children of the same
+-- mother, which is how the Baby Bonus Scheme counts it. It is a fact
+-- supplied to the encoding, not derived: the encoding cannot see a
+-- pregnancy history. See fork register F4.
+DECLARE Child
+    HAS `name`                        IS A STRING
+        `date of birth`               IS A DATE
+        `is a Singapore citizen`      IS A BOOLEAN
+        `birth order`                 IS A NUMBER
+        `parents lawfully married`    IS A BOOLEAN
+
+§§ `The parent, as an employee`
+
+-- CDCSA s 12B entitles an EMPLOYEE, not a parent in the abstract: the
+-- entitlement is computed per employer per relevant period, so months
+-- served is a field of the employment and not of the person.
+DECLARE Parent
+    HAS `name`                        IS A STRING
+        `is the natural father`       IS A BOOLEAN
+        `months served this period`   IS A NUMBER
+        `gross daily rate`            IS A NUMBER
+        `children`                    IS A LIST OF Child
+
+§§ `Ages and years, computed the way the schemes count them`
+
+-- Both schemes band by CALENDAR YEAR, not by exact age: the LifeSG cohort
+-- table reads "children turning 1 to 17 in 2026", and Child Credits are
+-- described as running "from the year the child turns 1 to the year the
+-- child turns 16". So the year a child turns n is the birth year plus n,
+-- and that is the unit both modules count in.
+GIVEN child IS A Child, n IS A NUMBER
+GIVETH A NUMBER
+`the year` child `turns` n MEANS
+    DATE_YEAR (child's `date of birth`) PLUS n
+
+GIVEN child IS A Child, year IS A NUMBER
+GIVETH A NUMBER
+`the age` child `attains in` year MEANS
+    year MINUS DATE_YEAR (child's `date of birth`)
+
+-- Exact age on a day, for the leave module: CDCSA s 12B(1)(b) says "below
+-- 7 years of age", which is an age on a day and not an age in a year.
+GIVEN child IS A Child, day IS A DATE
+GIVETH A NUMBER
+`the age` child `has on` day MEANS
+    LET  years MEANS DATE_YEAR day MINUS DATE_YEAR (child's `date of birth`)
+    IN   IF   `has had a birthday by` child day
+         THEN years
+         ELSE years MINUS 1
+    WHERE
+        GIVEN c IS A Child, d IS A DATE
+        GIVETH A BOOLEAN
+        DECIDE `has had a birthday by` c d IF
+               DATE_MONTH d GREATER THAN DATE_MONTH (c's `date of birth`)
+            OR (    DATE_MONTH d EQUALS DATE_MONTH (c's `date of birth`)
+                AND DATE_DAY   d AT LEAST DATE_DAY (c's `date of birth`))
+
+§§ `The rule-version axis`
+
+-- Every dollar figure in this subject is dated, because the subject IS a
+-- transition: the whole point of the encoding is to answer "what does this
+-- child get" under the rules as they stand AND under the rules as
+-- announced. A reader who cannot pin the rule date cannot tell which of
+-- those two answers they are being given.
+GIVEN amendment IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` amendment MEANS
+    `RULES EFFECTIVE DATE` AT LEAST amendment
+
+§§ `Materialised interpretive forks`
+
+-- R4 (single-instruction demo, R4-FORK-REPRESENTATION.md): where two
+-- readings of the source both survive, the fork is ONE FIELD of this
+-- record, threaded as an ordinary GIVEN, so both readings execute and the
+-- case suite shows what turns on the difference. The fork register maps
+-- these fields 1:1; two entries may not claim the same field.
+-- `TYPICALLY` carries the live reading as the field's own default. That is
+-- the slot a settling authority gets cited at: the day MSF publishes
+-- implementation detail that decides F1, the answer goes HERE, beside the
+-- field, and not into a constant somewhere else that a reader has to find.
+DECLARE Interpretation
+    HAS `the harmonised co-matching cap counts a lifetime total` IS A BOOLEAN TYPICALLY TRUE
+        `the service-duration graduation survives the merger`    IS A BOOLEAN TYPICALLY TRUE
+
+-- The readings this encoding takes when nobody says otherwise. It restates
+-- the TYPICALLY defaults so that call sites and #ASSERTs have a value to
+-- pass; the defaults above remain the normative statement of the readings.
+GIVETH AN Interpretation
+`the live reading` MEANS
+    Interpretation WITH
+        `the harmonised co-matching cap counts a lifetime total` IS TRUE
+        `the service-duration graduation survives the merger`    IS TRUE

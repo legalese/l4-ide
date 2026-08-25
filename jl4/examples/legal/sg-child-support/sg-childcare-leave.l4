@@ -1,0 +1,268 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-child-support-domain`
+
+§ `Childcare leave — Child Development Co-Savings Act 2001, and what the Rally would do to it`
+
+-- Unlike the money, THIS half of the subject has a statute. Sections 12B,
+-- 12C and 12CA of the Child Development Co-Savings Act 2001 are in force
+-- and are encoded here in the shape they are written in. The Rally
+-- announced that the two leave entitlements would be merged into one of
+-- 8, 10 or 12 days by number of children, and that the Government would
+-- "cover the cost for all child-related leave ... up to the reimbursement
+-- limit". No Bill has been introduced and, on the reporting, "no start
+-- date has been announced". So the announced arm below is dated at the
+-- Package's commencement as a PLACEHOLDER, and the encoding says so
+-- rather than implying the date is known.
+
+§§ `Section 12B(1B) and (1C) — who is an entitled employee at all`
+
+-- The bar is on the natural father of a child conceived while either he or
+-- the mother was married to somebody else, and it is lifted if the two of
+-- them later marry each other. The Rally said nothing about it, so it is
+-- encoded once and carried into both arms: an announcement that does not
+-- mention a provision does not repeal it.
+@ref CDCSA 2001 s 12B(1B), (1C)
+GIVEN parent IS A Parent, `conceived while either was married to another` IS A BOOLEAN, `have since married each other` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `is barred from leave for the child` IF
+        parent's `is the natural father`
+    AND `conceived while either was married to another`
+    AND NOT `have since married each other`
+
+@ref CDCSA 2001 s 12B(1)(a), (1A)(a) — three months' service is the threshold
+GIVEN parent IS A Parent
+GIVETH A BOOLEAN
+DECIDE `has served the qualifying period` IF
+    parent's `months served this period` AT LEAST 3
+
+§§ `Section 12B(1) — childcare leave, graduated by months served`
+
+-- The graduation is the part the headline drops. The Act does not give
+-- six days to everyone who has a young child; it gives two, three, four,
+-- five or six according to how much of the relevant period the employee
+-- served that employer.
+@ref CDCSA 2001 s 12B(1)(i)-(v)
+GIVEN months IS A NUMBER
+GIVETH A NUMBER
+`the graduated band for` months MEANS
+    BRANCH IF months LESS THAN 3  THEN 0
+           IF months LESS THAN 5  THEN 2
+           IF months LESS THAN 7  THEN 3
+           IF months LESS THAN 9  THEN 4
+           IF months LESS THAN 11 THEN 5
+           OTHERWISE 6
+
+§§ `Counting the children each entitlement turns on`
+
+GIVEN xs IS A LIST OF Child
+GIVETH A NUMBER
+`how many` xs MEANS foldr (GIVEN x, acc YIELD acc PLUS 1) 0 xs
+
+@ref CDCSA 2001 s 12B(1)(b) — a qualifying child below 7 years of age
+GIVEN parent IS A Parent, day IS A DATE
+GIVETH A NUMBER
+`children below seven that` parent `has on` day MEANS
+    `how many` (filter (GIVEN c YIELD     c's `is a Singapore citizen`
+                                      AND `the age` c `has on` day LESS THAN 7)
+                       (parent's `children`))
+
+@ref CDCSA 2001 s 12B(1A)(b) — of or above 7 but below 13 years of age
+GIVEN parent IS A Parent, day IS A DATE
+GIVETH A NUMBER
+`children from seven to twelve that` parent `has on` day MEANS
+    `how many` (filter (GIVEN c YIELD     c's `is a Singapore citizen`
+                                      AND `the age` c `has on` day AT LEAST 7
+                                      AND `the age` c `has on` day LESS THAN 13)
+                       (parent's `children`))
+
+-- The announced scheme bands on one number: Singapore Citizen children
+-- "aged 12 and below", which is the union of the Act's two age bands.
+@ref NDR 2026 — children aged 12 and below
+GIVEN parent IS A Parent, day IS A DATE
+GIVETH A NUMBER
+`children twelve and below that` parent `has on` day MEANS
+         `children below seven that` parent `has on` day
+    PLUS `children from seven to twelve that` parent `has on` day
+
+§§ `The entitlement under the Act as it stands`
+
+-- s 12B(2)(a)(iii): a COMBINED total of six days in any relevant period,
+-- however many children the employee has and whatever their ages. The
+-- combined cap is what makes the Act's answer independent of family size
+-- — which is precisely the feature the Rally set out to change.
+@ref CDCSA 2001 s 12B(1), (1A), (2)(a)(iii)
+GIVEN parent IS A Parent, day IS A DATE
+GIVETH A NUMBER
+`days of leave under the Act for` parent `on` day MEANS
+    BRANCH IF NOT `has served the qualifying period` parent THEN 0
+           IF `the combined entitlement` AT MOST 6 THEN `the combined entitlement`
+           OTHERWISE 6
+    WHERE
+        `the childcare leave limb` MEANS
+            IF   `children below seven that` parent `has on` day AT LEAST 1
+            THEN `the graduated band for` (parent's `months served this period`)
+            ELSE 0
+        `the extended limb` MEANS
+            IF   `children from seven to twelve that` parent `has on` day AT LEAST 1
+            THEN 2
+            ELSE 0
+        `the combined entitlement` MEANS `the childcare leave limb` PLUS `the extended limb`
+
+§§ `The entitlement under the announced scheme`
+
+-- "Every working parent will get: 8 days with one child, aged 12 and
+-- below, 10 days with two children, aged 12 and below, and 12 days with
+-- three or more children."
+@ref NDR 2026 (23 Aug 2026) — the merged childcare leave scheme
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the announced entitlement for this many children` n MEANS
+    BRANCH IF n AT MOST 0 THEN 0
+           IF n EQUALS 1  THEN 8
+           IF n EQUALS 2  THEN 10
+           OTHERWISE 12
+
+-- FORK F2. The announcement states one number per family size and says
+-- nothing about an employee who has served only part of the relevant
+-- period. Two readings survive:
+--
+--   live      — the s 12B(1) graduation survives the merger, because an
+--               announcement that does not mention a mechanism does not
+--               repeal it, and the days scale in the proportion the Act
+--               already uses. THE ROUNDING IS THE ENCODING'S OWN: the
+--               source gives no rule for a fractional day, so this arm
+--               floors. Any implementation would have to choose, and the
+--               choice is visible here rather than buried.
+--   rival     — the merged entitlement is flat for everyone past the
+--               three-month threshold, which is what the words say.
+--
+-- Both execute; the case suite shows what turns on the difference.
+GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
+GIVETH A NUMBER
+`days of leave as announced for` parent `on` day `under` reading MEANS
+    BRANCH IF NOT `has served the qualifying period` parent THEN 0
+           IF reading's `the service-duration graduation survives the merger`
+              THEN FLOOR ((full TIMES `the graduated band for` (parent's `months served this period`)) DIVIDED BY 6)
+           OTHERWISE full
+    WHERE
+        full MEANS `the announced entitlement for this many children` (`children twelve and below that` parent `has on` day)
+
+§§ `The entitlement, on whichever arm the rule date selects`
+
+GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
+GIVETH A NUMBER
+`days of childcare leave for` parent `on` day `under` reading MEANS
+    IF   `the rules in force include` `the announced leave scheme commences`
+    THEN `days of leave as announced for` parent `on` day `under` reading
+    ELSE `days of leave under the Act for` parent `on` day
+
+-- PLACEHOLDER, AND LABELLED ONE. The merged scheme needs an amendment to
+-- the Act and no commencement date has been announced. This encoding dates
+-- the announced arm at the Package's own commencement so that the arm can
+-- be reached and tested at all; it is NOT a claim that the leave scheme
+-- starts on that day. Fork register F3 records the assumption.
+@ref NDR 2026 — merged leave scheme; no commencement date announced (placeholder)
+GIVETH A DATE
+`the announced leave scheme commences` MEANS YMD 2027 4 1
+
+§§ `Who actually pays — sections 12B(9)-(10A), 12C and 12CA`
+
+-- The Act splits the cost three ways, and the split is the part the
+-- headline "the Government will cover the cost" has to be read against.
+--
+--   s 12B(9)   the employer pays the employee's GROSS RATE OF PAY for
+--              every day of leave taken;
+--   s 12B(10)  after three days of childcare leave, that payment "must not
+--              exceed $500 for each subsequent day";
+--   s 12B(10A) every day of EXTENDED childcare leave is capped at $500;
+--   s 12C      the employer may reclaim days four to six of childcare
+--              leave, at not more than $500 a day and $1,500 a year;
+--   s 12CA     and up to two days of extended childcare leave, at not more
+--              than $500 a day and $1,000 a year.
+--
+-- So today the employer bears the first three days in full and the
+-- Government bears the rest — capped. The Rally said the Government would
+-- "cover the cost for all child-related leave ... UP TO THE REIMBURSEMENT
+-- LIMIT", and the reported limit is unchanged at $500 a day. The four
+-- words after "all" are the whole finding: for any parent whose gross
+-- daily rate exceeds $500, the employer keeps paying the excess, on every
+-- day, and the day count doubles.
+@ref CDCSA 2001 s 12C(2)(a), s 12CA(2)(a); NDR 2026 reporting — $500 a day
+GIVETH A NUMBER
+`the daily reimbursement limit` MEANS 500
+
+GIVEN a IS A NUMBER, b IS A NUMBER
+GIVETH A NUMBER
+`the lesser of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+`no less than nothing` a MEANS IF a AT MOST 0 THEN 0 ELSE a
+
+@ref CDCSA 2001 s 12B(9)-(10A) read with s 12C(1) — the employer bears the first three days
+GIVEN parent IS A Parent, day IS A DATE
+GIVETH A NUMBER
+`the employer's cost under the Act for` parent `on` day MEANS
+    `the lesser of` (`days of leave under the Act for` parent `on` day) `and` 3
+    TIMES parent's `gross daily rate`
+
+@ref NDR 2026 — the Government covers all child-related leave up to the reimbursement limit
+GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
+GIVETH A NUMBER
+`the employer's cost as announced for` parent `on` day `under` reading MEANS
+         `days of leave as announced for` parent `on` day `under` reading
+    TIMES `no less than nothing` (parent's `gross daily rate` MINUS `the daily reimbursement limit`)
+
+-- The number an employer actually wants: does the reform cost them more or
+-- less? Negative is a saving.
+GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
+GIVETH A NUMBER
+`the change to the employer's cost for` parent `on` day `under` reading MEANS
+         `the employer's cost as announced for` parent `on` day `under` reading
+    MINUS `the employer's cost under the Act for` parent `on` day
+
+-- The gross daily rate at which the reform stops saving an employer money.
+-- Below it the employer pays less than today; above it, more. It is a
+-- consequence of the encoding, not a figure anybody announced.
+GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
+GIVETH A BOOLEAN
+DECIDE `the reform costs this employer more` `for` parent `on` day `under` reading IF
+    `the change to the employer's cost for` parent `on` day `under` reading GREATER THAN 0
+
+§§ `Section 12B(8) — the obligation, and how the entitlement lapses`
+
+DECLARE LeaveActor IS ONE OF
+    `the employer`
+    `the employee`
+
+DECLARE LeaveAction IS ONE OF
+    `grant the leave` HAS days IS A NUMBER
+    `take the leave`  HAS days IS A NUMBER
+
+-- "an employer must grant, and an employee who is entitled to childcare
+-- leave or extended childcare leave must take, the entitlement ... not
+-- later than the last day of that relevant period, and any employee who
+-- fails to take that leave by that day (a) thereupon ceases to be entitled
+-- to that leave; and (b) is not entitled to any payment in lieu of that
+-- leave."
+--
+-- The lapse is the reason this is a regulative rule and not a number: the
+-- entitlement is use-it-or-lose-it, so an encoding that reported only the
+-- day count would tell a parent in December something materially
+-- misleading.
+@ref CDCSA 2001 s 12B(8)
+GIVEN days IS A NUMBER, `days left in the relevant period` IS A NUMBER
+GIVETH A DEONTIC LeaveActor LeaveAction
+`the leave must be granted and taken` days `with` `days left in the relevant period` MEANS
+    PARTY  `the employer`
+    MUST   (`grant the leave` days)
+    WITHIN `days left in the relevant period`
+    HENCE  (PARTY  `the employee`
+            MUST   (`take the leave` days)
+            WITHIN `days left in the relevant period`
+            HENCE  FULFILLED
+            LEST   BREACH BY `the employee`
+                   BECAUSE "CDCSA s 12B(8): leave not taken by the last day of the relevant period ceases to be an entitlement, and no payment in lieu is due")
+    LEST   BREACH BY `the employer`
+           BECAUSE "CDCSA s 12B(8): an employer must grant the entitlement not later than the last day of the relevant period"

@@ -1,0 +1,481 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-child-support-domain`
+
+§ `The money — the SG Child Support Package and the schemes it replaces`
+
+-- WHAT THIS MODULE IS, AND IS NOT.
+--
+-- The SG Child Support Package was ANNOUNCED at the National Day Rally on
+-- 23 August 2026. It is not law. No Bill has been introduced; the Child
+-- Development Co-Savings Act 2001, under which the Baby Bonus Scheme and
+-- the Child Development Account operate, is unamended as at the encoding
+-- date. So the two arms of every figure below are NOT two versions of one
+-- statute. They are:
+--
+--   * before 2027-04-01 — the scheme as administered today, and
+--   * on or after      — the scheme as ANNOUNCED, on the administrative
+--                        statements at life.gov.sg and the Rally speech.
+--
+-- The rule-version axis carries them both because the whole subject IS the
+-- transition. A reader who cannot pin the rule date cannot tell which of
+-- the two answers they are being handed, and the announced arm is a
+-- statement about a policy intention, never about law in force. Every
+-- assertion in the case suite that reaches the announced arm is an
+-- assertion about the announcement.
+
+§§ `Dates — the rule-version axis`
+
+@ref Budget 2023 (14 Feb 2023) — Baby Bonus Cash Gift raised by $3,000 in every birth order
+GIVETH A DATE
+`the Baby Bonus enhancement` MEANS YMD 2023 2 14
+
+@ref Budget 2025 (18 Feb 2025) — Large Families Scheme commences
+GIVETH A DATE
+`the Large Families Scheme commences` MEANS YMD 2025 2 18
+
+@ref NDR 2026 (23 Aug 2026); life.gov.sg — the Package is implemented from 1 April 2027
+GIVETH A DATE
+`the Package commences` MEANS YMD 2027 4 1
+
+@ref life.gov.sg — Baby Bonus Cash Gift runs to 31 Mar 2027; top-up paid by 30 Apr 2027
+GIVETH A DATE
+`the last day of the Cash Gift` MEANS YMD 2027 3 31
+
+@ref life.gov.sg — from 1 Oct 2027 every co-matching cap becomes $5,000
+GIVETH A DATE
+`the co-matching caps harmonise` MEANS YMD 2027 10 1
+
+-- BIRTH-DATE bands. These are NOT rule dates: they attach to the child,
+-- and they keep their meaning whatever the rule date is. Conflating the
+-- two axes is the single easiest way to get this subject wrong, so they
+-- are named apart on purpose.
+@ref life.gov.sg — CDA remains open to the end of the year the child turns 16, born on/after 1 Jan 2015
+GIVETH A DATE
+`the CDA-to-16 cohort opens` MEANS YMD 2015 1 1
+
+§§ `The outgoing regime — Baby Bonus Cash Gift`
+
+-- CDCSA 2001 s 9 read with the Baby Bonus Scheme as administered. The
+-- Cash Gift is paid by birth order and by birth cohort: Budget 2023 both
+-- raised it by $3,000 and stretched the schedule from 18 months to six and
+-- a half years. Children born BEFORE the enhancement were paid out in
+-- full by 18 months and are therefore no longer receiving anything in
+-- 2027 — which is why the transition rule below can only reach the
+-- enhanced cohort.
+GIVEN child IS A Child
+GIVETH A BOOLEAN
+DECIDE `is a third or subsequent child` IF
+    child's `birth order` AT LEAST 3
+
+-- SCOPE, AND A CURATED REFUSAL. The rates below are the two cohorts this
+-- encoding has sources for: $8,000/$10,000 for a child born on or after
+-- 1 January 2015, and $11,000/$13,000 from the Budget 2023 enhancement.
+-- The Baby Bonus Scheme has been re-rated repeatedly since 2001 and this
+-- encoding does NOT carry the earlier rates. A birth before 2015 is
+-- therefore a refusal and not an answer: the ASSUME is a deliberate
+-- bottom, and an arm that reaches it stops with "... is an assumed term"
+-- naming this binding, rather than quoting a confident wrong figure.
+ASSUME `no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01` IS A NUMBER
+
+GIVETH A DATE
+`the earliest Cash Gift cohort encoded` MEANS YMD 2015 1 1
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Baby Bonus Cash Gift for` child MEANS
+    BRANCH IF child's `date of birth` LESS THAN `the earliest Cash Gift cohort encoded`
+              THEN `no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01`
+           IF child's `date of birth` AT LEAST `the Baby Bonus enhancement`
+              THEN IF   `is a third or subsequent child` child
+                   THEN 13_000
+                   ELSE 11_000
+           OTHERWISE IF   `is a third or subsequent child` child
+                     THEN 10_000
+                     ELSE 8_000
+
+-- The enhanced schedule, from madeforfamilies.gov.sg: $3,000 (or $4,000
+-- for a third or subsequent child) at birth; $1,500 (or $2,000) at six and
+-- at twelve months; $1,000 at eighteen months; then $400 every six months
+-- from age two to age six and a half — ten instalments. The instalments
+-- are what makes the transition computable: the top-up is a function of
+-- how much has ALREADY been paid on 31 March 2027, and that depends on the
+-- child's age on that day.
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Cash Gift instalment at birth for` child MEANS
+    IF `is a third or subsequent child` child THEN 4_000 ELSE 3_000
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Cash Gift half-yearly instalment for` child MEANS
+    IF `is a third or subsequent child` child THEN 2_000 ELSE 1_500
+
+GIVEN start IS A DATE, finish IS A DATE
+GIVETH A NUMBER
+`whole months from` start `to` finish MEANS
+    LET  raw MEANS   (DATE_YEAR finish MINUS DATE_YEAR start) TIMES 12
+                PLUS (DATE_MONTH finish MINUS DATE_MONTH start)
+    IN   IF   DATE_DAY finish LESS THAN DATE_DAY start
+         THEN raw MINUS 1
+         ELSE raw
+
+-- The ten $400 instalments fall at 24, 30, 36 … 78 months. How many have
+-- been reached by month m, floored at none and capped at ten.
+GIVEN m IS A NUMBER
+GIVETH A NUMBER
+`four-hundred-dollar instalments reached by month` m MEANS
+    BRANCH IF m LESS THAN 24 THEN 0
+           IF m AT LEAST 78  THEN 10
+           OTHERWISE FLOOR ((m MINUS 24) DIVIDED BY 6) PLUS 1
+
+@ref madeforfamilies.gov.sg — Baby Bonus Cash Gift disbursement schedule (enhanced cohort)
+GIVEN child IS A Child, day IS A DATE
+GIVETH A NUMBER
+`Cash Gift paid to` child `by` day MEANS
+    IF   child's `date of birth` LESS THAN `the Baby Bonus enhancement`
+    THEN `Baby Bonus Cash Gift for` child   -- pre-enhancement: paid out by 18 months
+    ELSE LET m MEANS `whole months from` (child's `date of birth`) `to` day
+         IN       (IF m AT LEAST 0  THEN `Cash Gift instalment at birth for` child ELSE 0)
+             PLUS (IF m AT LEAST 6  THEN `Cash Gift half-yearly instalment for` child ELSE 0)
+             PLUS (IF m AT LEAST 12 THEN `Cash Gift half-yearly instalment for` child ELSE 0)
+             PLUS (IF m AT LEAST 18 THEN 1_000 ELSE 0)
+             PLUS (400 TIMES `four-hundred-dollar instalments reached by month` m)
+
+§§ `The outgoing regime — the Child Development Account`
+
+-- First Step Grant, and the co-matching cap, both by birth order. The
+-- Large Families Scheme doubled the First Step Grant for a third or
+-- subsequent child born on or after 18 February 2025.
+@ref madeforfamilies.gov.sg — CDA First Step Grant
+GIVEN child IS A Child
+GIVETH A NUMBER
+`First Step Grant under the outgoing scheme for` child MEANS
+    IF       `is a third or subsequent child` child
+         AND child's `date of birth` AT LEAST `the Large Families Scheme commences`
+    THEN 10_000
+    ELSE 5_000
+
+@ref madeforfamilies.gov.sg — CDA Government co-matching caps by birth order
+GIVEN child IS A Child
+GIVETH A NUMBER
+`co-matching cap under the outgoing scheme for` child MEANS
+    BRANCH IF child's `birth order` AT MOST 1 THEN 4_000
+           IF child's `birth order` EQUALS 2  THEN 7_000
+           IF child's `birth order` AT MOST 4 THEN 9_000
+           OTHERWISE 15_000
+
+§§ `The outgoing regime — the Large Families Scheme`
+
+@ref Budget 2025 — Large Family MediSave Grant, third or subsequent child born on/after 18 Feb 2025
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Large Family MediSave Grant for` child MEANS
+    IF       `is a third or subsequent child` child
+         AND child's `date of birth` AT LEAST `the Large Families Scheme commences`
+    THEN 5_000
+    ELSE 0
+
+-- $1,000 a year from the year the child turns one to the year the child
+-- turns six: six instalments, $6,000 in all. life.gov.sg records that the
+-- Credits "cease with no 2027 disbursements", so a child who has not drawn
+-- all six by the end of 2026 never will. That truncation is computed, not
+-- assumed: see `Large Family LifeSG Credits paid to`.
+@ref Budget 2025 — Large Family LifeSG Credits, $1,000 a year from age 1 to age 6
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Large Family LifeSG Credits for` child MEANS
+    IF       `is a third or subsequent child` child
+         AND child's `date of birth` AT LEAST `the Large Families Scheme commences`
+    THEN 6_000
+    ELSE 0
+
+@ref life.gov.sg — Large Family LifeSG Credits cease; there are no 2027 disbursements
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Large Family LifeSG Credits paid to` child MEANS
+    IF   `Large Family LifeSG Credits for` child EQUALS 0
+    THEN 0
+    ELSE 1_000 TIMES `years of Credits drawn`
+    WHERE
+        -- years the child turned 1..6 that fell in 2026 or earlier
+        `years of Credits drawn` MEANS
+            BRANCH IF `the year` child `turns` 1 GREATER THAN 2026 THEN 0
+                   IF `the year` child `turns` 6 AT MOST 2026      THEN 6
+                   OTHERWISE 2026 MINUS `the year` child `turns` 1 PLUS 1
+
+§§ `The SG Child Support Package — Baby Gift`
+
+-- life.gov.sg: a child born on or after 1 April 2027 receives $10,000 in
+-- cash in two tranches within twelve months of birth. A child born before
+-- that date who is STILL RECEIVING the Baby Bonus Cash Gift keeps receiving
+-- it to 31 March 2027 and is then topped up, by 30 April 2027, "to reach
+-- $10,000 total".
+--
+-- READ THAT AS A FLOOR, NOT A REPLACEMENT. The top-up is the shortfall
+-- between what has already been paid and $10,000, and it cannot go
+-- negative: nothing in the announcement claws back a Cash Gift already
+-- received, and an administration that clawed back would need a power to
+-- do it. A child who has already been paid more than $10,000 is therefore
+-- topped up by nothing and keeps what they have.
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the Baby Gift for` child MEANS 10_000
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the Baby Gift top-up for` child MEANS
+    IF   `is still receiving the Cash Gift on the last day` child
+    THEN `the shortfall`
+    ELSE 0
+    WHERE
+        -- Only the enhanced cohort is still being paid in 2027: the
+        -- pre-enhancement schedule finished at eighteen months, so a child
+        -- born before 14 Feb 2023 was paid in full by August 2024.
+        `is still receiving the Cash Gift on the last day` c MEANS
+                c's `date of birth` AT LEAST `the Baby Bonus enhancement`
+            AND c's `date of birth` LESS THAN `the Package commences`
+        `the shortfall` MEANS
+            LET  paid MEANS `Cash Gift paid to` child `by` `the last day of the Cash Gift`
+            IN   IF paid AT LEAST 10_000 THEN 0 ELSE 10_000 MINUS paid
+
+§§ `The SG Child Support Package — Child Credits`
+
+-- "$2,000 disbursed annually over 16 years, from the year the child turns
+-- 1 to the year the child turns 16", extended to every existing Singapore
+-- Citizen child "turning 1 to 16 from 2026 onwards". So the credit years
+-- are the years the child turns 1 through 16, INTERSECTED with 2026
+-- onwards — which is exactly why an existing child collects less than the
+-- $32,000 the headline names, and a child born after commencement collects
+-- all of it.
+@ref life.gov.sg — Child Credits, $2,000 a year for the years the child turns 1 to 16, from 2026
+GIVETH A NUMBER
+`the first year of Child Credits` MEANS 2026
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`years of Child Credits for` child MEANS
+    LET  first  MEANS IF   `the year` child `turns` 1 AT LEAST `the first year of Child Credits`
+                      THEN `the year` child `turns` 1
+                      ELSE `the first year of Child Credits`
+         last   MEANS `the year` child `turns` 16
+    IN   IF   last LESS THAN first
+         THEN 0
+         ELSE last MINUS first PLUS 1
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`Child Credits for` child MEANS 2_000 TIMES `years of Child Credits for` child
+
+§§ `The SG Child Support Package — the Child Development Account`
+
+-- First Step Grant: $5,000, "provided at birth to all children", for a
+-- child born on or after commencement. A child born before it has already
+-- had whatever the outgoing scheme gave — including the Large Families
+-- Scheme's doubled grant, which is discontinued from 1 April 2027 but is
+-- not recovered from a child who already received it.
+-- The PACKAGE's First Step Grant line. life.gov.sg's cohort table fills
+-- this column for the 1 April 2027 band and dashes every band above it,
+-- because the grant is paid at birth and an existing child's was paid
+-- years ago under whatever scheme then applied. So the Package line is 0
+-- for them — not the historical grant, which belongs to the lifetime
+-- comparison below and not to "what does the Package give this child".
+@ref life.gov.sg — CDA First Step Grant $5,000 for children born on/after 1 Apr 2027
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the First Step Grant for` child MEANS
+    IF   child's `date of birth` AT LEAST `the Package commences`
+    THEN 5_000
+    ELSE 0
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`lifetime First Step Grant for` child MEANS
+    IF   child's `date of birth` AT LEAST `the Package commences`
+    THEN 5_000
+    ELSE `First Step Grant under the outgoing scheme for` child
+
+-- The co-matching cap, and FORK F1.
+--
+-- life.gov.sg: a child born on or after 1 April 2027 has a $5,000 cap from
+-- birth; a child born before it "retains the existing co-matching cap
+-- until 30 September 2027", and "from 1 October 2027, all caps adjust to
+-- $5,000".
+--
+-- "Adjust to $5,000" does not say what happens to a family that has
+-- already been co-matched ABOVE $5,000 under a cap of $9,000 or $15,000,
+-- nor whether a family co-matched $3,000 then has $2,000 of headroom left
+-- or a fresh $5,000. Two readings survive, and real money turns on the
+-- difference for exactly the families the outgoing scheme favoured most.
+-- Both are materialised: see fork register F1.
+GIVEN child IS A Child, `co-matching already received` IS A NUMBER, reading IS AN Interpretation
+GIVETH A NUMBER
+`co-matching still available to` child `given` `co-matching already received` `under` reading MEANS
+    BRANCH IF NOT `the caps have harmonised for` child
+              THEN `headroom under` (`co-matching cap under the outgoing scheme for` child)
+           IF reading's `the harmonised co-matching cap counts a lifetime total`
+              THEN `headroom under` 5_000
+           OTHERWISE 5_000
+    WHERE
+        GIVEN cap IS A NUMBER
+        GIVETH A NUMBER
+        `headroom under` cap MEANS
+            IF   `co-matching already received` AT LEAST cap
+            THEN 0
+            ELSE cap MINUS `co-matching already received`
+        GIVEN c IS A Child
+        GIVETH A BOOLEAN
+        DECIDE `the caps have harmonised for` c IF
+                c's `date of birth` AT LEAST `the Package commences`
+            OR  `the rules in force include` `the co-matching caps harmonise`
+
+-- A child born before 1 January 2015 has a Child Development Account that
+-- closed at the end of the year they turned 12, so by the Package's
+-- commencement there is no account left to co-match into and the line is
+-- a dash on life.gov.sg's table. Above that cohort the cap stands at the
+-- outgoing figure until the caps harmonise, and at $5,000 after.
+@ref life.gov.sg — from 1 Oct 2027 every cap is $5,000; before it, the outgoing cap stands
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the co-matching cap for` child MEANS
+    BRANCH IF child's `date of birth` LESS THAN `the CDA-to-16 cohort opens`
+              THEN 0
+           IF     child's `date of birth` LESS THAN `the Package commences`
+              AND NOT `the rules in force include` `the co-matching caps harmonise`
+              THEN `co-matching cap under the outgoing scheme for` child
+           OTHERWISE 5_000
+
+§§ `The SG Child Support Package — the Post-Secondary Education Account`
+
+@ref life.gov.sg — $10,000 PSEA top-up in the year the child turns 17, from 2026 onwards
+GIVETH A NUMBER
+`the first year of the PSEA top-up` MEANS 2026
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the PSEA top-up for` child MEANS
+    IF   `the year` child `turns` 17 AT LEAST `the first year of the PSEA top-up`
+    THEN 10_000
+    ELSE 0
+
+§§ `The totals, and what the transition does to each line`
+
+-- TWO DIFFERENT QUESTIONS, KEPT APART ON PURPOSE.
+--
+--   "What does the Package give this child?" is answered by the Package
+--   lines alone, and is meaningful for every cohort life.gov.sg's table
+--   covers — back to a birth in 2009. For a child born before the Budget
+--   2023 enhancement the Baby Gift line is a dash, and this encoding says
+--   0 rather than quoting the Baby Bonus they were paid years ago.
+--
+--   "Is this child better off than under the schemes being replaced?" is a
+--   LIFETIME comparison, and it is only honest if both sides count the
+--   same lines. So it counts the Cash Gift the child ends up with on BOTH
+--   sides — which drags the whole comparison into the scope of the
+--   outgoing rate table, and therefore refuses for a birth before 2015.
+--
+-- Answering the second question with the first question's totals would
+-- understate the Package by a whole Cash Gift for every child born between
+-- 2015 and the enhancement. That is not a rounding error; it is the
+-- largest single line in the comparison.
+--
+-- EVERY TOTAL BELOW IS A MAXIMUM, and says so in its name. Two of the
+-- lines are caps and not payments: Government co-matching happens only to
+-- the extent the parents save, so a family that saves nothing collects
+-- nothing on that line. A total that called itself "the support this
+-- child receives" would overstate the entitlement of every family that
+-- cannot afford to save, which is the opposite of who the figure is
+-- usually quoted at.
+
+-- The BABY GIFT LINE OF THE PACKAGE, which is not the same thing as
+-- whatever Baby Bonus a child once received. life.gov.sg's cohort table
+-- puts a dash against every band below 14 February 2023, and this is that
+-- dash: their historical Cash Gift is outside the Package's accounting.
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the cash actually paid as a Gift to` child MEANS
+    BRANCH IF child's `date of birth` AT LEAST `the Package commences`
+              THEN `the Baby Gift for` child
+           IF child's `date of birth` LESS THAN `the Baby Bonus enhancement`
+              THEN 0
+           OTHERWISE      `Cash Gift paid to` child `by` `the last day of the Cash Gift`
+                     PLUS `the Baby Gift top-up for` child
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the five Package lines for` child MEANS
+         `the cash actually paid as a Gift to` child
+    PLUS `Child Credits for` child
+    PLUS `the First Step Grant for` child
+    PLUS `the co-matching cap for` child
+    PLUS `the PSEA top-up for` child
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`maximum support under the Package for` child MEANS
+         `the five Package lines for` child
+    PLUS `Large Family MediSave Grant for` child
+    PLUS `Large Family LifeSG Credits paid to` child
+
+§§§ `The lifetime comparison`
+
+-- The Cash Gift a child ends up with, counted the same way whichever
+-- regime they fall in: $10,000 for a child born on or after commencement;
+-- the shortfall-topped total for a child still being paid on 31 March
+-- 2027; and, for a child whose Cash Gift finished years ago, exactly what
+-- the outgoing scheme gave them, because the Package does not touch it.
+GIVEN child IS A Child
+GIVETH A NUMBER
+`lifetime Gift-line cash for` child MEANS
+    BRANCH IF child's `date of birth` AT LEAST `the Package commences`
+              THEN `the Baby Gift for` child
+           IF child's `date of birth` LESS THAN `the Baby Bonus enhancement`
+              THEN `Baby Bonus Cash Gift for` child
+           OTHERWISE      `Cash Gift paid to` child `by` `the last day of the Cash Gift`
+                     PLUS `the Baby Gift top-up for` child
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`maximum lifetime support under the outgoing schemes for` child MEANS
+         `Baby Bonus Cash Gift for` child
+    PLUS `First Step Grant under the outgoing scheme for` child
+    PLUS `co-matching cap under the outgoing scheme for` child
+    PLUS `Large Family MediSave Grant for` child
+    PLUS `Large Family LifeSG Credits for` child
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`maximum lifetime support under the Package for` child MEANS
+         `lifetime Gift-line cash for` child
+    PLUS `Child Credits for` child
+    PLUS `lifetime First Step Grant for` child
+    PLUS `the co-matching cap for` child
+    PLUS `Large Family MediSave Grant for` child
+    PLUS `Large Family LifeSG Credits paid to` child
+    PLUS `the PSEA top-up for` child
+
+-- WHAT THE TRANSITION DOES TO THE CASH LINE, ON ITS OWN.
+--
+-- Negative for every child born on or after 14 February 2023, because the
+-- enhanced Cash Gift is $11,000 or $13,000 and the Gift is a $10,000
+-- floor. It is the one line of the Package that goes DOWN, and it goes
+-- down furthest for a third or subsequent child — the birth orders the
+-- scheme it replaces was built to favour. Zero for a child whose Cash
+-- Gift had already finished, who is untouched.
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the change to the cash line for` child MEANS
+         `lifetime Gift-line cash for` child
+    MINUS `Baby Bonus Cash Gift for` child
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the change to the co-matching cap for` child MEANS
+         `the co-matching cap for` child
+    MINUS `co-matching cap under the outgoing scheme for` child
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`the change to maximum support for` child MEANS
+         `maximum lifetime support under the Package for` child
+    MINUS `maximum lifetime support under the outgoing schemes for` child

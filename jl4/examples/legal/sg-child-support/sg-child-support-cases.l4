@@ -1,0 +1,302 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-child-support-domain`
+IMPORT `sg-csp`
+IMPORT `sg-childcare-leave`
+
+§ `Scenario cases — Singapore child support`
+
+TIMEZONE IS "Asia/Singapore"
+
+§§ `One child per band of life.gov.sg's published cohort table`
+
+-- The table has six rows. Each child below sits in one of them, and the
+-- first group of assertions is the isomorphism check that matters most:
+-- if the encoding reproduces the published table row by row, the cohort
+-- logic is right; if it does not, no downstream figure is worth reading.
+
+`Aisha` MEANS Child WITH          -- born after commencement: the full Package
+    `name` IS "Aisha", `date of birth` IS YMD 2027 6 15
+    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `parents lawfully married` IS TRUE
+
+`Bala` MEANS Child WITH           -- 1 Jan 2026 - 31 Mar 2027 band, third child
+    `name` IS "Bala", `date of birth` IS YMD 2026 1 1
+    `is a Singapore citizen` IS TRUE, `birth order` IS 3
+    `parents lawfully married` IS TRUE
+
+`Chloe` MEANS Child WITH          -- the first day of the enhanced Cash Gift
+    `name` IS "Chloe", `date of birth` IS YMD 2023 2 14
+    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `parents lawfully married` IS TRUE
+
+`Devi` MEANS Child WITH           -- ONE DAY EARLIER: the last pre-enhancement day
+    `name` IS "Devi", `date of birth` IS YMD 2023 2 13
+    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `parents lawfully married` IS TRUE
+
+`Elias` MEANS Child WITH          -- 1 Jan 2010 - 31 Dec 2014 band: Credits and PSEA only
+    `name` IS "Elias", `date of birth` IS YMD 2010 5 20
+    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `parents lawfully married` IS TRUE
+
+`Farah` MEANS Child WITH          -- the 2009 band: the PSEA top-up and nothing else
+    `name` IS "Farah", `date of birth` IS YMD 2009 3 10
+    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `parents lawfully married` IS TRUE
+
+`Gopal` MEANS Child WITH          -- a fifth child: the biggest co-matching cap in the outgoing scheme
+    `name` IS "Gopal", `date of birth` IS YMD 2025 3 1
+    `is a Singapore citizen` IS TRUE, `birth order` IS 5
+    `parents lawfully married` IS TRUE
+
+-- The steady state: after 1 October 2027 every co-matching cap has
+-- harmonised, so this rule date reads the table as it will finally stand.
+GIVETH A DATE
+`the settled Package` MEANS YMD 2027 10 1
+
+
+-- Helpers: pin the rule date once so every assertion below is one line.
+GIVEN child IS A Child
+GIVETH A NUMBER
+`settled lines for` child MEANS `EVAL UNDER RULES EFFECTIVE AT` `the settled Package` (`the five Package lines for` child)
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`settled gift for` child MEANS `EVAL UNDER RULES EFFECTIVE AT` `the settled Package` (`the cash actually paid as a Gift to` child)
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`settled cap for` child MEANS `EVAL UNDER RULES EFFECTIVE AT` `the settled Package` (`the co-matching cap for` child)
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`settled cap change for` child MEANS `EVAL UNDER RULES EFFECTIVE AT` `the settled Package` (`the change to the co-matching cap for` child)
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`settled support change for` child MEANS `EVAL UNDER RULES EFFECTIVE AT` `the settled Package` (`the change to maximum support for` child)
+
+GIVEN child IS A Child, got IS A NUMBER, reading IS AN Interpretation, day IS A DATE
+GIVETH A NUMBER
+`co-matching left for` child `given` got `under` reading `on` day MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` day (`co-matching still available to` child `given` got `under` reading)
+
+§§§ `Row by row against the published table`
+
+#ASSERT `settled lines for` `Aisha` EQUALS 62_000
+#ASSERT `settled lines for` `Bala`  EQUALS 57_000
+#ASSERT `settled lines for` `Chloe` EQUALS 53_000
+#ASSERT `settled lines for` `Devi`  EQUALS 43_000
+#ASSERT `settled lines for` `Elias` EQUALS 12_000
+#ASSERT `settled lines for` `Farah` EQUALS 10_000
+
+-- The headline. "Up to $62,000" is reached by exactly one cohort: a child
+-- born on or after commencement. Every existing child collects less, and
+-- the encoding says by how much rather than repeating the headline.
+#ASSERT `settled lines for` `Aisha` GREATER THAN `settled lines for` `Bala`
+
+§§§ `Component by component, for the post-commencement child`
+
+#ASSERT `settled gift for` `Aisha` EQUALS 10_000
+#ASSERT `Child Credits for` `Aisha`                                                                          EQUALS 32_000
+#ASSERT `years of Child Credits for` `Aisha`                                                                 EQUALS 16
+#ASSERT `the First Step Grant for` `Aisha`                                                                   EQUALS 5_000
+#ASSERT `settled cap for` `Aisha` EQUALS 5_000
+#ASSERT `the PSEA top-up for` `Aisha`                                                                        EQUALS 10_000
+
+-- The PSEA top-up reaches back to the child turning 17 in 2026 and stops.
+#ASSERT `the PSEA top-up for` `Farah` EQUALS 10_000
+#ASSERT `years of Child Credits for` `Farah` EQUALS 0
+#ASSERT `years of Child Credits for` `Elias` EQUALS 1
+
+§§ `FINDING 1 — the cash line is the one line that goes down`
+
+-- The Baby Gift is a $10,000 floor replacing a Cash Gift of $11,000 or
+-- $13,000. Every child born on or after the Budget 2023 enhancement
+-- collects LESS cash than the scheme being replaced would have paid them,
+-- and a third or subsequent child loses three times as much as a first.
+
+#ASSERT `Cash Gift paid to` `Bala` `by` `the last day of the Cash Gift` EQUALS 8_000
+#ASSERT `the Baby Gift top-up for` `Bala`      EQUALS 2_000
+#ASSERT `lifetime Gift-line cash for` `Bala`   EQUALS 10_000
+#ASSERT `Baby Bonus Cash Gift for` `Bala`      EQUALS 13_000
+#ASSERT `the change to the cash line for` `Bala`  EQUALS -3_000
+
+#ASSERT `Cash Gift paid to` `Chloe` `by` `the last day of the Cash Gift` EQUALS 9_000
+#ASSERT `the Baby Gift top-up for` `Chloe`     EQUALS 1_000
+#ASSERT `the change to the cash line for` `Chloe` EQUALS -1_000
+
+-- A prospective child loses on this line too: $10,000 where the enhanced
+-- Cash Gift would have paid $11,000.
+#ASSERT `the change to the cash line for` `Aisha` EQUALS -1_000
+
+-- A child whose Cash Gift had already finished is untouched by the change.
+#ASSERT `the change to the cash line for` `Devi` EQUALS 0
+
+-- THE ONE-DAY CLIFF. Chloe and Devi were born a day apart. On the
+-- Package's own accounting Chloe's Gift line is $10,000 and Devi's is a
+-- dash, a $10,000 gap; counted over both their lifetimes the gap is
+-- $2,000, because Devi was paid $8,000 in 2023 and Chloe's $11,000 was cut
+-- to $10,000. Both numbers are true and they answer different questions,
+-- which is exactly why the encoding computes them separately.
+#ASSERT (`settled gift for` `Chloe`) MINUS (`settled gift for` `Devi`) EQUALS 10_000
+#ASSERT (`lifetime Gift-line cash for` `Chloe`) MINUS (`lifetime Gift-line cash for` `Devi`) EQUALS 2_000
+
+-- And the Package is still, overall, a very large increase. Saying the
+-- cash line falls is not saying families are worse off; it is saying which
+-- line falls, which the headline does not.
+#ASSERT `settled support change for` `Bala`  GREATER THAN 0
+#ASSERT `settled support change for` `Aisha` GREATER THAN 0
+
+§§ `FINDING 2 — the co-matching cap, and a deadline worth acting on`
+
+-- The outgoing caps ran $4,000 / $7,000 / $9,000 / $15,000 by birth order.
+-- The Package makes them all $5,000. That is a rise for a first child and
+-- a cut for every other, and the cut does not bite until 1 October 2027 —
+-- so between now and then there is headroom that can still be used, and
+-- after it cannot.
+
+#ASSERT `co-matching cap under the outgoing scheme for` `Aisha` EQUALS 4_000
+#ASSERT `co-matching cap under the outgoing scheme for` `Bala`  EQUALS 9_000
+#ASSERT `co-matching cap under the outgoing scheme for` `Gopal` EQUALS 15_000
+
+#ASSERT `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 9 30) (`the co-matching cap for` `Gopal`) EQUALS 15_000
+#ASSERT `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 10 1) (`the co-matching cap for` `Gopal`) EQUALS 5_000
+#ASSERT `settled cap change for` `Gopal` EQUALS -10_000
+#ASSERT `settled cap change for` `Aisha` EQUALS 1_000
+
+-- A child born before 1 January 2015 has no account left to co-match into.
+#ASSERT `settled cap for` `Elias` EQUALS 0
+
+§§ `FORK F1 — what "all caps adjust to $5,000" does to a family already above it`
+
+`reading — the cap is a lifetime total` MEANS
+    Interpretation WITH
+        `the harmonised co-matching cap counts a lifetime total` IS TRUE
+        `the service-duration graduation survives the merger`    IS TRUE
+
+`reading — the cap is fresh headroom` MEANS
+    Interpretation WITH
+        `the harmonised co-matching cap counts a lifetime total` IS FALSE
+        `the service-duration graduation survives the merger`    IS TRUE
+
+-- A family that has already been co-matched $12,000 under the $15,000 cap.
+-- On the live reading they are done; on the rival reading they get another
+-- $5,000. Nothing in the announcement chooses between them, and $5,000 of
+-- public money per child turns on the choice.
+#ASSERT `co-matching left for` `Gopal` `given` 12_000 `under` `reading — the cap is a lifetime total` `on` `the settled Package` EQUALS 0
+#ASSERT `co-matching left for` `Gopal` `given` 12_000 `under` `reading — the cap is fresh headroom` `on` `the settled Package` EQUALS 5_000
+
+-- Before harmonisation the two readings agree, because the outgoing cap
+-- still governs. The fork opens on 1 October 2027 and not before.
+#ASSERT (`co-matching left for` `Gopal` `given` 12_000 `under` `reading — the cap is a lifetime total` `on` (YMD 2027 9 30)) EQUALS (`co-matching left for` `Gopal` `given` 12_000 `under` `reading — the cap is fresh headroom` `on` (YMD 2027 9 30))
+
+§§ `Childcare leave — the Act as it stands, and the announced merger`
+
+`one toddler` MEANS LIST `Aisha`
+`three children, one of school age` MEANS LIST `Aisha`, `Bala`, `Elias`
+
+GIVEN kids   IS A LIST OF Child
+      months IS A NUMBER
+      rate   IS A NUMBER
+GIVETH A Parent
+`a parent of` kids `serving` months `months at` rate MEANS
+    Parent WITH
+        `name` IS "the employee"
+        `is the natural father` IS FALSE
+        `months served this period` IS months
+        `gross daily rate` IS rate
+        `children` IS kids
+
+-- The reference day. Aisha is 1, Bala is 3, Elias is 18 — so on this day
+-- the parent of all three has TWO qualifying children aged 12 and below,
+-- not three: Elias has aged out. The encoding counts them; a reader
+-- eyeballing the family would not.
+GIVETH A DATE
+`the reference day` MEANS YMD 2028 9 1
+
+`the parent of one` MEANS `a parent of` `one toddler` `serving` 12 `months at` 400
+`the parent of three` MEANS `a parent of` `three children, one of school age` `serving` 12 `months at` 800
+`the half-year parent` MEANS `a parent of` `one toddler` `serving` 6 `months at` 400
+
+#ASSERT `children twelve and below that` `the parent of three` `has on` `the reference day` EQUALS 2
+#ASSERT `children below seven that` `the parent of three` `has on` `the reference day` EQUALS 2
+#ASSERT `children from seven to twelve that` `the parent of three` `has on` `the reference day` EQUALS 0
+
+§§§ `Section 12B as it stands`
+
+#ASSERT `the graduated band for` 2  EQUALS 0     -- below the three-month threshold
+#ASSERT `the graduated band for` 3  EQUALS 2
+#ASSERT `the graduated band for` 6  EQUALS 3
+#ASSERT `the graduated band for` 8  EQUALS 4
+#ASSERT `the graduated band for` 10 EQUALS 5
+#ASSERT `the graduated band for` 12 EQUALS 6
+
+#ASSERT `days of leave under the Act for` `the parent of one` `on` `the reference day` EQUALS 6
+#ASSERT `days of leave under the Act for` `the half-year parent` `on` `the reference day` EQUALS 3
+
+-- s 12B(2)(a)(iii): the combined cap is six days however many children.
+#ASSERT `days of leave under the Act for` `the parent of three` `on` `the reference day` EQUALS 6
+
+§§§ `The announced merger`
+
+#ASSERT `the announced entitlement for this many children` 1 EQUALS 8
+#ASSERT `the announced entitlement for this many children` 2 EQUALS 10
+#ASSERT `the announced entitlement for this many children` 5 EQUALS 12
+
+#ASSERT `days of leave as announced for` `the parent of one` `on` `the reference day` `under` `the live reading` EQUALS 8
+#ASSERT `days of leave as announced for` `the parent of three` `on` `the reference day` `under` `the live reading` EQUALS 10
+
+§§ `FORK F2 — does the service-duration graduation survive the merger?`
+
+`reading — the merged entitlement is flat` MEANS
+    Interpretation WITH
+        `the harmonised co-matching cap counts a lifetime total` IS TRUE
+        `the service-duration graduation survives the merger`    IS FALSE
+
+-- An employee six months into the job. On the live reading the Act's
+-- graduation carries over and they get four days; on the rival reading the
+-- announced number is flat and they get eight. The announcement states one
+-- number per family size and is silent on part-year service.
+#ASSERT `days of leave as announced for` `the half-year parent` `on` `the reference day` `under` `the live reading` EQUALS 4
+#ASSERT `days of leave as announced for` `the half-year parent` `on` `the reference day` `under` `reading — the merged entitlement is flat` EQUALS 8
+
+-- A full-year employee is unaffected by the fork: both readings agree.
+#ASSERT (`days of leave as announced for` `the parent of one` `on` `the reference day` `under` `the live reading`) EQUALS (`days of leave as announced for` `the parent of one` `on` `the reference day` `under` `reading — the merged entitlement is flat`)
+
+§§ `FINDING 3 — "the Government will cover the cost" has four words after it`
+
+-- s 12B(9) makes the employer pay the gross rate; s 12C lets them reclaim
+-- days four to six only, at up to $500 a day. So today the employer bears
+-- the first three days in full. The Rally said the Government would cover
+-- all child-related leave "up to the reimbursement limit" — reported
+-- unchanged at $500 a day. For an employee whose gross daily rate is under
+-- $500 that is total coverage; above it, the employer pays the excess on
+-- every one of the doubled days.
+
+-- A $400-a-day employee: the employer stops paying anything.
+#ASSERT `the employer's cost under the Act for` `the parent of one` `on` `the reference day` EQUALS 1_200
+#ASSERT `the employer's cost as announced for` `the parent of one` `on` `the reference day` `under` `the live reading` EQUALS 0
+
+-- An $800-a-day employee with two qualifying children: the employer's bill
+-- RISES, from three days at full rate to ten days of the $300 excess.
+#ASSERT `the employer's cost under the Act for` `the parent of three` `on` `the reference day` EQUALS 2_400
+#ASSERT `the employer's cost as announced for` `the parent of three` `on` `the reference day` `under` `the live reading` EQUALS 3_000
+#ASSERT `the change to the employer's cost for` `the parent of three` `on` `the reference day` `under` `the live reading` EQUALS 600
+#ASSERT `the reform costs this employer more` `for` `the parent of three` `on` `the reference day` `under` `the live reading`
+#ASSERT NOT (`the reform costs this employer more` `for` `the parent of one` `on` `the reference day` `under` `the live reading`)
+
+§§ `Section 12B(1B) — the bar on the natural father, which nobody announced away`
+
+`the natural father` MEANS
+    Parent WITH
+        `name` IS "the natural father"
+        `is the natural father` IS TRUE
+        `months served this period` IS 12
+        `gross daily rate` IS 400
+        `children` IS `one toddler`
+
+#ASSERT `is barred from leave for the child` `the natural father` TRUE FALSE
+#ASSERT NOT (`is barred from leave for the child` `the natural father` TRUE TRUE)
+#ASSERT NOT (`is barred from leave for the child` `the parent of one` TRUE FALSE)
