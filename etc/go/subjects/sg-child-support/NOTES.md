@@ -110,3 +110,39 @@ so the employer-cost finding is a **lower bound**); preschool fee reductions and
 income-ceiling changes, both announced at the same Rally but stated as targets rather than rules;
 and the Edusave contributions that make up the difference between the Package's "$62,000" and the
 speech's "almost $70,000".
+
+## 9. Cross-module functions are head-keyword-only, and that is not a style choice
+
+**Every function called from another module in this subject takes its arguments positionally**, with
+all keywords at the front:
+
+```l4
+`days of leave under the Act` parent day            -- not: `days of leave under the Act for` parent `on` day
+`co-matching still available` child got reading     -- not: `co-matching still available to` child `given` got `under` reading
+```
+
+Module-**internal** functions keep their interior keywords, and read better for it.
+
+The reason is a `prettyLayout` defect this corpus was the first to trip. The printer re-emits a
+mixfix application in the uncurried `f OF a, b` form and drops the interior keywords. Inside one
+module that is self-consistent — it strips the keywords from the **definition** too, so the printed
+module re-parses. Across a module boundary only the call site is rewritten; the imported definition
+still demands `on`, and the round-trip property (`jl4/tests/Main.hs`, #932) fails with
+
+```
+Expected keyword `on` but found `rule date`
+```
+
+It is **intermittent**, which is the part that matters: a cross-module call survives wherever the
+printer happens to parenthesise it (`(`the year` OF child, 1)` re-parses fine), and fails only where
+it is the whole right-hand side of a binding or a record field and the commas go ambiguous. That is
+why `regcf` and `sg-succession` never caught it — both keep interior-keyword definitions and their
+uses in the same module.
+
+**So: if you add a function here and call it from another module, do not give it interior keywords,
+and re-run `jl4-test -m 'legal/sg-child-support/<file>'` before you push.** A single file takes
+about forty seconds; the full `-m sg-child-support` sweep takes eight minutes.
+
+The honest fix is upstream — parenthesise every multi-argument `OF` the printer emits, which makes
+the construct's round-trip independent of where it sits. The draft issue is in the PR. Delete this
+section when that lands and give these functions their keywords back.

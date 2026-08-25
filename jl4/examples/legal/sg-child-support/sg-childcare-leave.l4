@@ -62,7 +62,7 @@ GIVETH A NUMBER
 @ref CDCSA 2001 s 12B(1)(b) — a qualifying child below 7 years of age
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
-`children below seven that` parent `has on` day MEANS
+`children below seven` parent day MEANS
     `how many` (filter (GIVEN c YIELD     c's `is a Singapore citizen`
                                       AND `the age` c `has on` day LESS THAN 7)
                        (parent's `children`))
@@ -70,7 +70,7 @@ GIVETH A NUMBER
 @ref CDCSA 2001 s 12B(1A)(b) — of or above 7 but below 13 years of age
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
-`children from seven to twelve that` parent `has on` day MEANS
+`children from seven to twelve` parent day MEANS
     `how many` (filter (GIVEN c YIELD     c's `is a Singapore citizen`
                                       AND `the age` c `has on` day AT LEAST 7
                                       AND `the age` c `has on` day LESS THAN 13)
@@ -81,9 +81,9 @@ GIVETH A NUMBER
 @ref NDR 2026 — children aged 12 and below
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
-`children twelve and below that` parent `has on` day MEANS
-         `children below seven that` parent `has on` day
-    PLUS `children from seven to twelve that` parent `has on` day
+`children twelve and below` parent day MEANS
+         `children below seven` parent day
+    PLUS `children from seven to twelve` parent day
 
 §§ `The entitlement under the Act as it stands`
 
@@ -94,17 +94,17 @@ GIVETH A NUMBER
 @ref CDCSA 2001 s 12B(1), (1A), (2)(a)(iii)
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
-`days of leave under the Act for` parent `on` day MEANS
+`days of leave under the Act` parent day MEANS
     BRANCH IF NOT `has served the qualifying period` parent THEN 0
            IF `the combined entitlement` AT MOST 6 THEN `the combined entitlement`
            OTHERWISE 6
     WHERE
         `the childcare leave limb` MEANS
-            IF   `children below seven that` parent `has on` day AT LEAST 1
+            IF   `children below seven` parent day AT LEAST 1
             THEN `the graduated band for` (parent's `months served this period`)
             ELSE 0
         `the extended limb` MEANS
-            IF   `children from seven to twelve that` parent `has on` day AT LEAST 1
+            IF   `children from seven to twelve` parent day AT LEAST 1
             THEN 2
             ELSE 0
         `the combined entitlement` MEANS `the childcare leave limb` PLUS `the extended limb`
@@ -140,22 +140,22 @@ GIVETH A NUMBER
 -- Both execute; the case suite shows what turns on the difference.
 GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
 GIVETH A NUMBER
-`days of leave as announced for` parent `on` day `under` reading MEANS
+`days of leave as announced` parent day reading MEANS
     BRANCH IF NOT `has served the qualifying period` parent THEN 0
            IF reading's `the service-duration graduation survives the merger`
               THEN FLOOR ((full TIMES `the graduated band for` (parent's `months served this period`)) DIVIDED BY 6)
            OTHERWISE full
     WHERE
-        full MEANS `the announced entitlement for this many children` (`children twelve and below that` parent `has on` day)
+        full MEANS `the announced entitlement for this many children` (`children twelve and below` parent day)
 
 §§ `The entitlement, on whichever arm the rule date selects`
 
 GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
 GIVETH A NUMBER
-`days of childcare leave for` parent `on` day `under` reading MEANS
+`days of childcare leave` parent day reading MEANS
     IF   `the rules in force include` `the announced leave scheme commences`
-    THEN `days of leave as announced for` parent `on` day `under` reading
-    ELSE `days of leave under the Act for` parent `on` day
+    THEN `days of leave as announced` parent day reading
+    ELSE `days of leave under the Act` parent day
 
 -- PLACEHOLDER, AND LABELLED ONE. The merged scheme needs an amendment to
 -- the Act and no commencement date has been announced. This encoding dates
@@ -203,32 +203,32 @@ GIVETH A NUMBER
 @ref CDCSA 2001 s 12B(9)-(10A) read with s 12C(1) — the employer bears the first three days
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
-`the employer's cost under the Act for` parent `on` day MEANS
-    `the lesser of` (`days of leave under the Act for` parent `on` day) `and` 3
+`the employer's cost under the Act` parent day MEANS
+    `the lesser of` (`days of leave under the Act` parent day) `and` 3
     TIMES parent's `gross daily rate`
 
 @ref NDR 2026 — the Government covers all child-related leave up to the reimbursement limit
 GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
 GIVETH A NUMBER
-`the employer's cost as announced for` parent `on` day `under` reading MEANS
-         `days of leave as announced for` parent `on` day `under` reading
+`the employer's cost if announced` parent day reading MEANS
+         `days of leave as announced` parent day reading
     TIMES `no less than nothing` (parent's `gross daily rate` MINUS `the daily reimbursement limit`)
 
 -- The number an employer actually wants: does the reform cost them more or
 -- less? Negative is a saving.
 GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
 GIVETH A NUMBER
-`the change to the employer's cost for` parent `on` day `under` reading MEANS
-         `the employer's cost as announced for` parent `on` day `under` reading
-    MINUS `the employer's cost under the Act for` parent `on` day
+`the change to the employer's cost` parent day reading MEANS
+         `the employer's cost if announced` parent day reading
+    MINUS `the employer's cost under the Act` parent day
 
 -- The gross daily rate at which the reform stops saving an employer money.
 -- Below it the employer pays less than today; above it, more. It is a
 -- consequence of the encoding, not a figure anybody announced.
 GIVEN parent IS A Parent, day IS A DATE, reading IS AN Interpretation
 GIVETH A BOOLEAN
-DECIDE `the reform costs this employer more` `for` parent `on` day `under` reading IF
-    `the change to the employer's cost for` parent `on` day `under` reading GREATER THAN 0
+DECIDE `the reform costs this employer more money` parent day reading IF
+    `the change to the employer's cost` parent day reading GREATER THAN 0
 
 §§ `Section 12B(8) — the obligation, and how the entitlement lapses`
 

@@ -185,14 +185,25 @@ GIVEN `rule date` IS A DATE @desc Apply the rules as they stood, or are announce
 GIVETH A LeaveAnswer
 `childcare leave under the rules effective on` `rule date` facts MEANS
     LeaveAnswer WITH
-        `days of leave`                       IS `EVAL UNDER RULES EFFECTIVE AT` `rule date` selected
-        `days under the Act as it stands`     IS `days of leave under the Act for` parent `on` `rule date`
+        `days of leave`                       IS selected
+        `days under the Act as it stands`     IS `today's days`
         `days under the announced scheme`     IS announced
-        `the employer's cost today`           IS `the employer's cost under the Act for` parent `on` `rule date`
-        `the employer's cost as announced`    IS `the employer's cost as announced for` parent `on` `rule date` `under` `the live reading`
-        `the reform costs this employer more` IS  `the employer's cost as announced for` parent `on` `rule date` `under` `the live reading`
-                                              GREATER THAN `the employer's cost under the Act for` parent `on` `rule date`
+        `the employer's cost today`           IS `today's cost`
+        `the employer's cost as announced`    IS `announced cost`
+        `the reform costs this employer more` IS `announced cost` GREATER THAN `today's cost`
     WHERE
-        parent    MEANS `the parent described by` facts `on` `rule date`
-        selected  MEANS `days of childcare leave for` parent `on` `rule date` `under` `the live reading`
-        announced MEANS `days of leave as announced for` parent `on` `rule date` `under` `the live reading`
+        -- EVERY FIELD IS A BARE NAME, and that is not a style preference.
+        -- `prettyLayout` re-emits a mixfix call in the uncurried `f OF a, b`
+        -- form, whose commas are ambiguous with a record literal's own field
+        -- separator; a multi-argument call written directly into a `WITH`
+        -- field prints to source that no longer parses against the imported
+        -- definition. Binding first sidesteps it, and the round-trip suite
+        -- (jl4/tests/Main.hs, #932) is what catches it. See NOTES.md section 9.
+        parent          MEANS `the parent described by` facts `on` `rule date`
+        reading         MEANS `the live reading`
+        selected        MEANS `EVAL UNDER RULES EFFECTIVE AT` `rule date`
+                                  (`days of childcare leave` parent `rule date` reading)
+        `today's days`  MEANS `days of leave under the Act` parent `rule date`
+        announced       MEANS `days of leave as announced` parent `rule date` reading
+        `today's cost`  MEANS `the employer's cost under the Act` parent `rule date`
+        `announced cost` MEANS `the employer's cost if announced` parent `rule date` reading

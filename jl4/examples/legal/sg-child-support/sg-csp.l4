@@ -132,7 +132,7 @@ GIVETH A NUMBER
 @ref madeforfamilies.gov.sg — Baby Bonus Cash Gift disbursement schedule (enhanced cohort)
 GIVEN child IS A Child, day IS A DATE
 GIVETH A NUMBER
-`Cash Gift paid to` child `by` day MEANS
+`Cash Gift paid by` child day MEANS
     IF   child's `date of birth` LESS THAN `the Baby Bonus enhancement`
     THEN `Baby Bonus Cash Gift for` child   -- pre-enhancement: paid out by 18 months
     ELSE LET m MEANS `whole months from` (child's `date of birth`) `to` day
@@ -236,7 +236,7 @@ GIVETH A NUMBER
                 c's `date of birth` AT LEAST `the Baby Bonus enhancement`
             AND c's `date of birth` LESS THAN `the Package commences`
         `the shortfall` MEANS
-            LET  paid MEANS `Cash Gift paid to` child `by` `the last day of the Cash Gift`
+            LET  paid MEANS `Cash Gift paid by` child `the last day of the Cash Gift`
             IN   IF paid AT LEAST 10_000 THEN 0 ELSE 10_000 MINUS paid
 
 §§ `The SG Child Support Package — Child Credits`
@@ -310,7 +310,7 @@ GIVETH A NUMBER
 -- Both are materialised: see fork register F1.
 GIVEN child IS A Child, `co-matching already received` IS A NUMBER, reading IS AN Interpretation
 GIVETH A NUMBER
-`co-matching still available to` child `given` `co-matching already received` `under` reading MEANS
+`co-matching still available` child `co-matching already received` reading MEANS
     BRANCH IF NOT `the caps have harmonised for` child
               THEN `headroom under` (`co-matching cap under the outgoing scheme for` child)
            IF reading's `the harmonised co-matching cap counts a lifetime total`
@@ -398,7 +398,7 @@ GIVETH A NUMBER
               THEN `the Baby Gift for` child
            IF child's `date of birth` LESS THAN `the Baby Bonus enhancement`
               THEN 0
-           OTHERWISE      `Cash Gift paid to` child `by` `the last day of the Cash Gift`
+           OTHERWISE      `Cash Gift paid by` child `the last day of the Cash Gift`
                      PLUS `the Baby Gift top-up for` child
 
 GIVEN child IS A Child
@@ -431,7 +431,7 @@ GIVETH A NUMBER
               THEN `the Baby Gift for` child
            IF child's `date of birth` LESS THAN `the Baby Bonus enhancement`
               THEN `Baby Bonus Cash Gift for` child
-           OTHERWISE      `Cash Gift paid to` child `by` `the last day of the Cash Gift`
+           OTHERWISE      `Cash Gift paid by` child `the last day of the Cash Gift`
                      PLUS `the Baby Gift top-up for` child
 
 GIVEN child IS A Child

@@ -80,7 +80,7 @@ GIVETH A NUMBER
 GIVEN child IS A Child, got IS A NUMBER, reading IS AN Interpretation, day IS A DATE
 GIVETH A NUMBER
 `co-matching left for` child `given` got `under` reading `on` day MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` day (`co-matching still available to` child `given` got `under` reading)
+    `EVAL UNDER RULES EFFECTIVE AT` day (`co-matching still available` child got reading)
 
 §§§ `Row by row against the published table`
 
@@ -117,13 +117,13 @@ GIVETH A NUMBER
 -- collects LESS cash than the scheme being replaced would have paid them,
 -- and a third or subsequent child loses three times as much as a first.
 
-#ASSERT `Cash Gift paid to` `Bala` `by` `the last day of the Cash Gift` EQUALS 8_000
+#ASSERT `Cash Gift paid by` `Bala` `the last day of the Cash Gift` EQUALS 8_000
 #ASSERT `the Baby Gift top-up for` `Bala`      EQUALS 2_000
 #ASSERT `lifetime Gift-line cash for` `Bala`   EQUALS 10_000
 #ASSERT `Baby Bonus Cash Gift for` `Bala`      EQUALS 13_000
 #ASSERT `the change to the cash line for` `Bala`  EQUALS -3_000
 
-#ASSERT `Cash Gift paid to` `Chloe` `by` `the last day of the Cash Gift` EQUALS 9_000
+#ASSERT `Cash Gift paid by` `Chloe` `the last day of the Cash Gift` EQUALS 9_000
 #ASSERT `the Baby Gift top-up for` `Chloe`     EQUALS 1_000
 #ASSERT `the change to the cash line for` `Chloe` EQUALS -1_000
 
@@ -220,9 +220,9 @@ GIVETH A DATE
 `the parent of three` MEANS `a parent of` `three children, one of school age` `serving` 12 `months at` 800
 `the half-year parent` MEANS `a parent of` `one toddler` `serving` 6 `months at` 400
 
-#ASSERT `children twelve and below that` `the parent of three` `has on` `the reference day` EQUALS 2
-#ASSERT `children below seven that` `the parent of three` `has on` `the reference day` EQUALS 2
-#ASSERT `children from seven to twelve that` `the parent of three` `has on` `the reference day` EQUALS 0
+#ASSERT `children twelve and below` `the parent of three` `the reference day` EQUALS 2
+#ASSERT `children below seven` `the parent of three` `the reference day` EQUALS 2
+#ASSERT `children from seven to twelve` `the parent of three` `the reference day` EQUALS 0
 
 §§§ `Section 12B as it stands`
 
@@ -233,11 +233,11 @@ GIVETH A DATE
 #ASSERT `the graduated band for` 10 EQUALS 5
 #ASSERT `the graduated band for` 12 EQUALS 6
 
-#ASSERT `days of leave under the Act for` `the parent of one` `on` `the reference day` EQUALS 6
-#ASSERT `days of leave under the Act for` `the half-year parent` `on` `the reference day` EQUALS 3
+#ASSERT `days of leave under the Act` `the parent of one` `the reference day` EQUALS 6
+#ASSERT `days of leave under the Act` `the half-year parent` `the reference day` EQUALS 3
 
 -- s 12B(2)(a)(iii): the combined cap is six days however many children.
-#ASSERT `days of leave under the Act for` `the parent of three` `on` `the reference day` EQUALS 6
+#ASSERT `days of leave under the Act` `the parent of three` `the reference day` EQUALS 6
 
 §§§ `The announced merger`
 
@@ -245,8 +245,8 @@ GIVETH A DATE
 #ASSERT `the announced entitlement for this many children` 2 EQUALS 10
 #ASSERT `the announced entitlement for this many children` 5 EQUALS 12
 
-#ASSERT `days of leave as announced for` `the parent of one` `on` `the reference day` `under` `the live reading` EQUALS 8
-#ASSERT `days of leave as announced for` `the parent of three` `on` `the reference day` `under` `the live reading` EQUALS 10
+#ASSERT `days of leave as announced` `the parent of one` `the reference day` `the live reading` EQUALS 8
+#ASSERT `days of leave as announced` `the parent of three` `the reference day` `the live reading` EQUALS 10
 
 §§ `FORK F2 — does the service-duration graduation survive the merger?`
 
@@ -259,11 +259,11 @@ GIVETH A DATE
 -- graduation carries over and they get four days; on the rival reading the
 -- announced number is flat and they get eight. The announcement states one
 -- number per family size and is silent on part-year service.
-#ASSERT `days of leave as announced for` `the half-year parent` `on` `the reference day` `under` `the live reading` EQUALS 4
-#ASSERT `days of leave as announced for` `the half-year parent` `on` `the reference day` `under` `reading — the merged entitlement is flat` EQUALS 8
+#ASSERT `days of leave as announced` `the half-year parent` `the reference day` `the live reading` EQUALS 4
+#ASSERT `days of leave as announced` `the half-year parent` `the reference day` `reading — the merged entitlement is flat` EQUALS 8
 
 -- A full-year employee is unaffected by the fork: both readings agree.
-#ASSERT (`days of leave as announced for` `the parent of one` `on` `the reference day` `under` `the live reading`) EQUALS (`days of leave as announced for` `the parent of one` `on` `the reference day` `under` `reading — the merged entitlement is flat`)
+#ASSERT (`days of leave as announced` `the parent of one` `the reference day` `the live reading`) EQUALS (`days of leave as announced` `the parent of one` `the reference day` `reading — the merged entitlement is flat`)
 
 §§ `FINDING 3 — "the Government will cover the cost" has four words after it`
 
@@ -276,16 +276,16 @@ GIVETH A DATE
 -- every one of the doubled days.
 
 -- A $400-a-day employee: the employer stops paying anything.
-#ASSERT `the employer's cost under the Act for` `the parent of one` `on` `the reference day` EQUALS 1_200
-#ASSERT `the employer's cost as announced for` `the parent of one` `on` `the reference day` `under` `the live reading` EQUALS 0
+#ASSERT `the employer's cost under the Act` `the parent of one` `the reference day` EQUALS 1_200
+#ASSERT `the employer's cost if announced` `the parent of one` `the reference day` `the live reading` EQUALS 0
 
 -- An $800-a-day employee with two qualifying children: the employer's bill
 -- RISES, from three days at full rate to ten days of the $300 excess.
-#ASSERT `the employer's cost under the Act for` `the parent of three` `on` `the reference day` EQUALS 2_400
-#ASSERT `the employer's cost as announced for` `the parent of three` `on` `the reference day` `under` `the live reading` EQUALS 3_000
-#ASSERT `the change to the employer's cost for` `the parent of three` `on` `the reference day` `under` `the live reading` EQUALS 600
-#ASSERT `the reform costs this employer more` `for` `the parent of three` `on` `the reference day` `under` `the live reading`
-#ASSERT NOT (`the reform costs this employer more` `for` `the parent of one` `on` `the reference day` `under` `the live reading`)
+#ASSERT `the employer's cost under the Act` `the parent of three` `the reference day` EQUALS 2_400
+#ASSERT `the employer's cost if announced` `the parent of three` `the reference day` `the live reading` EQUALS 3_000
+#ASSERT `the change to the employer's cost` `the parent of three` `the reference day` `the live reading` EQUALS 600
+#ASSERT `the reform costs this employer more money` `the parent of three` `the reference day` `the live reading`
+#ASSERT NOT (`the reform costs this employer more money` `the parent of one` `the reference day` `the live reading`)
 
 §§ `Section 12B(1B) — the bar on the natural father, which nobody announced away`
 

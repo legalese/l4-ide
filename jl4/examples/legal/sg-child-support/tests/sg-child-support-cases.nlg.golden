@@ -14,12 +14,12 @@
 `the PSEA top-up for` with `Farah` is equal to 10000
 `years of Child Credits for` with `Farah` is equal to 0
 `years of Child Credits for` with `Elias` is equal to 1
-`Cash Gift paid to _ by _` with `Bala` and `the last day of the Cash Gift` is equal to 8000
+`Cash Gift paid by` with `Bala` and `the last day of the Cash Gift` is equal to 8000
 `the Baby Gift top-up for` with `Bala` is equal to 2000
 `lifetime Gift-line cash for` with `Bala` is equal to 10000
 `Baby Bonus Cash Gift for` with `Bala` is equal to 13000
 `the change to the cash line for` with `Bala` is equal to -3000
-`Cash Gift paid to _ by _` with `Chloe` and `the last day of the Cash Gift` is equal to 9000
+`Cash Gift paid by` with `Chloe` and `the last day of the Cash Gift` is equal to 9000
 `the Baby Gift top-up for` with `Chloe` is equal to 1000
 `the change to the cash line for` with `Chloe` is equal to -1000
 `the change to the cash line for` with `Aisha` is equal to -1000
@@ -39,33 +39,33 @@ the difference between `lifetime Gift-line cash for` with `Devi` and `lifetime G
 `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is a lifetime total` and `the settled Package` is equal to 0
 `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is fresh headroom` and `the settled Package` is equal to 5000
 `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is a lifetime total` and `YMD` with 2027, 9 and 30 is equal to `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is fresh headroom` and `YMD` with 2027, 9 and 30
-`children twelve and below that _ has on _` with `the parent of three` and `the reference day` is equal to 2
-`children below seven that _ has on _` with `the parent of three` and `the reference day` is equal to 2
-`children from seven to twelve that _ has on _` with `the parent of three` and `the reference day` is equal to 0
+`children twelve and below` with `the parent of three` and `the reference day` is equal to 2
+`children below seven` with `the parent of three` and `the reference day` is equal to 2
+`children from seven to twelve` with `the parent of three` and `the reference day` is equal to 0
 `the graduated band for` with 2 is equal to 0
 `the graduated band for` with 3 is equal to 2
 `the graduated band for` with 6 is equal to 3
 `the graduated band for` with 8 is equal to 4
 `the graduated band for` with 10 is equal to 5
 `the graduated band for` with 12 is equal to 6
-`days of leave under the Act for _ on _` with `the parent of one` and `the reference day` is equal to 6
-`days of leave under the Act for _ on _` with `the half-year parent` and `the reference day` is equal to 3
-`days of leave under the Act for _ on _` with `the parent of three` and `the reference day` is equal to 6
+`days of leave under the Act` with `the parent of one` and `the reference day` is equal to 6
+`days of leave under the Act` with `the half-year parent` and `the reference day` is equal to 3
+`days of leave under the Act` with `the parent of three` and `the reference day` is equal to 6
 `the announced entitlement for this many children` with 1 is equal to 8
 `the announced entitlement for this many children` with 2 is equal to 10
 `the announced entitlement for this many children` with 5 is equal to 12
-`days of leave as announced for _ on _ under _` with `the parent of one`, `the reference day` and `the live reading` is equal to 8
-`days of leave as announced for _ on _ under _` with `the parent of three`, `the reference day` and `the live reading` is equal to 10
-`days of leave as announced for _ on _ under _` with `the half-year parent`, `the reference day` and `the live reading` is equal to 4
-`days of leave as announced for _ on _ under _` with `the half-year parent`, `the reference day` and `reading — the merged entitlement is flat` is equal to 8
-`days of leave as announced for _ on _ under _` with `the parent of one`, `the reference day` and `the live reading` is equal to `days of leave as announced for _ on _ under _` with `the parent of one`, `the reference day` and `reading — the merged entitlement is flat`
-`the employer's cost under the Act for _ on _` with `the parent of one` and `the reference day` is equal to 1200
-`the employer's cost as announced for _ on _ under _` with `the parent of one`, `the reference day` and `the live reading` is equal to 0
-`the employer's cost under the Act for _ on _` with `the parent of three` and `the reference day` is equal to 2400
-`the employer's cost as announced for _ on _ under _` with `the parent of three`, `the reference day` and `the live reading` is equal to 3000
-`the change to the employer's cost for _ on _ under _` with `the parent of three`, `the reference day` and `the live reading` is equal to 600
-`the reform costs this employer more for _ on _ under _` with `the parent of three`, `the reference day` and `the live reading`
-not `the reform costs this employer more for _ on _ under _` with `the parent of one`, `the reference day` and `the live reading`
+`days of leave as announced` with `the parent of one`, `the reference day` and `the live reading` is equal to 8
+`days of leave as announced` with `the parent of three`, `the reference day` and `the live reading` is equal to 10
+`days of leave as announced` with `the half-year parent`, `the reference day` and `the live reading` is equal to 4
+`days of leave as announced` with `the half-year parent`, `the reference day` and `reading — the merged entitlement is flat` is equal to 8
+`days of leave as announced` with `the parent of one`, `the reference day` and `the live reading` is equal to `days of leave as announced` with `the parent of one`, `the reference day` and `reading — the merged entitlement is flat`
+`the employer's cost under the Act` with `the parent of one` and `the reference day` is equal to 1200
+`the employer's cost if announced` with `the parent of one`, `the reference day` and `the live reading` is equal to 0
+`the employer's cost under the Act` with `the parent of three` and `the reference day` is equal to 2400
+`the employer's cost if announced` with `the parent of three`, `the reference day` and `the live reading` is equal to 3000
+`the change to the employer's cost` with `the parent of three`, `the reference day` and `the live reading` is equal to 600
+`the reform costs this employer more money` with `the parent of three`, `the reference day` and `the live reading`
+not `the reform costs this employer more money` with `the parent of one`, `the reference day` and `the live reading`
 `is barred from leave for the child` with `the natural father`, `TRUE` and `FALSE`
 not `is barred from leave for the child` with `the natural father`, `TRUE` and `TRUE`
 not `is barred from leave for the child` with `the parent of one`, `TRUE` and `FALSE`

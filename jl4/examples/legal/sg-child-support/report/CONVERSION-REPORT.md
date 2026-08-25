@@ -292,7 +292,7 @@ does not find a reading nobody thought of.
 ## 9. The pipeline run
 
 Driven by `etc/go/go.sh` in `legalese/l4-ide`, subject `sg-child-support`, encoding `primary`.
-Run `2026-08-25-36663f00-001`. **VERDICT: COMPLETE.**
+Run `2026-08-25-423e1cb8-001`. **VERDICT: COMPLETE.**
 
 | stage | status | what it means here |
 | --- | --- | --- |
@@ -307,7 +307,7 @@ Run `2026-08-25-36663f00-001`. **VERDICT: COMPLETE.**
 | `p9-report` | PASS | all 11 required sections; 5 render ABSENT with a stated reason |
 | `p9-explain` | SKIPPED | no checked-in explainer narrative for this subject |
 
-`p3-check` was **DEGRADED on the first run** with a real finding: seven `ELSE IF` sites against
+`p3-check` was **DEGRADED on an earlier run** with a real finding: seven `ELSE IF` sites against
 the house rule preferring `BRANCH`. They were converted and the assertions re-run unchanged; the
 finding was a defect in the encoding, not noise from the checker.
 
@@ -334,10 +334,45 @@ and the row-for-row reproduction of the published cohort table (§2.1) — not t
 took `p8-verify: PASS` as "the entitlements are verified" would be reading it for a claim it does
 not make.
 
+### 9.1b A compiler defect this corpus found
+
+The `prettyLayout` round-trip property (`jl4/tests/Main.hs`, #932) — print a module, re-parse it,
+re-type-check it — **failed on two of these six modules**, and the cause is a defect in the printer
+rather than in the encoding.
+
+`prettyLayout` re-emits a mixfix application in the uncurried `f OF a, b` form and drops the
+interior keywords. Inside one module that is self-consistent: it strips the keywords from the
+*definition* too, so the printed module re-parses. **Across a module boundary only the call site is
+rewritten** — the imported definition still demands its keyword — and the printed source no longer
+type-checks:
+
+```
+`today's cost` MEANS `the employer's cost under the Act for` OF parent, `rule date`
+      →  Expected keyword `on` but found `rule date`
+```
+
+It is **intermittent**, which is why no existing corpus caught it. A cross-module call survives
+wherever the printer happens to parenthesise it — `(`the year` OF child, 1)` re-parses fine — and
+fails only where the call is the whole right-hand side of a binding or a record field, where the
+commas go ambiguous. `regcf` and `sg-succession` keep their interior-keyword definitions and their
+uses in the same module, so neither ever exercised the cross-module path.
+
+**What was done about it.** The encoding's cross-module surface was renamed to head-keyword-only
+(`` `days of leave under the Act` parent day `` rather than
+`` `days of leave under the Act for` parent `on` day ``), which costs some of the prose readability
+the house style exists for and is therefore recorded as a **workaround, not a preference**. All 79
+assertions pass unchanged after the rename — it moved names, not values. The defect and the
+suggested fix (parenthesise every multi-argument `OF` the printer emits, which makes the
+round-trip independent of position) are written up for upstream and reproduced in `NOTES.md` §9.
+
+This is the round-trip property doing exactly the job `CLAUDE.md` §3.2 describes: it has no
+known-failure list, so a corpus that trips it either gets fixed or turns the suite red for the next
+person. It also found something no reviewer would have.
+
 ### 9.2 Independently checkable
 
 ```
-etc/go/go.sh verify --run-id 2026-08-25-36663f00-001 --gates
+etc/go/go.sh verify --run-id 2026-08-25-423e1cb8-001 --gates
   journal chain: verifies (22 records)
   artifacts: 39 recorded, 39 still hash as recorded
   gate HG1: waived — [reason on the record]
