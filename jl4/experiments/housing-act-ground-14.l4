@@ -1,0 +1,200 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 14 (nuisance / anti-social behaviour)`
+
+-- ===========================================================================
+-- GROUND 14 — the "nuisance or annoyance" DISCRETIONARY ground in Part II of
+-- Schedule 2 to the Housing Act 1988. The whole ground was substituted
+-- (28.2.1997) by the Housing Act 1996 (c. 52), s. 148; S.I. 1997/225 (marker
+-- F59). Limb (aa) was inserted (13.5.2014) by the Anti-social Behaviour, Crime
+-- and Policing Act 2014 (c. 12), s. 98(2) (marker F60). The word "indictable"
+-- in (b)(ii) was substituted (1.1.2006) for "an arrestable" by the Serious
+-- Organised Crime and Police Act 2005 (c. 15) (marker F61). The in-force
+-- reading resolves F59+F60+F61.
+--
+-- PART II IS DISCRETIONARY: where the ground is made out the court MAY (not
+-- MUST) order possession — it must also be satisfied it is reasonable to do so
+-- (Housing Act 1988 s.7(4)). The reasonableness discretion is carried as inert
+-- prose; the operative outcome is `PARTY Court MAY \`order possession\``.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause (MAY).
+--
+-- Statutory text encoded ("The tenant or a person residing in or visiting the
+-- dwelling-house—", a DISJUNCTION over (a)/(aa)/(b)):
+--   (a)  guilty of conduct causing or likely to cause a nuisance or annoyance
+--        to a person residing, visiting or otherwise engaging in a lawful
+--        activity in the locality, OR
+--   (aa) guilty of conduct causing or likely to cause a nuisance or annoyance
+--        to the landlord, or a housing-management employee, related to those
+--        functions, OR
+--   (b)  convicted of—
+--          (i)  using / allowing the dwelling-house to be used for immoral or
+--               illegal purposes, OR
+--          (ii) an indictable offence committed in, or in the locality of, the
+--               dwelling-house.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * Made out = (a) OR (aa) OR (b){(i) OR (ii)} — a top-level DISJUNCTION.
+--   * The actor phrase "The tenant or a person residing in or visiting the
+--     dwelling-house" is the lead-in to every limb; it is folded into each
+--     limb's operative conduct/conviction atom rather than lifted separately,
+--     since the statute pins the conduct/conviction to that class of person.
+--   * "guilty of conduct" in (a)/(aa) is treated as a single operative boolean
+--     per limb (the whole "causing or likely to cause a nuisance or annoyance
+--     to [the protected class]" qualifier folded in).
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms of limbs (a)/(aa)/(b), gathered on the claim.
+DECLARE Ground14Claim HAS
+  -- (a)
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`  IS A BOOLEAN
+  -- (aa)
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`  IS A BOOLEAN
+  -- (b)(i)
+  `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`  IS A BOOLEAN
+  -- (b)(ii)
+  `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`  IS A BOOLEAN
+
+§§ `(a) — conduct causing nuisance/annoyance to a person in the locality`
+
+GIVEN claim IS A Ground14Claim
+GIVETH A BOOLEAN
+`(a) — nuisance to a person in the locality` claim MEANS
+        "(a) has been guilty of conduct causing or likely to cause a nuisance or annoyance to a person residing, visiting or otherwise engaging in a lawful activity in the locality,"
+    ... claim's `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`
+
+§§ `(aa) — conduct causing nuisance/annoyance to the landlord or a housing-management employee`
+
+GIVEN claim IS A Ground14Claim
+GIVETH A BOOLEAN
+`(aa) — nuisance to the landlord or a housing-management employee` claim MEANS
+        "(aa) has been guilty of conduct causing or likely to cause a nuisance or annoyance to the landlord of the dwelling-house, or a person employed (whether or not by the landlord) in connection with the exercise of the landlord's housing management functions, and that is directly or indirectly related to or affects those functions,"
+    ... claim's `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`
+
+§§ `(b) — convicted of (i) immoral/illegal use, or (ii) an indictable offence in the locality`
+
+GIVEN claim IS A Ground14Claim
+GIVETH A BOOLEAN
+`(b) — relevant conviction` claim MEANS
+        "(b) has been convicted of—"
+    ...     "(i) using the dwelling-house or allowing it to be used for immoral or illegal purposes, or"
+        ..  claim's `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`
+        ..  "(ii) an indictable offence committed in, or in the locality of, the dwelling-house."
+        ..  claim's `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`
+
+§§ `Ground 14 made out — any of (a) / (aa) / (b) applies`
+
+GIVEN claim IS A Ground14Claim
+GIVETH A BOOLEAN
+`Ground 14 made out` claim MEANS
+        "The tenant or a person residing in or visiting the dwelling-house—"
+    ..  `(a) — nuisance to a person in the locality` claim
+    ..  `(aa) — nuisance to the landlord or a housing-management employee` claim
+    ..  `(b) — relevant conviction` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Part II ground: where made out the court MAY order possession (and only if it
+-- is also satisfied it is reasonable to do so — s.7(4)). MAY, not MUST.
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground14Claim
+GIVETH A DEONTIC Actor Action
+`ground 14 possession order` claim MEANS
+    IF   `Ground 14 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground14Claim value (the house style;
+-- L4 has no record-update). The all-false base sets every atom FALSE -> no
+-- limb fires. Then one positive scenario per limb (a)/(aa)/(b)(i)/(b)(ii),
+-- each lighting up exactly that limb, so a single TRUE disjunct carries the
+-- whole top-level OR.
+-- ---------------------------------------------------------------------------
+
+§§ `All-false base — no limb applies -> NOT made out`
+
+`base — all false` MEANS Ground14Claim WITH
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`  IS FALSE
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`  IS FALSE
+  `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`  IS FALSE
+  `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+
+#ASSERT NOT `(a) — nuisance to a person in the locality`              `base — all false`
+#ASSERT NOT `(aa) — nuisance to the landlord or a housing-management employee`  `base — all false`
+#ASSERT NOT `(b) — relevant conviction`                              `base — all false`
+#ASSERT NOT `Ground 14 made out`                                     `base — all false`
+
+§§ `(a) made out — nuisance to a neighbour in the locality`
+
+`claim via (a)` MEANS Ground14Claim WITH
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`  IS TRUE
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`  IS FALSE
+  `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`  IS FALSE
+  `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+
+#ASSERT `(a) — nuisance to a person in the locality` `claim via (a)`
+#ASSERT `Ground 14 made out`                         `claim via (a)`
+
+§§ `(aa) made out — nuisance to a housing-management employee`
+
+`claim via (aa)` MEANS Ground14Claim WITH
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`  IS FALSE
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`  IS TRUE
+  `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`  IS FALSE
+  `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+
+#ASSERT `(aa) — nuisance to the landlord or a housing-management employee` `claim via (aa)`
+#ASSERT `Ground 14 made out`                                              `claim via (aa)`
+
+§§ `(b)(i) made out — conviction for immoral/illegal use of the dwelling-house`
+
+`claim via (b)(i)` MEANS Ground14Claim WITH
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`  IS FALSE
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`  IS FALSE
+  `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`  IS TRUE
+  `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+
+#ASSERT `(b) — relevant conviction` `claim via (b)(i)`
+#ASSERT `Ground 14 made out`        `claim via (b)(i)`
+
+§§ `(b)(ii) made out — conviction for an indictable offence in the locality`
+
+`claim via (b)(ii)` MEANS Ground14Claim WITH
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to a person residing, visiting or engaging in a lawful activity in the locality`  IS FALSE
+  `tenant/resident/visitor guilty of conduct causing or likely to cause nuisance/annoyance to the landlord or a housing-management employee, related to those functions`  IS FALSE
+  `tenant/resident/visitor convicted of using the dwelling-house, or allowing it to be used, for immoral or illegal purposes`  IS FALSE
+  `tenant/resident/visitor convicted of an indictable offence committed in, or in the locality of, the dwelling-house`  IS TRUE
+
+#ASSERT `(b) — relevant conviction` `claim via (b)(ii)`
+#ASSERT `Ground 14 made out`        `claim via (b)(ii)`
+
+§§ `The discretionary possession order — Court MAY (performing it discharges)`
+
+-- When the ground is made out the residual is the Court's PERMISSION to order
+-- possession; because MAY is benign, NOT exercising it does not breach. Here we
+-- show the Court exercising the permission within the window (FULFILLED).
+#TRACE `ground 14 possession order` `claim via (a)` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- MAY is benign: letting the window pass WITHOUT ordering possession is not a
+-- breach (the discretionary ground does not compel the court).
+#TRACE `ground 14 possession order` `claim via (a)` AT 0 WITH
+    PARTY Tenant DOES `order possession` AT 99
+
+-- When the ground is not made out the contract is immediately FULFILLED.
+#TRACE `ground 14 possession order` `base — all false` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10

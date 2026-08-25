@@ -1,0 +1,213 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part 6 — Powers to amend certain grounds and definitions (paragraph 13) (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- PART 6 — POWERS TO AMEND CERTAIN GROUNDS AND DEFINITIONS (paragraph 13).
+-- Inserted into Schedule 2 to the Housing Act 1988 by the Renters' Rights Act
+-- 2025 (c. 26), s. 145(1)(8), Sch. 1 para. 25 (commencement 1.5.2026 for
+-- specified purposes; S.I. 2026/421, reg. 2(b), marker F77 — "Sch. 2 Pts. 5, 6
+-- inserted").
+--
+-- This Part contains NO "ground" and confers NO Court MUST/MAY possession
+-- outcome. It is a POWER-CONFERRING provision: a Henry-VIII-style delegated power
+-- letting the Secretary of State amend this very Schedule by regulations, subject
+-- to the draft affirmative procedure.
+--
+-- MODELLING CHOICE (flagged for the reviewer) — this is the most "homoiconic"
+-- provision in the corpus: a power to amend the GROUNDS THEMSELVES (rules about
+-- rules). We model it as a DEONTIC PERMISSION:
+--
+--       PARTY SecretaryOfState MAY `amend the Schedule` ...
+--
+-- guarded by the affirmative-resolution procedure (sub-paras (3)-(4)). The
+-- permission is only available where the s.13(4) condition is met (a draft of the
+-- statutory instrument has been laid before, and approved by a resolution of,
+-- each House of Parliament). The (a)-(g) menu of AMENDABLE TARGETS — the specific
+-- grounds and definitions the power may touch — is carried as a typed enum, with
+-- the verbatim sub-paragraph text riding alongside as inert prose; a predicate
+-- confirms a proposed amendment is within the conferred scope.
+--
+-- We use MAY (not MUST): the power is permissive — the Secretary of State is
+-- empowered, not obliged, to amend. Under MAY's defaults, never exercising the
+-- power is no breach (it residuates to FULFILLED). Exercising it WITHOUT the
+-- affirmative procedure is modelled as outside the permission (the guard is
+-- FALSE), i.e. ultra vires.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF SecretaryOfState, ParliamentHL, ParliamentHC
+
+-- (1) "The Secretary of State may by regulations amend this Schedule so as to—"
+-- the (a)-(g) menu of amendable targets. This is the scope of the power: a
+-- proposed regulation is INTRA VIRES only if its target is one of these.
+DECLARE AmendableTarget IS ONE OF
+  -- (a) amend Ground 2ZA to change the descriptions of the landlord who may use the ground
+  `(a) amend Ground 2ZA landlord descriptions`
+  -- (b) amend Ground 2ZC to change the descriptions of previous landlord mentioned in it
+  `(b) amend Ground 2ZC previous-landlord descriptions`
+  -- (c) provide for Ground 5C to apply only where the landlord seeking possession or the employer is of a particular description
+  `(c) restrict Ground 5C to a particular landlord or employer description`
+  -- (d) amend Ground 5H to change the descriptions of landlord who may use the ground
+  `(d) amend Ground 5H landlord descriptions`
+  -- (e) add other situations to the first paragraph of Ground 6B, or remove situations so added
+  `(e) add or remove Ground 6B situations`
+  -- (f) amend the definition of "special tenancy" in Ground 7
+  `(f) amend the "special tenancy" definition in Ground 7`
+  -- (g) amend the definition of "supported accommodation" or "managed accommodation" in paragraph 12
+  `(g) amend the "supported accommodation"/"managed accommodation" definition in paragraph 12`
+
+-- Carry the verbatim (a)-(g) list as inert prose, lifted to a predicate over the
+-- target. Because AmendableTarget is a closed enum, ANY inhabitant is within the
+-- conferred scope; the enum IS the exhaustive statement of what may be amended.
+GIVEN target IS A AmendableTarget
+GIVETH A BOOLEAN
+`is an amendable target under paragraph 13(1)` MEANS
+        "(1) The Secretary of State may by regulations amend this Schedule so as to—"
+    ...     "(a) amend Ground 2ZA to change the descriptions of the landlord who may use the ground;"
+        ..  "(b) amend Ground 2ZC to change the descriptions of previous landlord mentioned in it;"
+        ..  "(c) provide for Ground 5C to apply only where the landlord seeking possession or the employer is of a particular description;"
+        ..  "(d) amend Ground 5H to change the descriptions of landlord who may use the ground;"
+        ..  "(e) add other situations to the list in the first paragraph of Ground 6B in which that ground may be relied on or remove any situations added by virtue of this sub-paragraph;"
+        ..  "(f) amend the definition of “special tenancy” in Ground 7;"
+        ..  "(g) amend the definition of “supported accommodation” or “managed accommodation” in paragraph 12."
+        ..  ( CONSIDER target
+              WHEN `(a) amend Ground 2ZA landlord descriptions`                                          THEN TRUE
+              WHEN `(b) amend Ground 2ZC previous-landlord descriptions`                                 THEN TRUE
+              WHEN `(c) restrict Ground 5C to a particular landlord or employer description`             THEN TRUE
+              WHEN `(d) amend Ground 5H landlord descriptions`                                           THEN TRUE
+              WHEN `(e) add or remove Ground 6B situations`                                              THEN TRUE
+              WHEN `(f) amend the "special tenancy" definition in Ground 7`                              THEN TRUE
+              WHEN `(g) amend the "supported accommodation"/"managed accommodation" definition in paragraph 12` THEN TRUE )
+
+#ASSERT `is an amendable target under paragraph 13(1)` `(a) amend Ground 2ZA landlord descriptions`
+#ASSERT `is an amendable target under paragraph 13(1)` `(g) amend the "supported accommodation"/"managed accommodation" definition in paragraph 12`
+
+§§ `(2)-(4) The regulation-making procedure — supplementary powers, SI, draft affirmative`
+
+-- A proposed exercise of the power: the amendable target, plus the procedural
+-- facts that gate it (made by statutory instrument; draft laid before and
+-- approved by resolution of each House).
+DECLARE ProposedRegulations HAS
+  `the target to be amended`                                            IS A  AmendableTarget
+  `the regulations are to be made by statutory instrument`              IS A  BOOLEAN  -- (3)
+  `a draft has been laid before the House of Commons`                   IS A  BOOLEAN  -- (4)
+  `the draft has been approved by a resolution of the House of Commons` IS A  BOOLEAN  -- (4)
+  `a draft has been laid before the House of Lords`                     IS A  BOOLEAN  -- (4)
+  `the draft has been approved by a resolution of the House of Lords`   IS A  BOOLEAN  -- (4)
+
+-- (2) "Regulations under this paragraph may— (a) make consequential,
+-- supplementary, incidental, transitional or saving provision; (b) make different
+-- provision for different purposes." Carried as inert prose (a supplementary power
+-- that widens, but does not gate, the exercise).
+GIVETH A BOOLEAN
+`paragraph 13(2) — supplementary provision power` MEANS
+        "(2) Regulations under this paragraph may—"
+    ... "(a) make consequential, supplementary, incidental, transitional or saving provision;"
+    ... "(b) make different provision for different purposes."
+
+#EVAL `paragraph 13(2) — supplementary provision power`
+
+-- (4) The draft affirmative procedure: "A statutory instrument containing
+-- regulations under this paragraph may not be made unless a draft of the
+-- instrument has been laid before and approved by a resolution of EACH House of
+-- Parliament." This is the GUARD on the permission.
+GIVEN proposal IS A ProposedRegulations
+GIVETH A BOOLEAN
+`the affirmative-resolution procedure is satisfied` MEANS
+        "(3) Regulations under this paragraph are to be made by statutory instrument."
+    ... proposal's `the regulations are to be made by statutory instrument`
+    AND     "(4) A statutory instrument containing regulations under this paragraph may not be made unless a draft of the instrument has been laid before and approved by a resolution of each House of Parliament."
+        ...     "[laid before and approved by a resolution of the House of Commons]"
+            ...     proposal's `a draft has been laid before the House of Commons`
+                AND proposal's `the draft has been approved by a resolution of the House of Commons`
+        AND     "[laid before and approved by a resolution of the House of Lords]"
+            ...     proposal's `a draft has been laid before the House of Lords`
+                AND proposal's `the draft has been approved by a resolution of the House of Lords`
+
+§§ `The power as a deontic permission — Secretary of State MAY amend the Schedule, guarded by the procedure`
+
+DECLARE Action IS ONE OF
+  `amend the Schedule`
+
+-- The higher-order power. Where the proposed target is within scope AND the
+-- affirmative-resolution procedure is satisfied, the Secretary of State MAY amend
+-- the Schedule. Otherwise the permission is not conferred (FULFILLED — no breach,
+-- but also no power; an amendment made without the procedure is ultra vires).
+GIVEN proposal IS A ProposedRegulations
+GIVETH A DEONTIC Actor Action
+`power to amend the Schedule` proposal MEANS
+    IF      `is an amendable target under paragraph 13(1)` (proposal's `the target to be amended`)
+        AND `the affirmative-resolution procedure is satisfied` proposal
+    THEN PARTY SecretaryOfState MAY `amend the Schedule` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+§§ `Scope — every (a)-(g) target is within the conferred power`
+
+#ASSERT `is an amendable target under paragraph 13(1)` `(b) amend Ground 2ZC previous-landlord descriptions`
+#ASSERT `is an amendable target under paragraph 13(1)` `(c) restrict Ground 5C to a particular landlord or employer description`
+#ASSERT `is an amendable target under paragraph 13(1)` `(d) amend Ground 5H landlord descriptions`
+#ASSERT `is an amendable target under paragraph 13(1)` `(e) add or remove Ground 6B situations`
+#ASSERT `is an amendable target under paragraph 13(1)` `(f) amend the "special tenancy" definition in Ground 7`
+
+§§ `Procedure satisfied — SI, draft laid before and approved by BOTH Houses`
+
+`fully-compliant proposal` MEANS ProposedRegulations WITH
+  `the target to be amended`                                            IS `(g) amend the "supported accommodation"/"managed accommodation" definition in paragraph 12`
+  `the regulations are to be made by statutory instrument`              IS TRUE
+  `a draft has been laid before the House of Commons`                   IS TRUE
+  `the draft has been approved by a resolution of the House of Commons` IS TRUE
+  `a draft has been laid before the House of Lords`                     IS TRUE
+  `the draft has been approved by a resolution of the House of Lords`   IS TRUE
+
+#ASSERT `the affirmative-resolution procedure is satisfied` `fully-compliant proposal`
+
+§§ `Procedure NOT satisfied — approved by the Commons only, not the Lords`
+
+-- (4) requires approval by EACH House. Missing the Lords resolution defeats the
+-- procedure even though the Commons approved.
+`commons-only proposal` MEANS ProposedRegulations WITH
+  `the target to be amended`                                            IS `(g) amend the "supported accommodation"/"managed accommodation" definition in paragraph 12`
+  `the regulations are to be made by statutory instrument`              IS TRUE
+  `a draft has been laid before the House of Commons`                   IS TRUE
+  `the draft has been approved by a resolution of the House of Commons` IS TRUE
+  `a draft has been laid before the House of Lords`                     IS TRUE
+  `the draft has been approved by a resolution of the House of Lords`   IS FALSE
+
+#ASSERT NOT `the affirmative-resolution procedure is satisfied` `commons-only proposal`
+
+§§ `Procedure NOT satisfied — not made by statutory instrument`
+
+`no-SI proposal` MEANS ProposedRegulations WITH
+  `the target to be amended`                                            IS `(a) amend Ground 2ZA landlord descriptions`
+  `the regulations are to be made by statutory instrument`              IS FALSE
+  `a draft has been laid before the House of Commons`                   IS TRUE
+  `the draft has been approved by a resolution of the House of Commons` IS TRUE
+  `a draft has been laid before the House of Lords`                     IS TRUE
+  `the draft has been approved by a resolution of the House of Lords`   IS TRUE
+
+#ASSERT NOT `the affirmative-resolution procedure is satisfied` `no-SI proposal`
+
+§§ `Exercising the deontic — the power MAY be exercised when in scope and the procedure is met`
+
+-- A DEONTIC value cannot be compared with EQUALS, so we exercise the permission
+-- via #TRACE. With target in scope AND the affirmative procedure satisfied, the
+-- residual is the standing permission "PARTY SecretaryOfState MAY amend the
+-- Schedule". The Secretary of State exercises it within the deadline -> FULFILLED.
+#TRACE `power to amend the Schedule` `fully-compliant proposal` AT 0 WITH
+    PARTY SecretaryOfState DOES `amend the Schedule` AT 10
+
+-- The Secretary of State declines to exercise the power (never amends): under
+-- MAY's defaults this is benign -> residual FULFILLED (no breach). The power is
+-- permissive, not mandatory.
+#TRACE `power to amend the Schedule` `fully-compliant proposal` AT 0 WITH
+
+-- Procedure NOT met (Commons only): no permission is conferred; the contract is
+-- FULFILLED with no standing MAY. An amendment purportedly made here would be
+-- ultra vires (outside the modelled permission).
+#TRACE `power to amend the Schedule` `commons-only proposal` AT 0 WITH

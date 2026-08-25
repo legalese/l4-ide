@@ -1,0 +1,38 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 3 (REPEALED / OMITTED by Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 3 — REPEALED.
+--
+-- Ground 3 (the "out-of-season holiday let" mandatory ground) was OMITTED from
+-- Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025.
+--
+-- Provenance (Textual Amendment F9):
+--   "Sch. 2 Ground 3 omitted (1.5.2026 for specified purposes) by virtue of
+--    Renters' Rights Act 2025 (c. 26), s. 145(1)(8), Sch. 1 para. 8 (with
+--    ss. 138, 146(1), Sch. 6 paras. 1, 3, 4, 16, 17); S.I. 2026/421, reg. 2(b)"
+--
+-- This file is a deliberate STUB so the in-order corpus (Ground 2ZD -> [3] ->
+-- Ground 4) has no silent gap. There is NO operative logic and NO mandatory
+-- outcome: the ground no longer exists in the in-force text. The FORMER text is
+-- preserved below as inert prose for the record only.
+-- ===========================================================================
+
+§§ `Former text of Ground 3 (no longer in force) — preserved as inert prose`
+
+-- The pre-RRA-2025 wording (a fixed-term holiday let with prior written notice),
+-- carried as inert scaffolding. It is wrapped in a predicate that is never used
+-- as an operative test; it exists purely to keep the verbatim former wording in
+-- the corpus next to its repeal provenance.
+GIVETH A BOOLEAN
+`former Ground 3 text (REPEALED)` MEANS
+        "The tenancy is a fixed term tenancy for a term not exceeding eight months and—"
+    ... "(a) not later than the beginning of the tenancy the landlord gave notice in writing to the tenant that possession might be recovered on this ground; and"
+    ... "(b) at some time within the period of twelve months ending with the beginning of the tenancy, the dwelling-house was occupied under a right to occupy it for a holiday."
+
+-- Documentation marker only: the inert prose collapses to TRUE (the AND-identity),
+-- confirming the former text is recorded here. NOT an operative assertion about
+-- any present-day legal effect — Ground 3 has been repealed.
+#EVAL `former Ground 3 text (REPEALED)`

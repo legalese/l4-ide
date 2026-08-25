@@ -1,0 +1,98 @@
+-- Miles-card routing — the "choose a credit card" worked example.
+--
+-- Generated from two dmnmd decision tables (see this directory):
+--   categorize.dmn.md   -> Categorize : txn (merchant, mcc, channel, currency) -> spend category
+--   card-to-use.dmn.md   -> CardToUse  : (category, payment method, remaining caps) -> card + mpd
+--
+-- Regenerate:
+--   cd <dmnmd>/languages/haskell
+--   cabal run -v0 dmnmd -- -t l4 categorize.dmn.md   # rename f1        -> Categorize
+--   cabal run -v0 dmnmd -- -t l4 card-to-use.dmn.md   # rename f1/F1/mkF1 -> CardToUse/mkCardToUse
+-- then concatenate (Categorize block, then the CardToUse block).
+--
+-- The column-aligned "ditto" (^) grid below copies the token at the same start
+-- column from the previous line; that alignment is display-width-accurate, which
+-- is what this example ultimately exercises.
+
+GIVEN merchant IS A STRING
+      mcc      IS A NUMBER
+      channel  IS A STRING
+      currency IS A STRING
+GIVETH A STRING
+Categorize merchant mcc channel currency MEANS
+  BRANCH
+    IF                                                                                                                                                                                                                                                                                   currency EQUALS "MYR" THEN "MYR"
+    IF (merchant EQUALS "Cold Storage" OR merchant EQUALS "CS Fresh" OR merchant EQUALS "Jasons" OR merchant EQUALS "Giant")                                                                                                                              AND channel EQUALS "inPerson"                        THEN "GroceriesPhysical"
+    IF merchant                                                                                                                                EQUALS "foodpanda"                                                                                                                                              THEN "foodpanda"
+    IF ^                                                                                                                                       ^      "Charge+"                                                                                                                                                THEN "TeslaChargePlus"
+    IF ^                                                                                                                                       ^      "Tesla"                                                                                                                                                  THEN "TeslaSupercharger"
+    IF ^                                                                                                                                       ^      "SimplyGo"                                                                                                                                               THEN "SimplyGo"
+    IF                                                                                                                                                             (mcc EQUALS 4111 OR mcc EQUALS 4112)                                                                                                        THEN "SimplyGo"
+    IF (merchant EQUALS "Netflix" OR merchant EQUALS "Disney+" OR merchant EQUALS "HBO" OR merchant EQUALS "Spotify" OR merchant EQUALS "Viu")                                                                                                                                                                 THEN "Streaming"
+    IF                                                                                                                                                             (mcc EQUALS 4899 OR mcc EQUALS 5815)                                                   AND channel EQUALS "online"                          THEN "Streaming"
+    IF (merchant EQUALS "McDonald's" OR merchant EQUALS "KFC" OR merchant EQUALS "Starbucks" OR merchant EQUALS "Ya Kun")                                                                                                                                                                                      THEN "FastFood"
+    IF                                                                                                                                                             mcc                                                                        EQUALS 5814                                                      THEN "FastFood"
+    IF                                                                                                                                                             (mcc EQUALS 5812 OR mcc EQUALS 5813)                                                                                                        THEN "Dining"
+    IF                                                                                                                                                             mcc                                                                        EQUALS 4121                                                      THEN "RideHailing"
+    IF merchant                                                                                                                                EQUALS "RedMart"                                                                                                                                                THEN "GroceriesOnline"
+    IF                                                                                                                                                             mcc                                                                        EQUALS 5411 AND channel EQUALS "online"                          THEN "GroceriesOnline"
+    IF merchant                                                                                                                                EQUALS "Shopee"                                                                                                                                                 THEN "Shopee"
+    IF ^                                                                                                                                       ^      "StarHub"                                                                                                                                                THEN "StarHub"
+    IF                                                                                                                                                                                                                                                        channel EQUALS "online"                          THEN "OtherOnline"
+    IF                                                                                                                                                             (mcc EQUALS 5311 OR mcc EQUALS 5411 OR mcc EQUALS 5611 OR mcc EQUALS 5651)             AND ^       ^      "inPerson"                        THEN "ContactlessTap"
+    OTHERWISE "Other"
+
+
+DECLARE CardToUse HAS
+    Card IS A STRING
+    mpd  IS A STRING
+
+GIVEN v1 IS A STRING
+      v2 IS A STRING
+GIVETH A CardToUse
+mkCardToUse v1 v2 MEANS CardToUse WITH
+    Card IS v1
+    mpd  IS v2
+
+GIVEN Category         IS A STRING
+      PaymentMethod    IS A STRING
+      yuuRemaining     IS A NUMBER
+      passionRemaining IS A NUMBER
+      fourMpdRemaining IS A NUMBER
+GIVETH A CardToUse
+CardToUse Category PaymentMethod yuuRemaining passionRemaining fourMpdRemaining MEANS
+  BRANCH
+    IF (Category EQUALS "GroceriesPhysical" OR Category EQUALS "foodpanda" OR Category EQUALS "SimplyGo" OR Category EQUALS "TeslaChargePlus")                                                                                                                                    AND yuuRemaining >  0                                                    THEN mkCardToUse ("DBS yuu") "10"  -- shared
+    IF (Category EQUALS "GroceriesPhysical" OR Category EQUALS "foodpanda" OR Category EQUALS "SimplyGo")                                                                                                                                                                         ^   ^            <= ^ AND passionRemaining >  0                          THEN mkCardToUse ("PAssion Debit") "5"  -- self
+    IF (Category EQUALS "GroceriesPhysical" OR Category EQUALS "foodpanda")                                                                                               AND (PaymentMethod EQUALS "Online" OR PaymentMethod EQUALS "MobileWallet")                              ^   ^            ^  ^ ^   ^                <= ^ AND fourMpdRemaining > 0 THEN mkCardToUse ("Woman's World") "4"  -- shared
+    IF Category                                                                                                                                EQUALS "SimplyGo"                                                                                                                  ^   ^            ^  ^ ^   ^                ^  ^                          THEN mkCardToUse ("SC Smart") ("6% cb")  -- self
+    IF (Category EQUALS "GroceriesPhysical" OR Category EQUALS "foodpanda" OR Category EQUALS "TeslaChargePlus")                                                                                                                                                                  ^   ^            ^  ^ ^   ^                ^  ^                          THEN mkCardToUse "PRVI" "1.4"  -- —
+    IF Category                                                                                                                                EQUALS "TeslaSupercharger"                                                                                                                                                                                  THEN mkCardToUse "PRVI" "1.4"  -- —
+    IF (Category EQUALS "GroceriesOnline" OR Category EQUALS "Shopee" OR Category EQUALS "OtherOnline" OR Category EQUALS "StarHub")                                                                                                                                                                                              AND fourMpdRemaining > 0 THEN mkCardToUse ("Woman's World") "4"  -- shared
+    IF (Category EQUALS "Dining" OR Category EQUALS "RideHailing")                                                                                                                                                                                                                                                                ^   ^                ^ ^ THEN mkCardToUse ("HSBC Revolution") "4"  -- shared
+    IF Category                                                                                                                                EQUALS "ContactlessTap"    AND PaymentMethod                                                          EQUALS "MobileWallet"                                                        ^   ^                ^ ^ THEN mkCardToUse ("UOB Preferred") "4"  -- shared
+    IF ^                                                                                                                                       ^      ^                   ^   ^                                                                      ^      "PhysicalContactless"                                                 ^   ^                ^ ^ THEN mkCardToUse ("HSBC Revolution") "4"  -- shared
+    IF ^                                                                                                                                       ^      ^                   ^   ^                                                                      ^      "Amaze"                                                               ^   ^                ^ ^ THEN mkCardToUse ("Citi Rewards") "4"  -- shared
+    IF (Category EQUALS "Streaming" OR Category EQUALS "FastFood")                                                                                                                                                                                                                                                                                         THEN mkCardToUse ("SC Smart") ("6% cb")  -- self
+    IF Category                                                                                                                                EQUALS "MYR"                                                                                                                                             AND passionRemaining >  0                          THEN mkCardToUse ("PAssion Debit") "~4.5"  -- self
+    IF ^                                                                                                                                       ^      ^                                                                                                                                                 ^   ^                <= ^                          THEN mkCardToUse "PRVI" "2.4"  -- —
+    IF ^                                                                                                                                       ^      "Other"                                                                                                                                                                                              THEN mkCardToUse "PRVI" ("1.4 / 2.4")  -- —
+    OTHERWISE mkCardToUse "PRVI" "1.4"
+
+
+-- ── Demonstration (`l4 run` prints these; `l4 check` does not) ────────────────
+-- The two Tesla channels categorize differently:
+#EVAL Categorize "Tesla"   0 "online"   "SGD"   -- => "TeslaSupercharger"
+#EVAL Categorize "Charge+" 0 "inPerson" "SGD"   -- => "TeslaChargePlus"
+
+-- Supercharger is billed in-app by Tesla (not a yuu/Charge+ merchant), so it can
+-- never earn yuu — it always falls to the flat catch-all, whatever the caps:
+#EVAL CardToUse "TeslaSupercharger" "Online" 800 500 1000  -- => PRVI 1.4
+#EVAL CardToUse "TeslaSupercharger" "Online"   0   0    0  -- => PRVI 1.4
+
+-- Charge+ IS a yuu merchant: take yuu (10) while the cap has room, else PRVI 1.4:
+#EVAL CardToUse "TeslaChargePlus" "PhysicalContactless" 800 500 1000  -- => DBS yuu 10
+#EVAL CardToUse "TeslaChargePlus" "PhysicalContactless"   0 500 1000  -- => PRVI 1.4
+
+-- Regression: a physical grocery still cascades yuu -> PAssion -> PRVI:
+#EVAL CardToUse "GroceriesPhysical" "Online" 0 500 1000  -- => PAssion Debit 5

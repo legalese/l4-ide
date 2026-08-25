@@ -1,0 +1,440 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1B (Renters' Rights Act 2025)`
+
+-- Ground 1B (the rent-to-buy ground), inserted into Schedule 2 to the Housing
+-- Act 1988 by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 4. It is one of
+-- the MANDATORY grounds in Part I of Schedule 2: where it is made out, the court
+-- MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions (a)-(f) -> predicates carrying the verbatim
+--     statute inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome               -> a regulative/deontic clause guarded
+--     by the conjunction of conditions (a)-(f).
+--
+-- Statutory text encoded ("The following conditions are met—", a CONJUNCTION):
+--   (a) the landlord intends—
+--         (i)   to sell a freehold or leasehold interest in the dwelling-house,
+--         (ii)  to grant a lease of the dwelling-house for a term certain of more
+--               than 21 years which is not terminable before the end of that term
+--               by notice given by or to the landlord, or
+--         (iii) to grant an assured tenancy of the dwelling-house to another
+--               person;
+--   (b) the assured tenancy did not come into being by virtue of Schedule 1 to
+--       the Rent Act 1977 or section 4 of the Rent (Agriculture) Act 1976;
+--   (c) the landlord is a private registered provider of social housing;
+--   (d) the assured tenancy was entered into pursuant to a rent-to-buy agreement;
+--   (e) the period stated in the rent-to-buy agreement has expired;
+--   (f) the landlord has complied with—
+--         (i)  any provision of the rent-to-buy agreement which required the
+--              landlord to offer the dwelling-house for sale to the tenant, and
+--         (ii) any requirements set out in the agreement in relation to such an
+--              offer.
+--
+-- DEFINITION encoded ("rent-to-buy agreement"):
+--   a "rent-to-buy agreement" is an agreement in writing which—
+--     (a) provides for the rent payable under the tenancy to be no higher than
+--         80% of the market rent (references to rent and market rent include any
+--         service charge), and
+--     (b) gives notice that the landlord intends, after a stated period of not
+--         less than 5 years (or 10 years for dwelling-houses in Greater London)
+--         beginning with the day on which the tenancy is entered into, to offer
+--         the dwelling-house for sale to the tenant.
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The landlord's intended disposal, as TYPED DATA (not reflection). Ground 1B
+-- limb (a) admits THREE shapes: selling a freehold/leasehold interest, granting
+-- a "long lease", or granting an assured tenancy to another person. Whether a
+-- granted lease counts as a "long lease" is a STRUCTURAL PROPERTY of the intended
+-- instrument's data: "a term certain of more than 21 years which is not
+-- terminable before the end of that term by notice given by or to the landlord".
+-- A fuller treatment could introspect an actual imported L4 lease construct (its
+-- term, its break-notice clauses) rather than these summary fields; deferred.
+DECLARE Disposal IS ONE OF
+    `sell a freehold or leasehold interest`
+    `grant a long lease`
+        HAS `term certain in years`           IS A NUMBER
+            `terminable before end by notice`  IS A BOOLEAN
+    `grant an assured tenancy to another person`
+
+-- A rent-to-buy agreement, modelled as a record. The `valid rent-to-buy
+-- agreement` predicate below checks the in-writing + rent<=80% + period>=5yr
+-- (or >=10yr in Greater London) + notice-to-offer conditions of the definition.
+DECLARE RentToBuyAgreement HAS
+  `in writing`                                       IS A BOOLEAN  -- def chapeau
+  `rent payable under the tenancy`                   IS A NUMBER   -- includes service charge
+  `market rent`                                      IS A NUMBER   -- includes service charge
+  `stated period in years`                           IS A NUMBER   -- def (b)
+  `dwelling-house is in Greater London`              IS A BOOLEAN  -- 10yr threshold instead of 5
+  `gives notice of intent to offer for sale to the tenant`  IS A BOOLEAN  -- def (b)
+
+-- The operative atoms of conditions (b)-(f), gathered on the claim, alongside
+-- the intended disposal (a) and the rent-to-buy agreement (d).
+DECLARE Ground1BClaim HAS
+  `intended disposal`                                                 IS A Disposal  -- (a)
+  -- (b)
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS A BOOLEAN
+  -- (c)
+  `landlord is a private registered provider of social housing`       IS A BOOLEAN
+  -- (d)
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS A BOOLEAN
+  `rent-to-buy agreement`                                             IS A RentToBuyAgreement
+  -- (e)
+  `the period stated in the rent-to-buy agreement has expired`         IS A BOOLEAN
+  -- (f)
+  `landlord complied with the offer-for-sale provision`                IS A BOOLEAN  -- (f)(i)
+  `landlord complied with the requirements about such an offer`        IS A BOOLEAN  -- (f)(ii)
+
+§§ `Definition — a valid "rent-to-buy agreement"`
+
+-- (a) rent no higher than 80% of market rent (rent and market rent both include
+--     any service charge — modelled by construction: the fields already carry
+--     the service-charge-inclusive figures).
+GIVEN agreement IS A RentToBuyAgreement
+GIVETH A BOOLEAN
+`rent is no higher than 80% of market rent` agreement MEANS
+        "(a) provides for the rent payable under the tenancy to be no higher than 80% of the market rent (rent and market rent include any service charge)"
+    ... agreement's `rent payable under the tenancy`
+            AT MOST (0.8 TIMES agreement's `market rent`)
+
+-- (b) the stated period must be not less than 5 years, or not less than 10 years
+--     for dwelling-houses in Greater London.
+GIVEN agreement IS A RentToBuyAgreement
+GIVETH A NUMBER
+`minimum stated period in years` agreement MEANS
+    IF   agreement's `dwelling-house is in Greater London`
+    THEN 10
+    ELSE 5
+
+GIVEN agreement IS A RentToBuyAgreement
+GIVETH A BOOLEAN
+`stated period is long enough` agreement MEANS
+        "after a stated period of not less than 5 years (or 10 years for dwelling-houses in Greater London) beginning with the day on which the tenancy is entered into"
+    ... agreement's `stated period in years`
+            AT LEAST `minimum stated period in years` agreement
+
+GIVEN agreement IS A RentToBuyAgreement
+GIVETH A BOOLEAN
+`valid rent-to-buy agreement` agreement MEANS
+        "a 'rent-to-buy agreement' is an agreement in writing which—"
+    ... agreement's `in writing`
+    AND `rent is no higher than 80% of market rent` agreement
+    AND     "(b) gives notice that the landlord intends, after [the stated period], to offer the dwelling-house for sale to the tenant"
+        ... agreement's `gives notice of intent to offer for sale to the tenant`
+        AND `stated period is long enough` agreement
+
+§§ `Condition (a) — the disposal-intention gateway`
+
+-- A "grant a long lease" qualifies for this ground iff its term certain exceeds
+-- 21 years AND it is not terminable before the end of that term by notice.
+GIVEN disposal IS A Disposal
+GIVETH A BOOLEAN
+`is a qualifying long lease` disposal MEANS
+    CONSIDER disposal
+    WHEN `sell a freehold or leasehold interest` THEN FALSE
+    WHEN `grant an assured tenancy to another person` THEN FALSE
+    WHEN `grant a long lease` `term certain in years` `terminable before end by notice` THEN
+            "a term certain of more than 21 years"
+        ... `term certain in years` GREATER THAN 21
+        AND "which is not terminable before the end of that term by notice given by or to the landlord"
+        ... NOT `terminable before end by notice`
+
+GIVEN disposal IS A Disposal
+GIVETH A BOOLEAN
+`is a sale of a freehold or leasehold interest` disposal MEANS
+    CONSIDER disposal
+    WHEN `sell a freehold or leasehold interest` THEN TRUE
+    OTHERWISE FALSE
+
+GIVEN disposal IS A Disposal
+GIVETH A BOOLEAN
+`is a grant of an assured tenancy to another person` disposal MEANS
+    CONSIDER disposal
+    WHEN `grant an assured tenancy to another person` THEN TRUE
+    OTHERWISE FALSE
+
+-- (a) sell a freehold/leasehold interest, OR grant a qualifying long lease, OR
+--     grant an assured tenancy to another person.
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`condition (a) — disposal intention` claim MEANS
+        "(a) the landlord intends—"
+    ...     "(i) to sell a freehold or leasehold interest in the dwelling-house,"
+        ..  `is a sale of a freehold or leasehold interest` (claim's `intended disposal`)
+        ..  "(ii) to grant a lease of the dwelling-house for a term certain of more than 21 years which is not terminable before the end of that term by notice given by or to the landlord, or"
+        ..  `is a qualifying long lease` (claim's `intended disposal`)
+        ..  "(iii) to grant an assured tenancy of the dwelling-house to another person"
+        ..  `is a grant of an assured tenancy to another person` (claim's `intended disposal`)
+
+§§ `Condition (b) — not a Rent Act 1977 / Rent (Agriculture) Act 1976 tenancy`
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`condition (b) — not a Rent Act tenancy` claim MEANS
+        "(b) the assured tenancy did not come into being by virtue of Schedule 1 to the Rent Act 1977 or section 4 of the Rent (Agriculture) Act 1976"
+    ... NOT claim's `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`
+
+§§ `Condition (c) — landlord is a private registered provider of social housing`
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`condition (c) — private registered provider` claim MEANS
+        "(c) the landlord is a private registered provider of social housing"
+    ... claim's `landlord is a private registered provider of social housing`
+
+§§ `Condition (d) — tenancy entered into pursuant to a (valid) rent-to-buy agreement`
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`condition (d) — pursuant to a rent-to-buy agreement` claim MEANS
+        "(d) the assured tenancy was entered into pursuant to a rent-to-buy agreement"
+    ... claim's `tenancy was entered into pursuant to a rent-to-buy agreement`
+    AND `valid rent-to-buy agreement` (claim's `rent-to-buy agreement`)
+
+§§ `Condition (e) — the stated period has expired`
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`condition (e) — stated period has expired` claim MEANS
+        "(e) the period stated in the rent-to-buy agreement has expired"
+    ... claim's `the period stated in the rent-to-buy agreement has expired`
+
+§§ `Condition (f) — landlord has complied with the offer-for-sale obligations`
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`condition (f) — complied with offer obligations` claim MEANS
+        "(f) the landlord has complied with—"
+    ...     "(i) any provision of the rent-to-buy agreement which required the landlord to offer the dwelling-house for sale to the tenant, and"
+        ... claim's `landlord complied with the offer-for-sale provision`
+        AND "(ii) any requirements set out in the agreement in relation to such an offer"
+        ... claim's `landlord complied with the requirements about such an offer`
+
+§§ `Ground 1B made out — conditions (a)-(f), all met`
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A BOOLEAN
+`Ground 1B made out` claim MEANS
+        "The following conditions are met—"
+    ... `condition (a) — disposal intention` claim
+    AND `condition (b) — not a Rent Act tenancy` claim
+    AND `condition (c) — private registered provider` claim
+    AND `condition (d) — pursuant to a rent-to-buy agreement` claim
+    AND `condition (e) — stated period has expired` claim
+    AND `condition (f) — complied with offer obligations` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground1BClaim
+GIVETH A DEONTIC Actor Action
+`ground 1B possession order` claim MEANS
+    IF   `Ground 1B made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Disposals`
+
+`disposal — sell` MEANS `sell a freehold or leasehold interest`
+`disposal — assured tenancy` MEANS `grant an assured tenancy to another person`
+
+`disposal — long lease 99yr` MEANS `grant a long lease` WITH
+  `term certain in years`          IS 99
+  `terminable before end by notice` IS FALSE
+
+§§ `Rent-to-buy agreements`
+
+-- A valid agreement: in writing, rent 75% of market (<=80%), 5-year period,
+-- not Greater London, notice given.
+`rtb — valid` MEANS RentToBuyAgreement WITH
+  `in writing`                                       IS TRUE
+  `rent payable under the tenancy`                   IS 750
+  `market rent`                                      IS 1000
+  `stated period in years`                           IS 5
+  `dwelling-house is in Greater London`              IS FALSE
+  `gives notice of intent to offer for sale to the tenant`  IS TRUE
+
+-- Rent too high: 850 of 1000 market rent is 85% > 80%.
+`rtb — rent too high` MEANS RentToBuyAgreement WITH
+  `in writing`                                       IS TRUE
+  `rent payable under the tenancy`                   IS 850
+  `market rent`                                      IS 1000
+  `stated period in years`                           IS 5
+  `dwelling-house is in Greater London`              IS FALSE
+  `gives notice of intent to offer for sale to the tenant`  IS TRUE
+
+-- Period too short: 4 years (< 5) outside Greater London.
+`rtb — period too short` MEANS RentToBuyAgreement WITH
+  `in writing`                                       IS TRUE
+  `rent payable under the tenancy`                   IS 750
+  `market rent`                                      IS 1000
+  `stated period in years`                           IS 4
+  `dwelling-house is in Greater London`              IS FALSE
+  `gives notice of intent to offer for sale to the tenant`  IS TRUE
+
+-- Greater London with a 7-year period: fails the 10-year London threshold,
+-- even though 7 >= 5 would pass outside London.
+`rtb — London 7yr` MEANS RentToBuyAgreement WITH
+  `in writing`                                       IS TRUE
+  `rent payable under the tenancy`                   IS 750
+  `market rent`                                      IS 1000
+  `stated period in years`                           IS 7
+  `dwelling-house is in Greater London`              IS TRUE
+  `gives notice of intent to offer for sale to the tenant`  IS TRUE
+
+-- Greater London with a 10-year period: meets the 10-year London threshold.
+`rtb — London 10yr` MEANS RentToBuyAgreement WITH
+  `in writing`                                       IS TRUE
+  `rent payable under the tenancy`                   IS 750
+  `market rent`                                      IS 1000
+  `stated period in years`                           IS 10
+  `dwelling-house is in Greater London`              IS TRUE
+  `gives notice of intent to offer for sale to the tenant`  IS TRUE
+
+-- Rent-to-buy validity tests.
+#ASSERT     `valid rent-to-buy agreement` `rtb — valid`
+#ASSERT NOT `valid rent-to-buy agreement` `rtb — rent too high`     -- rent > 80%
+#ASSERT NOT `valid rent-to-buy agreement` `rtb — period too short`  -- period < 5 years
+#ASSERT NOT `valid rent-to-buy agreement` `rtb — London 7yr`        -- < 10 years in London
+#ASSERT     `valid rent-to-buy agreement` `rtb — London 10yr`       -- 10-year London threshold met
+
+§§ `Ground made out — all conditions (a)-(f) met`
+
+`claim all-met` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT `condition (a) — disposal intention`                  `claim all-met`
+#ASSERT `condition (b) — not a Rent Act tenancy`              `claim all-met`
+#ASSERT `condition (c) — private registered provider`         `claim all-met`
+#ASSERT `condition (d) — pursuant to a rent-to-buy agreement` `claim all-met`
+#ASSERT `condition (e) — stated period has expired`           `claim all-met`
+#ASSERT `condition (f) — complied with offer obligations`     `claim all-met`
+#ASSERT `Ground 1B made out`                                  `claim all-met`
+
+-- Ground also made out via the assured-tenancy disposal limb (a)(iii).
+`claim all-met (assured tenancy)` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — assured tenancy`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT `condition (a) — disposal intention` `claim all-met (assured tenancy)`
+#ASSERT `Ground 1B made out`                 `claim all-met (assured tenancy)`
+
+§§ `Condition (a) knocked out — disposal does not qualify`
+
+-- A long lease that is terminable by notice does not qualify, and the disposal
+-- is neither a sale nor a grant of an assured tenancy.
+`disposal — long lease terminable` MEANS `grant a long lease` WITH
+  `term certain in years`          IS 99
+  `terminable before end by notice` IS TRUE
+
+`claim — (a) fails` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — long lease terminable`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT NOT `condition (a) — disposal intention` `claim — (a) fails`
+#ASSERT NOT `Ground 1B made out`                 `claim — (a) fails`
+
+§§ `Condition (b) knocked out — tenancy arose under the Rent Acts`
+
+`claim — (b) fails` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS TRUE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT NOT `condition (b) — not a Rent Act tenancy` `claim — (b) fails`
+#ASSERT NOT `Ground 1B made out`                     `claim — (b) fails`
+
+§§ `Condition (c) knocked out — landlord is not a private registered provider`
+
+`claim — (c) fails` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS FALSE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT NOT `condition (c) — private registered provider` `claim — (c) fails`
+#ASSERT NOT `Ground 1B made out`                          `claim — (c) fails`
+
+§§ `Condition (d) knocked out — not pursuant to a (valid) rent-to-buy agreement`
+
+-- Here the tenancy was not entered into pursuant to a rent-to-buy agreement;
+-- the attached agreement is also invalid (rent too high), so (d) fails twice over.
+`claim — (d) fails` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS FALSE
+  `rent-to-buy agreement`                                             IS `rtb — rent too high`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT NOT `condition (d) — pursuant to a rent-to-buy agreement` `claim — (d) fails`
+#ASSERT NOT `Ground 1B made out`                                  `claim — (d) fails`
+
+§§ `Condition (e) knocked out — the stated period has not expired`
+
+`claim — (e) fails` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS FALSE
+  `landlord complied with the offer-for-sale provision`                IS TRUE
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT NOT `condition (e) — stated period has expired` `claim — (e) fails`
+#ASSERT NOT `Ground 1B made out`                        `claim — (e) fails`
+
+§§ `Condition (f) knocked out — landlord did not comply with the offer obligations`
+
+`claim — (f) fails` MEANS Ground1BClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `landlord is a private registered provider of social housing`       IS TRUE
+  `tenancy was entered into pursuant to a rent-to-buy agreement`       IS TRUE
+  `rent-to-buy agreement`                                             IS `rtb — valid`
+  `the period stated in the rent-to-buy agreement has expired`         IS TRUE
+  `landlord complied with the offer-for-sale provision`                IS FALSE   -- (f)(i) not complied
+  `landlord complied with the requirements about such an offer`        IS TRUE
+
+#ASSERT NOT `condition (f) — complied with offer obligations` `claim — (f) fails`
+#ASSERT NOT `Ground 1B made out`                              `claim — (f) fails`

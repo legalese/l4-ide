@@ -1,0 +1,405 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 6A (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 6A — the "redevelopment decant" MANDATORY ground, inserted into
+-- Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26),
+-- s. 145(1)(8), Sch. 1 para. 21 (with ss. 138, 146(1), Sch. 6 paras. 1, 3, 4,
+-- 16, 17); commencement 1.5.2026 for specified purposes; S.I. 2026/421,
+-- reg. 2(b), marker F39. Part I (mandatory): where made out, the court MUST
+-- order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions (a)-(d) -> predicates carrying the verbatim
+--     statute inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome               -> a guarded deontic clause.
+--
+-- Statutory text encoded ("These conditions are met—", a CONJUNCTION of (a)-(d)):
+--   (a) the landlord seeking possession (the "current landlord") is a relevant
+--       social landlord;
+--   (b) the dwelling-house (the "current home") was made available for occupation
+--       by the tenant, or a predecessor in title of the tenant, to enable
+--       redevelopment of another dwelling-house (the "previous home") which—
+--         (i)  was the only or principal home of the tenant or predecessor in
+--              title, and
+--         (ii) was occupied by the tenant or predecessor in title under a tenancy
+--              (the "previous tenancy") of which the landlord was—
+--                (A) a relevant social landlord, or
+--                (B) a registered provider of social housing other than a private
+--                    registered provider of social housing;
+--   (c) alternative accommodation that—
+--         (i)  consists of the previous home and is affordable, or
+--         (ii) consists of other premises and is affordable, in an appropriate
+--              location and not overcrowded,
+--       is available for the tenant or will be available for the tenant when the
+--       order for possession takes effect;
+--   (d) that alternative accommodation is to be let as a separate dwelling with
+--       adequate security of tenure.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * Made out = (a) AND (b) AND (c) AND (d), each conjunct fully spelled.
+--   * (b) is a chapeau conjoined with (i) AND (ii); within (ii) the "of which the
+--     landlord was—" requirement is a DISJUNCTION over (A) OR (B). So (b) =
+--     (made-available-to-enable-redevelopment) AND (i){only/principal home}
+--     AND (ii){occupied under previous tenancy AND ((A) OR (B))}.
+--   * (c) is a DISJUNCTION over (i) OR (ii), then "is available ... or will be
+--     available ... when the order takes effect" (itself an availability
+--     disjunction). So (c) = ((i) OR (ii)) AND (available now OR available on
+--     possession). The two limbs (i)/(ii) differ in their qualifiers: (i) = the
+--     previous home AND affordable; (ii) = other premises AND affordable AND in
+--     an appropriate location AND not overcrowded.
+--   * The "For the purpose of this ground" gloss on "adequate security of
+--     tenure" / "affordable" / "appropriate location" / "overcrowded", and the
+--     "In this Ground" definitions of "redevelopment" and "relevant social
+--     landlord", are carried as inert prose; their operative effect is folded
+--     into the lifted atoms (e.g. `accommodation is affordable`).
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms of conditions (a)-(d), gathered on the claim.
+DECLARE Ground6AClaim HAS
+  -- (a)
+  `the current landlord is a relevant social landlord`                                        IS A BOOLEAN
+  -- (b) chapeau
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS A BOOLEAN
+  -- (b)(i)
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS A BOOLEAN
+  -- (b)(ii) chapeau + (A)/(B)
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS A BOOLEAN
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS A BOOLEAN  -- (b)(ii)(A)
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS A BOOLEAN  -- (b)(ii)(B)
+  -- (c)(i)
+  `the alternative accommodation consists of the previous home`                                IS A BOOLEAN
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS A BOOLEAN
+  -- (c)(ii)
+  `the alternative accommodation consists of other premises`                                   IS A BOOLEAN
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS A BOOLEAN
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS A BOOLEAN
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS A BOOLEAN
+  -- (c) availability tail
+  `the alternative accommodation is available for the tenant`                                  IS A BOOLEAN
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS A BOOLEAN
+  -- (d)
+  `that alternative accommodation is to be let as a separate dwelling`                         IS A BOOLEAN
+  `that alternative accommodation is to be let with adequate security of tenure`               IS A BOOLEAN
+
+§§ `Condition (a) — the current landlord is a relevant social landlord`
+
+-- "relevant social landlord" has the same meaning as in Ground 6 (carried as
+-- inert prose).
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`condition (a) — current landlord is a relevant social landlord` claim MEANS
+        "(a) the landlord seeking possession (the \"current landlord\") is a relevant social landlord;"
+    ... "(\"relevant social landlord\" has the same meaning as in Ground 6)"
+    ... claim's `the current landlord is a relevant social landlord`
+
+§§ `Condition (b) — current home made available to enable redevelopment of a qualifying previous home`
+
+-- (b)(ii) "of which the landlord was—" is a DISJUNCTION over (A) OR (B).
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`(b)(ii) landlord under the previous tenancy was a qualifying landlord` claim MEANS
+        "of which the landlord was—"
+    ..      "(A) a relevant social landlord, or"
+        ..  claim's `under the previous tenancy the landlord was a relevant social landlord`
+    ..      "(B) a registered provider of social housing other than a private registered provider of social housing;"
+        ..  claim's `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`
+
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`condition (b) — current home a redevelopment decant of a qualifying previous home` claim MEANS
+        "(b) the dwelling-house (the \"current home\") was made available for occupation by the tenant, or a predecessor in title of the tenant, to enable redevelopment of another dwelling-house (the \"previous home\") which—"
+    ... "(\"redevelopment\" means (a) demolishing or reconstructing the whole or a substantial part of the dwelling-house, or (b) carrying out substantial works on the dwelling-house or any part of it, or any building of which it forms part)"
+    ... claim's `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`
+    AND     "(i) was the only or principal home of the tenant or predecessor in title, and"
+        ... claim's `the previous home was the only or principal home of the tenant or predecessor in title`
+    AND     "(ii) was occupied by the tenant or predecessor in title under a tenancy (the \"previous tenancy\")"
+        ... claim's `the previous home was occupied by the tenant or predecessor under the previous tenancy`
+        AND `(b)(ii) landlord under the previous tenancy was a qualifying landlord` claim
+
+§§ `Condition (c) — alternative accommodation, either limb, available now or on possession`
+
+-- (c)(i): consists of the previous home AND is affordable.
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`(c)(i) alternative accommodation is the previous home and affordable` claim MEANS
+        "(i) consists of the previous home and is affordable, or"
+    ... claim's `the alternative accommodation consists of the previous home`
+    AND claim's `the alternative accommodation (consisting of the previous home) is affordable`
+
+-- (c)(ii): consists of other premises AND is affordable AND in an appropriate
+-- location AND not overcrowded.
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`(c)(ii) alternative accommodation is other premises, affordable, appropriately located, not overcrowded` claim MEANS
+        "(ii) consists of other premises and is affordable, in an appropriate location and not overcrowded,"
+    ... claim's `the alternative accommodation consists of other premises`
+    AND claim's `the alternative accommodation (consisting of other premises) is affordable`
+    AND claim's `the alternative accommodation (consisting of other premises) is in an appropriate location`
+    AND claim's `the alternative accommodation (consisting of other premises) is not overcrowded`
+
+-- the availability tail: available now OR will be available when the order takes
+-- effect.
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`alternative accommodation is or will be available` claim MEANS
+        "is available for the tenant or will be available for the tenant when the order for possession takes effect;"
+    ..  claim's `the alternative accommodation is available for the tenant`
+    ..  claim's `the alternative accommodation will be available for the tenant when the order for possession takes effect`
+
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`condition (c) — qualifying alternative accommodation available` claim MEANS
+        "(c) alternative accommodation that—"
+    ...     `(c)(i) alternative accommodation is the previous home and affordable` claim
+        ..  `(c)(ii) alternative accommodation is other premises, affordable, appropriately located, not overcrowded` claim
+    AND `alternative accommodation is or will be available` claim
+
+§§ `Condition (d) — let as a separate dwelling with adequate security of tenure`
+
+-- "with adequate security of tenure" if let (i) on an assured tenancy, or
+-- (ii) on terms which will, in the opinion of the court, afford security of
+-- tenure reasonably equivalent to an assured tenancy (carried as inert prose).
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`condition (d) — let as a separate dwelling with adequate security of tenure` claim MEANS
+        "(d) that alternative accommodation is to be let as a separate dwelling"
+    ... claim's `that alternative accommodation is to be let as a separate dwelling`
+    AND "with adequate security of tenure."
+    ... "(let \"with adequate security of tenure\" if let (i) on an assured tenancy, or (ii) on terms which will, in the opinion of the court, afford to the tenant security of tenure reasonably equivalent to the security afforded by an assured tenancy)"
+    ... claim's `that alternative accommodation is to be let with adequate security of tenure`
+
+§§ `Ground 6A made out — conditions (a) AND (b) AND (c) AND (d)`
+
+GIVEN claim IS A Ground6AClaim
+GIVETH A BOOLEAN
+`Ground 6A made out` claim MEANS
+        "These conditions are met—"
+    ... `condition (a) — current landlord is a relevant social landlord` claim
+    AND `condition (b) — current home a redevelopment decant of a qualifying previous home` claim
+    AND `condition (c) — qualifying alternative accommodation available` claim
+    AND `condition (d) — let as a separate dwelling with adequate security of tenure` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground6AClaim
+GIVETH A DEONTIC Actor Action
+`ground 6A possession order` claim MEANS
+    IF   `Ground 6A made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground6AClaim value (the house style;
+-- L4 has no record-update). The all-met base sets (a)-(d) TRUE, using the
+-- (c)(i) limb (previous home + affordable) and availability-now. Each negative
+-- flips exactly one limb.
+-- ---------------------------------------------------------------------------
+
+§§ `All conditions met — (c) via (i), available now -> made out`
+
+`claim all-met` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS TRUE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS TRUE
+  `the alternative accommodation consists of other premises`                                   IS FALSE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS FALSE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS FALSE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS TRUE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT `condition (a) — current landlord is a relevant social landlord`                       `claim all-met`
+#ASSERT `condition (b) — current home a redevelopment decant of a qualifying previous home`    `claim all-met`
+#ASSERT `condition (c) — qualifying alternative accommodation available`                       `claim all-met`
+#ASSERT `condition (d) — let as a separate dwelling with adequate security of tenure`          `claim all-met`
+#ASSERT `Ground 6A made out`                                                                   `claim all-met`
+
+§§ `All conditions met — (b)(ii) via (B), (c) via (ii), available on possession -> still made out`
+
+-- Exercises the (b)(ii)(B) disjunct, the (c)(ii) limb (other premises + all its
+-- qualifiers), and the "will be available when the order takes effect" availability arm.
+`claim all-met via (B) and (c)(ii)` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS FALSE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS TRUE
+  `the alternative accommodation consists of the previous home`                                IS FALSE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS FALSE
+  `the alternative accommodation consists of other premises`                                   IS TRUE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS TRUE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS TRUE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS TRUE
+  `the alternative accommodation is available for the tenant`                                  IS FALSE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS TRUE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT `(b)(ii) landlord under the previous tenancy was a qualifying landlord`                `claim all-met via (B) and (c)(ii)`
+#ASSERT `condition (b) — current home a redevelopment decant of a qualifying previous home`    `claim all-met via (B) and (c)(ii)`
+#ASSERT `condition (c) — qualifying alternative accommodation available`                       `claim all-met via (B) and (c)(ii)`
+#ASSERT `Ground 6A made out`                                                                   `claim all-met via (B) and (c)(ii)`
+
+§§ `Condition (a) knocked out — current landlord is not a relevant social landlord`
+
+`claim — (a) fails` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS FALSE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS TRUE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS TRUE
+  `the alternative accommodation consists of other premises`                                   IS FALSE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS FALSE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS FALSE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS TRUE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT NOT `condition (a) — current landlord is a relevant social landlord` `claim — (a) fails`
+#ASSERT NOT `Ground 6A made out`                                            `claim — (a) fails`
+
+§§ `Condition (b) knocked out — neither (A) nor (B): previous-tenancy landlord not a qualifying landlord`
+
+-- (b)(ii) needs at least one of (A)/(B); with both FALSE, (b)(ii) fails and so does (b).
+`claim — (b) fails (neither A nor B)` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS FALSE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS TRUE
+  `the alternative accommodation consists of other premises`                                   IS FALSE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS FALSE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS FALSE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS TRUE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT NOT `(b)(ii) landlord under the previous tenancy was a qualifying landlord`             `claim — (b) fails (neither A nor B)`
+#ASSERT NOT `condition (b) — current home a redevelopment decant of a qualifying previous home` `claim — (b) fails (neither A nor B)`
+#ASSERT NOT `Ground 6A made out`                                                                `claim — (b) fails (neither A nor B)`
+
+§§ `Condition (b) knocked out — previous home was not the only or principal home (i)`
+
+`claim — (b) fails (not principal home)` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS FALSE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS TRUE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS TRUE
+  `the alternative accommodation consists of other premises`                                   IS FALSE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS FALSE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS FALSE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS TRUE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT NOT `condition (b) — current home a redevelopment decant of a qualifying previous home` `claim — (b) fails (not principal home)`
+#ASSERT NOT `Ground 6A made out`                                                                `claim — (b) fails (not principal home)`
+
+§§ `Condition (c) knocked out — neither limb (i) nor (ii) qualifies`
+
+-- The previous home arm fails (not affordable); the other-premises arm fails
+-- (overcrowded). Neither (c)(i) nor (c)(ii) holds -> (c) fails.
+`claim — (c) fails (neither limb)` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS TRUE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS FALSE
+  `the alternative accommodation consists of other premises`                                   IS TRUE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS TRUE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS TRUE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS TRUE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT NOT `condition (c) — qualifying alternative accommodation available` `claim — (c) fails (neither limb)`
+#ASSERT NOT `Ground 6A made out`                                            `claim — (c) fails (neither limb)`
+
+§§ `Condition (c) knocked out — a limb qualifies but the accommodation is not (and will not be) available`
+
+`claim — (c) fails (unavailable)` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS TRUE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS TRUE
+  `the alternative accommodation consists of other premises`                                   IS FALSE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS FALSE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS FALSE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS FALSE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS TRUE
+
+#ASSERT NOT `alternative accommodation is or will be available`              `claim — (c) fails (unavailable)`
+#ASSERT NOT `condition (c) — qualifying alternative accommodation available` `claim — (c) fails (unavailable)`
+#ASSERT NOT `Ground 6A made out`                                            `claim — (c) fails (unavailable)`
+
+§§ `Condition (d) knocked out — not let with adequate security of tenure`
+
+`claim — (d) fails` MEANS Ground6AClaim WITH
+  `the current landlord is a relevant social landlord`                                        IS TRUE
+  `the current home was made available for occupation by the tenant or a predecessor to enable redevelopment of the previous home`  IS TRUE
+  `the previous home was the only or principal home of the tenant or predecessor in title`    IS TRUE
+  `the previous home was occupied by the tenant or predecessor under the previous tenancy`     IS TRUE
+  `under the previous tenancy the landlord was a relevant social landlord`                      IS TRUE
+  `under the previous tenancy the landlord was a registered provider of social housing other than a private registered provider`  IS FALSE
+  `the alternative accommodation consists of the previous home`                                IS TRUE
+  `the alternative accommodation (consisting of the previous home) is affordable`              IS TRUE
+  `the alternative accommodation consists of other premises`                                   IS FALSE
+  `the alternative accommodation (consisting of other premises) is affordable`                 IS FALSE
+  `the alternative accommodation (consisting of other premises) is in an appropriate location` IS FALSE
+  `the alternative accommodation (consisting of other premises) is not overcrowded`            IS FALSE
+  `the alternative accommodation is available for the tenant`                                  IS TRUE
+  `the alternative accommodation will be available for the tenant when the order for possession takes effect`  IS FALSE
+  `that alternative accommodation is to be let as a separate dwelling`                         IS TRUE
+  `that alternative accommodation is to be let with adequate security of tenure`               IS FALSE
+
+#ASSERT NOT `condition (d) — let as a separate dwelling with adequate security of tenure` `claim — (d) fails`
+#ASSERT NOT `Ground 6A made out`                                                          `claim — (d) fails`
