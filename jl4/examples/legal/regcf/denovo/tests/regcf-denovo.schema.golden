@@ -1,0 +1,757 @@
+{
+    "$defs": {
+        "Closing": {
+            "properties": {
+                "amount sold in reliance on section 4(a)(6)": {
+                    "type": "number"
+                },
+                "date": {
+                    "format": "date",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "date",
+                "amount sold in reliance on section 4(a)(6)"
+            ],
+            "type": "object"
+        },
+        "CoveredPerson": {
+            "properties": {
+                "class": {
+                    "$ref": "#/$defs/covered person class"
+                },
+                "convicted of a felony or misdemeanor arising out of the conduct of the business of an underwriter, broker, dealer, municipal securities dealer, investment adviser, funding portal or paid solicitor of purchasers of securities": {
+                    "type": "boolean"
+                },
+                "convicted of a felony or misdemeanor in connection with the purchase or sale of any security": {
+                    "type": "boolean"
+                },
+                "convicted of a felony or misdemeanor involving the making of a false filing with the Commission": {
+                    "type": "boolean"
+                },
+                "date of the United States Postal Service false representation order": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date of the conviction": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date of the refusal order, stop order or order suspending the Regulation A exemption": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date of the suspension or expulsion": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date the Commission cease-and-desist order was entered": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date the Commission order under section 15(b), 15B(c) or Advisers Act 203(e) or (f) was entered": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date the court order, judgment or decree was entered": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date the final order was entered": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "filed as a registrant or issuer, or was named as an underwriter in, a registration statement or Regulation A offering statement that was the subject of a refusal order, stop order, or order suspending the Regulation A exemption": {
+                    "type": "boolean"
+                },
+                "in control of the issuer": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "subject to a Commission order to cease and desist from committing or causing a violation of a scienter-based anti-fraud provision of the Federal securities laws": {
+                    "type": "boolean"
+                },
+                "subject to a Commission order to cease and desist from committing or causing a violation of section 5 of the Securities Act": {
+                    "type": "boolean"
+                },
+                "subject to a United States Postal Service false representation order": {
+                    "type": "boolean"
+                },
+                "subject to a court order, judgment or decree restraining or enjoining conduct arising out of the conduct of the business of an underwriter, broker, dealer, municipal securities dealer, investment adviser, funding portal or paid solicitor of purchasers of securities": {
+                    "type": "boolean"
+                },
+                "subject to a court order, judgment or decree restraining or enjoining conduct in connection with the purchase or sale of any security": {
+                    "type": "boolean"
+                },
+                "subject to a court order, judgment or decree restraining or enjoining conduct involving the making of a false filing with the Commission": {
+                    "type": "boolean"
+                },
+                "subject to a final order of a State securities commission, a State bank or credit union supervisor, a State insurance commission, an appropriate Federal banking agency, the U.S. Commodity Futures Trading Commission or the National Credit Union Administration": {
+                    "type": "boolean"
+                },
+                "subject to an order of the Commission under section 15(b) or 15B(c) of the Exchange Act or section 203(e) or (f) of the Investment Advisers Act": {
+                    "type": "boolean"
+                },
+                "subject, at the time of such filing or sale, to a temporary restraining order or preliminary injunction with respect to conduct alleged by the United States Postal Service to constitute a scheme or device for obtaining money or property through the mail by means of false representations": {
+                    "type": "boolean"
+                },
+                "suspended or expelled from membership in, or suspended or barred from association with a member of, a registered national securities exchange or a registered national or affiliated securities association for conduct inconsistent with just and equitable principles of trade": {
+                    "type": "boolean"
+                },
+                "that Commission order bars the person from being associated with any entity or from participating in the offering of any penny stock": {
+                    "type": "boolean"
+                },
+                "that Commission order places limitations on the activities, functions or operations of the person": {
+                    "type": "boolean"
+                },
+                "that Commission order suspends or revokes the person's registration as a broker, dealer, municipal securities dealer, investment adviser or funding portal": {
+                    "type": "boolean"
+                },
+                "that cease-and-desist order is in effect at the time of such filing or sale": {
+                    "type": "boolean"
+                },
+                "that final order bars the person from association with an entity regulated by such commission, authority, agency or officer": {
+                    "type": "boolean"
+                },
+                "that final order bars the person from engaging in savings association or credit union activities": {
+                    "type": "boolean"
+                },
+                "that final order bars the person from engaging in the business of securities, insurance or banking": {
+                    "type": "boolean"
+                },
+                "that final order is based on a violation of a law or regulation prohibiting fraudulent, manipulative or deceptive conduct": {
+                    "type": "boolean"
+                },
+                "the court or regulatory authority that entered the relevant order, judgment or decree advised in writing that disqualification should not arise": {
+                    "type": "boolean"
+                },
+                "the court order, judgment or decree restrains or enjoins the person at the time of such filing or sale": {
+                    "type": "boolean"
+                },
+                "the event occurred before the affiliation with the issuer arose": {
+                    "type": "boolean"
+                },
+                "the subject, at the time of such filing or sale, of an investigation or proceeding to determine whether a stop order or suspension order should be issued": {
+                    "type": "boolean"
+                },
+                "under common control with the issuer by a third party that was in control of the affiliated entity at the time of such events": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "name",
+                "class",
+                "convicted of a felony or misdemeanor in connection with the purchase or sale of any security",
+                "convicted of a felony or misdemeanor involving the making of a false filing with the Commission",
+                "convicted of a felony or misdemeanor arising out of the conduct of the business of an underwriter, broker, dealer, municipal securities dealer, investment adviser, funding portal or paid solicitor of purchasers of securities",
+                "date of the conviction",
+                "subject to a court order, judgment or decree restraining or enjoining conduct in connection with the purchase or sale of any security",
+                "subject to a court order, judgment or decree restraining or enjoining conduct involving the making of a false filing with the Commission",
+                "subject to a court order, judgment or decree restraining or enjoining conduct arising out of the conduct of the business of an underwriter, broker, dealer, municipal securities dealer, investment adviser, funding portal or paid solicitor of purchasers of securities",
+                "the court order, judgment or decree restrains or enjoins the person at the time of such filing or sale",
+                "date the court order, judgment or decree was entered",
+                "subject to a final order of a State securities commission, a State bank or credit union supervisor, a State insurance commission, an appropriate Federal banking agency, the U.S. Commodity Futures Trading Commission or the National Credit Union Administration",
+                "that final order bars the person from association with an entity regulated by such commission, authority, agency or officer",
+                "that final order bars the person from engaging in the business of securities, insurance or banking",
+                "that final order bars the person from engaging in savings association or credit union activities",
+                "that final order is based on a violation of a law or regulation prohibiting fraudulent, manipulative or deceptive conduct",
+                "date the final order was entered",
+                "subject to an order of the Commission under section 15(b) or 15B(c) of the Exchange Act or section 203(e) or (f) of the Investment Advisers Act",
+                "that Commission order suspends or revokes the person's registration as a broker, dealer, municipal securities dealer, investment adviser or funding portal",
+                "that Commission order places limitations on the activities, functions or operations of the person",
+                "that Commission order bars the person from being associated with any entity or from participating in the offering of any penny stock",
+                "date the Commission order under section 15(b), 15B(c) or Advisers Act 203(e) or (f) was entered",
+                "subject to a Commission order to cease and desist from committing or causing a violation of a scienter-based anti-fraud provision of the Federal securities laws",
+                "subject to a Commission order to cease and desist from committing or causing a violation of section 5 of the Securities Act",
+                "that cease-and-desist order is in effect at the time of such filing or sale",
+                "date the Commission cease-and-desist order was entered",
+                "suspended or expelled from membership in, or suspended or barred from association with a member of, a registered national securities exchange or a registered national or affiliated securities association for conduct inconsistent with just and equitable principles of trade",
+                "date of the suspension or expulsion",
+                "filed as a registrant or issuer, or was named as an underwriter in, a registration statement or Regulation A offering statement that was the subject of a refusal order, stop order, or order suspending the Regulation A exemption",
+                "the subject, at the time of such filing or sale, of an investigation or proceeding to determine whether a stop order or suspension order should be issued",
+                "date of the refusal order, stop order or order suspending the Regulation A exemption",
+                "subject to a United States Postal Service false representation order",
+                "subject, at the time of such filing or sale, to a temporary restraining order or preliminary injunction with respect to conduct alleged by the United States Postal Service to constitute a scheme or device for obtaining money or property through the mail by means of false representations",
+                "date of the United States Postal Service false representation order",
+                "the court or regulatory authority that entered the relevant order, judgment or decree advised in writing that disqualification should not arise",
+                "the event occurred before the affiliation with the issuer arose",
+                "in control of the issuer",
+                "under common control with the issuer by a third party that was in control of the affiliated entity at the time of such events"
+            ],
+            "type": "object"
+        },
+        "Disclosure": {
+            "properties": {
+                "a description of exempt offerings conducted within the past three years": {
+                    "type": "boolean"
+                },
+                "a description of related-party transactions above the five percent threshold": {
+                    "type": "boolean"
+                },
+                "a description of the business of the issuer and the anticipated business plan of the issuer": {
+                    "type": "boolean"
+                },
+                "a description of the intermediary's financial interests in the issuer's transaction and in the issuer": {
+                    "type": "boolean"
+                },
+                "a description of the material terms of any indebtedness of the issuer": {
+                    "type": "boolean"
+                },
+                "a description of the ownership and capital structure of the issuer": {
+                    "type": "boolean"
+                },
+                "a description of the process to complete the transaction or cancel an investment commitment": {
+                    "type": "boolean"
+                },
+                "a description of the purpose and intended use of the offering proceeds": {
+                    "type": "boolean"
+                },
+                "a discussion of the issuer's financial condition": {
+                    "type": "boolean"
+                },
+                "a discussion of the material factors that make an investment in the issuer speculative or risky": {
+                    "type": "boolean"
+                },
+                "a statement that an investor who does not reconfirm after a material change will have the commitment cancelled and the funds returned": {
+                    "type": "boolean"
+                },
+                "any material information necessary to make the statements made not misleading": {
+                    "type": "boolean"
+                },
+                "any matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016": {
+                    "type": "boolean"
+                },
+                "any written communication or broadcast script provided in accordance with Â§ 227.206 or Â§ 230.241": {
+                    "type": "boolean"
+                },
+                "the current number of employees of the issuer": {
+                    "type": "boolean"
+                },
+                "the financial statements and tax information required by paragraph (t)": {
+                    "type": "boolean"
+                },
+                "the name of each beneficial owner of twenty percent or more of the issuer's outstanding voting equity securities": {
+                    "type": "boolean"
+                },
+                "the name, SEC file number and CRD number of the intermediary": {
+                    "type": "boolean"
+                },
+                "the name, legal status, physical address and Web site of the issuer": {
+                    "type": "boolean"
+                },
+                "the names of the directors and officers, their positions, tenure and business experience during the past three years": {
+                    "type": "boolean"
+                },
+                "the price to the public of the securities or the method for determining the price": {
+                    "type": "boolean"
+                },
+                "the target offering amount and the deadline to reach the target offering amount": {
+                    "type": "boolean"
+                },
+                "updates regarding the progress of the issuer in meeting the target offering amount": {
+                    "type": "boolean"
+                },
+                "where on the issuer's Web site investors will be able to find the issuer's annual report, and by when": {
+                    "type": "boolean"
+                },
+                "whether the issuer or any of its predecessors previously failed to comply with Â§ 227.202": {
+                    "type": "boolean"
+                },
+                "whether the issuer will accept investments in excess of the target offering amount and how oversubscriptions will be allocated": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "the name, legal status, physical address and Web site of the issuer",
+                "the names of the directors and officers, their positions, tenure and business experience during the past three years",
+                "the name of each beneficial owner of twenty percent or more of the issuer's outstanding voting equity securities",
+                "a description of the business of the issuer and the anticipated business plan of the issuer",
+                "the current number of employees of the issuer",
+                "a discussion of the material factors that make an investment in the issuer speculative or risky",
+                "the target offering amount and the deadline to reach the target offering amount",
+                "whether the issuer will accept investments in excess of the target offering amount and how oversubscriptions will be allocated",
+                "a description of the purpose and intended use of the offering proceeds",
+                "a description of the process to complete the transaction or cancel an investment commitment",
+                "a statement that an investor who does not reconfirm after a material change will have the commitment cancelled and the funds returned",
+                "the price to the public of the securities or the method for determining the price",
+                "a description of the ownership and capital structure of the issuer",
+                "the name, SEC file number and CRD number of the intermediary",
+                "a description of the intermediary's financial interests in the issuer's transaction and in the issuer",
+                "a description of the material terms of any indebtedness of the issuer",
+                "a description of exempt offerings conducted within the past three years",
+                "a description of related-party transactions above the five percent threshold",
+                "a discussion of the issuer's financial condition",
+                "the financial statements and tax information required by paragraph (t)",
+                "any matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016",
+                "updates regarding the progress of the issuer in meeting the target offering amount",
+                "where on the issuer's Web site investors will be able to find the issuer's annual report, and by when",
+                "whether the issuer or any of its predecessors previously failed to comply with Â§ 227.202",
+                "any material information necessary to make the statements made not misleading",
+                "any written communication or broadcast script provided in accordance with Â§ 227.206 or Â§ 230.241"
+            ],
+            "type": "object"
+        },
+        "Interpretation": {
+            "properties": {
+                "annual income period": {
+                    "$ref": "#/$defs/annual income period reading"
+                },
+                "holders of record basis": {
+                    "$ref": "#/$defs/holders of record reading"
+                },
+                "non-natural investor limit basis": {
+                    "$ref": "#/$defs/non-natural investor limit reading"
+                },
+                "one intermediary scope": {
+                    "$ref": "#/$defs/one intermediary scope reading"
+                },
+                "reporting disqualification tense": {
+                    "$ref": "#/$defs/reporting disqualification reading"
+                },
+                "twelve month window anchor": {
+                    "$ref": "#/$defs/twelve month window reading"
+                }
+            },
+            "required": [
+                "non-natural investor limit basis",
+                "twelve month window anchor",
+                "annual income period",
+                "reporting disqualification tense",
+                "holders of record basis",
+                "one intermediary scope"
+            ],
+            "type": "object"
+        },
+        "InvestorProfile": {
+            "properties": {
+                "a natural person": {
+                    "type": "boolean"
+                },
+                "a reasonable expectation of reaching the same income level in the current year": {
+                    "type": "boolean"
+                },
+                "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months": {
+                    "type": "number"
+                },
+                "annual income and net worth calculated jointly with that person's spouse": {
+                    "type": "boolean"
+                },
+                "annual income for the calendar year": {
+                    "type": "number"
+                },
+                "annual income for the investor's own fiscal year": {
+                    "type": "number"
+                },
+                "estimated fair market value of the primary residence at the time of the sale": {
+                    "type": "number"
+                },
+                "held securities of the same issuer, other than such right, on July 20, 2010": {
+                    "type": "boolean"
+                },
+                "indebtedness secured by the primary residence outstanding 60 days before the sale": {
+                    "type": "number"
+                },
+                "indebtedness secured by the primary residence outstanding at the time of the sale": {
+                    "type": "number"
+                },
+                "individual income in each of the two most recent years": {
+                    "type": "number"
+                },
+                "joint income with a spouse or spousal equivalent in each of those years": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "net assets as of the most recent fiscal year end": {
+                    "type": "number"
+                },
+                "net worth calculated without the paragraph (a)(5)(i) adjustments": {
+                    "type": "number"
+                },
+                "qualified as an accredited investor on the basis of net worth at the time the right was acquired": {
+                    "type": "boolean"
+                },
+                "revenue for the most recent fiscal year": {
+                    "type": "number"
+                },
+                "that right was held by the person on July 20, 2010": {
+                    "type": "boolean"
+                },
+                "the aggregate investment of the investor spouses": {
+                    "type": "number"
+                },
+                "the increase in that indebtedness was the result of the acquisition of the primary residence": {
+                    "type": "boolean"
+                },
+                "the purchase is made in accordance with a right to purchase such securities": {
+                    "type": "boolean"
+                },
+                "total assets other than the primary residence": {
+                    "type": "number"
+                },
+                "total liabilities other than indebtedness secured by the primary residence": {
+                    "type": "number"
+                },
+                "within a category of Â§ 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "name",
+                "a natural person",
+                "within a category of Â§ 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be",
+                "annual income for the calendar year",
+                "annual income for the investor's own fiscal year",
+                "revenue for the most recent fiscal year",
+                "net assets as of the most recent fiscal year end",
+                "total assets other than the primary residence",
+                "total liabilities other than indebtedness secured by the primary residence",
+                "estimated fair market value of the primary residence at the time of the sale",
+                "indebtedness secured by the primary residence outstanding at the time of the sale",
+                "indebtedness secured by the primary residence outstanding 60 days before the sale",
+                "the increase in that indebtedness was the result of the acquisition of the primary residence",
+                "the purchase is made in accordance with a right to purchase such securities",
+                "that right was held by the person on July 20, 2010",
+                "qualified as an accredited investor on the basis of net worth at the time the right was acquired",
+                "held securities of the same issuer, other than such right, on July 20, 2010",
+                "net worth calculated without the paragraph (a)(5)(i) adjustments",
+                "individual income in each of the two most recent years",
+                "joint income with a spouse or spousal equivalent in each of those years",
+                "a reasonable expectation of reaching the same income level in the current year",
+                "aggregate amount of securities sold to the investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months",
+                "annual income and net worth calculated jointly with that person's spouse",
+                "the aggregate investment of the investor spouses"
+            ],
+            "type": "object"
+        },
+        "IssuerProfile": {
+            "properties": {
+                "all of the securities issued in reliance on section 4(a)(6) repurchased, including any payment in full of debt securities or any complete redemption of redeemable securities": {
+                    "type": "boolean"
+                },
+                "amount sold in reliance on section 4(a)(6) during the 12-month period preceding the date of such offer or sale": {
+                    "type": "number"
+                },
+                "an investment company as defined in section 3 of the Investment Company Act, or excluded from that definition by section 3(b) or section 3(c) of that Act": {
+                    "type": "boolean"
+                },
+                "annual reports filed since its most recent sale of securities pursuant to this part": {
+                    "type": "number"
+                },
+                "closings in reliance on section 4(a)(6)": {
+                    "items": {
+                        "$ref": "#/$defs/Closing"
+                    },
+                    "type": "array"
+                },
+                "covered persons": {
+                    "items": {
+                        "$ref": "#/$defs/CoveredPerson"
+                    },
+                    "type": "array"
+                },
+                "date the offering statement was filed": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "did not know and, in the exercise of reasonable care, could not have known of the existence of the undisclosed matter": {
+                    "type": "boolean"
+                },
+                "did not know and, in the exercise of reasonable care, could not have known that a disqualification existed": {
+                    "type": "boolean"
+                },
+                "end of the fiscal year covered by the report": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "formerly subject to section 13 or 15(d) reporting, since terminated or suspended": {
+                    "type": "boolean"
+                },
+                "has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement": {
+                    "type": "boolean"
+                },
+                "has sold securities in reliance on section 4(a)(6)": {
+                    "type": "boolean"
+                },
+                "holders of record": {
+                    "type": "number"
+                },
+                "investors who invested in the offering": {
+                    "type": "number"
+                },
+                "liquidated or dissolved its business in accordance with state law": {
+                    "type": "boolean"
+                },
+                "matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "no specific business plan, or a business plan to engage in a merger or acquisition with an unidentified company or companies": {
+                    "type": "boolean"
+                },
+                "organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia": {
+                    "type": "boolean"
+                },
+                "previously failed to comply with the ongoing reporting requirements of Â§ 227.202": {
+                    "type": "boolean"
+                },
+                "previously sold securities in reliance on section 4(a)(6)": {
+                    "type": "boolean"
+                },
+                "required to file reports under section 13(a) or section 15(d) of the Exchange Act": {
+                    "type": "boolean"
+                },
+                "subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act": {
+                    "type": "boolean"
+                },
+                "the Commission has determined that it is not necessary under the circumstances that an exemption be denied": {
+                    "type": "boolean"
+                },
+                "those matters disclosed": {
+                    "type": "boolean"
+                },
+                "total assets": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "name",
+                "organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia",
+                "subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act",
+                "formerly subject to section 13 or 15(d) reporting, since terminated or suspended",
+                "an investment company as defined in section 3 of the Investment Company Act, or excluded from that definition by section 3(b) or section 3(c) of that Act",
+                "has sold securities in reliance on section 4(a)(6)",
+                "has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement",
+                "no specific business plan, or a business plan to engage in a merger or acquisition with an unidentified company or companies",
+                "covered persons",
+                "did not know and, in the exercise of reasonable care, could not have known that a disqualification existed",
+                "the Commission has determined that it is not necessary under the circumstances that an exemption be denied",
+                "closings in reliance on section 4(a)(6)",
+                "amount sold in reliance on section 4(a)(6) during the 12-month period preceding the date of such offer or sale",
+                "previously sold securities in reliance on section 4(a)(6)",
+                "required to file reports under section 13(a) or section 15(d) of the Exchange Act",
+                "annual reports filed since its most recent sale of securities pursuant to this part",
+                "holders of record",
+                "investors who invested in the offering",
+                "total assets",
+                "all of the securities issued in reliance on section 4(a)(6) repurchased, including any payment in full of debt securities or any complete redemption of redeemable securities",
+                "liquidated or dissolved its business in accordance with state law",
+                "matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016",
+                "those matters disclosed",
+                "did not know and, in the exercise of reasonable care, could not have known of the existence of the undisclosed matter",
+                "previously failed to comply with the ongoing reporting requirements of Â§ 227.202",
+                "date the offering statement was filed",
+                "end of the fiscal year covered by the report"
+            ],
+            "type": "object"
+        },
+        "OfferingProfile": {
+            "properties": {
+                "a material change to the terms of the offering or to the information provided by the issuer": {
+                    "type": "boolean"
+                },
+                "conducted exclusively through the intermediary's platform": {
+                    "type": "boolean"
+                },
+                "conducted through an intermediary that complies with section 4A(a) of the Securities Act and the related requirements in this part": {
+                    "type": "boolean"
+                },
+                "date the material change notice was received by the investor": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date the notice of the new offering deadline was provided": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "date the Â§ 227.201 and Â§ 227.203(a) information was first made publicly available on the intermediary's platform": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "deadline identified in the issuer's offering materials": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "maximum amount the issuer will accept": {
+                    "type": "number"
+                },
+                "more than one intermediary used by the issuer for this capital raise": {
+                    "type": "boolean"
+                },
+                "more than one intermediary used in this offering": {
+                    "type": "boolean"
+                },
+                "new offering deadline": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "notice given of the new, anticipated deadline of the offering": {
+                    "type": "boolean"
+                },
+                "notice given of the right of investors to cancel investment commitments for any reason until 48 hours prior to the new offering deadline": {
+                    "type": "boolean"
+                },
+                "notice given of whether the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline": {
+                    "type": "boolean"
+                },
+                "sum of the investment commitments": {
+                    "type": "number"
+                },
+                "target offering amount": {
+                    "type": "number"
+                },
+                "the disclosure provided": {
+                    "$ref": "#/$defs/Disclosure"
+                },
+                "the issuer complies with section 4A(b) of the Securities Act and the related requirements in this part": {
+                    "type": "boolean"
+                },
+                "the issuer knows that the investor has exceeded, or would exceed, the investor limits": {
+                    "type": "boolean"
+                },
+                "the issuer will accept investments in excess of the target offering amount": {
+                    "type": "boolean"
+                },
+                "the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline": {
+                    "type": "boolean"
+                },
+                "the offering completed": {
+                    "type": "boolean"
+                },
+                "the offering statement filed prior to the commencement of the offering": {
+                    "type": "boolean"
+                },
+                "the only failure to comply is with Â§Â§ 227.202, 227.203(a)(3) and 227.203(b)": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "target offering amount",
+                "deadline identified in the issuer's offering materials",
+                "the issuer will accept investments in excess of the target offering amount",
+                "maximum amount the issuer will accept",
+                "date the Â§ 227.201 and Â§ 227.203(a) information was first made publicly available on the intermediary's platform",
+                "sum of the investment commitments",
+                "the offering statement filed prior to the commencement of the offering",
+                "the disclosure provided",
+                "conducted through an intermediary that complies with section 4A(a) of the Securities Act and the related requirements in this part",
+                "conducted exclusively through the intermediary's platform",
+                "more than one intermediary used in this offering",
+                "more than one intermediary used by the issuer for this capital raise",
+                "the issuer complies with section 4A(b) of the Securities Act and the related requirements in this part",
+                "the only failure to comply is with Â§Â§ 227.202, 227.203(a)(3) and 227.203(b)",
+                "the issuer knows that the investor has exceeded, or would exceed, the investor limits",
+                "a material change to the terms of the offering or to the information provided by the issuer",
+                "date the material change notice was received by the investor",
+                "new offering deadline",
+                "date the notice of the new offering deadline was provided",
+                "notice given of the new, anticipated deadline of the offering",
+                "notice given of the right of investors to cancel investment commitments for any reason until 48 hours prior to the new offering deadline",
+                "notice given of whether the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline",
+                "the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline",
+                "the offering completed"
+            ],
+            "type": "object"
+        },
+        "annual income period reading": {
+            "enum": [
+                "the calendar year",
+                "the investor's own fiscal year"
+            ],
+            "type": "string"
+        },
+        "covered person class": {
+            "enum": [
+                "the issuer itself",
+                "a predecessor of the issuer",
+                "an affiliated issuer",
+                "a director, officer, general partner or managing member of the issuer",
+                "a beneficial owner of twenty percent or more of the issuer's outstanding voting equity securities",
+                "a promoter connected with the issuer in any capacity",
+                "a person paid remuneration for solicitation of purchasers",
+                "a general partner, director, officer or managing member of any such solicitor"
+            ],
+            "type": "string"
+        },
+        "holders of record reading": {
+            "enum": [
+                "the investors who invested in the offering",
+                "the register of holders of record"
+            ],
+            "type": "string"
+        },
+        "non-natural investor limit reading": {
+            "enum": [
+                "revenue or net assets",
+                "annual income or net worth"
+            ],
+            "type": "string"
+        },
+        "one intermediary scope reading": {
+            "enum": [
+                "the prohibition binds the offering",
+                "the prohibition binds the issuer"
+            ],
+            "type": "string"
+        },
+        "reporting disqualification reading": {
+            "enum": [
+                "presently subject to the reporting requirement",
+                "ever subject to the reporting requirement"
+            ],
+            "type": "string"
+        },
+        "twelve month window reading": {
+            "enum": [
+                "rolling from each closing",
+                "from the date of such offer or sale"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Decide whether the Regulation Crowdfunding exemption under Securities Act section 4(a)(6) is available for a particular sale of securities by a particular issuer to a particular investor.",
+    "properties": {
+        "interp": {
+            "$ref": "#/$defs/Interpretation",
+            "description": "Which reading of the six contested provisions to apply. Use `the staff reading` for the SEC staff's published interpretations, `the text alone` for the regulation's own words."
+        },
+        "investor": {
+            "$ref": "#/$defs/InvestorProfile",
+            "description": "The purchaser's accredited-investor status, income, net worth and prior crowdfunding investments."
+        },
+        "issuer": {
+            "$ref": "#/$defs/IssuerProfile",
+            "description": "The issuer's eligibility facts, its prior sales under section 4(a)(6), and its covered persons."
+        },
+        "offering": {
+            "$ref": "#/$defs/OfferingProfile",
+            "description": "The offering: target amount, deadline, intermediary arrangements and disclosure."
+        },
+        "the date of the offer or sale": {
+            "description": "The date of the offer or sale being tested, ISO 8601, e.g. 2026-06-16.",
+            "format": "date",
+            "type": "string"
+        },
+        "this investment": {
+            "description": "The dollar amount this investor is committing in this transaction.",
+            "type": "number"
+        }
+    },
+    "required": [
+        "interp",
+        "issuer",
+        "offering",
+        "investor",
+        "this investment",
+        "the date of the offer or sale"
+    ],
+    "title": "the exemption is available",
+    "type": "object"
+}

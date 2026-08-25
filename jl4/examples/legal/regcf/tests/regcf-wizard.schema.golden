@@ -1,0 +1,69 @@
+{
+    "$defs": {
+        "RaisePlan": {
+            "properties": {
+                "already files Exchange Act reports": {
+                    "description": "Does your company already file reports with the SEC under section 13 or section 15(d) of the Securities Exchange Act of 1934?",
+                    "type": "boolean"
+                },
+                "amount you want to raise": {
+                    "description": "How much do you want to raise, in dollars? Use the largest amount you would accept, not your target.",
+                    "type": "number"
+                },
+                "an investment company": {
+                    "description": "Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?",
+                    "type": "boolean"
+                },
+                "behind on past Reg CF annual reports": {
+                    "description": "Have you raised under Regulation Crowdfunding before and missed an annual report in the two years since?",
+                    "type": "boolean"
+                },
+                "has a bad actor disqualification": {
+                    "description": "Is your company, or anyone covered by the rule, subject to a bad-actor disqualification? Get advice before answering: this is a regime in its own right.",
+                    "type": "boolean"
+                },
+                "has no specific business plan": {
+                    "description": "Does your company lack a specific business plan, or is its plan to merge with or acquire a company it has not yet identified?",
+                    "type": "boolean"
+                },
+                "has raised under Reg CF before": {
+                    "description": "Has your company ever sold securities under Regulation Crowdfunding before?",
+                    "type": "boolean"
+                },
+                "organized in the United States": {
+                    "description": "Is your company organized under, and subject to, the laws of a US State or territory, or the District of Columbia?",
+                    "type": "boolean"
+                },
+                "raised under Reg CF in the last 12 months": {
+                    "description": "How much have you already sold under Regulation Crowdfunding in the last 12 months, in dollars? Enter 0 if none.",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "organized in the United States",
+                "already files Exchange Act reports",
+                "an investment company",
+                "has a bad actor disqualification",
+                "behind on past Reg CF annual reports",
+                "has no specific business plan",
+                "amount you want to raise",
+                "raised under Reg CF in the last 12 months",
+                "has raised under Reg CF before"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Check whether a company can raise money under SEC Regulation Crowdfunding, how much it may raise now, what financial statements it must provide, and what it will owe afterwards.",
+    "properties": {
+        "plan": {
+            "$ref": "#/$defs/RaisePlan",
+            "description": "Your company, and what you want to raise"
+        }
+    },
+    "required": [
+        "plan"
+    ],
+    "title": "raise check",
+    "type": "object"
+}
