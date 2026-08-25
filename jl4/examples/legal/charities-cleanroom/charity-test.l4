@@ -1,0 +1,1428 @@
+IMPORT prelude
+
+§ `Charities (Jersey) Law 2014 — the charity test`
+
+-- ===========================================================================
+-- CHARITIES (JERSEY) LAW 2014 (L.41/2014) — Articles 5, 6 and 7,
+-- with the Article 1 / Article 2 interpretation provisions they need.
+--
+-- SCOPE. This module encodes the CHARITY TEST CLUSTER only:
+--
+--   Article 5(1)      the charity test itself           -> `the entity meets the charity test`
+--   Article 5(2)      the government-control carve-out  -> `Article 5(2) — ... disqualification`
+--   Article 5(3)      Ministerial disapplication of 5(2)
+--   Article 6(1)      the sixteen charitable purposes
+--   Article 6(2)      the explanatory provisions (a)-(f) that gloss, gate or deem
+--   Article 6(5)      the political-purposes carve-out
+--   Article 7(2),(3)  public benefit: the mandatory considerations and the two bars
+--   Article 1         "charitable purpose", "constitution", "governor", "purpose"
+--   Article 2(4)(6)(7) the referents of those three definitions
+--
+-- It is NOT a formalisation of the Law. Parts 2 and 4 to 7 (the Commissioner,
+-- the register, registration and deregistration, misconduct and the required
+-- steps regime, the tribunal, offences) are out of scope, as are Articles
+-- 5(4)-(8) and 7(4) (the guidance-publication machinery), 6(3)-(4) (the
+-- States' power to add heads by Regulations) and Article 2(1)-(3),(5),(8)-(10).
+--
+-- SOURCE. Every quoted string is verbatim from the Official Consolidated
+-- Version at https://www.jerseylaw.je/laws/current/l_41_2014, retrieved
+-- 2026-08-02, showing the law from 16 October 2025 to Current. Full extracts
+-- with the fetch provenance are in SOURCE-EXTRACT.md beside this file. No
+-- quotation here was reconstructed from memory.
+--
+-- TEMPORAL AXIS. Articles 5, 6 and 7 carry no endnote marker in the
+-- consolidated version: they stand as enacted and have never been textually
+-- amended. The cluster also contains no dated threshold, no monetary figure
+-- and no commencement-sensitive constant. There is therefore nothing here for
+-- `RULES EFFECTIVE DATE` to select over, and no boundary pair to assert. The
+-- temporal axis for this cluster lives entirely in the choice of point-in-time
+-- version, which is pinned above and in SOURCE-EXTRACT.md.
+--
+-- MODELLING NOTE. The whole cluster is constitutive: it says when a state of
+-- affairs OBTAINS, never who must do what by when. So there is no regulative
+-- rule in this file — no PARTY/MUST/WITHIN. Article 5(4)-(8) and 7(4), the
+-- only deontic material in the cluster's neighbourhood, are out of scope and
+-- would be the natural home for one.
+--
+-- HOUSE STYLE. Verbatim statutory prose rides inline as inert strings; `...`
+-- is AND-sugar and `..` is OR-sugar, so a limb reads as the statute with the
+-- logic hanging off it. Each limb is a named predicate over a GIVEN-threaded
+-- record. Field names drop the leading verb: the genitive `'s` supplies "is"
+-- or "has", so `purpose's `the advancement of religion`` reads "the purpose is
+-- [for] the advancement of religion".
+--
+-- AMBIGUITY REGISTER. Twelve interpretive choices are marked `-- AMBIGUITY A1`
+-- to `A12`, at the site where each bites, with both readings, the reading
+-- taken and why. They are tabulated in README.md; the table and these comments
+-- must agree.
+-- ===========================================================================
+
+§§ `Article 1 and Article 2 — the interpretation provisions the test needs`
+
+-- Article 1 defines four terms by pointing elsewhere; three of the four point
+-- into Article 2, and the fourth points at Article 6, which this file encodes.
+-- Carried inert so the definitional chain is visible and auditable here.
+@ref Charities (Jersey) Law 2014, Article 1 — Interpretation
+`Article 1 — the definitions on which the charity test depends` MEANS
+        "\"charitable purpose\" has the meaning given by Article 6;"
+    ... "\"constitution\" has the meaning given by Article 2(4);"
+    ... "\"governor\" in relation to an entity (including a registered charity) has the meaning given by Article 2(7);"
+    ... "\"Minister\" means the Minister for External Relations;"
+    ... "\"purpose\", in relation to an entity, has the meaning given by Article 2(6);"
+
+-- Article 2(4), (6) and (7) each define their term by DISPATCH ON ENTITY TYPE
+-- (trust / fidéicommis / incorporated 1862 association / foundation / company /
+-- statutory body / other). That dispatch determines WHICH DOCUMENT or WHICH
+-- PERSON the words pick out; it does not vary the charity test's logic, which
+-- is identical whatever the answer. So the dispatch is carried inert, and the
+-- records below take the resolved referents as given.
+@ref Charities (Jersey) Law 2014, Article 2(4) — "constitution"
+`Article 2(4) — constitution` MEANS
+        "(4) In this Law, unless the context otherwise requires, \"constitution\" in relation to an entity means –"
+    ... "(a) in the case of a trust the terms of the trust;"
+    ... "(d) in the case of a foundation, the charter and regulations of the foundation;"
+    ... "(e) in the case of a company, the memorandum and articles of association of the company;"
+    ... "(g) in any other case, any instrument or instruments (in whatever form) that establish the entity or give it any powers."
+
+@ref Charities (Jersey) Law 2014, Article 2(6) — "purpose"
+`Article 2(6) — purpose` MEANS
+        "(6) In this Law, unless the context otherwise requires, \"purpose\" in relation to an entity means –"
+    ... "(c) in the case of a foundation, the objects specified in its charter or its regulations; or"
+    ... "(d) in the case of any other entity, a purpose to which that entity's property may lawfully be applied, other than by virtue of an order of a court, in accordance with the powers of the entity as set out in its constitution (including on its winding up or other termination)."
+
+@ref Charities (Jersey) Law 2014, Article 2(7) — "governor"
+`Article 2(7) — governor` MEANS
+        "(7) In this Law, unless the context otherwise requires, \"governor\" in relation to an entity means –"
+    ... "(a) in the case of a trust or fidéicommis, a trustee or fidéicommissaire of the trust or fidéicommis;"
+    ... "(b) in the case of a foundation, a member of the council of the foundation;"
+    ... "(c) in the case of a company, a director of the company;"
+    ... "(e) in any other case, a person who, under the constitution of the entity, has the general control and management of the administration of the entity."
+
+§§ `The ontology`
+
+-- A PURPOSE, in the Article 2(6) sense, characterised against the Article 6(1)
+-- heads. Independent checkboxes rather than an enum: Article 6(1) is a list of
+-- heads a purpose may fall within, and a single purpose can plainly fall within
+-- several (a soup kitchen relieves poverty AND relieves those in need by reason
+-- of financial hardship). An enum would force a false exclusivity the statute
+-- does not impose.
+--
+-- Fields tagged `6(2)(x)` are the explanatory provisions' own operands; they
+-- are separate fields because Article 6(2) does not merely restate its head,
+-- it either WIDENS it (2)(a),(b), GATES it (2)(c),(d), or DEEMS into it (2)(f).
+@ref Charities (Jersey) Law 2014, Article 6(1) and 6(2)
+DECLARE Purpose HAS
+    `description`                                                                                                                                                                                     IS A STRING
+    `the prevention or relief of poverty`                                                                                                                                                             IS A BOOLEAN   -- 6(1)(a)
+    `the advancement of education`                                                                                                                                                                    IS A BOOLEAN   -- 6(1)(b)
+    `the advancement of religion`                                                                                                                                                                     IS A BOOLEAN   -- 6(1)(c)
+    `the advancement of health`                                                                                                                                                                       IS A BOOLEAN   -- 6(1)(d)
+    `the prevention or relief of sickness, disease or human suffering`                                                                                                                                IS A BOOLEAN   -- 6(2)(a)
+    `the saving of lives`                                                                                                                                                                             IS A BOOLEAN   -- 6(1)(e)
+    `the advancement of citizenship or community development`                                                                                                                                         IS A BOOLEAN   -- 6(1)(f)
+    `rural or urban regeneration`                                                                                                                                                                     IS A BOOLEAN   -- 6(2)(b)(i)
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities`                                                             IS A BOOLEAN   -- 6(2)(b)(ii)
+    `the advancement of the arts, heritage, culture or science`                                                                                                                                       IS A BOOLEAN   -- 6(1)(g)
+    `the advancement of public participation in sport`                                                                                                                                                IS A BOOLEAN   -- 6(1)(h)
+    `sport that involves physical skill and exertion`                                                                                                                                                 IS A BOOLEAN   -- 6(2)(c)
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS A BOOLEAN -- 6(1)(i)
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage`                                                    IS A BOOLEAN   -- 6(2)(d)(i)
+    `available to members of the public at large or to male or female members of the public at large`                                                                                                  IS A BOOLEAN   -- 6(2)(d)(ii)
+    `the advancement of human rights, conflict resolution or reconciliation`                                                                                                                           IS A BOOLEAN   -- 6(1)(j)
+    `the promotion of religious or racial harmony`                                                                                                                                                     IS A BOOLEAN   -- 6(1)(k)
+    `the promotion of equality and diversity`                                                                                                                                                          IS A BOOLEAN   -- 6(1)(l)
+    `the advancement of environmental protection or improvement`                                                                                                                                       IS A BOOLEAN   -- 6(1)(m)
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage`                                                                                    IS A BOOLEAN   -- 6(1)(n)
+    `the advancement of animal welfare`                                                                                                                                                                IS A BOOLEAN   -- 6(1)(o)
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`                                                                                                       IS A BOOLEAN   -- 6(1)(p)
+    `the advancement of a philosophical belief (whether or not involving belief in a god)`                                                                                                              IS A BOOLEAN   -- 6(2)(f)
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`                                                                               IS A BOOLEAN   -- 6(5)
+    `purely ancillary or incidental to any of the entity's charitable purposes`                                                                                                                         IS A BOOLEAN   -- 5(1)(a)(ii)
+
+-- The Article 2(4) constitution, characterised against Article 5(2)'s six
+-- permission limbs (three listed persons x two modes of involvement) plus the
+-- trailing "acting in that capacity" qualifier.
+@ref Charities (Jersey) Law 2014, Article 5(2)
+DECLARE Constitution HAS
+    `description`                                                                                                                    IS A STRING
+    `express permission for the entity's activities to be directed or otherwise controlled by a Minister`                            IS A BOOLEAN   -- 5(2), limb (a), direction mode
+    `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly`       IS A BOOLEAN   -- 5(2), limb (b), direction mode
+    `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction` IS A BOOLEAN -- 5(2), limb (c), direction mode
+    `express permission for any of the entity's governors to be a Minister`                                                          IS A BOOLEAN   -- 5(2), limb (a), governor mode
+    `express permission for any of the entity's governors to be a member of the States Assembly`                                     IS A BOOLEAN   -- 5(2), limb (b), governor mode
+    `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction`             IS A BOOLEAN   -- 5(2), limb (c), governor mode
+    `that permission extended to such a person acting in that capacity`                                                              IS A BOOLEAN   -- 5(2), the trailing qualifier
+
+-- The Article 7 determination, as a record of what the determiner found and
+-- what the determiner did. Two of these fields are TRUTH-conditional (they can
+-- change whether the entity provides public benefit); four are PROCEDURAL
+-- (they record compliance with Article 7(2) and 7(3)(a), which bind the
+-- determiner's reasoning, not the entity's status). See AMBIGUITY A9 and A10.
+@ref Charities (Jersey) Law 2014, Articles 5(1)(b) and 7
+DECLARE PublicBenefitFinding HAS
+    `description`                                                                                                          IS A STRING
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes`            IS A BOOLEAN   -- 5(1)(b), first limb
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS A BOOLEAN -- 5(1)(b), the applicant's limb
+    `benefit provided only to one particular natural person or to a group of identified natural persons`                    IS A BOOLEAN   -- 7(3)(b), the bar
+    `benefit provided to a section of the public only`                                                                      IS A BOOLEAN   -- 7(2)(b), the trigger
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive`                              IS A BOOLEAN   -- 7(2)(b), the question asked
+    `regard had to the comparison required by Article 7(2)(a)`                                                              IS A BOOLEAN   -- 7(2)(a), procedural
+    `regard had to the question required by Article 7(2)(b)`                                                                IS A BOOLEAN   -- 7(2)(b), procedural
+    `a particular charitable purpose presumed to be for the public benefit`                                                 IS A BOOLEAN   -- 7(3)(a), procedural
+
+@ref Charities (Jersey) Law 2014, Articles 2(1), 5(1), 5(3)
+DECLARE Entity HAS
+    `name`                                                                    IS A STRING
+    `purposes`                                                                IS A LIST OF Purpose        -- Article 2(6)
+    `constitution`                                                            IS A Constitution           -- Article 2(4)
+    `an applicant`                                                            IS A BOOLEAN                -- 5(1)(b), "in the case of an applicant"
+    `the public benefit finding`                                              IS A PublicBenefitFinding   -- Articles 5(1)(b), 7
+    `specified in an Order under Article 5(3) disapplying paragraph (2)`      IS A BOOLEAN                -- 5(3)
+
+§§ `Article 6 — Charitable purposes`
+
+-- --- 6(1)(a) to (o), with the 6(2) glosses, gates and deemings applied ------
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(a)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(a) — the prevention or relief of poverty` purpose MEANS
+        "(a)" ... purpose's `the prevention or relief of poverty`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(b)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(b) — the advancement of education` purpose MEANS
+        "(b)" ... purpose's `the advancement of education`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(c)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(c) — the advancement of religion` purpose MEANS
+        "(c)" ... purpose's `the advancement of religion`
+
+-- 6(2)(a) WIDENS head (d): "the advancement of health" includes "the
+-- prevention or relief of sickness, disease or human suffering". A widening,
+-- not a restatement, because it names a different subject-matter — a purpose
+-- can prevent sickness without, on a narrow reading, advancing health. So it
+-- gets its own operand, disjoined into the head.
+@ref Charities (Jersey) Law 2014, Articles 6(1)(d) and 6(2)(a)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(d) — the advancement of health` purpose MEANS
+        "(d)" ... purpose's `the advancement of health`
+    ..  "(2)(a)" ... purpose's `the prevention or relief of sickness, disease or human suffering`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(e)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(e) — the saving of lives` purpose MEANS
+        "(e)" ... purpose's `the saving of lives`
+
+-- 6(2)(b) WIDENS head (f) with two named inclusions. Same reasoning as (2)(a):
+-- rural regeneration and the promotion of the voluntary sector are distinct
+-- subject-matters from "citizenship or community development", so each is an
+-- operand rather than a gloss.
+@ref Charities (Jersey) Law 2014, Articles 6(1)(f) and 6(2)(b)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(f) — the advancement of citizenship or community development` purpose MEANS
+        "(f)" ... purpose's `the advancement of citizenship or community development`
+    ..  "(2)(b)(i)" ... purpose's `rural or urban regeneration`
+    ..  "(2)(b)(ii)" ... purpose's `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(g)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(g) — the advancement of the arts, heritage, culture or science` purpose MEANS
+        "(g)" ... purpose's `the advancement of the arts, heritage, culture or science`
+
+-- 6(2)(c) GATES head (h): it is a stipulative definition of "sport" INSIDE
+-- (1)(h), so an activity that is not sport in that sense cannot advance public
+-- participation in sport. Conjunction, not disjunction.
+--
+-- AMBIGUITY A1 — "sport that involves physical skill and exertion".
+--   Reading (i)  CONJUNCTIVE: the sport must involve both physical skill and
+--                physical exertion. Darts (skill, little exertion) and a
+--                tug-of-war (exertion, little skill) both fall outside.
+--   Reading (ii) DISJUNCTIVE-ish / hendiadys: "physical skill and exertion" is
+--                one compound idea — physically demanding activity — so an
+--                activity strong in either component qualifies.
+--   TAKEN: (i), conjunctive. "and" is the drafter's conjunction and the
+--   provision is a NARROWING one — it exists to keep something out of (1)(h),
+--   which only reading (i) does. Encoded as a single field so the conjunction
+--   is settled at the input boundary; a determiner who reads it disjunctively
+--   sets the same field on looser grounds, and the head's logic is unchanged.
+@ref Charities (Jersey) Law 2014, Articles 6(1)(h) and 6(2)(c)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(h) — the advancement of public participation in sport` purpose MEANS
+        "(h)" ... purpose's `the advancement of public participation in sport`
+    ... "(2)(c)" ... purpose's `sport that involves physical skill and exertion`
+
+-- 6(2)(d) GATES head (i) with an express "applies only in relation to"
+-- restriction, whose own two limbs are disjoined ((i) OR (ii)).
+@ref Charities (Jersey) Law 2014, Articles 6(1)(i) and 6(2)(d)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(2)(d) — the recreational-facilities restriction is satisfied` purpose MEANS
+        "(2)(d) paragraph (1)(i) applies only in relation to recreational facilities or activities that are –"
+    ..  "(i)" ... purpose's `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage`
+    ..  "(ii)" ... purpose's `available to members of the public at large or to male or female members of the public at large`
+
+@ref Charities (Jersey) Law 2014, Articles 6(1)(i) and 6(2)(d)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(i) — the provision of recreational facilities or activities` purpose MEANS
+        "(i)" ... purpose's `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended`
+    ... `(2)(d) — the recreational-facilities restriction is satisfied` purpose
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(j)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(j) — the advancement of human rights, conflict resolution or reconciliation` purpose MEANS
+        "(j)" ... purpose's `the advancement of human rights, conflict resolution or reconciliation`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(k)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(k) — the promotion of religious or racial harmony` purpose MEANS
+        "(k)" ... purpose's `the promotion of religious or racial harmony`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(l)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(l) — the promotion of equality and diversity` purpose MEANS
+        "(l)" ... purpose's `the promotion of equality and diversity`
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(m)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(m) — the advancement of environmental protection or improvement` purpose MEANS
+        "(m)" ... purpose's `the advancement of environmental protection or improvement`
+
+-- AMBIGUITY A2 — 6(2)(e), "paragraph (1)(n) includes relief given by the
+-- provision of accommodation or care".
+--   Reading (i)  DECLARATORY: (2)(e) confirms that relief delivered as
+--                accommodation or care is still "relief" for (1)(n). The
+--                "in need by reason of age, ill-health, disability, financial
+--                hardship or other disadvantage" element continues to govern.
+--   Reading (ii) FREE-STANDING: providing accommodation or care is itself
+--                enough for head (n), whether or not the recipients are in need
+--                on any of the listed grounds.
+--   TAKEN: (i), declaratory. (2)(e) speaks of "relief", a word it takes from
+--   (1)(n), which supplies that relief's object. Reading (ii) would make a
+--   commercial care home a charitable purpose, which the head's own qualifying
+--   words exclude. Consequence: unlike (2)(a) and (2)(b), (2)(e) contributes NO
+--   OPERAND — it rides inert. That asymmetry is deliberate: (2)(a) and (2)(b)
+--   name different subject-matter, (2)(e) names a mode of delivering the very
+--   relief (1)(n) already requires.
+@ref Charities (Jersey) Law 2014, Articles 6(1)(n) and 6(2)(e)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(n) — the relief of those in need` purpose MEANS
+        "(n)" ... purpose's `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage`
+    ... "(2)(e) paragraph (1)(n) includes relief given by the provision of accommodation or care;"
+
+@ref Charities (Jersey) Law 2014, Article 6(1)(o)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(o) — the advancement of animal welfare` purpose MEANS
+        "(o)" ... purpose's `the advancement of animal welfare`
+
+-- 6(2)(f) DEEMS into head (p): philosophical belief is declared analogous to
+-- (1)(c), and (1)(p) admits anything analogous to (a)-(o). So the deeming
+-- enters the disjunction as an independent route into (p) — a purpose flagged
+-- only as advancing a philosophical belief reaches (p) without any separate
+-- analogy judgement.
+--
+-- AMBIGUITY A3 — 6(1)(p), "any other purpose that may reasonably be regarded
+-- as analogous to any of the purposes listed in sub-paragraphs (a) to (o)".
+--   Reading (i)  OPEN STANDARD: an evaluative judgement, made afresh on each
+--                purpose, not derivable from any fact the drafter enumerated.
+--   Reading (ii) CLOSED LIST: (p) reaches only what 6(2)(f) expressly deems
+--                analogous, i.e. philosophical belief.
+--   TAKEN: (i). "may reasonably be regarded" is the language of judgement, and
+--   6(2)(f) is expressed as one instance ("for the purposes of paragraph (1)(p)
+--   ... is analogous"), not as an exhaustive definition. Encoded as an input
+--   judgement rather than a computed one: this module records WHO decided the
+--   analogy, it does not decide it. That is a real limit on what this
+--   formalisation can verify and it is stated here rather than papered over.
+@ref Charities (Jersey) Law 2014, Articles 6(1)(p) and 6(2)(f)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(p) — any other analogous purpose` purpose MEANS
+        "(p)" ... purpose's `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`
+    ..  "(2)(f)" ... purpose's `the advancement of a philosophical belief (whether or not involving belief in a god)`
+
+-- --- 6(1), the disjunction of the heads ------------------------------------
+
+@ref Charities (Jersey) Law 2014, Article 6(1)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`the purpose falls within paragraph (1)` purpose MEANS
+        "(1) For the purposes of this Law, the charitable purposes are –"
+    ..  `(a) — the prevention or relief of poverty` purpose
+    ..  `(b) — the advancement of education` purpose
+    ..  `(c) — the advancement of religion` purpose
+    ..  `(d) — the advancement of health` purpose
+    ..  `(e) — the saving of lives` purpose
+    ..  `(f) — the advancement of citizenship or community development` purpose
+    ..  `(g) — the advancement of the arts, heritage, culture or science` purpose
+    ..  `(h) — the advancement of public participation in sport` purpose
+    ..  `(i) — the provision of recreational facilities or activities` purpose
+    ..  `(j) — the advancement of human rights, conflict resolution or reconciliation` purpose
+    ..  `(k) — the promotion of religious or racial harmony` purpose
+    ..  `(l) — the promotion of equality and diversity` purpose
+    ..  `(m) — the advancement of environmental protection or improvement` purpose
+    ..  `(n) — the relief of those in need` purpose
+    ..  `(o) — the advancement of animal welfare` purpose
+    ..  `(p) — any other analogous purpose` purpose
+
+-- --- 6(5), the political-purposes carve-out --------------------------------
+
+-- AMBIGUITY A4 — the SCOPE of the 6(5) carve-out.
+--   Reading (i)  PURPOSE-LEVEL: 6(5) disqualifies the political PURPOSE. The
+--                entity then fails only through 5(1)(a), because not all of its
+--                purposes are charitable or ancillary. An entity with no
+--                political purpose is untouched.
+--   Reading (ii) ENTITY-LEVEL: an entity that has any political purpose is
+--                itself outside the Law.
+--   TAKEN: (i). 6(5)'s grammatical subject is "the purpose of advancing a
+--   political party ...", and its predicate is "is neither a charitable purpose
+--   nor a purpose ancillary or incidental to a charitable purpose" — a
+--   statement about a purpose's classification, not an entity's status. The
+--   entity-level consequence follows through 5(1)(a) rather than directly, and
+--   the two readings coincide on the answer while differing on the REASON
+--   given, which is what an explainable determination has to report.
+--
+-- Note the double reach: 6(5) removes the purpose from BOTH limbs of 5(1)(a),
+-- so a political purpose cannot be rescued by calling it ancillary. That is
+-- what "nor a purpose ancillary or incidental to a charitable purpose,
+-- irrespective of whether it would otherwise fall within paragraph (1) or
+-- Article 5(1)(a)(ii)" does, and it is applied at both use sites below.
+@ref Charities (Jersey) Law 2014, Article 6(5)
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+`(5) — the purpose is excluded as political` purpose MEANS
+        "(5)" ... purpose's `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`
+
+@ref Charities (Jersey) Law 2014, Article 6 — read with Article 1
+GIVEN purpose IS A Purpose
+GIVETH A BOOLEAN
+DECIDE `the purpose is a charitable purpose` purpose IF
+        `the purpose falls within paragraph (1)` purpose
+    AND NOT `(5) — the purpose is excluded as political` purpose
+
+§§ `Article 7 — Public benefit`
+
+-- AMBIGUITY A5 — whether Article 7 constrains the MEANING of public benefit or
+-- only BINDS three named determiners.
+--   Reading (i)  RULE OF CONSTRUCTION: 7(2) and 7(3) fix what "public benefit"
+--                means for the purpose of 5(1)(b), whoever is applying it.
+--   Reading (ii) ADDRESSEE-LIMITED: 7(1) says paragraphs (2) and (3) "apply to
+--                the Commissioner, the tribunal and the court", so a
+--                self-assessing entity, or anyone else, is unconstrained by
+--                them (bound only by the 5(5) duty to have regard to guidance).
+--   TAKEN: (i). Reading (ii) makes the charity test mean different things
+--   depending on who is applying it — an entity benefiting a single identified
+--   individual would fail before the Commissioner and pass on self-assessment —
+--   which cannot be right of a single statutory standard. 7(1) is read as
+--   identifying the officers on whom the DUTY falls, not as limiting the
+--   standard's reach. Consequence: 7(3)(b) below is applied unconditionally.
+
+-- AMBIGUITY A6 — the operative force of 7(3)(b).
+--   Reading (i)  SUBSTANTIVE BAR: an entity benefiting only one identified
+--                natural person, or only a group of identified natural persons,
+--                does not provide public benefit. Full stop.
+--   Reading (ii) EVIDENTIAL: the determiner may not TREAT such persons as a
+--                section of the public, but might still find public benefit on
+--                some other footing.
+--   TAKEN: (i). The provision does not stop at the treating-as rule; it goes on
+--   "and accordingly must not treat an entity that benefits only such a person
+--   or persons as providing public benefit" — a conclusion about the entity,
+--   not about the evidence. So it is encoded as a hard negative limb that
+--   overrides the 5(1)(b) judgement.
+@ref Charities (Jersey) Law 2014, Article 7(3)(b)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`7(3)(b) — the entity benefits only identified natural persons` entity MEANS
+        "(3)(b)" ... entity's `the public benefit finding`'s `benefit provided only to one particular natural person or to a group of identified natural persons`
+
+-- AMBIGUITY A7 — whether an "unduly restrictive" condition under 7(2)(b)
+-- DEFEATS public benefit.
+--   Reading (i)  CONSIDERATION ONLY: 7(2) says the determiner "must have regard
+--                to" the question. An affirmative answer weighs against public
+--                benefit but does not settle it; the 5(1)(b) judgement absorbs
+--                it.
+--   Reading (ii) DEFEATER: an unduly restrictive condition is fatal.
+--   TAKEN: (i). The statute distinguishes its own modalities in adjacent
+--   paragraphs — 7(2) "must have regard to", 7(3) "must not" — and only the
+--   latter is cast as a prohibition on the conclusion. Reading (ii) would
+--   collapse that distinction. Consequence: `unduly restrictive` is recorded
+--   and reported but contributes NO operand to the public-benefit truth value.
+--   This is the same declaratory/operative distinction drawn at A2, and it is
+--   the choice most likely to be wrong if Jersey practice has hardened the
+--   other way: it is isolated here so it can be flipped in one place.
+@ref Charities (Jersey) Law 2014, Article 7(2)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`7(2) — the mandatory considerations were had regard to` entity MEANS
+        "(2) The person determining the question must have regard to –"
+    ... "(a) how any – (i) benefit gained or likely to be gained by members of the entity or any other persons (other than as members of the public), and (ii) disbenefit incurred or likely to be incurred by the public, in consequence of the entity exercising its functions, compares with the benefit gained or likely to be gained by the public in that consequence; and"
+    ... entity's `the public benefit finding`'s `regard had to the comparison required by Article 7(2)(a)`
+    ... "(b) if benefit is, or is likely to be, provided to a section of the public only, whether any condition on obtaining that benefit (including any charge or fee) is unduly restrictive."
+    ... `7(2)(b) — the section-of-the-public question was reached` entity
+
+-- 7(2)(b)'s duty is CONDITIONAL on benefit being provided to a section of the
+-- public only. Where it is not, the duty is vacuously discharged: the classic
+-- proviso limb, (NOT trigger) OR condition.
+@ref Charities (Jersey) Law 2014, Article 7(2)(b)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`7(2)(b) — the section-of-the-public question was reached` entity MEANS
+        NOT entity's `the public benefit finding`'s `benefit provided to a section of the public only`
+    ..  entity's `the public benefit finding`'s `regard had to the question required by Article 7(2)(b)`
+
+@ref Charities (Jersey) Law 2014, Article 7(3)(a)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`7(3)(a) — no charitable purpose was presumed to be for the public benefit` entity MEANS
+        "(3)(a)" ... NOT entity's `the public benefit finding`'s `a particular charitable purpose presumed to be for the public benefit`
+
+-- AMBIGUITY A8 — the consequence of a determiner IGNORING a 7(2) consideration
+-- or breaching the 7(3)(a) no-presumption rule.
+--   Reading (i)  VALIDITY: the determination is defective and liable to be set
+--                aside, but the entity's status is whatever a properly-made
+--                determination would find. Procedure and truth are separate
+--                questions.
+--   Reading (ii) TRUTH: a defective determination cannot establish public
+--                benefit, so the entity fails 5(1)(b).
+--   TAKEN: (i). 7(2) and 7(3)(a) are addressed to "the person determining the
+--   question" and regulate HOW the question is answered; nothing in them speaks
+--   to the entity. Encoded as a SEPARATE predicate that the charity test does
+--   not read — so a presumption-tainted determination can still be reported as
+--   improperly made while the test itself answers on the merits. The asserts
+--   below exercise exactly that divergence.
+@ref Charities (Jersey) Law 2014, Article 7(2) and 7(3)(a)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+DECIDE `the public benefit determination was properly made` entity IF
+        `7(2) — the mandatory considerations were had regard to` entity
+    AND `7(3)(a) — no charitable purpose was presumed to be for the public benefit` entity
+
+§§ `Article 5 — The charity test`
+
+-- --- 5(1)(a): all of its purposes are charitable or ancillary ---------------
+
+@ref Charities (Jersey) Law 2014, Article 5(1)(a)(i)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`the entity has at least one charitable purpose` entity MEANS
+    any `the purpose is a charitable purpose` (entity's `purposes`)
+
+-- AMBIGUITY A9 — 5(1)(a)(ii), "purposes that are purely ancillary or incidental
+-- to any of ITS CHARITABLE PURPOSES", applied to an entity that has none.
+--   Reading (i)  REFERENTIAL: the limb presupposes at least one charitable
+--                purpose to be ancillary TO. An entity whose every purpose is
+--                merely ancillary has nothing to attach them to and fails.
+--   Reading (ii) LITERAL-FLAG: take the ancillary characterisation as given and
+--                do not test the referent, so an all-ancillary entity passes
+--                5(1)(a).
+--   TAKEN: (i). "its charitable purposes" is a definite reference that the
+--   entity must be able to satisfy, and reading (ii) admits an entity that is
+--   entirely incidental to nothing — which cannot be a charity. Encoded as an
+--   explicit gate on the ancillary limb rather than left to the input, so the
+--   presupposition is checked rather than assumed. The `an entity whose only
+--   purpose is ancillary` scenario below exercises it.
+@ref Charities (Jersey) Law 2014, Articles 5(1)(a)(ii) and 6(5)
+GIVEN entity IS AN Entity, purpose IS A Purpose
+GIVETH A BOOLEAN
+`(ii) — the purpose is purely ancillary or incidental` entity purpose MEANS
+        "(ii)" ... purpose's `purely ancillary or incidental to any of the entity's charitable purposes`
+    ... `the entity has at least one charitable purpose` entity
+    ... NOT `(5) — the purpose is excluded as political` purpose
+
+@ref Charities (Jersey) Law 2014, Article 5(1)(a)
+GIVEN entity IS AN Entity, purpose IS A Purpose
+GIVETH A BOOLEAN
+`the purpose is charitable, or purely ancillary or incidental` entity purpose MEANS
+        "(i)"
+    ..  `the purpose is a charitable purpose` purpose
+    ..  `(ii) — the purpose is purely ancillary or incidental` entity purpose
+
+-- AMBIGUITY A10 — 5(1)(a) applied to an entity with NO purposes at all.
+--   Reading (i)  VACUOUS TRUTH: "all of its purposes are ..." is satisfied by
+--                an empty set, so limb (a) passes and the entity turns on
+--                limb (b) alone.
+--   Reading (ii) EXISTENTIAL IMPORT: "all of its purposes" presupposes that it
+--                has some, so a purposeless entity fails (a).
+--   TAKEN: (i), vacuous truth — the standard reading of a universal, and the
+--   one `all` implements. The choice is nearly harmless in practice because
+--   limb (b) catches such an entity anyway: it cannot provide public benefit
+--   "in giving effect to those purposes" when there are none. It is registered
+--   because the two readings differ in the REASON reported, and because an
+--   input pipeline that silently drops unparsed purposes would turn a failing
+--   entity into a passing one under reading (i). The `a purposeless entity`
+--   scenario below pins the behaviour so a later change to `all` is caught.
+@ref Charities (Jersey) Law 2014, Article 5(1)(a)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`5(1)(a) — all of its purposes are charitable or ancillary` entity MEANS
+        "(a)" ... all (GIVEN purpose YIELD `the purpose is charitable, or purely ancillary or incidental` entity purpose)
+                      (entity's `purposes`)
+
+-- --- 5(1)(b): public benefit ------------------------------------------------
+
+-- AMBIGUITY A11 — who may rely on 5(1)(b)'s "intends to provide" limb.
+--   Reading (i)  APPLICANTS ONLY: the parenthesis "(or, in the case of an
+--                applicant, provides or intends to provide)" extends the test
+--                to intention for applicants alone; a registered charity must
+--                actually provide.
+--   Reading (ii) GENERAL: intention suffices for anyone, the parenthesis merely
+--                spelling out the commonest case.
+--   TAKEN: (i). "in the case of an applicant" is a restrictive qualifier and
+--   would do no work under reading (ii). This is the limb with the sharpest
+--   practical bite in the file — it is what makes a not-yet-operating applicant
+--   registrable and a dormant registered charity not — so both scenarios are
+--   asserted below.
+@ref Charities (Jersey) Law 2014, Article 5(1)(b)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`the entity provides or intends to provide public benefit` entity MEANS
+        entity's `the public benefit finding`'s `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes`
+    ..  `the applicant's intention limb` entity
+
+@ref Charities (Jersey) Law 2014, Article 5(1)(b)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`the applicant's intention limb` entity MEANS
+        entity's `an applicant`
+    ... entity's `the public benefit finding`'s `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes`
+
+@ref Charities (Jersey) Law 2014, Articles 5(1)(b) and 7(3)(b)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`5(1)(b) — public benefit` entity MEANS
+        "(b)" ... `the entity provides or intends to provide public benefit` entity
+    ... NOT `7(3)(b) — the entity benefits only identified natural persons` entity
+
+-- --- 5(2) and 5(3): the government-control carve-out ------------------------
+
+-- AMBIGUITY A12 — the reach of the tabulated list (a)-(c) in 5(2).
+--   Reading (i)  DISTRIBUTED: "expressly permits its activities to be directed
+--                or otherwise controlled by, OR any of its governors to be —
+--                (a) a Minister; (b) a member of the States Assembly; (c) any
+--                equivalent ..." — the list supplies the object of BOTH modes,
+--                giving six permission limbs.
+--   Reading (ii) SECOND-MODE-ONLY: the list attaches only to "any of its
+--                governors to be", leaving the direction-or-control mode with
+--                no stated object at all.
+--   TAKEN: (i). Reading (ii) leaves "directed or otherwise controlled by"
+--   dangling with nothing to be controlled by, which is not a possible reading
+--   of the sentence; the shared list is exactly what the comma before "or any
+--   of its governors" and the tabulation are doing. Encoded as six fields, and
+--   both modes are asserted below.
+--
+-- The trailing "acting in that capacity" is read as qualifying the whole
+-- tabulated list under BOTH modes: it sits after limb (c) at the outer
+-- indentation level, which is the drafting convention for a qualifier returning
+-- to the stem. A constitution that permits a person who HAPPENS to be a
+-- Minister to serve in a purely private capacity is therefore not caught.
+@ref Charities (Jersey) Law 2014, Article 5(2)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`5(2) — direction or control by a listed person is expressly permitted` entity MEANS
+        "(a)" ... entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by a Minister`
+    ..  "(b)" ... entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly`
+    ..  "(c)" ... entity's `constitution`'s `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction`
+
+@ref Charities (Jersey) Law 2014, Article 5(2)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`5(2) — governorship by a listed person is expressly permitted` entity MEANS
+        "(a)" ... entity's `constitution`'s `express permission for any of the entity's governors to be a Minister`
+    ..  "(b)" ... entity's `constitution`'s `express permission for any of the entity's governors to be a member of the States Assembly`
+    ..  "(c)" ... entity's `constitution`'s `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction`
+
+@ref Charities (Jersey) Law 2014, Article 5(2)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`5(2) — a listed person is expressly permitted under either mode` entity MEANS
+        `5(2) — direction or control by a listed person is expressly permitted` entity
+    ..  `5(2) — governorship by a listed person is expressly permitted` entity
+
+-- 5(3) makes the whole of 5(2) defeasible by Ministerial Order. The Order
+-- operates on paragraph (2), not on the test, so it is a negative limb ON the
+-- disqualification rather than a positive limb of the test.
+@ref Charities (Jersey) Law 2014, Articles 5(2) and 5(3)
+GIVEN entity IS AN Entity
+GIVETH A BOOLEAN
+`5(2) — the government-control disqualification applies` entity MEANS
+        "(2)" ... `5(2) — a listed person is expressly permitted under either mode` entity
+    ... entity's `constitution`'s `that permission extended to such a person acting in that capacity`
+    ... "(3)" ... NOT entity's `specified in an Order under Article 5(3) disapplying paragraph (2)`
+
+-- --- The test ---------------------------------------------------------------
+
+@export Decide whether an entity meets the charity test in Article 5 of the Charities (Jersey) Law 2014, applying the charitable-purposes heads in Article 6 (including the political-purposes carve-out), the public-benefit rules in Article 7, and the government-control disqualification in Article 5(2).
+@ref Charities (Jersey) Law 2014, Article 5
+GIVEN entity IS AN Entity @desc The entity, its purposes as characterised against the Article 6(1) heads, its constitution as characterised against Article 5(2), and the Article 7 public-benefit finding.
+GIVETH A BOOLEAN
+DECIDE `the entity meets the charity test` entity IF
+        `5(1)(a) — all of its purposes are charitable or ancillary` entity
+    AND `5(1)(b) — public benefit` entity
+    AND NOT `5(2) — the government-control disqualification applies` entity
+
+§§ `Scenarios`
+
+-- Purposes. Full record literals: L4 has no record-update operator, so each
+-- scenario spells every field. Read them as checkbox forms.
+
+`a poverty-relief purpose` MEANS Purpose WITH
+    `description` IS "the prevention and relief of poverty in the Parish of St Helier"
+    `the prevention or relief of poverty` IS TRUE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Reaches head (d) ONLY through the 6(2)(a) widening: the entity does not
+-- claim to advance health, it claims to prevent sickness.
+`a sickness-prevention purpose` MEANS Purpose WITH
+    `description` IS "the prevention of communicable disease"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS TRUE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Head (h) claimed, but the 6(2)(c) gate fails: competitive pigeon fancying is
+-- not sport involving physical skill and exertion.
+`a spectator-pastime purpose` MEANS Purpose WITH
+    `description` IS "the advancement of public participation in competitive pigeon fancying"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS TRUE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Head (h) with the 6(2)(c) gate satisfied.
+`a physical-sport purpose` MEANS Purpose WITH
+    `description` IS "the advancement of public participation in island swimming"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS TRUE
+    `sport that involves physical skill and exertion` IS TRUE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Head (i) claimed, but neither 6(2)(d) limb holds: a members-only club.
+`a members-only recreation purpose` MEANS Purpose WITH
+    `description` IS "the provision of a members-only tennis pavilion"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS TRUE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Head (i) with the 6(2)(d)(ii) limb satisfied.
+`an open recreation purpose` MEANS Purpose WITH
+    `description` IS "the provision of a public recreation ground open to all"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS TRUE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS TRUE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Reaches head (p) ONLY through the 6(2)(f) deeming: no separate analogy
+-- judgement has been made.
+`a philosophical-belief purpose` MEANS Purpose WITH
+    `description` IS "the advancement of secular humanism"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS TRUE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Falls squarely within head (l) AND is political. 6(5) knocks it out of both
+-- limbs of 5(1)(a), which is the whole point of the carve-out.
+`a party-political purpose` MEANS Purpose WITH
+    `description` IS "the promotion of equality and diversity by securing the election of the Party's candidates"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS TRUE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS TRUE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Political AND flagged ancillary — the shape 6(5)'s second half exists to
+-- defeat ("nor a purpose ancillary or incidental to a charitable purpose").
+`an ancillary party-political purpose` MEANS Purpose WITH
+    `description` IS "campaigning for the Party's candidates, incidental to the relief of poverty"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS TRUE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS TRUE
+
+-- No head at all, but characterised as ancillary: a fundraising shop.
+`an ancillary fundraising purpose` MEANS Purpose WITH
+    `description` IS "the operation of a charity shop to fund the relief of poverty"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS TRUE
+
+-- No head, not ancillary, not political: simply off the list.
+`a purely commercial purpose` MEANS Purpose WITH
+    `description` IS "the carrying on of a wholesale grocery business for profit"
+    `the prevention or relief of poverty` IS FALSE
+    `the advancement of education` IS FALSE
+    `the advancement of religion` IS FALSE
+    `the advancement of health` IS FALSE
+    `the prevention or relief of sickness, disease or human suffering` IS FALSE
+    `the saving of lives` IS FALSE
+    `the advancement of citizenship or community development` IS FALSE
+    `rural or urban regeneration` IS FALSE
+    `the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities` IS FALSE
+    `the advancement of the arts, heritage, culture or science` IS FALSE
+    `the advancement of public participation in sport` IS FALSE
+    `sport that involves physical skill and exertion` IS FALSE
+    `the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended` IS FALSE
+    `primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `available to members of the public at large or to male or female members of the public at large` IS FALSE
+    `the advancement of human rights, conflict resolution or reconciliation` IS FALSE
+    `the promotion of religious or racial harmony` IS FALSE
+    `the promotion of equality and diversity` IS FALSE
+    `the advancement of environmental protection or improvement` IS FALSE
+    `the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage` IS FALSE
+    `the advancement of animal welfare` IS FALSE
+    `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)` IS FALSE
+    `the advancement of a philosophical belief (whether or not involving belief in a god)` IS FALSE
+    `for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere` IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes` IS FALSE
+
+-- Constitutions.
+
+`a clean constitution` MEANS Constitution WITH
+    `description` IS "no reservation of control to any public office-holder"
+    `express permission for the entity's activities to be directed or otherwise controlled by a Minister` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction` IS FALSE
+    `express permission for any of the entity's governors to be a Minister` IS FALSE
+    `express permission for any of the entity's governors to be a member of the States Assembly` IS FALSE
+    `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction` IS FALSE
+    `that permission extended to such a person acting in that capacity` IS FALSE
+
+`a constitution reserving Ministerial direction` MEANS Constitution WITH
+    `description` IS "Article 7: the Minister may direct the activities of the trust"
+    `express permission for the entity's activities to be directed or otherwise controlled by a Minister` IS TRUE
+    `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction` IS FALSE
+    `express permission for any of the entity's governors to be a Minister` IS FALSE
+    `express permission for any of the entity's governors to be a member of the States Assembly` IS FALSE
+    `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction` IS FALSE
+    `that permission extended to such a person acting in that capacity` IS TRUE
+
+`a constitution reserving a States Assembly governorship` MEANS Constitution WITH
+    `description` IS "Article 4: one seat on the council is reserved to a member of the States Assembly"
+    `express permission for the entity's activities to be directed or otherwise controlled by a Minister` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction` IS FALSE
+    `express permission for any of the entity's governors to be a Minister` IS FALSE
+    `express permission for any of the entity's governors to be a member of the States Assembly` IS TRUE
+    `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction` IS FALSE
+    `that permission extended to such a person acting in that capacity` IS TRUE
+
+`a constitution reserving a foreign-equivalent governorship` MEANS Constitution WITH
+    `description` IS "Article 4: one seat is reserved to a member of the Guernsey States of Deliberation"
+    `express permission for the entity's activities to be directed or otherwise controlled by a Minister` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction` IS FALSE
+    `express permission for any of the entity's governors to be a Minister` IS FALSE
+    `express permission for any of the entity's governors to be a member of the States Assembly` IS FALSE
+    `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction` IS TRUE
+    `that permission extended to such a person acting in that capacity` IS TRUE
+
+-- The "acting in that capacity" qualifier failing: the constitution permits a
+-- person who happens to hold office to serve, but in a private capacity only.
+`a constitution admitting a Minister in a private capacity` MEANS Constitution WITH
+    `description` IS "Article 4: a governor who is a Minister serves in a personal capacity and not ex officio"
+    `express permission for the entity's activities to be directed or otherwise controlled by a Minister` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly` IS FALSE
+    `express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction` IS FALSE
+    `express permission for any of the entity's governors to be a Minister` IS TRUE
+    `express permission for any of the entity's governors to be a member of the States Assembly` IS FALSE
+    `express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction` IS FALSE
+    `that permission extended to such a person acting in that capacity` IS FALSE
+
+-- Public benefit findings.
+
+`a sound public benefit finding` MEANS PublicBenefitFinding WITH
+    `description` IS "benefit to the public at large, properly determined"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS TRUE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS TRUE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS FALSE
+    `benefit provided to a section of the public only` IS FALSE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS FALSE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS FALSE
+    `a particular charitable purpose presumed to be for the public benefit` IS FALSE
+
+`a finding of no public benefit` MEANS PublicBenefitFinding WITH
+    `description` IS "no benefit provided or intended"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS FALSE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS FALSE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS FALSE
+    `benefit provided to a section of the public only` IS FALSE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS FALSE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS FALSE
+    `a particular charitable purpose presumed to be for the public benefit` IS FALSE
+
+`a finding of intended but not actual public benefit` MEANS PublicBenefitFinding WITH
+    `description` IS "not yet operating; benefit intended"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS FALSE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS TRUE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS FALSE
+    `benefit provided to a section of the public only` IS FALSE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS FALSE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS FALSE
+    `a particular charitable purpose presumed to be for the public benefit` IS FALSE
+
+`a finding that benefit reaches only identified individuals` MEANS PublicBenefitFinding WITH
+    `description` IS "the trust benefits the settlor's four named grandchildren"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS TRUE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS TRUE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS TRUE
+    `benefit provided to a section of the public only` IS TRUE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS FALSE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS TRUE
+    `a particular charitable purpose presumed to be for the public benefit` IS FALSE
+
+`a finding with an unduly restrictive fee` MEANS PublicBenefitFinding WITH
+    `description` IS "benefit to a section of the public, behind a fee the determiner found unduly restrictive"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS TRUE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS TRUE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS FALSE
+    `benefit provided to a section of the public only` IS TRUE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS TRUE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS TRUE
+    `a particular charitable purpose presumed to be for the public benefit` IS FALSE
+
+`a finding made on a presumption` MEANS PublicBenefitFinding WITH
+    `description` IS "public benefit presumed from the advancement of religion, contrary to Article 7(3)(a)"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS TRUE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS TRUE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS FALSE
+    `benefit provided to a section of the public only` IS FALSE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS FALSE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS FALSE
+    `a particular charitable purpose presumed to be for the public benefit` IS TRUE
+
+`a finding that skipped the section-of-the-public question` MEANS PublicBenefitFinding WITH
+    `description` IS "benefit to a section of the public only, but Article 7(2)(b) was never asked"
+    `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes` IS TRUE
+    `public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes` IS TRUE
+    `benefit provided only to one particular natural person or to a group of identified natural persons` IS FALSE
+    `benefit provided to a section of the public only` IS TRUE
+    `any condition on obtaining that benefit (including any charge or fee) unduly restrictive` IS FALSE
+    `regard had to the comparison required by Article 7(2)(a)` IS TRUE
+    `regard had to the question required by Article 7(2)(b)` IS FALSE
+    `a particular charitable purpose presumed to be for the public benefit` IS FALSE
+
+-- Entities. A GIVEN-parameterised constructor: L4 has no record-update
+-- operator, so each scenario supplies every field, varying only the operative
+-- ones.
+GIVEN `the name`        IS A STRING
+      `the purposes`    IS A LIST OF Purpose
+      `a constitution`  IS A Constitution
+      `applicant`       IS A BOOLEAN
+      `the finding`     IS A PublicBenefitFinding
+      `an Order`        IS A BOOLEAN
+GIVETH AN Entity
+`an entity` MEANS Entity WITH
+    `name` IS `the name`
+    `purposes` IS `the purposes`
+    `constitution` IS `a constitution`
+    `an applicant` IS `applicant`
+    `the public benefit finding` IS `the finding`
+    `specified in an Order under Article 5(3) disapplying paragraph (2)` IS `an Order`
+
+`the St Helier poverty trust` MEANS
+    `an entity` "the St Helier poverty trust" (LIST `a poverty-relief purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the poverty trust with a charity shop` MEANS
+    `an entity` "the poverty trust with a charity shop"
+        (LIST `a poverty-relief purpose`, `an ancillary fundraising purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the charity shop with nothing behind it` MEANS
+    `an entity` "the charity shop with nothing behind it" (LIST `an ancillary fundraising purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the poverty trust with a party-political object` MEANS
+    `an entity` "the poverty trust with a party-political object"
+        (LIST `a poverty-relief purpose`, `a party-political purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the poverty trust with incidental campaigning` MEANS
+    `an entity` "the poverty trust with incidental campaigning"
+        (LIST `a poverty-relief purpose`, `an ancillary party-political purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the grocery company` MEANS
+    `an entity` "the grocery company" (LIST `a purely commercial purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the entity with no purposes` MEANS
+    `an entity` "the entity with no purposes" EMPTY
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the entity with no purposes and no benefit` MEANS
+    `an entity` "the entity with no purposes and no benefit" EMPTY
+        `a clean constitution` FALSE `a finding of no public benefit` FALSE
+
+`the disease-prevention trust` MEANS
+    `an entity` "the disease-prevention trust" (LIST `a sickness-prevention purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the pigeon fanciers' association` MEANS
+    `an entity` "the pigeon fanciers' association" (LIST `a spectator-pastime purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the island swimming association` MEANS
+    `an entity` "the island swimming association" (LIST `a physical-sport purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the members-only tennis club` MEANS
+    `an entity` "the members-only tennis club" (LIST `a members-only recreation purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the public recreation ground trust` MEANS
+    `an entity` "the public recreation ground trust" (LIST `an open recreation purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the humanist society` MEANS
+    `an entity` "the humanist society" (LIST `a philosophical-belief purpose`)
+        `a clean constitution` FALSE `a sound public benefit finding` FALSE
+
+`the Ministerially directed trust` MEANS
+    `an entity` "the Ministerially directed trust" (LIST `a poverty-relief purpose`)
+        `a constitution reserving Ministerial direction` FALSE `a sound public benefit finding` FALSE
+
+`the Ministerially directed trust exempted by Order` MEANS
+    `an entity` "the Ministerially directed trust exempted by Order" (LIST `a poverty-relief purpose`)
+        `a constitution reserving Ministerial direction` FALSE `a sound public benefit finding` TRUE
+
+`the States-governed foundation` MEANS
+    `an entity` "the States-governed foundation" (LIST `a poverty-relief purpose`)
+        `a constitution reserving a States Assembly governorship` FALSE `a sound public benefit finding` FALSE
+
+`the Guernsey-governed foundation` MEANS
+    `an entity` "the Guernsey-governed foundation" (LIST `a poverty-relief purpose`)
+        `a constitution reserving a foreign-equivalent governorship` FALSE `a sound public benefit finding` FALSE
+
+`the trust with a Minister in a private capacity` MEANS
+    `an entity` "the trust with a Minister in a private capacity" (LIST `a poverty-relief purpose`)
+        `a constitution admitting a Minister in a private capacity` FALSE `a sound public benefit finding` FALSE
+
+`the dormant registered charity` MEANS
+    `an entity` "the dormant registered charity" (LIST `a poverty-relief purpose`)
+        `a clean constitution` FALSE `a finding of intended but not actual public benefit` FALSE
+
+`the applicant not yet operating` MEANS
+    `an entity` "the applicant not yet operating" (LIST `a poverty-relief purpose`)
+        `a clean constitution` TRUE `a finding of intended but not actual public benefit` FALSE
+
+`the grandchildren's trust` MEANS
+    `an entity` "the grandchildren's trust" (LIST `a poverty-relief purpose`)
+        `a clean constitution` FALSE `a finding that benefit reaches only identified individuals` FALSE
+
+`the school with an unduly restrictive fee` MEANS
+    `an entity` "the school with an unduly restrictive fee" (LIST `a poverty-relief purpose`)
+        `a clean constitution` FALSE `a finding with an unduly restrictive fee` FALSE
+
+`the church whose benefit was presumed` MEANS
+    `an entity` "the church whose benefit was presumed" (LIST `a poverty-relief purpose`)
+        `a clean constitution` FALSE `a finding made on a presumption` FALSE
+
+`the entity whose determiner skipped 7(2)(b)` MEANS
+    `an entity` "the entity whose determiner skipped 7(2)(b)" (LIST `a poverty-relief purpose`)
+        `a clean constitution` FALSE `a finding that skipped the section-of-the-public question` FALSE
+
+§§ `Assertions`
+
+§§§ `Article 6(1) — each head, positive and negative`
+
+#ASSERT     `(a) — the prevention or relief of poverty` `a poverty-relief purpose`
+#ASSERT NOT `(a) — the prevention or relief of poverty` `a purely commercial purpose`
+#ASSERT NOT `(b) — the advancement of education` `a poverty-relief purpose`
+#ASSERT NOT `(c) — the advancement of religion` `a philosophical-belief purpose`
+#ASSERT NOT `(e) — the saving of lives` `a poverty-relief purpose`
+#ASSERT NOT `(g) — the advancement of the arts, heritage, culture or science` `a poverty-relief purpose`
+#ASSERT NOT `(j) — the advancement of human rights, conflict resolution or reconciliation` `a poverty-relief purpose`
+#ASSERT NOT `(k) — the promotion of religious or racial harmony` `a poverty-relief purpose`
+#ASSERT     `(l) — the promotion of equality and diversity` `a party-political purpose`
+#ASSERT NOT `(l) — the promotion of equality and diversity` `a poverty-relief purpose`
+#ASSERT NOT `(m) — the advancement of environmental protection or improvement` `a poverty-relief purpose`
+#ASSERT NOT `(n) — the relief of those in need` `a poverty-relief purpose`
+#ASSERT NOT `(o) — the advancement of animal welfare` `a poverty-relief purpose`
+
+§§§ `Article 6(2)(a) — the health widening`
+
+-- The disease-prevention trust does NOT claim to advance health; it reaches
+-- head (d) only because 6(2)(a) widens the head to reach it.
+#ASSERT     `(d) — the advancement of health` `a sickness-prevention purpose`
+#ASSERT NOT `(d) — the advancement of health` `a poverty-relief purpose`
+
+§§§ `Article 6(2)(c) — the sport gate, exercised both ways`
+
+#ASSERT NOT `(h) — the advancement of public participation in sport` `a spectator-pastime purpose`
+#ASSERT     `(h) — the advancement of public participation in sport` `a physical-sport purpose`
+-- The gate is what separates them: both claim the head, one satisfies 6(2)(c).
+#ASSERT `a spectator-pastime purpose`'s `the advancement of public participation in sport`
+#ASSERT `a physical-sport purpose`'s   `the advancement of public participation in sport`
+
+§§§ `Article 6(2)(d) — the recreational-facilities gate, exercised both ways`
+
+#ASSERT NOT `(2)(d) — the recreational-facilities restriction is satisfied` `a members-only recreation purpose`
+#ASSERT     `(2)(d) — the recreational-facilities restriction is satisfied` `an open recreation purpose`
+#ASSERT NOT `(i) — the provision of recreational facilities or activities` `a members-only recreation purpose`
+#ASSERT     `(i) — the provision of recreational facilities or activities` `an open recreation purpose`
+
+§§§ `Article 6(2)(f) — the philosophical-belief deeming into head (p)`
+
+-- No separate analogy judgement was made; the purpose reaches (p) by 6(2)(f).
+#ASSERT NOT `a philosophical-belief purpose`'s `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`
+#ASSERT     `(p) — any other analogous purpose` `a philosophical-belief purpose`
+#ASSERT NOT `(p) — any other analogous purpose` `a poverty-relief purpose`
+
+§§§ `Article 6(5) — the political-purposes carve-out, exercised both ways`
+
+#ASSERT     `(5) — the purpose is excluded as political` `a party-political purpose`
+#ASSERT NOT `(5) — the purpose is excluded as political` `a poverty-relief purpose`
+-- A political purpose that WOULD otherwise fall within paragraph (1) still
+-- does; 6(5) removes it at the charitable-purpose step, not at the head.
+#ASSERT     `the purpose falls within paragraph (1)` `a party-political purpose`
+#ASSERT NOT `the purpose is a charitable purpose`   `a party-political purpose`
+#ASSERT     `the purpose is a charitable purpose`   `a poverty-relief purpose`
+#ASSERT NOT `the purpose is a charitable purpose`   `a purely commercial purpose`
+#ASSERT NOT `the purpose is a charitable purpose`   `an ancillary fundraising purpose`
+
+§§§ `Article 5(1)(a)(ii) — the ancillary limb, and its referential gate (A9)`
+
+#ASSERT     `(ii) — the purpose is purely ancillary or incidental` `the poverty trust with a charity shop` `an ancillary fundraising purpose`
+-- Same purpose, entity with no charitable purpose to be ancillary TO: fails.
+#ASSERT NOT `(ii) — the purpose is purely ancillary or incidental` `the charity shop with nothing behind it` `an ancillary fundraising purpose`
+-- 6(5)'s second half: a political purpose cannot be rescued by calling it
+-- ancillary, even inside an entity that has a charitable purpose.
+#ASSERT NOT `(ii) — the purpose is purely ancillary or incidental` `the poverty trust with incidental campaigning` `an ancillary party-political purpose`
+#ASSERT     `an ancillary party-political purpose`'s `purely ancillary or incidental to any of the entity's charitable purposes`
+
+§§§ `Article 5(1)(a) — all of its purposes`
+
+#ASSERT     `5(1)(a) — all of its purposes are charitable or ancillary` `the St Helier poverty trust`
+#ASSERT     `5(1)(a) — all of its purposes are charitable or ancillary` `the poverty trust with a charity shop`
+#ASSERT NOT `5(1)(a) — all of its purposes are charitable or ancillary` `the charity shop with nothing behind it`
+#ASSERT NOT `5(1)(a) — all of its purposes are charitable or ancillary` `the poverty trust with a party-political object`
+#ASSERT NOT `5(1)(a) — all of its purposes are charitable or ancillary` `the poverty trust with incidental campaigning`
+#ASSERT NOT `5(1)(a) — all of its purposes are charitable or ancillary` `the grocery company`
+-- AMBIGUITY A10 pinned: vacuous truth over the empty purpose list.
+#ASSERT     `5(1)(a) — all of its purposes are charitable or ancillary` `the entity with no purposes`
+
+§§§ `Article 5(1)(b) and Article 7 — public benefit`
+
+#ASSERT     `5(1)(b) — public benefit` `the St Helier poverty trust`
+#ASSERT NOT `5(1)(b) — public benefit` `the entity with no purposes and no benefit`
+-- AMBIGUITY A11 exercised both ways: intention avails an applicant only.
+#ASSERT     `the applicant's intention limb` `the applicant not yet operating`
+#ASSERT NOT `the applicant's intention limb` `the dormant registered charity`
+#ASSERT     `5(1)(b) — public benefit` `the applicant not yet operating`
+#ASSERT NOT `5(1)(b) — public benefit` `the dormant registered charity`
+-- AMBIGUITY A6: 7(3)(b) is a hard bar and overrides an affirmative finding.
+#ASSERT     `the grandchildren's trust`'s `the public benefit finding`'s `public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes`
+#ASSERT     `7(3)(b) — the entity benefits only identified natural persons` `the grandchildren's trust`
+#ASSERT NOT `5(1)(b) — public benefit` `the grandchildren's trust`
+#ASSERT NOT `7(3)(b) — the entity benefits only identified natural persons` `the St Helier poverty trust`
+-- AMBIGUITY A7: an unduly restrictive condition is a consideration, not a
+-- defeater. The finding records it; the truth value is unmoved.
+#ASSERT     `the school with an unduly restrictive fee`'s `the public benefit finding`'s `any condition on obtaining that benefit (including any charge or fee) unduly restrictive`
+#ASSERT     `5(1)(b) — public benefit` `the school with an unduly restrictive fee`
+
+§§§ `Article 7(2) and 7(3)(a) — the determination's own validity (A8)`
+
+#ASSERT     `the public benefit determination was properly made` `the St Helier poverty trust`
+-- 7(2)(b)'s duty is vacuously discharged when benefit is not confined to a
+-- section of the public, even though the question was not asked.
+#ASSERT NOT `the St Helier poverty trust`'s `the public benefit finding`'s `regard had to the question required by Article 7(2)(b)`
+#ASSERT     `7(2)(b) — the section-of-the-public question was reached` `the St Helier poverty trust`
+-- ... and bites when it is.
+#ASSERT NOT `7(2)(b) — the section-of-the-public question was reached` `the entity whose determiner skipped 7(2)(b)`
+#ASSERT NOT `the public benefit determination was properly made` `the entity whose determiner skipped 7(2)(b)`
+#ASSERT     `7(2)(b) — the section-of-the-public question was reached` `the school with an unduly restrictive fee`
+-- 7(3)(a): a presumption invalidates the determination ...
+#ASSERT NOT `7(3)(a) — no charitable purpose was presumed to be for the public benefit` `the church whose benefit was presumed`
+#ASSERT NOT `the public benefit determination was properly made` `the church whose benefit was presumed`
+-- ... but under A8 does NOT change the entity's status on the merits.
+#ASSERT     `the entity meets the charity test` `the church whose benefit was presumed`
+
+§§§ `Article 5(2) and 5(3) — the government-control carve-out, exercised both ways`
+
+-- A12 reading (i): the tabulated list serves BOTH modes. Direction mode ...
+#ASSERT     `5(2) — direction or control by a listed person is expressly permitted` `the Ministerially directed trust`
+#ASSERT NOT `5(2) — governorship by a listed person is expressly permitted` `the Ministerially directed trust`
+#ASSERT     `5(2) — the government-control disqualification applies` `the Ministerially directed trust`
+-- ... and governor mode, limbs (b) and (c).
+#ASSERT NOT `5(2) — direction or control by a listed person is expressly permitted` `the States-governed foundation`
+#ASSERT     `5(2) — governorship by a listed person is expressly permitted` `the States-governed foundation`
+#ASSERT     `5(2) — the government-control disqualification applies` `the States-governed foundation`
+#ASSERT     `5(2) — governorship by a listed person is expressly permitted` `the Guernsey-governed foundation`
+#ASSERT     `5(2) — the government-control disqualification applies` `the Guernsey-governed foundation`
+-- Clean constitution: neither mode.
+#ASSERT NOT `5(2) — a listed person is expressly permitted under either mode` `the St Helier poverty trust`
+#ASSERT NOT `5(2) — the government-control disqualification applies` `the St Helier poverty trust`
+-- The "acting in that capacity" qualifier, exercised negatively: the permission
+-- exists but is confined to a private capacity.
+#ASSERT     `5(2) — governorship by a listed person is expressly permitted` `the trust with a Minister in a private capacity`
+#ASSERT NOT `5(2) — the government-control disqualification applies` `the trust with a Minister in a private capacity`
+-- 5(3): an Order disapplies paragraph (2) for an otherwise-caught entity.
+#ASSERT     `5(2) — a listed person is expressly permitted under either mode` `the Ministerially directed trust exempted by Order`
+#ASSERT NOT `5(2) — the government-control disqualification applies` `the Ministerially directed trust exempted by Order`
+
+§§§ `Article 5 — the charity test end to end`
+
+#ASSERT     `the entity meets the charity test` `the St Helier poverty trust`
+#ASSERT     `the entity meets the charity test` `the poverty trust with a charity shop`
+#ASSERT     `the entity meets the charity test` `the disease-prevention trust`
+#ASSERT     `the entity meets the charity test` `the island swimming association`
+#ASSERT     `the entity meets the charity test` `the public recreation ground trust`
+#ASSERT     `the entity meets the charity test` `the humanist society`
+#ASSERT     `the entity meets the charity test` `the applicant not yet operating`
+#ASSERT     `the entity meets the charity test` `the school with an unduly restrictive fee`
+#ASSERT     `the entity meets the charity test` `the Ministerially directed trust exempted by Order`
+#ASSERT     `the entity meets the charity test` `the trust with a Minister in a private capacity`
+
+#ASSERT NOT `the entity meets the charity test` `the charity shop with nothing behind it`
+#ASSERT NOT `the entity meets the charity test` `the poverty trust with a party-political object`
+#ASSERT NOT `the entity meets the charity test` `the poverty trust with incidental campaigning`
+#ASSERT NOT `the entity meets the charity test` `the grocery company`
+#ASSERT NOT `the entity meets the charity test` `the pigeon fanciers' association`
+#ASSERT NOT `the entity meets the charity test` `the members-only tennis club`
+#ASSERT NOT `the entity meets the charity test` `the dormant registered charity`
+#ASSERT NOT `the entity meets the charity test` `the grandchildren's trust`
+#ASSERT NOT `the entity meets the charity test` `the Ministerially directed trust`
+#ASSERT NOT `the entity meets the charity test` `the States-governed foundation`
+#ASSERT NOT `the entity meets the charity test` `the Guernsey-governed foundation`
+#ASSERT NOT `the entity meets the charity test` `the entity with no purposes and no benefit`
+
+-- A10's practical consequence: an entity with NO purposes passes 5(1)(a)
+-- vacuously, so on this reading it turns entirely on 5(1)(b). Where the
+-- determiner has nonetheless found public benefit, the test is met — which is
+-- the reading's uncomfortable edge, recorded rather than hidden.
+#ASSERT     `the entity meets the charity test` `the entity with no purposes`

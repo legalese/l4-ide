@@ -1,0 +1,5 @@
+OK    jl4/examples/legal/charities-cleanroom/projections/charity-test.dmn
+       40 decision(s): 0 table(s), 40 literal expression(s); 2 inputData; 1 diagram(s)
+OK    jl4/examples/legal/charities-cleanroom/projections/probe-feel-quantifier.dmn
+       40 decision(s): 0 table(s), 40 literal expression(s); 2 inputData; 1 diagram(s)
+SKIP  dmnmd legs (set DMNMD=<path to the cabal-built dmnmd binary> to run them)
