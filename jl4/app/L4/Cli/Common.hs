@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 -- | Shared helpers for the l4 CLI subcommands.
 --
 -- Everything here is neutral to a specific command so individual
@@ -15,7 +17,9 @@ module L4.Cli.Common
 
     -- * Running the LSP pipeline
   , runOneshot
+  , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , hasBlockingError
 
     -- * Rendering
   , TraceTextMode(..)
@@ -46,6 +50,7 @@ import qualified Options.Applicative as Options
 import System.IO (hPutStrLn, stderr)
 import Control.Applicative ((<|>))
 
+import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -57,7 +62,7 @@ import LSP.Logger
   , makeRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath)
+import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
 import Development.IDE.Graph (Action)
 
 import L4.EvaluateLazy
@@ -66,6 +71,7 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , parseFixedNow
   , prettyEvalException
+  , prettyLedger
   , readFixedNowEnv
   , resolveEvalConfig
   )
@@ -174,6 +180,56 @@ runOneshot evalConfig fp act = do
   -- Post-filter: drop lines matching known progress-chatter prefixes.
   pure (filter (not . isProgressChatter) rawErrs, res)
 
+-- | Like 'runOneshot', but additionally returns the structured diagnostics
+-- published to the Shake store during the run (across every file in the
+-- import closure, not just the entry file).
+--
+-- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
+-- is what callers should consult for a severity-aware pass/fail verdict, since
+-- some structural errors (notably an import cycle) attach their diagnostic to a
+-- transitively-imported module rather than the entry file — so the entry
+-- file's own typecheck result can spuriously look successful.
+runOneshotWithDiagnostics
+  :: EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+runOneshotWithDiagnostics evalConfig fp act = do
+  (getLog, refRecorder) <- makeRefRecorder
+  let prettyRecorder = cmapWithPrio pretty refRecorder
+      keep wp = wp.priority /= Debug
+      filteredRec = cfilter keep prettyRecorder
+  (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
+  rawErrs <- getLog
+  pure (filter (not . isProgressChatter) rawErrs, diags, res)
+
+-- | Does the diagnostics set contain an error that should make a CLI command
+-- fail (exit non-zero)?
+--
+-- An Error-severity diagnostic from any source /except/ @\"eval\"@ counts as
+-- blocking: parse errors, type errors, unresolved/failed imports, and the raw
+-- engine cycle exception all qualify. @#EVAL@ directive outcomes are tagged
+-- with source @\"eval\"@ and are excluded /here/, so that this predicate speaks
+-- only about structural diagnostics and stays usable by commands that never
+-- evaluate (notably @l4 check@).
+--
+-- That exclusion is NOT the whole exit-code contract for @l4 run@. Ruled by
+-- Meng 2026-08-01: a @#EVAL@ that CRASHES during evaluation must be loud — it
+-- exits non-zero. @l4 run@ therefore applies its own crash check on the
+-- directive results ('L4.Cli.Run.evalDirectiveCrashed') in addition to calling
+-- this predicate. An earlier version of this comment claimed an
+-- evaluation-time exception never changes the exit code; that was the
+-- pre-ruling behaviour and is no longer true.
+--
+-- If silencing is ever wanted, add a @-q@ \/ @--quiet-eval@ option to @l4 run@
+-- that restores exit 0 for a crashed directive — rather than flipping the
+-- default back.
+hasBlockingError :: [FileDiagnostic] -> Bool
+hasBlockingError = any isBlocking
+  where
+    isBlocking FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
+      _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
+
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather
 -- than user-facing diagnostics.
@@ -181,11 +237,17 @@ runOneshot evalConfig fp act = do
 -- The rendered format puts priority + content inline, e.g.
 -- @"Info | [Import Resolution] Found on filesystem: ..."@, so we look
 -- past the @"Priority | "@ prefix.
+--
+-- Import-resolution lines at Warning/Error priority are NOT chatter: they
+-- carry the library-shadow warning (multiple differing copies of a module
+-- visible; see LIBRARY-RESOLUTION-SHADOW-SPEC) and module-not-found notices,
+-- which a CLI user must see.
 isProgressChatter :: Text -> Bool
 isProgressChatter txt =
-  let body    = dropPriorityPrefix txt
+  let (mPriority, body) = splitPriorityPrefix txt
       starts p = p `Text.isPrefixOf` body
-  in  starts "[Import Resolution]"
+      warningOrWorse = mPriority `elem` [Just "Warning", Just "Error"]
+  in  (starts "[Import Resolution]" && not warningOrWorse)
    || starts "[VFS"
    || starts "Ide: Shake"
    || starts "Shake:"
@@ -193,11 +255,12 @@ isProgressChatter txt =
    || starts "Opening Shake database"
    || Text.null (Text.strip body)
 
-dropPriorityPrefix :: Text -> Text
-dropPriorityPrefix txt =
+-- | Split a rendered log line into its priority column (if present) and body.
+splitPriorityPrefix :: Text -> (Maybe Text, Text)
+splitPriorityPrefix txt =
   case Text.breakOn " | " txt of
-    (_, rest) | not (Text.null rest) -> Text.stripStart (Text.drop 3 rest)
-    _                                -> txt
+    (prio, rest) | not (Text.null rest) -> (Just (Text.strip prio), Text.stripStart (Text.drop 3 rest))
+    _                                   -> (Nothing, txt)
 
 -- | Like 'runOneshot', but routes LSP diagnostics through a caller-supplied
 -- recorder (e.g. one backed by stderr) and returns only the action's result.
@@ -237,10 +300,11 @@ traceTextModeReader = eitherReader \input ->
     other -> Left $ "Invalid trace MODE: " <> Text.unpack other <> " (expected none|full)"
 
 renderEvalOutput :: TraceTextMode -> Int -> EvalDirectiveResult -> Text
-renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace} =
+renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace, ledger = led} =
   Text.intercalate "\n\n" $ catMaybes
     [ Just headerLine
     , Just ("Result:\n" <> indentBlockText (renderEvalValue result))
+    , ledgerSection
     , traceSection
     ]
   where
@@ -248,6 +312,12 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
       let idxText = Text.pack (show idx)
           rangeText = maybe "" (\rng -> " @ " <> prettySrcRange rng) mRange
       in "Evaluation[" <> idxText <> "]" <> rangeText
+    -- STATE-AS-LEDGER M2: surface the ledger this directive produced (the
+    -- RECORD/COMMIT/ATTEST writes). 'prettyLedger' returns empty for a directive
+    -- that wrote nothing, so we drop the section in that case.
+    ledgerSection =
+      let body = prettyLedger led
+      in if Text.null body then Nothing else Just (Text.dropWhile (== '\n') body)
     traceSection = case traceMode of
       TraceTextNone -> Nothing
       TraceTextFull ->

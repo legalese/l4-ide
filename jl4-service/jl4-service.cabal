@@ -163,6 +163,7 @@ test-suite jl4-service-test
     quickcheck-instances,
     serialise,
     servant >=0.20.2 && <0.21,
+    servant-server >=0.20.2 && <0.21,
     stm,
     string-interpolate,
     text,
