@@ -1988,6 +1988,57 @@ process.stdout.write("\n-- cost accounting --\n");
           led.network.ms_in_window[k] <= led.network.ms[k],
       ),
     );
+    // …and for the per-workflow rollups, which used to carry ONLY a session
+    // total. A session that has run for days holds every fan-out it ever ran,
+    // so a windowed ledger listed workflows from other days with no field to
+    // tell them apart, and the first person to read one — me — misread it
+    // within minutes of building the file.
+    check(
+      "a workflow rollup carries BOTH a session total and an in-window figure",
+      led.workflows.every(
+        (w) =>
+          w.total &&
+          w.in_window &&
+          typeof w.agents === "number" &&
+          typeof w.agents_in_window === "number",
+      ),
+    );
+    check(
+      "…and the in-window figure never exceeds the unclipped one",
+      led.workflows.every(
+        (w) =>
+          w.agents_in_window <= w.agents &&
+          w.in_window.requests <= w.total.requests &&
+          w.in_window.output_tokens <= w.total.output_tokens,
+      ),
+    );
+    // The fixture's one workflow agent sits OUTSIDE the window, so its
+    // in-window figure must be zero while its total is not. Written as an
+    // equality on both, because the inequality above is satisfied trivially by
+    // a rollup that reports its session total in both fields — which is
+    // exactly the defect, and exactly what this check fails on if the
+    // `mergeUsage(g.in_window, …)` line is reverted to `m.total`.
+    // THE DISCRIMINATING CASE, over the same fixture with a narrower window:
+    // the one workflow agent sits at t=2s, so a window ending at t=1s puts it
+    // wholly outside. Its total must stay 1 and its in-window figure must go
+    // to 0. The inequality above is satisfied trivially by a rollup that
+    // reports its session total in both fields — which is precisely the defect
+    // — so this is the check that fails if `mergeUsage(g.in_window, …)` is
+    // reverted to `m.total`. Verified by doing exactly that.
+    const narrow = buildLedger({
+      sessions: [{ session: SID, attributed_by: "declared" }],
+      from: at(0),
+      to: at(1000),
+      root: resolve(cdir, "cfg"),
+    });
+    check(
+      "a workflow wholly outside the window reports zero, not its total",
+      narrow.workflows.length === 1 &&
+        narrow.workflows[0].total.requests === 1 &&
+        narrow.workflows[0].in_window.requests === 0 &&
+        narrow.workflows[0].agents === 1 &&
+        narrow.workflows[0].agents_in_window === 0,
+    );
     check(
       "a backgrounded tool's duration is flagged as dispatch, not as work",
       led.tools.every(
