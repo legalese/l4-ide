@@ -17,10 +17,10 @@ policy and predates the Rally.
 
 So the rule-version axis here does **not** carry two versions of one statute. Its arms are:
 
-| rule date | what the arm states |
-| --- | --- |
+| rule date           | what the arm states                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------- |
 | before `2027-04-01` | the schemes **as administered today** — Baby Bonus, Large Families Scheme, CDCSA s 12B |
-| on or after | the scheme **as announced** — policy, not law |
+| on or after         | the scheme **as announced** — policy, not law                                          |
 
 `sg-csp.l4`'s header says this, and each dated figure repeats it. A reader who does not pin a rule
 date must not be handed an announced figure without being told it is one.
@@ -28,8 +28,8 @@ date must not be handed an announced figure without being told it is one.
 ## 2. `checks.min_dated_arms` is 0, and it is NOT sg-succession's zero
 
 sg-succession declares 0 because it has no rule-version axis at all. This subject has a thorough
-one — and still declares 0, because `p3-check` matches a dated arm syntactically: *a line comparing
-`RULES EFFECTIVE DATE` against a `Date` **literal***. This encoding reaches the axis through a named
+one — and still declares 0, because `p3-check` matches a dated arm syntactically: \*a line comparing
+`RULES EFFECTIVE DATE` against a `Date` **literal\***. This encoding reaches the axis through a named
 predicate instead:
 
 ```l4
@@ -74,7 +74,7 @@ Both are fields of one `Interpretation` record, with the live reading carried on
 
 - **F1 — `the harmonised co-matching cap counts a lifetime total`.** life.gov.sg says "from
   1 October 2027, all caps adjust to $5,000" without saying whether that counts what was already
-  matched. **$5,000 per child** turns on it, concentrated on the largest families. The fork *opens*
+  matched. **$5,000 per child** turns on it, concentrated on the largest families. The fork _opens_
   on 1 October 2027: before that the outgoing cap governs and both readings agree, which the case
   suite asserts.
 - **F2 — `the service-duration graduation survives the merger`.** The Act gives 2–6 days graduated
@@ -95,8 +95,8 @@ days do I have left for this child, ever" gets no answer here.
 ## 7. Where the third finding actually comes from
 
 The conversion report's employer-cost finding rides on **fork F7**: that the employee keeps their
-gross rate and the *employer* bears the excess above the $500 reimbursement limit. Under the rival
-reading — the structure CDCSA s 12B(10) already uses — the *employee* is capped instead, the
+gross rate and the _employer_ bears the excess above the $500 reimbursement limit. Under the rival
+reading — the structure CDCSA s 12B(10) already uses — the _employee_ is capped instead, the
 employer's residual is nil, and the finding becomes "high earners take a pay cut on leave days".
 Either way somebody bears the excess. The fork decides who, and it is not settled.
 

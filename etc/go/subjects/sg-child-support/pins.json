@@ -18,28 +18,10 @@
   "measured_on": "2026-08-25",
   "measured_against": "jl4/examples/legal/sg-child-support/sg-child-support.l4",
   "enums": {
-    "export_to": [
-      "dmn",
-      "dmn-md",
-      "bpmn"
-    ],
-    "export_flavor": [
-      "camunda",
-      "kie"
-    ],
-    "export_fail_on": [
-      "none",
-      "blocking",
-      "lossy",
-      "advisory"
-    ],
-    "render_format": [
-      "json",
-      "plan",
-      "text",
-      "html",
-      "akn"
-    ]
+    "export_to": ["dmn", "dmn-md", "bpmn"],
+    "export_flavor": ["camunda", "kie"],
+    "export_fail_on": ["none", "blocking", "lossy", "advisory"],
+    "render_format": ["json", "plan", "text", "html", "akn"]
   },
   "regulative_rules": [],
   "checkers_that_must_exist": []
