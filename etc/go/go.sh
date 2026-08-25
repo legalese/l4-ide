@@ -55,7 +55,7 @@
 #             or NEVER RUN. Exit: 0 none stale · 1 something is stale.
 #     gc      [--keep N]
 #     new-subject ID --citation TEXT --source-url URL [--display-name TEXT]
-#             [--encoding PATH] [--force]
+#             [--encoding-main PATH] [--force]
 #             Scaffold etc/go/subjects/ID/ so `plan --subject ID` works at
 #             once. The sidecar declares encoding.state "unwritten": the
 #             encoding does not exist yet, every stage that reads a module
@@ -179,6 +179,23 @@ die_usage() {
   exit 2
 }
 
+# A VALUE-TAKING FLAG MUST BE FOLLOWED BY A VALUE, and saying so is this
+# driver's job rather than the shell's.
+#
+# Every such arm reads `$2` and shifts twice. With a flag last on the line there
+# is no `$2`, and under `set -euo pipefail` bash aborts with
+# `go.sh: line 246: $2: unbound variable` and exit 1 — an interpreter stack
+# trace where a usage message belongs, naming a line number instead of the flag
+# the caller typed. The exit code is wrong too: 2 is this driver's usage exit
+# and 1 means a real finding about the corpus, so a script that distinguishes
+# them reads a typo as a result.
+#
+# Called as `need_val "$@"` from inside the arm, where `$1` is still the flag
+# and `$2` its value.
+need_val() {
+  [[ $# -ge 2 ]] || die_usage "$1 needs a value"
+}
+
 # --- argument parsing -------------------------------------------------------
 CMD="${1:-help}"
 shift || true
@@ -219,35 +236,43 @@ fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --subject)
+      need_val "$@"
       SUBJECT="$2"
       shift 2
       ;;
     --run-id)
+      need_val "$@"
       RUN_ID="$2"
       shift 2
       ;;
     --through)
+      need_val "$@"
       THROUGH="$2"
       shift 2
       ;;
     --only)
+      need_val "$@"
       ONLY="$2"
       shift 2
       ;;
     --waive)
+      need_val "$@"
       WAIVERS+=("$2")
       shift 2
       ;;
     --fixed-now)
+      need_val "$@"
       L4_GO_FIXED_NOW="$2"
       shift 2
       ;;
     --encoding)
+      need_val "$@"
       ENCODING_ID="$2"
       ENCODING_SEEN=1
       shift 2
       ;;
     --stage)
+      need_val "$@"
       STAGE_ONLY="$2"
       shift 2
       ;;
@@ -256,6 +281,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --keep)
+      need_val "$@"
       KEEP="$2"
       shift 2
       ;;
@@ -264,18 +290,31 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --display-name)
+      need_val "$@"
       NEW_DISPLAY_NAME="$2"
       shift 2
       ;;
     --citation)
+      need_val "$@"
       NEW_CITATION="$2"
       shift 2
       ;;
     --source-url)
+      need_val "$@"
       NEW_SOURCE_URL="$2"
       shift 2
       ;;
-    --encoding)
+    # RENAMED FROM `--encoding`, which R2/R3 gave a second, unrelated meaning.
+    #
+    # This names where a NEW subject's entry module will live — it becomes
+    # `encoding.main` in the scaffolded sidecar. `--encoding` now selects which
+    # encoding a RUN is about, and its arm sits earlier in this same `case`, so
+    # this one had become unreachable: `new-subject … --encoding path/x.l4`
+    # exited 0, said nothing, and wrote the default path. A documented input
+    # silently discarded, which `bash -n` cannot see because a duplicate `case`
+    # label is legal shell. selftest.mjs now checks for one directly.
+    --encoding-main)
+      need_val "$@"
       NEW_ENCODING="$2"
       shift 2
       ;;
@@ -325,6 +364,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# `new-subject` takes no run selection, so `--encoding` there is either the old
+# spelling of `--encoding-main` or a misunderstanding of what the command does.
+# Accepting it silently is how the rename would keep the very defect it repairs:
+# the flag would parse, set a variable `new-subject` never reads, and exit 0
+# having written the default path — which is exactly what the collision did.
+if [[ "$CMD" == "new-subject" && $ENCODING_SEEN -eq 1 ]]; then
+  die_usage "new-subject takes no --encoding: it registers a subject rather than selecting a run over one. To say where the entry module will live, use --encoding-main PATH"
+fi
 
 RUNDIR_BASE="${L4_GO_RUNDIR:-${TMPDIR:-/tmp}/l4-go}"
 FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
