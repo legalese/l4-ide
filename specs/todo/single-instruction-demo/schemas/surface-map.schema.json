@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legalese.com/l4-go/schemas/surface-map@1.json",
+  "title": "l4-go surface map",
+  "description": "The declared correspondence between two L4 encodings of the same body of law, consumed by etc/go/lib/denovo-diff.mjs (the SPEC.md §8 diff oracle). Two encodings of one subject rarely share names or structure, so nothing here is inferred: every pairing is declared, and the oracle's job is to disagree with the declaration behaviourally rather than to guess it. Every path is repo-root-relative. additionalProperties is false throughout, matching etc/go/lib/subject.mjs's refuse-by-default stance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "subject", "sides", "slots", "pairs"],
+  "properties": {
+    "schema": { "const": "l4-go/surface-map@1" },
+    "subject": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "A sidecar id under etc/go/subjects/."
+    },
+    "note": { "$ref": "#/$defs/note" },
+    "generated_by": { "$ref": "#/$defs/generated_by" },
+    "sides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right"],
+      "description": "`left` is the reference encoding (at G2: the committed corpus). Battery slot values are written in `left`'s vocabulary; `right` declares its renames. Nothing else privileges left over right — the triage dispositions are symmetric.",
+      "properties": {
+        "left": { "$ref": "#/$defs/side" },
+        "right": { "$ref": "#/$defs/side" }
+      }
+    },
+    "slots": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "The shared fact vocabulary. A slot is one argument's worth of facts, named once and referenced by both sides' calls — this is what makes two differently-named encodings comparable at all.",
+      "additionalProperties": { "$ref": "#/$defs/slot" }
+    },
+    "battery": { "$ref": "#/$defs/battery" },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/pair" }
+    }
+  },
+  "$defs": {
+    "note": {
+      "description": "Free prose for humans and the skill. No script branches on it.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Absent on a hand-written map; written by the stage that deposits one.",
+      "properties": {
+        "stage": { "type": "string" },
+        "run_id": { "type": "string" },
+        "at": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string" },
+        "retrieved": { "type": "string" },
+        "cite": { "type": "string" }
+      }
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "module", "timezone"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "How this encoding is named in the triage table, e.g. \"corpus\" / \"de novo\"."
+        },
+        "module": {
+          "type": "string",
+          "description": "Repo-relative path to the .l4 module under test."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA zone, emitted as TIMEZONE IS \"…\" in the generated probe. TIMEZONE is per-document and is NOT inherited through IMPORT, so an unpinned RULES EFFECTIVE DATE read inside the module fails at evaluation without it. Use the same zone the module itself declares."
+        },
+        "stage": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extra repo-relative .l4 files to copy alongside the module into its scratch side-directory, for IMPORTs the sibling scan would miss. The oracle already copies every *.l4 in the module's own directory."
+        },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "sideslot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The L4 type of this argument IN THIS MODULE, spelled exactly as it appears after IS A / IS AN (e.g. `IssuerProfile`, `NUMBER`, `DATE`). The oracle needs it because JSONDECODE is driven by the declared result type, not by inference from the application site: without an explicit GIVETH the decode returns NOTHING. A wrong type name is loud — the generated probe fails `l4 check` naming the file and line."
+        },
+        "rename": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "canonical field name (as written in the battery, i.e. `left`'s vocabulary) -> this module's field name. Fields not listed pass through unchanged. A field this module declares but the battery does not supply is loud: the decoder reports `Missing required field`."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "left", "right"],
+      "properties": {
+        "kind": {
+          "enum": ["record", "number", "boolean", "string", "date"],
+          "description": "`record` slots hold an object of field->value; the rest hold a scalar. Dates are ISO-8601 strings; JSONDECODE parses them into DATE."
+        },
+        "left": { "$ref": "#/$defs/sideslot" },
+        "right": { "$ref": "#/$defs/sideslot" },
+        "from_case": {
+          "type": "string",
+          "description": "Key in a seed case's context object to draw this slot's value from (see battery.cases). Absent = this slot is supplied only by battery.rows."
+        },
+        "perturb": {
+          "type": "boolean",
+          "default": true,
+          "description": "Set false to freeze a slot — it still varies across seed rows, but the oracle generates no single-field mutations inside it."
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": ["number", "string", "boolean"] }
+          },
+          "description": "field name -> extra values the perturbation generator must try for that field. This is where a human puts the statutory boundary figures the generator cannot know. Each is also tried at ±1 for numbers."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the fact battery comes from. Both sources may be used together; `rows` are appended after `cases`.",
+      "properties": {
+        "cases": {
+          "type": "string",
+          "description": "Repo-relative path to a cases file with a top-level `cases` array, each entry {name, context}. The subject sidecar's legs['p7-dmn'].cases is the intended value: its context keys are DMN-sanitised, and the oracle un-sanitises them against the type dictionary it reads back out of `l4 render --format json --include-unused`. A key that does not un-sanitise onto a declared field is a hard error, never a silent drop."
+        },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/row" }
+        },
+        "perturbation": { "$ref": "#/$defs/perturbation" },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "slots"],
+      "properties": {
+        "name": { "type": "string" },
+        "slots": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "slot name -> value, in `left`'s field vocabulary."
+        },
+        "rule_date": {
+          "type": ["string", "null"],
+          "description": "ISO date. When present, every pair whose rule_date is \"case\" is evaluated under EVAL UNDER RULES EFFECTIVE AT this date."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "perturbation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Systematic single-field mutation of each seed row. One field at a time is what makes a divergence witness minimal by construction: the witness is `seed row + this one change`, and the seed agreed.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "max_per_seed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0 = no cap."
+        },
+        "numeric_deltas": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "Absolute offsets applied to every numeric leaf. Default [-1, 1] — the boundary bias: a threshold is crossed by one, not by an order of magnitude."
+        },
+        "numeric_multipliers": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "Default [0, 0.5, 2]."
+        },
+        "cross_pollinate": {
+          "type": "boolean",
+          "default": true,
+          "description": "For each leaf, also try every distinct value that leaf takes across the OTHER seed rows (and, for numbers, ±1 around each). The seed cases carry the regime boundaries a human already found; this reuses them everywhere instead of only where they were written."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "left", "right"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Stable, unique. Cited by the triage table and by fork-register entries."
+        },
+        "left": { "$ref": "#/$defs/call" },
+        "right": { "$ref": "#/$defs/call" },
+        "rule_date": {
+          "type": ["string", "null"],
+          "description": "\"case\" = take it from the row; an ISO date = pin it for every row; absent/null = evaluate with no EVAL UNDER RULES EFFECTIVE AT wrapper, which requires the module's own TIMEZONE."
+        },
+        "fork": {
+          "type": "string",
+          "description": "Optional id of a fork-register entry this pair is known to interpret. Carried into the triage table so a divergence lands next to an ambiguity somebody already recorded."
+        },
+        "citation": {
+          "type": "string",
+          "description": "The source-text coordinate both sides claim to encode, e.g. \"17 CFR 227.100(b)\"."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call", "args"],
+      "properties": {
+        "call": {
+          "type": "string",
+          "description": "The decision's name in this module, spelled exactly as declared (backticks are added by the oracle; do not write them). Checked against the module's own rule headings, read back from `l4 render --format json --include-unused`; a name that is not there is a hard error listing the nearest matches."
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Slot names, in call order. The two sides need not have the same arity — an Interpretation parameter on one side only is expected (SPEC.md R4) — they need only agree on the answer."
+        },
+        "field": {
+          "type": ["string", "null"],
+          "description": "Optional field to project out of a record-shaped result, so two encodings with different result records can still be compared on one answer. Absent = compare the whole rendered value."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    }
+  }
+}

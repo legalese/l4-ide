@@ -1,0 +1,268 @@
+{
+  "schema": "l4-go/surface-map@1",
+  "subject": "regcf",
+  "note": [
+    "THE IDENTITY MAP — a fixture, not a G2 artifact.",
+    "",
+    "Both sides name the same module, and every pair maps a decision onto itself.",
+    "It exists so the diff oracle can be shown to be honest in the only two ways",
+    "that matter: over this map it must report 100% agreement and zero",
+    "divergences (self-test A), and when one threshold constant in a COPY of the",
+    "module is moved, it must catch that and nothing else (self-test B).",
+    "",
+    "A real G2 surface map has two different modules on the two sides, and its",
+    "`right` side carries `rename` entries wherever the de novo encoding chose",
+    "different field names. Nothing else about the shape changes.",
+    "",
+    "Coverage is deliberately partial: 13 of the corpus's 100 declared rules.",
+    "The pairs chosen are the ones the Lexipedia page's eight requirement groups",
+    "actually answer, plus the two intermediate figures (aggregate offering",
+    "amount, investment limit) whose divergence would otherwise hide inside a",
+    "boolean. The `supplied` and `annual_cycles` context entries of the cases",
+    "file are not modelled: `supplied` is an enum-valued FinancialStatementRequirement",
+    "and `annual_cycles` only feeds a regulative rule, which this oracle does not",
+    "reach (see the Limits section of any report it writes). The `filing` slot and",
+    "the `disclosure requirements are met` pair are also out, for a third reason",
+    "worth stating: FormCFiling carries an enum-typed field (`the financial",
+    "statements supplied` IS A FinancialStatementRequirement) and JSONDECODE",
+    "delivers a constructor name as a ValString, so every CONSIDER over it raises",
+    "NonExhaustivePatterns. Both sides raise it identically, so the pair would have",
+    "read as 14 agreements that measure nothing. Measured 2026-08-02; the same",
+    "limit applies to `l4 batch`, which decodes rows the same way."
+  ],
+  "sides": {
+    "left": {
+      "label": "corpus",
+      "module": "jl4/examples/legal/regcf/regcf.l4",
+      "timezone": "America/New_York",
+      "note": "The committed hand-built encoding. At G2 this side is the diff oracle's reference, per SPEC.md §5."
+    },
+    "right": {
+      "label": "corpus (identity)",
+      "module": "jl4/examples/legal/regcf/regcf.l4",
+      "timezone": "America/New_York",
+      "note": "The same file. Self-test B points this at a scratch copy with one constant moved."
+    }
+  },
+  "slots": {
+    "issuer": {
+      "kind": "record",
+      "from_case": "issuer",
+      "left": { "type": "IssuerProfile" },
+      "right": { "type": "IssuerProfile" }
+    },
+    "offering": {
+      "kind": "record",
+      "from_case": "offering",
+      "left": { "type": "Offering" },
+      "right": { "type": "Offering" },
+      "thresholds": {
+        "maximum offering amount the issuer will accept": [
+          1000000, 1070000, 5000000
+        ],
+        "aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months": [
+          0, 124000, 618000, 1235000
+        ]
+      }
+    },
+    "investor": {
+      "kind": "record",
+      "from_case": "investor",
+      "left": { "type": "InvestorProfile" },
+      "right": { "type": "InvestorProfile" },
+      "thresholds": {
+        "annual income": [100000, 107000, 124000],
+        "net worth": [100000, 107000, 124000]
+      }
+    },
+    "arrangement": {
+      "kind": "record",
+      "from_case": "arrangement",
+      "left": { "type": "IntermediaryArrangement" },
+      "right": { "type": "IntermediaryArrangement" },
+      "thresholds": {
+        "days the offering information has been publicly available on the intermediary's platform": [
+          21
+        ]
+      }
+    },
+    "notice": {
+      "kind": "record",
+      "from_case": "notice",
+      "left": { "type": "AdvertisingNotice" },
+      "right": { "type": "AdvertisingNotice" }
+    },
+    "status": {
+      "kind": "record",
+      "from_case": "status",
+      "left": { "type": "ReportingStatus" },
+      "right": { "type": "ReportingStatus" },
+      "thresholds": { "holders of record": [300], "total assets": [10000000] }
+    },
+    "transfer": {
+      "kind": "record",
+      "from_case": "transfer",
+      "left": { "type": "Transfer" },
+      "right": { "type": "Transfer" },
+      "thresholds": { "days since the securities were issued": [364, 365, 366] }
+    },
+    "amount": {
+      "kind": "number",
+      "from_case": "amount_to_be_sold_in_this_transaction",
+      "left": { "type": "NUMBER" },
+      "right": { "type": "NUMBER" }
+    }
+  },
+  "battery": {
+    "cases": "jl4/examples/dmn/regcf-corpus.cases.json",
+    "note": [
+      "The subject sidecar's legs['p7-dmn'].cases file. Its 16 cases are the base",
+      "world plus 15 relocation cases carrying the rule-version boundaries",
+      "(PR #194, DMN ruling R-C), which is exactly the boundary-biased seed set",
+      "the perturbation generator wants: cross-pollination reuses every regime",
+      "date and every dated figure across every other case."
+    ],
+    "perturbation": { "enabled": true, "cross_pollinate": true }
+  },
+  "pairs": [
+    {
+      "id": "issuer-eligibility",
+      "citation": "17 CFR 227.100(b)",
+      "rule_date": "case",
+      "left": { "call": "issuer is eligible", "args": ["issuer"] },
+      "right": { "call": "issuer is eligible", "args": ["issuer"] }
+    },
+    {
+      "id": "issuer-excluded",
+      "citation": "17 CFR 227.100(b)(1)-(6)",
+      "rule_date": "case",
+      "left": {
+        "call": "issuer is excluded by Rule 100(b)",
+        "args": ["issuer"]
+      },
+      "right": {
+        "call": "issuer is excluded by Rule 100(b)",
+        "args": ["issuer"]
+      }
+    },
+    {
+      "id": "offering-within-limit",
+      "citation": "17 CFR 227.100(a)(1)",
+      "rule_date": "case",
+      "left": {
+        "call": "offering is within the offering limit",
+        "args": ["offering"]
+      },
+      "right": {
+        "call": "offering is within the offering limit",
+        "args": ["offering"]
+      }
+    },
+    {
+      "id": "aggregate-offering-amount",
+      "citation": "17 CFR 227.100(a)(1)",
+      "rule_date": "case",
+      "left": { "call": "aggregate offering amount", "args": ["offering"] },
+      "right": { "call": "aggregate offering amount", "args": ["offering"] }
+    },
+    {
+      "id": "investment-limit",
+      "citation": "17 CFR 227.100(a)(2)",
+      "rule_date": "case",
+      "left": { "call": "investment limit", "args": ["investor"] },
+      "right": { "call": "investment limit", "args": ["investor"] }
+    },
+    {
+      "id": "investor-within-limit",
+      "citation": "17 CFR 227.100(a)(2)",
+      "rule_date": "case",
+      "left": {
+        "call": "investor is within the investment limit",
+        "args": ["investor", "amount"]
+      },
+      "right": {
+        "call": "investor is within the investment limit",
+        "args": ["investor", "amount"]
+      }
+    },
+    {
+      "id": "accredited-carve-out",
+      "citation": "17 CFR 227.100(a)(2), as amended by Release 33-10884",
+      "rule_date": "case",
+      "left": {
+        "call": "the accredited-investor carve-out applies to",
+        "args": ["investor"]
+      },
+      "right": {
+        "call": "the accredited-investor carve-out applies to",
+        "args": ["investor"]
+      }
+    },
+    {
+      "id": "financial-statements-required",
+      "citation": "17 CFR 227.201(t)",
+      "rule_date": "case",
+      "left": { "call": "financial statements required", "args": ["offering"] },
+      "right": { "call": "financial statements required", "args": ["offering"] }
+    },
+    {
+      "id": "intermediary-obligations",
+      "citation": "17 CFR 227.100(a)(3), 227.301-303",
+      "rule_date": "case",
+      "left": {
+        "call": "intermediary obligations are met",
+        "args": ["arrangement"]
+      },
+      "right": {
+        "call": "intermediary obligations are met",
+        "args": ["arrangement"]
+      }
+    },
+    {
+      "id": "advertising-notice",
+      "citation": "17 CFR 227.204(b)",
+      "rule_date": "case",
+      "left": {
+        "call": "notice complies with Rule 204(b)",
+        "args": ["notice"]
+      },
+      "right": {
+        "call": "notice complies with Rule 204(b)",
+        "args": ["notice"]
+      }
+    },
+    {
+      "id": "reporting-may-terminate",
+      "citation": "17 CFR 227.202(b)",
+      "rule_date": "case",
+      "left": {
+        "call": "ongoing reporting obligation may terminate",
+        "args": ["status"]
+      },
+      "right": {
+        "call": "ongoing reporting obligation may terminate",
+        "args": ["status"]
+      }
+    },
+    {
+      "id": "transfer-permitted",
+      "citation": "17 CFR 227.501",
+      "rule_date": "case",
+      "left": { "call": "transfer is permitted", "args": ["transfer"] },
+      "right": { "call": "transfer is permitted", "args": ["transfer"] }
+    },
+    {
+      "id": "restricted-period",
+      "citation": "17 CFR 227.501(a)",
+      "rule_date": "case",
+      "left": {
+        "call": "transfer is within the one-year restricted period",
+        "args": ["transfer"]
+      },
+      "right": {
+        "call": "transfer is within the one-year restricted period",
+        "args": ["transfer"]
+      }
+    }
+  ]
+}

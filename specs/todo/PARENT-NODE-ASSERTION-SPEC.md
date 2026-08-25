@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** OPEN — assertions remain leaf-only; no parent-node (And/Or) assertion support.
+>
+> - Ladder viz (`ts-shared/l4-ladder-visualizer/`) makes only leaf `UBoolVar` nodes clickable (`ladder-lir-to-sf.ts:135`, `flow-base.svelte:337`); And/Or bundling nodes are not clickable, no child-locking, no asserted-vs-derived states.
+> - Query planner (`jl4-query-plan/src/L4/Decision/QueryPlan.hs`) is keyed on leaf `QueryAtom`s only; no `parentAssertions`/`nodeId` input path. Phases 1-3 not started.
+
 # Specification: Parent Node Assertions in Wizard
 
 **Status:** Draft
