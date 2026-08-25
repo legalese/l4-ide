@@ -1,0 +1,76 @@
+{
+  "explainer_schema": 1,
+  "title": "SEC Regulation Crowdfunding, explained \u2014 and what happened when somebody made it executable",
+  "spine": {
+    "orientation": {
+      "file": "orientation.md"
+    },
+    "body": [
+      {
+        "id": "the-bargain",
+        "heading": "The bargain: five conditions up front, three duties afterwards",
+        "law": "s2-01-the-bargain.law.md",
+        "encoding": "s2-01-the-bargain.encoding.md"
+      },
+      {
+        "id": "who-may-not-use-it",
+        "heading": "Who may not use it \u2014 Rule 100(b)",
+        "law": "s2-02-who-may-not-use-it.law.md",
+        "encoding": "s2-02-who-may-not-use-it.encoding.md"
+      },
+      {
+        "id": "how-much",
+        "heading": "How much may be raised, and how much one person may put in \u2014 Rule 100(a)",
+        "law": "s2-03-how-much.law.md",
+        "encoding": "s2-03-how-much.encoding.md"
+      },
+      {
+        "id": "what-must-be-disclosed",
+        "heading": "What must be disclosed \u2014 Rules 201 and 203(a)",
+        "law": "s2-04-what-must-be-disclosed.law.md",
+        "encoding": "s2-04-what-must-be-disclosed.encoding.md"
+      },
+      {
+        "id": "what-the-issuer-may-say",
+        "heading": "What the issuer may say \u2014 Rule 204",
+        "law": "s2-05-what-the-issuer-may-say.law.md",
+        "encoding": "s2-05-what-the-issuer-may-say.encoding.md"
+      },
+      {
+        "id": "what-is-owed-afterwards",
+        "heading": "What is owed afterwards \u2014 Rules 202 and 203(b)",
+        "law": "s2-06-what-is-owed-afterwards.law.md",
+        "encoding": "s2-06-what-is-owed-afterwards.encoding.md"
+      },
+      {
+        "id": "what-buyers-may-do",
+        "heading": "What buyers may do \u2014 Rule 501",
+        "law": "s2-07-what-buyers-may-do.law.md",
+        "encoding": "s2-07-what-buyers-may-do.encoding.md"
+      }
+    ],
+    "pictures": {
+      "intro": "pictures.md"
+    },
+    "time": {
+      "law": "time.law.md",
+      "encoding": "time.encoding.md"
+    },
+    "limits": {
+      "law": null,
+      "encoding": "limits.encoding.md"
+    },
+    "sweep": {
+      "file": "sweep.md"
+    },
+    "call_to_action": {
+      "file": "call-to-action.md"
+    },
+    "forks": {
+      "register": "jl4/examples/legal/regcf/fork-register.json"
+    },
+    "how_it_works": {
+      "file": "how-it-works.md"
+    }
+  }
+}
