@@ -121,6 +121,9 @@ library
     L4.Mixfix
     L4.Names
     L4.Nlg
+    L4.OpenFisca.IR
+    L4.OpenFisca.Lower
+    L4.OpenFisca.Emit
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry

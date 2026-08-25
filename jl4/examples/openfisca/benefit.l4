@@ -1,0 +1,27 @@
+-- A small means-tested benefit, exercising comparisons, IF/THEN/ELSE,
+-- booleans, and a call from one decision to another. Still scalar + single
+-- entity: this is the OpenFisca "80%" shape.
+
+DECLARE Household
+    HAS income     IS A NUMBER
+        dependents IS A NUMBER
+
+@export Whether the household is eligible for the benefit
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A BOOLEAN
+`eligible for benefit` h period MEANS
+  (h's income) < 2000 AND (h's dependents) > 0
+
+@export Monthly benefit amount payable to the household
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`monthly benefit` h period MEANS
+  IF `eligible for benefit` h period
+  THEN 500 + (h's dependents) * 100
+  ELSE 0
+
+#EVAL `eligible for benefit` (Household WITH income IS 1500, dependents IS 2) "2026-01"  -- TRUE
+#EVAL `monthly benefit`      (Household WITH income IS 1500, dependents IS 2) "2026-01"  -- 700
+#EVAL `monthly benefit`      (Household WITH income IS 3000, dependents IS 2) "2026-01"  -- 0
