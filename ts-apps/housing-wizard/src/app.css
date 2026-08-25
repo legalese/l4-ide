@@ -1,0 +1,277 @@
+@import 'tailwindcss';
+
+/*
+ * Standalone citizen wizard theme.
+ *
+ * The legally load-bearing element is the MUST (mandatory) vs MAY (discretionary)
+ * distinction in the answer card. Its colour is applied ONLY through the static
+ * .outcome-* classes below — never via an inline style="" attribute — so the CSP
+ * `style-src` can stay strict 'self' and the badge colour survives the built app.
+ *
+ * Every MUST/MAY/CLEAR foreground-on-background pair is chosen to pass >= 4.5:1
+ * contrast in BOTH the light and dark palettes, so the badge stays legible on a
+ * phone in dark mode. Colour is never the SOLE cue — the badges also carry an
+ * icon, a word, a plain-English gloss and an aria-label.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Brand (Legalese crimson) */
+  --brand: #c8376a;
+  --brand-hover: #d94d7e;
+  --brand-dark: #6e1636;
+
+  /* Ink / surfaces */
+  --ink: #1f1f23;
+  --muted: #5f5f6a;
+  --surface: #ffffff;
+  --surface-sunk: #f7f7f9;
+  --hairline: #e4e4e7;
+  --focus: #c8376a;
+
+  /* Semantic outcome tokens — consumed only by the static outcome classes. */
+  --must-bg: #fbe9ef;
+  --must-fg: #6e1636;
+  --must-border: #e0a7bd;
+
+  --may-bg: #fdf3e0;
+  --may-fg: #7a4a00;
+  --may-border: #e6c785;
+
+  --clear-bg: #e6f5ec;
+  --clear-fg: #14663d;
+  --clear-border: #a6d6ba;
+
+  --chip-bg: #f0f0f2;
+  --chip-fg: #303036;
+  --cite-fg: #5a5a66;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --ink: #e6e6e9;
+    --muted: #a3a3ad;
+    --surface: #1b1b1f;
+    --surface-sunk: #222227;
+    --hairline: #2f2f35;
+    --focus: #d94d7e;
+    /* Lighter crimson so emphasis text (.bar-title, the intro <strong>must/may</strong>)
+       stays AA-legible on the dark surface — the #6e1636 light value is ~1.5:1 here. */
+    --brand-dark: #ff9dbe;
+
+    --must-bg: #44102560;
+    --must-fg: #ffd2e0;
+    --must-border: #7a2344;
+
+    --may-bg: #43320f60;
+    --may-fg: #ffe2b0;
+    --may-border: #6b551f;
+
+    --clear-bg: #103a2560;
+    --clear-fg: #bdeed1;
+    --clear-border: #1f6b46;
+
+    --chip-bg: #2c2c30;
+    --chip-fg: #e6e6e9;
+    --cite-fg: #9a9aa3;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font:
+    17px/1.6 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: var(--ink);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* SvelteKit body wrapper; transparent to layout so the app participates
+   directly in the body box. A class (not an inline style) keeps style-src
+   strict. */
+.app-shell {
+  display: contents;
+}
+
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The ONLY place answer-card outcome colour is applied. Referenced via
+   class:outcome-must / class:outcome-may / class:outcome-clear. */
+.outcome-must {
+  background: var(--must-bg);
+  color: var(--must-fg);
+  border-color: var(--must-border);
+}
+.outcome-may {
+  background: var(--may-bg);
+  color: var(--may-fg);
+  border-color: var(--may-border);
+}
+.outcome-clear {
+  background: var(--clear-bg);
+  color: var(--clear-fg);
+  border-color: var(--clear-border);
+}
+
+.chip {
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+}
+.citation {
+  color: var(--cite-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Shared component classes. Global (not scoped) so widgets stay lean, and
+   class-based (never inline style="") so the strict CSP style-src holds.
+   --------------------------------------------------------------------------- */
+
+.field {
+  border: 0;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  min-width: 0;
+}
+.field > legend,
+.field > label {
+  display: block;
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+.help {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0 0 0.6rem;
+}
+.error {
+  color: var(--must-fg);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 0;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.option-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 2px solid var(--hairline);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  background: var(--surface);
+  font-size: 1.02rem;
+}
+.option-card:hover {
+  border-color: var(--brand);
+}
+.option-card.selected {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+}
+.option-card input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--brand);
+}
+
+.input-wrap {
+  display: flex;
+  align-items: stretch;
+  border: 2px solid var(--hairline);
+  border-radius: 10px;
+  overflow: hidden;
+  max-width: 16rem;
+}
+.input-wrap:focus-within {
+  border-color: var(--brand);
+}
+.input-wrap .prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  background: var(--surface-sunk);
+  color: var(--muted);
+  font-weight: 600;
+}
+.input-wrap input {
+  flex: 1;
+  border: 0;
+  padding: 0.7rem 0.8rem;
+  font-size: 1.05rem;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 0;
+}
+.input-wrap input:focus {
+  outline: none;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.85rem 1.4rem;
+  font-size: 1.08rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.submit:hover {
+  background: var(--brand-hover);
+}
+.submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.summary {
+  border: 2px solid var(--must-border);
+  background: var(--must-bg);
+  color: var(--must-fg);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.summary ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+.summary a {
+  color: inherit;
+  font-weight: 700;
+}
