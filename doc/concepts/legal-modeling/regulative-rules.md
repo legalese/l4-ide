@@ -44,6 +44,8 @@ GIVETH A DEONTIC Actor Action
 
 The `DEONTIC` type parameterises over the actor type and the action type, so different contracts can use different domain-specific parties and actions while sharing the same machinery.
 
+> **Who may perform which action?** When actors are modelled as values and actions carry their actor(s), L4 enforces that a `PARTY p MUST a` obligation (and a `PARTY p DOES a` event) has `p` as the action's _performer_ — so a Drinker cannot be obligated to eat. This covers duplex actions, parameterised (overloaded) actions, and higher-order procurement. See **[Actors, Actions, and Agreement](actors-and-actions.md)** for the full syntax and copious worked examples of what is and isn't allowed.
+
 ---
 
 ## The Mental Model: A Contract Awaiting Events
@@ -77,6 +79,8 @@ An event is a triple:
 - **party** — who did it (must match a value of the contract's actor type)
 - **action** — what they did (matched against the contract's action shape — see [Conditional obligations with PROVIDED](#conditional-obligations-with-provided))
 - **timestamp** — a number on the same timeline as the start time and `WITHIN` deadlines
+
+> **The party must be the action's performer.** When actors are modelled as values and actions carry their actor(s), a `PARTY p DOES a` event — and a `PARTY p MUST a` obligation — is rejected at type-check time unless `p` is the action `a`'s _performer_. So `PARTY Drinker DOES eat` does not type-check if `eat`'s performer is the Eater. See [Actors, Actions, and Agreement](actors-and-actions.md) for the full rule (the subject-first canon, duplex actions, parameterised actions, and higher-order procurement).
 
 Events are consumed **in order**. As each event is examined, two pieces of internal state move:
 

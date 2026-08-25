@@ -488,22 +488,23 @@ See [Libraries](../libraries/README.md) for the full list of available libraries
 
 **Error message:** `Error: cannot resolve import 'modulename'`
 
-**What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order:
+**What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
 
 1. Virtual filesystem (VFS) provided by the IDE or service
 2. `JL4_LIBRARY_PATH` environment variable (if set)
-3. Project root directory / relative to the importing file
-4. XDG data directory (`~/.local/share/jl4/libraries/`)
-5. Bundled with the VSCode extension (`../../libraries/` from executable)
-6. Embedded standard libraries compiled into the binary
+3. Project root directory
+4. Relative to the importing file
+5. Embedded standard libraries compiled into the binary
+6. XDG data directory (`~/.local/share/jl4/libraries/`)
+7. Bundled with the VSCode extension (`../../libraries/` from executable)
 
-When `JL4_LIBRARY_PATH` is set, embedded libraries (step 6) are skipped. This gives operators full control over which libraries are available.
+Project-scoped locations (2–4) outrank the embedded stdlib, so intentional overrides work; machine-global locations (6–7) rank below it, so they can only supply modules the embed does not carry. When `JL4_LIBRARY_PATH` is set, the embedded copy (step 5) is skipped entirely — the operator has full control over which libraries are available. See [Library Resolution](../libraries/resolution.md) for the full story, including the shadow warning emitted when several differing copies of a module are visible at once.
 
 **How to fix it:**
 
 - Check the module name for typos.
 - For your own modules, place them in the project directory or set `JL4_LIBRARY_PATH`.
-- For third-party libraries, install them to `~/.local/share/jl4/libraries/`
+- For third-party (non-stdlib) libraries, install them to `~/.local/share/jl4/libraries/`
 - If `JL4_LIBRARY_PATH` is set, ensure it contains the standard libraries you need (e.g., `prelude.l4`).
 
 ---

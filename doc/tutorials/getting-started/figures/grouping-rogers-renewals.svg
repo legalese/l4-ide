@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1096" height="275" viewBox="0 0 1096 275">
+<rect width="1096" height="275" fill="#ffffff"/>
+<text x="413.8" y="86.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">for a period of</text>
+<text x="413.8" y="106.5" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">five (5) years</text>
+<rect data-fnid="5" data-value="5" class="lad-box lad-clickable" x="528.6" y="72.8" width="224.0" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="5" x="640.6" y="97.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`initial term is running`</text>
+<polyline class="lad-wire lad-clickable" data-fold="3" points="484.6,92.6 528.6,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="3" points="343.0,92.6 484.6,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,137.4 C 230.0,137.4 223.0,92.6 343.0,92.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 752.6,92.6 C 872.6,92.6 865.7,137.4 985.7,137.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<text x="218.6" y="166.9" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">and thereafter for</text>
+<text x="218.6" y="186.9" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">successive terms</text>
+<rect data-fnid="8" data-value="8" class="lad-box lad-clickable" x="345.1" y="153.2" width="239.7" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="8" x="465.0" y="178.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`a renewal term is running`</text>
+<rect data-fnid="10" data-value="10" class="lad-box lad-clickable" x="644.8" y="153.2" width="278.9" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="10" x="784.2" y="178.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`one year notice has been given`</text>
+<text data-fnid="9" x="784.2" y="148.2" font-family="Georgia, serif" font-size="11" text-anchor="middle" fill="#555" font-style="italic">NOT</text>
+<polyline class="lad-wire" points="628.8,173.0 644.8,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="923.7,173.0 934.7,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<circle cx="939.7" cy="173.0" r="5" fill="#ffffff" stroke="#1b1b1b" stroke-width="1.5"/>
+<polyline class="lad-wire" points="944.7,173.0 959.7,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="6" points="301.1,173.0 345.1,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="6" points="584.8,173.0 628.8,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="6" points="136.0,173.0 301.1,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 110.0,137.4 C 140.0,137.4 106.0,173.0 136.0,173.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="2" d="M 959.7,173.0 C 989.7,173.0 955.7,137.4 985.7,137.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,137.4 110.0,137.4" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="137.4" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="985.7,137.4 1025.7,137.4" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="1025.7" cy="137.4" r="3.5" fill="#222"/>
+</svg>

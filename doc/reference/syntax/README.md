@@ -57,6 +57,48 @@ Names for variables, functions, and types.
 
 ---
 
+### Lists
+
+A list literal is written with `LIST`, either inline or as an indented block:
+
+```l4
+LIST 1, 2, 3          -- inline, comma-separated
+
+LIST                  -- vertical block (layout replaces the commas)
+  1
+  2
+  3
+```
+
+**Bullet lists.** A `•` followed by a space and a same-line body opens a list
+element; a block of `•` items aligned at a common column desugars to the same
+list (conventionally written at the start of a line, though that's a style
+convention, not an enforced rule). `•` was chosen because, unlike `-` (which
+is subtraction), it has no arithmetic meaning, so it is unambiguous even in
+**argument position**:
+
+```l4
+xs IS                 -- a plain list
+  • 1
+  • 2
+  • 3                 -- == LIST 1, 2, 3
+
+item "Parent"         -- bullet children nest under a constructor, no LIST/parens
+  • item "a"
+  • item "Sub"
+    • item "b"        -- child '•' lines up under the parent's `item`; any
+    • item "c"        --   deeper indent works too, to arbitrary depth
+```
+
+**Corner case.** Inside a vertical `LIST` block, a bare name is itself one of
+the list's items, at the same column as its siblings. If a `•` block follows
+immediately at that column, it binds to the name as an _argument_ rather than
+becoming the next sibling item — this only matters for a name that is
+arity-overloaded across a 0-arg and a list-taking definition. Wrap the name in
+parens, e.g. `(reverse)`, to force it back into a standalone list item.
+
+---
+
 ## Annotations
 
 Metadata attached to declarations.
@@ -112,6 +154,45 @@ DECIDE `calculate premium` IS ...
 ```
 
 Only functions carrying `@export` are exported; everything else stays internal.
+
+### @infixl / @infixr / @infix
+
+Declare the precedence and associativity of a binary infix operator, so that
+unparenthesized chains of such operators group the way you declare —
+GHC-style fixity for L4's identifier operators.
+
+```l4
+@infixl 6
+GIVEN p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p UNION q MEANS ...
+
+@infixl 7
+p INTERSECT q MEANS ...
+
+#EVAL a UNION b INTERSECT c    -- groups as a UNION (b INTERSECT c)
+#EVAL a UNION b UNION c        -- groups as (a UNION b) UNION c
+```
+
+- `@infixl N` — left-associative, `@infixr N` — right-associative,
+  `@infix N` — non-associative (chains of it always need parentheses).
+- `N` is a priority from 1 (loosest) to 9 (tightest).
+- The annotation goes on the line(s) above the operator's definition and only
+  applies to a plain binary infix definition (`a OP b MEANS ...`); anywhere
+  else it is ignored with a warning.
+- **No default fixity.** An operator without a declaration cannot be chained
+  without parentheses (you get the usual arity error). This is a deliberate
+  divergence from GHC's `infixl 9` default: existing programs keep their
+  meaning exactly.
+- Fixity travels with the operator across `IMPORT`, so a library can declare
+  it once and every client gets bare chains. Conflicting imported
+  declarations for the same operator are an error at the use site.
+- Chaining operators of equal priority requires them to associate in the
+  same direction; mixed `@infixl`/`@infixr` at one priority is an error.
+- Keyword operators (`PLUS`, `AND`, ...) have their own built-in precedence
+  table; mixing keyword and identifier operators in one unparenthesized
+  expression is not re-associated — parenthesize.
 
 ---
 

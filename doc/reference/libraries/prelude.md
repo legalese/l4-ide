@@ -70,6 +70,9 @@ The prelude can be imported into every L4 program with `IMPORT prelude` and prov
 - `asum` / `firstJust` - First successful Maybe
 - `maybeToList` / `listToMaybe` - Convert between Maybe and List
 
+For negation as failure over `MAYBE BOOLEAN` (`holds` / `naf` / `presumed`), see
+the dedicated [negation-as-failure](negation-as-failure.md) library.
+
 #### Either Functions
 
 - `either` - Fold over Either

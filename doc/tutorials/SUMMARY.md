@@ -12,6 +12,14 @@
 - [Encoding Legislation](getting-started/encoding-legislation.md)
 - [Wedding Vows](getting-started/wedding-vows.md)
 
+## Set Operators
+
+- [Sets, and the Two Meanings of "And"](set-operators/sets-and-the-two-ands.md)
+
+## Multi-Temporal Modeling
+
+- [Multi-Temporal Rule Modeling](multi-temporal-modeling/multi-temporal-rule-modeling.md)
+
 ## Deployment
 
 - [Exporting Rules for Deployment](deploying-rules/exporting-rules-for-deployment.md)
