@@ -58,6 +58,13 @@ export const PHASE_CLASS = {
   "p7-wizard": "projection",
   "p8-diff": "compare",
   "p8-verify": "verify",
+  // p9-cost reports on the RUN rather than on the body of law, which is what
+  // p9-report and p9-explain also do — hence the same class. It was missing
+  // when the stage landed, which made classOf("p9-cost") return "unknown", and
+  // the comment above says exactly why that matters: the entries exist so role
+  // derivation is TOTAL. Nothing tested that until the check in selftest.mjs
+  // that derives this table's required keys from go.sh's own stage lists.
+  "p9-cost": "report",
   "p9-explain": "report",
   "p9-report": "report",
   "p10-publish": "publish",

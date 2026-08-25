@@ -281,9 +281,11 @@ keep two different kinds of evidence from being averaged into one.
   driver's own time before it: asking the stage for its inputs, digesting and itemising them,
   searching for a replayable receipt). The driver took both readings, and it is the only party that
   could: it is the process that waited. The figure is **refusable**, which is what makes it worth
-  recording — `ledger.verify` reports any `elapsed_ms` larger than the interval between its own
-  `stage_begin` and `stage_end`, so an inflated duration fails arithmetic rather than merely being
-  unlikely. A replayed row writes no `stage_begin` and is exempt by construction, not by exception.
+  recording — `ledger.verify` reports any `elapsed_ms` more than a second longer than the interval between its
+  own `stage_begin` and `stage_end`, so an inflated duration fails arithmetic rather than merely
+  being unlikely. The second of slack is not a rounding convenience: `lib/clock.sh` falls back to
+  whole seconds where bash 5's `EPOCHREALTIME` is absent, and two second-truncated readings can
+  overshoot a true interval by just under 1000 ms. A replayed row writes no `stage_begin` and is exempt by construction, not by exception.
 - **Attributed.** Tokens, tool calls and their durations are read out of the agent harness's own
   JSONL transcripts. Nobody types them — but a transcript is an ordinary file that an agent with a
   shell could edit, so the ledger names every one it read with its sha256 and byte count, and the
@@ -310,6 +312,16 @@ pipeline's own runs:
 3. **The figures stop at `p9-cost` itself**, which runs before the reporting stages so that the
    report has something to render. The report's own per-stage table, rendered after `run_end`, sees
    all of them; the two totals differ by exactly the stages between them, and both say so.
+
+**Where the cost went, not only how much.** The journal's stage brackets cut the run into
+segments and every counted request and tool call falls in exactly one, so `by_segment` re-sums to
+the in-window totals — an invariant the stage checks, and the one check in its oracle that is not a
+restatement of how the totals were accumulated. The breakdown makes one thing about the method
+visible that a single total hides: a phase script **calls no model**, so a `during <stage>` row can
+only be work the session was doing concurrently, never the stage's own cost. Attribution is by
+clock and a clock cannot separate concurrent work from the work it overlaps; the `between` rows —
+the agent reading the source, writing the encoding, deciding whether to grant the gate — are where
+a pipeline's tokens actually go.
 
 **Two populations of network activity, never added.** Calls the _model_ made are counted from the
 transcript by tool name (`WebSearch`, `WebFetch`, any `mcp__*`). Requests the _pipeline_ made are
@@ -801,9 +813,17 @@ elsewhere should say "SI-Rn".
   alternative was the deposit shape used everywhere else here — the agent produces a cost record
   and a stage validates it — which was the working assumption until the environment variable was
   found. Observation beats validation when observation is available.
-  (3) **Dispatch is recorded separately from execution.** The driver's own pre-stage time is real,
-  is spent on every stage including the ones that then replay in milliseconds, and folding it into
-  `elapsed_ms` would make the pipeline look faster than it is while making the stage look slower.
+  (3) **Dispatch is recorded separately from execution — on an EXECUTED stage.** The driver's own
+  pre-stage time is real, is spent on every stage including the ones that then replay in
+  milliseconds, and folding it into `elapsed_ms` would make the pipeline look faster than it is
+  while making the stage look slower. The exception is structural and is stated rather than
+  smoothed over: on a REPLAYED stage the driver writes the receipt itself and has one figure to
+  write, so dispatch is inside `elapsed_ms` and `dispatch_ms` is null. The report says so at the
+  point it prints the totals, because the dispatch total then omits those rows while the elapsed
+  total contains them — which matters most in the replay-heavy runs where harness overhead
+  dominates. (An earlier draft of this ruling stated (3) without the exception, which the review
+  of this change caught: the rule was written from the executed path and the replay path was not
+  re-read against it.)
   (4) **Every derived figure states its bound.** `busy_ms_lower_bound` is a union and never a sum,
   and is explicitly a floor; the window column and the session-total column are printed together
   because one understates and the other overstates; the two network populations are counted

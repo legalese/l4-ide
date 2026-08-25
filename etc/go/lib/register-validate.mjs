@@ -889,7 +889,11 @@ const RULES = {
       // SMALLER than the sum is a number nothing produced.
       const parts = ctx.doc.documents.filter((d) => d.retrieval_cost);
       if (!parts.length) return;
-      for (const k of ["requests", "elapsed_ms"]) {
+      // EVERY ADDITIVE FIELD, not the two that happened to be required. The
+      // rule's description says "the sum of whatever the documents state"; with
+      // `bytes` left out, a bundle could state a byte total smaller than its own
+      // documents and pass a rule documented as covering it.
+      for (const k of ["requests", "elapsed_ms", "bytes"]) {
         const sum = parts.reduce((a, d) => a + (d.retrieval_cost[k] ?? 0), 0);
         if ((top[k] ?? 0) < sum)
           ctx.f(

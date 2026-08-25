@@ -134,6 +134,36 @@ const mv = runVerdict({
   gates: gateStates,
 });
 
+/**
+ * The cost ledger, IF this run left one on disk beside its journal.
+ *
+ * `p9-report`'s rule is that the report is a function of `journal.ndjson` and
+ * nothing else, and that rule is why the report can be re-derived by anyone
+ * holding the run directory. This does not break it: the ledger is an artifact
+ * of THIS run, named and hashed on `p9-cost`'s own receipt, and it is read only
+ * for the per-segment breakdown — a table whose absence costs the report
+ * nothing and whose numbers are checked against the journal-derived metrics by
+ * the stage that wrote it. Every headline figure still comes from a receipt.
+ *
+ * Fail-open by construction: a run whose artifacts have been swept renders the
+ * rest of this section exactly as before.
+ */
+let _ledger;
+function costLedger() {
+  if (_ledger !== undefined) return _ledger;
+  _ledger = null;
+  const rec = byStage.get("p9-cost");
+  for (const a of rec?.artifacts ?? []) {
+    if (!String(a.path ?? "").endsWith("cost-ledger.json")) continue;
+    try {
+      _ledger = JSON.parse(readFileSync(a.path, "utf8"));
+    } catch {
+      _ledger = null;
+    }
+  }
+  return _ledger;
+}
+
 const esc = (s) =>
   String(s ?? "")
     .replace(/\|/g, "\\|")
@@ -487,6 +517,20 @@ const num = (v) =>
  */
 function costSection() {
   const timed = stageEnds.filter((r) => typeof r.elapsed_ms === "number");
+  // The run's span, taken from THIS journal at render time — after `run_end`,
+  // so it covers the reporting stages that `p9-cost` ran too early to see.
+  const stamps = records
+    .map((r) => r.ts)
+    .filter(Boolean)
+    .sort();
+  // Replayed rows behave differently in three places below — the table, the
+  // totals, and the wall-clock floor — so they are identified once.
+  const replayed = stageEnds.filter(
+    (r) => r.replayed_from && typeof r.elapsed_ms === "number",
+  );
+  const runSpanMs = stamps.length
+    ? Date.parse(stamps[stamps.length - 1]) - Date.parse(stamps[0])
+    : null;
   const cost = byStage.get("p9-cost");
   if (!timed.length && !cost)
     return absent(
@@ -501,7 +545,7 @@ function costSection() {
     const totalDisp = stageEnds.reduce((a, r) => a + (r.dispatch_ms ?? 0), 0);
     const untimed = stageEnds.length - timed.length;
     out.push(
-      "**Attested — measured by the driver.** It started each clock and stopped it; `go.sh verify` refuses any row claiming more time than the interval between its own `stage_begin` and `stage_end`.",
+      "**Attested — measured by the driver.** It started each clock and stopped it; `go.sh verify` refuses any row claiming more than a second more time than the interval between its own `stage_begin` and `stage_end` — a second of slack, because the clock falls back to whole seconds on a shell without `EPOCHREALTIME`.",
       "",
       "| stage | status | ran for | dispatch | |",
       "| ----- | ------ | ------: | -------: | - |",
@@ -514,19 +558,17 @@ function costSection() {
     out.push(
       `| **total** | | **${dur(totalStage)}** | **${dur(totalDisp)}** | |`,
       "",
-      "`dispatch` is the driver's own time before each stage started — asking the stage for its inputs, digesting and itemising them, and searching for a replayable receipt. It is spent on every stage, including the ones that then replay in milliseconds, and it is listed separately rather than folded in because it is the harness's cost and not the stage's work.",
+      "`dispatch` is the driver's own time before each stage started — asking the stage for its inputs, digesting and itemising them, and searching for a replayable receipt. It is spent on every stage, including the ones that then replay in milliseconds, and on an EXECUTED stage it is listed separately rather than folded in, because it is the harness's cost and not the stage's work.",
     );
     // A REPLAYED ROW'S NUMBER IS NOT WHAT THE STAGE COSTS. It is what finding
     // and materialising the earlier receipt cost, which is the right thing to
     // record and the wrong thing to read as execution — so it is named rather
     // than left to the `replayed` marker in the last column.
-    const replayed = stageEnds.filter(
-      (r) => r.replayed_from && typeof r.elapsed_ms === "number",
-    );
+    // (hoisted above; the wall-clock paragraph needs it too)
     if (replayed.length)
       out.push(
         "",
-        `${replayed.length} stage(s) replayed an earlier receipt rather than executing. Their figure is what the replay cost — finding the receipt and materialising its artifacts, ${dur(replayed.reduce((a, r) => a + r.elapsed_ms, 0))} in total — and not what the work would cost; the work was done, and timed, in the run the receipt came from. A replay writes no \`stage_begin\`, so it has no interval and contributes nothing to any wall-clock union.`,
+        `**A replayed row's number is not the same measurement as the rest of the column.** ${replayed.length} stage(s) replayed an earlier receipt rather than executing, costing ${dur(replayed.reduce((a, r) => a + r.elapsed_ms, 0))} between them. Two things follow, and neither is visible from the table alone. First, that figure is what the REPLAY cost — declaring inputs, digesting them, finding the receipt and materialising its artifacts — not what the work costs; the work was done, and timed, in the run the receipt came from. Second, the driver has nowhere to put a separate dispatch figure for a row it writes itself, so on these rows dispatch is INSIDE the "ran for" number and the dispatch cell is blank. The dispatch total below therefore omits their dispatch and the "ran for" total contains it — which matters most in the replay-heavy runs where harness overhead dominates. A replay also writes no \`stage_begin\`, so it has no interval and contributes nothing to any wall-clock union.`,
       );
     if (untimed)
       out.push(
@@ -570,17 +612,23 @@ function costSection() {
     `| cache reads | ${num(g("cost_cache_read_tokens"))} | |`,
     `| tool calls | ${num(g("cost_tool_calls"))} | ${num(g("cost_tool_calls_session_total"))} |`,
     "",
-    `The right-hand column is an upper bound, not a second measurement: it is everything the session did, including whatever else it was asked to do. The left column clips to this run's own window, from its first journal record to its last. Work done before the pipeline was first invoked — reading the statute, deciding what to encode — falls outside it, so the left column understates and the right overstates, and the truth is between them.`,
+    `The right-hand column is an upper bound, not a second measurement: it is everything the session did, including whatever else it was asked to do. The left column clips to this run's own window, from its first journal record to its last.`,
+    "",
+    // THE LIMIT OF CLOCK ATTRIBUTION, stated where the numbers are rather than
+    // left for a reader to infer. Demonstrated on this pipeline's own runs: a
+    // session that resumed a day-old run to re-run one stage had a full day of
+    // unrelated work fall inside the window and be reported as this run's cost.
+    "Both columns are attributions **by clock**, and a clock cannot tell work on this run apart from work that merely happened at the same time. So the left column misses what came before the driver was first invoked — reading the source, deciding what to encode — and includes anything else the session did between the first record and the last, which on a human-gated pipeline can be days. It understates at one end and overstates at the other; the honest reading is that the true figure lies between the two columns, nearer the left.",
     "",
     // THE SUBAGENT FIGURES ARE SESSION TOTALS, and the sentence has to say so.
     // It said "of the requests above" while quoting a whole-session number
     // beside a window-clipped table — the same conflation the ledger's own
     // arithmetic check was added to catch, reappearing in prose, where no
     // check reaches it.
-    `Model(s): \`${esc(g("cost_models") ?? "—")}\`. Across the whole session — the right-hand column, not the left — ${num(g("cost_subagent_requests"))} requests were made by subagents, spending ${num(g("cost_subagent_output_tokens"))} output tokens across ${num(g("cost_workflows"))} workflow fan-out(s). Those are measured from the subagents' own transcripts, which the session file does not contain at all: a ledger that read only the session file would report a fraction and look complete.`,
+    `Model(s): \`${esc(g("cost_models") ?? "—")}\`. Across the whole session — the right-hand column, not the left — ${num(g("cost_subagent_requests_session_total"))} requests were made by subagents, spending ${num(g("cost_subagent_output_tokens_session_total"))} output tokens across ${num(g("cost_workflows_session_total"))} workflow fan-out(s). Those are measured from the subagents' own transcripts, which the session file does not contain at all: a ledger that read only the session file would report a fraction and look complete.`,
     "",
     "**Network, model-initiated.** " +
-      `${num(g("cost_web_search"))} web search(es), ${num(g("cost_web_fetch"))} fetch(es) and ${num(g("cost_mcp_calls"))} external-service call(s), taking ${dur(g("cost_network_ms"))} in total.`,
+      `In this run's window — the left-hand column above, not the right — ${num(g("cost_web_search"))} web search(es), ${num(g("cost_web_fetch"))} fetch(es) and ${num(g("cost_mcp_calls"))} external-service call(s), taking ${dur(g("cost_network_ms"))} between them. Across the whole session: ${num(g("cost_web_search_session_total"))} web search(es).`,
     "",
     "That counts calls the MODEL made, by tool name. A stage that runs `curl` reaches the network inside a shell call and is invisible to it, so the pipeline's own retrievals are counted separately, by the stage that makes them:",
     "",
@@ -589,23 +637,70 @@ function costSection() {
       // model-initiated and counted by tool name; the other is the fetch that
       // produced the source bundle, counted by the script that made the
       // requests. A single total over both would be a number about nothing.
-      const ing = byStage.get("p1-ingest")?.metrics ?? {};
+      const p1 = byStage.get("p1-ingest");
+      const ing = p1?.metrics ?? {};
+      if (!p1)
+        return "> This run declared no `p1-ingest` stage, so there is no source-side figure. On the committed-encoding path the sources were fetched in an earlier run; on the deposit path `p1-ingest` validates the bundle that records them.";
+      if (ing.documents_retrieved === undefined)
+        return `> \`p1-ingest\` reported **${esc(p1.status)}**${p1.reason ? ` — ${esc(p1.reason)}` : ""}, so no bundle was read and there is no source-side figure.`;
       if (ing.retrieval_requests === undefined)
-        return ing.documents_retrieved === undefined
-          ? "> This run has no source-bundle receipt, so it has no source-side figure. The pipeline does not fetch: retrieving the statute is agent work, deposited as a bundle and validated by `p1-ingest`."
-          : `> The source bundle records ${num(ing.documents_retrieved)} document(s) retrieved. It states no \`retrieval_cost\`, so how many requests that took, and how long, is not recorded — a bundle assembled by hand cannot know it, and a zero would read as a source that cost nothing to fetch.`;
-      return `> Source side: ${num(ing.retrieval_requests)} HTTP request(s) over ${num(ing.documents_retrieved)} document(s), taking ${dur(ing.retrieval_ms)}${ing.retrieval_bytes ? ` for ${num(ing.retrieval_bytes)} bytes` : ""}. Measured by the fetching script itself and carried in the bundle, where the schema refuses a total smaller than the sum of its documents.`;
+        return `> The source bundle records ${num(ing.documents_retrieved)} document(s) retrieved. It states no \`retrieval_cost\`, so how many requests that took, and how long, is not recorded — a bundle assembled by hand cannot know it, and a zero would read as a source that cost nothing to fetch.`;
+      // STANDING, said plainly. Unlike everything else in this section, these
+      // figures are not read from anything this pipeline controls: the bundle
+      // is an agent DEPOSIT, and its retrieval_cost is whatever the depositing
+      // fetch recorded. The schema constrains it — a total may not be smaller
+      // than the sum of its own documents — and that is the whole of the
+      // guarantee. Calling it "measured" without saying whose measurement it is
+      // would give it the standing of the driver's own clock.
+      return `> Source side, **as deposited** — a claim by the fetch that produced the bundle, not a measurement by this run: ${num(ing.retrieval_requests)} HTTP request(s) over ${num(ing.documents_retrieved)} document(s), taking ${dur(ing.retrieval_ms)}${ing.retrieval_bytes ? ` for ${num(ing.retrieval_bytes)} bytes` : ""}. What the schema guarantees is internal consistency and nothing more: a stated total may not be smaller than the sum of the documents it totals.`;
     })(),
     "",
     "**Wall clock.** " +
-      `The run spans ${dur(g("cost_span_ms"))} end to end. Of that, ${dur(g("cost_pipeline_busy_ms"))} is attested stage execution and at least ${dur(g("cost_agent_tool_ms"))} is measured tool-call time, giving a floor of ${dur(g("cost_busy_lower_bound_ms"))} during which something was demonstrably running.`,
+      // THE SPAN IS DERIVED HERE, from the journal, not read from the metric.
+      // `cost_span_ms` was frozen when p9-cost ran, so it stops before the
+      // reporting stages while the per-stage table above does not — and the
+      // frozen figure can therefore be SMALLER than the stage total printed a
+      // few lines up, which reads as a broken report rather than as two
+      // boundaries.
+      `The run spans ${dur(runSpanMs)} from its first journal record to its last. Of that, ${dur(g("cost_pipeline_busy_ms"))} is attested stage execution${replayed.length ? ` (over the stages that actually EXECUTED, which is why it can sit far below the "ran for" total above when most stages replayed)` : ""}, and at least ${dur(g("cost_agent_tool_ms"))} is measured tool-call time, giving a floor of ${dur(g("cost_busy_lower_bound_ms"))} during which something was demonstrably running. Both component figures stop where the attributed ones do; the span does not.`,
     "",
     "The gap between the span and that floor is mostly not idleness in the ordinary sense: this pipeline stops at a human gate and waits. The floor is a floor and not an estimate — it unions attested stage brackets with measured tool intervals, and counts nothing at all for the time a model spends reasoning between two tool calls, which is real work that leaves no interval to measure.",
     "",
     "**No money.** Token counts are facts about this run; prices are facts about a contract and change without notice. A stale rate table would put a confident wrong figure in a report whose whole premise is that every number has a row behind it. A reader with a rate card can multiply.",
     "",
-    `Figures stop at \`${esc(g("cost_measured_through") ?? "—")}\`: \`p9-cost\` runs before the reporting stages so that this section can exist, and therefore cannot count them. The per-stage table above, rendered after \`run_end\`, can.`,
+    `The attributed figures stop at \`${esc(g("cost_measured_through") ?? "—")}\` — the last stage that had written a receipt when \`p9-cost\` read the journal. \`p9-cost\` runs before the reporting stages so that this section can exist, so it cannot count itself, \`p9-report\` or \`p9-explain\`. The per-stage table above is rendered after \`run_end\` and does see them, which is why the two totals differ by exactly the stages between them.`,
   );
+  // --- WHERE THE COST WENT ---------------------------------------------------
+  const seg = costLedger()?.by_segment ?? [];
+  if (seg.length) {
+    out.push(
+      "",
+      "**Where it went.** The journal's stage brackets cut the run into segments, and every counted request and tool call falls in exactly one — an invariant `p9-cost` checks rather than assumes.",
+      "",
+      "| segment | requests | output tokens | tool calls | tool time (summed) |",
+      "| ------- | -------: | ------------: | ---------: | -----------------: |",
+    );
+    for (const x of seg)
+      out.push(
+        `| ${esc(x.title)} | ${num(x.requests)} | ${num(x.output_tokens)} | ${num(x.tool_calls)} | ${dur(x.tool_ms)} |`,
+      );
+    out.push(
+      "",
+      // THE FINDING THIS TABLE MAKES VISIBLE, and it is a finding about the
+      // method rather than a hedge about the numbers.
+      "The tool column here is a **sum**, while the wall-clock floor above is a **union**: calls made in parallel are counted once each here and once in total there, so these figures are larger and the two must not be compared as though they answered the same question.",
+      "",
+      "A `during <stage>` row is **not what that stage cost**. A phase script calls no model, so by construction it spends no tokens; anything attributed to a stage's own bracket is work the session was doing at the same time on something else. Attribution here is by clock, and a clock cannot tell concurrent work apart from the work it overlaps. The `between` rows are the ones that answer \"what did this pipeline cost\": they are the agent's own working time — reading the source, writing the encoding, deciding whether to grant the gate.",
+    );
+  }
+
+  const selves = Number(g("cost_transcripts_measuring_self") ?? 0);
+  if (selves)
+    out.push(
+      "",
+      `One further boundary: ${num(selves)} of the transcripts read is the session that did the reading, so its own figures stop at the moment it measured itself. Two reads of a live transcript minutes apart differ by exactly the calls that did the reading.`,
+    );
+
   if (cost.status !== "PASS")
     out.push(
       "",

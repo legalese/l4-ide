@@ -290,9 +290,28 @@ export function verify(journalPath) {
     // exceed the true interval by just under 1000 ms. A tighter bound would
     // fire on the clock rather than on a defect.
     //
-    // A REPLAYED row is exempt by construction, not by exception: a replay
-    // writes no `stage_begin`, so there is no bracket, and `begin` is null.
-    if (rec.kind === "stage_end" && typeof rec.elapsed_ms === "number") {
+    // A REPLAYED row is exempt EXPLICITLY rather than by accident.
+    //
+    // The claim it used to carry — "exempt by construction, because a replay
+    // writes no stage_begin" — is false in one reachable case: a run killed
+    // after a `stage_begin` was written leaves an ORPHAN, and if that stage is
+    // later satisfied by a cross-run replay, the backward scan below pairs the
+    // replay with an orphan from hours earlier.
+    //
+    // Be precise about what the guard buys HERE, because it is not much: an
+    // orphan's bracket is always at least as long as the replay's own elapsed
+    // (the orphan was written in an earlier invocation), so no finding would
+    // have fired either way. What the pairing actually corrupted was the
+    // BRACKET, and the damage was in `cost-ledger.bracketsFrom`, which turned
+    // those idle hours into a figure labelled attested stage execution. The
+    // guard is here so both sites state one rule — a replay did not run, so it
+    // has no bracket — rather than one enforcing it while the other rests on a
+    // claim that is not true.
+    if (
+      rec.kind === "stage_end" &&
+      !rec.replayed_from &&
+      typeof rec.elapsed_ms === "number"
+    ) {
       let begin = null;
       for (let j = i - 1; j >= 0; j--) {
         const r = records[j];

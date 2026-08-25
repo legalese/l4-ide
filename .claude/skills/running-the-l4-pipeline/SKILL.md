@@ -182,7 +182,7 @@ Run directories accumulate. `etc/go/go.sh gc` prunes them — run dirs only; the
 
 **Nothing.** That is the design. `p9-cost` runs before `p9-report`, writes `cost-ledger.json`, and the report renders it under **What this run cost**. You do not deposit a cost record and you are not asked to state a number, because the two sources are better than anything you could report:
 
-- the **driver** measures each stage's wall clock and its own dispatch time, and `go.sh verify` refuses a duration larger than the interval between that stage's own `stage_begin` and `stage_end`;
+- the **driver** measures each stage's wall clock and its own dispatch time, and `go.sh verify` refuses a duration more than a second longer than the interval between that stage's own `stage_begin` and `stage_end` — a second of slack, because `lib/clock.sh` falls back to whole seconds on a shell without `EPOCHREALTIME`;
 - the **harness transcripts** carry every request's token usage and every tool call's start and finish, and the ledger reads them, naming each file with its sha256.
 
 The join is made for you: every `go.sh run` writes a `session` row recording `CLAUDE_CODE_SESSION_ID` from the environment it was invoked in, so a run driven across several sittings — which a human-gated pipeline always is — attributes all of them.
