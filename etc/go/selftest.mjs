@@ -1921,6 +1921,13 @@ process.stdout.write("\n-- cost accounting --\n");
       .map((r) => JSON.stringify(r))
       .join("\n") + '\n{"type":"assist',
   );
+  // The workflow's OWN journal, which lives in the same directory and is not an
+  // agent: it records what the fan-out returned and carries no requests. It is
+  // here so the group attribution has something to exclude.
+  writeFileSync(
+    resolve(projects, SID, "subagents", "workflows", "wf_x", "journal.jsonl"),
+    JSON.stringify({ type: "result", label: "encode:x", result: {} }) + "\n",
+  );
 
   const led = buildLedger({
     sessions: [{ session: SID, attributed_by: "declared" }],
@@ -1952,7 +1959,9 @@ process.stdout.write("\n-- cost accounting --\n");
   );
   check(
     "a truncated final line does not abort the read",
-    led.transcripts.length === 2 &&
+    // 3, not 2: the session file, the workflow agent, and the workflow's own
+    // journal, which is read like any other .jsonl and contributes nothing.
+    led.transcripts.length === 3 &&
       led.transcripts.every((t) => typeof t.sha256 === "string"),
   );
   check(
@@ -1993,6 +2002,10 @@ process.stdout.write("\n-- cost accounting --\n");
     // so a windowed ledger listed workflows from other days with no field to
     // tell them apart, and the first person to read one — me — misread it
     // within minutes of building the file.
+    check(
+      "a workflow's own journal.jsonl is not counted as an agent in it",
+      led.workflows.length === 1 && led.workflows[0].agents === 1,
+    );
     check(
       "a workflow rollup carries BOTH a session total and an in-window figure",
       led.workflows.every(

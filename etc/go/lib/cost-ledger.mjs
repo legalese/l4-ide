@@ -116,7 +116,18 @@ export function transcriptsFor(session, root = configRoot()) {
               session,
               // The workflow run this subagent belonged to, when the layout
               // says so: subagents/workflows/<runId>/agent-<id>.jsonl.
-              group: /\/subagents\/workflows\/([^/]+)\//.exec(p)?.[1] ?? null,
+              //
+              // The `agent-` prefix is load-bearing, not decoration. The same
+              // directory holds the workflow's own `journal.jsonl`, which is a
+              // record OF the fan-out and not an agent in it — it carries no
+              // requests at all. Matching the directory alone counted it,
+              // so every group reported one more agent than it ran (measured:
+              // 13 for a twelve-agent workflow, and the same off-by-one in all
+              // six groups of one run). It is still read and still counted as a
+              // transcript; it simply belongs to no group.
+              group: /^agent-/.test(e.name)
+                ? (/\/subagents\/workflows\/([^/]+)\//.exec(p)?.[1] ?? null)
+                : null,
             });
         }
       };
