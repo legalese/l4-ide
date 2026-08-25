@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "The CLI surface the stage table reads, and nothing else. Measured, not guessed.",
+    "",
+    "'regulative_rules' is EMPTY, and that is a measurement rather than an omission.",
+    "sg-childcare-leave.l4 carries exactly one regulative rule -- the CDCSA s 12B(8)",
+    "obligation to grant and to take the leave before the relevant period ends. With",
+    "a single rule in the module, `l4 export --to bpmn` EMITS THE BPMN instead of",
+    "refusing with the list of rule names that discover.mjs's `rules` probe reads, so",
+    "the probe reports BROKEN on a module that is in fact fine. Pinning the empty",
+    "list records what the probe can establish today; the rule's own name is in the",
+    "module and in NOTES.md.",
+    "",
+    "'checkers_that_must_exist' is empty because this subject declares no leg that",
+    "shells out to a checker: p7-lts, p7-mcp, p7-wizard and p7-akn are all internal",
+    "to the l4 CLI. Adding a DMN or BPMN leg would add the corresponding validators."
+  ],
+  "measured_on": "2026-08-25",
+  "measured_against": "jl4/examples/legal/sg-child-support/sg-child-support.l4",
+  "enums": {
+    "export_to": [
+      "dmn",
+      "dmn-md",
+      "bpmn"
+    ],
+    "export_flavor": [
+      "camunda",
+      "kie"
+    ],
+    "export_fail_on": [
+      "none",
+      "blocking",
+      "lossy",
+      "advisory"
+    ],
+    "render_format": [
+      "json",
+      "plan",
+      "text",
+      "html",
+      "akn"
+    ]
+  },
+  "regulative_rules": [],
+  "checkers_that_must_exist": []
+}
