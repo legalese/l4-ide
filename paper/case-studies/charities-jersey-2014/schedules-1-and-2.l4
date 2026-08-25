@@ -1,0 +1,562 @@
+IMPORT prelude
+IMPORT `charities-common`
+
+§ `Charities (Jersey) Law 2014 — Schedule 1 (the Commissioner) and Schedule 2 (the Tribunal)`
+
+-- ===========================================================================
+-- SCHEDULE 1 (Article 3) — Jersey Charity Commissioner.
+-- SCHEDULE 2 (Article 32) — Charity Tribunal.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- Provenance: Schedule 1 amended by the Dormant Bank Accounts (Jersey) Law 2017
+-- (L.1/2017) — endnote [5].
+--
+-- The Schedules look like pure administrative furniture, and most of them are.
+-- But three provisions in them are OPERATIVE, CHECKABLE, and worth having in a
+-- machine-readable form, because each one is a constraint that a real decision
+-- can VIOLATE:
+--
+--   * Schedule 1 para 4(3) — THE NON-DELEGABLE DECISIONS. "Any function of the
+--     Commissioner may, to the extent authorized by the Commissioner, be exercised
+--     on behalf of the Commissioner by any member of the Commissioner's staff,
+--     EXCEPT - (a) the decision under Article 11 on whether to register a charity;
+--     (b) the decision under Article 15(3) on whether to refuse to deregister a
+--     charity; and (c) the decision under Article 16 on whether to deregister a
+--     charity." Three reserved decisions. A registration signed off by a member of
+--     staff is ULTRA VIRES, and this file can say so.
+--
+--   * NUMERIC BOUNDS. Sch 1 para 1(5): a Commissioner's appointment is "not more
+--     than 6 years". Sch 1 para 3(4)(c): the appointment expires on completing
+--     12 years of service "whether consecutive or in aggregate". Sch 2 para 1(1):
+--     the tribunal has "at least 4, and no more than 8" members. Sch 1 para 4(9)
+--     and Sch 2 para 3(4): the annual report must reach the Minister "in no case
+--     later than 4 months after the end of that year". These are bounds a
+--     spreadsheet gets wrong and a type system does not.
+--
+--   * Sch 2 para 4(1) — THE PRESIDING CASCADE. A priority chain with two
+--     fallbacks: the chair; the vice-chair if the chair is absent; and if BOTH are
+--     absent, a member appointed for the purpose by the members present. Modelled
+--     as a total function returning who presides, so it cannot silently fall
+--     through to nobody.
+--
+-- The rest — the appointment procedure, the Jersey Appointments Commission
+-- consultation, the funding provisions, the tribunal's power to regulate its own
+-- procedure, and the States' Regulation-making power over tribunal procedure — is
+-- carried as INERT PROSE so the corpus has no silent gap, but has no computable
+-- content and is given no invented logic.
+--
+-- ENCODING STYLE — INERT: verbatim statute inline as bare strings (identity of
+-- their context), `...` = AND-sugar, `..` = OR-sugar, layout IS the bracketing.
+--
+-- >>> INTERPRETATION CALL — Sch 1 para 4(3) reserves "the decision under Article
+--     11 on whether to register a charity". Article 11(4) imposes the duty to
+--     register and 11(5) the duty to refuse; we read the reservation as covering
+--     BOTH arms (it is one decision, taken one way or the other), not merely the
+--     positive one. The contrary reading would let staff refuse registrations
+--     while reserving only grants to the Commissioner, which inverts the
+--     protective purpose of the paragraph.
+-- ===========================================================================
+
+§§ `The Schedules' own vocabulary`
+
+-- Actions specific to the Schedules; charities-common's Action enum covers the
+-- operative Parts of the Law, not its administrative machinery.
+DECLARE ScheduleAction IS ONE OF
+  `present to the States a notice of intention to appoint`      -- Sch 1 para 1(3), Sch 2 para 1(3)
+  `seek the views of the Jersey Appointments Commission`        -- Sch 1 para 1(2), Sch 2 para 1(2)
+  `present to the States a notice of termination`               -- Sch 1 para 3(3), Sch 2 para 2(3)
+  `prepare and publish the annual report`                       -- Sch 1 para 4(8)
+  `provide the annual report to the Minister`                   -- Sch 1 para 4(9), Sch 2 para 3(4)
+  `lay the annual report before the States`                     -- Sch 1 para 4(10), Sch 2 para 3(5)
+  `make staff available to the Commissioner`                    -- Sch 1 para 4(1)
+  `exercise a reserved decision`                                -- Sch 1 para 4(3)
+
+§§ `Schedule 1 paragraph 4(3) — the decisions the Commissioner may NOT delegate`
+
+DECLARE CommissionerFunction IS ONE OF
+  `the decision under Article 11 on whether to register a charity`
+  `the decision under Article 15(3) on whether to refuse to deregister a charity`
+  `the decision under Article 16 on whether to deregister a charity`
+  `any other function of the Commissioner`
+
+-- The three reserved decisions, as a predicate. This is the exception list in
+-- Sch 1 para 4(3)(a)-(c), and nothing else is on it.
+GIVEN f IS A CommissionerFunction
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 4(3) — the function is a reserved decision` f MEANS
+    CONSIDER f
+    WHEN `the decision under Article 11 on whether to register a charity`              THEN TRUE
+    WHEN `the decision under Article 15(3) on whether to refuse to deregister a charity`  THEN TRUE
+    WHEN `the decision under Article 16 on whether to deregister a charity`            THEN TRUE
+    OTHERWISE FALSE
+
+DECLARE StaffExercise HAS
+    `the function purportedly exercised`                             IS A CommissionerFunction
+    `the Commissioner authorized the exercise of the function`       IS A BOOLEAN
+    `the person exercising it is a member of the Commissioner's staff`  IS A BOOLEAN
+
+-- "Any function of the Commissioner MAY, TO THE EXTENT AUTHORIZED by the
+-- Commissioner, be exercised on behalf of the Commissioner by any member of the
+-- Commissioner's staff, EXCEPT - (a) ... (b) ... and (c) ..."
+-- So a staff exercise is lawful iff: staff member, AND authorized, AND NOT reserved.
+GIVEN x IS A StaffExercise
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 4(3) — the staff exercise of the function is lawful` x MEANS
+        "(3) Any function of the Commissioner may, to the extent authorized by the Commissioner, be exercised on behalf of the Commissioner by any member of the Commissioner's staff, except -"
+    ... x's `the person exercising it is a member of the Commissioner's staff`
+    AND x's `the Commissioner authorized the exercise of the function`
+    AND     "(a) the decision under Article 11 on whether to register a charity;"
+        ... "(b) the decision under Article 15(3) on whether to refuse to deregister a charity; and"
+        ... "(c) the decision under Article 16 on whether to deregister a charity."
+        ... NOT `Schedule 1 paragraph 4(3) — the function is a reserved decision` (x's `the function purportedly exercised`)
+
+-- The safety property this Schedule exists to guarantee, stated positively.
+GIVEN x IS A StaffExercise
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 4(3) — the purported exercise is ultra vires` x MEANS
+        `Schedule 1 paragraph 4(3) — the function is a reserved decision` (x's `the function purportedly exercised`)
+    AND x's `the person exercising it is a member of the Commissioner's staff`
+
+§§ `Schedule 1 paragraphs 1 and 3 — the Commissioner's appointment and its termination`
+
+DECLARE CommissionerAppointment HAS
+    name                                                            IS A STRING
+    -- para 1(5): "not more than 6 years"
+    `the period of the appointment, in years`                       IS A NUMBER
+    -- para 3(4)(c): "12 years (whether consecutive or in aggregate) of service"
+    `total years served as Commissioner, whether consecutive or in aggregate`  IS A NUMBER
+    -- para 1(3): "at least 2 weeks before appointing"
+    `weeks of notice given to the States before the appointment`    IS A NUMBER
+
+    -- para 3(1) — the three routes by which a person ceases to be Commissioner
+    `(1)(a) has resigned by giving not less than 3 months notice in writing to the Minister`  IS A BOOLEAN
+    `months of notice given on resignation`                         IS A NUMBER
+
+    -- para 3(2) — the grounds on which the Minister may terminate
+    `(2)(a) has been absent from his or her duties for a period longer than 4 consecutive weeks`  IS A BOOLEAN
+    `(2)(b) has become bankrupt`                                    IS A BOOLEAN
+    `(2)(c) is incapacitated by illness`                            IS A BOOLEAN
+    `(2)(d) is otherwise unable or unfit to discharge the functions of the Commissioner`  IS A BOOLEAN
+
+    -- para 3(4) — the routes by which the appointment expires
+    `(4)(a) the period for which the person was appointed has expired without re-appointment`  IS A BOOLEAN
+    `(4)(b) the person has become a member of the States`           IS A BOOLEAN
+
+-- para 1(5): "When appointing a person as the Commissioner the Minister must
+-- determine the period of the appointment, being NOT MORE THAN 6 YEARS."
+GIVEN a IS A CommissionerAppointment
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 1(5) — the appointment period is within the 6-year bound` a MEANS
+        "(5) When appointing a person as the Commissioner the Minister must determine the period of the appointment, being not more than 6 years."
+    ... a's `the period of the appointment, in years` AT MOST 6
+
+-- para 1(3): "The Minister must, AT LEAST 2 WEEKS before appointing a person as
+-- the Commissioner, present to the States a notice of his or her intention."
+GIVEN a IS A CommissionerAppointment
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 1(3) — the States were given at least 2 weeks notice` a MEANS
+        "(3) The Minister must, at least 2 weeks before appointing a person as the Commissioner, present to the States a notice of his or her intention to make the appointment."
+    ... a's `weeks of notice given to the States before the appointment` AT LEAST 2
+
+-- para 3(1)(a): resignation is effective only on "NOT LESS THAN 3 MONTHS' notice
+-- in writing to the Minister" — so the notice period is itself a condition of the
+-- resignation, not merely a courtesy.
+GIVEN a IS A CommissionerAppointment
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 3(1)(a) — a valid resignation` a MEANS
+        "(1)(a) he or she resigns from office by giving not less than 3 months' notice in writing to the Minister;"
+    ... a's `(1)(a) has resigned by giving not less than 3 months notice in writing to the Minister`
+    AND a's `months of notice given on resignation` AT LEAST 3
+
+-- para 3(2) — the Minister MAY terminate "after satisfying himself or herself
+-- that the person - (a) ... (b) ... (c) ... or (d) ...". A disjunction of grounds
+-- gating a discretion.
+GIVEN a IS A CommissionerAppointment
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 3(2) — a ground for the Minister to terminate the appointment` a MEANS
+        "(2) The Minister may terminate the appointment of a person as the Commissioner, after satisfying himself or herself that the person -"
+    ..  "(a) has been absent from his or her duties for a period longer than 4 consecutive weeks;"
+    ..  a's `(2)(a) has been absent from his or her duties for a period longer than 4 consecutive weeks`
+    ..  "(b) has become bankrupt;"
+    ..  a's `(2)(b) has become bankrupt`
+    ..  "(c) is incapacitated by illness; or"
+    ..  a's `(2)(c) is incapacitated by illness`
+    ..  "(d) is otherwise unable or unfit to discharge the functions of the Commissioner."
+    ..  a's `(2)(d) is otherwise unable or unfit to discharge the functions of the Commissioner`
+
+-- para 3(4) — expiry. (4)(c) is the 12-year aggregate service cap: note that it
+-- bites on TOTAL service "whether consecutive or in aggregate", so a Commissioner
+-- cannot reset the clock by taking a break and being re-appointed.
+GIVEN a IS A CommissionerAppointment
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 3(4) — the appointment has expired` a MEANS
+        "(4) A person's appointment as the Commissioner expires if -"
+    ..  "(a) the period for which the person was appointed expires without re-appointment;"
+    ..  a's `(4)(a) the period for which the person was appointed has expired without re-appointment`
+    ..  "(b) the person becomes a member of the States; or"
+    ..  a's `(4)(b) the person has become a member of the States`
+    ..  "(c) the person completes 12 years (whether consecutive or in aggregate) of service as Commissioner."
+    ..  a's `total years served as Commissioner, whether consecutive or in aggregate` AT LEAST 12
+
+-- para 3(1) — the three routes, taken together.
+GIVEN a IS A CommissionerAppointment
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 3(1) — the person ceases to be the Commissioner` a MEANS
+        "(1) A person ceases to be appointed as the Commissioner if -"
+    ..  `Schedule 1 paragraph 3(1)(a) — a valid resignation` a
+    ..  "(b) the Minister terminates his or her appointment under sub-paragraph (2); or"
+    ..  `Schedule 1 paragraph 3(2) — a ground for the Minister to terminate the appointment` a
+    ..  "(c) his or her appointment expires under sub-paragraph (4)."
+    ..  `Schedule 1 paragraph 3(4) — the appointment has expired` a
+
+§§ `Schedule 1 paragraph 4(8) to (10) — the annual report chain`
+
+-- "(8) The Commissioner must prepare and publish a report on the activities of the
+--  Commissioner in each calendar year.
+--  (9) The Commissioner must provide the Minister with the report AS SOON AS
+--  PRACTICABLE after the end of the year to which the report relates, BUT IN NO
+--  CASE LATER THAN 4 MONTHS after the end of that year.
+--  (10) The Minister must lay a copy of the report so provided before the States as
+--  soon as practicable after the Minister receives the report."
+--
+-- Note the drafting: para 4(9) pairs an OPEN-TEXTURED standard ("as soon as
+-- practicable") with a HARD LONGSTOP ("in no case later than 4 months"). The
+-- longstop is checkable; the standard is not. We model the longstop, and flag the
+-- standard.
+GIVEN `months after the end of the year, at which the report was provided` IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 4(9) — the report met the 4-month longstop` `months after the end of the year, at which the report was provided` MEANS
+        "(9) The Commissioner must provide the Minister with the report as soon as practicable after the end of the year to which the report relates, but in no case later than 4 months after the end of that year."
+    ... `months after the end of the year, at which the report was provided` AT MOST 4
+
+-- The chain as a regulative obligation. Deadlines in DAYS.
+-- >>> The 4-month longstop in para 4(9) is expressed here as WITHIN 120 (days).
+--     "As soon as practicable" (paras 4(9) and 4(10)) is OPEN-TEXTURED and has no
+--     number in the Law: the WITHIN 30 on the laying duty is a REVIEWABLE
+--     PLACEHOLDER for that standard, not a figure taken from the statute.
+`Schedule 1 paragraphs 4(8) to (10) — the annual report chain` MEANS
+    PARTY Commissioner MUST `prepare and publish the annual report` WITHIN 120
+    HENCE PARTY Commissioner MUST `provide the annual report to the Minister` WITHIN 120
+          HENCE PARTY Minister MUST `lay the annual report before the States` WITHIN 30
+
+-- para 4(12) — the independence guarantee, as a PROHIBITION on the Minister's
+-- direction power. "Directions under paragraph (11) must respect the independence
+-- of the Commissioner and, in particular, MUST NOT require the report to contain
+-- justification of any decision of the Commissioner in relation to individual
+-- charities, governors or applicants for registration."
+DECLARE MinisterialDirection HAS
+    `the direction requires the report to contain justification of a decision of the Commissioner in relation to an individual charity, governor or applicant for registration`  IS A BOOLEAN
+    `the direction otherwise fails to respect the independence of the Commissioner`  IS A BOOLEAN
+
+GIVEN d IS A MinisterialDirection
+GIVETH A BOOLEAN
+`Schedule 1 paragraph 4(12) — the direction is beyond the Minister's power` d MEANS
+        "(12) Directions under paragraph (11) must respect the independence of the Commissioner and, in particular, must not require the report to contain justification of any decision of the Commissioner in relation to individual charities, governors or applicants for registration."
+    ..  d's `the direction requires the report to contain justification of a decision of the Commissioner in relation to an individual charity, governor or applicant for registration`
+    ..  d's `the direction otherwise fails to respect the independence of the Commissioner`
+
+§§ `Schedule 2 paragraph 1(1) — the size of the tribunal`
+
+DECLARE TribunalComposition HAS
+    `the number of members appointed to the tribunal`               IS A NUMBER
+    `a chair has been designated from among the members`            IS A BOOLEAN   -- para 1(7)
+    `a vice-chair has been designated from among the members`       IS A BOOLEAN   -- para 1(7)
+
+-- "(1) The Minister must appoint as members of the tribunal AT LEAST 4, and NO
+--  MORE THAN 8, persons ..." — a two-sided bound, and the kind of thing that is
+--  quietly breached when a member resigns and is not replaced.
+GIVEN t IS A TribunalComposition
+GIVETH A BOOLEAN
+`Schedule 2 paragraph 1(1) — the tribunal is validly constituted as to number` t MEANS
+        "(1) The Minister must appoint as members of the tribunal at least 4, and no more than 8, persons appearing to the Minister to be suitable for the position and to have appropriate experience to safeguard the interests of the public and the charitable sector in Jersey."
+    ... t's `the number of members appointed to the tribunal` AT LEAST 4
+    AND t's `the number of members appointed to the tribunal` AT MOST 8
+
+-- para 1(7): "The Minister must, among the members of the tribunal, designate one
+-- as the chair and another as the vice-chair." Both, not either.
+GIVEN t IS A TribunalComposition
+GIVETH A BOOLEAN
+`Schedule 2 paragraph 1(7) — the chair and vice-chair have been designated` t MEANS
+        "(7) The Minister must, among the members of the tribunal, designate one as the chair and another as the vice-chair."
+    ... t's `a chair has been designated from among the members`
+    AND t's `a vice-chair has been designated from among the members`
+
+§§ `Schedule 2 paragraph 4(1) — the presiding cascade`
+
+DECLARE Presider IS ONE OF
+  `the chair`
+  `the vice-chair`
+  `a tribunal member appointed for the purpose by the tribunal members present at the sitting`
+
+DECLARE TribunalSitting HAS
+    `the chair is absent`                                           IS A BOOLEAN
+    `the vice-chair is absent`                                      IS A BOOLEAN
+
+-- "(1) A sitting of the tribunal is to be presided over by - (a) the chair; (b) the
+--  vice-chair, IF THE CHAIR IS ABSENT; or (c) IF BOTH THE CHAIR AND VICE-CHAIR ARE
+--  ABSENT, a tribunal member appointed for the purpose by the tribunal members
+--  present at the sitting."
+--
+-- A TOTAL function: every sitting has a presider. Returning a Presider rather than a
+-- BOOLEAN is what makes the cascade impossible to fall through.
+GIVEN s IS A TribunalSitting
+GIVETH A Presider
+`Schedule 2 paragraph 4(1) — who presides at the sitting` s MEANS
+    BRANCH IF NOT s's `the chair is absent`      THEN `the chair`
+           IF NOT s's `the vice-chair is absent` THEN `the vice-chair`
+           OTHERWISE `a tribunal member appointed for the purpose by the tribunal members present at the sitting`
+
+§§ `Carried as inert prose — the provisions with no computable content`
+
+-- These are DELIBERATE stubs. They keep the corpus gap-free and auditable without
+-- inventing logic the Law does not contain.
+
+`Schedule 1 paragraph 2 — the status of the Commissioner (inert)` MEANS
+        "(1) The Commissioner may, as a corporation sole, in the name of his or her office -"
+    ... "(a) enter into an agreement for any purpose of his or her office;"
+    ... "(b) acquire, hold and dispose of movable property;"
+    ... "(c) sue and be sued in any civil proceedings;"
+    ... "(d) be charged with an offence and defend criminal proceedings; and"
+    ... "(e) do anything reasonably necessary or expedient for or incidental to any of the Commissioner's functions."
+    ... "(2) The Commissioner is independent of the States and the Minister."
+    ... "(3) The terms and conditions of the appointment of the Commissioner must not be construed so as to create a contract of employment or agency between the States, or the Minister, and the person appointed."
+
+#EVAL `Schedule 1 paragraph 2 — the status of the Commissioner (inert)`
+
+`Schedule 1 paragraph 4(4) and (5) — the relevant person as acting Commissioner (inert)` MEANS
+        "(4) The Minister may designate a person as the relevant person for the purpose of sub-paragraph (5)."
+    ... "(5) A relevant person designated under sub-paragraph (4) is to be treated as the Commissioner for the purposes of this Law, if -"
+    ... "(a) the person appointed as the Commissioner is unable to act through incapacity or absence; or"
+    ... "(b) there is a vacancy in the office of Commissioner,"
+    ... "on a temporary basis until the Commissioner becomes able to act again or a new Commissioner is appointed under paragraph 1."
+
+#EVAL `Schedule 1 paragraph 4(4) and (5) — the relevant person as acting Commissioner (inert)`
+
+`Schedule 2 paragraph 4(3) — the States' power over tribunal procedure (inert)` MEANS
+        "(3) The States may by Regulations make further provision as to the procedure of the tribunal, including in particular provision as to -"
+    ... "(a) the burden of proof on an appeal;"
+    ... "(b) the summoning of witnesses and the administration of oaths;"
+    ... "(c) securing the production of documents and evidence;"
+    ... "(d) the conduct of hearings, the determination of appeals with or without hearings, and the holding of hearings wholly or partly in public or private or in the absence of any party;"
+    ... "(e) enabling an appeal to be determined, or any matter preliminary or incidental to an appeal to be dealt with or direction given, by the chair or vice-chair, or subject to any quorum or voting rules;"
+    ... "(f) the award of costs, and the creation of offences in relation to the tribunal, carrying a penalty not exceeding imprisonment for a term of 2 years and a fine;"
+    ... "(g) the publication of reports of the tribunal's decisions;"
+    ... "(h) duties of the Commissioner in relation to an appeal;"
+    ... "(i) striking out, withdrawal and amendment of appeals or replies;"
+    ... "(j) such ancillary powers of the tribunal as the States think necessary for the proper discharge of its functions."
+
+#EVAL `Schedule 2 paragraph 4(3) — the States' power over tribunal procedure (inert)`
+
+§ `Tests — the Schedules`
+
+§§ `Schedule 1 paragraph 4(3) — the three reserved decisions`
+
+#ASSERT `Schedule 1 paragraph 4(3) — the function is a reserved decision` `the decision under Article 11 on whether to register a charity`
+#ASSERT `Schedule 1 paragraph 4(3) — the function is a reserved decision` `the decision under Article 15(3) on whether to refuse to deregister a charity`
+#ASSERT `Schedule 1 paragraph 4(3) — the function is a reserved decision` `the decision under Article 16 on whether to deregister a charity`
+#ASSERT NOT `Schedule 1 paragraph 4(3) — the function is a reserved decision` `any other function of the Commissioner`
+
+-- A staff member, duly authorized, answering correspondence: lawful.
+`a clerk answers routine correspondence` MEANS StaffExercise WITH
+    `the function purportedly exercised`                             IS `any other function of the Commissioner`
+    `the Commissioner authorized the exercise of the function`       IS TRUE
+    `the person exercising it is a member of the Commissioner's staff`  IS TRUE
+
+#ASSERT `Schedule 1 paragraph 4(3) — the staff exercise of the function is lawful` `a clerk answers routine correspondence`
+#ASSERT NOT `Schedule 1 paragraph 4(3) — the purported exercise is ultra vires` `a clerk answers routine correspondence`
+
+-- The SAME clerk, equally authorized, signing off a registration under Article 11.
+-- The authorization is IRRELEVANT: the decision is reserved, and the Commissioner
+-- cannot delegate what the Schedule withholds. ULTRA VIRES.
+`a clerk signs off an Article 11 registration` MEANS StaffExercise WITH
+    `the function purportedly exercised`                             IS `the decision under Article 11 on whether to register a charity`
+    `the Commissioner authorized the exercise of the function`       IS TRUE   -- and it still does not help
+    `the person exercising it is a member of the Commissioner's staff`  IS TRUE
+
+#ASSERT NOT `Schedule 1 paragraph 4(3) — the staff exercise of the function is lawful` `a clerk signs off an Article 11 registration`
+#ASSERT `Schedule 1 paragraph 4(3) — the purported exercise is ultra vires` `a clerk signs off an Article 11 registration`
+
+-- And a deregistration under Article 16, likewise.
+`a clerk deregisters a charity under Article 16` MEANS StaffExercise WITH
+    `the function purportedly exercised`                             IS `the decision under Article 16 on whether to deregister a charity`
+    `the Commissioner authorized the exercise of the function`       IS TRUE
+    `the person exercising it is a member of the Commissioner's staff`  IS TRUE
+
+#ASSERT `Schedule 1 paragraph 4(3) — the purported exercise is ultra vires` `a clerk deregisters a charity under Article 16`
+
+§§ `Schedule 1 — appointment bounds`
+
+`a lawful 5-year appointment` MEANS CommissionerAppointment WITH
+    name                                                            IS "a lawful 5-year appointment"
+    `the period of the appointment, in years`                       IS 5
+    `total years served as Commissioner, whether consecutive or in aggregate`  IS 5
+    `weeks of notice given to the States before the appointment`    IS 3
+    `(1)(a) has resigned by giving not less than 3 months notice in writing to the Minister`  IS FALSE
+    `months of notice given on resignation`                         IS 0
+    `(2)(a) has been absent from his or her duties for a period longer than 4 consecutive weeks`  IS FALSE
+    `(2)(b) has become bankrupt`                                    IS FALSE
+    `(2)(c) is incapacitated by illness`                            IS FALSE
+    `(2)(d) is otherwise unable or unfit to discharge the functions of the Commissioner`  IS FALSE
+    `(4)(a) the period for which the person was appointed has expired without re-appointment`  IS FALSE
+    `(4)(b) the person has become a member of the States`           IS FALSE
+
+#ASSERT `Schedule 1 paragraph 1(5) — the appointment period is within the 6-year bound` `a lawful 5-year appointment`
+#ASSERT `Schedule 1 paragraph 1(3) — the States were given at least 2 weeks notice` `a lawful 5-year appointment`
+#ASSERT NOT `Schedule 1 paragraph 3(1) — the person ceases to be the Commissioner` `a lawful 5-year appointment`
+
+-- A 7-year appointment, on 1 week's notice: both bounds broken.
+`an unlawful 7-year appointment, on short notice` MEANS CommissionerAppointment WITH
+    name                                                            IS "an unlawful 7-year appointment"
+    `the period of the appointment, in years`                       IS 7   -- exceeds the 6-year bound
+    `total years served as Commissioner, whether consecutive or in aggregate`  IS 7
+    `weeks of notice given to the States before the appointment`    IS 1   -- short of the 2-week notice
+    `(1)(a) has resigned by giving not less than 3 months notice in writing to the Minister`  IS FALSE
+    `months of notice given on resignation`                         IS 0
+    `(2)(a) has been absent from his or her duties for a period longer than 4 consecutive weeks`  IS FALSE
+    `(2)(b) has become bankrupt`                                    IS FALSE
+    `(2)(c) is incapacitated by illness`                            IS FALSE
+    `(2)(d) is otherwise unable or unfit to discharge the functions of the Commissioner`  IS FALSE
+    `(4)(a) the period for which the person was appointed has expired without re-appointment`  IS FALSE
+    `(4)(b) the person has become a member of the States`           IS FALSE
+
+#ASSERT NOT `Schedule 1 paragraph 1(5) — the appointment period is within the 6-year bound` `an unlawful 7-year appointment, on short notice`
+#ASSERT NOT `Schedule 1 paragraph 1(3) — the States were given at least 2 weeks notice` `an unlawful 7-year appointment, on short notice`
+
+-- The 12-year aggregate cap. Two 6-year terms are each individually lawful under
+-- para 1(5) — but on completing the twelfth year the appointment EXPIRES under
+-- para 3(4)(c), "whether consecutive or in aggregate". The break does not reset it.
+`a second 6-year term, completing 12 years of service` MEANS CommissionerAppointment WITH
+    name                                                            IS "a second 6-year term"
+    `the period of the appointment, in years`                       IS 6   -- lawful, taken alone
+    `total years served as Commissioner, whether consecutive or in aggregate`  IS 12   -- but the aggregate bites
+    `weeks of notice given to the States before the appointment`    IS 4
+    `(1)(a) has resigned by giving not less than 3 months notice in writing to the Minister`  IS FALSE
+    `months of notice given on resignation`                         IS 0
+    `(2)(a) has been absent from his or her duties for a period longer than 4 consecutive weeks`  IS FALSE
+    `(2)(b) has become bankrupt`                                    IS FALSE
+    `(2)(c) is incapacitated by illness`                            IS FALSE
+    `(2)(d) is otherwise unable or unfit to discharge the functions of the Commissioner`  IS FALSE
+    `(4)(a) the period for which the person was appointed has expired without re-appointment`  IS FALSE
+    `(4)(b) the person has become a member of the States`           IS FALSE
+
+#ASSERT `Schedule 1 paragraph 1(5) — the appointment period is within the 6-year bound` `a second 6-year term, completing 12 years of service`
+#ASSERT `Schedule 1 paragraph 3(4) — the appointment has expired` `a second 6-year term, completing 12 years of service`
+#ASSERT `Schedule 1 paragraph 3(1) — the person ceases to be the Commissioner` `a second 6-year term, completing 12 years of service`
+
+-- Resignation on 1 month's notice is NOT a valid resignation: para 3(1)(a) requires
+-- not less than 3 months.
+`a resignation on one month's notice` MEANS CommissionerAppointment WITH
+    name                                                            IS "a resignation on one month's notice"
+    `the period of the appointment, in years`                       IS 5
+    `total years served as Commissioner, whether consecutive or in aggregate`  IS 2
+    `weeks of notice given to the States before the appointment`    IS 4
+    `(1)(a) has resigned by giving not less than 3 months notice in writing to the Minister`  IS TRUE
+    `months of notice given on resignation`                         IS 1   -- short
+    `(2)(a) has been absent from his or her duties for a period longer than 4 consecutive weeks`  IS FALSE
+    `(2)(b) has become bankrupt`                                    IS FALSE
+    `(2)(c) is incapacitated by illness`                            IS FALSE
+    `(2)(d) is otherwise unable or unfit to discharge the functions of the Commissioner`  IS FALSE
+    `(4)(a) the period for which the person was appointed has expired without re-appointment`  IS FALSE
+    `(4)(b) the person has become a member of the States`           IS FALSE
+
+#ASSERT NOT `Schedule 1 paragraph 3(1)(a) — a valid resignation` `a resignation on one month's notice`
+#ASSERT NOT `Schedule 1 paragraph 3(1) — the person ceases to be the Commissioner` `a resignation on one month's notice`
+
+§§ `Schedule 1 paragraph 4(9) — the 4-month report longstop`
+
+#ASSERT `Schedule 1 paragraph 4(9) — the report met the 4-month longstop` 3
+#ASSERT `Schedule 1 paragraph 4(9) — the report met the 4-month longstop` 4    -- the boundary: 4 months exactly is "not later than 4 months"
+#ASSERT NOT `Schedule 1 paragraph 4(9) — the report met the 4-month longstop` 5
+
+-- The chain run to completion.
+#TRACE `Schedule 1 paragraphs 4(8) to (10) — the annual report chain` AT 0 WITH
+    PARTY Commissioner DOES `prepare and publish the annual report` AT 60
+    PARTY Commissioner DOES `provide the annual report to the Minister` AT 100
+    PARTY Minister DOES `lay the annual report before the States` AT 120
+
+-- The Commissioner publishes, but never provides the report to the Minister. The
+-- residual is the outstanding duty.
+#TRACE `Schedule 1 paragraphs 4(8) to (10) — the annual report chain` AT 0 WITH
+    PARTY Commissioner DOES `prepare and publish the annual report` AT 60
+
+§§ `Schedule 1 paragraph 4(12) — the independence guarantee`
+
+`a direction demanding justification of individual decisions` MEANS MinisterialDirection WITH
+    `the direction requires the report to contain justification of a decision of the Commissioner in relation to an individual charity, governor or applicant for registration`  IS TRUE
+    `the direction otherwise fails to respect the independence of the Commissioner`  IS FALSE
+
+`a direction as to the report's format` MEANS MinisterialDirection WITH
+    `the direction requires the report to contain justification of a decision of the Commissioner in relation to an individual charity, governor or applicant for registration`  IS FALSE
+    `the direction otherwise fails to respect the independence of the Commissioner`  IS FALSE
+
+#ASSERT `Schedule 1 paragraph 4(12) — the direction is beyond the Minister's power` `a direction demanding justification of individual decisions`
+#ASSERT NOT `Schedule 1 paragraph 4(12) — the direction is beyond the Minister's power` `a direction as to the report's format`
+
+§§ `Schedule 2 paragraph 1(1) — the size of the tribunal`
+
+`a tribunal of 5, properly chaired` MEANS TribunalComposition WITH
+    `the number of members appointed to the tribunal`               IS 5
+    `a chair has been designated from among the members`            IS TRUE
+    `a vice-chair has been designated from among the members`       IS TRUE
+
+#ASSERT `Schedule 2 paragraph 1(1) — the tribunal is validly constituted as to number` `a tribunal of 5, properly chaired`
+#ASSERT `Schedule 2 paragraph 1(7) — the chair and vice-chair have been designated` `a tribunal of 5, properly chaired`
+
+-- Both bounds are live. Three members is too few...
+`a tribunal of 3` MEANS TribunalComposition WITH
+    `the number of members appointed to the tribunal`               IS 3
+    `a chair has been designated from among the members`            IS TRUE
+    `a vice-chair has been designated from among the members`       IS TRUE
+
+#ASSERT NOT `Schedule 2 paragraph 1(1) — the tribunal is validly constituted as to number` `a tribunal of 3`
+
+-- ...and nine is too many.
+`a tribunal of 9` MEANS TribunalComposition WITH
+    `the number of members appointed to the tribunal`               IS 9
+    `a chair has been designated from among the members`            IS TRUE
+    `a vice-chair has been designated from among the members`       IS TRUE
+
+#ASSERT NOT `Schedule 2 paragraph 1(1) — the tribunal is validly constituted as to number` `a tribunal of 9`
+
+-- The boundaries themselves: 4 and 8 are both INSIDE the bound.
+`a tribunal of 4` MEANS TribunalComposition WITH
+    `the number of members appointed to the tribunal`               IS 4
+    `a chair has been designated from among the members`            IS TRUE
+    `a vice-chair has been designated from among the members`       IS TRUE
+
+`a tribunal of 8` MEANS TribunalComposition WITH
+    `the number of members appointed to the tribunal`               IS 8
+    `a chair has been designated from among the members`            IS TRUE
+    `a vice-chair has been designated from among the members`       IS TRUE
+
+#ASSERT `Schedule 2 paragraph 1(1) — the tribunal is validly constituted as to number` `a tribunal of 4`
+#ASSERT `Schedule 2 paragraph 1(1) — the tribunal is validly constituted as to number` `a tribunal of 8`
+
+§§ `Schedule 2 paragraph 4(1) — the presiding cascade, all three rungs`
+
+`the chair is present` MEANS TribunalSitting WITH
+    `the chair is absent`                                           IS FALSE
+    `the vice-chair is absent`                                      IS FALSE
+
+`the chair is away` MEANS TribunalSitting WITH
+    `the chair is absent`                                           IS TRUE
+    `the vice-chair is absent`                                      IS FALSE
+
+`both the chair and the vice-chair are away` MEANS TribunalSitting WITH
+    `the chair is absent`                                           IS TRUE
+    `the vice-chair is absent`                                      IS TRUE
+
+#ASSERT `Schedule 2 paragraph 4(1) — who presides at the sitting` `the chair is present` EQUALS `the chair`
+#ASSERT `Schedule 2 paragraph 4(1) — who presides at the sitting` `the chair is away` EQUALS `the vice-chair`
+#ASSERT `Schedule 2 paragraph 4(1) — who presides at the sitting` `both the chair and the vice-chair are away` EQUALS `a tribunal member appointed for the purpose by the tribunal members present at the sitting`
+
+-- The cascade is TOTAL: there is no sitting without a presider. Note the corner the
+-- statute does NOT address — a sitting at which the chair is present but the
+-- vice-chair is absent is governed by rung (a), and para 4(1)(b)'s condition ("if
+-- the chair is absent") never arises. The model returns `the chair`, correctly.
+`the vice-chair is away` MEANS TribunalSitting WITH
+    `the chair is absent`                                           IS FALSE
+    `the vice-chair is absent`                                      IS TRUE
+
+#ASSERT `Schedule 2 paragraph 4(1) — who presides at the sitting` `the vice-chair is away` EQUALS `the chair`

@@ -1,0 +1,197 @@
+% Fragment: §7-§9 of Bounded Deontics. Preamble, macros, theorem envs live in bd-draft.tex.
+% §7 Instantiation in L4 (honest implemented/roadmap split, grounded in the jl4 source)
+% §8 Worked example: perfection under UCC Article 9
+% §9 Conclusion
+
+\section{Instantiation in L4}
+\label{sec:tooling}
+
+It helps to begin with what the tool deliberately does \emph{not} represent. A
+decision-theoretic ``ought'' in the manner of \src{Pearl 1993} composes four ingredients: a
+causal structure of acts and their effects, the conditions under which a choice is posed, a
+\emph{probability} over outcomes, and a \emph{utility} on them. L4 makes two of these
+explicit and computable---the act-and-effect structure, as the \texttt{HENCE}/\texttt{LEST}
+graph, and the conditions, as the constitutive \texttt{IF}/\texttt{AND}/\texttt{OR} decision
+logic (its ``terms and conditions'')---and drops the third outright: there is no probability
+anywhere in the language. Utility re-enters only at the assertion level, and only ordinally,
+as the party ordering $\ppref$ of Section~\ref{sec:boundary}. L4 is in this sense the
+\emph{no-probability limit} of qualitative decision theory, and it is \emph{entitled} to
+that limit because legal consequences are largely \emph{constituted, not caused} (the
+distinction of Section~\ref{sec:sorter}): ``the deadline lapses, hence breach'' is a
+stipulation of the rule, certain by definition, not a bet on the world. Where the law does
+turn on an uncertain fact, the uncertainty is pushed down to fact-finding---\emph{did the
+antecedent obtain?}---not up into the consequence. This is also why the all-paths dominator
+of Section~\ref{sec:nec} is so much as available: one can model-check a reachability graph,
+but not a probability distribution, into a yes-or-no landmark.
+
+The two-level architecture of this paper is not only a way of talking; its lower level is
+implemented. We report here, with deliberate care to separate what \emph{ships} from what
+is \emph{designed}, how the construction lands in L4, the legal DSL whose evaluator and
+tooling are open source.\footnote{The constructs described here live in the \texttt{jl4}
+implementation; the regulative parser, the lazy evaluator, and the state-graph extractor
+are in the \texttt{jl4-core} package, and the decision service that exposes them over HTTP
+is in \texttt{jl4-service}. We name modules rather than line numbers, which drift.}
+
+\paragraph{The letter ships.} The object level of Section~\ref{sec:object}---a contract as
+a labelled transition system with neutral terminals---is realised directly. L4's regulative
+form names a party, a deontic modal, an action, an optional guard and deadline, and the two
+continuations:
+\begin{verbatim}
+    PARTY  p
+    MUST   a                 -- or MAY, SHANT, or the neutral DO
+    WITHIN deadline
+    PROVIDED guard
+    HENCE  outcome_if_done
+    LEST   outcome_if_not
+\end{verbatim}
+The terminals are exactly Meyer's neutral markers: \texttt{FULFILLED}, and
+\texttt{BREACH BY}~$p$~\texttt{BECAUSE}~$r$, a breach annotated with a structured reason but
+carrying no verdict of its own. The evaluator compiles a regulative program to an
+\emph{obligation value} and, given a dated sequence of events, runs it: a directive
+\texttt{\#TRACE}~$c$~\texttt{AT}~$t$~\texttt{WITH}~$e_1,\dots,e_n$ simulates the contract
+$c$ against those events and reduces it either to \texttt{FULFILLED} or to a structured
+breach---a missed deadline or an explicit \texttt{BREACH}---with a full, replayable trace.
+The companion directives \texttt{\#EVAL}, \texttt{\#CHECK} (type-check only), and
+\texttt{\#ASSERT} round out an audit-grade evaluation surface. This is the executable
+``letter,'' and it is the artefact a non-lawyer actually runs.
+
+\paragraph{The state graph ships---and it is the substrate the spirit needs.} More than
+evaluate a single trace, the toolchain \emph{extracts} from a regulative program the
+labelled transition system itself: a graph whose states are typed (an initial state,
+intermediate states, and the two terminal kinds, fulfilled and breach) and whose edges are
+labelled by modal, party, action, deadline, and guard, with \texttt{HENCE} and \texttt{LEST}
+distinguished as the success and failure branches. The extractor renders this to GraphViz
+and serves it over the decision-service API. The significance for this paper is precise:
+the object $T=(S,A,{\to},s_0)$ of Definition~\ref{def:dom} is not a modelling convenience we
+impose from outside but a structure the tool already builds and hands back. The ``letter as
+a machine of states and admissible actions'' is a concrete, inspectable artefact.
+
+\paragraph{What does not yet ship, and why saying so is part of the contribution.} The
+bounded \MUST{} of Section~\ref{sec:nec} is a \emph{query} over that extracted graph---the
+dominator set $\dom_s(J)$---and that query is, at the time of writing, \emph{not}
+implemented. We are candid about this because the boundary is the paper's subject: what we
+add over the shipping tool is exactly the derived-necessity reading, and realising it is a
+near-linear dominator computation \src{Lengauer \& Tarjan 1979} over a graph that already
+exists in memory, not new infrastructure. Two further layers are designed but unbuilt. The
+\emph{verification} of the faithful region (Section~\ref{sec:faithful})---closed goal
+family, acyclic ordering, closed facts---is to be discharged by transpiling the extracted
+automaton to an external model checker (UPPAAL, SPIN, or NuSMV) and posing the bounded
+modality as a temporal-logic property; this is specified in L4's roadmap but not yet
+wired. And the party-indexed ordering $\ppref$ of Section~\ref{sec:boundary}, together with
+the force-gap, are today \emph{parameters supplied to} the reading rather than quantities the
+tool computes. The honest summary is a single sentence: \emph{the object level and its state
+graph are implemented and in use; the dominator query and the verification backends are
+designed and not yet built.} The gap between those two clauses is, almost exactly, the gap
+this paper exists to map.
+
+\paragraph{What it already buys.} Even short of the dominator query, the shipping layer is
+not idle with respect to the thesis. Because the letter executes and the state graph is
+inspectable, an obligation can be \emph{simulated} and its breach traced rather than merely
+asserted; because the evaluation is total and replayable, it can serve as the
+guard-railed, audit-grade ``left brain'' behind a neural-network front end---an LLM that
+proposes, and an L4 trace that certifies. The derived \MUST{} is the next increment on this
+substrate, not a separate system.
+
+\section{A worked example: perfection under UCC Article~9}
+\label{sec:eval}
+
+We close the loop on a single doctrine in which the bounded \MUST{} is not a contrivance
+but the law's own structure: perfection of a security interest under Article~9 of the
+Uniform Commercial Code. The example is chosen because it exhibits, in real and citable
+law, the precise phenomenon of Section~\ref{sec:nec}---a goal reachable by several methods
+in general, collapsing to a \emph{unique necessary} method under particular
+circumstances---and because the collapse is \emph{non-temporal}, driven by the kind of
+collateral rather than by a deadline.
+
+\paragraph{The doctrine.} A secured party perfects its interest to obtain priority over
+competing claimants; perfection is the goal $J$. Article~9 offers, in general, three
+methods: \emph{filing} a financing statement (UCC \S\,9-310, the default),
+\emph{possession} of the collateral (\S\,9-313), and \emph{control} (\S\,9-314). For
+ordinary goods, more than one method is available, so none is necessary. But for a
+\emph{deposit account} taken as original collateral, \S\,9-312(b)(1) provides that the
+interest ``may be perfected only by control,'' and possession is not available at all. The
+general menu of methods collapses to one.
+
+\paragraph{The object level in L4.} We encode only the letter: the methods as a neutral
+choice point and the outcome each produces, with no \MUST{} written by hand (declarations
+elided).
+\begin{verbatim}
+    PARTY secured_party DO file
+      HENCE perfected
+      LEST  PARTY secured_party DO possess
+              HENCE perfected
+              LEST  PARTY secured_party DO control
+                      HENCE perfected
+                      LEST  unperfected
+\end{verbatim}
+Which edges actually reach \texttt{perfected} is a fact about the collateral, supplied by
+the statute, not a deontic operator we annotate. The extractor of
+Section~\ref{sec:tooling} yields two automata for the two collateral types:
+\begin{verbatim}
+    ordinary goods                     deposit account (9-312(b)(1))
+       file ----> perfected               file ----> unperfected
+    s0 possess -> perfected            s0 possess -> unperfected
+       control -> perfected               control -> perfected
+\end{verbatim}
+The bounded modalities of Definition~\ref{def:dom} are now read off, \emph{not declared},
+by the dominator query over each graph:
+\begin{itemize}[noitemsep,topsep=2pt]
+  \item \textbf{Ordinary goods.} Three disjoint edges reach \texttt{perfected}; no action
+  lies on every path, so $\dom_{s_0}(\texttt{perfected})=\varnothing$. Each method is a
+  \MAY{} ($\EF\,\texttt{perfected}$ holds via any of them); none is a \MUST{}.
+  \item \textbf{Deposit account.} Filing and possession reach only \texttt{unperfected};
+  the unique path to \texttt{perfected} runs through \texttt{control}, so
+  $\dom_{s_0}(\texttt{perfected})=\{\texttt{control}\}$. Control is a \MUST{}---derived
+  entirely from the pruned graph and the goal, with no deontic primitive in the source.
+\end{itemize}
+This is the $\MAY\!\to\!\MUST$ transition of Section~\ref{sec:nec} in its non-temporal
+form: nothing expired; the set of alternatives was narrowed by the \emph{kind} of
+collateral, and control entered $\dom_{s_0}(\texttt{perfected})$ as the last alternative
+fell away. The constitutive/regulative sorter of Section~\ref{sec:sorter} also earns its
+keep here: ``may be perfected only by control'' is a \emph{must-be}, a condition on the
+institutional fact of perfection, not a duty the secured party breaches---and the account
+classifies it correctly, as bare domination with no valued breach terminal.
+
+\paragraph{The boundary, on the same example.} The two orderings of
+Section~\ref{sec:holmeshart} and the force-gap of Section~\ref{sec:force} are visible too.
+The law's ordering $\plaw$ ranks \texttt{perfected} categorically above
+\texttt{unperfected}. A given secured party's $\ppref$ may track it or diverge: a lender
+who needs to prevail against a lien creditor or the debtor's bankruptcy trustee (UCC
+\S\,9-317; the trustee's strong-arm power) faces a large gap between perfecting and not, and
+for it the ``must control'' carries real force; a party content with a merely attached,
+enforceable-against-the-debtor interest assigns the two outcomes nearly equal $\ppref$-rank,
+and for it the same ``must'' is, in the sense of Section~\ref{sec:force}, close to a price.
+One letter; force indexed to party; the divergence between $\plaw$ and $\ppref$ doing the
+Holmes/Hart work---on a fragment that L4 parses, type-checks, evaluates, and draws today,
+needing only the dominator query of Section~\ref{sec:tooling} to read the \MUST{} off
+automatically.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have treated ``or else what?'' not as a cynic's challenge to obligation but as its
+analysis. The deontic force of a rule is bounded---by a goal, by a consequence, and by the
+ordering against which compliance and breach are ranked---and the binding can be made
+precise on a transition-system ``letter'' over which the ``spirit'' is read as a query. We
+claimed no new logical primitive, and conceded each ingredient by name: the
+Anderson--Meyer reduction of obligation to a modality plus a neutral violation, planning
+landmarks and their dominator computation, the Kratzer ordering source, betterness-and-
+priority orderings, and obligation as strategic ability. The contribution is their
+composition and its jurisprudential reading: a party-indexed ordering laid over a
+\emph{graph-dominator} necessity; the sanction/goal duality as the \emph{sign} of an
+outcome under that ordering; the force of a ``must'' as an ordinal preference gap, which
+predicts both ``a fine is a price'' and the protester's inversion; and, above all, the
+unification of Holmes's bad man and Hart's internal point of view as the divergence and the
+coincidence of a \emph{single} pair of orderings over one derived necessity. UCC
+Article~9 showed the bounded \MUST{} arising as the law's own structure rather than our
+imposition, and the L4 toolchain showed the letter and its state graph already in hand,
+with the derived-necessity query the next increment over a shipping substrate.
+
+Three lines of work remain. The basket question---necessity for a conjunction of
+goals---needs minimal-hitting-set enumeration \src{Reiter 1987} rather than the Galois
+lattice that Remark~\ref{rem:basket} refutes. The multi-party escalation of
+Section~\ref{sec:atl}, from cooperative domination to strategic ability, is a recombination
+we have flagged but not made. And the verification backend that would discharge the
+faithful region of Section~\ref{sec:faithful} at compile time is specified but unbuilt.
+Each is a facet of the same programme: to give law the tooling that lets a ``must'' be
+asked, and answered, \emph{or else what?}

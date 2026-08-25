@@ -1,0 +1,68 @@
+% Fragment: §3-§4 of Bounded Deontics. Preamble, macros, theorem envs live in bd-draft.tex.
+
+\section{The object level: a contract as a transition system}
+\label{sec:object}
+
+In L4, the ``letter'' of a contract is a state machine, and its primitive is deontically
+\emph{neutral}. The core form names a party, an action, and the two branches that follow
+from doing or not doing it:
+\begin{verbatim}
+    PARTY p DO a
+      HENCE outcome_if_done
+      LEST  outcome_if_not
+\end{verbatim}
+No moral weight is attached: \texttt{DO} merely records a choice point and its two
+continuations. The familiar deontic operators are \emph{sugar} over this primitive, with
+conventional default terminals---\texttt{MUST} fulfils on the action and breaches on the
+deadline, \texttt{MAY} fulfils on either branch, \textsc{shant} breaches on the action:
+\begin{verbatim}
+    PARTY tenant MUST return_deposit WITHIN 30 days
+      HENCE fulfilled    -- the action was taken
+      LEST  breach       -- the deadline lapsed
+\end{verbatim}
+Crucially, \texttt{breach} and \texttt{fulfilled} are \emph{neutral terminals}, not
+verdicts. They are Meyer's violation atom \src{Meyer 1988}: a marker that a designated
+branch was taken, whose moral valence is supplied only by the enclosing context. An inner
+contract's ``breach'' may be perfectly acceptable to the outer one---it records merely
+``this path was not taken''---exactly as a Unix process returning a non-zero exit code
+states a fact that the calling script is free to interpret. Contracts thus compose like
+processes with exit codes, after the fashion of Hvitved's contract calculus
+\src{Hvitved 2012}, with \texttt{HENCE}/\texttt{LEST} as the wiring (and, read as
+synchronisation, the point of contact with process algebra \src{Hoare 1985}).
+
+This object level is, by design, \emph{goal-free and preference-free}. It is precisely the
+labelled transition system $T$ of Definition~\ref{def:dom}: states, actions, and the
+branches between them, and nothing about which states are good. Goals and orderings enter
+only at the assertion level, in Sections~\ref{sec:nec}--\ref{sec:boundary}. Keeping them
+out of the letter is what lets one contract answer many different normative questions---and
+is exactly the discipline that a goal-\emph{indexed} obligation gives up.
+
+\section{Sorting constitutive from regulative: which ``musts'' are deontic}
+\label{sec:sorter}
+
+Before a ``must'' can be read as an obligation it must be sorted, because ordinary language
+uses the word for two different things. Searle's distinction is the one we need
+\src{Searle 1969; Searle 1995}. A \emph{regulative} rule prescribes behaviour---``directors
+must vote within seven days''---and can be \emph{breached}: missing the deadline is a
+violation with consequences. A \emph{constitutive} rule defines an institutional fact---
+``all directors must vote yes \emph{for the resolution to pass}''---and cannot be breached
+at all. A director who votes no violates nothing; the resolution simply does not pass. The
+``must'' here is a \emph{must-be}, a necessary condition, not a duty.
+
+The two readings are easy to conflate, because both wear the word ``must'' and both, at the
+object level, are mere choice points and branches. The two-level architecture separates
+them at the assertion level: a constitutive ``must $K$ for $J$'' is the bare statement that
+$J$ is unreachable without $K$---there is no violation terminal on the no-$K$ branch, only
+the non-occurrence of $J$---whereas a regulative ``must'' has a reachable \texttt{breach}
+state that some party disvalues.
+
+This is more than bookkeeping; it locates the seam of the paper. A constitutive must-be is
+\emph{exactly} the party-neutral dominator relation of Section~\ref{sec:nec}:
+$K\in\dom(J)$, necessity with no valence attached. A regulative must-\emph{do} is that same
+relation \emph{plus} an ordering that makes failure a valued breach---the construction of
+Section~\ref{sec:boundary}. The constitutive/regulative distinction is therefore not a
+separate mechanism but the boundary between $\nect$ taken alone and $\nect$ composed with a
+preference ordering. The sorter fixes the domain of every later quantifier: only regulative
+musts carry obligation, and only they are read against the two orderings of
+Section~\ref{sec:holmeshart}. Constitutive necessity needs no ``or else what?''---its ``or
+else'' is just that the institutional fact fails to obtain.
