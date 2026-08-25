@@ -19,7 +19,7 @@
 // about what the stages will do.
 //
 // Usage (driven by go.sh; env is the interface):
-//   node etc/go/lib/doctor.mjs --milestone g1 --stages "p0-preflight p3-check …" [--brief]
+//   node etc/go/lib/doctor.mjs --encoding primary --stages "p0-preflight p3-check …" [--brief]
 //
 // Reads: L4, GO_L4_PROVENANCE, JL4_LSP_CMD, GO_LSP_PROVENANCE,
 //        JL4_GO_SERVICE_URL, JL4_LIBRARY_PATH, GO_S_* (subject sidecar).
@@ -39,7 +39,7 @@ const arg = (name, dflt = "") => {
   return i >= 0 ? args[i + 1] : dflt;
 };
 const BRIEF = args.includes("--brief");
-const MILESTONE = arg("--milestone", "g1");
+const ENCODING = arg("--encoding", "primary");
 const STAGES = arg("--stages", "").split(/\s+/).filter(Boolean);
 const env = process.env;
 
@@ -224,7 +224,7 @@ const provLine = (name, val, prov) =>
 
 if (!BRIEF) {
   process.stdout.write(
-    `doctor: milestone ${MILESTONE} — ${STAGES.length} declared stage(s)\n`,
+    `doctor: encoding ${ENCODING} — ${STAGES.length} declared stage(s)\n`,
   );
   process.stdout.write(
     provLine("l4", env.L4, env.GO_L4_PROVENANCE || "explicit") + "\n",

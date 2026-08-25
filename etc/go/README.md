@@ -4,7 +4,7 @@ One instruction names a subject; the pipeline takes it from source text through 
 encoding to every projection, gate and conversion report. The driver, libraries and phase
 scripts are subject-generic: everything the pipeline knows about one body of law lives in a
 per-subject sidecar under `etc/go/subjects/<id>/`. `regcf` (SEC Regulation Crowdfunding) is
-the inaugural, replay-milestone subject, not the scope — the BNA smoke test (PR #195) is the
+the inaugural replay subject, not the scope — the BNA smoke test (PR #195) is the
 same pipeline pointed at a different statute, and it will slot in as a second sidecar.
 
 Everything here has an exit code. Everything that is a judgement lives in the
@@ -18,21 +18,30 @@ cannot run. The pipeline it serves is `specs/todo/single-instruction-demo/SPEC.m
 ## Usage
 
 ```
-etc/go/go.sh run     --milestone g1 --subject <id> [--run-id ID] [--through STAGE]
-                     [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
-etc/go/go.sh doctor  [--milestone g1|g2] [--subject <id>]
-etc/go/go.sh plan    [--milestone g1|g2] [--subject <id>]
+etc/go/go.sh run     --subject <id> [--encoding primary|<id>|undeclared] [--run-id ID]
+                     [--through STAGE] [--only STAGE] [--waive HG1=REASON]
+                     [--fixed-now ISO8601]
+etc/go/go.sh doctor  [--subject <id>] [--encoding primary|<id>|undeclared]
+etc/go/go.sh plan    [--subject <id>] [--encoding primary|<id>|undeclared]
 etc/go/go.sh status  [--run-id ID]
 etc/go/go.sh verify  [--run-id ID] [--gates]
 etc/go/go.sh gc      [--keep N]
 etc/go/go.sh help
 ```
 
-Milestone `g2` is the de novo path; its stages validate deposits rather than producing them, and
-— since 2026-08-09 — measure the deposited encoding itself (house rules, assertions, `l4
-verify`, emit-only DMN, and the §8 comparator). `plan --milestone g2` says which deposits a
-subject has. `g2 COMPLETE` is completeness of accounting over those stages, not a claim that a
-de novo run happened: a run with every deposit absent is COMPLETE over `SKIPPED` receipts.
+**A run is about one subject and one encoding of it**, and `--encoding` selects it: `primary`
+(the committed encoding — the default), a declared additional encoding's id, or `undeclared` for
+the deposit path over a subject that declares none. There is no capability label; `--milestone`
+was retired by `specs/todo/PIPELINE-ARTIFACT-MODEL-SPEC.md` §3.9 and now refuses, naming the
+replacement. Which stages run, which of them HG1 gates, and what a gate binds to are all derived
+from that selection.
+
+Naming an additional encoding puts the run on the de novo path; its stages validate deposits
+rather than producing them, and — since 2026-08-09 — measure the deposited encoding itself
+(house rules, assertions, `l4 verify`, emit-only DMN, and the §8 comparator). A deposit-path
+`plan` says which deposits a subject has. `COMPLETE` there is completeness of accounting over
+those stages, not a claim that a de novo run happened: a run with every deposit absent is
+COMPLETE over `SKIPPED` receipts.
 
 `<id>` names a sidecar directory under `etc/go/subjects/` (today: `regcf`). While exactly
 one sidecar exists, `--subject` may be omitted and defaults to it; with several, naming one
@@ -44,8 +53,8 @@ exports are needed — `run` discovers `l4` and `jl4-lsp` from `dist-newstyle`
 and says so; `doctor` forecasts what the run will and will not produce:
 
 ```
-etc/go/go.sh doctor --milestone g1
-etc/go/go.sh run --milestone g1 --subject regcf
+etc/go/go.sh doctor --subject regcf --encoding primary
+etc/go/go.sh run --subject regcf --encoding primary
 ```
 
 On a machine with no build anywhere, point `L4` at a prebuilt binary first:
@@ -58,8 +67,8 @@ That stops at HG1 with exit 3 and tells you how to grant the gate. To proceed
 without a signature, waive it on the record:
 
 ```
-etc/go/go.sh run --milestone g1 --subject regcf \
-  --waive HG1="G1 replays the already-reviewed committed corpus"
+etc/go/go.sh run --subject regcf --encoding primary \
+  --waive HG1="this replays the already-reviewed committed encoding"
 ```
 
 ## Subjects
@@ -77,7 +86,7 @@ A subject sidecar is four files in `etc/go/subjects/<id>/`:
 `etc/go/lib/subject.mjs` resolves and validates a sidecar (unknown keys refused; a leg entry
 naming a missing golden is a hard error naming the path) and exports it to the driver as
 `GO_S_*` environment variables. **The `legs` object is the leg declaration**: a p7 stage is a
-declared member of the milestone iff `legs` has its entry, and the wizard-dependent halves of
+declared member of the run iff `legs` has its entry, and the wizard-dependent halves of
 p0/p3/p6/p7-mcp engage iff `encoding.wizard` is present. So a future subject with no wizard and
 no regulative rules (no bpmn/lts legs, no NLG goldens) simply omits those entries, and
 `COMPLETE` still means what it says. **A subject's encoding may be more than one module**: since
@@ -230,17 +239,17 @@ finding · `2` usage or a schema the validator cannot fully enforce.
 **Nothing in the pipeline writes one, and nothing will.** Producing a bundle or a sweep needs
 outward network access this orchestrator does not take, and producing an encoding or a fork
 inventory needs a model it does not call. What the stages own is the other half: since 2026-08-03,
-`p1-ingest`, `p2-sweep`, `p3-encode`, `p4-forks` and `p5-gate` are milestone `g2`'s declared
+`p1-ingest`, `p2-sweep`, `p3-encode`, `p4-forks` and `p5-gate` are the deposit path's declared
 members and each VALIDATES its deposit — `SKIPPED` when it is not there, `DEGRADED` naming every
 rule that fired against it, `PASS` over a hashed artifact. Since 2026-08-09 the measurement
-stages run over the deposit too: the driver resolves one module set per milestone
-(`GO_MODULES`), so `p3-check` (house rules + the floors that travel with the selected encoding), `p6-tests` (the deposit's
+stages run over the deposit too: the driver resolves one module set per run, from the
+selected encoding (`GO_MODULES`), so `p3-check` (house rules + the floors that travel with the selected encoding), `p6-tests` (the deposit's
 own `#ASSERT`s), `p8-verify` (`l4 verify`) and `p7-dmn` (emit-only — no golden exists for a
 deposit) measure the deposited encoding itself, and `p8-diff` runs the §8 comparator below. A
 subject says where its deposits live in `subject.json`'s `natlang_sources` and `comparison` sections (`bundle`,
 `register`, `fork_register`, `modules`, `surface_map`, plus `checks` floors and per-leg `legs`
 declarations); those paths need not exist, because an unwritten deposit is a missing
-prerequisite, not a misconfiguration. `etc/go/go.sh plan --milestone g2 --subject <id>` prints
+prerequisite, not a misconfiguration. `etc/go/go.sh plan --subject <id> --encoding <encoding-id>` prints
 each one's state.
 
 ## The §8 diff oracle
@@ -276,7 +285,7 @@ the map and the module, and triaging any witness, remain agent/reviewer acts.
 
 `selftest.mjs` proves the status lattice can still say no: that every status is
 producible, that `PASS` is rejected with a null, failing, or _weak_ oracle, that
-a `BROKEN` receipt cannot yield a `COMPLETE` milestone, and that editing,
+a `BROKEN` receipt cannot yield a `COMPLETE` run, and that editing,
 deleting or rewriting a journal record breaks the chain. It also proves the
 subject resolver refuses an unknown subject (listing the available sidecars), a
 descriptor naming a nonexistent golden, and a descriptor carrying an unknown

@@ -66,7 +66,7 @@ import {
 } from "./report/md-lite.mjs";
 import {
   checkReceipt,
-  milestoneVerdict,
+  runVerdict,
   ORACLE_CLASSES,
   STATUSES,
 } from "./lib/verdict.mjs";
@@ -232,7 +232,7 @@ check(
   checkReceipt(base({ oracle: null, replayed_from: null })).length > 0,
 );
 
-// -------------------------------------------------------------- 2. milestone
+// ------------------------------------------------------------- 2. run verdict
 
 process.stdout.write("\n-- cross-run replay --\n");
 
@@ -250,7 +250,7 @@ process.stdout.write("\n-- cross-run replay --\n");
     append(j, {
       kind: "run_begin",
       run_id: id,
-      milestone: "g1",
+      encoding: "primary",
       subject,
       repo_head: "abc",
       tree_state: "clean",
@@ -322,7 +322,7 @@ process.stdout.write("\n-- cross-run replay --\n");
     append(j, {
       kind: "run_begin",
       run_id: "2026-01-01-bbbbbbbb-001",
-      milestone: "g1",
+      encoding: "primary",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -371,7 +371,7 @@ process.stdout.write("\n-- cross-run replay --\n");
   append(j, {
     kind: "run_begin",
     run_id: "2026-01-01-cccccccc-001",
-    milestone: "g1",
+    encoding: "primary",
     subject: "subj",
     repo_head: "abc",
     tree_state: "clean",
@@ -406,7 +406,7 @@ process.stdout.write("\n-- cross-run replay --\n");
   );
 }
 
-process.stdout.write("\n-- the milestone rule --\n");
+process.stdout.write("\n-- the run rule --\n");
 
 const declared = ["a", "b", "c"];
 const ok = [
@@ -415,13 +415,12 @@ const ok = [
   base({ stage: "c", status: "SKIPPED", oracle: null, reason: "no tool" }),
 ];
 check(
-  "a milestone of PASS + DEGRADED + SKIPPED is COMPLETE",
-  milestoneVerdict({ declared, receipts: ok, gates: [] }).verdict ===
-    "COMPLETE",
+  "a run of PASS + DEGRADED + SKIPPED is COMPLETE",
+  runVerdict({ declared, receipts: ok, gates: [] }).verdict === "COMPLETE",
 );
 check(
-  "a milestone with a BROKEN receipt is NOT COMPLETE",
-  milestoneVerdict({
+  "a run with a BROKEN receipt is NOT COMPLETE",
+  runVerdict({
     declared,
     receipts: [
       ...ok.slice(0, 2),
@@ -431,13 +430,13 @@ check(
   }).verdict === "BROKEN",
 );
 check(
-  "a milestone missing a declared stage is INCOMPLETE",
-  milestoneVerdict({ declared, receipts: ok.slice(0, 2), gates: [] })
-    .verdict === "INCOMPLETE",
+  "a run missing a declared stage is INCOMPLETE",
+  runVerdict({ declared, receipts: ok.slice(0, 2), gates: [] }).verdict ===
+    "INCOMPLETE",
 );
 check(
-  "a milestone with an unexplained non-PASS is INCOMPLETE",
-  milestoneVerdict({
+  "a run with an unexplained non-PASS is INCOMPLETE",
+  runVerdict({
     declared,
     receipts: [
       ...ok.slice(0, 2),
@@ -447,29 +446,29 @@ check(
   }).verdict === "INCOMPLETE",
 );
 check(
-  "a refused gate makes the milestone GATE",
-  milestoneVerdict({
+  "a refused gate makes the run GATE",
+  runVerdict({
     declared,
     receipts: ok,
     gates: [{ gate: "HG1", state: "refused" }],
   }).verdict === "GATE",
 );
 check(
-  "a WAIVED gate does not block the milestone",
-  milestoneVerdict({
+  "a WAIVED gate does not block the run",
+  runVerdict({
     declared,
     receipts: ok,
     gates: [{ gate: "HG1", state: "waived", reason: "why" }],
   }).verdict === "COMPLETE",
 );
 check(
-  "a milestone that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
-  milestoneVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
+  "a run that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
+  runVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
     "INCOMPLETE",
 );
 check(
   "BROKEN outranks GATE",
-  milestoneVerdict({
+  runVerdict({
     declared,
     receipts: [
       ...ok.slice(0, 2),
@@ -487,7 +486,7 @@ const journal = resolve(dir, "journal.ndjson");
 append(journal, {
   kind: "run_begin",
   run_id: "test",
-  milestone: "g1",
+  encoding: "primary",
   subject: "t",
   declared_stages: ["a"],
 });
@@ -564,7 +563,7 @@ process.stdout.write("\n-- the gate payload --\n");
   append(j, {
     kind: "run_begin",
     run_id: "payload-test",
-    milestone: "g1",
+    encoding: "primary",
     subject: "fixture-subject",
     repo_head: "abc",
     tree_state: "clean",
@@ -663,7 +662,7 @@ process.stdout.write("\n-- gate ordering --\n");
   append(j, {
     kind: "run_begin",
     run_id: "order-test",
-    milestone: "g1",
+    encoding: "primary",
     subject: "fixture-subject",
     declared_stages: ["p6-tests"],
     gated_stages: JSON.stringify({ HG1: ["p6-tests"], HG2: ["p10-publish"] }),
@@ -696,7 +695,7 @@ process.stdout.write("\n-- gate ordering --\n");
   append(j, {
     kind: "run_begin",
     run_id: "order-ok",
-    milestone: "g1",
+    encoding: "primary",
     subject: "fixture-subject",
     declared_stages: ["p6-tests"],
     gated_stages: JSON.stringify({ HG1: ["p6-tests"] }),
@@ -762,6 +761,20 @@ const SUBJECTS = execFileSync(
   .filter(Boolean);
 check("at least one subject sidecar exists", SUBJECTS.length >= 1);
 const FIXTURE_SUBJECT = SUBJECTS[0];
+// The additional encoding this subject declares, if any. DERIVED, never
+// hardcoded: R9 replaced "the second pass" with a NAMED id, and a test that
+// spelled the name out would go quietly wrong the day a sidecar renames it —
+// which is the whole failure mode an id exists to prevent. `undeclared` is the
+// third case, and is what a subject that has declared none resolves to.
+const FIXTURE_ENCODING =
+  execFileSync(
+    "node",
+    [resolve(HERE, "lib/subject.mjs"), FIXTURE_SUBJECT, "--encodings"],
+    { encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter(Boolean)[0] ?? "undeclared";
 
 {
   // Every declared sidecar must resolve cleanly.
@@ -1038,8 +1051,8 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
         [
           resolve(HERE, "go.sh"),
           "plan",
-          "--milestone",
-          "g1",
+          "--encoding",
+          "primary",
           "--subject",
           "cm",
         ],
@@ -1047,7 +1060,7 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
       );
     const before = planOf();
     check(
-      "the g1 gate digest covers every declared corpus module, not just the entry module",
+      "the primary gate digest covers every declared corpus module, not just the entry module",
       before.status === 0 &&
         [ONTOLOGY, MAIN, WILLS, INTESTATE, WIZARD].every((m) =>
           before.stdout.includes(m.replace(`${REPO_ROOT}/`, "")),
@@ -1138,8 +1151,8 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
       run,
       "--run-id",
       "corpus-metrics-test",
-      "--milestone",
-      "g1",
+      "--encoding",
+      "primary",
       "--subject",
       "cm",
       "--declared",
@@ -1220,14 +1233,14 @@ process.stdout.write("\n-- the signable document --\n");
   const root = mkdtempSync(resolve(tmpdir(), "l4-go-payload-"));
   const GP = resolve(HERE, "lib/gate-payload.mjs");
 
-  const mkRun = (id, milestone, p0Row) => {
+  const mkRun = (id, encoding, p0Row) => {
     const d = resolve(root, id);
     mkdirSync(d, { recursive: true });
     const j = resolve(d, "journal.ndjson");
     append(j, {
       kind: "run_begin",
       run_id: id,
-      milestone,
+      encoding,
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -1260,7 +1273,7 @@ process.stdout.write("\n-- the signable document --\n");
       .split("\n")
       .filter(Boolean);
 
-  const executed = render(mkRun("2026-01-01-aaaaaaaa-001", "g1", p0({})));
+  const executed = render(mkRun("2026-01-01-aaaaaaaa-001", "primary", p0({})));
   check(
     "a payload over an EXECUTED p0-preflight renders",
     executed.status === 0,
@@ -1293,13 +1306,13 @@ process.stdout.write("\n-- the signable document --\n");
   );
 
   // And the refusals: a document that names nothing must not be signable.
-  const blindG1 = render(mkRun("2026-01-03-aaaaaaaa-001", "g1", null));
+  const blindG1 = render(mkRun("2026-01-03-aaaaaaaa-001", "primary", null));
   check(
-    "a g1 payload with no p0-preflight at all REFUSES",
+    "a primary payload with no p0-preflight at all REFUSES",
     blindG1.status === 2,
   );
   check(
-    "the g1 refusal names p0-preflight as the stage to run",
+    "the primary refusal names p0-preflight as the stage to run",
     /p0-preflight/.test(blindG1.stderr),
   );
   check(
@@ -1307,9 +1320,9 @@ process.stdout.write("\n-- the signable document --\n");
     !/l4-go gate payload/.test(blindG1.stdout),
   );
 
-  const blindG2 = render(mkRun("2026-01-04-aaaaaaaa-001", "g2", null));
+  const blindG2 = render(mkRun("2026-01-04-aaaaaaaa-001", "cleanroom-a", null));
   check(
-    "a g2 payload REFUSES — p0-preflight is not a g2 stage",
+    "a deposit payload REFUSES — p0-preflight is not a deposit stage",
     blindG2.status === 2,
   );
 
@@ -1317,7 +1330,7 @@ process.stdout.write("\n-- the signable document --\n");
   // fully populated journal with every declared stage green. An empty journal
   // would refuse under a much weaker rule ("no stages, no payload"); a g2 run
   // that did everything asked of it and still cannot describe what it blesses
-  // is the actual property, because p0-preflight is not in G2_STAGES at all.
+  // is the actual property, because p0-preflight is not in DEPOSIT_STAGES at all.
   {
     const d = resolve(root, "2026-01-05-aaaaaaaa-001");
     mkdirSync(d, { recursive: true });
@@ -1338,7 +1351,7 @@ process.stdout.write("\n-- the signable document --\n");
     append(j, {
       kind: "run_begin",
       run_id: "2026-01-05-aaaaaaaa-001",
-      milestone: "g2",
+      encoding: "cleanroom-a",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -1359,12 +1372,12 @@ process.stdout.write("\n-- the signable document --\n");
       });
     const fullG2 = render(d);
     check(
-      "a FULLY GREEN g2 run still refuses — every stage passed and none states the corpus",
+      "a FULLY GREEN deposit run still refuses — every stage passed and none states the corpus",
       fullG2.status === 2,
     );
     check(
       "and it says so without claiming the run failed",
-      /not a declared g2 stage/.test(fullG2.stderr),
+      /not among this run's declared stages/.test(fullG2.stderr),
     );
   }
 
@@ -1383,10 +1396,52 @@ process.stdout.write("\n-- the signable document --\n");
       /stage_end/.test(readFileSync(GP, "utf8")),
   );
   check(
-    "the g2 refusal explains why g2 differs, and names the waiver as the honest alternative",
-    /not a declared g2 stage/.test(blindG2.stderr) &&
+    "the deposit refusal explains why the deposit path differs, and names the waiver as the honest alternative",
+    /not among this run's declared stages/.test(blindG2.stderr) &&
       /[Ww]aive/.test(blindG2.stderr),
   );
+
+  // R9 REGRESSION, PINNED. The arm used to be chosen by `begin.milestone ===
+  // "g2"`, and journal schema 5 stopped writing that field — so a deposit run
+  // fell through to the OTHER arm, which still refused (the same exit code, the
+  // same absence of a payload) while telling the reader to "run p0-preflight in
+  // this run". p0-preflight is not in DEPOSIT_STAGES and `--only p0-preflight`
+  // intersects to nothing, so the advice could not be followed: a silent
+  // downgrade from a correct refusal to an impossible instruction. The arm is
+  // now chosen by the DECLARED STAGE LIST, which every schema from 2 onward
+  // records, so both spellings resolve to the same, correct advice.
+  {
+    const armFor = (beginExtra, stages) => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-gatearm-"));
+      append(resolve(d, "journal.ndjson"), {
+        kind: "run_begin",
+        run_id: "2026-01-05-aaaaaaaa-001",
+        subject: "subj",
+        repo_head: "abc",
+        tree_state: "clean",
+        fixed_now: "2025-01-31T00:00:00Z",
+        declared_stages: stages,
+        ...beginExtra,
+      });
+      return render(d).stderr;
+    };
+    const DEPOSIT = ["p1-ingest", "p6-tests", "p8-diff", "p9-report"];
+    const PRIMARY = ["p0-preflight", "p3-check", "p6-tests", "p9-report"];
+    const deposit = /not among this run's declared stages/;
+    const primary = /Run p0-preflight in this run/;
+    check(
+      "the refusal arm is chosen by the declared stages, so a schema-5 deposit run gets deposit advice",
+      deposit.test(armFor({ encoding: "cleanroom-a" }, DEPOSIT)),
+    );
+    check(
+      "…and a legacy row carrying `milestone` instead of `encoding` resolves to the SAME arm",
+      deposit.test(armFor({ milestone: "g2" }, DEPOSIT)),
+    );
+    check(
+      "…while a run that DOES declare p0-preflight is told to run it, which it can",
+      primary.test(armFor({ encoding: "primary" }, PRIMARY)),
+    );
+  }
 
   // The old behaviour, pinned so it cannot come back: the parenthetical must
   // never be PUSHED into the document again. (The string still appears in
@@ -1653,8 +1708,8 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
     [
       resolve(HERE, "go.sh"),
       "plan",
-      "--milestone",
-      "g1",
+      "--encoding",
+      "primary",
       "--subject",
       FIXTURE_SUBJECT,
     ],
@@ -1673,13 +1728,206 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
       `     ungated at or after p6-tests: ${ungated.join(", ")}\n`,
     );
   check(
-    "every declared g1 stage sequenced at or after p6-tests is gated",
+    "every declared primary stage sequenced at or after p6-tests is gated",
     plan.status === 0 && from >= 0 && ungated.length === 0,
   );
   check(
-    "the never-replaying stages are declared g1 members, and the plan names them",
+    "the never-replaying stages are declared primary members, and the plan names them",
     NEVER_REPLAY.every((s) => rows.some((r) => r.stage === s)),
   );
+
+  // ---- R9: the gate set is DERIVED, and the flag that used to pick it is gone
+  //
+  // `gated_by_HG1` was two hand-kept lists, one per stage set, and nothing
+  // stopped them drifting from SPEC.md §7.3's actual sentence ("HG1 blocks P6
+  // onward"). An ungated stage in either list would publish HG1-unreviewed work
+  // and every downstream honesty check would AGREE with the omission, because
+  // verify-run.mjs reads the gated set out of run_begin rather than deriving it.
+  // The rule is now written once and applied; these ask the driver, through
+  // `plan`, what it would actually gate.
+  {
+    const planRows = (subject, encoding) => {
+      const r = spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "plan",
+          "--subject",
+          subject,
+          "--encoding",
+          encoding,
+        ],
+        { encoding: "utf8" },
+      );
+      // Both plans print a per-stage gate column; the primary plan spells it
+      // `gate=HG1` and the deposit plan uses a column. One regex over the
+      // stage-bearing lines covers both.
+      const out = [];
+      for (const line of r.stdout.split("\n")) {
+        const m = /^\s{2}(p\d+[a-z-]*)\s+(?:gate=)?(HG1|HG2|NOT WIRED|-)/.exec(
+          line,
+        );
+        if (m) out.push({ stage: m[1], gate: m[2] });
+      }
+      return { status: r.status, rows: out };
+    };
+    const phase = (st) => Number(/^p(\d+)/.exec(st)[1]);
+
+    for (const [subject, encoding, label] of [
+      [FIXTURE_SUBJECT, "primary", "primary"],
+      [FIXTURE_SUBJECT, FIXTURE_ENCODING, "deposit"],
+    ]) {
+      const { status, rows: pr } = planRows(subject, encoding);
+      check(
+        `the ${label} plan enumerates its stages with a gate each`,
+        status === 0 && pr.length > 0,
+      );
+      // A row the sidecar declares no leg for prints NOT WIRED and is not a
+      // declared stage, so it is outside the rule either way.
+      const declared = pr.filter((r) => r.gate !== "NOT WIRED");
+      check(
+        `every declared ${label} stage from P6 onward is HG1-gated, and none before P6 is`,
+        declared.every((r) =>
+          phase(r.stage) >= 6 && r.gate !== "HG2"
+            ? r.gate === "HG1"
+            : r.gate !== "HG1",
+        ),
+      );
+    }
+  }
+
+  // ---- R9: --milestone refuses, and says what replaced it --------------------
+  //
+  // Refusing beats accepting-and-translating: a shim that still works keeps the
+  // ORDINAL executable, and "the additional encoding" stops naming anything the
+  // day a subject declares two. It also beats a silent "unknown option": the
+  // reader has a mental model to correct, and this message is the only thing
+  // left in the system that can correct it.
+  {
+    const refused = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "plan",
+        "--subject",
+        FIXTURE_SUBJECT,
+        "--milestone",
+        "g1",
+      ],
+      { encoding: "utf8" },
+    );
+    check(
+      "--milestone is REFUSED, not translated and not silently unknown",
+      refused.status === 2 && /--milestone was retired/.test(refused.stderr),
+    );
+    check(
+      "…and the refusal names the replacement for BOTH of its old values",
+      /--encoding primary/.test(refused.stderr) &&
+        /--encoding <id>/.test(refused.stderr) &&
+        /--encoding undeclared/.test(refused.stderr),
+    );
+    // The refusal must NOT be spelled as a `case` arm: check-skill-drift.mjs
+    // decides a flag exists by looking for its arm in go.sh, so an arm would
+    // make the drift guard green over any stale `--milestone` command line
+    // left in SKILL.md — the one sweep this ruling depends on being complete.
+    //
+    // The pattern is LINE-ANCHORED, mirroring check-skill-drift's `flagExists`,
+    // and that is not incidental: the checker used a bare substring, and the
+    // comment above — which exists to explain why there is no arm — contains
+    // the text that substring looks for. It reported the retired flag as still
+    // accepted. A declaration and a mention of one are different things, and
+    // only the anchor tells them apart.
+    check(
+      "the refusal is not a `case` arm, so check-skill-drift still treats --milestone as nonexistent",
+      !/^\s*(?:[^\n)]*\|)?--milestone\)/m.test(
+        readFileSync(resolve(HERE, "go.sh"), "utf8"),
+      ),
+    );
+    check(
+      "…and check-skill-drift's own flag test is line-anchored, not a substring",
+      !/goSrc\.includes\(`\$\{flag\}\)`\)/.test(
+        readFileSync(resolve(HERE, "check-skill-drift.mjs"), "utf8"),
+      ),
+    );
+  }
+
+  // ---- R9: `undeclared` is a CLAIM about the subject, and is checked ---------
+  {
+    const wrong = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "plan",
+        "--subject",
+        FIXTURE_SUBJECT,
+        "--encoding",
+        "undeclared",
+      ],
+      { encoding: "utf8" },
+    );
+    // Only meaningful for a subject that DOES declare one; skip otherwise.
+    if (FIXTURE_ENCODING !== "undeclared")
+      check(
+        "--encoding undeclared is refused when the subject does declare one, and lists them",
+        wrong.status === 2 && wrong.stderr.includes(FIXTURE_ENCODING),
+      );
+  }
+
+  // ---- ARGUMENT-PARSER HYGIENE ----------------------------------------------
+  //
+  // Two defects the R9 review found, both of which `bash -n` is structurally
+  // unable to see.
+  {
+    const goSrc = readFileSync(resolve(HERE, "go.sh"), "utf8");
+
+    // 1. NO DUPLICATE `case` LABEL. A repeated label is legal shell — the first
+    //    arm wins and the second is dead — so the symptom is a documented flag
+    //    that parses, sets a variable nobody reads, and exits 0. That is what
+    //    happened when R2/R3 gave `--encoding` a second, unrelated meaning:
+    //    `new-subject … --encoding path/x.l4` silently wrote the default path
+    //    instead. Measured before the repair; `new-subject` and a control run
+    //    with no flag at all produced byte-identical sidecars.
+    const labels = [
+      ...goSrc.matchAll(/^\s*(-[-a-z][a-z-]*(?:\s*\|\s*-[-a-z][a-z-]*)*)\)/gm),
+    ].flatMap((m) => m[1].split("|").map((x) => x.trim()));
+    const dupes = labels.filter((f, i) => labels.indexOf(f) !== i);
+    check(
+      "no flag is declared twice in go.sh's argument parser",
+      dupes.length === 0 ||
+        (process.stdout.write(`     duplicated: ${dupes.join(", ")}\n`), false),
+    );
+
+    // 2. EVERY VALUE-TAKING FLAG REFUSES A MISSING VALUE, with exit 2 and its
+    //    own name. Without the guard, `$2` is unbound under `set -u` and bash
+    //    aborts with a line number and exit 1 — an interpreter stack trace
+    //    where a usage error belongs, and the wrong code: 2 is this driver's
+    //    usage exit, 1 means a real finding about the corpus.
+    //
+    //    Derived from the parser, not listed here: a flag added without the
+    //    guard must fail this, which a hand-kept list cannot make happen.
+    const valueTaking = [
+      ...goSrc.matchAll(
+        /^\s*(--[a-z][a-z-]*)\)\n(?:\s*#[^\n]*\n)*\s*([^\n]*)/gm,
+      ),
+    ]
+      .filter(([, , body]) => /"\$2"/.test(body) || /need_val/.test(body))
+      .map(([, flag]) => flag);
+    const unguarded = [];
+    for (const flag of [...new Set(valueTaking)]) {
+      const r = spawnSync("bash", [resolve(HERE, "go.sh"), "plan", flag], {
+        encoding: "utf8",
+      });
+      if (r.status !== 2 || !r.stderr.includes(`${flag} needs a value`))
+        unguarded.push(`${flag} (exit ${r.status})`);
+    }
+    check(
+      `all ${new Set(valueTaking).size} value-taking flags refuse a missing value with exit 2`,
+      valueTaking.length > 0 &&
+        (unguarded.length === 0 ||
+          (process.stdout.write(`     unguarded: ${unguarded.join(", ")}\n`),
+          false)),
+    );
+  }
   // HG1 MUST RE-OPEN WHEN THE NARRATIVE MOVES.
   //
   // `p9-explain` is HG1-gated because it publishes narrative prose, but the
@@ -1700,8 +1948,8 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
         [
           resolve(HERE, "go.sh"),
           "plan",
-          "--milestone",
-          "g1",
+          "--encoding",
+          "primary",
           "--subject",
           FIXTURE_SUBJECT,
         ],
@@ -1781,8 +2029,8 @@ if (!process.argv.includes("--with-driver")) {
   };
   go([
     "run",
-    "--milestone",
-    "g1",
+    "--encoding",
+    "primary",
     "--subject",
     FIXTURE_SUBJECT,
     "--waive",
@@ -1799,8 +2047,8 @@ if (!process.argv.includes("--with-driver")) {
 
   go([
     "run",
-    "--milestone",
-    "g1",
+    "--encoding",
+    "primary",
     "--subject",
     FIXTURE_SUBJECT,
     "--run-id",
@@ -1839,7 +2087,7 @@ if (!process.argv.includes("--with-driver")) {
       secondPass.length - executed.length,
   );
   check(
-    "the milestone verdict is unchanged by replay",
+    "the run verdict is unchanged by replay",
     verdict1 === verdict2 && !!verdict1,
   );
   check(
@@ -1899,8 +2147,8 @@ if (!process.argv.includes("--with-driver")) {
       [
         resolve(HERE, "go.sh"),
         "run",
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         FIXTURE_SUBJECT,
         "--run-id",
@@ -1929,8 +2177,8 @@ if (!process.argv.includes("--with-driver")) {
       [
         resolve(HERE, "go.sh"),
         "run",
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         FIXTURE_SUBJECT,
         "--through",
@@ -1968,12 +2216,12 @@ if (!process.argv.includes("--with-driver")) {
     };
     go2([
       "run",
-      "--milestone",
-      "g2",
+      "--encoding",
+      FIXTURE_ENCODING,
       "--subject",
       FIXTURE_SUBJECT,
       "--waive",
-      "HG1=selftest g2 replay-correctness",
+      "HG1=selftest deposit replay-correctness",
     ]);
     const runId2 = execFileSync("ls", ["-1", rundir2], { encoding: "utf8" })
       .trim()
@@ -1985,8 +2233,8 @@ if (!process.argv.includes("--with-driver")) {
       .pop()?.verdict;
     go2([
       "run",
-      "--milestone",
-      "g2",
+      "--encoding",
+      FIXTURE_ENCODING,
       "--subject",
       FIXTURE_SUBJECT,
       "--run-id",
@@ -2004,18 +2252,18 @@ if (!process.argv.includes("--with-driver")) {
     const sameSet2 = (a, b) =>
       a.length === b.length && a.every((x, i) => x === b[i]);
     check(
-      "a second g2 run re-executes nothing but the never-replaying stages",
+      "a second deposit run re-executes nothing but the never-replaying stages",
       sameSet2(
         executed2,
         NEVER_REPLAY.filter((s) => second2.some((r) => r.stage === s)).sort(),
       ),
     );
     check(
-      "the g2 milestone verdict is unchanged by replay",
+      "the deposit run verdict is unchanged by replay",
       verdictA === verdictB && !!verdictA,
     );
     check(
-      "replayed g2 receipts keep their original verdict",
+      "replayed deposit receipts keep their original verdict",
       second2
         .filter((r) => r.replayed_from)
         .every(
@@ -2023,7 +2271,7 @@ if (!process.argv.includes("--with-driver")) {
         ),
     );
     check(
-      "the g2 journal still verifies after a replay",
+      "the deposit journal still verifies after a replay",
       verify(j2).ok === true,
     );
     check(
@@ -2042,7 +2290,7 @@ if (!process.argv.includes("--with-driver")) {
     // explainer.html, announced by the driver, with zero p9-explain journal
     // rows — narrative prose outside the g2 HG1 digest, reported to nobody.
     check(
-      "a g2 run renders NO explainer — the stage is undeclared at g2 and the render respects the declared list",
+      "a deposit run renders NO explainer — the stage is undeclared there and the render respects the declared list",
       !existsSync(resolve(rundir2, runId2, "explainer.md")) &&
         !existsSync(resolve(rundir2, runId2, "explainer.html")),
     );
@@ -2094,7 +2342,7 @@ check(
     append(j, {
       kind: "run_begin",
       run_id: "gone-test",
-      milestone: "g1",
+      encoding: "primary",
       subject: "fixture-subject",
       declared_stages: ["p7-dmn"],
     });
@@ -2178,7 +2426,7 @@ process.stdout.write("\n-- the explainer --\n");
     append(j, {
       kind: "run_begin",
       run_id: "explainer-selftest",
-      milestone: "g1",
+      encoding: "primary",
       subject: FIXTURE_SUBJECT,
       repo_head: "0000000",
       tree_state: "clean",
@@ -2323,7 +2571,7 @@ process.stdout.write("\n-- the explainer --\n");
       append(j, {
         kind: "run_begin",
         run_id: "no-run-end",
-        milestone: "g1",
+        encoding: "primary",
         subject: FIXTURE_SUBJECT,
         repo_head: "0000000",
         tree_state: "clean",
@@ -2364,7 +2612,7 @@ process.stdout.write("\n-- the explainer --\n");
       append(j, {
         kind: "run_begin",
         run_id: "fold-equality",
-        milestone: "g1",
+        encoding: "primary",
         subject: FIXTURE_SUBJECT,
         repo_head: "0000000",
         tree_state: "clean",
@@ -2494,9 +2742,7 @@ process.stdout.write("\n-- the explainer --\n");
     lintNarrative("Every assertion is a PASS.").some(
       (f) => f.code === "N-STATUS",
     ) &&
-      lintNarrative("the milestone is COMPLETE").some(
-        (f) => f.code === "N-STATUS",
-      ) &&
+      lintNarrative("the run is COMPLETE").some((f) => f.code === "N-STATUS") &&
       lintNarrative("the run passed and the corpus is complete").length === 0,
   );
   // The SLOT owns `##`. MEASURED 2026-08-05: S10's deposit used `##` for its
@@ -3362,7 +3608,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       })(),
     );
     check(
-      "--encodings lists the additional encodings, which is what the driver translates g2 with",
+      "--encodings lists the additional encodings, which is what --encoding names and what a bad id is refused against",
       subjectRun("smoke", "--encodings").stdout.trim() === "cleanroom-a",
     );
   }
@@ -3638,10 +3884,15 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     void s;
     const t = stage("p2-sweep", { ...ALL, GO_S_NATLANG_REGISTER: "" });
     check(
-      "a subject that declares no denovo.register is SKIPPED naming the key and the file to add it to",
+      "a subject that declares no register is SKIPPED naming a LIVE key and the file to add it to",
       t.exit === 0 &&
         t.row?.status === "SKIPPED" &&
-        /declares no denovo\.register/.test(t.row.reason) &&
+        // The key must be one the schema still accepts. Asserting the OLD
+        // spelling is how a diagnostic survives a rename and starts pointing at
+        // nothing: `denovo.*` ceased to exist at R2/R3, and these two tests were
+        // pinning it in place for two rulings afterwards.
+        !/denovo\./.test(t.row.reason) &&
+        /declares no natlang_sources\.register/.test(t.row.reason) &&
         /subject\.json/.test(t.row.reason),
     );
   }
@@ -3754,12 +4005,45 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 7. p3-encode ---------------------------------------------------------
   {
-    const s = stage("p3-encode");
+    // GO_MODULES="" IS THE DRIVER-PRODUCED STATE, and the fixture must use it.
+    //
+    // It used to hand the stage `GO_S_ENCODING_MODULES=""` — a state go.sh
+    // cannot produce, because subject.mjs guarantees at least the entry module —
+    // and the stage read that sidecar name directly. So the test passed while
+    // the DRIVER-produced state (`--encoding undeclared`: GO_MODULES empty,
+    // GO_S_ENCODING_MODULES still holding the COMMITTED encoding) sent all seven
+    // of sg-succession's committed modules through `l4 check` and earned a PASS
+    // whose oracle read "the deposit is L4 the toolchain accepts". Measured on
+    // 4cce130b before the repair; the stage's own plan row said `undeclared` at
+    // the same moment.
+    const s = stage("p3-encode", { GO_MODULES: "" });
     check(
-      "p3-encode with no denovo.modules is SKIPPED naming the key",
+      "p3-encode with no module set is SKIPPED, naming a key the schema accepts",
       s.exit === 0 &&
         s.row?.status === "SKIPPED" &&
-        /declares no denovo\.modules/.test(s.row.reason),
+        !/denovo\./.test(s.row.reason) &&
+        /declares no encodings\.<id>\.modules|declares no encoding\.modules/.test(
+          s.row.reason,
+        ),
+    );
+    // The half the old fixture could not see: with the DRIVER's empty set the
+    // stage must reach no module at all, whatever the sidecar still declares.
+    check(
+      "…and it names no module in its inputs, even though the sidecar declares the committed encoding",
+      !/\.l4/.test(
+        spawnSync(
+          "bash",
+          [resolve(HERE, "phases", "p3-encode.sh"), "--inputs"],
+          {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              GO_MODULES: "",
+              GO_S_ENCODING_MODULES: CORPUS,
+            },
+          },
+        ).stdout ?? "",
+      ),
     );
   }
   {
@@ -3876,10 +4160,11 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // p8-diff's deposit contract is over the MAP, not the module set.
     const und = stage("p8-diff", { GO_S_COMPARISON_SURFACE_MAP: "" });
     check(
-      "p8-diff with no declared surface map is SKIPPED naming denovo.surface_map",
+      "p8-diff with no declared surface map is SKIPPED naming comparison.surface_map",
       und.exit === 0 &&
         und.row?.status === "SKIPPED" &&
-        /denovo\.surface_map/.test(und.row.reason),
+        !/denovo\./.test(und.row.reason) &&
+        /comparison\.surface_map/.test(und.row.reason),
     );
     const abs = stage("p8-diff", {
       GO_S_COMPARISON_SURFACE_MAP: resolve(DEP, "never-written-map.json"),
@@ -4051,8 +4336,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       [
         resolve(HERE, "go.sh"),
         "plan",
-        "--milestone",
-        "g2",
+        "--encoding",
+        "cleanroom-a",
         "--subject",
         "smoke",
       ],
@@ -4062,7 +4347,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       },
     );
     check(
-      "go.sh plan --milestone g2 no longer refuses, and prints SPEC.md §4's full de novo order",
+      "go.sh plan --encoding <id> no longer refuses, and prints SPEC.md §4's full de novo order",
       r.status === 0 &&
         [
           "p1-ingest",
@@ -4103,8 +4388,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         [
           resolve(HERE, "go.sh"),
           "plan",
-          "--milestone",
-          "g2",
+          "--encoding",
+          FIXTURE_ENCODING,
           "--subject",
           FIXTURE_SUBJECT,
         ],
@@ -4136,7 +4421,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
     }
     check(
-      "and it refuses to let 'g2 COMPLETE' be read as 'a de novo run happened'",
+      "and it refuses to let COMPLETE be read as 'a de novo run happened'",
       /does NOT mean a de novo run happened/.test(r.stdout) &&
         /§8 diff oracle/.test(r.stdout),
     );
@@ -4145,8 +4430,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       [
         resolve(HERE, "go.sh"),
         "plan",
-        "--milestone",
-        "g2",
+        "--encoding",
+        "undeclared",
         "--subject",
         "bare",
       ],
@@ -4156,7 +4441,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       },
     );
     check(
-      "a subject with no additional encoding still PLANS at g2, every deposit reading 'undeclared'",
+      "a subject with no additional encoding still PLANS on the deposit path, every deposit reading 'undeclared'",
       t.status === 0 && (t.stdout.match(/undeclared/g) ?? []).length >= 4,
     );
   }
@@ -4187,7 +4472,7 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
   append(j, {
     kind: "run_begin",
     run_id: "denovo-report-test",
-    milestone: "g2",
+    encoding: "cleanroom-a",
     subject: "fixture-subject",
     declared_stages: [
       "p1-ingest",
@@ -4300,7 +4585,7 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
     append(oj, {
       kind: "run_begin",
       run_id: "orphan-reason-test",
-      milestone: "g1",
+      encoding: "primary",
       subject: FIXTURE_SUBJECT,
       declared_stages: ["p6-tests", "p9-report", "p9-explain", "pZ-invented"],
     });
@@ -4358,8 +4643,8 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
   const gj = resolve(g1, "journal.ndjson");
   append(gj, {
     kind: "run_begin",
-    run_id: "g1-report-test",
-    milestone: "g1",
+    run_id: "primary-report-test",
+    encoding: "primary",
     subject: "fixture-subject",
     declared_stages: ["p6-tests"],
   });
@@ -4377,10 +4662,10 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
       ? readFileSync(resolve(g1, "report.md"), "utf8")
       : "«unrendered»";
   check(
-    "a g1 report no longer claims the de novo stages refuse, or that their tooling is unbuilt",
+    "a primary-encoding report no longer claims the de novo stages refuse, or that their tooling is unbuilt",
     !/entry point that refuses/.test(gmd) &&
       !/de novo tooling is unbuilt/.test(gmd) &&
-      /not declared at this milestone/.test(gmd),
+      /not declared for this run/.test(gmd),
   );
   rmSync(d, { recursive: true, force: true });
   rmSync(g1, { recursive: true, force: true });
@@ -4555,8 +4840,8 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
       "node",
       [
         resolve(HERE, "lib/doctor.mjs"),
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--stages",
         stages,
       ],
@@ -4662,7 +4947,7 @@ process.stdout.write("\n-- gc retention --\n");
     append(j, {
       kind: "run_begin",
       run_id: id,
-      milestone: "g1",
+      encoding: "primary",
       subject: subject ?? undefined,
       repo_head: "abc",
       tree_state: "clean",
@@ -4848,7 +5133,7 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
   );
 
   // It is a real subject immediately: that is the whole point of R12.
-  const planned = go(["plan", "--subject", id, "--milestone", "g1"]);
+  const planned = go(["plan", "--subject", id, "--encoding", "primary"]);
   check("the scaffolded subject plans at once", planned.status === 0);
   check(
     "the plan says the encoding is unwritten rather than leaving it to be inferred",
@@ -4861,7 +5146,7 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
   // declaration must not survive. This is what stops the state key from rotting.
   mkdirSync(dirname(encAbs), { recursive: true });
   writeFileSync(encAbs, "§ `Selftest`\n");
-  const stale = go(["plan", "--subject", id, "--milestone", "g1"]);
+  const stale = go(["plan", "--subject", id, "--encoding", "primary"]);
   check(
     "a written encoding under an 'unwritten' sidecar is refused",
     stale.status !== 0,
@@ -4877,7 +5162,7 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
   const desc = JSON.parse(readFileSync(descPath, "utf8"));
   desc.encoding.state = "written";
   writeFileSync(descPath, JSON.stringify(desc, null, 2) + "\n");
-  const written = go(["plan", "--subject", id, "--milestone", "g1"]);
+  const written = go(["plan", "--subject", id, "--encoding", "primary"]);
   check(
     "flipping the state to written resolves the sidecar",
     written.status === 0,
@@ -5141,7 +5426,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: id,
       ts,
-      milestone: "g1",
+      encoding: "primary",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -5193,7 +5478,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: id,
       ts,
-      milestone: "g1",
+      encoding: "primary",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -5249,7 +5534,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: "2026-03-09-zzzzzzzz-001",
       subject: "subj",
-      milestone: "g1",
+      encoding: "primary",
       declared_stages: ["p7-wizard"],
     },
     {
@@ -5275,7 +5560,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: "2026-03-01-aaaaaaaa-001",
       subject: "subj",
-      milestone: "g1",
+      encoding: "primary",
       declared_stages: ["p7-wizard"],
     },
     {
@@ -5841,8 +6126,8 @@ process.stdout.write("\n-- artifacts through the store --\n");
         d,
         "--run-id",
         id,
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         "s",
         "--repo-head",
@@ -6005,7 +6290,7 @@ process.stdout.write("\n-- artifacts through the store --\n");
   // T-5 · a replayed PASS naming no artifact. The guard it restores was
   // vacuous — `!r.replayed_from` inside a branch where `replayed` is true is
   // always false — so this receipt was accepted and `verify` called the
-  // milestone COMPLETE.
+  // the run COMPLETE.
   {
     const b3 = mkRun(store, "r4");
     const empty = resolve(b3, "none.json");
@@ -6120,8 +6405,8 @@ process.stdout.write("\n-- the blessing edge --\n");
         d,
         "--run-id",
         "r",
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         "sg",
         "--repo-head",
@@ -7456,7 +7741,7 @@ process.stdout.write("\n-- store verbs --\n");
     })(),
   );
 
-  // subject-report's declarable universe came from G1_STAGES, which was never
+  // subject-report's declarable universe came from PRIMARY_STAGES, which was never
   // assembled for that command, so every g1-only phase reached the report only
   // via a surviving journal — and would vanish once those expired.
   check(
