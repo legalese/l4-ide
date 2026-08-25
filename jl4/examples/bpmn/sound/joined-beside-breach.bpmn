@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DELIBERATELY SOUND, and sound only if an error end event is modelled as
+  terminating the instance. See ./README.md.
+
+  Shape: a RAND whose two branches are joined by a converging parallel gateway,
+  where one branch carries an interrupting boundary event routing to BREACH.
+  If the boundary fires, the sibling's token is sitting on Flow_Task_A__Join and
+  no second token will ever arrive — so under "an error end consumes one token
+  and leaves its siblings running" this diagram deadlocks. Under BPMN's actual
+  semantics, where an uncaught top-level error ends the instance and discards
+  every remaining token, it does not.
+
+  Hand-written, not exporter output. Today's exporter declines to join a branch
+  that can breach (P-NOJOIN), so it cannot emit this yet; the point of the
+  fixture is that the gate must not block that relaxation with a false positive.
+
+  gatewayDirection, errorRef and the <bpmn:error> declaration are all present
+  because jBPM refuses the file without them, and this fixture is meant to be
+  runnable by every checker in etc/.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_joined_beside_breach"
+                  targetNamespace="https://legalese.com/l4/bpmn">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:process id="Process_joined_beside_breach" name="a joined RAND beside a BREACH branch" isExecutable="false">
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:parallelGateway id="Split_0" name="all of" gatewayDirection="Diverging" />
+    <bpmn:task id="Task_A" name="MUST file the notice">
+      <bpmn:documentation>PARTY Tenant MUST file the notice</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:task id="Task_B" name="MUST pay the deposit">
+      <bpmn:documentation>PARTY Tenant MUST pay the deposit</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Lapse_B" name="after P7D" attachedToRef="Task_B" cancelActivity="true">
+      <bpmn:documentation>the deadline passes without performance, which routes to BREACH</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Lapse_B">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:parallelGateway id="Join_0" gatewayDirection="Converging">
+      <bpmn:documentation>every branch of the RAND must complete; each delivers exactly one token</bpmn:documentation>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="End_Ok" name="Fulfilled" />
+    <bpmn:endEvent id="End_Breach" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_Breach" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_A" sourceRef="Split_0" targetRef="Task_A" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_B" sourceRef="Split_0" targetRef="Task_B" />
+    <bpmn:sequenceFlow id="Flow_Task_A__Join_0" sourceRef="Task_A" targetRef="Join_0" />
+    <bpmn:sequenceFlow id="Flow_Task_B__Join_0" sourceRef="Task_B" targetRef="Join_0" />
+    <bpmn:sequenceFlow id="Flow_Lapse_B__End_Breach" sourceRef="Lapse_B" targetRef="End_Breach" />
+    <bpmn:sequenceFlow id="Flow_Join_0__End_Ok" sourceRef="Join_0" targetRef="End_Ok" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_0">
+    <bpmndi:BPMNPlane id="Plane_0" bpmnElement="Process_joined_beside_breach">
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="160" y="182" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
+        <dc:Bounds x="250" y="175" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_A" bpmnElement="Task_A">
+        <dc:Bounds x="360" y="80" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_B" bpmnElement="Task_B">
+        <dc:Bounds x="360" y="240" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lapse_B" bpmnElement="Lapse_B">
+        <dc:Bounds x="462" y="302" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Join_0" bpmnElement="Join_0">
+        <dc:Bounds x="550" y="175" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_Ok" bpmnElement="End_Ok">
+        <dc:Bounds x="660" y="182" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_Breach" bpmnElement="End_Breach">
+        <dc:Bounds x="660" y="382" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
+        <di:waypoint x="196" y="200" />
+        <di:waypoint x="250" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_A" bpmnElement="Flow_Split_0__Task_A">
+        <di:waypoint x="300" y="200" />
+        <di:waypoint x="330" y="200" />
+        <di:waypoint x="330" y="120" />
+        <di:waypoint x="360" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_B" bpmnElement="Flow_Split_0__Task_B">
+        <di:waypoint x="300" y="200" />
+        <di:waypoint x="330" y="200" />
+        <di:waypoint x="330" y="280" />
+        <di:waypoint x="360" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_A__Join_0" bpmnElement="Flow_Task_A__Join_0">
+        <di:waypoint x="480" y="120" />
+        <di:waypoint x="520" y="120" />
+        <di:waypoint x="520" y="200" />
+        <di:waypoint x="550" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_B__Join_0" bpmnElement="Flow_Task_B__Join_0">
+        <di:waypoint x="480" y="280" />
+        <di:waypoint x="520" y="280" />
+        <di:waypoint x="520" y="200" />
+        <di:waypoint x="550" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_B__End_Breach" bpmnElement="Flow_Lapse_B__End_Breach">
+        <di:waypoint x="480" y="338" />
+        <di:waypoint x="480" y="400" />
+        <di:waypoint x="660" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Join_0__End_Ok" bpmnElement="Flow_Join_0__End_Ok">
+        <di:waypoint x="600" y="200" />
+        <di:waypoint x="660" y="200" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
