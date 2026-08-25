@@ -1,0 +1,39 @@
+-- NEGATIVE fixture for the future D-CYCLE check (spec §6.4.2, §6.3.7).
+--
+-- p7: a nullary `MEANS` cycle written as DEFINITIONS rather than as
+-- calculations, which is how the shape actually shows up in a corpus: a term
+-- defined in terms of a second term that is defined back in terms of the first.
+--
+--     `a qualifying disposal` MEANS `a reportable disposal`
+--     `a reportable disposal` MEANS `a qualifying disposal`
+--
+-- Booleans, not numbers, because that is the idiom the definitional style uses
+-- and because a cycle among BOOLEAN decides is the one a reader is most likely
+-- to write by accident while paraphrasing two cross-referring definitions out
+-- of a statute.
+--
+-- On today's tree the emitted DRG IS cyclic here and the report is ADVISORY
+-- ONLY.
+--
+-- Expected after Phase 4: one D-CYCLE over an SCC of size 2.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `definitional cycle`
+
+GIVETH A BOOLEAN
+`a qualifying disposal` MEANS
+    `a reportable disposal`
+
+GIVETH A BOOLEAN
+`a reportable disposal` MEANS
+    `a qualifying disposal`

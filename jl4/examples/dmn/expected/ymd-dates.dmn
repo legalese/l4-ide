@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_ymd_date_literals" name="YMD date literals" namespace="https://legalese.com/l4/dmn/ymd_date_literals" exporter="jl4">
+  <inputData id="input_the_application_date" name="the_application_date" label="the application date">
+    <variable id="input_the_application_date_var" name="the_application_date" label="the application date" typeRef="date"/>
+  </inputData>
+  <inputData id="input_no_fee_is_prescribed_before_commencement_on_1983_01_01" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01">
+    <variable id="input_no_fee_is_prescribed_before_commencement_on_1983_01_01_var" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01" typeRef="number"/>
+  </inputData>
+  <inputData id="input_rules_effective_date" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE">
+    <variable id="input_rules_effective_date_var" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE" typeRef="date"/>
+  </inputData>
+  <decision id="decision_commencement" name="commencement">
+    <variable id="decision_commencement_var" name="commencement" typeRef="date"/>
+    <literalExpression id="decision_commencement_literal">
+      <text>date("1983-01-01")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_appointed_day" name="the_appointed_day" label="the appointed day">
+    <variable id="decision_the_appointed_day_var" name="the_appointed_day" label="the appointed day" typeRef="date"/>
+    <literalExpression id="decision_the_appointed_day_literal">
+      <text>date("2024-02-29")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_transition_day" name="the_transition_day" label="the transition day">
+    <variable id="decision_the_transition_day_var" name="the_transition_day" label="the transition day" typeRef="date"/>
+    <literalExpression id="decision_the_transition_day_literal">
+      <text>date("2026-01-01")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_regime_that_applies" name="the_regime_that_applies" label="the regime that applies">
+    <variable id="decision_the_regime_that_applies_var" name="the_regime_that_applies" label="the regime that applies" typeRef="string"/>
+    <informationRequirement id="decision_the_regime_that_applies_ir1">
+      <requiredDecision href="#decision_commencement"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_regime_that_applies_ir2">
+      <requiredDecision href="#decision_the_appointed_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_regime_that_applies_ir3">
+      <requiredDecision href="#decision_the_transition_day"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_regime_that_applies_ir4">
+      <requiredInput href="#input_the_application_date"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_regime_that_applies_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="the regime that applies">
+      <input id="decision_the_regime_that_applies_i1" label="`the application date`">
+        <inputExpression id="decision_the_regime_that_applies_i1_expr" typeRef="date">
+          <text>the_application_date</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_regime_that_applies_o1"/>
+      <rule id="decision_the_regime_that_applies_r1">
+        <description>`the application date` AT LEAST `the transition day`</description>
+        <inputEntry id="decision_the_regime_that_applies_r1_i1">
+          <text>&gt;= date("2026-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_regime_that_applies_r1_o1">
+          <text>"transitional"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_regime_that_applies_r2">
+        <description>`the application date` AT LEAST `the appointed day`</description>
+        <inputEntry id="decision_the_regime_that_applies_r2_i1">
+          <text>&gt;= date("2024-02-29")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_regime_that_applies_r2_o1">
+          <text>"appointed"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_regime_that_applies_r3">
+        <description>`the application date` AT LEAST commencement</description>
+        <inputEntry id="decision_the_regime_that_applies_r3_i1">
+          <text>&gt;= date("1983-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_regime_that_applies_r3_o1">
+          <text>"original"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_regime_that_applies_r4">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_the_regime_that_applies_r4_i1">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_the_regime_that_applies_r4_o1">
+          <text>"pre-commencement"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_the_filing_fee" name="the_filing_fee" label="the filing fee">
+    <variable id="decision_the_filing_fee_var" name="the_filing_fee" label="the filing fee" typeRef="number"/>
+    <informationRequirement id="decision_the_filing_fee_ir1">
+      <requiredInput href="#input_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_filing_fee_ir2">
+      <requiredInput href="#input_rules_effective_date"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_filing_fee_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="the filing fee">
+      <input id="decision_the_filing_fee_i1" label="`RULES EFFECTIVE DATE`">
+        <inputExpression id="decision_the_filing_fee_i1_expr" typeRef="date">
+          <text>RULES_EFFECTIVE_DATE</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_filing_fee_o1"/>
+      <annotation name="regime"/>
+      <rule id="decision_the_filing_fee_r1">
+        <description>`RULES EFFECTIVE DATE` AT LEAST `the transition day`</description>
+        <inputEntry id="decision_the_filing_fee_r1_i1">
+          <text>&gt;= date("2026-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_filing_fee_r1_o1">
+          <text>1000</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>the transition day (main.l4:68:1-69:40)</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_the_filing_fee_r2">
+        <description>`RULES EFFECTIVE DATE` AT LEAST (YMD OF 1983, 1, 1)</description>
+        <inputEntry id="decision_the_filing_fee_r2_i1">
+          <text>[date("1983-01-01")..date("2026-01-01"))</text>
+        </inputEntry>
+        <outputEntry id="decision_the_filing_fee_r2_o1">
+          <text>250</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>from 1983-01-01</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_the_filing_fee_r3">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_the_filing_fee_r3_i1">
+          <text>&lt; date("1983-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_filing_fee_r3_o1">
+          <text>no_fee_is_prescribed_before_commencement_on_1983_01_01</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>no fee is prescribed before commencement on 1983-01-01</text>
+        </annotationEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_the_fee_with_surcharge" name="the_fee_with_surcharge" label="the fee with surcharge">
+    <variable id="decision_the_fee_with_surcharge_var" name="the_fee_with_surcharge" label="the fee with surcharge" typeRef="number"/>
+    <informationRequirement id="decision_the_fee_with_surcharge_ir1">
+      <requiredDecision href="#decision_the_filing_fee"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_fee_with_surcharge_literal">
+      <text>the_filing_fee * 2</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="service_ymd_date_literals" name="YMD_date_literals" label="YMD date literals">
+    <variable id="service_ymd_date_literals_var" name="YMD_date_literals" label="YMD date literals" typeRef="Any"/>
+    <outputDecision href="#decision_the_regime_that_applies"/>
+    <outputDecision href="#decision_the_fee_with_surcharge"/>
+    <encapsulatedDecision href="#decision_commencement"/>
+    <encapsulatedDecision href="#decision_the_appointed_day"/>
+    <encapsulatedDecision href="#decision_the_transition_day"/>
+    <encapsulatedDecision href="#decision_the_filing_fee"/>
+    <inputData href="#input_the_application_date"/>
+    <inputData href="#input_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
+    <inputData href="#input_rules_effective_date"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_ymd_date_literals_diagram" name="YMD date literals">
+      <dmndi:DMNShape id="input_the_application_date_shape" dmnElementRef="input_the_application_date">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_no_fee_is_prescribed_before_commencement_on_1983_01_01_shape" dmnElementRef="input_no_fee_is_prescribed_before_commencement_on_1983_01_01">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_rules_effective_date_shape" dmnElementRef="input_rules_effective_date">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_commencement_shape" dmnElementRef="decision_commencement">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_appointed_day_shape" dmnElementRef="decision_the_appointed_day">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_transition_day_shape" dmnElementRef="decision_the_transition_day">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_filing_fee_shape" dmnElementRef="decision_the_filing_fee">
+        <dc:Bounds x="720" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_regime_that_applies_shape" dmnElementRef="decision_the_regime_that_applies">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_fee_with_surcharge_shape" dmnElementRef="decision_the_fee_with_surcharge">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_ymd_date_literals_shape" dmnElementRef="service_ymd_date_literals">
+        <dc:Bounds x="40" y="40" width="880" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_the_regime_that_applies_ir1_edge" dmnElementRef="decision_the_regime_that_applies_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_regime_that_applies_ir2_edge" dmnElementRef="decision_the_regime_that_applies_ir2">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_regime_that_applies_ir3_edge" dmnElementRef="decision_the_regime_that_applies_ir3">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_regime_that_applies_ir4_edge" dmnElementRef="decision_the_regime_that_applies_ir4">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_filing_fee_ir1_edge" dmnElementRef="decision_the_filing_fee_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="810" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_filing_fee_ir2_edge" dmnElementRef="decision_the_filing_fee_ir2">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="810" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_fee_with_surcharge_ir1_edge" dmnElementRef="decision_the_fee_with_surcharge_ir1">
+        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

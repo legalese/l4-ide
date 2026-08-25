@@ -1,0 +1,38 @@
+-- CONTROL fixture for the future D-CYCLE / D-RECURSIVE checks (spec §6.4.2,
+-- §6.4.4-5). One of eleven files covering the nine cycle shapes; read
+-- jl4/examples/dmn/README.md's cycle table for the set.
+--
+-- p1: a FORWARD REFERENCE and nothing more. `the headline figure` is defined
+-- before `the base figure`, which it reads. The DRG edge runs base -> headline
+-- and the graph is GENUINELY ACYCLIC.
+--
+-- This is the file that proves the SCC does not cry wolf. Every other fixture
+-- in the set asserts that something IS reported; without this one, a detector
+-- that reported every node would pass all ten of them.
+--
+-- Expected after Phase 4: NO D-CYCLE and NO D-RECURSIVE. (On today's tree the
+-- fidelity report carries D-SCOPE and two D-LITERALEXPR notes, which are
+-- unrelated to the cycle question and are not what this fixture asserts.)
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `forward reference only`
+
+ASSUME `the reported amount` IS A NUMBER
+
+GIVETH A NUMBER
+`the headline figure` MEANS
+    `the base figure` TIMES 2
+
+GIVETH A NUMBER
+`the base figure` MEANS
+    `the reported amount` PLUS 1
