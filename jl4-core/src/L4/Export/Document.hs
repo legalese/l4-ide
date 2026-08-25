@@ -247,7 +247,7 @@ mapUnitBody f u = case u.uDecl of
 -- declaring type name do not share a 'Unique'.
 recordCtorFields :: [Module Resolved] -> Map.Map Text [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ <- fields ])
+  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ <- fields ])
   | m <- mods
   , Declare _ (MkDeclare _ _ (MkAppForm _ ctorName _ _) (RecordDecl _ _ fields)) <- topDeclsRec m
   ]
@@ -307,7 +307,7 @@ decideNlg (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAn
        , getOriginal headName ^. annoOf % annNlg
        ]
     <> [ getOriginal a ^. annoOf % annNlg | a <- appArgs ]
-    <> [ getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ <- names ]
+    <> [ getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ _ <- names ]
 
 substNlgInUnit :: Map.Map (Text, Int) (Nlg, [Unique]) -> Unit -> Unit
 substNlgInUnit info u = case u.uDecl of
@@ -379,7 +379,7 @@ mixfixHeadingText tysig info =
 -- | Each GIVEN parameter's name to its (optional) declared type.
 paramTypeMap :: TypeSig Resolved -> Map.Map Text (Maybe (Type' Resolved))
 paramTypeMap (MkTypeSig _ (MkGivenSig _ names) _) =
-  Map.fromList [ (resolvedText r, mty) | MkOptionallyTypedName _ r mty <- names ]
+  Map.fromList [ (resolvedText r, mty) | MkOptionallyTypedName _ r mty _ <- names ]
 
 -- | "a Person buyer" / "an Order item" — article + type + parameter name.
 -- Falls back to the bare parameter name when no type is available.
@@ -404,7 +404,7 @@ declareApp :: Declare Resolved -> Resolved
 declareApp (MkDeclare _ _ (MkAppForm _ n _ _) _) = n
 
 assumeApp :: Assume Resolved -> Resolved
-assumeApp (MkAssume _ _ (MkAppForm _ n _ _) _) = n
+assumeApp (MkAssume _ _ (MkAppForm _ n _ _) _ _) = n
 
 definedIn :: UnitDecl -> Set.Set Unique
 definedIn = collectUniques (\case Def{} -> True; _ -> False)
@@ -695,7 +695,7 @@ isExportUnit u = case u.uDecl of
 isComputedSelector :: Unit -> Bool
 isComputedSelector u = case u.uDecl of
   UDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ params) _) _ _) ->
-    any (\(MkOptionallyTypedName _ r _) -> nameToText (getActual r) == "_self") params
+    any (\(MkOptionallyTypedName _ r _ _) -> nameToText (getActual r) == "_self") params
   _ -> False
 
 -- ----------------------------------------------------------------------------
@@ -817,7 +817,7 @@ localDefClause outerSubst = \case
 paramSubst :: TypeSig Resolved -> Map.Map Unique Text
 paramSubst (MkTypeSig _ (MkGivenSig _ names) _) =
   let params = [ (getUnique r, nameToText (getActual r), mty >>= userTypeName)
-               | MkOptionallyTypedName _ r mty <- names ]
+               | MkOptionallyTypedName _ r mty _ <- names ]
       dupTypes = Map.fromListWith (+) [ (tn, 1 :: Int) | (_, _, Just tn) <- params ]
       phraseOf pname = \case
         Just tn
@@ -937,8 +937,8 @@ declareClause = \case
   EnumDecl _ cons       -> CLeaf ("one of " <> oxford "or" (map conName cons))
   SynonymDecl _ ty      -> CLeaf (typeText ty)
  where
-  recordField (MkTypedName _ n ty Nothing)     = (resolvedText n, typeText ty)
-  recordField (MkTypedName _ n ty (Just expr)) =
+  recordField (MkTypedName _ n ty _mTypically Nothing)     = (resolvedText n, typeText ty)
+  recordField (MkTypedName _ n ty _mTypically (Just expr)) =
     (resolvedText n, typeText ty <> ", computed as " <> leafText expr)
   conName (MkConDecl _ n _) = resolvedText n
 
@@ -1198,7 +1198,7 @@ formulaText e
  where
   arithTop = \case
     Plus{} -> True; Minus{} -> True; Times{} -> True
-    DividedBy{} -> True; Modulo{} -> True; Exponent{} -> True
+    DividedBy{} -> True; Modulo{} -> True
     _ -> False
   go :: Expr Resolved -> Maybe (Int, Text)
   go expr = case carameliseNode expr of
@@ -1207,7 +1207,6 @@ formulaText e
     Times _ a b     -> bin 2 " × " a b
     DividedBy _ a b -> bin 2 " ÷ " a b
     Modulo _ a b    -> bin 2 " mod " a b
-    Exponent _ a b  -> bin 3 " ^ " a b
     Lit _ (NumericLit _ r) -> Just (4, numText r)
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)

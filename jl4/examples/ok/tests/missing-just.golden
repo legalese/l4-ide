@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+missing-just.l4:7:3-8:22:
+  I found a problem while checking the definition of `f`:
+    The following branches still need to be considered:
+    
+      WHEN JUST `_` THEN
+    

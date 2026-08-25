@@ -1,0 +1,36 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: unify-sibling-rebind.l4
+  Hidden: no
+  Range: 19:9-19:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at unify-sibling-rebind.l4:18:8-16, namely
+
+      NUMBER
+
+    but is here of type
+
+      STRING
+
+File: unify-sibling-rebind.l4
+  Hidden: no
+  Range: 19:17-19:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first argument of function 
+
+      firstOf (defined at unify-sibling-rebind.l4:14:1-8)
+
+    is expected to be of type
+
+      Pair OF STRING, STRING
+
+    but is here of type
+
+      Pair OF STRING, NUMBER

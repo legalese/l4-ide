@@ -1,0 +1,15 @@
+IMPORT prelude
+-- R3: COMMIT/ATTEST in a block. Same Record node from recordOrCommitExpr; both
+-- carry isOfficial=True and mParty=Nothing (the placeholder mParty hole keeps the
+-- invariant isOfficial ==> mParty==Nothing parser-enforced).
+
+DECLARE Person IS ONE OF P
+DECLARE Act IS ONE OF serve
+
+commitBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE COMMIT `a` IS TRUE
+        ATTEST `b` IS FALSE
+        PARTY P MUST serve WITHIN 20

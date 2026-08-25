@@ -1,0 +1,7 @@
+`_ set equals _` with `s12` and `s21`
+`setSize` with `setFromList` with list of `s12` and `s21`
+`setSize` with `setFromList` with list of `s12` and `s12`
+`_ is in _` with `s21` and `setFromList` with list of `s12`
+`setSize` with `_ INTERSECT _` with `setFromList` with list of `s12` and `setFromList` with list of `s21`
+`_ set equals _` with `t1` 's `members` and `t2` 's `members`
+`t1` is equal to `t2`

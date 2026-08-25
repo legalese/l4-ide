@@ -1,0 +1,51 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: fixity-conflict.l4
+  Hidden: no
+  Range: 17:7-17:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The operator `CLASHOP` has conflicting fixity declarations in scope:
+
+      @infixr 7
+      @infixl 6
+
+    so I cannot re-associate this operator chain. Parenthesize the
+    expression, or make the declarations agree.
+
+File: fixity-conflict.l4
+  Hidden: no
+  Range: 17:7-17:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      CLASHOP
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      CLASHOP (predefined) of type FUNCTION FROM STRING AND STRING TO STRING
+      CLASHOP (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+
+File: fixity-conflict.l4
+  Hidden: no
+  Range: 17:19-17:26
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      CLASHOP
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      CLASHOP (predefined) of type FUNCTION FROM STRING AND STRING TO STRING
+      CLASHOP (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER

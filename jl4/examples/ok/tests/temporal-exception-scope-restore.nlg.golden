@@ -1,0 +1,4 @@
+`DATE_SERIAL` with `TODAY`
+`EVAL AS OF SYSTEM TIME` with `past` and the result of dividing 1 by 0
+`DATE_SERIAL` with `TODAY`
+`fresh`

@@ -1,20 +1,34 @@
-<script lang="ts">
-  import type { LirContext } from '@repo/layout-ir'
+<script lang="ts" generics="C = unknown">
   import type { Unique } from '@repo/viz-expr'
-  import type { LadderGraphLirNode } from '$lib/layout-ir/ladder-graph/ladder.svelte.js'
   import type { PartialEvalAnalysis } from '$lib/eval/partial-eval.js'
   import { FalseVal, TrueVal, UnknownVal } from '$lib/eval/type.js'
+  import type { UBoolVal } from '$lib/eval/type.js'
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw'
   import X from 'lucide-svelte/icons/x'
 
-  interface PartialEvalSidebarProps {
-    context: LirContext
-    ladderGraph: LadderGraphLirNode
+  /** The three methods this panel actually calls, and nothing else — so it no longer
+   *  knows the LIR exists. `LadderGraphLirNode` satisfies it with `C = LirContext`
+   *  (flow-base.svelte's call site, unchanged); the Step-4 `LadderSvg` shell satisfies
+   *  it with `C = null` and a three-method shim over `LadderModel`
+   *  (`displayers/svg/sidebar-bridge.ts`). Structural, so neither side imports the
+   *  other. E1-IDE-INTEGRATION.md:104: "reuse partial-eval-sidebar.svelte as-is". */
+  interface SidebarBindings<Ctx> {
+    resetBindings(context: Ctx): unknown
+    getLabelForUnique(context: Ctx, unique: Unique): string
+    submitNewBinding(
+      context: Ctx,
+      binding: { unique: Unique; value: UBoolVal }
+    ): unknown
+  }
+
+  interface PartialEvalSidebarProps<Ctx> {
+    context: Ctx
+    ladderGraph: SidebarBindings<Ctx>
     analysis: PartialEvalAnalysis | null
     onClose: () => void
   }
 
-  let { context, ladderGraph, analysis, onClose }: PartialEvalSidebarProps =
+  let { context, ladderGraph, analysis, onClose }: PartialEvalSidebarProps<C> =
     $props()
 
   function handleReset() {

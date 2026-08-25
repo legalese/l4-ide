@@ -319,6 +319,9 @@ findExport name bundle =
 -- so the CLI and the HTTP wrapper share a single source of truth for
 -- the ABI marshaling and the @env.__l4_*@ import table.
 runtimeJs :: String
+-- NB: embedStringFile splices the runtime at compile time; a change to the
+-- .mjs file requires this module to recompile (cabal tracks it as a TH
+-- dependent file).
 runtimeJs = $(embedStringFile "runtime/jl4-runtime.mjs")
 
 runNode :: FilePath -> FunctionExport -> ResolvedArgs -> IO (Either Text ResponseWithReason)

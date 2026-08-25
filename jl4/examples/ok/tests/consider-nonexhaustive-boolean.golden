@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+consider-nonexhaustive-boolean.l4:10:3-11:25:
+  I found a problem while checking the definition of `classify`:
+    The following branches still need to be considered:
+    
+      WHEN FALSE THEN
+    

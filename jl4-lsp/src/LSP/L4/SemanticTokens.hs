@@ -203,6 +203,9 @@ instance ToSemTokens Context PosToken DeonticModal where
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens Context PosToken InertContext where
   toSemTokens _ = pure []
+-- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
+instance ToSemTokens Context PosToken RecallMode where
+  toSemTokens _ = pure []
 instance ToSemTokens Context PosToken (RAction Name) where
 instance ToSemTokens Context PosToken (LocalDecl Name) where
 instance ToSemTokens Context PosToken (Assume Name) where
@@ -231,6 +234,10 @@ instance ToSemTokens Context PosToken Int where
 
 -- Text has no tokens to highlight (used in Inert expressions)
 instance ToSemTokens Context PosToken Text where
+  toSemTokens _ = pure []
+
+-- Bool has no tokens to highlight (the RECORD/COMMIT isOfficial flag on Expr)
+instance ToSemTokens Context PosToken Bool where
   toSemTokens _ = pure []
 
 instance ToSemTokens Context PosToken Name where
@@ -306,6 +313,9 @@ instance ToSemTokens () PosToken DeonticModal where
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens () PosToken InertContext where
   toSemTokens _ = pure []
+-- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
+instance ToSemTokens () PosToken RecallMode where
+  toSemTokens _ = pure []
 instance ToSemTokens () PosToken (RAction Resolved) where
 instance ToSemTokens () PosToken (Event Resolved) where
   toSemTokens (MkEvent ann p a t atFirst) = traverseCsnWithHoles ann $ map toSemTokens
@@ -337,6 +347,10 @@ instance ToSemTokens () PosToken Int where
 
 -- Text has no tokens to highlight (used in Inert expressions)
 instance ToSemTokens () PosToken Text where
+  toSemTokens _ = pure []
+
+-- Bool has no tokens to highlight (the RECORD/COMMIT isOfficial flag on Expr)
+instance ToSemTokens () PosToken Bool where
   toSemTokens _ = pure []
 
 instance ToSemTokens () PosToken Name where

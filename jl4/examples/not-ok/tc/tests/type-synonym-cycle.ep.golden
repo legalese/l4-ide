@@ -1,0 +1,11 @@
+-- Type synonym cycle detection (SHOULD FAIL).
+-- A synonym that refers to itself, directly or via other synonyms, has no
+-- finite expansion. These declarations used to be accepted and then sent
+-- the type checker's synonym expansion into an infinite loop at use sites.
+DECLARE Loop IS A Loop
+
+DECLARE Ping IS A Pong
+DECLARE Pong IS A Ping
+
+GIVETH A Loop
+oops MEANS 42

@@ -41,7 +41,7 @@ import qualified Data.UUID.V5 as UUIDV5
 
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.VizExpr as VizExpr
-import LSP.L4.Viz.QueryPlan (vizExprToBoolExpr)
+import LSP.L4.Viz.QueryPlan (annotateLadderWithAtomIdsUsing, vizExprToBoolExpr)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import Backend.Api (FnArguments (..), FnLiteral (..))
@@ -164,13 +164,32 @@ decisionQueryCacheKey funName sourceText =
 
 -- | Build the decision query cache from an already-compiled module.
 -- Uses the pre-compiled AST and resolved module directly, avoiding re-typechecking.
+--
+-- The first argument is the ladder node budget (see
+-- 'Options.Options.maxLadderNodes'). A ladder is drawn in AND\/OR normal form,
+-- and 'L4.Transform.simplify' reaches that form by distributing OR over AND, so
+-- the ladder for @(a AND b) OR (c AND d) OR …@ over 2n variables has 2^n
+-- clauses. Everything downstream — the BDD compile below, and the JSON body
+-- both @query-plan@ and @ladder@ hand back — is linear or worse in that, so
+-- this is the place to refuse: after the visualization (which is what knows the
+-- real shape) and before anything that has to traverse it.
+--
+-- What this does NOT do is bound the visualization itself. 'LadderViz.doVisualize'
+-- materialises the whole normal form before returning, so by the time the
+-- budget can be consulted the expensive thing has already happened; 32
+-- variables take about half a second, 64 do not finish. Bounding that is the
+-- caller's job — see the @evalTimeout@ in
+-- 'DataPlane.requireDecisionQueryCache'. The two limits are separate because
+-- they bound separate things: the timeout bounds a one-time build, the budget
+-- bounds a response that is re-serialized on every request.
 buildDecisionQueryCacheFromCompiled ::
   (MonadError ServerError m) =>
+  Int ->
   Text ->
   CompiledModule ->
   Text ->
   m CachedDecisionQuery
-buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
+buildDecisionQueryCacheFromCompiled nodeBudget funName compiled sourceText = do
   let resolvedModule = compiled.compiledModule
       decide = compiled.compiledDecide
       fileName = Text.unpack funName <> ".l4"
@@ -182,27 +201,99 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
     Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
     Right x -> pure x
 
+  when (exceedsNodeBudget nodeBudget ladderInfo.funDecl.body) $
+    throwError err400
+      { errBody = Aeson.encode $ object
+          [ "error" .=
+              ( "The ladder diagram for `" <> funName <> "` has more than "
+                  <> Text.pack (show nodeBudget)
+                  <> " nodes, which is past the limit this service will build or serve. \
+                     \Reaching the AND/OR normal form a ladder draws is exponential in the \
+                     \width of a disjunction of conjunctions, so a decision written as \
+                     \`(a AND b) OR (c AND d) OR ...` over many variables expands past any \
+                     \size a reader could take in. Split the decision into named \
+                     \sub-decisions, or raise JL4_MAX_LADDER_NODES."
+                :: Text )
+          ]
+      }
+
   let (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
       bddCompiled = BDQ.compileDecisionQuery order boolExpr
       deps = LadderViz.getAtomDeps vizState
       inputRefs = LadderViz.getAtomInputRefs vizState
 
+      core =
+        QP.CachedDecisionQuery
+          { varLabelByUnique = labels
+          , varDepsByUnique = deps
+          , varInputRefsByUnique =
+              fmap
+                (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
+                inputRefs
+          , compiled = bddCompiled
+          , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+          }
+
+      -- Put the ladder's leaves into the SAME atomId namespace the query plan
+      -- will answer in (upstream smucclaw/l4-ide#935).
+      --
+      -- Before this, the two surfaces minted different ids for the same atom, so
+      -- a client that fetched the diagram and then posted answers keyed by its
+      -- atomIds — the natural thing for a ladder-embedded wizard, and what the
+      -- Reg CF wizard does — got a 200 and a silent no-op: no 4xx, no warning,
+      -- verdict unchanged. jl4-lsp had reconciled them since the beginning by
+      -- calling annotateLadderWithAtomIds before serving the ladder; the service
+      -- never had, so the IDE and the deployed service disagreed about what a
+      -- question was called.
+      --
+      -- The atomId map is derived from @funName@ — the name this deployment
+      -- serves the function under, and the same one 'queryPlan' will be handed —
+      -- rather than from the diagram's own @fnName@ label, so the two cannot
+      -- drift apart if a function is ever registered under something other than
+      -- its DECIDE name. @paramsByUnique@ is read off the ladder's params, which
+      -- the annotation does not touch, so it stays valid afterwards.
+      paramsByUnique = Map.fromList [(p.unique, p.label) | p <- ladderInfo.funDecl.params]
+      joinableLadder =
+        annotateLadderWithAtomIdsUsing (QP.atomIdByUnique funName paramsByUnique core) ladderInfo
+
   pure
     CachedDecisionQuery
       { cacheKey = decisionQueryCacheKey funName sourceText
-      , ladderInfo
-      , core =
-          QP.CachedDecisionQuery
-            { varLabelByUnique = labels
-            , varDepsByUnique = deps
-            , varInputRefsByUnique =
-                fmap
-                  (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
-                  inputRefs
-            , compiled = bddCompiled
-            }
+      , ladderInfo = joinableLadder
+      , core
       , paramSchema = parametersFromDecideWithErrors resolvedModule decide []
       }
+
+-- | Does this ladder body have more than @budget@ nodes?
+--
+-- Fuel-limited: it stops the moment the budget is blown, so the answer costs
+-- @O(budget)@ and never @O(size)@. That does not make the oversized ladder
+-- cheap — 'LadderViz.doVisualize' has already built it, which is the expensive
+-- part, and is why @evalTimeout@ exists alongside this — but it does keep the
+-- guard itself from becoming a second traversal of the very thing it is
+-- refusing, and it keeps the guard honest if the visualizer is ever made lazier.
+--
+-- An explicit worklist rather than a fold, so nothing forces the (potentially
+-- enormous) argument list of a wide @Or@ beyond the element being counted.
+exceedsNodeBudget :: Int -> VizExpr.IRExpr -> Bool
+exceedsNodeBudget budget root = go budget [root]
+ where
+  go :: Int -> [VizExpr.IRExpr] -> Bool
+  go fuel _ | fuel <= 0 = True
+  go _    []            = False
+  go fuel (e : rest)    = go (fuel - 1) (children e <> rest)
+
+  children :: VizExpr.IRExpr -> [VizExpr.IRExpr]
+  children = \case
+    VizExpr.And _ args            -> args
+    VizExpr.Or _ args             -> args
+    VizExpr.Not _ negand          -> [negand]
+    VizExpr.Implies _ scope req _ -> [scope, req]
+    VizExpr.App _ _ args _        -> args
+    VizExpr.UBoolVar{}            -> []
+    VizExpr.TrueE{}               -> []
+    VizExpr.FalseE{}              -> []
+    VizExpr.InertE{}              -> []
 
 mkVerDocId :: FilePath -> LSP.VersionedTextDocumentIdentifier
 mkVerDocId fileName =
@@ -214,6 +305,10 @@ mkVerDocId fileName =
 
 data QueryPlanResponse = QueryPlanResponse
   { determined :: !(Maybe Bool)
+  -- ^ The FUNCTION's truth value. Correct, and NOT a verdict — see 'verdict'.
+  , verdict :: !QP.Verdict
+  -- ^ What may be shown to a user. Clients should switch on THIS: for a rule stated as
+  -- a seam, @Complies@ and @NotApplicable@ are both @determined = true@ (DESIGN §25.3).
   , stillNeeded :: ![QueryAtom]
   , ranked :: ![QueryAtom]
   , inputs :: ![QueryInput]
@@ -256,7 +351,7 @@ queryPlan name cached args =
             Just v -> flattenBoolBindings k v
         | (k, mv) <- Map.toList args.fnArguments
         ]
-    QP.QueryPlanResponse{determined, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note} =
+    QP.QueryPlanResponse{determined, verdict, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note} =
       QP.queryPlan name paramsByUnique cached.core flattenedLabelBindings
 
     asksEnriched =
@@ -274,6 +369,7 @@ queryPlan name cached args =
    in
     QueryPlanResponse
       { determined
+      , verdict
       , stillNeeded
       , ranked
       , inputs

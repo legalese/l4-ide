@@ -83,8 +83,8 @@ directive-showcase.l4:127:1-30:
   │├ age OF p
   ││┌ age
   ││└ <function>
-  │├ CONSIDER Person WHEN Person name
-  ││                              age THEN age
+  │├ CONSIDER Person
+  ││   WHEN Person name age THEN age
   │├ age
   │└ 30
   └ TRUE
@@ -100,8 +100,8 @@ directive-showcase.l4:128:1-35:
   ││├ age OF p
   │││┌ age
   │││└ <function>
-  ││├ CONSIDER Person WHEN Person name
-  │││                              age THEN age
+  ││├ CONSIDER Person
+  │││   WHEN Person name age THEN age
   ││├ age
   ││└ 17
   │└ FALSE
@@ -111,8 +111,8 @@ directive-showcase.l4:128:1-35:
   ││├ age OF p
   │││┌ age
   │││└ <function>
-  ││├ CONSIDER Person WHEN Person name
-  │││                              age THEN age
+  ││├ CONSIDER Person
+  │││   WHEN Person name age THEN age
   ││├ age
   ││└ 17
   │└ FALSE

@@ -40,7 +40,7 @@
 <title>0&#45;&gt;2</title>
 <path fill="none" stroke="#dc3545" stroke-dasharray="5,2" d="M56,-208.65C82.8,-195.69 129.41,-173.15 162.91,-156.95"/>
 <polygon fill="#dc3545" stroke="#dc3545" points="164,-160.3 171.48,-152.8 160.96,-154 164,-160.3"/>
-<text xml:space="preserve" text-anchor="middle" x="144.9" y="-174.44" font-family="Helvetica,sans-Serif" font-size="10.00">timeout</text>
+<text xml:space="preserve" text-anchor="middle" x="146.78" y="-174.44" font-family="Helvetica,sans-Serif" font-size="10.00">violation</text>
 </g>
 <!-- 2&#45;&gt;1 -->
 <g id="edge3" class="edge">

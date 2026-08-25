@@ -1,0 +1,1 @@
+list of record x is 1, if `EVER BETWEEN` with `DATE_FROM_DMY` with 1, 1 and 2020, `DATE_FROM_DMY` with 3, 1 and 2020 and `x is set on` then 100 else 200 and if `EVER BETWEEN` with `DATE_FROM_DMY` with 30, 1 and 2025, `DATE_FROM_DMY` with 1, 2 and 2025 and `x is set on` then 100 else 200

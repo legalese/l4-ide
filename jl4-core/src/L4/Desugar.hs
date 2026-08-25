@@ -8,6 +8,9 @@ module L4.Desugar (
   desugarComputedFields,
   detectComputedFieldCycles,
   extractComputedFieldNames,
+  -- * Type Synonyms
+  --
+  detectTypeSynonymCycles,
   ) where
 
 
@@ -47,7 +50,6 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   Times      ann e1 e2 -> Times     ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
   DividedBy  ann e1 e2 -> DividedBy ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
   Modulo     ann e1 e2 -> Modulo    ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
-  Exponent   ann e1 e2 -> Exponent  ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
   Cons       ann e1 e2 -> Cons      ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
   Leq        ann e1 e2 -> Leq       ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
   Geq        ann e1 e2 -> Geq       ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2)
@@ -71,6 +73,8 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   Fetch      ann e -> Fetch ann (carameliseExprWithContext InertCtxNone e)
   Env        ann e -> Env ann (carameliseExprWithContext InertCtxNone e)
   Post       ann e1 e2 e3 -> Post ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2) (carameliseExprWithContext InertCtxNone e3)
+  Record     ann mParty cell val isOfficial mHence -> Record ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (carameliseExprWithContext InertCtxNone cell) (carameliseExprWithContext InertCtxNone val) isOfficial (fmap (carameliseExprWithContext InertCtxNone) mHence)
+  ReadCell   ann mParty isOfficial mode cell -> ReadCell ann (fmap (carameliseExprWithContext InertCtxNone) mParty) isOfficial mode (carameliseExprWithContext InertCtxNone cell)
   Concat     ann es -> Concat ann (fmap (carameliseExprWithContext InertCtxNone) es)
   AsString   ann e -> AsString ann (carameliseExprWithContext InertCtxNone e)
   Breach     ann mParty mReason -> Breach ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (fmap (carameliseExprWithContext InertCtxNone) mReason)
@@ -232,14 +236,14 @@ desugarCFDeclare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon tns
     let
       -- Extract type parameters from the DECLARE's GIVEN (e.g., GIVEN a IS A TYPE)
       MkTypeSig _ (MkGivenSig _ typeParams) _ = tysig
-      storedFields = [tn | tn@(MkTypedName _ _ _ Nothing) <- tns]
+      storedFields = [tn | tn@(MkTypedName _ _ _ _mTypically Nothing) <- tns]
       syntheticDecides = mapMaybe (makeComputedDecide appForm typeParams tns) tns
       newDeclare = Declare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon storedFields))
     in newDeclare : map (uncurry Decide) syntheticDecides
 desugarCFDeclare dAnn decl = [Declare dAnn decl]
 
 isComputed :: TypedName n -> Bool
-isComputed (MkTypedName _ _ _ (Just _)) = True
+isComputed (MkTypedName _ _ _ _mTypically (Just _)) = True
 isComputed _ = False
 
 -- | Generate a synthetic Decide for a computed field.
@@ -257,7 +261,7 @@ isComputed _ = False
 -- duplicate names in scope (the selector and the LET local), which causes
 -- ambiguity errors with polymorphic operators like @=@.
 makeComputedDecide :: AppForm Name -> [OptionallyTypedName Name] -> [TypedName Name] -> TypedName Name -> Maybe (Anno, Decide Name)
-makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName fieldType (Just meansExpr)) =
+makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName fieldType _mTypically (Just meansExpr)) =
   let
     -- Extract record name and type args from the DECLARE's AppForm
     MkAppForm _ recordName typeArgs _ = appForm
@@ -268,7 +272,7 @@ makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName 
     -- Type signature: GIVEN <typeParams>, _self IS A <RecordType> GIVETH A <FieldType>
     -- Prepend type parameters from the DECLARE so parameterized types work.
     -- Use the field's annotation to preserve source range info.
-    selfParam = MkOptionallyTypedName emptyAnno selfName (Just recordType)
+    selfParam = MkOptionallyTypedName emptyAnno selfName (Just recordType) Nothing
     decideTypeSig = MkTypeSig fieldAnn
       (MkGivenSig emptyAnno (typeParams ++ [selfParam]))
       (Just (MkGivethSig emptyAnno fieldType))
@@ -277,7 +281,7 @@ makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName 
     -- Sibling field names (excluding the field being defined)
     siblingNames = Set.fromList
       [ rawName sibName
-      | MkTypedName _ sibName _ _ <- allFields
+      | MkTypedName _ sibName _ _ _ <- allFields
       , rawName sibName /= rawName fieldName
       ]
     -- Rewrite bare field references to _self's field projections
@@ -313,7 +317,6 @@ rewriteFieldRefs fields self = go fields
       Times ann e1 e2     -> Times ann (go flds e1) (go flds e2)
       DividedBy ann e1 e2 -> DividedBy ann (go flds e1) (go flds e2)
       Modulo ann e1 e2    -> Modulo ann (go flds e1) (go flds e2)
-      Exponent ann e1 e2  -> Exponent ann (go flds e1) (go flds e2)
       Cons ann e1 e2      -> Cons ann (go flds e1) (go flds e2)
       Leq ann e1 e2       -> Leq ann (go flds e1) (go flds e2)
       Geq ann e1 e2       -> Geq ann (go flds e1) (go flds e2)
@@ -352,6 +355,8 @@ rewriteFieldRefs fields self = go fields
       Fetch ann e         -> Fetch ann (go flds e)
       Env ann e           -> Env ann (go flds e)
       Post ann u h b      -> Post ann (go flds u) (go flds h) (go flds b)
+      Record ann mp c v off mh -> Record ann (fmap (go flds) mp) (go flds c) (go flds v) off (fmap (go flds) mh)
+      ReadCell ann mp off mode c -> ReadCell ann (fmap (go flds) mp) off mode (go flds c)
       Breach ann mp mr    -> Breach ann (fmap (go flds) mp) (fmap (go flds) mr)
       Event {}            -> expr  -- regulative events are complex; leave as-is
       Regulative {}       -> expr  -- regulative rules: leave as-is
@@ -416,11 +421,11 @@ detectCFCDeclare (MkDeclare _ _ appForm (RecordDecl _ _ tns))
     let
       MkAppForm _ recordName _ _ = appForm
       -- All field names in this record (for filtering references)
-      allFieldRawNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ <- tns]
+      allFieldRawNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ _ <- tns]
       -- Build SCC graph: (node=Name, key=RawName, deps=[RawName])
       graphData =
         [ (fn, rawName fn, Set.toList (exprFieldRefs allFieldRawNames e))
-        | MkTypedName _ fn _ (Just e) <- tns
+        | MkTypedName _ fn _ _mTypically (Just e) <- tns
         ]
     in [ (recordName, cyc) | CyclicSCC cyc <- stronglyConnComp graphData ]
 detectCFCDeclare _ = []
@@ -432,6 +437,69 @@ detectCFCDeclare _ = []
 exprFieldRefs :: Set RawName -> Expr Name -> Set RawName
 exprFieldRefs fieldNames expr =
   Set.fromList [rawName n | n <- toList expr, rawName n `Set.member` fieldNames]
+
+-- ----------------------------------------------------------------------------
+-- Cycle Detection for Type Synonyms
+-- ----------------------------------------------------------------------------
+
+-- | Detect cycles among the type synonym declarations of a module.
+-- Returns the members of each cyclic strongly-connected component.
+--
+-- A recursive synonym has no finite expansion, so it would otherwise send
+-- the type checker's synonym-expanding loops into infinite regress (those
+-- loops carry fuel as a backstop, since a cycle can also arrive via
+-- imports — see 'L4.TypeCheck.Unify').
+--
+-- Like 'detectComputedFieldCycles' this matches names textually, which
+-- over-approximates references (it is blind to arity and to whether a
+-- name would actually resolve to the sibling synonym); a synonym's own
+-- type parameters are excluded from its dependencies so that a parameter
+-- shadowing a sibling synonym's name cannot manufacture a spurious cycle.
+-- A synonym is referenceable through its AKA aliases as well as its
+-- primary name, so aliases participate on both sides of the graph.
+detectTypeSynonymCycles :: Module Name -> [[Name]]
+detectTypeSynonymCycles (MkModule _ _ section) =
+  let
+    synonyms = synonymsInSection section
+    -- alias or primary raw name -> primary raw name. Primary names must
+    -- win over aliases (left-biased union): an alias that collides with a
+    -- sibling synonym's primary name would otherwise capture that
+    -- sibling's references and manufacture a false, declaration-order-
+    -- dependent cycle. Name resolution disambiguates such collisions by
+    -- arity/kind, which this textual pass cannot see; when it cannot,
+    -- the program is ambiguous and rejected anyway, and the expansion
+    -- fuel in L4.TypeCheck.Unify remains the termination guarantee.
+    primaryName =
+      Map.fromList
+        [ (rawName n, rawName n) | (n, _, _, _) <- synonyms ]
+      `Map.union`
+      Map.fromList
+        [ (alias, rawName n) | (n, aliases, _, _) <- synonyms, alias <- aliases ]
+    graphData =
+      [ (n, rawName n, Set.toList deps)
+      | (n, _aliases, params, ty) <- synonyms
+      , let deps = Set.fromList
+              [ primary
+              | r <- toList ty
+              , not (rawName r `Set.member` params)
+              , Just primary <- [Map.lookup (rawName r) primaryName]
+              ]
+      ]
+  in
+    [ cyc | CyclicSCC cyc <- stronglyConnComp graphData ]
+
+-- | All type synonym declarations in a section (recursively):
+-- name, AKA aliases, type parameters, body.
+synonymsInSection :: Section Name -> [(Name, [RawName], Set RawName, Type' Name)]
+synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
+  where
+    go (Declare _ (MkDeclare _ _ (MkAppForm _ n args mAka) (SynonymDecl _ ty))) =
+      [(n, akaNames mAka, Set.fromList (rawName <$> args), ty)]
+    go (Section _ s) = synonymsInSection s
+    go _ = []
+
+    akaNames Nothing              = []
+    akaNames (Just (MkAka _ ns))  = rawName <$> ns
 
 -- ----------------------------------------------------------------------------
 -- Extract Computed Field Names
@@ -450,7 +518,7 @@ extractCFNSection (MkSection _ _ _ topDecls) =
 extractCFNTopDecl :: TopDecl Name -> Map.Map RawName (Set RawName)
 extractCFNTopDecl (Declare _ (MkDeclare _ _ (MkAppForm _ recName _ _) (RecordDecl _ _ tns)))
   | any isComputed tns =
-    let cfNames = Set.fromList [rawName fn | MkTypedName _ fn _ (Just _) <- tns]
+    let cfNames = Set.fromList [rawName fn | MkTypedName _ fn _ _mTypically (Just _) <- tns]
     in Map.singleton (rawName recName) cfNames
 extractCFNTopDecl (Section _ section) = extractCFNSection section
 extractCFNTopDecl _ = Map.empty

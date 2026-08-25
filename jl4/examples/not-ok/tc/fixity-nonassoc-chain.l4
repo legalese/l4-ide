@@ -1,0 +1,10 @@
+-- A non-associative operator (@infix) cannot be chained with itself:
+-- a NONAS b NONAS c requires explicit parentheses.
+
+@infix 4
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p NONAS q MEANS p - q
+
+#EVAL 1 NONAS 2 NONAS 3

@@ -4,6 +4,22 @@ version: 0.1
 build-type: Simple
 tested-with: GHC==9.10.2
 
+-- KEEP THIS ABOVE THE `flag` STANZAS, AND ABOVE EVERY OTHER SECTION.
+--
+-- Cabal ignores package-level fields that appear after the first section, so a
+-- stanza inserted above this line silently disables it. `cabal check` then says
+-- "Ignoring trailing fields after sections: data-files", the sdist ships no .l4
+-- files at all, and because `cabal install` builds from the sdist, every
+-- installed `l4` gets an EMPTY embedded stdlib and answers "Module not found:
+-- prelude". `cabal build` keeps working, because GHC's cwd for an inplace build
+-- is this directory and the TH splice's cwd fallback finds libraries/ anyway —
+-- which is why the two disagreed, and why nobody noticed for months.
+--
+-- That is not hypothetical: it is what happened between 61653b0e (which
+-- inserted `flag safe-mode` here) and this commit. See the CI step that runs
+-- `cabal check` and greps `cabal sdist --list-only`.
+data-files: libraries/*.l4
+
 flag safe-mode
   description: Disable FETCH/POST builtins (for WASM builds). When enabled, HTTP operations return errors.
   default: False
@@ -13,8 +29,6 @@ flag serialise-support
   description: Enable Serialise instances for AST types (for jl4-service CBOR caching). Disable for WASM builds where cborg doesn't compile.
   default: True
   manual: True
-
-data-files: libraries/*.l4
 
 common defaults
   default-language: GHC2021
@@ -55,7 +69,9 @@ library
     graphviz,
     logict,
     lsp-types,
-    megaparsec,
+    -- >=9.7: the lexer's ditto (^) column metric is display width, which the
+    -- Text stream instance only provides from 9.7.0 (Text.Megaparsec.Unicode).
+    megaparsec >=9.7,
     mtl,
     optics,
     optics-core,
@@ -100,6 +116,8 @@ library
     L4.DirectiveFilter
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
+    L4.Evaluate.ValueLazyJSON
+    L4.Evaluate.Ledger
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
@@ -128,6 +146,7 @@ library
     L4.Parser.SrcSpan
     L4.ParserCombinators
     L4.Print
+    L4.Print.Columnar
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
@@ -144,6 +163,7 @@ library
     L4.Utils.Ratio
     L4.Crypto.SHA1
     L4.Crypto.UUID5
+    L4.Viz.GuardedRows
     L4.Viz.Ladder
     L4.Viz.VizExpr
     L4.Import.Resolution
@@ -162,17 +182,40 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
+    PatternMatchParserSpec
+    EventExactPrintSpec
+    FormatFidelitySpec
+    BulletParserSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    EdgeCrashSpec
+    TracePostprocessSpec
+    LedgerSubstrateSpec
+    LedgerThunkCacheSpec
+    RecordLedgerSpec
+    LedgerRenderingSpec
+    M4PartyLedgerSpec
+    M45ReadSpec
+    M5DeonticSequencingSpec
+    BitemporalSubstrateSpec
+    BitemporalRecallSpec
+    TraceOrderingSpec
+    DirectiveAmbiguitySpec
+    RefAnnotationSpec
+    PrintRoundtripSpec
+    StateGraphSpec
+    ResolutionCascadeSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,

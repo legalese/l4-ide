@@ -1,4 +1,5 @@
 import type { FunDecl, IRExpr, IRId } from '@repo/viz-expr'
+import { expandImplies } from '@repo/viz-expr'
 /*
 Do not use $lib for the layout-ir imports
 */
@@ -60,8 +61,17 @@ export const LadderGraphLirSource: LadderLirSource<IRExpr, LadderGraphLirNode> =
     async toLir(
       nodeInfo: LirNodeInfo,
       env: LadderEnv,
-      expr: IRExpr
+      rawExpr: IRExpr
     ): Promise<LadderGraphLirNode> {
+      // 0. The wire IR now carries a real `Implies` SEAM (ladder DESIGN §25). This
+      // LIR has no node for it — it predates the seam — so read it classically here.
+      // That reproduces exactly the picture this visualizer drew before the seam
+      // existed (`NOT scope OR requirement`), so nothing regresses; but the loss is
+      // real, and documented on `expandImplies`: downstream of this line a rule that
+      // never reached the case is indistinguishable from one the case satisfies.
+      // Drawing that difference is what ladder-core's two sinks are for.
+      const expr = expandImplies(rawExpr)
+
       // 1. Get structure of the graph
       const overallSource = vertex(new SourceNoAnnoLirNode(nodeInfo).getId())
       const overallSink = vertex(new SinkLirNode(nodeInfo).getId())
@@ -163,6 +173,15 @@ function transform(
         vizExprToLirGraph,
         noIntermediateBundlingNodeGraph: graph,
       }
+    })
+    .with({ $type: 'Implies' }, () => {
+      // Unreachable: `LadderGraphLirSource.toLir` runs `expandImplies` over the whole
+      // tree before any of this, so no `Implies` can survive to here. Kept as a loud
+      // failure rather than a silent one — if a second entry point into `transform`
+      // ever appears without that rewrite, this says so instead of drawing a lie.
+      throw new Error(
+        'viz-expr-to-lir: an Implies reached transform(); expandImplies must run first (ladder DESIGN §25a)'
+      )
     })
     .with({ $type: 'Not' }, (neg) => {
       const {
