@@ -15,6 +15,9 @@ fi
 
 GO_LIB="$GO_ROOT/etc/go/lib"
 
+# One clock for the driver and the phases alike; see lib/clock.sh.
+source "$GO_LIB/clock.sh"
+
 # Exit codes, matching etc/check-bpmn-kie.sh's 0/1/2/3/4 and extending it.
 readonly GO_EXIT_CLEAN=0
 readonly GO_EXIT_FINDING=1
@@ -49,10 +52,35 @@ go_probe() {
 
 # go_receipt --status S [--reason …] [--artifact P]… — the ONLY way to record.
 go_receipt() {
+  # R4's read-set rides beside the digest it proves. Guarded on the file
+  # existing rather than passed unconditionally: a stage that declares no
+  # inputs has neither a digest nor a read-set, and receipt.mjs REFUSES a
+  # --read-set naming a file that is not there — correctly, because a read-set
+  # that cannot be read is not an empty read-set.
+  local rs=()
+  [[ -n "${GO_READ_SET:-}" && -f "${GO_READ_SET}" ]] && rs=(--read-set "$GO_READ_SET")
+  # WHAT THIS STAGE COST, closed here because here is the last moment it can be.
+  #
+  # go.sh starts the clock immediately before `bash "$script"` and cannot stop
+  # it: by the time the driver regains control the receipt is already written
+  # and a hash-chained row cannot be amended. So the phase script closes the
+  # interval — which is also the honest boundary, because everything after this
+  # point is receipt.mjs, not the stage.
+  #
+  # `dispatch_ms` is NOT measured here. It is the driver's own time, computed by
+  # the driver and passed through untouched, so a phase script that never sees
+  # its start cannot get it wrong.
+  local t=()
+  local _el
+  _el="$(go_since_ms "${GO_STAGE_EXEC_T0:-}")"
+  [[ -n "$_el" ]] && t+=(--elapsed-ms "$_el")
+  [[ -n "${GO_DISPATCH_MS:-}" ]] && t+=(--dispatch-ms "$GO_DISPATCH_MS")
   node "$GO_LIB/receipt.mjs" stage-end \
     --run "$GO_RUN" \
     --stage "$GO_STAGE" \
     --inputs-digest "${GO_INPUTS_DIGEST:-}" \
+    "${rs[@]}" \
+    "${t[@]}" \
     "$@"
 }
 

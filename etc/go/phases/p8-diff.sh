@@ -2,7 +2,7 @@
 # P8-diff — SPEC.md §8's acceptance comparator, as a stage (D4, 2026-08-09).
 #
 # Runs etc/go/lib/denovo-diff.mjs over the subject's declared surface map
-# (subject.json denovo.surface_map). THIS IS THE ONE STAGE LICENSED TO READ
+# (subject.json comparison.surface_map). THIS IS THE ONE STAGE LICENSED TO READ
 # BOTH the committed corpus and the de novo deposit: the map's sides.left /
 # sides.right name the two modules, and §8's whole question is what they
 # answer differently over a shared fact battery. Every other g2 stage must
@@ -37,11 +37,11 @@
 # its schema, and this script. When the map is unreadable the two module rows
 # are simply absent, and the map's own digest carries the change.
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' ${GO_S_DENOVO_SURFACE_MAP:+"$GO_S_DENOVO_SURFACE_MAP"} \
+  printf '%s\n' ${GO_S_COMPARISON_SURFACE_MAP:+"$GO_S_COMPARISON_SURFACE_MAP"} \
     "${BASH_SOURCE[0]}" \
     "$GO_ROOT/etc/go/lib/denovo-diff.mjs" \
     "$GO_ROOT/specs/todo/single-instruction-demo/schemas/surface-map.schema.json"
-  if [[ -n "${GO_S_DENOVO_SURFACE_MAP:-}" && -f "${GO_S_DENOVO_SURFACE_MAP:-}" ]]; then
+  if [[ -n "${GO_S_COMPARISON_SURFACE_MAP:-}" && -f "${GO_S_COMPARISON_SURFACE_MAP:-}" ]]; then
     node -e '
       try {
         const m = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
@@ -51,19 +51,19 @@ if [[ "${1:-}" == "--inputs" ]]; then
           if (typeof p === "string" && p) process.stdout.write(resolve(process.argv[2], p) + "\n");
         }
       } catch { /* unreadable map: its own digest carries the change */ }
-    ' "$GO_S_DENOVO_SURFACE_MAP" "$GO_ROOT" || true
+    ' "$GO_S_COMPARISON_SURFACE_MAP" "$GO_ROOT" || true
   fi
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-MAP="${GO_S_DENOVO_SURFACE_MAP:-}"
+MAP="${GO_S_COMPARISON_SURFACE_MAP:-}"
 if [[ -z "$MAP" ]]; then
-  go_skip "the '$GO_S_ID' sidecar declares no denovo.surface_map, so the §8 comparator has no pairing declaration to run over. Add it to $GO_S_DIR/subject.json; writing the map (which decisions correspond, over which shared fact slots) is agent work owned by the skill's G2 section and DENOVO-DIFF-ORACLE.md."
+  go_skip "the '$GO_S_ID' sidecar declares no comparison.surface_map, so the §8 comparator has no pairing declaration to run over. Add it to $GO_S_DIR/subject.json; writing the map (which decisions correspond, over which shared fact slots) is agent work owned by the deposit runbook in .claude/skills/running-the-l4-pipeline/SKILL.md and by DENOVO-DIFF-ORACLE.md."
 fi
 if [[ ! -f "$MAP" ]]; then
-  go_skip "the declared denovo.surface_map has not been deposited yet: $MAP is not a file. Producing it is agent work; deposit it and re-run this stage."
+  go_skip "the declared comparison.surface_map has not been deposited yet: $MAP is not a file. Producing it is agent work; deposit it and re-run this stage."
 fi
 
 OUTDIR="$GO_OUT/p8-diff"

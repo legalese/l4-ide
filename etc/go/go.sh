@@ -6,38 +6,56 @@
 # .claude/skills/running-the-l4-pipeline/. This script never calls a model, and
 # the skill never writes a status.
 #
-# Scope today: MILESTONE G1 — the replay run. It drives the EXISTING corpus
-# through every currently-reachable projection and emits conversion report v0.
-# No de novo encoding.
+# A RUN IS ABOUT ONE SUBJECT AND ONE ENCODING OF IT, and `--encoding` is what
+# selects it. There is no capability label: G0-G4 describe what this tooling can
+# do in the order it was built, which is a fact about this repository and not
+# about any body of law (PIPELINE-ARTIFACT-MODEL-SPEC.md §3.9).
 #
-# MILESTONE G2 — the de novo run — validates AND measures the agent's deposit.
-# P1-P4 do not fetch, search, encode or find forks (those need the network or a
-# model; this driver takes neither); p3-check, p6-tests, p8-verify and p7-dmn
-# (emit-only) measure the deposited module set, and p8-diff runs SPEC.md §6's
-# G2 acceptance — the §8 diff oracle — over the declared surface map. Every
-# stage reports SKIPPED, on the record, when its deposit is not there; so
-# `g2 COMPLETE` means every stage is accounted for — NOT that a de novo run
-# happened. See `go.sh plan --milestone g2`.
+# --encoding primary (the default) — the run drives the COMMITTED encoding
+# through every currently-reachable projection and emits conversion report v0.
+# Nothing is encoded from source.
+#
+# --encoding <id> — the run is about an ADDITIONAL encoding, and VALIDATES what
+# an agent deposited rather than producing it. P1-P4 do not fetch, search,
+# encode or find forks (those need the network or a model; this driver takes
+# neither); p3-check, p6-tests, p8-verify and p7-dmn (emit-only) measure the
+# deposited module set, and p8-diff runs SPEC.md §8's diff oracle over the
+# declared surface map. Every stage reports SKIPPED, on the record, when its
+# deposit is not there — so COMPLETE means every stage is accounted for, NOT
+# that a de novo run happened. See `go.sh plan --subject ID --encoding <id>`.
+#
+# --encoding undeclared — the same stage set over a subject that declares no
+# additional encoding at all: a forecast of what would have to be deposited.
 #
 # This script NEVER runs cabal, never commits, and never pushes.
 #
 #   Usage:  etc/go/go.sh <command> [options]
 #
-#     run     --milestone g1|g2 --subject ID [--run-id ID] [--through STAGE]
-#             [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
+#     run     --subject ID [--encoding primary|ID|undeclared] [--run-id ID]
+#             [--through STAGE] [--only STAGE] [--waive HG1=REASON]
+#             [--fixed-now ISO8601]
 #
 #             HG1 is the only waivable gate. HG2 guards anything outward-facing
 #             and opens on a signature or not at all; --waive HG2 exits 2.
-#     doctor  [--milestone g1|g2] [--subject ID]
+#     doctor  [--subject ID] [--encoding primary|ID|undeclared]
 #             the front-door forecast: which declared stages will run whole,
 #             which will SKIP and why, each with its remedy. Runs no stage.
 #             Exit: 0 wants met · 1 will not run whole · 2 no usable l4.
-#     plan    [--milestone g1|g2] [--subject ID]
+#     plan    [--subject ID] [--encoding primary|ID|undeclared]
 #     status  [--run-id ID] [--subject ID]
 #     verify  [--run-id ID] [--subject ID] [--gates]
+#     readset [--run-id ID] [--subject ID] [--stage S] [--json]
+#             R4: what a run READ, itemised, with each member's role and
+#             whether a newer version of it exists. Freshness is Make's — a
+#             newer prerequisite — and is derived, never stored.
+#             Exit: 0 all current · 1 something is stale.
+#     subject-report --subject ID [--json]
+#             R13: the account of a SUBJECT across every run whose evidence
+#             survives, not of one run. Each phase resolves to CURRENT, STALE
+#             or NEVER RUN. Exit: 0 none stale · 1 something is stale.
 #     gc      [--keep N]
 #     new-subject ID --citation TEXT --source-url URL [--display-name TEXT]
-#             [--encoding PATH] [--force]
+#             [--encoding-main PATH] [--force]
 #             Scaffold etc/go/subjects/ID/ so `plan --subject ID` works at
 #             once. The sidecar declares encoding.state "unwritten": the
 #             encoding does not exist yet, every stage that reads a module
@@ -80,6 +98,8 @@ LIB="$GO_ROOT/etc/go/lib"
 # dist-newstyle when unset. Sourced here, invoked only by `run` and `doctor` —
 # `plan` and `help` must keep working with no binary anywhere (CI asserts it).
 source "$LIB/toolchain.sh"
+# One clock for the driver and the phases alike; see lib/clock.sh.
+source "$LIB/clock.sh"
 
 # --- the stage table --------------------------------------------------------
 # G1's declared stages, in order. p0-preflight, p3-check, p6-tests and
@@ -87,9 +107,9 @@ source "$LIB/toolchain.sh"
 # sidecar (etc/go/subjects/<id>/subject.json) has an entry for it in `legs`.
 # That is what keeps COMPLETE honest for a subject that has, say, no wizard
 # and no regulative rules: its sidecar omits those legs, so their absence
-# cannot make the milestone INCOMPLETE and their presence is never faked.
+# cannot make a run INCOMPLETE and their presence is never faked.
 # `p9-report` is last: the report reads the journal, so it must run after
-# everything that writes to it. G1_STAGES is assembled after subject
+# everything that writes to it. PRIMARY_STAGES is assembled after subject
 # resolution below.
 P7_LEG_ORDER=(
   p7-dmn
@@ -104,12 +124,12 @@ P7_LEG_ORDER=(
 )
 
 # Stages that exist as entry points and cannot run. Each refuses with exit 3 and
-# names its blocker. They are NOT declared members of any milestone, so they
-# cannot make a milestone INCOMPLETE by their absence.
+# names its blocker. They are NOT declared members of any stage set, so they
+# cannot make a run INCOMPLETE by their absence.
 #
 # p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they are
 # now real stages that validate a deposit, and they are g2's declared members.
-# p8-verify left it 2026-08-09 (D3): declared at both milestones below.
+# p8-verify left it 2026-08-09 (D3): declared in both stage sets below.
 UNIMPLEMENTED_STAGES=(p10-publish)
 
 # G2's declared stages, in order (2026-08-09, D5). The five deposit-validating
@@ -122,28 +142,37 @@ UNIMPLEMENTED_STAGES=(p10-publish)
 # ELSE IF, @ref per dated arm, the per-origin floors) against the same
 # deposit. They are one phase's two halves and their receipts say so.
 # p6-tests runs the deposit's own #ASSERT directives; p7-dmn runs EMIT-ONLY
-# (no goldens exist for a deposit — see the leg's g2 branch); p8-verify runs
+# (no goldens exist for a deposit — see the leg's golden-absent branch); p8-verify runs
 # `l4 verify`; p8-diff is the ONE stage licensed to read both the committed
 # corpus and the deposit, because SPEC.md §8's acceptance is precisely the
 # comparison of the two over the declared surface map.
 #
-# STILL NOT HERE: p0-preflight — so a g2 run carries no CLI-surface pin and no
+# STILL NOT HERE: p0-preflight — so a deposit run carries no CLI-surface pin and no
 # failing-#ASSERT tripwire, while p6-tests' oracle rests on the workaround
-# that tripwire defends (§5.3); a p0 for g2 is future work. The p7 legs other
+# that tripwire defends (§5.3); a p0 for the deposit path is future work. The p7 legs other
 # than p7-dmn read committed goldens/entries the deposit does not have; the
 # plan names each one's missing piece. p9-report reads journal.ndjson and
-# nothing else, so it is correct for any milestone.
-G2_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-report)
+# nothing else, so it is correct for either stage set.
+DEPOSIT_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests p7-dmn p8-verify p8-diff p9-cost p9-report)
 
 # SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
-# anything outward-facing, which at G1 means the MCP deployment leg and P10.
-# gated_by_HG1 is assembled after subject resolution: P6 onward means p6-tests,
+# anything outward-facing, which on the primary path means the MCP deployment
+# leg and P10. gated_by_HG1 is DERIVED after subject resolution: P6 onward means p6-tests,
 # every declared p7 leg, and p9-report.
 gated_by_HG1=""
 gated_by_HG2="p10-publish"
 
 usage() {
-  sed -n '2,60p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # DERIVED, not a hardcoded last line. `sed -n '2,60p'` truncated the block the
+  # moment the header grew past 60 lines — R9's rewrite pushed it to 89, so
+  # `help` stopped printing its last five commands INCLUDING `help` itself, and
+  # ended mid-sentence. Nothing caught it: check-skill-drift skips `help` by
+  # construction, and a truncated usage still exits 0.
+  #
+  # The header is every comment line from line 2 up to the first line that is
+  # not a comment, so the block defines its own end and the next edit cannot
+  # re-break this.
+  awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
 }
 
 die_usage() {
@@ -152,11 +181,27 @@ die_usage() {
   exit 2
 }
 
+# A VALUE-TAKING FLAG MUST BE FOLLOWED BY A VALUE, and saying so is this
+# driver's job rather than the shell's.
+#
+# Every such arm reads `$2` and shifts twice. With a flag last on the line there
+# is no `$2`, and under `set -euo pipefail` bash aborts with
+# `go.sh: line 246: $2: unbound variable` and exit 1 — an interpreter stack
+# trace where a usage message belongs, naming a line number instead of the flag
+# the caller typed. The exit code is wrong too: 2 is this driver's usage exit
+# and 1 means a real finding about the corpus, so a script that distinguishes
+# them reads a typo as a result.
+#
+# Called as `need_val "$@"` from inside the arm, where `$1` is still the flag
+# and `$2` its value.
+need_val() {
+  [[ $# -ge 2 ]] || die_usage "$1 needs a value"
+}
+
 # --- argument parsing -------------------------------------------------------
 CMD="${1:-help}"
 shift || true
 
-MILESTONE="g1"
 SUBJECT=""
 RUN_ID=""
 THROUGH=""
@@ -171,6 +216,15 @@ NEW_SOURCE_URL=""
 NEW_ENCODING=""
 NEW_FORCE=0
 declare -a STORE_ARGS=()
+STAGE_ONLY=""
+WANT_JSON=0
+ENCODING_ID=""
+# Whether --encoding was PASSED, which "" cannot tell you: the initializer above
+# and an explicitly empty value are the same string. Only the flag distinguishes
+# "no selection given, use the default" from "a selection was attempted and named
+# nothing", and R9 made that difference matter — --encoding is now the sole
+# selector of what a run is about.
+ENCODING_SEEN=0
 
 # `store` owns its own flag vocabulary (--keep-days, --dry-run, --allow-waived,
 # --subject, --stage), so the driver hands it every argument verbatim rather
@@ -183,35 +237,53 @@ fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --milestone)
-      MILESTONE="$2"
-      shift 2
-      ;;
     --subject)
+      need_val "$@"
       SUBJECT="$2"
       shift 2
       ;;
     --run-id)
+      need_val "$@"
       RUN_ID="$2"
       shift 2
       ;;
     --through)
+      need_val "$@"
       THROUGH="$2"
       shift 2
       ;;
     --only)
+      need_val "$@"
       ONLY="$2"
       shift 2
       ;;
     --waive)
+      need_val "$@"
       WAIVERS+=("$2")
       shift 2
       ;;
     --fixed-now)
+      need_val "$@"
       L4_GO_FIXED_NOW="$2"
       shift 2
       ;;
+    --encoding)
+      need_val "$@"
+      ENCODING_ID="$2"
+      ENCODING_SEEN=1
+      shift 2
+      ;;
+    --stage)
+      need_val "$@"
+      STAGE_ONLY="$2"
+      shift 2
+      ;;
+    --json)
+      WANT_JSON=1
+      shift
+      ;;
     --keep)
+      need_val "$@"
       KEEP="$2"
       shift 2
       ;;
@@ -220,18 +292,31 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --display-name)
+      need_val "$@"
       NEW_DISPLAY_NAME="$2"
       shift 2
       ;;
     --citation)
+      need_val "$@"
       NEW_CITATION="$2"
       shift 2
       ;;
     --source-url)
+      need_val "$@"
       NEW_SOURCE_URL="$2"
       shift 2
       ;;
-    --encoding)
+    # RENAMED FROM `--encoding`, which R2/R3 gave a second, unrelated meaning.
+    #
+    # This names where a NEW subject's entry module will live — it becomes
+    # `encoding.main` in the scaffolded sidecar. `--encoding` now selects which
+    # encoding a RUN is about, and its arm sits earlier in this same `case`, so
+    # this one had become unreachable: `new-subject … --encoding path/x.l4`
+    # exited 0, said nothing, and wrote the default path. A documented input
+    # silently discarded, which `bash -n` cannot see because a duplicate `case`
+    # label is legal shell. selftest.mjs now checks for one directly.
+    --encoding-main)
+      need_val "$@"
       NEW_ENCODING="$2"
       shift 2
       ;;
@@ -248,6 +333,27 @@ while [[ $# -gt 0 ]]; do
     # which resolves an EXISTING sidecar — the thing this command's argument
     # by definition is not.
     *)
+      # `--milestone` was RETIRED, and it refuses rather than being quietly
+      # unknown: a reader who types it has a mental model to correct, and the
+      # message is the only place left in the system that can correct it.
+      #
+      # DELIBERATELY NOT A `case` ARM. check-skill-drift.mjs decides a flag
+      # exists by testing whether go.sh contains the literal `--milestone)`, so
+      # a real arm would make the drift guard green over any stale `--milestone`
+      # command line left in SKILL.md — which is exactly the sweep this ruling
+      # depends on. Matching it here keeps `flagExists("--milestone")` false, so
+      # a surviving mention fails CI.
+      if [[ "$1" == --milestone || "$1" == --milestone=* ]]; then
+        echo "go.sh: --milestone was retired by PIPELINE-ARTIFACT-MODEL-SPEC.md §3.9 — G0-G4 are" >&2
+        echo "       CAPABILITY milestones (what this tooling can do, in the order it was built)," >&2
+        echo "       not phases a body of law passes through. A run is about one subject and one" >&2
+        echo "       ENCODING of it, and that is what selects it now:" >&2
+        echo "         --milestone g1  ->  --encoding primary      (the default; drop the flag)" >&2
+        echo "         --milestone g2  ->  --encoding <id>, or --encoding undeclared when the" >&2
+        echo "                             subject declares none. List the ids with:" >&2
+        echo "                               node etc/go/lib/subject.mjs <subject> --encodings" >&2
+        exit 2
+      fi
       if [[ "$CMD" == "new-subject" && -z "$NEW_ID" && "$1" != -* ]]; then
         NEW_ID="$1"
         shift
@@ -260,6 +366,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# `new-subject` takes no run selection, so `--encoding` there is either the old
+# spelling of `--encoding-main` or a misunderstanding of what the command does.
+# Accepting it silently is how the rename would keep the very defect it repairs:
+# the flag would parse, set a variable `new-subject` never reads, and exit 0
+# having written the default path — which is exactly what the collision did.
+if [[ "$CMD" == "new-subject" && $ENCODING_SEEN -eq 1 ]]; then
+  die_usage "new-subject takes no --encoding: it registers a subject rather than selecting a run over one. To say where the entry module will live, use --encoding-main PATH"
+fi
 
 RUNDIR_BASE="${L4_GO_RUNDIR:-${TMPDIR:-/tmp}/l4-go}"
 FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
@@ -281,7 +396,13 @@ FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
 # second one here would shadow it and the checker would report every real
 # command as undispatched. One dispatch table per driver is also just true.
 _NEEDS_SUBJECT=0
-[[ " run plan doctor " == *" $CMD "* ]] && _NEEDS_SUBJECT=1
+# `subject-report` is here because it needs PRIMARY_STAGES and DEPOSIT_STAGES — the
+# DECLARABLE universe — and those are assembled inside the subject-dependent
+# region below. Without it the universe held only the deposit list, so every
+# g1-only phase reached the report solely via a surviving journal's
+# declared_stages, and would vanish entirely once those journals expired:
+# exactly the silence R13 exists to break.
+[[ " run plan doctor subject-report " == *" $CMD "* ]] && _NEEDS_SUBJECT=1
 
 # With no --subject, the sole sidecar under etc/go/subjects/ is the default;
 # once a second subject exists, naming one becomes mandatory — a silent
@@ -301,7 +422,61 @@ fi
 # an unknown subject exits 2 listing the available sidecars and the recipe for
 # adding one. The eval is safe because subject.mjs single-quotes every value.
 if [[ -n "$SUBJECT" ]]; then
-  SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT")" || exit 2
+  # WHICH ENCODING THIS RUN IS ABOUT — the only thing a run is selected by.
+  #
+  # `--encoding` takes exactly the three values GO_S_ENCODING_ID can hold, so
+  # the input vocabulary and the output vocabulary are the same words:
+  #
+  #   primary      the committed encoding. The default; the flag may be omitted.
+  #   <id>         that additional encoding, NAMED. subject.mjs refuses an id
+  #                the subject does not declare, and lists the ones it does.
+  #   undeclared   the deposit path over a subject that declares NO additional
+  #                encoding — a forecast of what would have to be deposited.
+  #
+  # NOTHING RESOLVES AN ORDINAL. `--milestone g2` used to mean "the additional
+  # encoding", picked by counting, and that is a POSITION rather than a name: it
+  # changes meaning silently as a subject's declarations grow and breaks loudly
+  # the day a second one is declared. `regcf` is one edit from that. §3.2 is the
+  # ruling; R9 is where the driver stops disagreeing with it.
+  # AN UNPASSED FLAG MEANS "the default"; a PASSED-BUT-EMPTY one means the caller
+  # tried to name something and named nothing. R9 made `--encoding` the sole
+  # selector of what a run is about, so silently coercing an empty selector to
+  # `primary` would quietly run a different thing than the caller asked for.
+  # `${ENCODING_ID:-primary}` alone cannot tell the two apart, because the
+  # initializer is itself the empty string — hence ENCODING_SEEN.
+  if [[ $ENCODING_SEEN -eq 1 && -z "$ENCODING_ID" ]]; then
+    die_usage "--encoding needs a value: primary, a declared encoding id, or undeclared"
+  fi
+  _ENC="${ENCODING_ID:-primary}"
+  _NO_ADDITIONAL_ENCODING=0
+  _ENC_UNDECLARED=0
+  if [[ "$_ENC" == "undeclared" ]]; then
+    mapfile -t _DECLARED < <(node "$LIB/subject.mjs" "$SUBJECT" --encodings 2>/dev/null || true)
+    if [[ ${#_DECLARED[@]} -gt 0 && -n "${_DECLARED[0]}" ]]; then
+      # `undeclared` is a CLAIM ABOUT THE SUBJECT, and here it is false. Running
+      # anyway would measure nothing and report it green.
+      echo "go.sh: --encoding undeclared says '$SUBJECT' declares no additional encoding," >&2
+      echo "       but it declares ${#_DECLARED[@]}. Name one:" >&2
+      printf '         %s\n' "${_DECLARED[@]}" >&2
+      echo "       ...or --encoding primary for the committed encoding." >&2
+      exit 2
+    fi
+    # NOT an error. A subject that has not yet declared an additional encoding is
+    # exactly the subject a deposit PLAN is most useful for: it forecasts what
+    # would have to be deposited. The module set is empty — there is no
+    # additional encoding to iterate — and the deposit stages report SKIPPED
+    # naming what is missing, which is what R12's "unwritten" case depends on.
+    _ENC=""
+    _NO_ADDITIONAL_ENCODING=1
+    # The run is about an additional encoding that DOES NOT EXIST YET, and the
+    # stages must say so. Leaving GO_S_ENCODING_ID at "primary" made every skip
+    # reason tell the reader to add modules to the COMMITTED encoding — advice
+    # that is wrong in the only case that ever fires.
+    _ENC_UNDECLARED=1
+  fi
+  _ENC_ARGS=()
+  [[ -n "$_ENC" && "$_ENC" != "primary" ]] && _ENC_ARGS=(--encoding "$_ENC")
+  SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT" "${_ENC_ARGS[@]}")" || exit 2
   eval "$SUBJECT_ENV"
   export "${!GO_S_@}"
 fi
@@ -315,123 +490,184 @@ fi
 # requirement alone, is what makes those four commands genuinely
 # subject-independent.
 if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
-  # The subject's corpus file set: EVERY module the sidecar declares, resolved by
-  # subject.mjs into one space-separated list (corpus.modules, defaulting to
-  # corpus.main plus the wizard module when no set is declared). Used for the
-  # corpus digest that gates bind to — which is why it has to be the whole
-  # encoding and not just the entry module: a digest over one module of four
-  # would leave a granted HG1 open across an edit to the other three, and a gate
-  # that does not re-open over the thing it gates is not a gate over that thing
-  # (the same lesson the narrative deposit taught below, at a different scale).
-  # Split the same way the g2 branch splits GO_S_DENOVO_MODULES.
-  declare -a GO_ENCODING_FILES=()
-  read -ra _CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING}"
-  GO_ENCODING_FILES+=("${_CORPUS_MODULES[@]}")
-
-  # At g2 the gate binds to the DE NOVO deposits instead, because that is what HG1
-  # is being asked about. A waiver granted over the committed corpus says nothing
-  # about an encoding that did not exist when it was granted — and since digestSet
-  # records a missing file as ABSENT rather than skipping it, DEPOSITING a bundle
-  # or a module changes the digest and re-opens the gate, which is the behaviour
-  # §6.3 claims for a post-gate edit.
-  if [[ "$MILESTONE" == "g2" ]]; then
-    GO_ENCODING_FILES=()
-    # The surface map is in the set for the same reason the narrative deposit is
-    # in g1's: HG1 covers the pairing declaration too, and a map edited after a
-    # waiver would otherwise ride the old grant into p8-diff.
-    for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
-      [[ -n "$_p" ]] && GO_ENCODING_FILES+=("$_p")
-    done
-    if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
-      read -ra _mods <<<"$GO_S_DENOVO_MODULES"
-      GO_ENCODING_FILES+=("${_mods[@]}")
-    fi
-    # A subject with no `denovo` section at all still needs a digest to bind a
-    # gate to; `text:` entries are literal digest contributors (digestSet).
-    [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
-  else
-    # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
-    #
-    # `p9-explain` is HG1-gated because it publishes narrative prose about a body
-    # of law. But the gate binds to this digest, and this digest used to cover the
-    # L4 modules alone — MEASURED: editing `explainer/orientation.md`, re-running
-    # `--only p9-explain` with no new grant, and watching the gate stay open while
-    # the replaced prose went straight into the rendered document. The drift
-    # detector fired (an inline `UNRECORDED EDIT` banner, a `narrative-drift`
-    # finding), and `--bless` cleared all of it in one command with nothing left
-    # to compare. A gate that does not re-open over the thing it gates is not a
-    # gate over that thing.
-    #
-    # Folding the deposit in here also closes the `--bless` hole for free:
-    # blessing rewrites `provenance.json`, which is in this set, so the digest
-    # moves and HG1 shuts.
-    if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]]; then
-      for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
-        [[ -e "$_f" ]] && GO_ENCODING_FILES+=("$_f")
-      done
-    fi
-  fi
-
-  # --- the milestone-scoped module set (ONE list per run) ----------------------
-  # p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
-  # g1 the committed corpus (corpus.modules — every module of the encoding, which
-  # defaults to corpus.main plus the optional corpus.wizard when the sidecar
-  # declares no set), at g2 the subject's declared de novo deposit
-  # (denovo.modules — possibly empty, which those stages report as SKIPPED under
-  # the deposit contract). GO_MODULES_ORIGIN
-  # says which, so a stage selects the matching per-origin floor and never reads
-  # a corpus floor over a deposit, or a deposit floor over the corpus.
+  # --- 1. the module set this run's stages iterate ----------------------------
+  #
+  # THE SELECTED ENCODING IS THE MODULE SET. There is no "origin" sentinel and
+  # no capability label: subject.mjs resolves the SELECTED encoding into the
+  # ordinary GO_S_ENCODING_MODULES and GO_S_MIN_* names, so a stage reads the
+  # encoding it was handed and no stage branches on which one it is. That is
+  # what let p3-check, p6-tests and p7-dmn DELETE their per-origin arms (R2/R3)
+  # rather than rename them.
+  #
+  # Floors travel with their encoding structurally: `encodings.<id>.checks` sits
+  # inside the encoding it measures, so a committed floor cannot be applied to a
+  # deposit and a deposit floor cannot be applied to the committed one.
   #
   # Exported EXPLICITLY: the `export "${!GO_S_@}"` glob above covers only the
   # sidecar-derived names, and the `--inputs` answers are produced by subshells
   # the dispatch loop spawns, which inherit only exported env.
-  if [[ "$MILESTONE" == "g2" ]]; then
-    GO_MODULES="${GO_S_DENOVO_MODULES:-}"
-    GO_MODULES_ORIGIN="denovo"
-  else
-    # Symmetrical with the g2 line above: one space-separated list, already
-    # resolved and validated by subject.mjs. The `:-` arm is the pre-2026-08-18
-    # shape, kept so a sidecar resolved by an older subject.mjs — or a hand-set
-    # environment — still names a module set rather than none.
-    GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
-    GO_MODULES_ORIGIN="corpus"
-  fi
-  export GO_MODULES GO_MODULES_ORIGIN
+  GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  # An asked-for additional encoding the subject has not declared leaves the
+  # module set EMPTY rather than falling back to the committed one. Falling back
+  # would silently run the deposit stages over the COMMITTED encoding and report
+  # them green — a run that measured the wrong thing and said so confidently,
+  # which is worse than the SKIP the stages give when they find nothing.
+  [[ "${_NO_ADDITIONAL_ENCODING:-0}" == "1" ]] && GO_MODULES=""
+  # `undeclared` is a THIRD value beside `primary` and a real id, because there
+  # are genuinely three cases and collapsing any two makes a stage give advice
+  # about the wrong key.
+  [[ "${_ENC_UNDECLARED:-0}" == "1" ]] && GO_S_ENCODING_ID="undeclared"
+  export GO_S_ENCODING_ID
+  export GO_MODULES
 
-  # Assemble the declared stage list and the HG1 set from the sidecar's legs.
-  # p8-verify sits directly after p6-tests (D3, 2026-08-09) and is HG1-gated on
-  # the same line it is declared: SPEC.md §7.3 blocks P6 onward, and a
-  # verification report about an unreviewed encoding is still analysis OF that
-  # encoding. (ORCHESTRATOR.md §5.1a's gates row was retensed in the same
-  # change.)
-  G1_STAGES=(p0-preflight p3-check p6-tests p8-verify)
-  gated_by_HG1="p6-tests p8-verify"
+  # --- 2. the declared stage list --------------------------------------------
+  #
+  # WHICH STAGES RUN IS A PROPERTY OF THE ENCODING, NOT OF A CAPABILITY LABEL
+  # (R9, §3.9). A run about the COMMITTED encoding measures and projects it; a
+  # run about an ADDITIONAL encoding validates what was deposited and compares
+  # it against the committed one. Neither is "G1" or "G2": those name what the
+  # tooling could do in the order it was built, which is a fact about this
+  # repository's history and not about any body of law.
+  #
+  # p0-preflight, p3-check, p6-tests and p9-report are always declared; each p7
+  # leg is declared iff the subject's sidecar has an entry for it in `legs`.
+  # That is what keeps COMPLETE honest for a subject with, say, no wizard and no
+  # regulative rules: its sidecar omits those legs, so their absence cannot make
+  # a run INCOMPLETE and their presence is never faked. `p9-report` is last: the
+  # report reads the journal, so it must run after everything that writes to it.
+  PRIMARY_STAGES=(p0-preflight p3-check p6-tests p8-verify)
   for s in "${P7_LEG_ORDER[@]}"; do
-    if [[ " $GO_S_LEGS " == *" $s "* ]]; then
-      G1_STAGES+=("$s")
-      gated_by_HG1="$gated_by_HG1 $s"
-    fi
+    [[ " $GO_S_LEGS " == *" $s "* ]] && PRIMARY_STAGES+=("$s")
   done
+  # p9-cost precedes p9-report and p9-explain, which both read the journal and
+  # would otherwise have no cost figures to render. The consequence is stated on
+  # the receipt rather than hidden: the ledger stops at itself, so the two
+  # stages after it are not in its totals.
+  #
   # p9-explain follows p9-report: both read the journal, and the explainer also
   # reads the report's own presence. Declared, so that a run which produced no
-  # explainer says so in its milestone verdict rather than staying silent; and
-  # HG1-gated on the SAME LINE as it is declared, so the two cannot drift apart.
-  # An ungated stage here would publish HG1-unreviewed narrative and every
-  # downstream honesty check would report clean — the gate test below defaults to
-  # UNGATED, and verify-run.mjs reads the gated set out of run_begin, so it would
-  # agree with the omission. selftest.mjs asserts the invariant directly.
-  G1_STAGES+=(p9-report p9-explain)
-  gated_by_HG1="$gated_by_HG1 p9-report p9-explain"
+  # explainer says so in its verdict rather than staying silent.
+  PRIMARY_STAGES+=(p9-cost p9-report p9-explain)
 
-  # SPEC.md §7.3: HG1 blocks P6 onward. In g2's declared set the stages after P5
-  # are the §8 comparator and the report, so those are what HG1 gates — and, as
-  # at g1, a g2 run stops there with exit 3 until the gate is signed or waived on
-  # the record. At g2 the gate binds to the DE NOVO deposit-set digest (see
-  # GO_ENCODING_FILES above), so a waiver over the replay corpus covers nothing
-  # here, and depositing or editing a deposit — the surface map included —
-  # re-opens the gate.
-  if [[ "$MILESTONE" == "g2" ]]; then gated_by_HG1="p6-tests p7-dmn p8-verify p8-diff p9-report"; fi
+  declare -a DECLARED_STAGES=()
+  if [[ "$GO_S_ENCODING_ID" == "primary" ]]; then
+    DECLARED_STAGES=("${PRIMARY_STAGES[@]}")
+  else
+    DECLARED_STAGES=("${DEPOSIT_STAGES[@]}")
+  fi
+
+  # --- 3. which stages HG1 gates — DERIVED, not listed ------------------------
+  #
+  # SPEC.md §7.3: HG1 blocks P6 onward. That sentence is the rule, so it is
+  # written once and applied, rather than being transcribed into one hand-kept
+  # list per stage set. The two lists it replaces were byte-equal to this
+  # derivation on every selection the tree can express (measured, R9) — the
+  # point is not that they were wrong but that nothing stopped them drifting:
+  # an ungated stage here would publish HG1-unreviewed work and every downstream
+  # honesty check would agree with the omission, because verify-run.mjs reads
+  # the gated set out of run_begin.
+  #
+  # MINUS gated_by_HG2, not "and phase < 10": a stage carries one gate, and
+  # `< 10` would merely be a coincidence of p10-publish's number. verify-run.mjs
+  # reports a finding for any gate that gates a declared stage and has no
+  # record, so a p10-publish that ever became declared would otherwise demand an
+  # HG1 record it must never have.
+  gated_by_HG1=""
+  for s in "${DECLARED_STAGES[@]}"; do
+    [[ " $gated_by_HG2 " == *" $s "* ]] && continue
+    _n="${s#p}"
+    _n="${_n%%-*}"
+    [[ "$_n" =~ ^[0-9]+$ ]] || continue
+    [[ "$_n" -ge 6 ]] && gated_by_HG1="${gated_by_HG1:+$gated_by_HG1 }$s"
+  done
+  unset _n
+
+  # --- 4. what a gate on this run would bind to -------------------------------
+  #
+  # THE DIGEST BINDS TO WHAT THE RUN IS ABOUT: the module set its stages
+  # actually iterate, plus every DEPOSIT a declared stage of this run reads.
+  #
+  # It used to branch on `--milestone`, which is R3's complaint exactly — same
+  # subject, same tree, different flag, a different thing signed. Deriving it
+  # from the selection makes the digest a function of what is under review, so
+  # the same encoding yields the same digest whatever else the run does.
+  #
+  # It is GO_MODULES and not GO_S_ENCODING_MODULES. The difference bites in one
+  # measured case: a deposit-path run over a subject that declares no additional
+  # encoding empties GO_MODULES above, while GO_S_ENCODING_MODULES still holds
+  # the committed encoding's modules — so the gate bound HG1 to an encoding the
+  # run is not about, and the `text:` sentinel written for exactly that case was
+  # unreachable because the array was never empty.
+  #
+  # GO_MODULES IS THE ONE ANSWER, AND EVERY STAGE MUST ASK IT. p3-encode read
+  # the sidecar name directly and so typechecked those committed modules and
+  # wrote PASS for a deposit that does not exist — the same divergence, one
+  # layer down, found by the review of this change. Its four sibling
+  # measurement stages already had the fallback; it now does too.
+  #
+  # ITERATE THE DEPOSITS, NOT THE STAGES. manifestText sorts but does NOT
+  # dedupe, so a path contributed twice renders twice and changes the hash;
+  # p1-ingest, p2-sweep, p4-forks and p5-gate all read all three natlang and
+  # comparison deposits, so a stage-major union would double-count them.
+  declare -a GO_ENCODING_FILES=()
+  declare -a _MODS=()
+  read -ra _MODS <<<"$GO_MODULES" || true
+  [[ ${#_MODS[@]} -gt 0 ]] && GO_ENCODING_FILES+=("${_MODS[@]}")
+
+  _declares() {
+    local want="$1" s
+    for s in "${DECLARED_STAGES[@]}"; do [[ "$s" == "$want" ]] && return 0; done
+    return 1
+  }
+  # Each deposit, once, iff a declared stage reads it. HG1 covers the pairing
+  # declarations too: a surface map edited after a waiver would otherwise ride
+  # the old grant into p8-diff, and the narrative deposit taught the same lesson
+  # at a different scale — editing explainer/orientation.md, re-running
+  # `--only p9-explain` with no new grant, and watching the gate stay open while
+  # the replaced prose went straight into the rendered document. A gate that
+  # does not re-open over the thing it gates is not a gate over that thing.
+  if [[ -n "${GO_S_NATLANG_BUNDLE:-}" ]] && { _declares p1-ingest || _declares p5-gate; }; then
+    GO_ENCODING_FILES+=("$GO_S_NATLANG_BUNDLE")
+  fi
+  if [[ -n "${GO_S_NATLANG_REGISTER:-}" ]] && { _declares p2-sweep || _declares p5-gate; }; then
+    GO_ENCODING_FILES+=("$GO_S_NATLANG_REGISTER")
+  fi
+  if [[ -n "${GO_S_COMPARISON_FORKS:-}" ]] && { _declares p4-forks || _declares p5-gate; }; then
+    GO_ENCODING_FILES+=("$GO_S_COMPARISON_FORKS")
+  fi
+  if [[ -n "${GO_S_COMPARISON_SURFACE_MAP:-}" ]] && _declares p8-diff; then
+    GO_ENCODING_FILES+=("$GO_S_COMPARISON_SURFACE_MAP")
+  fi
+  # Folding the narrative deposit in also closes the `--bless` hole for free:
+  # blessing rewrites provenance.json, which is in this set, so the digest moves
+  # and HG1 shuts.
+  if [[ -n "${GO_S_EXPLAINER_DIR:-}" && -d "$GO_S_EXPLAINER_DIR" ]] && _declares p9-explain; then
+    for _f in "$GO_S_EXPLAINER_DIR"/*.md "$GO_S_EXPLAINER_DIR"/manifest.json "$GO_S_EXPLAINER_DIR"/provenance.json; do
+      [[ -e "$_f" ]] && GO_ENCODING_FILES+=("$_f")
+    done
+    unset _f
+  fi
+  # A run with nothing to bind still needs a digest to bind a gate to; `text:`
+  # entries are literal digest contributors (digestSet). Reachable at last: it
+  # fires for a subject that declares no additional encoding AND no deposits.
+  [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:no-additional-encoding-declared=$GO_S_ID")
 fi
+
+# gate_for STAGE -> HG1 | HG2 | -. ONE lookup, read by both plans, so a plan
+# cannot print a gate the driver does not enforce. The deposit plan used to
+# print the literal string "HG1" in each of its rows — a third copy of a claim
+# the driver derives, and one that could not witness the derivation at all.
+gate_for() {
+  [[ " $gated_by_HG2 " == *" $1 "* ]] && {
+    echo HG2
+    return
+  }
+  [[ " $gated_by_HG1 " == *" $1 "* ]] && {
+    echo HG1
+    return
+  }
+  echo -
+}
 
 # deposit_state PATH -> undeclared | absent | present. `plan` only.
 deposit_state() {
@@ -444,35 +680,55 @@ deposit_state() {
   fi
 }
 
+# The stage list this run declares. Resolved above, from the SELECTED ENCODING
+# and nothing else — so there is no label that can be unknown, and no error arm.
+# An encoding id that does not resolve was refused by subject.mjs before any of
+# this ran, and it was refused BY NAME, listing the ids the subject declares.
 stages_for() {
-  case "$1" in
-    g1) printf '%s\n' "${G1_STAGES[@]}" ;;
-    g2) printf '%s\n' "${G2_STAGES[@]}" ;;
-    *)
-      echo "go.sh: unknown milestone '$1'; SPEC.md §6 defines G0-G4 and this driver implements G1." >&2
-      return 2
-      ;;
-  esac
+  printf '%s\n' "${DECLARED_STAGES[@]}"
 }
 
 # --- commands ---------------------------------------------------------------
 
-# The G2 plan. It prints SPEC.md §4's full de novo stage order — including the
-# stages this driver does NOT declare at g2 — because a plan that lists only
+# The DEPOSIT plan. It prints SPEC.md §4's full de novo stage order — including
+# the stages this driver does NOT declare — because a plan that lists only
 # what runs cannot tell you what is missing. Every row says which of the two it
 # is, and the deposit rows say whether the deposit is there.
-cmd_plan_g2() {
-  local b r f m
-  b="${GO_S_DENOVO_BUNDLE:-}"
-  r="${GO_S_DENOVO_REGISTER:-}"
-  f="${GO_S_DENOVO_FORKS:-}"
-  m="${GO_S_DENOVO_MODULES:-}"
+cmd_plan_deposit() {
+  local b r f m enc key
+  b="${GO_S_NATLANG_BUNDLE:-}"
+  r="${GO_S_NATLANG_REGISTER:-}"
+  f="${GO_S_COMPARISON_FORKS:-}"
+  enc="${GO_S_ENCODING_ID:-primary}"
+  # THE DEPOSIT MODULE SET IS THE SELECTED ADDITIONAL ENCODING'S, and there is
+  # none when nothing was selected. Reading GO_S_ENCODING_MODULES unconditionally
+  # showed the COMMITTED encoding here — `sg-succession`, which declares no
+  # additional encoding, reported "7 declared module(s)" for a deposit it does
+  # not have. A plan that confidently describes the wrong artifact is worse than
+  # one that says `undeclared`, which is what the deposit contract asks for.
+  case "$enc" in
+    primary | undeclared)
+      m=""
+      key="encodings.<id>"
+      ;;
+    *)
+      m="${GO_S_ENCODING_MODULES:-}"
+      key="encodings.$enc"
+      ;;
+  esac
 
-  echo "milestone g2, subject $SUBJECT — SPEC.md §4's de novo stage order, in order:"
+  if [[ "$enc" == "primary" || "$enc" == "undeclared" ]]; then
+    echo "subject $SUBJECT, encoding undeclared — the deposit stage order, in order."
+    echo "This subject declares NO additional encoding, so every deposit below reads"
+    echo "'undeclared': the plan is a forecast of what would have to be declared under"
+    echo "'encodings' and deposited, not an account of anything that exists."
+  else
+    echo "subject $SUBJECT, encoding '$enc' — the deposit stage order, in order:"
+  fi
   echo
   printf '  %-14s %-9s %-11s %s\n' STAGE GATE DEPOSIT "WHAT IT CHECKS / WHY NOT"
-  printf '  %-14s %-9s %-11s %s\n' "p1-ingest" "-" "$(deposit_state "$b")" "${b:-(no denovo.bundle in subject.json)}"
-  printf '  %-14s %-9s %-11s %s\n' "p2-sweep" "-" "$(deposit_state "$r")" "${r:-(no denovo.register in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p1-ingest" "$(gate_for p1-ingest)" "$(deposit_state "$b")" "${b:-(no natlang_sources.bundle in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p2-sweep" "$(gate_for p2-sweep)" "$(deposit_state "$r")" "${r:-(no natlang_sources.register in subject.json)}"
 
   local mstate="undeclared" mn=0
   if [[ -n "$m" ]]; then
@@ -483,15 +739,15 @@ cmd_plan_g2() {
     local x
     for x in "${mm[@]}"; do [[ -f "$x" ]] || mstate=absent; done
   fi
-  printf '  %-14s %-9s %-11s %s\n' "p3-encode" "-" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no denovo.modules in subject.json)")"
-  printf '  %-14s %-9s %-11s %s\n' "p3-check" "-" "$mstate" "the P3 house rules over the SAME deposit: BRANCH over ELSE IF, @ref per dated arm, per-origin floors (denovo.checks)"
-  printf '  %-14s %-9s %-11s %s\n' "p4-forks" "-" "$(deposit_state "$f")" "${f:-(no denovo.fork_register in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p3-encode" "$(gate_for p3-encode)" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no $key.modules in subject.json)")"
+  printf '  %-14s %-9s %-11s %s\n' "p3-check" "$(gate_for p3-check)" "$mstate" "the P3 house rules over the SAME deposit: BRANCH over ELSE IF, @ref per dated arm, and the floors that travel with this encoding ($key.checks)"
+  printf '  %-14s %-9s %-11s %s\n' "p4-forks" "$(gate_for p4-forks)" "$(deposit_state "$f")" "${f:-(no comparison.fork_register in subject.json)}"
 
   local n=0 s
   for s in "$b" "$r" "$f"; do [[ -n "$s" && -f "$s" ]] && n=$((n + 1)); done
-  printf '  %-14s %-9s %-11s %s\n' "p5-gate" "-" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
+  printf '  %-14s %-9s %-11s %s\n' "p5-gate" "$(gate_for p5-gate)" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
   echo "  ---- HG1 ------- Meng's go on the encoding; blocks P6 onward (SPEC.md §7.3)"
-  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "HG1" "$mstate" "the deposit's own #ASSERT directives, via l4 run --json results[]; floor = denovo.checks.min_assertions"
+  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "$(gate_for p6-tests)" "$mstate" "the deposit's own #ASSERT directives, via l4 run --json results[]; floor = $key.checks.min_assertions"
   # Every p7 leg the sidecar declares, with a PRECISE reason per leg: a plan
   # that lists only what runs cannot tell a reader what is missing, and a
   # generic reason ("compares against committed goldens") was true of some
@@ -501,41 +757,52 @@ cmd_plan_g2() {
   for leg in "${P7_LEG_ORDER[@]}"; do
     [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
     if [[ "$leg" == "p7-dmn" ]]; then
-      printf '  %-14s %-9s %-11s %s\n' "p7-dmn" "HG1" "$mstate" "emit-only over the deposit: l4 export + dmn-moddle gate + engine-load probes; no golden exists, so no diff. Cases via denovo.legs['p7-dmn'].cases when declared"
+      printf '  %-14s %-9s %-11s %s\n' "p7-dmn" "$(gate_for p7-dmn)" "$mstate" "emit-only over the deposit: l4 export + dmn-moddle gate + engine-load probes; no golden exists, so no diff. Cases via encodings.<id>.legs['p7-dmn'].cases when declared"
       continue
     fi
     case "$leg" in
-      p7-dmn-md) legwhy="golden-differential only, and no de novo dmn-md golden exists; re-pointing it emit-only is unbuilt" ;;
+      p7-dmn-md) legwhy="golden-differential only, and this encoding declares no dmn-md golden; re-pointing it emit-only is unbuilt" ;;
       p7-bpmn) legwhy="needs an expected_dir + rules map for the deposit; the sidecar declares neither, and the leg's soundness gate reads committed goldens" ;;
-      p7-ladder) legwhy="needs a de novo demo entry + figures dir (no denovo demo/*.ts exists); the committed ones render the replay corpus" ;;
+      p7-ladder) legwhy="needs its own demo entry + figures dir, and none is declared for this encoding; the committed ones render the committed encoding" ;;
       p7-lts) legwhy="its oracle cross-checks digraph count against the BPMN discovery call over the committed corpus; re-pointing both halves is unbuilt" ;;
       p7-mcp) legwhy="needs a loopback JL4_GO_SERVICE_URL deployment of the DEPOSIT (it carries @exports); the leg today zips the committed corpus pair" ;;
-      p7-tnr) legwhy="the sidecar declares no denovo.legs['p7-tnr'].golden — a de novo .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
+      p7-tnr) legwhy="the sidecar declares no legs['p7-tnr'].golden for this encoding — a .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
       p7-wizard) legwhy="its well-formedness checks read the committed wizard module; the deposit declares no wizard split" ;;
       p7-akn) legwhy="re-pointing its shallow well-formedness pass at the deposit is unbuilt" ;;
       *) legwhy="re-pointing this leg at the deposit is unbuilt" ;;
     esac
     printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "$legwhy"
   done
-  printf '  %-14s %-9s %-11s %s\n' "p8-verify" "HG1" "$mstate" "l4 verify over the de novo module set; five control fixtures license the oracle"
-  local sm="${GO_S_DENOVO_SURFACE_MAP:-}" smwhat
+  printf '  %-14s %-9s %-11s %s\n' "p8-verify" "$(gate_for p8-verify)" "$mstate" "l4 verify over the de novo module set; five control fixtures license the oracle"
+  local sm="${GO_S_COMPARISON_SURFACE_MAP:-}" smwhat
   if [[ -n "$sm" ]]; then
     smwhat="SPEC.md §8's diff oracle over $sm"
   else
-    smwhat="(no denovo.surface_map in subject.json)"
+    smwhat="(no comparison.surface_map in subject.json)"
   fi
-  printf '  %-14s %-9s %-11s %s\n' "p8-diff" "HG1" "$(deposit_state "$sm")" "$smwhat"
-  printf '  %-14s %-9s %-11s %s\n' "p9-report" "HG1" "-" "reads journal.ndjson and nothing else"
+  printf '  %-14s %-9s %-11s %s\n' "p8-diff" "$(gate_for p8-diff)" "$(deposit_state "$sm")" "$smwhat"
+  printf '  %-14s %-9s %-11s %s\n' "p9-cost" "$(gate_for p9-cost)" "-" "what the run cost: driver-measured stage wall clock off the journal, plus the agent sessions' tokens and tool calls off the transcripts the session rows name"
+  printf '  %-14s %-9s %-11s %s\n' "p9-report" "$(gate_for p9-report)" "-" "reads journal.ndjson and nothing else"
   echo
-  echo "declared by this driver at g2, and therefore run: ${G2_STAGES[*]}"
+  # WHAT A GATE WOULD BIND TO, printed here for the same reason `cmd_plan`
+  # prints it: a gate grant covers one digest and nothing else, so "which files
+  # are in it" is the question a reader of a waiver actually has. The deposit
+  # plan printed no digest at all until R9, which is how a deposit run over a
+  # subject with nothing deposited came to bind HG1 to the COMMITTED encoding
+  # without anyone being able to see it from `plan`.
+  echo "the digest a gate on this run would bind to, over ${#GO_ENCODING_FILES[@]} file(s):"
+  echo "  $(node "$LIB/digest.mjs" "${GO_ENCODING_FILES[@]}")"
+  for s in "${GO_ENCODING_FILES[@]}"; do printf '  %s\n' "${s#"$GO_ROOT"/}"; done
+  echo
+  echo "declared for a deposit run, and therefore run: ${DEPOSIT_STAGES[*]}"
   echo "entry points that still exist and refuse, each with a named blocker:"
   for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
   echo
-  echo "READ THIS BEFORE READING A g2 VERDICT. P1, P2, P3 and P4 do not fetch, search,"
+  echo "READ THIS BEFORE READING A DEPOSIT VERDICT. P1, P2, P3 and P4 do not fetch, search,"
   echo "encode or find forks: those need the network or a model, and this driver takes"
   echo "neither (ORCHESTRATOR.md §2.1, §6.4). They VALIDATE what an agent deposited, and"
-  echo "report SKIPPED with a named reason when the deposit is not there. So 'g2 COMPLETE'"
-  echo "means every g2 stage is accounted for — it does NOT mean a de novo run happened:"
+  echo "report SKIPPED with a named reason when the deposit is not there. So COMPLETE here"
+  echo "means every declared stage is accounted for — it does NOT mean a de novo run happened:"
   echo "a run with every deposit absent is COMPLETE over SKIPPED receipts. SPEC.md §6's"
   echo "G2 acceptance is the §8 diff oracle, etc/go/lib/denovo-diff.mjs, which p8-diff"
   echo "runs over the declared surface map — its receipt above says whether it did."
@@ -545,19 +812,16 @@ cmd_plan_g2() {
 cmd_plan() {
   local rc=0
   local stages
-  stages=$(stages_for "$MILESTONE") || rc=$?
+  stages=$(stages_for) || rc=$?
   [[ $rc -eq 0 ]] || exit $rc
-  if [[ "$MILESTONE" == "g2" ]]; then
-    cmd_plan_g2
+  if [[ "$GO_S_ENCODING_ID" != "primary" ]]; then
+    cmd_plan_deposit
     return 0
   fi
-  echo "milestone $MILESTONE, subject $SUBJECT — declared stages, in order:"
+  echo "subject $SUBJECT, encoding primary — declared stages, in order:"
   local s
   while read -r s; do
-    local gate="-"
-    [[ " $gated_by_HG1 " == *" $s "* ]] && gate="HG1"
-    [[ " $gated_by_HG2 " == *" $s "* ]] && gate="HG2"
-    printf '  %-14s gate=%-4s %s\n' "$s" "$gate" "$PHASES/$s.sh"
+    printf '  %-14s gate=%-4s %s\n' "$s" "$(gate_for "$s")" "$PHASES/$s.sh"
   done <<<"$stages"
   echo
   # WHAT A GATE WOULD BIND TO, printed rather than left to be inferred. A gate
@@ -585,7 +849,7 @@ cmd_plan() {
   echo "entry points that exist and refuse, each with a named blocker:"
   for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
   echo
-  echo "the milestone rule: $MILESTONE is COMPLETE when every declared stage has a"
+  echo "the run rule: this run is COMPLETE when every declared stage has a"
   echo "receipt, no receipt is BROKEN, every non-PASS receipt carries a reason that"
   echo "appears in the report, and every gate is satisfied or explicitly waived."
   echo "That is completeness of accounting, not greenness — SPEC.md §6 permits a"
@@ -665,6 +929,78 @@ cmd_status() {
   local run
   run="$(resolve_run)" || exit $?
   node "$LIB/verify-run.mjs" "$run"
+}
+
+# R13's fold: the account of a SUBJECT, across every run whose evidence survives.
+# Not a union — a receipt binds to the digest it ran over, so each phase resolves
+# to one state. STALE here is R4's (a newer prerequisite exists, named), never
+# "the digest moved": a digest cannot say WHICH member, and can miss a
+# prerequisite that moved without moving it.
+cmd_subject_report() {
+  local l4_path l4_sha stdlib_dir stdlib_sha
+  [[ -n "$SUBJECT" ]] || die_usage "subject-report needs --subject <id>"
+  go_provision_toolchain "$GO_ROOT"
+  l4_path="$(command -v "${L4:-l4}" || echo "${L4:-l4}")"
+  if [[ -x "$l4_path" ]]; then
+    l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
+  else
+    l4_sha="unset"
+  fi
+  stdlib_dir="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  stdlib_sha="$(node "$LIB/stdlib-digest.mjs" "$stdlib_dir")"
+  local extra=()
+  [[ "$WANT_JSON" == "1" ]] && extra+=(--json)
+  # THE DECLARABLE UNIVERSE, not merely the declared one. A phase that has never
+  # been declared for this subject is exactly the phase R13 must still name: the
+  # union of surviving `declared_stages` omits it, and omission reads as
+  # "accounted for elsewhere" when nothing had accounted for it anywhere. That
+  # misreading is R12's failure. The driver owns the stage sets, so the driver
+  # passes them; the library never guesses at a universe it cannot see.
+  local declarable
+  declarable="$(printf '%s\n' "${PRIMARY_STAGES[@]}" "${DEPOSIT_STAGES[@]}" | sort -u | tr '\n' ' ')"
+  node "$LIB/subject-report.mjs" "$RUNDIR_BASE" --subject "$SUBJECT" \
+    --declarable "$declarable" \
+    --param "l4-binary=$l4_sha" \
+    --param "l4-stdlib=$stdlib_sha" \
+    --param "fixed_now=$FIXED_NOW" \
+    "${extra[@]}"
+}
+
+# R4's query: what did this run READ, and does a newer version of any of it
+# exist? A QUERY and not a phase (§4.2) — it consumes no declared input set,
+# earns no receipt and nothing depends on its answer.
+#
+# The toolchain params are passed IN rather than recomputed inside the library,
+# because the driver is what owns those facts: a param nobody supplies is
+# reported UNEVALUATED, never assumed unchanged. Assuming it unchanged is
+# exactly the §3.7a bug — the binary and the stdlib moved and no digest noticed.
+cmd_readset() {
+  local run l4_path l4_sha stdlib_dir stdlib_sha
+  run="$(resolve_run)" || exit $?
+  # THE QUERY MUST RESOLVE A PREREQUISITE EXACTLY AS A RUN WOULD, or "stale"
+  # degrades into "I asked a different question". Measured: a `command -v l4`
+  # fallback reported every stage of a green run STALE on `l4-binary`, because
+  # the driver had discovered a binary under a SIBLING WORKTREE's dist-newstyle
+  # while the PATH held an unrelated `~/.local/bin/l4`. Nothing had moved; two
+  # resolutions had merely disagreed, and a freshness tool that cries wolf on a
+  # clean tree is a tool nobody reads twice. So: the same discovery the run uses.
+  go_provision_toolchain "$GO_ROOT"
+  l4_path="$(command -v "${L4:-l4}" || echo "${L4:-l4}")"
+  if [[ -x "$l4_path" ]]; then
+    l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
+  else
+    l4_sha="unset"
+  fi
+  stdlib_dir="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+  stdlib_sha="$(node "$LIB/stdlib-digest.mjs" "$stdlib_dir")"
+  local extra=()
+  [[ -n "$STAGE_ONLY" ]] && extra+=(--stage "$STAGE_ONLY")
+  [[ "$WANT_JSON" == "1" ]] && extra+=(--json)
+  node "$LIB/readset-cli.mjs" "$run" \
+    --param "l4-binary=$l4_sha" \
+    --param "l4-stdlib=$stdlib_sha" \
+    --param "fixed_now=$FIXED_NOW" \
+    "${extra[@]}"
 }
 
 cmd_verify() {
@@ -784,22 +1120,38 @@ cmd_gc() {
   # "(unattributed)" rather than pooled with a real subject: it cannot be shown
   # to be redundant with any subject's latest, so it is not collected as if it
   # were.
+  # KEEP-LIST MEMBERSHIP IS BY RUN ID, NOT BY PATH STRING.
+  #
+  # It was by path string, and that DELETED EVERY RUN DIRECTORY, gate-holding
+  # ones included, while printing "kept N". macOS sets TMPDIR with a trailing
+  # slash, so `${TMPDIR:-/tmp}/l4-go` is `/var/.../T//l4-go` — a double slash.
+  # `ls -1d … | sed` preserves it; `gc-subjects.mjs` runs the path through
+  # node's resolver, which collapses it. The two spellings name the same
+  # directory and compare unequal, so nothing ever matched the keep-list. It
+  # fired by DEFAULT on macOS, and it is what destroyed three runs during the
+  # review that found it.
+  #
+  # A run id is the directory's basename, is unique within the base, and is
+  # immune to every path-form difference there is. Comparing those cannot
+  # reproduce this class of bug even if a third spelling appears tomorrow.
   local keep_ids=()
   local d
   for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
     if grep -q '"kind":"gate"' "$d/journal.ndjson" 2>/dev/null && grep -q '"state":"satisfied"' "$d/journal.ndjson" 2>/dev/null; then
-      keep_ids+=("$d")
+      keep_ids+=("$(basename "$d")")
     fi
   done
   local subj
   for subj in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE"); do
-    for d in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE" "$subj" | sort | tail -"$KEEP"); do keep_ids+=("$d"); done
+    for d in $(node "$LIB/gc-subjects.mjs" "$RUNDIR_BASE" "$subj" | sort | tail -"$KEEP"); do keep_ids+=("$(basename "$d")"); done
   done
   local removed=0
   for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
     local k
     local keep=0
-    for k in "${keep_ids[@]}"; do [[ "$k" == "$d" ]] && keep=1; done
+    local id
+    id="$(basename "$d")"
+    for k in "${keep_ids[@]}"; do [[ "$k" == "$id" ]] && keep=1; done
     if [[ $keep -eq 0 ]]; then
       rm -rf "$d"
       removed=$((removed + 1))
@@ -814,17 +1166,17 @@ cmd_gc() {
 # doctor's per-stage verdict. Runs no stage, writes no run dir.
 cmd_doctor() {
   local stages rc=0
-  stages=$(stages_for "$MILESTONE") || rc=$?
+  stages=$(stages_for) || rc=$?
   [[ $rc -eq 0 ]] || exit $rc
   go_provision_toolchain "$GO_ROOT"
   export GO_ROOT
   export JL4_LIBRARY_PATH="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
-  node "$LIB/doctor.mjs" --milestone "$MILESTONE" --stages "$(echo "$stages" | tr '\n' ' ')"
+  node "$LIB/doctor.mjs" --encoding "$GO_S_ENCODING_ID" --stages "$(echo "$stages" | tr '\n' ' ')"
 }
 
 cmd_run() {
   local stages rc=0
-  stages=$(stages_for "$MILESTONE") || rc=$?
+  stages=$(stages_for) || rc=$?
   [[ $rc -eq 0 ]] || exit $rc
 
   # --- provision, then the one hard prerequisite: a prebuilt l4 --------------
@@ -878,7 +1230,7 @@ EOF
   fi
   local doctor_rc=0
   set +e
-  node "$LIB/doctor.mjs" --milestone "$MILESTONE" --stages "$(echo "$door_stages" | tr '\n' ' ')" --brief
+  node "$LIB/doctor.mjs" --encoding "$GO_S_ENCODING_ID" --stages "$(echo "$door_stages" | tr '\n' ' ')" --brief
   doctor_rc=$?
   set -e
   if [[ "${L4_GO_REQUIRED:-0}" == "1" && $doctor_rc -ge 1 ]]; then
@@ -954,14 +1306,14 @@ EOF
   export GO_STDLIB_DIR="$stdlib_dir" GO_STDLIB_SHA="$stdlib_sha"
 
   export GO_ROOT
-  export GO_RUN="$RUN" GO_RUNID="$RUN_ID" GO_SUBJECT="$SUBJECT" GO_MILESTONE="$MILESTONE"
+  export GO_RUN="$RUN" GO_RUNID="$RUN_ID" GO_SUBJECT="$SUBJECT"
   export GO_FIXED_NOW="$FIXED_NOW"
 
   # run_begin is written once per run dir, not once per invocation: a resumed
   # run is the same run.
   if [[ ! -f "$RUN/journal.ndjson" ]]; then
     node "$LIB/receipt.mjs" run-begin --run "$RUN" \
-      --run-id "$RUN_ID" --milestone "$MILESTONE" --subject "$SUBJECT" \
+      --run-id "$RUN_ID" --encoding "$GO_S_ENCODING_ID" --subject "$SUBJECT" \
       --repo-head "$head" --tree-state "$tree_state" --fixed-now "$FIXED_NOW" \
       --l4-binary "$L4" --declared "$(echo "$stages" | tr '\n' ',')" \
       --gated-stages "{\"HG1\":[$(for x in $gated_by_HG1; do printf '"%s",' "$x"; done | sed 's/,$//')],\"HG2\":[$(for x in $gated_by_HG2; do printf '"%s",' "$x"; done | sed 's/,$//')]}"
@@ -984,7 +1336,15 @@ EOF
     });
   ' "${GO_ENCODING_FILES[@]}" > "$RUN/.corpus-members.json"
 
-  echo "go: run $RUN_ID  (milestone $MILESTONE, subject $SUBJECT)"
+  # WHO IS DRIVING THIS INVOCATION — once per invocation, like the itemisation
+  # above and unlike run_begin. A human-gated run is driven in several sittings
+  # and the sittings are routinely different agent sessions; the set of these
+  # rows is the run's answer to "whose token spend belongs here", which is the
+  # one thing p9-cost cannot measure for itself. Observed from the environment,
+  # never declared: see the `session` case in lib/receipt.mjs.
+  node "$LIB/receipt.mjs" session --run "$RUN" --cwd "$PWD"
+
+  echo "go: run $RUN_ID  (subject $SUBJECT, encoding $GO_S_ENCODING_ID)"
   echo "go: tree $head [$tree_state]   fixed-now $FIXED_NOW"
   echo "go: run dir $RUN"
   [[ "$tree_state" == "dirty" ]] && echo "go: NOTE — the working tree is dirty. That is a fact, not a failure; it is stamped on the report."
@@ -1036,8 +1396,8 @@ EOF
       --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
       --corpus-digest "$corpus_digest" --reason "$greason"
     echo "go: gate $gname WAIVED — $greason"
-    if [[ "$MILESTONE" == "g2" ]]; then
-      echo "go:   the waiver covers the de novo deposit set $corpus_digest and nothing else; deposit or edit one and $gname re-opens."
+    if [[ "$GO_S_ENCODING_ID" != "primary" ]]; then
+      echo "go:   the waiver covers the deposit set $corpus_digest and nothing else; deposit or edit one and $gname re-opens."
     else
       echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file, or any file of the subject's explainer narrative deposit, and $gname re-opens."
     fi
@@ -1046,9 +1406,22 @@ EOF
   # --- dispatch --------------------------------------------------------------
   local overall=0
   local s
+  local _t_stage0 _t_exec0
   while read -r s; do
     [[ -n "$s" ]] || continue
     if [[ -n "$ONLY" && "$s" != "$ONLY" ]]; then continue; fi
+
+    # THE STAGE CLOCK STARTS HERE, not at `bash "$script"`.
+    #
+    # Between this line and the script running, the driver asks the stage for
+    # its inputs, digests them and itemises them, and searches this run and
+    # every sibling run for a replayable receipt. Over a corpus of hundreds of
+    # files that is seconds, it is spent on EVERY stage including the ones that
+    # then replay instantly, and attributing it to nobody is how a pipeline
+    # reports a wall clock its own stages do not add up to. It is recorded
+    # separately (`dispatch_ms`) rather than folded in, because it is the
+    # driver's cost and not the stage's work.
+    _t_stage0="$(go_now_ms)"
 
     # gate check, default-deny
     local gate=""
@@ -1096,14 +1469,33 @@ EOF
     # and the driver folds in the one input no stage can declare — the `l4`
     # binary it was handed. `text:` entries are literal digest contributors; see
     # digestSet in lib/ledger.mjs.
-    local inputs digest
+    #
+    # R4: the SAME pass also itemises the set into a read-set, written beside
+    # the run. One `--members-out` flag rather than a second invocation, because
+    # the members must prove the digest and two passes over a tree that is being
+    # edited would produce a read-set that does not — a race indistinguishable,
+    # later, from a doctored row.
+    local inputs digest members
     inputs=$(GO_STAGE="$s" bash "$script" --inputs 2>/dev/null || true)
+    members="$RUN/.read-set-$s.json"
     if [[ -n "$inputs" ]]; then
-      digest=$(printf '%s\ntext:l4-binary=%s\ntext:l4-stdlib=%s\n' "$inputs" "$l4_sha" "$stdlib_sha" | node "$LIB/digest.mjs" --stdin)
+      digest=$(printf '%s\ntext:l4-binary=%s\ntext:l4-stdlib=%s\n' "$inputs" "$l4_sha" "$stdlib_sha" | node "$LIB/digest.mjs" --stdin --members-out "$members")
     else
       digest=""
+      rm -f "$members"
     fi
     export GO_INPUTS_DIGEST="$digest"
+    # R4: the itemised members, for go_receipt to record on the stage_end row.
+    # `rs_arg` is the same fact as an argv fragment, for the two REPLAY exits
+    # below — a replayed stage runs no phase script, so nothing would call
+    # go_receipt for it, yet its receipt must still say what it read. R8: a run
+    # directory is answerable by someone holding only that directory.
+    export GO_READ_SET=""
+    local rs_arg=()
+    if [[ -n "$digest" && -f "$members" ]]; then
+      export GO_READ_SET="$members"
+      rs_arg=(--read-set "$members")
+    fi
 
     # Resumability, in two widths.
     #
@@ -1181,8 +1573,8 @@ EOF
       # A replayed receipt KEEPS its verdict and names the receipt that earned
       # it. It carries no oracle of its own, and it should not: the oracle ran,
       # on inputs whose digest is byte-identical, and its row is in the same
-      # hash-chained journal. Demoting a replayed PASS would make the milestone
-      # verdict change when the same milestone is run twice, which is exactly
+      # hash-chained journal. Demoting a replayed PASS would make the run
+      # verdict change when the same run is repeated, which is exactly
       # the property resumability needs to preserve.
       #
       # Everything else on the receipt DOES carry forward, because
@@ -1242,11 +1634,13 @@ EOF
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
           --inputs-digest "$digest" --replayed-from "$phash" --replayed-from-run "$prior_run" \
           --subject "$SUBJECT" --run-id "$RUN_ID" --donor-dir "$from_dir" \
-          --artifacts-json "$RUN/.replay-artifacts.json" "${extra[@]}"
+          --elapsed-ms "$(go_since_ms "$_t_stage0")" \
+          --artifacts-json "$RUN/.replay-artifacts.json" "${rs_arg[@]}" "${extra[@]}"
         echo "go: $s replayed from run $prior_run (inputs unchanged)"
       else
         node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
-          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${extra[@]}"
+          --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" \
+          --elapsed-ms "$(go_since_ms "$_t_stage0")" "${rs_arg[@]}" "${extra[@]}"
         echo "go: $s replayed (inputs unchanged)"
       fi
       [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
@@ -1254,6 +1648,13 @@ EOF
     fi
 
     node "$LIB/receipt.mjs" stage-begin --run "$RUN" --stage "$s" --inputs-digest "$digest"
+
+    # Everything above was dispatch; everything below is the stage. The phase
+    # script closes the interval in go_receipt (lib/phase-prelude.sh) because
+    # the receipt is written before the driver regains control.
+    export GO_DISPATCH_MS="$(go_since_ms "$_t_stage0")"
+    _t_exec0="$(go_now_ms)"
+    export GO_STAGE_EXEC_T0="$_t_exec0"
 
     set +e
     bash "$script"
@@ -1283,10 +1684,10 @@ EOF
     [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
   done <<<"$stages"
 
-  # --- milestone verdict, recomputed from the journal ------------------------
+  # --- the run verdict, recomputed from the journal --------------------------
   # verify-run.mjs answers three questions — does the chain verify, do the
   # artifacts every receipt names still hash as recorded, and what is the
-  # milestone verdict — and encodes the first two in `chain_ok`/`findings` and
+  # run verdict — and encodes the first two in `chain_ok`/`findings` and
   # in its EXIT CODE. This used to read `.verdict` and discard the rest behind
   # `|| true`, so a run whose recorded artifacts had vanished, or whose journal
   # had been hand-edited, still printed `COMPLETE` and exited 0 while
@@ -1318,7 +1719,7 @@ EOF
     BROKEN) vexit=4 ;;
     *) vexit=1 ;;
   esac
-  [[ $overall -eq 1 && $vexit -eq 0 ]] && vexit=0 # a leg finding is accounted for, not a milestone failure
+  [[ $overall -eq 1 && $vexit -eq 0 ]] && vexit=0 # a leg finding is accounted for, not a run failure
 
   if [[ "${findings_n:-0}" -gt 0 ]]; then
     echo >&2
@@ -1338,16 +1739,16 @@ EOF
     node "$GO_ROOT/etc/go/report/render-report.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
     # The explainer's final render, for the same reason and with the same
     # status — but DECLARED-STAGES-ONLY. p9-explain renders narrative prose
-    # about a body of law, and a milestone that does not declare the stage
+    # about a body of law, and a run that does not declare the stage
     # gets no explainer file. The guard is load-bearing, measured 2026-08-09
-    # before it existed: a g2 run wrote the g1 narrative — 127 KB about the
+    # before it existed: a deposit run wrote the primary narrative — 127 KB about the
     # COMMITTED corpus, drift banners included — into the run dir with no
-    # receipt, no journal row, and no gate covering it (the g2 HG1 digest
+    # receipt, no journal row, and no gate covering it (a deposit run's HG1 digest
     # deliberately excludes the narrative deposit), then announced its path.
     # That is the relabelling ORCHESTRATOR.md §5.2 exists to prevent. (An
     # earlier comment here PREDICTED this guard's behaviour while the render
     # ran unconditionally; the sidecar's declared explainer dir made the
-    # prediction false.) At a declaring milestone the render may still
+    # prediction false.) In a declaring run the render may still
     # legitimately leave no file — a subject with no declared narrative — so
     # a failure stays silent rather than inventing one.
     if [[ $'\n'"$stages"$'\n' == *$'\n'"p9-explain"$'\n'* ]]; then
@@ -1356,9 +1757,9 @@ EOF
   fi
 
   echo
-  echo "go: VERDICT: $MILESTONE $verdict"
-  if [[ "$MILESTONE" == "g2" ]]; then
-    echo "go:   g2's verdict is over its declared stages. It says the deposits present are"
+  echo "go: VERDICT: $verdict  (subject $SUBJECT, encoding $GO_S_ENCODING_ID)"
+  if [[ "$GO_S_ENCODING_ID" != "primary" ]]; then
+    echo "go:   this verdict is over the DECLARED stages. It says the deposits present are"
     echo "go:   well formed and names the ones that are not there. It does not, by itself,"
     echo "go:   say a de novo run happened: a run with every deposit absent is COMPLETE over"
     echo "go:   SKIPPED receipts. SPEC.md §6's G2 acceptance is the §8 diff oracle"
@@ -1383,6 +1784,8 @@ case "$CMD" in
   verify) cmd_verify ;;
   gc) cmd_gc ;;
   new-subject) cmd_new_subject ;;
+  readset) cmd_readset ;;
+  subject-report) cmd_subject_report ;;
   store) cmd_store ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;

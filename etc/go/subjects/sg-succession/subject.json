@@ -40,11 +40,11 @@
     "Singapore succession encoding, so there is nothing to diff, and a de novo",
     "module that IS the corpus makes the comparison an identity (which the",
     "resolver refuses). The registers are genuine P1/P2/P4 deposits regardless,",
-    "so 'go.sh run --milestone g2' validates them and p8-diff reports SKIPPED",
+    "so a deposit-path run validates them and p8-diff reports SKIPPED",
     "with a named reason. See NOTES.md."
   ],
   "id": "sg-succession",
-  "display_name": "Singapore succession — Wills, Intestate Succession, Probate and Administration",
+  "display_name": "Singapore succession \u2014 Wills, Intestate Succession, Probate and Administration",
   "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934 (Singapore)",
   "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
   "encoding": {
@@ -64,9 +64,11 @@
     "min_dated_arms": 0,
     "min_assertions": 178
   },
-  "denovo": {
+  "natlang_sources": {
     "bundle": "jl4/examples/legal/sg-succession/denovo/source-bundle.json",
-    "register": "jl4/examples/legal/sg-succession/denovo/external-modifications.json",
+    "register": "jl4/examples/legal/sg-succession/denovo/external-modifications.json"
+  },
+  "comparison": {
     "fork_register": "jl4/examples/legal/sg-succession/denovo/fork-register.json"
   },
   "legs": {

@@ -8,20 +8,21 @@
 #
 # The module set carries its tests as #ASSERT directives inside the .l4 files.
 # This stage runs them and reports what they say. It does NOT write new tests —
-# writing a test is agent work at every milestone; this stage measures the
-# committed carrier, whichever origin the driver resolved (2026-08-09: the
-# corpus at g1, the de novo deposit at g2).
+# writing a test is agent work whichever encoding is under test. This stage
+# measures the carrier of THE ENCODING IT WAS HANDED, and does not ask which one
+# that is: the selected encoding arrives in the ordinary GO_S_ENCODING_* and
+# GO_S_MIN_* variables, so the module set and the floor are already the right
+# ones by the time this file runs.
 
-# The milestone-scoped module set, resolved by the driver as GO_MODULES with
-# GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
-# documented direct-invocation route — the committed corpus set is the default,
-# preserving the pre-2026-08-09 contract. Kept byte-for-byte in step with the
-# driver's own derivation (go.sh, the g1 arm): a fallback that resolved a
-# NARROWER set than a run does would make a direct invocation measure something
-# other than what the receipt claims.
+# The module set for the encoding this run is about, resolved by the driver as
+# GO_MODULES. When invoked directly without one — the documented
+# direct-invocation route — the committed encoding's set is the default, which
+# is exactly what subject.mjs resolves when no --encoding is named. Kept
+# byte-for-byte in step with the driver's own derivation (go.sh): a fallback
+# that resolved a NARROWER set than a run does would make a direct invocation
+# measure something other than what the receipt claims.
 if [[ -z "${GO_MODULES+x}" ]]; then
   GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
-  GO_MODULES_ORIGIN="corpus"
 fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
@@ -29,15 +30,17 @@ if [[ "${1:-}" == "--inputs" ]]; then
   # via GO_S_* env), so it is a digest contributor — `text:` entries are
   # literal contributors, per digestSet in lib/ledger.mjs. Without this line,
   # editing the floor and resuming a run REPLAYED the old verdict: measured
-  # 2026-08-09, denovo.checks.min_assertions 39 → 1000 then --run-id resume
-  # printed "p6-tests: PASS (replayed)" — a PASS the edited configuration
-  # would refuse. The undeclared case is a distinct contributor because it
-  # changes the receipt (the toothless-guard note below).
-  if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
-    _floor="${GO_S_DENOVO_MIN_ASSERTIONS:-undeclared}"
-  else
-    _floor="${GO_S_MIN_ASSERTIONS:-undeclared}"
-  fi
+  # 2026-08-09, the encoding-under-test's min_assertions 39 → 1000 then
+  # --run-id resume printed "p6-tests: PASS (replayed)" — a PASS the edited
+  # configuration would refuse. The undeclared case is a distinct contributor
+  # because it changes the receipt (the toothless-guard note below).
+  #
+  # ONE read where there used to be a two-armed branch on the module set's
+  # origin. Both arms collapsed to the same line once floors began travelling
+  # WITH their encoding: the selected encoding's floor IS GO_S_MIN_ASSERTIONS,
+  # whichever encoding was selected, so there is no longer anything to tell
+  # apart here. The branch was deleted rather than renamed.
+  _floor="${GO_S_MIN_ASSERTIONS:-undeclared}"
   # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
   # `--fixed-now` is what this stage passes to `l4` a few lines down, and it is
   # the answer to "as at what date does the law say this". It was in NO stage's
@@ -55,13 +58,45 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
 REPORT="$GO_OUT/p6-assertions.txt"
 
+# WHICH SIDECAR KEYS THIS RUN'S DIAGNOSTICS MUST NAME. The stage never branches
+# on which encoding it was handed to decide what to MEASURE — that travels in
+# the ordinary variables — but a note telling a human to go and edit a key has
+# to name a key that is actually in their file, and the committed encoding's
+# declarations sit at the top level of subject.json while an additional
+# encoding's sit under its own id. Derived once, from the id the driver
+# resolved, so no message below can point at a key that does not exist — the
+# old note said "denovo.checks.min_assertions", which is now no key at all.
+# Both floor spellings are derived even though only the additional encoding's
+# note can fire today (subject.mjs makes `checks` mandatory on the committed
+# encoding, so its floor is never absent): the pair is the mapping, and a
+# half-derived mapping is what goes stale when the schema next moves.
+# THREE cases, not two. `undeclared` means no additional encoding is declared
+# at all, so there is no id to name and the reader must CREATE the entry rather
+# than fill one in — collapsing it into `primary` sent them to `encoding.*`,
+# which is advice about the committed encoding in the one case that ever fires.
+_ENC_ID="${GO_S_ENCODING_ID:-primary}"
+case "$_ENC_ID" in
+  primary)
+    SIDECAR_MODULES_KEY="encoding.modules"
+    SIDECAR_FLOOR_KEY="checks.min_assertions"
+    ;;
+  undeclared)
+    SIDECAR_MODULES_KEY="encodings.<id>.modules (none is declared yet)"
+    SIDECAR_FLOOR_KEY="encodings.<id>.checks.min_assertions"
+    ;;
+  *)
+    SIDECAR_MODULES_KEY="encodings.$_ENC_ID.modules"
+    SIDECAR_FLOOR_KEY="encodings.$_ENC_ID.checks.min_assertions"
+    ;;
+esac
+
 # The deposit contract (ORCHESTRATOR.md §5.2): a module set the stage cannot
 # see is a missing PREREQUISITE, reported as SKIPPED with the key to declare or
 # the file to deposit — and fatal (exit 5) under L4_GO_REQUIRED=1 via go_skip.
 declare -a MODULES=()
 read -ra MODULES <<<"${GO_MODULES:-}"
 if [[ ${#MODULES[@]} -eq 0 ]]; then
-  go_skip "the '$GO_S_ID' sidecar declares no module set for this milestone's origin (${GO_MODULES_ORIGIN:-corpus}: denovo.modules), so there are no committed #ASSERT directives to run. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
+  go_skip "the '$GO_S_ID' sidecar declares no module set for the encoding this run is about ($_ENC_ID: $SIDECAR_MODULES_KEY), so there are no committed #ASSERT directives to run. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
 fi
 declare -a MISSING=()
 for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING+=("$m"); done
@@ -78,8 +113,9 @@ for m in "${MODULES[@]}"; do
   rc=$?
   set -e
   # A non-zero exit from `l4 run` means a TYPECHECK failure, which the earlier
-  # check stage over the same module set (p3-check; and p3-encode at g2) should
-  # already have caught. If it appears here the run is inconsistent with itself.
+  # check stage over the same module set (p3-check; and p3-encode when the run
+  # is about an additional encoding) should already have caught. If it appears
+  # here the run is inconsistent with itself.
   if [[ $rc -ne 0 ]]; then
     go_broken "l4 run exited $rc on $(basename "$m") (typecheck failure) — the earlier check stage reported this module set checking clean, so the run is inconsistent with itself"
   fi
@@ -99,20 +135,28 @@ TOTAL=$(node -e '
   process.stdout.write(String(r.reduce((n, x) => n + x.assertions_total, 0)));
 ')
 
-# The floor is the subject's own for THIS ORIGIN's module set (D2, 2026-08-09:
-# floors are per-origin — checks.min_assertions measures the committed corpus,
-# denovo.checks.min_assertions measures the deposit; the count compared is
+# The floor is the SELECTED ENCODING's own (D2, 2026-08-09: a floor measures the
+# population it was pinned against, so each encoding carries its own; the
+# committed encoding's lives at checks.min_assertions, an additional encoding's
+# at encodings.<id>.checks.min_assertions, and the driver hands whichever one
+# was selected over as GO_S_MIN_ASSERTIONS). The count compared is
 # assertions_total out of results[], NOT a grep over the source, so pin the
-# floor to the executed figure). A drop below the floor is a finding about the
+# floor to the executed figure. A drop below the floor is a finding about the
 # test carrier, never a pass.
 declare -a FLOOR_NOTES=()
-if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
-  MIN_ASSERTIONS="${GO_S_DENOVO_MIN_ASSERTIONS:-0}"
-  if [[ -z "${GO_S_DENOVO_MIN_ASSERTIONS:-}" ]]; then
-    FLOOR_NOTES+=(--note "the sidecar declares no denovo.checks.min_assertions; the assertion floor defaulted to 0, so the anti-vacuity guard had no teeth on this run. Measure the deposit and pin its floor.")
-  fi
-else
+# THIS BRANCH SURVIVES, and it is not about origin: it is about whether the
+# floor CAN be absent. `checks` is required on the committed encoding, so its
+# floor is always a declared number; an additional encoding's `checks` is
+# optional and arrives EMPTY when omitted. The stage must not invent a floor
+# quietly, so the empty case defaults to 0 and SAYS SO on the receipt, naming
+# the key the reader has to add.
+if [[ "$_ENC_ID" == "primary" ]]; then
   MIN_ASSERTIONS="$GO_S_MIN_ASSERTIONS"
+else
+  MIN_ASSERTIONS="${GO_S_MIN_ASSERTIONS:-0}"
+  if [[ -z "${GO_S_MIN_ASSERTIONS:-}" ]]; then
+    FLOOR_NOTES+=(--note "the sidecar declares no $SIDECAR_FLOOR_KEY; the assertion floor defaulted to 0, so the anti-vacuity guard had no teeth on this run. Measure this encoding and pin its floor.")
+  fi
 fi
 ENV_ARTS=()
 for e in "${ENVELOPES[@]}"; do ENV_ARTS+=(--artifact "$e"); done
@@ -121,26 +165,26 @@ if [[ "$TOTAL" -lt "$MIN_ASSERTIONS" ]]; then
   go_receipt --status DEGRADED \
     --reason "only $TOTAL assertions ran across the module set (floor is $MIN_ASSERTIONS). An empty or near-empty results[] satisfies 'no failed assertion' vacuously, so a low count is a finding about the test carrier, not a pass." \
     --artifact "$REPORT" "${ENV_ARTS[@]}" \
-    --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
+    --metric "encoding_id=$_ENC_ID" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
   exit "$GO_EXIT_FINDING"
 fi
 
 # THE ZERO-ASSERTION CASE IS NOT A GREEN (2026-08-09). With the floor at 0 —
-# the schema default when denovo.checks is undeclared, the natural state of a
-# new subject — a module set carrying no #ASSERT at all fell through the floor
-# check and earned PASS with oracle-class `execution`, whose ORCHESTRATOR.md
-# §3.1 promise is "ran on its target engine, on cases, and agreed". Nothing
-# ran and nothing agreed; measured RED before this branch existed. Unlike
-# p3-check — where temporal closure is one sub-check among several and a
-# 0-over-0 case demotes to NOT CHECKED without moving the status — the
-# assertions ARE this stage's whole oracle, so an empty set demotes the
+# what an additional encoding that declares no `checks` resolves to, the natural
+# state of a fresh deposit — a module set carrying no #ASSERT at all fell
+# through the floor check and earned PASS with oracle-class `execution`, whose
+# ORCHESTRATOR.md §3.1 promise is "ran on its target engine, on cases, and
+# agreed". Nothing ran and nothing agreed; measured RED before this branch
+# existed. Unlike p3-check — where temporal closure is one sub-check among
+# several and a 0-over-0 case demotes to NOT CHECKED without moving the status —
+# the assertions ARE this stage's whole oracle, so an empty set demotes the
 # status itself.
 if [[ "$TOTAL" -eq 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "0 assertions ran across the module set (floor: $MIN_ASSERTIONS). 'No failed assertion' over an empty results[] is vacuous, and this stage's PASS claims oracle-class execution — something ran and agreed — which nothing did. A module set with no #ASSERT directives is a finding about the test carrier; a 0 floor is honest only when 0 is the measured population, and even then the absence of tests is reportable, not green." \
     --artifact "$REPORT" "${ENV_ARTS[@]}" \
     --metric "assertions_total=0" \
-    --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
+    --metric "encoding_id=$_ENC_ID" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
   exit "$GO_EXIT_FINDING"
 fi
 
@@ -149,19 +193,21 @@ if [[ $ORACLE_EXIT -ne 0 ]]; then
     --reason "assert-report found failing assertions or error results in results[]; see $REPORT. Note that 'l4 run' itself exited 0 for every module — the exit code is not the oracle." \
     --artifact "$REPORT" "${ENV_ARTS[@]}" \
     --metric "assertions_total=$TOTAL" \
-    --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
+    --metric "encoding_id=$_ENC_ID" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"}
   exit "$GO_EXIT_FINDING"
 fi
 
-# The closing caveat is origin-specific because the claim it hedges is: at g1
-# the carrier is the committed corpus and no encoding happened; at g2 the
-# carrier is the deposit, whose assertions were written by the same agent that
-# wrote the encoding, and nothing here measures whether they discriminate
-# between the fork register's readings.
-if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
-  CARRIER_NOTE="these are the de novo deposit's own committed assertions, written by the same agent act that wrote the encoding; whether they discriminate between the fork register's readings is not measured by this stage"
+# THE CLOSING CAVEAT IS A GENUINE DIFFERENCE, not an origin sentinel in
+# disguise: it describes WHERE THESE ASSERTIONS CAME FROM, and that is not the
+# same story for the two cases. A run about the committed encoding writes no
+# encoding, so its assertions were already in the tree and were written by
+# whoever committed them; a run about an additional encoding is measuring
+# assertions written by the same agent act that wrote that encoding, which is a
+# weaker independence claim and has to be said out loud.
+if [[ "$_ENC_ID" == "primary" ]]; then
+  CARRIER_NOTE="these are the committed encoding's own assertions, already in the tree before this run: a run about the committed encoding does no encoding, so none of them were written to discriminate between the fork register's readings"
 else
-  CARRIER_NOTE="these are the corpus's own committed assertions; no fork-discriminating tests exist at G1 because G1 does no encoding"
+  CARRIER_NOTE="these are the assertions committed alongside encoding '$_ENC_ID', written by the same agent act that wrote that encoding; whether they discriminate between the fork register's readings is not measured by this stage"
 fi
 
 go_receipt \
@@ -173,5 +219,5 @@ go_receipt \
   --artifact "$REPORT" \
   "${ENV_ARTS[@]}" \
   --metric "assertions_total=$TOTAL" \
-  --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"} \
+  --metric "encoding_id=$_ENC_ID" ${FLOOR_NOTES[@]+"${FLOOR_NOTES[@]}"} \
   --note "$CARRIER_NOTE"

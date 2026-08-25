@@ -23,35 +23,87 @@
 # the file does not exist yet, because its ABSENCE is this leg's designed
 # NOT-EXECUTABLE story rather than a configuration error.
 #
-# AT G2 (GO_MODULES_ORIGIN=denovo, 2026-08-09, D6) THIS LEG RUNS EMIT-ONLY
-# OVER THE DEPOSIT: there is no committed golden for a de novo module, so the
-# golden machinery below is g1's and is not touched. The g2 oracle set is:
-# emission + the dmn-moddle structural gate + a no-cases ENGINE-LOAD PROBE on
-# both harnesses (they accept a bare FILE.dmn). An engine refusing to load the
-# emitted model is a DEGRADED receipt naming the error — a finding about the
-# EXPORTER over this encoding's constructs, which is exactly the §8.1 exhibit.
-# A model both engines load, with no denovo.legs['p7-dmn'].cases declared, is
-# NOT-EXECUTABLE with that blocker: dmn-moddle acceptance is `wellformedness`,
-# which ORCHESTRATOR.md §3.1 bars from PASS.
+# WITH NO GOLDEN TO DIFF AGAINST, THIS LEG RUNS EMIT-ONLY (2026-08-09, D6).
+# That arm was written for the g2 deposit and keyed on GO_MODULES_ORIGIN=denovo
+# — a LABEL. It said which PASS a run was, and the leg inferred from the label
+# what the run could actually be judged against. R2/R3 deleted the sentinel, and
+# the honest question is neither which pass nor even which encoding: it is
+# WHETHER A COMMITTED GOLDEN EXISTS FOR THE ENCODING THIS RUN IS ABOUT, which
+# the sidecar answers outright. A fresh deposit has none — nothing committed
+# exists to diff it against — so the oracle set drops to emission + the
+# dmn-moddle structural gate + a no-cases ENGINE-LOAD PROBE on both harnesses
+# (they accept a bare FILE.dmn). An engine refusing to load the emitted model is
+# a DEGRADED receipt naming the error — a finding about the EXPORTER over this
+# encoding's constructs, which is exactly the §8.1 exhibit. A model both engines
+# load, with no cases file declared for that encoding, is NOT-EXECUTABLE with
+# that blocker: dmn-moddle acceptance is `wellformedness`, which
+# ORCHESTRATOR.md §3.1 bars from PASS.
 
-# The milestone-scoped module set. At corpus origin this leg emits the corpus
-# MAIN module only (the wizard is not part of the DMN golden), so the g1
-# branch keeps reading GO_S_ENCODING; the resolved set drives the g2 branch.
+# The module set the emit-only arm exports from. The driver exports GO_MODULES
+# as the SELECTED encoding's modules; invoked directly without it, fall back to
+# the selected encoding's own set before the entry module, so a hand-run under
+# `--encoding <id>` emits from THAT encoding rather than from the committed one.
+# The golden arm deliberately never reads this: it exports the entry module
+# alone, because the wizard is not part of the DMN golden.
 if [[ -z "${GO_MODULES+x}" ]]; then
-  GO_MODULES="${GO_S_ENCODING:-}"
-  GO_MODULES_ORIGIN="corpus"
+  GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}}"
 fi
 
+# --- IS THERE A GOLDEN TO DIFF AGAINST? -------------------------------------
+#
+# The one question this leg's shape turns on, and it is now asked of the
+# DECLARATION rather than of a label. That re-keying is the substantive part of
+# the R2/R3 change here. `GO_MODULES_ORIGIN=denovo` said which PASS a run was,
+# and the leg then had to KNOW, as an unwritten fact about the run, that a
+# second pass happens to have nothing committed to diff against — so the
+# stage set and the oracle were welded together in a reader's head, and a third
+# encoding would have had nowhere to sit. The sidecar states the fact outright,
+# so the leg reads it: no golden, no differential oracle, whoever the run is
+# about.
+GOLDEN="${GO_S_DMN_GOLDEN:-}"
+
+# TRANSITIONAL GUARD, CARRYING THE CONDITION FOR ITS OWN DELETION.
+#
+# The selection spread in etc/go/lib/subject.mjs ("THE SELECTION WINS, LAST")
+# overrides only GO_S_ENCODING_MODULES, GO_S_MIN_* and GO_S_ENCODING_DMN_CASES,
+# so a run about an ADDITIONAL encoding still inherits the COMMITTED encoding's
+# GO_S_DMN_GOLDEN. MEASURED 2026-08-24: `node etc/go/lib/subject.mjs regcf
+# --encoding cleanroom-2026-08` prints
+# GO_S_DMN_GOLDEN=jl4/examples/dmn/expected/regcf-corpus.dmn. Left unguarded the
+# golden arm would then export GO_S_ENCODING — the COMMITTED entry module, which
+# the selection does not override either — diff it against its own golden and,
+# regcf having a cases file, report PASS/execution, while the run is about the
+# deposit. That is a green receipt measuring an encoding the run was not about,
+# which is worse than a red one.
+#
+# DELETE THIS GUARD, NOT THE TEST ABOVE, once the resolver blanks the keys a
+# selected encoding does not carry: `GO_S_DMN_GOLDEN: ""` beside the existing
+# `GO_S_ENCODING_DMN_CASES: ""` in that function's `out` initialiser. The test
+# above is then correct on its own for every encoding that has no golden.
+#
+# NOT CLAIMED, because it is not true yet: that an additional encoding which
+# ACQUIRED a golden would ride the arm below untouched. Two further things would
+# have to move first — subject.mjs's ALT_LEG_KEYS/ALT_LEG_ENV, which today
+# REFUSE a `golden` key on an additional encoding (etc/go/selftest.mjs asserts
+# exactly that refusal), and the arm's `$L4 export "$GO_S_ENCODING"`, which
+# names the committed entry module rather than the selected encoding's. What
+# this test buys today is that the leg no longer decides on a label, and that
+# whichever of those lands, the decision here needs no re-derivation.
+[[ "${GO_S_ENCODING_ID:-primary}" == "primary" ]] || GOLDEN=""
+
 if [[ "${1:-}" == "--inputs" ]]; then
-  if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
+  # Same question, same answer: with no golden the inputs are the deposit and
+  # the two engine harnesses; with one they additionally include the goldens and
+  # the canonicaliser that compares against them.
+  if [[ -z "$GOLDEN" ]]; then
     printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" \
       "$GO_ROOT/etc/validate-dmn.mjs" \
-      ${GO_S_DENOVO_DMN_CASES:+"$GO_S_DENOVO_DMN_CASES"} \
+      ${GO_S_ENCODING_DMN_CASES:+"$GO_S_ENCODING_DMN_CASES"} \
       "$GO_ROOT/etc/kie-dmn-check/run.sh" \
       "$GO_ROOT/etc/camunda-dmn-check/run.sh"
   else
     printf '%s\n' "$GO_S_ENCODING" "${BASH_SOURCE[0]}" \
-      "$GO_S_DMN_GOLDEN" \
+      "$GOLDEN" \
       "$GO_S_DMN_FIDELITY_GOLDEN" \
       "$GO_ROOT/etc/validate-dmn.mjs" \
       "$GO_ROOT/etc/go/lib/canon-diff.mjs" \
@@ -64,12 +116,27 @@ fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-# ============================== the g2 branch ================================
-if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
+# WHICH SIDECAR KEY A DIAGNOSTIC TELLS THE READER TO EDIT is one of the two
+# things that genuinely differ between encodings, so it is one of the two things
+# still keyed on GO_S_ENCODING_ID. The committed encoding declares its modules
+# and its legs at the top level of subject.json; an additional encoding declares
+# them under its own id. Building the names here means a note always points at a
+# key that EXISTS — the pre-R2 text said `denovo.legs['p7-dmn'].cases`, which is
+# now no key at all, so a reader following it would edit nothing.
+if [[ "${GO_S_ENCODING_ID:-primary}" == "primary" ]]; then
+  S_MODULES_KEY="encoding.modules"
+  S_CASES_KEY="legs['p7-dmn'].cases"
+else
+  S_MODULES_KEY="encodings['$GO_S_ENCODING_ID'].modules"
+  S_CASES_KEY="encodings['$GO_S_ENCODING_ID'].legs['p7-dmn'].cases"
+fi
+
+# ========================= the emit-only arm: no golden ======================
+if [[ -z "$GOLDEN" ]]; then
   declare -a MODULES=()
   read -ra MODULES <<<"${GO_MODULES:-}"
   if [[ ${#MODULES[@]} -eq 0 ]]; then
-    go_skip "the '$GO_S_ID' sidecar declares no denovo.modules, so there is no de novo module to emit DMN from. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
+    go_skip "the '$GO_S_ID' sidecar declares no $S_MODULES_KEY, so there is no de novo module to emit DMN from. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
   fi
   declare -a MISSING=()
   for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING+=("$m"); done
@@ -77,7 +144,7 @@ if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
     go_skip "the declared module set has not been fully deposited yet: ${#MISSING[@]} of ${#MODULES[@]} module(s) are not files — ${MISSING[*]}. Depositing them is agent work; re-run this stage after."
   fi
 
-  CASES="${GO_S_DENOVO_DMN_CASES:-}"
+  CASES="${GO_S_ENCODING_DMN_CASES:-}"
   TOTAL_BLOCKING=0
   TOTAL_LOSSY=0
   TOTAL_ADVISORY=0
@@ -111,7 +178,7 @@ if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
       go_receipt --status DEGRADED \
         --reason "l4 export --to dmn exited $EXPORT_RC on $STEM.l4, $CERT. That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
         --artifact "$GO_OUT/$STEM.dmn.emit.stderr" \
-        --metric "module_origin=denovo" --metric "export_exit=$EXPORT_RC"
+        --metric "encoding_id=${GO_S_ENCODING_ID:-primary}" --metric "export_exit=$EXPORT_RC"
       exit "$GO_EXIT_FINDING"
     fi
     FID="${OUT%.dmn}.fidelity.txt"
@@ -129,7 +196,11 @@ if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
     ARTS+=(--artifact "$OUT" --artifact "$FID" --artifact "$GO_OUT/$STEM.dmn.validate.txt")
   done
 
-  METRICS=(--metric "module_origin=denovo" --metric "modules=${#MODULES[@]}"
+  # `module_origin` named the PASS ("denovo"); `encoding_id` names the thing the
+  # run was about, which is what a receipt has to be joinable on once a subject
+  # can carry more than two encodings. Same position, same receipt, a value that
+  # answers a question instead of asserting a position in history.
+  METRICS=(--metric "encoding_id=${GO_S_ENCODING_ID:-primary}" --metric "modules=${#MODULES[@]}"
     --metric "blocking=$TOTAL_BLOCKING" --metric "lossy=$TOTAL_LOSSY" --metric "advisory=$TOTAL_ADVISORY")
 
   if [[ $VALIDATE_FAILURES -gt 0 ]]; then
@@ -201,9 +272,9 @@ if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
   fi
 
   if [[ "$KIE_PROBE" == "ok" && "$CAM_PROBE" == "ok" ]]; then
-    BLOCKER="no denovo.legs['p7-dmn'].cases is declared in $GO_S_DIR/subject.json (or the declared file is absent), so neither engine harness can EXECUTE the model it just loaded. Writing cases with L4-evaluated expected values is agent work; declaring the path is one sidecar line."
+    BLOCKER="no $S_CASES_KEY is declared in $GO_S_DIR/subject.json (or the declared file is absent), so neither engine harness can EXECUTE the model it just loaded. Writing cases with L4-evaluated expected values is agent work; declaring the path is one sidecar line."
   else
-    BLOCKER="no denovo.legs['p7-dmn'].cases is declared, AND the engine-load probe could not run (kie: $KIE_PROBE, camunda: $CAM_PROBE — a harness with no toolchain skips loudly and prints no VERDICT banner). The strongest oracle that ran is emission + dmn-moddle wellformedness, which ORCHESTRATOR.md §3.1 bars from PASS."
+    BLOCKER="no $S_CASES_KEY is declared, AND the engine-load probe could not run (kie: $KIE_PROBE, camunda: $CAM_PROBE — a harness with no toolchain skips loudly and prints no VERDICT banner). The strongest oracle that ran is emission + dmn-moddle wellformedness, which ORCHESTRATOR.md §3.1 bars from PASS."
   fi
   go_receipt --status NOT-EXECUTABLE \
     --reason "the de novo DMN was emitted (${#MODULES[@]} module(s)) and passes the dmn-moddle interchange gate, and it CANNOT BE claimed executed: no cases file is declared for the deposit${KIE_PROBE:+; engine-load probe kie=$KIE_PROBE camunda=$CAM_PROBE}. R0 makes non-execution a defect, not a caveat, and this receipt is the Blocking line SPEC.md §6 requires." \
@@ -211,9 +282,9 @@ if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
     "${ARTS[@]}" "${METRICS[@]}"
   exit "$GO_EXIT_CLEAN"
 fi
-# ============================ end of the g2 branch ===========================
+# ======================= end of the emit-only arm ============================
 
-GOLDEN="$GO_S_DMN_GOLDEN"
+# GOLDEN is already set, at the top, by the one test this file branches on.
 GOLDEN_FID="$GO_S_DMN_FIDELITY_GOLDEN"
 CASES="$GO_S_DMN_CASES"
 # The regenerated artifact lands under the golden's own basename, so the diff

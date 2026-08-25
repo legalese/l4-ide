@@ -30,6 +30,15 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  bracketsFrom,
+  buildLedger,
+  labelAt,
+  networkClass,
+  pipelineFromJournal,
+  segKey,
+  unionMs,
+} from "./lib/cost-ledger.mjs";
+import {
   CROSS_RUN_INELIGIBLE,
   append,
   digestMembers,
@@ -38,11 +47,19 @@ import {
   hashRecord,
   manifestText,
   read,
+  refold,
   runSubject,
   sha256File as hashOf,
   sha256Text as hashText,
   verify,
 } from "./lib/ledger.mjs";
+import {
+  classOf,
+  comparability,
+  freshness,
+  independence,
+  rolesFor,
+} from "./lib/readset.mjs";
 import * as Store from "./lib/store.mjs";
 import {
   driftFor,
@@ -58,7 +75,7 @@ import {
 } from "./report/md-lite.mjs";
 import {
   checkReceipt,
-  milestoneVerdict,
+  runVerdict,
   ORACLE_CLASSES,
   STATUSES,
 } from "./lib/verdict.mjs";
@@ -224,7 +241,7 @@ check(
   checkReceipt(base({ oracle: null, replayed_from: null })).length > 0,
 );
 
-// -------------------------------------------------------------- 2. milestone
+// ------------------------------------------------------------- 2. run verdict
 
 process.stdout.write("\n-- cross-run replay --\n");
 
@@ -242,7 +259,7 @@ process.stdout.write("\n-- cross-run replay --\n");
     append(j, {
       kind: "run_begin",
       run_id: id,
-      milestone: "g1",
+      encoding: "primary",
       subject,
       repo_head: "abc",
       tree_state: "clean",
@@ -314,7 +331,7 @@ process.stdout.write("\n-- cross-run replay --\n");
     append(j, {
       kind: "run_begin",
       run_id: "2026-01-01-bbbbbbbb-001",
-      milestone: "g1",
+      encoding: "primary",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -363,7 +380,7 @@ process.stdout.write("\n-- cross-run replay --\n");
   append(j, {
     kind: "run_begin",
     run_id: "2026-01-01-cccccccc-001",
-    milestone: "g1",
+    encoding: "primary",
     subject: "subj",
     repo_head: "abc",
     tree_state: "clean",
@@ -398,7 +415,7 @@ process.stdout.write("\n-- cross-run replay --\n");
   );
 }
 
-process.stdout.write("\n-- the milestone rule --\n");
+process.stdout.write("\n-- the run rule --\n");
 
 const declared = ["a", "b", "c"];
 const ok = [
@@ -407,13 +424,12 @@ const ok = [
   base({ stage: "c", status: "SKIPPED", oracle: null, reason: "no tool" }),
 ];
 check(
-  "a milestone of PASS + DEGRADED + SKIPPED is COMPLETE",
-  milestoneVerdict({ declared, receipts: ok, gates: [] }).verdict ===
-    "COMPLETE",
+  "a run of PASS + DEGRADED + SKIPPED is COMPLETE",
+  runVerdict({ declared, receipts: ok, gates: [] }).verdict === "COMPLETE",
 );
 check(
-  "a milestone with a BROKEN receipt is NOT COMPLETE",
-  milestoneVerdict({
+  "a run with a BROKEN receipt is NOT COMPLETE",
+  runVerdict({
     declared,
     receipts: [
       ...ok.slice(0, 2),
@@ -423,13 +439,13 @@ check(
   }).verdict === "BROKEN",
 );
 check(
-  "a milestone missing a declared stage is INCOMPLETE",
-  milestoneVerdict({ declared, receipts: ok.slice(0, 2), gates: [] })
-    .verdict === "INCOMPLETE",
+  "a run missing a declared stage is INCOMPLETE",
+  runVerdict({ declared, receipts: ok.slice(0, 2), gates: [] }).verdict ===
+    "INCOMPLETE",
 );
 check(
-  "a milestone with an unexplained non-PASS is INCOMPLETE",
-  milestoneVerdict({
+  "a run with an unexplained non-PASS is INCOMPLETE",
+  runVerdict({
     declared,
     receipts: [
       ...ok.slice(0, 2),
@@ -439,29 +455,29 @@ check(
   }).verdict === "INCOMPLETE",
 );
 check(
-  "a refused gate makes the milestone GATE",
-  milestoneVerdict({
+  "a refused gate makes the run GATE",
+  runVerdict({
     declared,
     receipts: ok,
     gates: [{ gate: "HG1", state: "refused" }],
   }).verdict === "GATE",
 );
 check(
-  "a WAIVED gate does not block the milestone",
-  milestoneVerdict({
+  "a WAIVED gate does not block the run",
+  runVerdict({
     declared,
     receipts: ok,
     gates: [{ gate: "HG1", state: "waived", reason: "why" }],
   }).verdict === "COMPLETE",
 );
 check(
-  "a milestone that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
-  milestoneVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
+  "a run that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
+  runVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
     "INCOMPLETE",
 );
 check(
   "BROKEN outranks GATE",
-  milestoneVerdict({
+  runVerdict({
     declared,
     receipts: [
       ...ok.slice(0, 2),
@@ -479,7 +495,7 @@ const journal = resolve(dir, "journal.ndjson");
 append(journal, {
   kind: "run_begin",
   run_id: "test",
-  milestone: "g1",
+  encoding: "primary",
   subject: "t",
   declared_stages: ["a"],
 });
@@ -556,7 +572,7 @@ process.stdout.write("\n-- the gate payload --\n");
   append(j, {
     kind: "run_begin",
     run_id: "payload-test",
-    milestone: "g1",
+    encoding: "primary",
     subject: "fixture-subject",
     repo_head: "abc",
     tree_state: "clean",
@@ -655,7 +671,7 @@ process.stdout.write("\n-- gate ordering --\n");
   append(j, {
     kind: "run_begin",
     run_id: "order-test",
-    milestone: "g1",
+    encoding: "primary",
     subject: "fixture-subject",
     declared_stages: ["p6-tests"],
     gated_stages: JSON.stringify({ HG1: ["p6-tests"], HG2: ["p10-publish"] }),
@@ -688,7 +704,7 @@ process.stdout.write("\n-- gate ordering --\n");
   append(j, {
     kind: "run_begin",
     run_id: "order-ok",
-    milestone: "g1",
+    encoding: "primary",
     subject: "fixture-subject",
     declared_stages: ["p6-tests"],
     gated_stages: JSON.stringify({ HG1: ["p6-tests"] }),
@@ -754,6 +770,20 @@ const SUBJECTS = execFileSync(
   .filter(Boolean);
 check("at least one subject sidecar exists", SUBJECTS.length >= 1);
 const FIXTURE_SUBJECT = SUBJECTS[0];
+// The additional encoding this subject declares, if any. DERIVED, never
+// hardcoded: R9 replaced "the second pass" with a NAMED id, and a test that
+// spelled the name out would go quietly wrong the day a sidecar renames it —
+// which is the whole failure mode an id exists to prevent. `undeclared` is the
+// third case, and is what a subject that has declared none resolves to.
+const FIXTURE_ENCODING =
+  execFileSync(
+    "node",
+    [resolve(HERE, "lib/subject.mjs"), FIXTURE_SUBJECT, "--encodings"],
+    { encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter(Boolean)[0] ?? "undeclared";
 
 {
   // Every declared sidecar must resolve cleanly.
@@ -1011,11 +1041,11 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
     // diff would have been a partial identity with no error anywhere.
     const r = withCorpus((desc) => {
       FIVE(desc);
-      desc.denovo = { ...(desc.denovo ?? {}), modules: [WILLS] };
+      desc.encodings = { "cleanroom-a": { modules: [WILLS] } };
     });
     check(
-      "a denovo module colliding with a corpus module that is NEITHER main NOR the wizard is refused",
-      r.status === 2 && /also a corpus module/.test(r.stderr),
+      "an additional encoding's module colliding with a committed module that is NEITHER main NOR the wizard is refused",
+      r.status === 2 && /also a committed encoding module/.test(r.stderr),
     );
   }
   {
@@ -1030,8 +1060,8 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
         [
           resolve(HERE, "go.sh"),
           "plan",
-          "--milestone",
-          "g1",
+          "--encoding",
+          "primary",
           "--subject",
           "cm",
         ],
@@ -1039,7 +1069,7 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
       );
     const before = planOf();
     check(
-      "the g1 gate digest covers every declared corpus module, not just the entry module",
+      "the primary gate digest covers every declared corpus module, not just the entry module",
       before.status === 0 &&
         [ONTOLOGY, MAIN, WILLS, INTESTATE, WIZARD].every((m) =>
           before.stdout.includes(m.replace(`${REPO_ROOT}/`, "")),
@@ -1130,8 +1160,8 @@ const FIXTURE_SUBJECT = SUBJECTS[0];
       run,
       "--run-id",
       "corpus-metrics-test",
-      "--milestone",
-      "g1",
+      "--encoding",
+      "primary",
       "--subject",
       "cm",
       "--declared",
@@ -1212,14 +1242,14 @@ process.stdout.write("\n-- the signable document --\n");
   const root = mkdtempSync(resolve(tmpdir(), "l4-go-payload-"));
   const GP = resolve(HERE, "lib/gate-payload.mjs");
 
-  const mkRun = (id, milestone, p0Row) => {
+  const mkRun = (id, encoding, p0Row) => {
     const d = resolve(root, id);
     mkdirSync(d, { recursive: true });
     const j = resolve(d, "journal.ndjson");
     append(j, {
       kind: "run_begin",
       run_id: id,
-      milestone,
+      encoding,
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -1252,7 +1282,7 @@ process.stdout.write("\n-- the signable document --\n");
       .split("\n")
       .filter(Boolean);
 
-  const executed = render(mkRun("2026-01-01-aaaaaaaa-001", "g1", p0({})));
+  const executed = render(mkRun("2026-01-01-aaaaaaaa-001", "primary", p0({})));
   check(
     "a payload over an EXECUTED p0-preflight renders",
     executed.status === 0,
@@ -1285,13 +1315,13 @@ process.stdout.write("\n-- the signable document --\n");
   );
 
   // And the refusals: a document that names nothing must not be signable.
-  const blindG1 = render(mkRun("2026-01-03-aaaaaaaa-001", "g1", null));
+  const blindG1 = render(mkRun("2026-01-03-aaaaaaaa-001", "primary", null));
   check(
-    "a g1 payload with no p0-preflight at all REFUSES",
+    "a primary payload with no p0-preflight at all REFUSES",
     blindG1.status === 2,
   );
   check(
-    "the g1 refusal names p0-preflight as the stage to run",
+    "the primary refusal names p0-preflight as the stage to run",
     /p0-preflight/.test(blindG1.stderr),
   );
   check(
@@ -1299,9 +1329,9 @@ process.stdout.write("\n-- the signable document --\n");
     !/l4-go gate payload/.test(blindG1.stdout),
   );
 
-  const blindG2 = render(mkRun("2026-01-04-aaaaaaaa-001", "g2", null));
+  const blindG2 = render(mkRun("2026-01-04-aaaaaaaa-001", "cleanroom-a", null));
   check(
-    "a g2 payload REFUSES — p0-preflight is not a g2 stage",
+    "a deposit payload REFUSES — p0-preflight is not a deposit stage",
     blindG2.status === 2,
   );
 
@@ -1309,7 +1339,7 @@ process.stdout.write("\n-- the signable document --\n");
   // fully populated journal with every declared stage green. An empty journal
   // would refuse under a much weaker rule ("no stages, no payload"); a g2 run
   // that did everything asked of it and still cannot describe what it blesses
-  // is the actual property, because p0-preflight is not in G2_STAGES at all.
+  // is the actual property, because p0-preflight is not in DEPOSIT_STAGES at all.
   {
     const d = resolve(root, "2026-01-05-aaaaaaaa-001");
     mkdirSync(d, { recursive: true });
@@ -1330,7 +1360,7 @@ process.stdout.write("\n-- the signable document --\n");
     append(j, {
       kind: "run_begin",
       run_id: "2026-01-05-aaaaaaaa-001",
-      milestone: "g2",
+      encoding: "cleanroom-a",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -1351,12 +1381,12 @@ process.stdout.write("\n-- the signable document --\n");
       });
     const fullG2 = render(d);
     check(
-      "a FULLY GREEN g2 run still refuses — every stage passed and none states the corpus",
+      "a FULLY GREEN deposit run still refuses — every stage passed and none states the corpus",
       fullG2.status === 2,
     );
     check(
       "and it says so without claiming the run failed",
-      /not a declared g2 stage/.test(fullG2.stderr),
+      /not among this run's declared stages/.test(fullG2.stderr),
     );
   }
 
@@ -1375,10 +1405,52 @@ process.stdout.write("\n-- the signable document --\n");
       /stage_end/.test(readFileSync(GP, "utf8")),
   );
   check(
-    "the g2 refusal explains why g2 differs, and names the waiver as the honest alternative",
-    /not a declared g2 stage/.test(blindG2.stderr) &&
+    "the deposit refusal explains why the deposit path differs, and names the waiver as the honest alternative",
+    /not among this run's declared stages/.test(blindG2.stderr) &&
       /[Ww]aive/.test(blindG2.stderr),
   );
+
+  // R9 REGRESSION, PINNED. The arm used to be chosen by `begin.milestone ===
+  // "g2"`, and journal schema 5 stopped writing that field — so a deposit run
+  // fell through to the OTHER arm, which still refused (the same exit code, the
+  // same absence of a payload) while telling the reader to "run p0-preflight in
+  // this run". p0-preflight is not in DEPOSIT_STAGES and `--only p0-preflight`
+  // intersects to nothing, so the advice could not be followed: a silent
+  // downgrade from a correct refusal to an impossible instruction. The arm is
+  // now chosen by the DECLARED STAGE LIST, which every schema from 2 onward
+  // records, so both spellings resolve to the same, correct advice.
+  {
+    const armFor = (beginExtra, stages) => {
+      const d = mkdtempSync(resolve(tmpdir(), "l4-go-gatearm-"));
+      append(resolve(d, "journal.ndjson"), {
+        kind: "run_begin",
+        run_id: "2026-01-05-aaaaaaaa-001",
+        subject: "subj",
+        repo_head: "abc",
+        tree_state: "clean",
+        fixed_now: "2025-01-31T00:00:00Z",
+        declared_stages: stages,
+        ...beginExtra,
+      });
+      return render(d).stderr;
+    };
+    const DEPOSIT = ["p1-ingest", "p6-tests", "p8-diff", "p9-report"];
+    const PRIMARY = ["p0-preflight", "p3-check", "p6-tests", "p9-report"];
+    const deposit = /not among this run's declared stages/;
+    const primary = /Run p0-preflight in this run/;
+    check(
+      "the refusal arm is chosen by the declared stages, so a schema-5 deposit run gets deposit advice",
+      deposit.test(armFor({ encoding: "cleanroom-a" }, DEPOSIT)),
+    );
+    check(
+      "…and a legacy row carrying `milestone` instead of `encoding` resolves to the SAME arm",
+      deposit.test(armFor({ milestone: "g2" }, DEPOSIT)),
+    );
+    check(
+      "…while a run that DOES declare p0-preflight is told to run it, which it can",
+      primary.test(armFor({ encoding: "primary" }, PRIMARY)),
+    );
+  }
 
   // The old behaviour, pinned so it cannot come back: the parenthetical must
   // never be PUSHED into the document again. (The string still appears in
@@ -1470,6 +1542,7 @@ process.stdout.write("\n-- the register schemas --\n");
       "archive-method-requires-archive-url",
       "integrity-digest-or-immutable-capture",
       "assembled-digest-matches",
+      "retrieval-cost-covers-its-documents",
       "covers-or-absent-reason",
       "covers-range-ordered",
       "in-force-or-absent-reason",
@@ -1616,6 +1689,566 @@ process.stdout.write("\n-- the register schemas --\n");
   }
 }
 
+// ------------------------------------------------- 3f. cost accounting
+//
+// Two halves with two standings, and the checks below are about keeping them
+// apart. The attested half must be refusable — a driver-measured duration that
+// nothing could falsify is decoration. The attributed half must not
+// double-count, must not silently mix a whole-session figure with a
+// run-window one, and must never report a union larger than its parts.
+process.stdout.write("\n-- cost accounting --\n");
+{
+  const cdir = mkdtempSync(resolve(tmpdir(), "l4-go-cost-"));
+
+  // ---- the attested half: an elapsed_ms cannot exceed its own bracket -------
+  //
+  // Writing the rows by hand and then re-hashing is the point: this is exactly
+  // what an edit that inflates a duration would have to do, and it must still
+  // be caught by arithmetic rather than by the chain.
+  const bracketed = (elapsedMs, gapMs, { withBegin = true } = {}) => {
+    const f = resolve(cdir, `br-${elapsedMs}-${gapMs}-${withBegin}.ndjson`);
+    rmSync(f, { force: true });
+    append(f, {
+      kind: "run_begin",
+      run_id: "t",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a"],
+    });
+    if (withBegin) append(f, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(f, base({ stage: "a", elapsed_ms: elapsedMs }));
+    // Re-stamp the last row's ts so the bracket is a known width, then repair
+    // its hash and every `prev` after it — the chain must stay intact so the
+    // ONLY thing verify can complain about is the duration.
+    const rows = readFileSync(f, "utf8").trimEnd().split("\n").map(JSON.parse);
+    const beginIdx = rows.findIndex((r) => r.kind === "stage_begin");
+    const endIdx = rows.findIndex((r) => r.kind === "stage_end");
+    const t0 = Date.parse(rows[beginIdx >= 0 ? beginIdx : 0].ts);
+    rows[endIdx].ts = new Date(t0 + gapMs).toISOString();
+    let prev = rows[0].prev;
+    for (const r of rows) {
+      r.prev = prev;
+      r.hash = hashRecord(r);
+      prev = r.hash;
+    }
+    writeFileSync(f, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    return f;
+  };
+  const complains = (f) =>
+    verify(f).problems.filter((p) => /elapsed_ms/.test(p));
+
+  check(
+    "an elapsed_ms inside its own bracket verifies",
+    verify(bracketed(4000, 5000)).ok === true,
+  );
+  check(
+    "an elapsed_ms LARGER than its bracket is reported",
+    complains(bracketed(9000, 5000)).length === 1,
+  );
+  check(
+    "…and the finding names both numbers, so it can be checked by hand",
+    /9000/.test(complains(bracketed(9000, 5000))[0]) &&
+      /5000/.test(complains(bracketed(9000, 5000))[0]),
+  );
+  // The tolerance exists for the second-resolution `date` fallback in
+  // lib/clock.sh, which can overshoot a true interval by just under 1000 ms.
+  check(
+    "the clock tolerance forgives sub-second overshoot",
+    complains(bracketed(5900, 5000)).length === 0,
+  );
+  check(
+    "…but not a second and a half of it",
+    complains(bracketed(6500, 5000)).length === 1,
+  );
+  // A replay writes no stage_begin: there is no bracket, so there is nothing to
+  // check. Exempt by construction rather than by an exception in the code.
+  check(
+    "a replayed row, which has no stage_begin, is not accused",
+    complains(bracketed(99000, 1, { withBegin: false })).length === 0,
+  );
+  check(
+    "a row carrying no elapsed_ms at all is not accused either",
+    (() => {
+      const f = resolve(cdir, "noel.ndjson");
+      append(f, {
+        kind: "run_begin",
+        run_id: "t",
+        encoding: "primary",
+        subject: "t",
+        declared_stages: ["a"],
+      });
+      append(f, { kind: "stage_begin", stage: "a", attempt: 1 });
+      append(f, base({ stage: "a" }));
+      return verify(f).ok === true;
+    })(),
+  );
+
+  // ---- the union: never larger than the sum, never smaller than a part ------
+  check(
+    "unionMs merges overlapping intervals",
+    unionMs([
+      [0, 10],
+      [5, 20],
+    ]) === 20,
+  );
+  check(
+    "unionMs adds disjoint ones",
+    unionMs([
+      [0, 10],
+      [30, 40],
+    ]) === 20,
+  );
+  check(
+    "unionMs absorbs a contained interval",
+    unionMs([
+      [0, 100],
+      [10, 20],
+    ]) === 100,
+  );
+  check(
+    "unionMs does not depend on input order",
+    unionMs([
+      [30, 40],
+      [0, 10],
+    ]) === 20,
+  );
+  check(
+    "unionMs discards a zero-width or reversed interval rather than counting it",
+    unionMs([
+      [5, 5],
+      [10, 4],
+      [0, 10],
+    ]) === 10,
+  );
+  check(
+    "a union never exceeds the sum of its parts",
+    unionMs([
+      [0, 10],
+      [5, 20],
+      [30, 40],
+    ]) <=
+      10 + 15 + 10,
+  );
+
+  // ---- the attributed half, over a synthetic transcript --------------------
+  //
+  // Built to carry all three traps at once: one request split across four rows
+  // repeating the same usage, a subagent transcript in its own file, and a tool
+  // call left unpaired.
+  const projects = resolve(cdir, "cfg", "projects", "-proj");
+  const SID = "11111111-2222-3333-4444-555555555555";
+  mkdirSync(resolve(projects, SID, "subagents", "workflows", "wf_x"), {
+    recursive: true,
+  });
+  const at = (ms) => new Date(Date.UTC(2026, 0, 1, 0, 0, 0) + ms).toISOString();
+  const usage = (out) => ({
+    input_tokens: 1,
+    output_tokens: out,
+    cache_creation_input_tokens: 10,
+    cache_read_input_tokens: 100,
+    output_tokens_details: { thinking_tokens: 2 },
+    server_tool_use: { web_search_requests: 3, web_fetch_requests: 0 },
+  });
+  const rowsMain = [
+    // ONE request, four rows, identical usage. Summing rows gives 4x.
+    ...["thinking", "text", "tool_use", "tool_use"].map((kind, i) => ({
+      type: "assistant",
+      timestamp: at(1000 + i),
+      requestId: "req_A",
+      message: {
+        model: "m1",
+        usage: usage(100),
+        content:
+          kind === "tool_use"
+            ? [
+                {
+                  type: "tool_use",
+                  id: `tu${i}`,
+                  name: i === 2 ? "WebSearch" : "Bash",
+                },
+              ]
+            : [{ type: kind }],
+      },
+    })),
+    // the results, 2s and 4s later
+    {
+      type: "user",
+      timestamp: at(3002),
+      message: { content: [{ type: "tool_result", tool_use_id: "tu2" }] },
+    },
+    {
+      type: "user",
+      timestamp: at(5003),
+      message: { content: [{ type: "tool_result", tool_use_id: "tu3" }] },
+    },
+    // a second request, OUTSIDE the window used below
+    {
+      type: "assistant",
+      timestamp: at(900_000),
+      requestId: "req_B",
+      message: { model: "m1", usage: usage(7), content: [{ type: "text" }] },
+    },
+    // a tool call that never returns — counted, never timed
+    {
+      type: "assistant",
+      timestamp: at(910_000),
+      requestId: "req_C",
+      message: {
+        model: "m1",
+        usage: usage(1),
+        content: [{ type: "tool_use", id: "tu9", name: "Bash" }],
+      },
+    },
+  ];
+  writeFileSync(
+    resolve(projects, `${SID}.jsonl`),
+    rowsMain.map((r) => JSON.stringify(r)).join("\n") + "\n",
+  );
+  writeFileSync(
+    resolve(projects, SID, "subagents", "workflows", "wf_x", "agent-1.jsonl"),
+    [
+      {
+        type: "assistant",
+        timestamp: at(2000),
+        requestId: "req_S",
+        isSidechain: true,
+        message: { model: "m1", usage: usage(50), content: [{ type: "text" }] },
+      },
+      // A HALF-WRITTEN LAST LINE, which a live session always has.
+      null,
+    ]
+      .filter(Boolean)
+      .map((r) => JSON.stringify(r))
+      .join("\n") + '\n{"type":"assist',
+  );
+
+  const led = buildLedger({
+    sessions: [{ session: SID, attributed_by: "declared" }],
+    from: at(0),
+    to: at(10_000),
+    root: resolve(cdir, "cfg"),
+  });
+
+  check(
+    "a request split across four rows is counted ONCE",
+    led.totals.session_total.requests === 4, // req_A, req_B, req_C, req_S
+  );
+  check(
+    "…and its tokens are not multiplied by its row count",
+    led.totals.session_total.output_tokens === 100 + 7 + 1 + 50,
+  );
+  check(
+    "a subagent transcript is found and counted",
+    led.by_role.subagent.requests === 1 && led.by_role.main.requests === 3,
+  );
+  check(
+    "…and the roles re-sum to the total",
+    led.by_role.subagent.output_tokens + led.by_role.main.output_tokens ===
+      led.totals.session_total.output_tokens,
+  );
+  check(
+    "the harness's own sidechain marking agrees with the file-role split",
+    led.sidechain_requests === led.by_role.subagent.requests,
+  );
+  check(
+    "a truncated final line does not abort the read",
+    led.transcripts.length === 2 &&
+      led.transcripts.every((t) => typeof t.sha256 === "string"),
+  );
+  check(
+    "the window clips requests, and in-window never exceeds the total",
+    led.totals.in_window.requests === 2 &&
+      led.totals.in_window.requests < led.totals.session_total.requests,
+  );
+  {
+    const ws = led.tools.find((t) => t.name === "WebSearch");
+    const bash = led.tools.find((t) => t.name === "Bash");
+    check(
+      "a tool call is timed from its own result",
+      ws.calls === 1 && ws.ms === 2000,
+    );
+    check(
+      "an unreturned tool call is counted and left untimed",
+      bash.calls === 2 && bash.unpaired === 1 && bash.ms === 4000,
+    );
+    // THE DEFECT THIS PAIR EXISTS FOR, found by reading the first real run: a
+    // whole-session tool total sat beside a run-window token total under
+    // sibling names, and read as one measurement.
+    check(
+      "every tool's in-window duration is clipped, never the session total",
+      led.tools.every(
+        (t) => t.ms_in_window <= t.ms && t.calls_in_window <= t.calls,
+      ),
+    );
+    check(
+      "…and the same holds for the network rollup",
+      Object.keys(led.network.calls).every(
+        (k) =>
+          led.network.calls_in_window[k] <= led.network.calls[k] &&
+          led.network.ms_in_window[k] <= led.network.ms[k],
+      ),
+    );
+    check(
+      "a backgrounded tool's duration is flagged as dispatch, not as work",
+      led.tools.every(
+        (t) =>
+          t.duration_is_dispatch ===
+          ["Workflow", "Agent", "Task", "Monitor"].includes(t.name),
+      ),
+    );
+  }
+  check(
+    "a server-side search count is kept apart from the client tool count",
+    led.network.calls.web_search === 1 &&
+      led.network.server_side.web_search === 12,
+  );
+  check(
+    "the ledger names its own standing rather than leaving it to the reader",
+    led.standing === "attributed",
+  );
+  check(
+    "every transcript read is named with its sha256 and byte count",
+    led.transcripts.every(
+      (t) => /^sha256:[0-9a-f]{64}$/.test(t.sha256) && t.bytes > 0,
+    ),
+  );
+  check(
+    "the occupancy floor contains both of its parts and exceeds neither sum",
+    led.occupancy.busy_ms_lower_bound >= led.occupancy.agent_tool_ms &&
+      led.occupancy.busy_ms_lower_bound >= led.occupancy.pipeline_busy_ms &&
+      led.occupancy.busy_ms_lower_bound <=
+        led.occupancy.agent_tool_ms + led.occupancy.pipeline_busy_ms,
+  );
+  check(
+    "a session with no transcript on this machine is reported, not dropped",
+    (() => {
+      const l = buildLedger({
+        sessions: [{ session: "no-such-session", attributed_by: "declared" }],
+        root: resolve(cdir, "cfg"),
+      });
+      return l.sessions.length === 1 && l.sessions[0].transcripts === 0;
+    })(),
+  );
+  check(
+    "networkClass names the two web tools and any MCP tool",
+    () =>
+      networkClass("WebSearch") === "web_search" &&
+      networkClass("WebFetch") === "web_fetch" &&
+      networkClass("mcp__x__y") === "mcp" &&
+      networkClass("Bash") === null,
+  );
+
+  // ---- the join: which sessions belong to this run -------------------------
+  {
+    const j = resolve(cdir, "sess.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "r1",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a", "b"],
+    });
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    append(j, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(j, base({ stage: "a", elapsed_ms: 10, dispatch_ms: 3 }));
+    // a second invocation, same session — one session, two rows
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    // a third, driven by hand: no session id at all
+    append(j, { kind: "session", session: null, agent: null, cwd: "/x" });
+    append(
+      j,
+      base({ stage: "b", status: "DEGRADED", reason: "r", oracle: null }),
+    );
+    append(j, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    const p = pipelineFromJournal(j);
+    check("driver-observed sessions are deduplicated", p.sessions.length === 1);
+    check(
+      "…while the invocations that produced them are counted",
+      p.invocations === 3,
+    );
+    check(
+      "an invocation with no session is counted as unattributable, not as zero",
+      p.unattributed_invocations === 1,
+    );
+    check(
+      "a stage with no elapsed_ms is NAMED rather than averaged over",
+      p.totals.untimed === 1 && p.totals.stages === 2,
+    );
+    check(
+      "the attested half declares itself attested",
+      p.standing === "attested",
+    );
+    check(
+      "a finished run's window closes at its own run_end",
+      typeof p.ended_at === "string",
+    );
+    check(
+      "each stage contributes one bracket to the busy union",
+      p.busy_intervals.length === 1,
+    );
+  }
+
+  // ---- WHAT THE ADVERSARIAL REVIEW OF THIS MACHINERY FOUND ------------------
+  //
+  // Each block below is a defect that shipped and a check that would have
+  // stopped it. They are grouped because they share one shape: a figure that
+  // was correct on the path it was written for and wrong on a path nobody
+  // re-read it against.
+  {
+    // 1. THE WINDOW ON A RESUMED RUN.
+    //
+    // go.sh writes a `run_end` on EVERY exit, including the `--verdict GATE`
+    // exit it takes when a human gate is not yet satisfied — and the journal is
+    // reused across sittings. Closing the cost window at "the last run_end row"
+    // therefore closed it in the MIDDLE of a gated run's history, clipping out
+    // the whole sitting that granted the gate and did the work. Nothing caught
+    // it: every other check in the oracle is a one-directional bound that a
+    // too-small window satisfies trivially.
+    const j = resolve(cdir, "resumed.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "r",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a", "b"],
+    });
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    append(j, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(j, base({ stage: "a", elapsed_ms: 5 }));
+    append(j, { kind: "run_end", verdict: "GATE", exit: 3 }); // <- the sitting ends at a gate
+    append(j, { kind: "session", session: "s1", agent: null, cwd: "/x" });
+    append(j, { kind: "stage_begin", stage: "b", attempt: 1 });
+    append(j, base({ stage: "b", elapsed_ms: 5 }));
+    const mid = pipelineFromJournal(j);
+    check(
+      "a run_end from an earlier sitting does NOT close a resumed run's window",
+      mid.ended_at === null,
+    );
+
+    const done = resolve(cdir, "finished.ndjson");
+    append(done, {
+      kind: "run_begin",
+      run_id: "r",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a"],
+    });
+    append(done, { kind: "stage_begin", stage: "a", attempt: 1 });
+    append(done, base({ stage: "a", elapsed_ms: 5 }));
+    append(done, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    check(
+      "…while a journal that ENDS with a run_end reports the run finished",
+      typeof pipelineFromJournal(done).ended_at === "string",
+    );
+  }
+
+  {
+    // 2. THE ORPHANED stage_begin.
+    //
+    // "A replay is exempt by construction, because it writes no stage_begin"
+    // was false in the one case that matters. A run killed after a stage_begin
+    // leaves an ORPHAN; if that stage is later satisfied by a cross-run replay,
+    // a backward scan pairs the replay with the orphan. The bracket is then
+    // enormous, no impossible-duration finding can fire inside it, and those
+    // idle hours are reported as attested stage execution.
+    const j = resolve(cdir, "orphan.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: "r",
+      encoding: "primary",
+      subject: "t",
+      declared_stages: ["a"],
+    });
+    append(j, { kind: "stage_begin", stage: "a", attempt: 1 }); // killed here
+    append(j, base({ stage: "a", elapsed_ms: 40, replayed_from: "sha256:x" }));
+    const rows = readFileSync(j, "utf8").trimEnd().split("\n").map(JSON.parse);
+    // Stamp the replay row four hours after the orphan, chain intact, so the
+    // ONLY thing anything could complain about is the pairing.
+    rows[rows.length - 1].ts = new Date(
+      Date.parse(rows[1].ts) + 4 * 3600_000,
+    ).toISOString();
+    let prev = rows[0].prev;
+    for (const r of rows) {
+      r.prev = prev;
+      r.hash = hashRecord(r);
+      prev = r.hash;
+    }
+    writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    // The observable damage was in the BRACKET, not in `verify`: an orphan's
+    // bracket is always at least as long as the replay's own elapsed, so no
+    // impossible-duration finding would have fired either way. Assert the
+    // thing that actually went wrong, and assert that the journal still
+    // verifies — a guard that started reporting findings on legitimate
+    // journals would be its own defect.
+    check(
+      "a replayed row contributes no bracket, so four idle hours are not attested stage time",
+      bracketsFrom(rows).length === 0 &&
+        pipelineFromJournal(j).busy_intervals.length === 0,
+    );
+    check(
+      "…and the journal still verifies clean, so the guard invents no findings",
+      verify(j).ok === true,
+    );
+  }
+
+  {
+    // 3. SEGMENTS — where the cost went.
+    const rows = [
+      { kind: "stage_begin", stage: "a", ts: "2026-01-01T00:00:10.000Z" },
+      {
+        kind: "stage_end",
+        stage: "a",
+        ts: "2026-01-01T00:00:20.000Z",
+        elapsed_ms: 9000,
+      },
+      { kind: "stage_begin", stage: "b", ts: "2026-01-01T00:00:40.000Z" },
+      {
+        kind: "stage_end",
+        stage: "b",
+        ts: "2026-01-01T00:00:50.000Z",
+        elapsed_ms: 9000,
+      },
+    ];
+    const br = bracketsFrom(rows);
+    check("bracketsFrom pairs each executed stage once", br.length === 2);
+    const at = (sec) =>
+      Date.parse(`2026-01-01T00:00:${String(sec).padStart(2, "0")}.000Z`);
+    check(
+      "labelAt is total over the timeline",
+      segKey(labelAt(at(5), br)) === "before:a" &&
+        segKey(labelAt(at(15), br)) === "during:a" &&
+        segKey(labelAt(at(30), br)) === "between:a:b" &&
+        segKey(labelAt(at(45), br)) === "during:b" &&
+        segKey(labelAt(at(59), br)) === "after:b",
+    );
+    check(
+      "…including the exact boundary instants, which belong to the stage",
+      segKey(labelAt(at(10), br)) === "during:a" &&
+        segKey(labelAt(at(20), br)) === "during:a",
+    );
+    check(
+      "a stage re-run inside one journal contributes two brackets, not one",
+      bracketsFrom([
+        ...rows,
+        { kind: "stage_begin", stage: "a", ts: "2026-01-01T00:01:00.000Z" },
+        {
+          kind: "stage_end",
+          stage: "a",
+          ts: "2026-01-01T00:01:10.000Z",
+          elapsed_ms: 9000,
+        },
+      ]).length === 3,
+    );
+    check(
+      "a journal with no brackets still labels every moment",
+      segKey(labelAt(at(5), [])) === "whole-run",
+    );
+  }
+
+  rmSync(cdir, { recursive: true, force: true });
+}
+
 // ------------------------------------------------------------- 4. the driver
 process.stdout.write("\n-- the driver --\n");
 
@@ -1623,7 +2256,7 @@ process.stdout.write("\n-- the driver --\n");
 // function of the journal, which grows while it runs. Keep this list and
 // go.sh's two `--inputs` no-op blocks in step; the idempotence checks below
 // compare against it as a SET, not as a count.
-const NEVER_REPLAY = ["p9-report", "p9-explain"];
+const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
 
 // THE ASSERTION THAT DID NOT EXIST, and whose absence is total when it bites.
 //
@@ -1645,8 +2278,8 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
     [
       resolve(HERE, "go.sh"),
       "plan",
-      "--milestone",
-      "g1",
+      "--encoding",
+      "primary",
       "--subject",
       FIXTURE_SUBJECT,
     ],
@@ -1665,13 +2298,208 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
       `     ungated at or after p6-tests: ${ungated.join(", ")}\n`,
     );
   check(
-    "every declared g1 stage sequenced at or after p6-tests is gated",
+    "every declared primary stage sequenced at or after p6-tests is gated",
     plan.status === 0 && from >= 0 && ungated.length === 0,
   );
   check(
-    "the never-replaying stages are declared g1 members, and the plan names them",
+    "the never-replaying stages are declared primary members, and the plan names them",
     NEVER_REPLAY.every((s) => rows.some((r) => r.stage === s)),
   );
+
+  // ---- R9: the gate set is DERIVED, and the flag that used to pick it is gone
+  //
+  // `gated_by_HG1` was two hand-kept lists, one per stage set, and nothing
+  // stopped them drifting from SPEC.md §7.3's actual sentence ("HG1 blocks P6
+  // onward"). An ungated stage in either list would publish HG1-unreviewed work
+  // and every downstream honesty check would AGREE with the omission, because
+  // verify-run.mjs reads the gated set out of run_begin rather than deriving it.
+  // The rule is now written once and applied; these ask the driver, through
+  // `plan`, what it would actually gate.
+  {
+    const planRows = (subject, encoding) => {
+      const r = spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "plan",
+          "--subject",
+          subject,
+          "--encoding",
+          encoding,
+        ],
+        { encoding: "utf8" },
+      );
+      // Both plans print a per-stage gate column; the primary plan spells it
+      // `gate=HG1` and the deposit plan uses a column. One regex over the
+      // stage-bearing lines covers both.
+      const out = [];
+      for (const line of r.stdout.split("\n")) {
+        const m = /^\s{2}(p\d+[a-z-]*)\s+(?:gate=)?(HG1|HG2|NOT WIRED|-)/.exec(
+          line,
+        );
+        if (m) out.push({ stage: m[1], gate: m[2] });
+      }
+      return { status: r.status, rows: out };
+    };
+    const phase = (st) => Number(/^p(\d+)/.exec(st)[1]);
+
+    for (const [subject, encoding, label] of [
+      [FIXTURE_SUBJECT, "primary", "primary"],
+      [FIXTURE_SUBJECT, FIXTURE_ENCODING, "deposit"],
+    ]) {
+      const { status, rows: pr } = planRows(subject, encoding);
+      check(
+        `the ${label} plan enumerates its stages with a gate each`,
+        status === 0 && pr.length > 0,
+      );
+      // A row the sidecar declares no leg for prints NOT WIRED and is not a
+      // declared stage, so it is outside the rule either way.
+      const declared = pr.filter((r) => r.gate !== "NOT WIRED");
+      check(
+        `every declared ${label} stage from P6 onward is HG1-gated, and none before P6 is`,
+        declared.every((r) =>
+          phase(r.stage) >= 6 && r.gate !== "HG2"
+            ? r.gate === "HG1"
+            : r.gate !== "HG1",
+        ),
+      );
+    }
+  }
+
+  // ---- R9: --milestone refuses, and says what replaced it --------------------
+  //
+  // Refusing beats accepting-and-translating: a shim that still works keeps the
+  // ORDINAL executable, and "the additional encoding" stops naming anything the
+  // day a subject declares two. It also beats a silent "unknown option": the
+  // reader has a mental model to correct, and this message is the only thing
+  // left in the system that can correct it.
+  {
+    const refused = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "plan",
+        "--subject",
+        FIXTURE_SUBJECT,
+        "--milestone",
+        "g1",
+      ],
+      { encoding: "utf8" },
+    );
+    check(
+      "--milestone is REFUSED, not translated and not silently unknown",
+      refused.status === 2 && /--milestone was retired/.test(refused.stderr),
+    );
+    check(
+      "…and the refusal names the replacement for BOTH of its old values",
+      /--encoding primary/.test(refused.stderr) &&
+        /--encoding <id>/.test(refused.stderr) &&
+        /--encoding undeclared/.test(refused.stderr),
+    );
+    // The refusal must NOT be spelled as a `case` arm: check-skill-drift.mjs
+    // decides a flag exists by looking for its arm in go.sh, so an arm would
+    // make the drift guard green over any stale `--milestone` command line
+    // left in SKILL.md — the one sweep this ruling depends on being complete.
+    //
+    // The pattern is LINE-ANCHORED, mirroring check-skill-drift's `flagExists`,
+    // and that is not incidental: the checker used a bare substring, and the
+    // comment above — which exists to explain why there is no arm — contains
+    // the text that substring looks for. It reported the retired flag as still
+    // accepted. A declaration and a mention of one are different things, and
+    // only the anchor tells them apart.
+    check(
+      "the refusal is not a `case` arm, so check-skill-drift still treats --milestone as nonexistent",
+      !/^\s*(?:[^\n)]*\|)?--milestone\)/m.test(
+        readFileSync(resolve(HERE, "go.sh"), "utf8"),
+      ),
+    );
+    check(
+      "…and check-skill-drift's own flag test is line-anchored, not a substring",
+      !/goSrc\.includes\(`\$\{flag\}\)`\)/.test(
+        readFileSync(resolve(HERE, "check-skill-drift.mjs"), "utf8"),
+      ),
+    );
+  }
+
+  // ---- R9: `undeclared` is a CLAIM about the subject, and is checked ---------
+  {
+    const wrong = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "plan",
+        "--subject",
+        FIXTURE_SUBJECT,
+        "--encoding",
+        "undeclared",
+      ],
+      { encoding: "utf8" },
+    );
+    // Only meaningful for a subject that DOES declare one; skip otherwise.
+    if (FIXTURE_ENCODING !== "undeclared")
+      check(
+        "--encoding undeclared is refused when the subject does declare one, and lists them",
+        wrong.status === 2 && wrong.stderr.includes(FIXTURE_ENCODING),
+      );
+  }
+
+  const goSrcOf = () => readFileSync(resolve(HERE, "go.sh"), "utf8");
+
+  // ---- ARGUMENT-PARSER HYGIENE ----------------------------------------------
+  //
+  // Two defects the R9 review found, both of which `bash -n` is structurally
+  // unable to see.
+  {
+    const goSrc = readFileSync(resolve(HERE, "go.sh"), "utf8");
+
+    // 1. NO DUPLICATE `case` LABEL. A repeated label is legal shell — the first
+    //    arm wins and the second is dead — so the symptom is a documented flag
+    //    that parses, sets a variable nobody reads, and exits 0. That is what
+    //    happened when R2/R3 gave `--encoding` a second, unrelated meaning:
+    //    `new-subject … --encoding path/x.l4` silently wrote the default path
+    //    instead. Measured before the repair; `new-subject` and a control run
+    //    with no flag at all produced byte-identical sidecars.
+    const labels = [
+      ...goSrc.matchAll(/^\s*(-[-a-z][a-z-]*(?:\s*\|\s*-[-a-z][a-z-]*)*)\)/gm),
+    ].flatMap((m) => m[1].split("|").map((x) => x.trim()));
+    const dupes = labels.filter((f, i) => labels.indexOf(f) !== i);
+    check(
+      "no flag is declared twice in go.sh's argument parser",
+      dupes.length === 0 ||
+        (process.stdout.write(`     duplicated: ${dupes.join(", ")}\n`), false),
+    );
+
+    // 2. EVERY VALUE-TAKING FLAG REFUSES A MISSING VALUE, with exit 2 and its
+    //    own name. Without the guard, `$2` is unbound under `set -u` and bash
+    //    aborts with a line number and exit 1 — an interpreter stack trace
+    //    where a usage error belongs, and the wrong code: 2 is this driver's
+    //    usage exit, 1 means a real finding about the corpus.
+    //
+    //    Derived from the parser, not listed here: a flag added without the
+    //    guard must fail this, which a hand-kept list cannot make happen.
+    const valueTaking = [
+      ...goSrc.matchAll(
+        /^\s*(--[a-z][a-z-]*)\)\n(?:\s*#[^\n]*\n)*\s*([^\n]*)/gm,
+      ),
+    ]
+      .filter(([, , body]) => /"\$2"/.test(body) || /need_val/.test(body))
+      .map(([, flag]) => flag);
+    const unguarded = [];
+    for (const flag of [...new Set(valueTaking)]) {
+      const r = spawnSync("bash", [resolve(HERE, "go.sh"), "plan", flag], {
+        encoding: "utf8",
+      });
+      if (r.status !== 2 || !r.stderr.includes(`${flag} needs a value`))
+        unguarded.push(`${flag} (exit ${r.status})`);
+    }
+    check(
+      `all ${new Set(valueTaking).size} value-taking flags refuse a missing value with exit 2`,
+      valueTaking.length > 0 &&
+        (unguarded.length === 0 ||
+          (process.stdout.write(`     unguarded: ${unguarded.join(", ")}\n`),
+          false)),
+    );
+  }
   // HG1 MUST RE-OPEN WHEN THE NARRATIVE MOVES.
   //
   // `p9-explain` is HG1-gated because it publishes narrative prose, but the
@@ -1692,8 +2520,8 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
         [
           resolve(HERE, "go.sh"),
           "plan",
-          "--milestone",
-          "g1",
+          "--encoding",
+          "primary",
           "--subject",
           FIXTURE_SUBJECT,
         ],
@@ -1728,6 +2556,79 @@ const NEVER_REPLAY = ["p9-report", "p9-explain"];
           writeFileSync(p, original);
         }
       })(),
+    );
+  }
+
+  // ---- PHASE-SCRIPT HYGIENE -------------------------------------------------
+  //
+  // `bash -n` over every phase script, and it is not busywork: several of these
+  // scripts embed a JS program inside `node -e '…'`, and a single APOSTROPHE in
+  // an English word inside that block closes the shell quote and turns the rest
+  // of the file into syntax errors. It happened while p9-cost was being
+  // written — the offending word was a possessive in a code comment — and the
+  // script still looked entirely reasonable on screen.
+  //
+  // Every script, not a list: a new phase must pass this without anyone
+  // remembering to add it.
+  {
+    const bad = [];
+    for (const f of readdirSync(resolve(HERE, "phases")).sort()) {
+      if (!f.endsWith(".sh")) continue;
+      const r = spawnSync("bash", ["-n", resolve(HERE, "phases", f)], {
+        encoding: "utf8",
+      });
+      if (r.status !== 0)
+        bad.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
+    }
+    for (const f of ["go.sh", "gate-request.sh", "gate-verify.sh"]) {
+      const p = resolve(HERE, f);
+      if (!existsSync(p)) continue;
+      const r = spawnSync("bash", ["-n", p], { encoding: "utf8" });
+      if (r.status !== 0)
+        bad.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
+    }
+    for (const f of [
+      "phase-prelude.sh",
+      "deposit-prelude.sh",
+      "clock.sh",
+      "toolchain.sh",
+    ]) {
+      const p = resolve(HERE, "lib", f);
+      if (!existsSync(p)) continue;
+      const r = spawnSync("bash", ["-n", p], { encoding: "utf8" });
+      if (r.status !== 0)
+        bad.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
+    }
+    check(
+      "every shell script under etc/go parses",
+      bad.length === 0 ||
+        (process.stdout.write(bad.map((b) => `     ${b}\n`).join("")), false),
+    );
+  }
+
+  // ---- THE ROLE TABLE MUST BE TOTAL OVER THE STAGES THAT EXIST --------------
+  //
+  // readset.mjs says its entries exist "so role derivation is total, because a
+  // member whose role is `unknown` silently weakens every predicate built on
+  // top of it" — and nothing enforced it. `p9-cost` landed without an entry and
+  // classified `unknown`. DERIVED from the driver's own lists, not a second
+  // copy of them: a stage added tomorrow fails this without anyone remembering.
+  {
+    const declared = new Set();
+    for (const m of goSrcOf().matchAll(
+      /^(?:PRIMARY_STAGES|DEPOSIT_STAGES)\+?=\(([^)]*)\)/gm,
+    ))
+      for (const w of m[1].split(/\s+/).filter(Boolean)) declared.add(w);
+    for (const f of readdirSync(resolve(HERE, "phases")))
+      if (f.endsWith(".sh")) declared.add(f.slice(0, -3));
+    const missing = [...declared]
+      .filter((s) => classOf(s) === "unknown")
+      .sort();
+    check(
+      "every stage that exists has a PHASE_CLASS entry, so role derivation is total",
+      missing.length === 0 ||
+        (process.stdout.write(`     unclassified: ${missing.join(", ")}\n`),
+        false),
     );
   }
 
@@ -1773,8 +2674,8 @@ if (!process.argv.includes("--with-driver")) {
   };
   go([
     "run",
-    "--milestone",
-    "g1",
+    "--encoding",
+    "primary",
     "--subject",
     FIXTURE_SUBJECT,
     "--waive",
@@ -1791,8 +2692,8 @@ if (!process.argv.includes("--with-driver")) {
 
   go([
     "run",
-    "--milestone",
-    "g1",
+    "--encoding",
+    "primary",
     "--subject",
     FIXTURE_SUBJECT,
     "--run-id",
@@ -1831,7 +2732,7 @@ if (!process.argv.includes("--with-driver")) {
       secondPass.length - executed.length,
   );
   check(
-    "the milestone verdict is unchanged by replay",
+    "the run verdict is unchanged by replay",
     verdict1 === verdict2 && !!verdict1,
   );
   check(
@@ -1891,8 +2792,8 @@ if (!process.argv.includes("--with-driver")) {
       [
         resolve(HERE, "go.sh"),
         "run",
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         FIXTURE_SUBJECT,
         "--run-id",
@@ -1921,8 +2822,8 @@ if (!process.argv.includes("--with-driver")) {
       [
         resolve(HERE, "go.sh"),
         "run",
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         FIXTURE_SUBJECT,
         "--through",
@@ -1960,12 +2861,12 @@ if (!process.argv.includes("--with-driver")) {
     };
     go2([
       "run",
-      "--milestone",
-      "g2",
+      "--encoding",
+      FIXTURE_ENCODING,
       "--subject",
       FIXTURE_SUBJECT,
       "--waive",
-      "HG1=selftest g2 replay-correctness",
+      "HG1=selftest deposit replay-correctness",
     ]);
     const runId2 = execFileSync("ls", ["-1", rundir2], { encoding: "utf8" })
       .trim()
@@ -1977,8 +2878,8 @@ if (!process.argv.includes("--with-driver")) {
       .pop()?.verdict;
     go2([
       "run",
-      "--milestone",
-      "g2",
+      "--encoding",
+      FIXTURE_ENCODING,
       "--subject",
       FIXTURE_SUBJECT,
       "--run-id",
@@ -1996,18 +2897,18 @@ if (!process.argv.includes("--with-driver")) {
     const sameSet2 = (a, b) =>
       a.length === b.length && a.every((x, i) => x === b[i]);
     check(
-      "a second g2 run re-executes nothing but the never-replaying stages",
+      "a second deposit run re-executes nothing but the never-replaying stages",
       sameSet2(
         executed2,
         NEVER_REPLAY.filter((s) => second2.some((r) => r.stage === s)).sort(),
       ),
     );
     check(
-      "the g2 milestone verdict is unchanged by replay",
+      "the deposit run verdict is unchanged by replay",
       verdictA === verdictB && !!verdictA,
     );
     check(
-      "replayed g2 receipts keep their original verdict",
+      "replayed deposit receipts keep their original verdict",
       second2
         .filter((r) => r.replayed_from)
         .every(
@@ -2015,16 +2916,18 @@ if (!process.argv.includes("--with-driver")) {
         ),
     );
     check(
-      "the g2 journal still verifies after a replay",
+      "the deposit journal still verifies after a replay",
       verify(j2).ok === true,
     );
     check(
-      "the g2 measurement stages ran at denovo origin — the deposit, not the corpus",
-      ["p3-check", "p6-tests", "p8-verify"].every(
-        (s) =>
-          first2.find((r) => r.stage === s)?.metrics?.module_origin ===
-          "denovo",
-      ),
+      "the deposit-run measurement stages record WHICH ENCODING they measured",
+      ["p3-check", "p6-tests", "p8-verify"].every((s) => {
+        const id = first2.find((r) => r.stage === s)?.metrics?.encoding_id;
+        // The metric names the thing measured, not the pass it belonged to.
+        // `module_origin=denovo` said "this was the second pass"; `encoding_id`
+        // says which encoding, which is the fact a later reader needs.
+        return typeof id === "string" && id !== "" && id !== "primary";
+      }),
     );
     // The after-verdict explainer render is DECLARED-STAGES-ONLY (2026-08-09).
     // RED, measured before the guard: a g2 run dir held explainer.md
@@ -2032,7 +2935,7 @@ if (!process.argv.includes("--with-driver")) {
     // explainer.html, announced by the driver, with zero p9-explain journal
     // rows — narrative prose outside the g2 HG1 digest, reported to nobody.
     check(
-      "a g2 run renders NO explainer — the stage is undeclared at g2 and the render respects the declared list",
+      "a deposit run renders NO explainer — the stage is undeclared there and the render respects the declared list",
       !existsSync(resolve(rundir2, runId2, "explainer.md")) &&
         !existsSync(resolve(rundir2, runId2, "explainer.html")),
     );
@@ -2084,7 +2987,7 @@ check(
     append(j, {
       kind: "run_begin",
       run_id: "gone-test",
-      milestone: "g1",
+      encoding: "primary",
       subject: "fixture-subject",
       declared_stages: ["p7-dmn"],
     });
@@ -2168,7 +3071,7 @@ process.stdout.write("\n-- the explainer --\n");
     append(j, {
       kind: "run_begin",
       run_id: "explainer-selftest",
-      milestone: "g1",
+      encoding: "primary",
       subject: FIXTURE_SUBJECT,
       repo_head: "0000000",
       tree_state: "clean",
@@ -2313,7 +3216,7 @@ process.stdout.write("\n-- the explainer --\n");
       append(j, {
         kind: "run_begin",
         run_id: "no-run-end",
-        milestone: "g1",
+        encoding: "primary",
         subject: FIXTURE_SUBJECT,
         repo_head: "0000000",
         tree_state: "clean",
@@ -2354,7 +3257,7 @@ process.stdout.write("\n-- the explainer --\n");
       append(j, {
         kind: "run_begin",
         run_id: "fold-equality",
-        milestone: "g1",
+        encoding: "primary",
         subject: FIXTURE_SUBJECT,
         repo_head: "0000000",
         tree_state: "clean",
@@ -2484,9 +3387,7 @@ process.stdout.write("\n-- the explainer --\n");
     lintNarrative("Every assertion is a PASS.").some(
       (f) => f.code === "N-STATUS",
     ) &&
-      lintNarrative("the milestone is COMPLETE").some(
-        (f) => f.code === "N-STATUS",
-      ) &&
+      lintNarrative("the run is COMPLETE").some((f) => f.code === "N-STATUS") &&
       lintNarrative("the run passed and the corpus is complete").length === 0,
   );
   // The SLOT owns `##`. MEASURED 2026-08-05: S10's deposit used `##` for its
@@ -3116,7 +4017,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         "the Reg CF corpus is not in this tree",
       );
     } else {
-      const out = mkdtempSync(resolve(tmpdir(), "go-denovo-diff-"));
+      const out = mkdtempSync(resolve(tmpdir(), "go-encode-diff-"));
       const r = spawnSync(
         "node",
         [
@@ -3239,7 +4140,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     rmSync,
   } = await import("node:fs");
   const REPO = resolve(HERE, "../..");
-  const T = mkdtempSync(resolve(tmpdir(), "l4-go-denovo-"));
+  const T = mkdtempSync(resolve(tmpdir(), "l4-go-deposit-"));
   const DEP = resolve(T, "deposits");
   mkd(DEP, { recursive: true });
 
@@ -3272,9 +4173,16 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
 
-  // --- 1. the sidecar's `denovo` section ------------------------------------
+  // --- 1. the sidecar's split sections (R2/R3) ------------------------------
+  //
+  // `denovo` used to be ONE object bundling six keys across four kinds of
+  // thing. It is now three: `natlang_sources` (the fetched text and the sweep),
+  // `comparison` (the declarations that only relate two encodings), and
+  // `encodings` (additional encodings, keyed by an author-chosen id). The
+  // schema's whole value is that it is CLOSED, so every positive resolution
+  // below has a refusing sibling.
   const sidecars = resolve(T, "subjects");
-  const mkSidecar = (id, denovo, corpus = CORPUS) => {
+  const mkSidecar = (id, extra, corpus = CORPUS) => {
     const d = resolve(sidecars, id);
     mkd(d, { recursive: true });
     wr(
@@ -3287,7 +4195,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         encoding: { main: corpus },
         checks: { min_dated_arms: 0, min_assertions: 0 },
         legs: {},
-        ...(denovo ? { denovo } : {}),
+        ...(extra ?? {}),
       }),
     );
     wr(resolve(d, "pins.json"), "{}");
@@ -3295,131 +4203,224 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     wr(resolve(d, "NOTES.md"), "selftest fixture\n");
     return d;
   };
-  const subjectRun = (id) =>
-    spawnSync("node", [resolve(HERE, "lib/subject.mjs"), id], {
+  const subjectRun = (id, ...args) =>
+    spawnSync("node", [resolve(HERE, "lib/subject.mjs"), id, ...args], {
       encoding: "utf8",
       env: { ...process.env, L4_GO_SUBJECTS_DIR: sidecars },
     });
 
   mkSidecar("smoke", {
-    bundle: BUNDLE,
-    register: REGISTER,
-    fork_register: FORKS,
-    modules: [resolve(DEP, "smoke.l4")],
+    natlang_sources: { bundle: BUNDLE, register: REGISTER },
+    comparison: { fork_register: FORKS },
+    encodings: { "cleanroom-a": { modules: [resolve(DEP, "smoke.l4")] } },
   });
   {
     const r = subjectRun("smoke");
     check(
-      "a sidecar's denovo section resolves to GO_S_DENOVO_* paths whose existence is NOT required",
+      "natlang_sources and comparison resolve to absolute paths under their own keys",
       r.status === 0 &&
-        r.stdout.includes(`GO_S_DENOVO_BUNDLE='${BUNDLE}'`) &&
-        r.stdout.includes(`GO_S_DENOVO_REGISTER='${REGISTER}'`) &&
-        r.stdout.includes(`GO_S_DENOVO_FORKS='${FORKS}'`) &&
-        r.stdout.includes(
-          `GO_S_DENOVO_MODULES='${resolve(DEP, "smoke.l4")}'`,
+        r.stdout.includes(`GO_S_NATLANG_BUNDLE='${BUNDLE}'`) &&
+        r.stdout.includes(`GO_S_NATLANG_REGISTER='${REGISTER}'`) &&
+        r.stdout.includes(`GO_S_COMPARISON_FORKS='${FORKS}'`),
+    );
+    // THE SELECTION IS A RUN PARAMETER, NOT A SCHEMA KEY. Unselected, the answer
+    // is about the committed encoding; that is the whole of R3 in one flag.
+    check(
+      "unselected, the committed encoding's modules are the module set",
+      r.status === 0 &&
+        r.stdout.includes(`GO_S_ENCODING_MODULES='${CORPUS}'`) &&
+        r.stdout.includes("GO_S_ENCODING_ID='primary'"),
+    );
+    const sel = subjectRun("smoke", "--encoding", "cleanroom-a");
+    check(
+      "selecting an encoding swaps the module set under the ORDINARY name",
+      sel.status === 0 &&
+        sel.stdout.includes(
+          `GO_S_ENCODING_MODULES='${resolve(DEP, "smoke.l4")}'`,
         ) &&
+        sel.stdout.includes("GO_S_ENCODING_ID='cleanroom-a'") &&
         !ex(resolve(DEP, "smoke.l4")),
     );
+    check(
+      "an undeclared encoding id is refused, and the message names what IS declared",
+      (() => {
+        const bad = subjectRun("smoke", "--encoding", "nope");
+        return (
+          bad.status === 2 &&
+          /declares no such encoding/.test(bad.stderr) &&
+          /cleanroom-a/.test(bad.stderr)
+        );
+      })(),
+    );
+    check(
+      "--encodings lists the additional encodings, which is what --encoding names and what a bad id is refused against",
+      subjectRun("smoke", "--encodings").stdout.trim() === "cleanroom-a",
+    );
   }
   {
-    mkSidecar("badkey", { bundle: BUNDLE, surprise: "x" });
+    mkSidecar("badkey", { natlang_sources: { bundle: BUNDLE, surprise: "x" } });
     const r = subjectRun("badkey");
     check(
-      "an unknown key inside denovo is refused, naming the allowed set",
-      r.status === 2 && /denovo: unknown key 'surprise'/.test(r.stderr),
+      "an unknown key inside natlang_sources is refused, naming the allowed set",
+      r.status === 2 &&
+        /natlang_sources: unknown key 'surprise'/.test(r.stderr),
     );
   }
-  // --- 1a. the per-origin floors, the surface map, the per-leg declarations --
-  // (D2/D4/D6, 2026-08-09). Each positive resolution has a refusing sibling,
-  // because the schema's whole value is that it is CLOSED — measured before the
-  // extension landed: every one of these sidecars was refused with
-  // "denovo: unknown key 'checks'".
   {
-    mkSidecar("dnfloors", {
-      modules: [resolve(DEP, "smoke.l4")],
-      checks: { min_dated_arms: 0, min_assertions: 39 },
-      surface_map: resolve(DEP, "never-written-map.json"),
-      legs: { "p7-dmn": { cases: resolve(DEP, "never-written.cases.json") } },
-    });
-    const r = subjectRun("dnfloors");
+    mkSidecar("badcmp", { comparison: { surprise: "x" } });
+    const r = subjectRun("badcmp");
     check(
-      "denovo.checks resolves to per-origin floor env, distinct from the corpus floors",
+      "an unknown key inside comparison is refused",
+      r.status === 2 && /comparison: unknown key 'surprise'/.test(r.stderr),
+    );
+  }
+  // FLOORS TRAVEL WITH THEIR ENCODING, and that is now STRUCTURAL rather than a
+  // convention: `encodings.<id>.checks` sits inside the encoding it measures, so
+  // a committed floor cannot be applied to a deposit and vice versa.
+  {
+    mkSidecar("floors", {
+      comparison: { surface_map: resolve(DEP, "never-written-map.json") },
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          checks: { min_dated_arms: 0, min_assertions: 39 },
+          legs: {
+            "p7-dmn": { cases: resolve(DEP, "never-written.cases.json") },
+          },
+        },
+      },
+    });
+    const r = subjectRun("floors");
+    check(
+      "unselected, the floors are the committed encoding's",
       r.status === 0 &&
-        r.stdout.includes("GO_S_DENOVO_MIN_DATED_ARMS='0'") &&
-        r.stdout.includes("GO_S_DENOVO_MIN_ASSERTIONS='39'"),
+        r.stdout.includes("GO_S_MIN_DATED_ARMS='0'") &&
+        r.stdout.includes("GO_S_MIN_ASSERTIONS='0'"),
+    );
+    const sel = subjectRun("floors", "--encoding", "cleanroom-a");
+    check(
+      "selecting an encoding swaps the FLOORS too, under the ordinary names",
+      sel.status === 0 && sel.stdout.includes("GO_S_MIN_ASSERTIONS='39'"),
     );
     check(
-      "denovo.surface_map and denovo.legs['p7-dmn'].cases resolve, and their existence is NOT required",
-      r.status === 0 &&
-        r.stdout.includes(
-          `GO_S_DENOVO_SURFACE_MAP='${resolve(DEP, "never-written-map.json")}'`,
+      "comparison.surface_map and the encoding's own p7-dmn cases resolve, existence not required",
+      sel.status === 0 &&
+        sel.stdout.includes(
+          `GO_S_COMPARISON_SURFACE_MAP='${resolve(DEP, "never-written-map.json")}'`,
         ) &&
-        r.stdout.includes(
-          `GO_S_DENOVO_DMN_CASES='${resolve(DEP, "never-written.cases.json")}'`,
+        sel.stdout.includes(
+          `GO_S_ENCODING_DMN_CASES='${resolve(DEP, "never-written.cases.json")}'`,
         ) &&
         !ex(resolve(DEP, "never-written-map.json")),
     );
   }
   {
-    mkSidecar("dnbadfloor", {
-      checks: { min_assertions: 39, surprise: 1 },
+    mkSidecar("badfloor", {
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          checks: { min_assertions: 39, surprise: 1 },
+        },
+      },
     });
-    const r = subjectRun("dnbadfloor");
+    const r = subjectRun("badfloor");
     check(
-      "an unknown key inside denovo.checks is refused, naming the two floors",
-      r.status === 2 && /denovo\.checks: unknown key 'surprise'/.test(r.stderr),
-    );
-  }
-  {
-    mkSidecar("dnbadleg", {
-      legs: { "p7-dmn": { golden: "x.dmn" } },
-    });
-    const r = subjectRun("dnbadleg");
-    check(
-      "denovo.legs does NOT reuse LEG_KEYS: a golden inside denovo.legs['p7-dmn'] is refused",
+      "an unknown key inside an encoding's checks is refused, naming the two floors",
       r.status === 2 &&
-        /denovo\.legs\['p7-dmn'\]: unknown key 'golden'/.test(r.stderr),
+        /encodings\['cleanroom-a'\]\.checks: unknown key 'surprise'/.test(
+          r.stderr,
+        ),
     );
   }
   {
-    mkSidecar("dnbadleg2", {
-      legs: { "p7-akn": { cases: "x.json" } },
+    mkSidecar("badleg", {
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          legs: { "p7-dmn": { golden: "x.dmn" } },
+        },
+      },
     });
-    const r = subjectRun("dnbadleg2");
+    const r = subjectRun("badleg");
     check(
-      "a denovo.legs entry for a leg with no de novo schema refuses every key",
+      "an additional encoding's legs do NOT reuse LEG_KEYS: a golden is refused, because it has none",
       r.status === 2 &&
-        /denovo\.legs\['p7-akn'\]: unknown key 'cases'/.test(r.stderr),
+        /encodings\['cleanroom-a'\]\.legs\['p7-dmn'\]: unknown key 'golden'/.test(
+          r.stderr,
+        ),
     );
   }
   {
-    mkSidecar("nodenovo2", null);
-    const r = subjectRun("nodenovo2");
+    mkSidecar("badleg2", {
+      encodings: {
+        "cleanroom-a": {
+          modules: [resolve(DEP, "smoke.l4")],
+          legs: { "p7-akn": { cases: "x.json" } },
+        },
+      },
+    });
+    const r = subjectRun("badleg2");
     check(
-      "a subject with no denovo section resolves every new GO_S_DENOVO_* to ''",
-      r.status === 0 &&
-        r.stdout.includes("GO_S_DENOVO_MIN_DATED_ARMS=''") &&
-        r.stdout.includes("GO_S_DENOVO_MIN_ASSERTIONS=''") &&
-        r.stdout.includes("GO_S_DENOVO_SURFACE_MAP=''") &&
-        r.stdout.includes("GO_S_DENOVO_DMN_CASES=''"),
+      "a leg with no additional-encoding schema refuses every key",
+      r.status === 2 &&
+        /encodings\['cleanroom-a'\]\.legs\['p7-akn'\]: unknown key 'cases'/.test(
+          r.stderr,
+        ),
+    );
+  }
+  // AN ID NAMES AN OCCASION, NOT A SENTENCE — and 'primary' is reserved, because
+  // that is what the selector calls the committed encoding.
+  {
+    mkSidecar("badid", {
+      encodings: { "Cleanroom Two": { modules: [resolve(DEP, "smoke.l4")] } },
+    });
+    check(
+      "an encoding id that is not a slug is refused",
+      subjectRun("badid").status === 2,
+    );
+    mkSidecar("reservedid", {
+      encodings: { primary: { modules: [resolve(DEP, "smoke.l4")] } },
+    });
+    const r = subjectRun("reservedid");
+    check(
+      "'primary' may not be redeclared as an encoding id",
+      r.status === 2 && /may not be redeclared/.test(r.stderr),
     );
   }
   {
-    mkSidecar("selfdiff", { modules: ["jl4/examples/legal/regcf/regcf.l4"] });
+    mkSidecar("nomodules", { encodings: { "cleanroom-a": { checks: {} } } });
+    const r = subjectRun("nomodules");
+    check(
+      "an encoding with no modules is refused — an encoding IS its modules",
+      r.status === 2 && /modules is required/.test(r.stderr),
+    );
+  }
+  {
+    mkSidecar("selfdiff", {
+      encodings: {
+        "cleanroom-a": { modules: ["jl4/examples/legal/regcf/regcf.l4"] },
+      },
+    });
     const r = subjectRun("selfdiff");
     check(
-      "a denovo module that IS the corpus is refused — SPEC.md §8's diff would be an identity",
-      r.status === 2 && /also a corpus module/.test(r.stderr),
+      "an additional module that IS the committed one is refused — the diff would be an identity",
+      r.status === 2 && /also a committed encoding module/.test(r.stderr),
     );
   }
   {
-    mkSidecar("nodenovo", null);
-    const r = subjectRun("nodenovo");
+    mkSidecar("bare", null);
+    const r = subjectRun("bare");
     check(
-      "omitting denovo entirely is legal, and every GO_S_DENOVO_* comes back empty",
+      "omitting all three sections is legal, and every new GO_S_* comes back empty",
       r.status === 0 &&
-        r.stdout.includes("GO_S_DENOVO_BUNDLE=''") &&
-        r.stdout.includes("GO_S_DENOVO_MODULES=''"),
+        r.stdout.includes("GO_S_NATLANG_BUNDLE=''") &&
+        r.stdout.includes("GO_S_NATLANG_REGISTER=''") &&
+        r.stdout.includes("GO_S_COMPARISON_FORKS=''") &&
+        r.stdout.includes("GO_S_COMPARISON_SURFACE_MAP=''"),
+    );
+    check(
+      "and a subject with no additional encoding lists none",
+      subjectRun("bare", "--encodings").stdout.trim() === "",
     );
   }
 
@@ -3441,10 +4442,10 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         GO_S_DIR: resolve(sidecars, "smoke"),
         GO_S_CITATION: "n/a",
         GO_S_ENCODING: CORPUS,
-        GO_S_DENOVO_BUNDLE: "",
-        GO_S_DENOVO_REGISTER: "",
-        GO_S_DENOVO_FORKS: "",
-        GO_S_DENOVO_MODULES: "",
+        GO_S_NATLANG_BUNDLE: "",
+        GO_S_NATLANG_REGISTER: "",
+        GO_S_COMPARISON_FORKS: "",
+        GO_S_ENCODING_MODULES: "",
         L4_GO_REQUIRED: "0",
         ...over,
       },
@@ -3461,16 +4462,16 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     return { exit: r.status, stdout: r.stdout, stderr: r.stderr, row, rows };
   };
   const ALL = {
-    GO_S_DENOVO_BUNDLE: BUNDLE,
-    GO_S_DENOVO_REGISTER: REGISTER,
-    GO_S_DENOVO_FORKS: FORKS,
+    GO_S_NATLANG_BUNDLE: BUNDLE,
+    GO_S_NATLANG_REGISTER: REGISTER,
+    GO_S_COMPARISON_FORKS: FORKS,
   };
 
   // --- 3. deposit present: the stage validates it and PASSes -----------------
   for (const [name, key] of [
-    ["p1-ingest", "GO_S_DENOVO_BUNDLE"],
-    ["p2-sweep", "GO_S_DENOVO_REGISTER"],
-    ["p4-forks", "GO_S_DENOVO_FORKS"],
+    ["p1-ingest", "GO_S_NATLANG_BUNDLE"],
+    ["p2-sweep", "GO_S_NATLANG_REGISTER"],
+    ["p4-forks", "GO_S_COMPARISON_FORKS"],
   ]) {
     const s = stage(name, ALL);
     check(
@@ -3513,7 +4514,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const s = stage("p1-ingest", {
       ...ALL,
-      GO_S_DENOVO_BUNDLE: resolve(DEP, "never-written.json"),
+      GO_S_NATLANG_BUNDLE: resolve(DEP, "never-written.json"),
     });
     check(
       "a declared-but-undeposited bundle is SKIPPED as a missing prerequisite, not refused as a defect",
@@ -3526,19 +4527,24 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const s = stage("p2-sweep", ALL, {});
     void s;
-    const t = stage("p2-sweep", { ...ALL, GO_S_DENOVO_REGISTER: "" });
+    const t = stage("p2-sweep", { ...ALL, GO_S_NATLANG_REGISTER: "" });
     check(
-      "a subject that declares no denovo.register is SKIPPED naming the key and the file to add it to",
+      "a subject that declares no register is SKIPPED naming a LIVE key and the file to add it to",
       t.exit === 0 &&
         t.row?.status === "SKIPPED" &&
-        /declares no denovo\.register/.test(t.row.reason) &&
+        // The key must be one the schema still accepts. Asserting the OLD
+        // spelling is how a diagnostic survives a rename and starts pointing at
+        // nothing: `denovo.*` ceased to exist at R2/R3, and these two tests were
+        // pinning it in place for two rulings afterwards.
+        !/denovo\./.test(t.row.reason) &&
+        /declares no natlang_sources\.register/.test(t.row.reason) &&
         /subject\.json/.test(t.row.reason),
     );
   }
   {
     const s = stage("p4-forks", {
       ...ALL,
-      GO_S_DENOVO_FORKS: resolve(DEP, "never-written.json"),
+      GO_S_COMPARISON_FORKS: resolve(DEP, "never-written.json"),
       L4_GO_REQUIRED: "1",
     });
     check(
@@ -3549,7 +4555,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 5. deposit invalid: DEGRADED, naming the rule ------------------------
   {
-    const s = stage("p4-forks", { ...ALL, GO_S_DENOVO_FORKS: BAD_FORKS });
+    const s = stage("p4-forks", { ...ALL, GO_S_COMPARISON_FORKS: BAD_FORKS });
     check(
       "an invalid fork register is DEGRADED, and the reason NAMES the rules that fired against it",
       s.exit === 1 &&
@@ -3571,7 +4577,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // its command line, so a clean bundle beside a broken fork register exits 1
     // — and reading that as a fact about the bundle produced a measured
     // falsehood: p1-ingest naming fifteen fork-register rules as the bundle's.
-    const s = stage("p1-ingest", { ...ALL, GO_S_DENOVO_FORKS: BAD_FORKS });
+    const s = stage("p1-ingest", { ...ALL, GO_S_COMPARISON_FORKS: BAD_FORKS });
     check(
       "a clean bundle beside a broken peer is DEGRADED, but its reason does not blame the bundle",
       s.exit === 1 &&
@@ -3586,7 +4592,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     );
   }
   {
-    const s = stage("p4-forks", { ...ALL, GO_S_DENOVO_FORKS: BNA_FORKS });
+    const s = stage("p4-forks", { ...ALL, GO_S_COMPARISON_FORKS: BNA_FORKS });
     check(
       "a deposit about a different body of law is refused — nothing in the three schemas ties a register to a subject",
       s.exit === 1 &&
@@ -3599,7 +4605,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const notJson = resolve(DEP, "not.json");
     wr(notJson, "{ this is not json\n");
-    const s = stage("p1-ingest", { ...ALL, GO_S_DENOVO_BUNDLE: notJson });
+    const s = stage("p1-ingest", { ...ALL, GO_S_NATLANG_BUNDLE: notJson });
     check(
       "an unparseable deposit is a finding about the DEPOSIT (DEGRADED), never BROKEN about the harness",
       s.exit === 1 &&
@@ -3610,7 +4616,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 6. p5-gate: the joins, and the two halves it does not hold ------------
   {
-    const s = stage("p5-gate", { ...ALL, GO_S_DENOVO_FORKS: "" });
+    const s = stage("p5-gate", { ...ALL, GO_S_COMPARISON_FORKS: "" });
     const notes = (s.row?.notes ?? []).map((n) => n.text).join("\n");
     check(
       "p5-gate SKIPs when a deposit is missing rather than passing over joins that could not run",
@@ -3644,17 +4650,50 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 7. p3-encode ---------------------------------------------------------
   {
-    const s = stage("p3-encode");
+    // GO_MODULES="" IS THE DRIVER-PRODUCED STATE, and the fixture must use it.
+    //
+    // It used to hand the stage `GO_S_ENCODING_MODULES=""` — a state go.sh
+    // cannot produce, because subject.mjs guarantees at least the entry module —
+    // and the stage read that sidecar name directly. So the test passed while
+    // the DRIVER-produced state (`--encoding undeclared`: GO_MODULES empty,
+    // GO_S_ENCODING_MODULES still holding the COMMITTED encoding) sent all seven
+    // of sg-succession's committed modules through `l4 check` and earned a PASS
+    // whose oracle read "the deposit is L4 the toolchain accepts". Measured on
+    // 4cce130b before the repair; the stage's own plan row said `undeclared` at
+    // the same moment.
+    const s = stage("p3-encode", { GO_MODULES: "" });
     check(
-      "p3-encode with no denovo.modules is SKIPPED naming the key",
+      "p3-encode with no module set is SKIPPED, naming a key the schema accepts",
       s.exit === 0 &&
         s.row?.status === "SKIPPED" &&
-        /declares no denovo\.modules/.test(s.row.reason),
+        !/denovo\./.test(s.row.reason) &&
+        /declares no encodings\.<id>\.modules|declares no encoding\.modules/.test(
+          s.row.reason,
+        ),
+    );
+    // The half the old fixture could not see: with the DRIVER's empty set the
+    // stage must reach no module at all, whatever the sidecar still declares.
+    check(
+      "…and it names no module in its inputs, even though the sidecar declares the committed encoding",
+      !/\.l4/.test(
+        spawnSync(
+          "bash",
+          [resolve(HERE, "phases", "p3-encode.sh"), "--inputs"],
+          {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              GO_MODULES: "",
+              GO_S_ENCODING_MODULES: CORPUS,
+            },
+          },
+        ).stdout ?? "",
+      ),
     );
   }
   {
     const s = stage("p3-encode", {
-      GO_S_DENOVO_MODULES: resolve(DEP, "never-written.l4"),
+      GO_S_ENCODING_MODULES: resolve(DEP, "never-written.l4"),
     });
     check(
       "p3-encode with a declared-but-undeposited module is SKIPPED, naming which module",
@@ -3677,7 +4716,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         good,
         "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\n`is positive` x MEANS x > 0\n",
       );
-      const s = stage("p3-encode", { GO_S_DENOVO_MODULES: good });
+      const s = stage("p3-encode", { GO_S_ENCODING_MODULES: good });
       check(
         "p3-encode over a deposited module that typechecks PASSes, and says on the row what it did not check",
         s.exit === 0 &&
@@ -3691,7 +4730,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         bad,
         "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\n`is broken` x MEANS x > \n",
       );
-      const t = stage("p3-encode", { GO_S_DENOVO_MODULES: bad });
+      const t = stage("p3-encode", { GO_S_ENCODING_MODULES: bad });
       check(
         "p3-encode is capable of red: a module that does not typecheck is DEGRADED",
         t.exit === 1 &&
@@ -3716,17 +4755,21 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     const skp = stage("p3-check", {
       GO_MODULES: "",
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
     });
     check(
-      "p3-check with no de novo module set is SKIPPED naming denovo.modules",
+      "p3-check with no module set for its encoding is SKIPPED, naming the key that EXISTS",
       skp.exit === 0 &&
         skp.row?.status === "SKIPPED" &&
-        /denovo\.modules/.test(skp.row.reason),
+        // NAMES A KEY THAT EXISTS. The old message said `denovo.modules`, which
+        // the schema now refuses — a diagnostic pointing at a nonexistent key
+        // sends the reader to edit something that cannot be edited.
+        /encodings?[.[]/.test(skp.row.reason) &&
+        !/denovo/.test(skp.row.reason),
     );
     const abs = stage("p3-check", {
       GO_MODULES: resolve(DEP, "never-written.l4"),
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
       L4_GO_REQUIRED: "1",
     });
     check(
@@ -3737,36 +4780,39 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     );
     const p6u = stage("p6-tests", {
       GO_MODULES: "",
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
     });
     check(
-      "p6-tests with no de novo module set is SKIPPED naming denovo.modules",
+      "p6-tests with no module set for its encoding is SKIPPED, naming the key that EXISTS",
       p6u.exit === 0 &&
         p6u.row?.status === "SKIPPED" &&
-        /denovo\.modules/.test(p6u.row.reason),
+        /encodings?[.[]/.test(p6u.row.reason) &&
+        !/denovo/.test(p6u.row.reason),
     );
     const p8u = stage("p8-verify", {
       GO_MODULES: "",
-      GO_MODULES_ORIGIN: "denovo",
+      GO_S_ENCODING_ID: "cleanroom-a",
     });
     check(
-      "p8-verify with no de novo module set is SKIPPED naming denovo.modules",
+      "p8-verify with no module set for its encoding is SKIPPED, naming the key that EXISTS",
       p8u.exit === 0 &&
         p8u.row?.status === "SKIPPED" &&
-        /denovo\.modules/.test(p8u.row.reason),
+        /encodings?[.[]/.test(p8u.row.reason) &&
+        !/denovo/.test(p8u.row.reason),
     );
   }
   {
     // p8-diff's deposit contract is over the MAP, not the module set.
-    const und = stage("p8-diff", { GO_S_DENOVO_SURFACE_MAP: "" });
+    const und = stage("p8-diff", { GO_S_COMPARISON_SURFACE_MAP: "" });
     check(
-      "p8-diff with no declared surface map is SKIPPED naming denovo.surface_map",
+      "p8-diff with no declared surface map is SKIPPED naming comparison.surface_map",
       und.exit === 0 &&
         und.row?.status === "SKIPPED" &&
-        /denovo\.surface_map/.test(und.row.reason),
+        !/denovo\./.test(und.row.reason) &&
+        /comparison\.surface_map/.test(und.row.reason),
     );
     const abs = stage("p8-diff", {
-      GO_S_DENOVO_SURFACE_MAP: resolve(DEP, "never-written-map.json"),
+      GO_S_COMPARISON_SURFACE_MAP: resolve(DEP, "never-written-map.json"),
       L4_GO_REQUIRED: "1",
     });
     check(
@@ -3780,7 +4826,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // and short battery rows.
     const badMap = resolve(DEP, "bad-map.json");
     wr(badMap, "{ this is not a surface map\n");
-    const deg = stage("p8-diff", { GO_S_DENOVO_SURFACE_MAP: badMap });
+    const deg = stage("p8-diff", { GO_S_COMPARISON_SURFACE_MAP: badMap });
     check(
       "p8-diff over an unparseable map is DEGRADED naming the harness error, never PASS and never BROKEN",
       deg.exit === 1 &&
@@ -3804,7 +4850,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const FLOORS = {
         GO_MODULES: tiny,
-        GO_MODULES_ORIGIN: "denovo",
+        GO_S_ENCODING_ID: "cleanroom-a",
         // the poison: if a stage reads a corpus floor at denovo origin, these
         // make it red, so a green run PROVES per-origin selection
         GO_S_MIN_DATED_ARMS: "999",
@@ -3812,14 +4858,14 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       };
       const p3 = stage("p3-check", {
         ...FLOORS,
-        GO_S_DENOVO_MIN_DATED_ARMS: "0",
+        GO_S_MIN_DATED_ARMS: "0",
       });
       check(
-        "p3-check at denovo origin reads the denovo floor, not the poisoned corpus floor",
+        "p3-check over an additional encoding reads THAT encoding's floor, not the poisoned committed one",
         p3.exit === 0 &&
           p3.row?.status === "PASS" &&
           p3.row?.metrics?.min_dated_arms === "0" &&
-          p3.row?.metrics?.module_origin === "denovo",
+          p3.row?.metrics?.encoding_id === "cleanroom-a",
       );
       check(
         "…and a zero floor over zero matched arms is NOT CHECKED on the receipt, not a vacuous green",
@@ -3829,7 +4875,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6 = stage("p6-tests", {
         ...FLOORS,
-        GO_S_DENOVO_MIN_ASSERTIONS: "1",
+        GO_S_MIN_ASSERTIONS: "1",
       });
       check(
         "p6-tests at denovo origin reads the denovo assertion floor, not the poisoned corpus floor",
@@ -3839,7 +4885,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6red = stage("p6-tests", {
         ...FLOORS,
-        GO_S_DENOVO_MIN_ASSERTIONS: "2",
+        GO_S_MIN_ASSERTIONS: "2",
       });
       check(
         "…and the denovo floor is capable of red: floor 2 over 1 assertion is DEGRADED",
@@ -3849,7 +4895,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6undecl = stage("p6-tests", {
         GO_MODULES: tiny,
-        GO_MODULES_ORIGIN: "denovo",
+        GO_S_ENCODING_ID: "cleanroom-a",
       });
       check(
         "an UNDECLARED denovo assertion floor defaults to 0 with a toothless-guard note on the receipt",
@@ -3872,7 +4918,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
       const p6zero = stage("p6-tests", {
         GO_MODULES: empty,
-        GO_MODULES_ORIGIN: "denovo",
+        GO_S_ENCODING_ID: "cleanroom-a",
       });
       check(
         "a zero-assertion module set is DEGRADED, never a vacuous PASS/execution",
@@ -3900,14 +4946,14 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
           ...process.env,
           GO_ROOT: REPO,
           GO_MODULES: "probe.l4",
-          GO_MODULES_ORIGIN: "denovo",
-          GO_S_DENOVO_MIN_ASSERTIONS: "",
-          GO_S_DENOVO_MIN_DATED_ARMS: "",
+          GO_S_ENCODING_ID: "cleanroom-a",
+          GO_S_MIN_ASSERTIONS: "",
+          GO_S_MIN_DATED_ARMS: "",
           ...over,
         },
       }).stdout;
-    const a6 = inputsOf("p6-tests", { GO_S_DENOVO_MIN_ASSERTIONS: "1" });
-    const b6 = inputsOf("p6-tests", { GO_S_DENOVO_MIN_ASSERTIONS: "2" });
+    const a6 = inputsOf("p6-tests", { GO_S_MIN_ASSERTIONS: "1" });
+    const b6 = inputsOf("p6-tests", { GO_S_MIN_ASSERTIONS: "2" });
     check(
       "p6-tests' --inputs carries the resolved assertion floor, so a floor edit moves the digest",
       a6.includes("text:min_assertions=1") &&
@@ -3918,8 +4964,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       "…and an undeclared assertion floor is its own contributor (it changes the receipt too)",
       inputsOf("p6-tests").includes("text:min_assertions=undeclared"),
     );
-    const a3 = inputsOf("p3-check", { GO_S_DENOVO_MIN_DATED_ARMS: "0" });
-    const b3 = inputsOf("p3-check", { GO_S_DENOVO_MIN_DATED_ARMS: "2" });
+    const a3 = inputsOf("p3-check", { GO_S_MIN_DATED_ARMS: "0" });
+    const b3 = inputsOf("p3-check", { GO_S_MIN_DATED_ARMS: "2" });
     check(
       "p3-check's --inputs carries the resolved dated-arm floor, so a floor edit moves the digest",
       a3.includes("text:min_dated_arms=0") &&
@@ -3935,8 +4981,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       [
         resolve(HERE, "go.sh"),
         "plan",
-        "--milestone",
-        "g2",
+        "--encoding",
+        "cleanroom-a",
         "--subject",
         "smoke",
       ],
@@ -3946,7 +4992,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       },
     );
     check(
-      "go.sh plan --milestone g2 no longer refuses, and prints SPEC.md §4's full de novo order",
+      "go.sh plan --encoding <id> no longer refuses, and prints SPEC.md §4's full de novo order",
       r.status === 0 &&
         [
           "p1-ingest",
@@ -3987,8 +5033,8 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         [
           resolve(HERE, "go.sh"),
           "plan",
-          "--milestone",
-          "g2",
+          "--encoding",
+          FIXTURE_ENCODING,
           "--subject",
           FIXTURE_SUBJECT,
         ],
@@ -3998,10 +5044,20 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         "each still-unwired p7 leg carries its own precise reason, and p7-dmn is a wired emit-only row",
         rp.status === 0 &&
           /p7-dmn\s+HG1\s+present\s+emit-only/.test(rp.stdout) &&
-          /p7-tnr\s+NOT WIRED\s+-\s+the sidecar declares no denovo\.legs\['p7-tnr'\]\.golden/.test(
+          // The reasons must name keys and things that EXIST in the new schema.
+          // They used to say `denovo.legs[...]` and "a de novo demo entry",
+          // both of which are now vocabulary the sidecar refuses.
+          /p7-tnr\s+NOT WIRED\s+-\s+the sidecar declares no legs\['p7-tnr'\]\.golden for this encoding/.test(
             rp.stdout,
           ) &&
-          /p7-ladder\s+NOT WIRED\s+-\s+needs a de novo demo entry/.test(
+          /p7-ladder\s+NOT WIRED\s+-\s+needs its own demo entry/.test(
+            rp.stdout,
+          ) &&
+          // Scoped to schema KEY references, not the bare word: the corpus
+          // directory is still literally named `denovo/`, and renaming it means
+          // moving a .l4 whose four goldens must be regenerated — a change that
+          // needs a build, and a separate one. R2/R3 is about keys.
+          !/denovo\.(legs|checks|modules|bundle|register|fork_register|surface_map)/.test(
             rp.stdout,
           ) &&
           !/compares against this subject's committed goldens, which are the replay artifacts/.test(
@@ -4010,7 +5066,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       );
     }
     check(
-      "and it refuses to let 'g2 COMPLETE' be read as 'a de novo run happened'",
+      "and it refuses to let COMPLETE be read as 'a de novo run happened'",
       /does NOT mean a de novo run happened/.test(r.stdout) &&
         /§8 diff oracle/.test(r.stdout),
     );
@@ -4019,10 +5075,10 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       [
         resolve(HERE, "go.sh"),
         "plan",
-        "--milestone",
-        "g2",
+        "--encoding",
+        "undeclared",
         "--subject",
-        "nodenovo",
+        "bare",
       ],
       {
         encoding: "utf8",
@@ -4030,7 +5086,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
       },
     );
     check(
-      "a subject with no denovo section plans cleanly, every deposit reading 'undeclared'",
+      "a subject with no additional encoding still PLANS on the deposit path, every deposit reading 'undeclared'",
       t.status === 0 && (t.stdout.match(/undeclared/g) ?? []).length >= 4,
     );
   }
@@ -4061,7 +5117,7 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
   append(j, {
     kind: "run_begin",
     run_id: "denovo-report-test",
-    milestone: "g2",
+    encoding: "cleanroom-a",
     subject: "fixture-subject",
     declared_stages: [
       "p1-ingest",
@@ -4174,7 +5230,7 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
     append(oj, {
       kind: "run_begin",
       run_id: "orphan-reason-test",
-      milestone: "g1",
+      encoding: "primary",
       subject: FIXTURE_SUBJECT,
       declared_stages: ["p6-tests", "p9-report", "p9-explain", "pZ-invented"],
     });
@@ -4232,8 +5288,8 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
   const gj = resolve(g1, "journal.ndjson");
   append(gj, {
     kind: "run_begin",
-    run_id: "g1-report-test",
-    milestone: "g1",
+    run_id: "primary-report-test",
+    encoding: "primary",
     subject: "fixture-subject",
     declared_stages: ["p6-tests"],
   });
@@ -4251,10 +5307,10 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
       ? readFileSync(resolve(g1, "report.md"), "utf8")
       : "«unrendered»";
   check(
-    "a g1 report no longer claims the de novo stages refuse, or that their tooling is unbuilt",
+    "a primary-encoding report no longer claims the de novo stages refuse, or that their tooling is unbuilt",
     !/entry point that refuses/.test(gmd) &&
       !/de novo tooling is unbuilt/.test(gmd) &&
-      /not declared at this milestone/.test(gmd),
+      /not declared for this run/.test(gmd),
   );
   rmSync(d, { recursive: true, force: true });
   rmSync(g1, { recursive: true, force: true });
@@ -4429,8 +5485,8 @@ process.stdout.write("\n-- de novo receipts in the report --\n");
       "node",
       [
         resolve(HERE, "lib/doctor.mjs"),
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--stages",
         stages,
       ],
@@ -4536,7 +5592,7 @@ process.stdout.write("\n-- gc retention --\n");
     append(j, {
       kind: "run_begin",
       run_id: id,
-      milestone: "g1",
+      encoding: "primary",
       subject: subject ?? undefined,
       repo_head: "abc",
       tree_state: "clean",
@@ -4722,7 +5778,7 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
   );
 
   // It is a real subject immediately: that is the whole point of R12.
-  const planned = go(["plan", "--subject", id, "--milestone", "g1"]);
+  const planned = go(["plan", "--subject", id, "--encoding", "primary"]);
   check("the scaffolded subject plans at once", planned.status === 0);
   check(
     "the plan says the encoding is unwritten rather than leaving it to be inferred",
@@ -4735,7 +5791,7 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
   // declaration must not survive. This is what stops the state key from rotting.
   mkdirSync(dirname(encAbs), { recursive: true });
   writeFileSync(encAbs, "§ `Selftest`\n");
-  const stale = go(["plan", "--subject", id, "--milestone", "g1"]);
+  const stale = go(["plan", "--subject", id, "--encoding", "primary"]);
   check(
     "a written encoding under an 'unwritten' sidecar is refused",
     stale.status !== 0,
@@ -4751,7 +5807,7 @@ process.stdout.write("\n-- new-subject / unwritten encoding --\n");
   const desc = JSON.parse(readFileSync(descPath, "utf8"));
   desc.encoding.state = "written";
   writeFileSync(descPath, JSON.stringify(desc, null, 2) + "\n");
-  const written = go(["plan", "--subject", id, "--milestone", "g1"]);
+  const written = go(["plan", "--subject", id, "--encoding", "primary"]);
   check(
     "flipping the state to written resolves the sidecar",
     written.status === 0,
@@ -5015,7 +6071,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: id,
       ts,
-      milestone: "g1",
+      encoding: "primary",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -5067,7 +6123,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: id,
       ts,
-      milestone: "g1",
+      encoding: "primary",
       subject: "subj",
       repo_head: "abc",
       tree_state: "clean",
@@ -5123,7 +6179,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: "2026-03-09-zzzzzzzz-001",
       subject: "subj",
-      milestone: "g1",
+      encoding: "primary",
       declared_stages: ["p7-wizard"],
     },
     {
@@ -5149,7 +6205,7 @@ process.stdout.write("\n-- cross-run ordering --\n");
       kind: "run_begin",
       run_id: "2026-03-01-aaaaaaaa-001",
       subject: "subj",
-      milestone: "g1",
+      encoding: "primary",
       declared_stages: ["p7-wizard"],
     },
     {
@@ -5715,8 +6771,8 @@ process.stdout.write("\n-- artifacts through the store --\n");
         d,
         "--run-id",
         id,
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         "s",
         "--repo-head",
@@ -5879,7 +6935,7 @@ process.stdout.write("\n-- artifacts through the store --\n");
   // T-5 · a replayed PASS naming no artifact. The guard it restores was
   // vacuous — `!r.replayed_from` inside a branch where `replayed` is true is
   // always false — so this receipt was accepted and `verify` called the
-  // milestone COMPLETE.
+  // the run COMPLETE.
   {
     const b3 = mkRun(store, "r4");
     const empty = resolve(b3, "none.json");
@@ -5994,8 +7050,8 @@ process.stdout.write("\n-- the blessing edge --\n");
         d,
         "--run-id",
         "r",
-        "--milestone",
-        "g1",
+        "--encoding",
+        "primary",
         "--subject",
         "sg",
         "--repo-head",
@@ -6452,6 +7508,927 @@ process.stdout.write("\n-- store verbs --\n");
   rmSync(work, { recursive: true, force: true });
 }
 // ===== END store verbs ======================================================
+
+// ===== the read-set (R4) ====================================================
+//
+// R4's claim is that recording the MEMBERS of an input set, rather than only
+// the digest they fold into, makes four questions answerable that a digest
+// cannot answer at all. These checks pin the identity that makes the members
+// trustworthy, and then each of the four.
+{
+  process.stdout.write("\n-- the read-set (R4) --\n");
+  const work = mkdtempSync(resolve(tmpdir(), "go-readset-"));
+  const a = resolve(work, "a.txt");
+  const b = resolve(work, "b.txt");
+  writeFileSync(a, "alpha");
+  writeFileSync(b, "beta");
+  const paths = [a, b, resolve(work, "gone.txt"), "text:k=v"];
+
+  // THE CORNERSTONE. Everything else in R4 rests on the members being a proof
+  // of the digest rather than a second opinion about it.
+  check(
+    "refold(digestMembers(paths)) === digestSet(paths)",
+    refold(digestMembers(paths)) === digestSet(paths),
+  );
+  check(
+    "and the identity holds through manifestText, which is the frozen format",
+    refold(digestMembers(paths)) === hashText(manifestText(paths)),
+  );
+  check(
+    "a REORDERED read-set still re-folds — serialisation order is not evidence",
+    (() => {
+      const m = digestMembers(paths);
+      return refold([m[3], m[0], m[2], m[1]]) === digestSet(paths);
+    })(),
+  );
+  check(
+    "a DOCTORED member does NOT re-fold — which is the asymmetry that matters",
+    (() => {
+      const m = digestMembers(paths).map((x) =>
+        x.path === a ? { ...x, sha256: `sha256:${"0".repeat(64)}` } : x,
+      );
+      return refold(m) !== digestSet(paths);
+    })(),
+  );
+  check(
+    "an ABSENT member is part of the proof, not skipped from it",
+    (() => {
+      const m = digestMembers(paths);
+      return m.some((x) => x.absent) && refold(m) === digestSet(paths);
+    })(),
+  );
+
+  // digest.mjs --members-out: one pass, and the argv path must not regress.
+  const DIGEST = resolve(HERE, "lib/digest.mjs");
+  const out = resolve(work, "members.json");
+  const withFlag = spawnSync(
+    process.execPath,
+    [DIGEST, a, b, "--members-out", out],
+    { encoding: "utf8" },
+  );
+  const bare = spawnSync(process.execPath, [DIGEST, a, b], {
+    encoding: "utf8",
+  });
+  check(
+    "digest.mjs --members-out prints the SAME digest it always did",
+    withFlag.stdout.trim() === bare.stdout.trim() && bare.status === 0,
+  );
+  check(
+    "and the file it wrote re-folds to that digest",
+    refold(JSON.parse(readFileSync(out, "utf8"))) === withFlag.stdout.trim(),
+  );
+  // REGRESSION: the flag-stripping filter was `i !== membersIdx + 1`, and with
+  // no flag present membersIdx is -1, so it dropped argv[0] — the first real
+  // path. The bare invocation above would have digested only `b`.
+  check(
+    "digest.mjs with NO --members-out still digests every argv path",
+    bare.stdout.trim() === digestSet([a, b]),
+  );
+
+  // rolesFor — resolution order.
+  const rows = [
+    {
+      kind: "stage_end",
+      stage: "p1-ingest",
+      artifacts: [{ sha256: "sha256:aaa", rel: "src/act.txt" }],
+    },
+  ];
+  const index = [
+    { sha256: "sha256:bbb", stage: "p3-encode", rel: "enc.l4", subject: "s" },
+    // The blessing path re-admits every covers[] member under the pseudo-stage
+    // `covers`, whose rel is `tree:<abs>`. It must NOT outrank the tree check.
+    { sha256: "sha256:ccc", stage: "covers", rel: `tree:${a}`, subject: "s" },
+  ];
+  const roled = rolesFor(
+    [
+      { path: "text:l4-binary=x", sha256: null, bytes: null },
+      { path: "/w/src/act.txt", sha256: "sha256:aaa", bytes: 1 },
+      { path: "/w/enc.l4", sha256: "sha256:bbb", bytes: 1 },
+      { path: a, sha256: "sha256:ccc", bytes: 5 },
+      { path: "/elsewhere/x", sha256: "sha256:zzz", bytes: 1 },
+    ],
+    rows,
+    index,
+    work,
+  );
+  const roleOf = (p) => roled.find((m) => m.path === p)?.role;
+  check("a text: member is a param", roleOf("text:l4-binary=x") === "param");
+  check(
+    "a member produced by an earlier stage of THIS run takes that stage's class",
+    roleOf("/w/src/act.txt") === "natlang_sources",
+  );
+  check(
+    "a member found only in the store takes its record's class",
+    roleOf("/w/enc.l4") === "encode",
+  );
+  // REGRESSION: `covers` has no phase class, and letting the store hit win
+  // returned `unknown` for every corpus module of a BLESSED run — a worse
+  // answer than the filesystem was about to give for free.
+  check(
+    "a store record whose stage has no class does NOT outrank the tree check",
+    roleOf(a) === "tree",
+  );
+  check(
+    "a member resolvable nowhere is `unknown`, never guessed",
+    roleOf("/elsewhere/x") === "unknown",
+  );
+  check(
+    "classOf is total over the stages the driver declares",
+    classOf("p1-ingest") === "natlang_sources" && classOf("nope") === "unknown",
+  );
+
+  // freshness — Make's meaning, per member, derived.
+  const treeMember = digestMembers([a])[0];
+  check(
+    "an unchanged tree member is current",
+    freshness([{ ...treeMember, role: "tree", origin: "tree" }], [], {})
+      .state === "current",
+  );
+  writeFileSync(a, "alpha CHANGED");
+  const stale = freshness(
+    [{ ...treeMember, role: "tree", origin: "tree" }],
+    [],
+    {},
+  );
+  check("a moved tree member is STALE", stale.state === "stale");
+  check(
+    "and freshness NAMES the member that moved — the whole point over a digest",
+    stale.moved.length === 1 && stale.moved[0].path === a,
+  );
+  // A param nobody supplied must never be reported current. Assuming it
+  // unchanged is exactly the §3.7a bug: the binary and the stdlib moved and no
+  // digest noticed.
+  const unevaluated = freshness(
+    [{ path: "text:l4-binary=old", role: "param", origin: "declared" }],
+    [],
+    {},
+  );
+  check(
+    "an UNSUPPLIED param is `unknown`, never `current`",
+    unevaluated.state === "unknown" && unevaluated.unknown === 1,
+  );
+  // A member outside the checkout is still a prerequisite. Gating freshness on
+  // repo membership reported `unknown` for every one of them — an unevaluated
+  // prerequisite wearing the same word as an evaluated one.
+  check(
+    "a member OUTSIDE the repo is still freshness-checked, not `unknown`",
+    (() => {
+      const outside = digestMembers([b])[0];
+      return (
+        freshness(
+          [{ ...outside, role: "unknown", origin: "unresolved" }],
+          [],
+          {},
+        ).state === "current"
+      );
+    })(),
+  );
+  check(
+    "a DELETED prerequisite is stale, and is reported with no current value",
+    (() => {
+      const ghost = {
+        path: resolve(work, "never-existed"),
+        sha256: `sha256:${"3".repeat(64)}`,
+        bytes: 1,
+        role: "tree",
+        origin: "tree",
+      };
+      const f = freshness([ghost], [], {});
+      return f.state === "stale" && f.moved[0].now === null;
+    })(),
+  );
+  check(
+    "a member recorded ABSENT and still absent has NOT moved",
+    (() => {
+      const gone = {
+        path: resolve(work, "never-existed"),
+        sha256: null,
+        bytes: null,
+        absent: true,
+        role: "tree",
+        origin: "tree",
+      };
+      return freshness([gone], [], {}).state === "current";
+    })(),
+  );
+  check(
+    "a supplied param that moved is stale",
+    freshness(
+      [{ path: "text:l4-binary=old", role: "param", origin: "declared" }],
+      [],
+      { "l4-binary": "new" },
+    ).state === "stale",
+  );
+
+  // independence — the one sense in which `blind` was ever meaningful.
+  check(
+    "a read-set with no prior encoding is independent",
+    independence([{ path: "x", role: "natlang_sources" }]).independent,
+  );
+  check(
+    "a read-set containing a prior encoding is NOT independent, and names it",
+    (() => {
+      const r = independence([{ path: "prior.l4", role: "encode" }]);
+      return !r.independent && r.priors.length === 1;
+    })(),
+  );
+
+  // comparability — R5's precondition, and the predicate a boolean cannot express.
+  const src = (sha) => [{ path: "s", role: "natlang_sources", sha256: sha }];
+  check(
+    "two read-sets over identical natlang_sources are comparable",
+    comparability(src("sha256:1"), src("sha256:1")).comparable,
+  );
+  check(
+    "two read-sets over DIFFERENT sources are not — their diff is not a fork",
+    (() => {
+      const r = comparability(src("sha256:1"), src("sha256:2"));
+      return !r.comparable && r.reason === "upstream sources differ";
+    })(),
+  );
+  // ABSENCE OF EVIDENCE IS NOT COMPARABILITY. Returning true here would license
+  // exactly the spurious fork claim R5 exists to prevent — and it is the case
+  // that holds today for every subject in the tree.
+  check(
+    "two read-sets with NO natlang_sources at all are not comparable either",
+    !comparability([], []).comparable,
+  );
+
+  // THE REFUSALS. A read-set is only worth recording if a false one cannot be.
+  {
+    const RECEIPT = resolve(HERE, "lib/receipt.mjs");
+    const run = mkdtempSync(resolve(tmpdir(), "go-rs-run-"));
+    const good = digestMembers([b]);
+    const goodF = resolve(run, "good.json");
+    writeFileSync(goodF, JSON.stringify(good));
+    const badF = resolve(run, "bad.json");
+    writeFileSync(
+      badF,
+      JSON.stringify(
+        good.map((m) => ({ ...m, sha256: `sha256:${"1".repeat(64)}` })),
+      ),
+    );
+    // SKIPPED-with-a-reason, deliberately: a bare PASS is REFUSED by the
+    // verdict lattice ("a status may not be asserted, only measured"), and
+    // borrowing an oracle here would test that rule rather than this one.
+    const call = (f, digest) =>
+      spawnSync(
+        process.execPath,
+        [
+          RECEIPT,
+          "stage-end",
+          "--run",
+          run,
+          "--stage",
+          "p3-check",
+          "--status",
+          "SKIPPED",
+          "--reason",
+          "read-set fixture",
+          "--inputs-digest",
+          digest,
+          "--read-set",
+          f,
+        ],
+        { encoding: "utf8" },
+      );
+    const okCall = call(goodF, digestSet([b]));
+    check("receipt.mjs ACCEPTS a read-set that re-folds", okCall.status === 0);
+    check(
+      "and the row it wrote carries the members",
+      (() => {
+        const rows = read(resolve(run, "journal.ndjson"));
+        const r = rows.find((x) => x.kind === "stage_end");
+        return Array.isArray(r?.read_set) && r.read_set.length === good.length;
+      })(),
+    );
+    const badCall = call(badF, digestSet([b]));
+    check(
+      "receipt.mjs REFUSES a read-set that does not re-fold to its own digest",
+      badCall.status !== 0,
+    );
+    check(
+      "and says so, rather than recording an unprovable claim",
+      /does not re-fold/.test(badCall.stderr),
+    );
+    check(
+      "the refused read-set was NOT appended to the journal",
+      read(resolve(run, "journal.ndjson")).filter((x) => x.kind === "stage_end")
+        .length === 1,
+    );
+    check(
+      "a --read-set naming a file that is not there is BROKEN, not an empty read-set",
+      spawnSync(
+        process.execPath,
+        [
+          RECEIPT,
+          "stage-end",
+          "--run",
+          run,
+          "--stage",
+          "p3-check",
+          "--status",
+          "SKIPPED",
+          "--reason",
+          "fixture",
+          "--inputs-digest",
+          "sha256:x",
+          "--read-set",
+          resolve(run, "nope.json"),
+        ],
+        { encoding: "utf8" },
+      ).status !== 0,
+    );
+    rmSync(run, { recursive: true, force: true });
+  }
+
+  // verify() must catch a read-set doctored AFTER the fact — the chain proves
+  // nobody edited a record, and this proves the record was worth writing.
+  {
+    const run = mkdtempSync(resolve(tmpdir(), "go-rs-ver-"));
+    const j = resolve(run, "journal.ndjson");
+    append(j, { kind: "run_begin", run_id: "r", subject: "s" });
+    append(j, {
+      kind: "stage_end",
+      stage: "p3-check",
+      status: "PASS",
+      inputs_digest: digestSet([b]),
+      read_set: digestMembers([b]),
+    });
+    check("a journal with a re-folding read-set verifies", verify(j).ok);
+    // Rewrite the row AND re-chain it, so the hash check cannot be what fires.
+    const rows = read(j);
+    rows[1].read_set = rows[1].read_set.map((m) => ({
+      ...m,
+      sha256: `sha256:${"2".repeat(64)}`,
+    }));
+    rows[1].hash = hashRecord(rows[1]);
+    writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    const v = verify(j);
+    check(
+      "a read-set doctored and RE-CHAINED is still caught by the refold check",
+      !v.ok && v.problems.some((p) => /read_set re-folds to/.test(p)),
+    );
+    rmSync(run, { recursive: true, force: true });
+  }
+
+  // Backward compatibility: schema 2 and 3 carry no read-set and must verify
+  // exactly as they did. The journals in `legalese/canon` are schema 2 and 3.
+  {
+    const run = mkdtempSync(resolve(tmpdir(), "go-rs-old-"));
+    const j = resolve(run, "journal.ndjson");
+    writeFileSync(
+      j,
+      [
+        {
+          journal_schema: 3,
+          seq: 0,
+          kind: "run_begin",
+          run_id: "r",
+          subject: "s",
+        },
+        {
+          journal_schema: 3,
+          seq: 1,
+          kind: "stage_end",
+          stage: "p3-check",
+          status: "PASS",
+          inputs_digest: "sha256:whatever",
+        },
+      ]
+        .map((r, i, all) => {
+          r.prev = i === 0 ? "sha256:" + "0".repeat(64) : all[i - 1].hash;
+          r.hash = hashRecord(r);
+          return JSON.stringify(r);
+        })
+        .join("\n") + "\n",
+    );
+    check(
+      "a schema-3 journal with no read_set verifies unchanged",
+      verify(j).ok,
+    );
+    rmSync(run, { recursive: true, force: true });
+  }
+
+  rmSync(work, { recursive: true, force: true });
+}
+// ===== END the read-set =====================================================
+
+// ===== a diff means something different per phase (R5) ======================
+//
+// A uniform "diff the artifacts" layer would mislabel three different events.
+// These pin the labels, and the one constraint the whole comparison layer rests
+// on: an encoding diff is an interpretive fork ONLY IF the upstream read-sets
+// matched.
+{
+  process.stdout.write("\n-- per-phase diff meaning (R5) --\n");
+  const store = mkdtempSync(resolve(tmpdir(), "go-r5-store-"));
+  const work = mkdtempSync(resolve(tmpdir(), "go-r5-work-"));
+  const CLI = resolve(HERE, "lib/store-cli.mjs");
+  const runCli = (...a) =>
+    spawnSync(process.execPath, [CLI, ...a], {
+      encoding: "utf8",
+      env: { ...process.env, L4_GO_STORE: store },
+    });
+
+  // Two witnesses per key, differing, so every key is divergent.
+  const admit = (stage, rel, text, sources) => {
+    const f = resolve(work, `${stage}-${text.length}-${rel}`);
+    writeFileSync(f, text);
+    Store.put(store, f, hashOf(f), {
+      subject: "s",
+      stage,
+      rel,
+      inputs_digest: "sha256:same",
+      run_id: `r${text.length}`,
+      sources_digest: sources,
+    });
+  };
+  admit("p1-ingest", "act.txt", "one", null);
+  admit("p1-ingest", "act.txt", "two", null);
+  admit("p2-sweep", "reg.json", "one", null);
+  admit("p2-sweep", "reg.json", "twoo", null);
+  const d1 = runCli("diff");
+  check(
+    "a natlang_sources divergence is a CURRENCY EVENT, explicitly not a fork",
+    /CURRENCY EVENT/.test(d1.stdout) && /NOT a fork/.test(d1.stdout),
+  );
+  check(
+    "a research divergence is a SWEEP FINDING routed to the modification register",
+    /SWEEP FINDING/.test(d1.stdout) &&
+      /external-modification\s*\n?\s*register/.test(d1.stdout),
+  );
+
+  // encode, with the sources recorded and IDENTICAL -> a real fork.
+  admit("p3-encode", "enc.l4", "aaa", "sha256:src1");
+  admit("p3-encode", "enc.l4", "bbb", "sha256:src1");
+  check(
+    "an encode divergence over IDENTICAL sources is an INTERPRETIVE FORK",
+    /INTERPRETIVE FORK/.test(runCli("diff").stdout),
+  );
+
+  // encode, sources DIFFER -> not a fork at all.
+  const store2 = mkdtempSync(resolve(tmpdir(), "go-r5-store2-"));
+  const admit2 = (text, sources) => {
+    const f = resolve(work, `enc2-${text}`);
+    writeFileSync(f, text);
+    Store.put(store2, f, hashOf(f), {
+      subject: "s",
+      stage: "p3-encode",
+      rel: "enc.l4",
+      inputs_digest: "sha256:same",
+      run_id: `r-${text}`,
+      sources_digest: sources,
+    });
+  };
+  admit2("aaa", "sha256:src1");
+  admit2("bbb", "sha256:src2");
+  const d3 = spawnSync(process.execPath, [CLI, "diff"], {
+    encoding: "utf8",
+    env: { ...process.env, L4_GO_STORE: store2 },
+  });
+  check(
+    "an encode divergence over DIFFERENT sources is NOT A FORK — it is a currency event",
+    /NOT A FORK/.test(d3.stdout),
+  );
+
+  // encode, sources UNRECORDED -> refuse to call it either way.
+  const store3 = mkdtempSync(resolve(tmpdir(), "go-r5-store3-"));
+  for (const t of ["aaa", "bbb"]) {
+    const f = resolve(work, `enc3-${t}`);
+    writeFileSync(f, t);
+    Store.put(store3, f, hashOf(f), {
+      subject: "s",
+      stage: "p3-encode",
+      rel: "enc.l4",
+      inputs_digest: "sha256:same",
+      run_id: `r-${t}`,
+    });
+  }
+  const d4 = spawnSync(process.execPath, [CLI, "diff"], {
+    encoding: "utf8",
+    env: { ...process.env, L4_GO_STORE: store3 },
+  });
+  // ABSENCE OF EVIDENCE IS NOT COMPARABILITY. This is the case that holds for
+  // every subject in the tree today, because none has run p1-ingest for real.
+  check(
+    "an encode divergence with NO recorded sources is NOT ESTABLISHED as a fork",
+    /NOT ESTABLISHED as a fork/.test(d4.stdout),
+  );
+  check(
+    "and it says why, rather than defaulting to the interesting answer",
+    /Absence of evidence is not comparability/.test(d4.stdout),
+  );
+
+  for (const d of [store, store2, store3, work])
+    rmSync(d, { recursive: true, force: true });
+}
+// ===== END per-phase diff meaning ===========================================
+
+// ===== the subject-level fold (R13) =========================================
+{
+  process.stdout.write("\n-- the subject fold (R13) --\n");
+  const SR = resolve(HERE, "lib/subject-report.mjs");
+  const base = mkdtempSync(resolve(tmpdir(), "go-r13-"));
+  const work = mkdtempSync(resolve(tmpdir(), "go-r13-w-"));
+  const src = resolve(work, "law.l4");
+  writeFileSync(src, "ORIGINAL");
+
+  const mkRun = (id, stage, members, digest) => {
+    const dir = resolve(base, id);
+    mkdirSync(dir, { recursive: true });
+    const j = resolve(dir, "journal.ndjson");
+    append(j, {
+      kind: "run_begin",
+      run_id: id,
+      subject: "subj",
+      declared_stages: [stage],
+    });
+    append(j, {
+      kind: "stage_end",
+      stage,
+      status: "PASS",
+      inputs_digest: digest,
+      read_set: members,
+    });
+    return dir;
+  };
+  mkRun(
+    "2026-01-01-aaa-001",
+    "p3-check",
+    digestMembers([src]),
+    digestSet([src]),
+  );
+
+  const run = (...a) =>
+    spawnSync(process.execPath, [SR, base, "--subject", "subj", ...a], {
+      encoding: "utf8",
+      env: { ...process.env, L4_GO_STORE: resolve(work, "no-store") },
+    });
+
+  const clean = run();
+  check(
+    "a fold over an unchanged prerequisite is CURRENT",
+    /CURRENT/.test(clean.stdout),
+  );
+  check("and exits 0", clean.status === 0);
+
+  // A phase in the DECLARABLE set that no run ever declared must still appear.
+  // This is R13's whole point: a phase that is absent from the report reads as
+  // "accounted for elsewhere" when nothing accounted for it anywhere.
+  const wide = run("--declarable", "p3-check p1-ingest");
+  check(
+    "a declarable phase with no receipt anywhere is NEVER RUN, not omitted",
+    /p1-ingest\s+NEVER RUN/.test(wide.stdout),
+  );
+
+  writeFileSync(src, "CHANGED");
+  const stale = run();
+  check(
+    "a moved prerequisite makes the phase STALE",
+    /STALE/.test(stale.stdout),
+  );
+  check(
+    "and NAMES the member that moved",
+    /MOVED .*law\.l4/.test(stale.stdout),
+  );
+  check("and exits 1, so a caller can gate on it", stale.status === 1);
+  check(
+    "the footer states that STALE is Make's, not 'the digest moved'",
+    /a newer version of some prerequisite exists/.test(stale.stdout),
+  );
+
+  // The evidence horizon must be reported, because a narrowed view must never
+  // read as an empty world.
+  check(
+    "the evidence horizon is printed",
+    /Evidence horizon: 1 surviving journal/.test(stale.stdout),
+  );
+
+  // A journal whose chain does not verify is not evidence, and its exclusion is
+  // announced rather than silent.
+  const j = resolve(base, "2026-01-01-aaa-001", "journal.ndjson");
+  const rows = read(j);
+  rows[1].status = "FORGED";
+  writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const tampered = run();
+  check(
+    "a journal that does not verify is EXCLUDED from the fold",
+    /1 journal\(s\) EXCLUDED/.test(tampered.stdout),
+  );
+  check(
+    "and its phase then reads NEVER RUN rather than inheriting a forged status",
+    !/FORGED/.test(tampered.stdout),
+  );
+
+  rmSync(base, { recursive: true, force: true });
+  rmSync(work, { recursive: true, force: true });
+}
+// ===== END the subject fold =================================================
+
+// ===== defects the adversarial review found (2026-08-24) ====================
+//
+// Five independent lenses converged on the first of these, which is the whole
+// argument for reviewing by attack rather than by reading.
+{
+  process.stdout.write("\n-- review findings, pinned --\n");
+
+  // THE SEPARATOR MISMATCH. The map was BUILT with NUL bytes and READ with
+  // spaces, so every produced member missed and reported `unknown`. Invisible
+  // in a diff, which is exactly why the separator is now an escape and this
+  // test reads the file as BYTES.
+  check(
+    "readset.mjs contains no raw NUL byte — a separator must be visible in source",
+    !readFileSync(resolve(HERE, "lib/readset.mjs")).includes(0),
+  );
+  check(
+    "witnessKey is the ONE key builder, so the two ends cannot disagree",
+    (() => {
+      const src = readFileSync(resolve(HERE, "lib/readset.mjs"), "utf8");
+      const uses = (src.match(/witnessKey\(/g) || []).length;
+      return uses >= 3; // one definition, one build site, one lookup site
+    })(),
+  );
+  check(
+    "a produced member whose bytes are unchanged is CURRENT, not `unknown`",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "act.txt" }],
+        },
+      ];
+      const roled = rolesFor(
+        [{ path: "/w/act.txt", sha256: "sha256:aaa", bytes: 1 }],
+        rows,
+        [],
+      );
+      const idx = [
+        {
+          subject: "subj",
+          stage: "p1-ingest",
+          rel: "act.txt",
+          sha256: "sha256:aaa",
+        },
+      ];
+      return freshness(roled, idx, {}).state === "current";
+    })(),
+  );
+  check(
+    "and when a NEWER admission exists for that slot it is STALE, naming it",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "act.txt" }],
+        },
+      ];
+      const roled = rolesFor(
+        [{ path: "/w/act.txt", sha256: "sha256:aaa", bytes: 1 }],
+        rows,
+        [],
+      );
+      const idx = [
+        {
+          subject: "subj",
+          stage: "p1-ingest",
+          rel: "act.txt",
+          sha256: "sha256:aaa",
+        },
+        {
+          subject: "subj",
+          stage: "p1-ingest",
+          rel: "act.txt",
+          sha256: "sha256:bbb",
+        },
+      ];
+      const f = freshness(roled, idx, {});
+      return f.state === "stale" && f.moved[0].now === "sha256:bbb";
+    })(),
+  );
+  // rolesFor's run branch returned no subject, so the key carried an empty one
+  // while every store record carries a real one — a guaranteed miss even after
+  // the separator was fixed.
+  check(
+    "rolesFor stamps the run's own subject onto a run-origin member",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "act.txt" }],
+        },
+      ];
+      return (
+        rolesFor([{ path: "/w/act.txt", sha256: "sha256:aaa" }], rows, [])[0]
+          .subject === "subj"
+      );
+    })(),
+  );
+
+  // THE SHARPER HALF of the missing subject: an empty-subject key does not
+  // merely MISS, it can FALSE-MATCH a `subject: null` record left by an
+  // unrelated run — reporting STALE against another run's bytes, which is a
+  // confident wrong answer rather than an absent one.
+  check(
+    "a run-origin member does not match a foreign subject-null store record",
+    (() => {
+      const rows = [
+        { kind: "run_begin", subject: "subj" },
+        {
+          kind: "stage_end",
+          stage: "p1-ingest",
+          artifacts: [{ sha256: "sha256:aaa", rel: "p1-ingest-validate.txt" }],
+        },
+      ];
+      const roled = rolesFor(
+        [{ path: "/w/p1-ingest-validate.txt", sha256: "sha256:aaa", bytes: 1 }],
+        rows,
+        [],
+      );
+      // A record from somewhere else entirely, with no subject on it.
+      const foreign = [
+        {
+          subject: null,
+          stage: "p1-ingest",
+          rel: "p1-ingest-validate.txt",
+          sha256: "sha256:ffff",
+        },
+      ];
+      const f = freshness(roled, foreign, {});
+      // `unknown` is the honest answer: nothing in the index speaks for THIS
+      // subject. Reporting `stale` here would be an accusation sourced from a
+      // stranger's run.
+      return f.state === "unknown" && f.moved.length === 0;
+    })(),
+  );
+
+  // refold must REPORT a broken journal, not die on it. A verifier that throws
+  // turns "this journal is wrong" into "the tool is wrong".
+  check(
+    "refold does not throw on a malformed read_set member",
+    (() => {
+      try {
+        return typeof refold(["not-a-member", null, 42]) === "string";
+      } catch {
+        return false;
+      }
+    })(),
+  );
+  check(
+    "and verify REPORTS such a journal rather than crashing",
+    (() => {
+      const run = mkdtempSync(resolve(tmpdir(), "go-malformed-"));
+      const j = resolve(run, "journal.ndjson");
+      const rows = [
+        {
+          journal_schema: 4,
+          seq: 0,
+          kind: "run_begin",
+          run_id: "r",
+          subject: "s",
+        },
+        {
+          journal_schema: 4,
+          seq: 1,
+          kind: "stage_end",
+          stage: "p3-check",
+          status: "PASS",
+          inputs_digest: "sha256:x",
+          read_set: ["bogus"],
+        },
+      ];
+      let prev = "sha256:" + "0".repeat(64);
+      for (const r of rows) {
+        r.prev = prev;
+        r.hash = hashRecord(r);
+        prev = r.hash;
+      }
+      writeFileSync(j, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      let ok = false;
+      try {
+        ok = verify(j).problems.some((p) => /read_set re-folds/.test(p));
+      } catch {
+        ok = false;
+      }
+      rmSync(run, { recursive: true, force: true });
+      return ok;
+    })(),
+  );
+
+  // A journal's schema is fixed at creation. Resuming across a bump would put
+  // two schemas in one chain and make the run permanently unverifiable.
+  check(
+    "append REFUSES to add a row to a journal created at another schema",
+    (() => {
+      const run = mkdtempSync(resolve(tmpdir(), "go-schema-"));
+      const j = resolve(run, "journal.ndjson");
+      const r0 = {
+        journal_schema: 3,
+        seq: 0,
+        kind: "run_begin",
+        run_id: "r",
+        subject: "s",
+        prev: "sha256:" + "0".repeat(64),
+      };
+      r0.hash = hashRecord(r0);
+      writeFileSync(j, JSON.stringify(r0) + "\n");
+      let threw = false;
+      try {
+        append(j, { kind: "stage_begin", stage: "p3-check" });
+      } catch (e) {
+        threw = /permanently unverifiable|two schemas/.test(e.message);
+      }
+      const stillVerifies = verify(j).ok;
+      rmSync(run, { recursive: true, force: true });
+      return threw && stillVerifies;
+    })(),
+  );
+
+  // gc's keep-list compared PATH STRINGS. macOS TMPDIR ends in a slash, so the
+  // base carries a double slash that `ls` preserves and node's resolver
+  // collapses; nothing ever matched, and every run directory was deleted —
+  // gate-holding ones included — while the summary printed "kept N".
+  check(
+    "gc matches its keep-list by run id, never by path string",
+    (() => {
+      const src = readFileSync(resolve(HERE, "go.sh"), "utf8");
+      const body = src.slice(src.indexOf("cmd_gc()"));
+      const gc = body.slice(0, body.indexOf("\n}\n"));
+      return /basename "\$d"/.test(gc) && /"\$k" == "\$id"/.test(gc);
+    })(),
+  );
+  check(
+    "and a double-slashed base still keeps a gate-holding run",
+    (() => {
+      const base = mkdtempSync(resolve(tmpdir(), "go-gcpath-"));
+      const dir = resolve(base, "l4-go", "2026-01-01-aaa-001");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        resolve(dir, "journal.ndjson"),
+        JSON.stringify({ kind: "run_begin", subject: "regcf" }) +
+          "\n" +
+          JSON.stringify({ kind: "gate", state: "satisfied" }) +
+          "\n",
+      );
+      const r = spawnSync(resolve(HERE, "go.sh"), ["gc", "--keep", "1"], {
+        encoding: "utf8",
+        env: { ...process.env, L4_GO_RUNDIR: `${base}//l4-go` },
+      });
+      const survived = existsSync(dir);
+      rmSync(base, { recursive: true, force: true });
+      return r.status === 0 && survived;
+    })(),
+  );
+
+  // subject-report's declarable universe came from PRIMARY_STAGES, which was never
+  // assembled for that command, so every g1-only phase reached the report only
+  // via a surviving journal — and would vanish once those expired.
+  check(
+    "subject-report is in the set of commands that resolve a subject",
+    /" run plan doctor subject-report "/.test(
+      readFileSync(resolve(HERE, "go.sh"), "utf8"),
+    ),
+  );
+
+  // Run ids sort date, then CONTENT HASH, then counter — so lexicographic order
+  // is not chronological within a day.
+  check(
+    "subject-report orders runs by recorded start time, not by run id",
+    /run_begin\"\)\?\.ts/.test(
+      readFileSync(resolve(HERE, "lib/subject-report.mjs"), "utf8"),
+    ),
+  );
+
+  // store diff read only the FIRST admission of each sha, hiding a real
+  // disagreement between two runs that read different sources.
+  check(
+    "store diff folds EVERY admission's sources_digest, not just the first",
+    (() => {
+      const src = readFileSync(resolve(HERE, "lib/store-cli.mjs"), "utf8");
+      return (
+        /admissions\.map\(\(a\) => a\.sources_digest/.test(src) &&
+        !/a\[0\]\.sources_digest/.test(src)
+      );
+    })(),
+  );
+
+  // receipt.mjs passed [] as the store index, which made the store branch of
+  // rolesFor unreachable — so sources_digest was structurally null for exactly
+  // the cross-run case it exists to serve.
+  check(
+    "receipt.mjs classifies a read-set against the REAL store index",
+    /storeIndex = indexRecords\(store\)/.test(
+      readFileSync(resolve(HERE, "lib/receipt.mjs"), "utf8"),
+    ),
+  );
+}
+// ===== END review findings ==================================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,
