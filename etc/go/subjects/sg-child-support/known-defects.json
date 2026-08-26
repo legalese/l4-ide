@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "NOT MEASURED, and deliberately containing no groups.",
+    "",
+    "Every entry in this file is a NEGATIVE CONTROL: a defect observed on a stated",
+    "date, which a leg then expects to keep reproducing. A negative control that",
+    "stops reproducing is itself a finding, so the legs report BROKEN rather than",
+    "turning green when an expected defect disappears.",
+    "",
+    "That machinery only works if every entry was actually observed. `new-subject`",
+    "observes nothing, so it writes nothing: known-defects.mjs refuses with 'no",
+    "group <name>' for any leg that needs one, which names the gap instead of",
+    "hiding it. Predicting a defect here would be exactly the drift this",
+    "orchestrator exists to prevent.",
+    "",
+    "See etc/go/subjects/regcf/known-defects.json for the entry shape and for the",
+    "convention that an empty group states its reason."
+  ]
+}
