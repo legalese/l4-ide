@@ -3,8 +3,13 @@
 Prelude-provided (after `IMPORT prelude`). Backed by `LIST OF a`; order and duplicates are
 irrelevant to all observers. Motivation: legal _and_ is type-ambiguous — "residents of NY
 **and** NJ" is a **union of people**; "cruel **and** unusual" is a **conjunction of
-conditions**. L4 disambiguates by type: `AND` on `SET`s is union; `AND` on `BOOLEAN`s stays
-conjunction. Transcribe the statute's connective verbatim and let the checker route it.
+conditions**. L4 splits the two by **spelling**: term-level union is written `UNION`; `AND`
+is boolean conjunction only. (Until 2026-07-28 the prelude overloaded `AND`/`OR` on sets to
+mean union; the overloads were removed — SET-OPERATORS-SPEC §16. **Always write `UNION`**:
+it is correct in every tree, before and after the removal. The typechecking blow-up that
+forced the removal has since been fixed, so whether the overloads ever return is now a
+semantic question rather than a performance one — `doc/reference/libraries/sets.md` carries
+the current account.)
 
 ## Vocabulary
 
@@ -25,7 +30,8 @@ setSize s / setToList s / emptySet
 - `p PLUS q` = union, `p MINUS q` = difference — **bare AND precedence-correct** (they ride
   the arithmetic table): `a PLUS b MINUS c` needs no parens. But sets are a join
   semilattice, not a group: `(A PLUS B) MINUS B ≠ A`.
-- `p AND q` = `p OR q` = union. Both connectives coincide on sets — intended.
+- `p AND q` / `p OR q` on sets = **type error since 2026-07-28** (on older trees they
+  resolve to union). Write `UNION` — never generate `AND`/`OR` between sets.
 - `p EQUALS q` = **compile-time ambiguity error, on purpose** ("multiple definitions for
   `__EQUALS__`"). Structural equality is order-sensitive and silently wrong for sets, so L4
   refuses to guess. Write `` `set equals` ``.

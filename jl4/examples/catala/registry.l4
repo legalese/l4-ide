@@ -1,0 +1,113 @@
+-- The emitter's remaining expression forms, in one exhibit.
+--
+-- The other five files here each pin one ruling. This one exists for coverage:
+-- an adversarial review found that across all of them the harness exercised
+-- `for all` and `Decimal.sum` and nothing else — no private toplevel
+-- (`depends on`), no `match` over a MAYBE, no date literal or `Date.get_*`, no
+-- `optional of`, no `combine all`, no `number of`, no `contains`, no
+-- `impossible`, no lenient `Date`. Each of those paths could have regressed
+-- with nothing in the repo noticing.
+--
+-- So: a small vehicle registry, whose rules reach every one of them.
+
+IMPORT prelude
+IMPORT daydate
+
+DECLARE Registration HAS
+    plate       IS A STRING                 -- never inspected: elided under R11
+    firstOnRoad IS A DATE
+    seats       IS A NUMBER
+    endorsement IS A MAYBE NUMBER           -- `optional of decimal`
+
+DECLARE Fleet HAS
+    members IS A LIST OF Registration
+
+DECLARE `Plate class` IS ONE OF
+    ordinary
+    vintage
+    diplomatic
+
+-- A non-exported helper: a private `declaration … depends on … equals`.
+GIVEN r IS A Registration
+GIVETH A NUMBER
+`seat levy` r MEANS r's seats TIMES 12
+
+-- `YMD` on literal components is a Catala date literal; the getters are the
+-- `Date` stdlib module, and `count` is `number of` behind an R2 coercion.
+@export The year a vehicle came onto the road, and the levy it attracts.
+GIVEN f IS A Fleet
+GIVETH A NUMBER
+`fleet levy` f MEANS
+    sum (map (GIVEN r YIELD `seat levy` r) (f's members))
+
+@export Registrations are pre-2020 if they were on the road before the cutoff.
+GIVEN r IS A Registration
+GIVETH A BOOLEAN
+`pre cutoff` r MEANS DATE_YEAR (r's firstOnRoad) LESS THAN DATE_YEAR cutoff
+  WHERE
+    cutoff MEANS YMD 2020 1 1
+
+-- `fromMaybe` is a `match` over `optional of`; the endorsement carries a
+-- penalty that folds into the levy.
+@export The endorsement penalty, zero when there is none.
+GIVEN r IS A Registration
+GIVETH A NUMBER
+penalty r MEANS fromMaybe 0 (r's endorsement)
+
+-- `foldl` is `combine all … initially … with …`; `elem` is `contains`;
+-- `count` is `number of`.
+@export Whether a fleet is oversized, and by how much it exceeds the cap.
+GIVEN f IS A Fleet
+GIVETH A NUMBER
+`excess seats` f MEANS
+    foldl (GIVEN acc, r YIELD acc PLUS (r's seats)) 0 (f's members) MINUS 20
+
+@export Whether any member of the fleet seats exactly the reportable number.
+GIVEN f IS A Fleet
+GIVETH A BOOLEAN
+reportable f MEANS
+    elem 9 (map (GIVEN r YIELD r's seats) (f's members))
+    AND count (f's members) GREATER THAN 0
+
+-- `@nonexhaustive` says the author asserts the missing cases cannot arise;
+-- Catala's `impossible` says exactly that, so the uncovered arms are emitted
+-- rather than the CONSIDER being rejected (§2.1, §4.3).
+@export nonexhaustive The registration fee for an ordinary or vintage plate.
+GIVEN c IS A `Plate class`
+GIVETH A NUMBER
+`plate fee` c MEANS
+    CONSIDER c
+      WHEN ordinary THEN 100
+      WHEN vintage  THEN 40
+
+-- The lenient `Date day month year`, which R3 compiles through an emitted
+-- day-granular helper: 31 February rolls forward.
+@export The date a registration lapses: the same day, five years on.
+GIVEN r IS A Registration
+GIVETH A DATE
+lapses r MEANS
+    Date (DATE_DAY (r's firstOnRoad))
+         (DATE_MONTH (r's firstOnRoad))
+         (DATE_YEAR (r's firstOnRoad) PLUS 5)
+
+-- Two registrations feed the directives below:
+--   SBA1234A  on the road 2018-06-01,  5 seats, no endorsement
+--   SBB5678B  on the road 2021-03-15,  9 seats, 250 endorsement
+
+#EVAL `fleet levy` (Fleet WITH members IS LIST (Registration WITH plate IS "SBA1234A", firstOnRoad IS YMD 2018 6 1, seats IS 5, endorsement IS NOTHING), (Registration WITH plate IS "SBB5678B", firstOnRoad IS YMD 2021 3 15, seats IS 9, endorsement IS JUST 250))
+
+#EVAL `plate fee` vintage
+
+#EVAL `pre cutoff` (Registration WITH plate IS "SBA1234A", firstOnRoad IS YMD 2018 6 1, seats IS 5, endorsement IS NOTHING)
+
+#EVAL penalty (Registration WITH plate IS "SBB5678B", firstOnRoad IS YMD 2021 3 15, seats IS 9, endorsement IS JUST 250)
+
+#EVAL penalty (Registration WITH plate IS "SBA1234A", firstOnRoad IS YMD 2018 6 1, seats IS 5, endorsement IS NOTHING)
+
+#EVAL `excess seats` (Fleet WITH members IS LIST (Registration WITH plate IS "SBA1234A", firstOnRoad IS YMD 2018 6 1, seats IS 5, endorsement IS NOTHING))
+
+#EVAL reportable (Fleet WITH members IS LIST (Registration WITH plate IS "SBB5678B", firstOnRoad IS YMD 2021 3 15, seats IS 9, endorsement IS JUST 250))
+
+-- 29 February 2020 plus five years: 2025 has no 29 February, so the lenient
+-- `Date` rolls it forward to 1 March 2025 (R3, §8.3).
+#EVAL lapses (Registration WITH plate IS "SBA1234A", firstOnRoad IS YMD 2020 2 29, seats IS 5, endorsement IS NOTHING)

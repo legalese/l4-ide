@@ -116,7 +116,18 @@ export function transcriptsFor(session, root = configRoot()) {
               session,
               // The workflow run this subagent belonged to, when the layout
               // says so: subagents/workflows/<runId>/agent-<id>.jsonl.
-              group: /\/subagents\/workflows\/([^/]+)\//.exec(p)?.[1] ?? null,
+              //
+              // The `agent-` prefix is load-bearing, not decoration. The same
+              // directory holds the workflow's own `journal.jsonl`, which is a
+              // record OF the fan-out and not an agent in it — it carries no
+              // requests at all. Matching the directory alone counted it,
+              // so every group reported one more agent than it ran (measured:
+              // 13 for a twelve-agent workflow, and the same off-by-one in all
+              // six groups of one run). It is still read and still counted as a
+              // transcript; it simply belongs to no group.
+              group: /^agent-/.test(e.name)
+                ? (/\/subagents\/workflows\/([^/]+)\//.exec(p)?.[1] ?? null)
+                : null,
             });
         }
       };
@@ -472,16 +483,32 @@ export function buildLedger({ sessions, from, to, label, root, pipeline }) {
       if (m.span.last && (!acc.span.last || m.span.last > acc.span.last))
         acc.span.last = m.span.last;
       // Per-workflow rollup: what one fan-out cost, separable from the rest.
+      //
+      // BOTH FIGURES, because a session outlives the question being asked of
+      // it. A session that has run for days holds every workflow it ever ran,
+      // and a caller who passes --from/--to wants the ones inside the window;
+      // a caller who passes neither wants all of them. Carrying only `total`
+      // gave the second and silently answered the first with it — the same
+      // session-total-beside-a-clipped-figure conflation the tool already
+      // avoids in `totals`, `tools` and `network`. Measured: a ledger built
+      // over an eight-hour window listed fourteen workflows, six of them from
+      // earlier days, with no field to tell them apart.
       if (m.file.group) {
         const g = groups.get(m.file.group) ?? {
           group: m.file.group,
           agents: 0,
+          agents_in_window: 0,
           first: null,
           last: null,
           total: ZERO(),
+          in_window: ZERO(),
         };
         g.agents += 1;
         mergeUsage(g.total, m.total);
+        mergeUsage(g.in_window, m.in_window);
+        // An agent counts as in-window when any of its requests fell inside
+        // it, which is the same test `in_window` itself applies per request.
+        if (m.in_window.requests > 0) g.agents_in_window += 1;
         if (m.span.first && (!g.first || m.span.first < g.first))
           g.first = m.span.first;
         if (m.span.last && (!g.last || m.span.last > g.last))

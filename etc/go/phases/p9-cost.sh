@@ -132,6 +132,14 @@ METRICS="$(node -e '
     if (j.network.calls_in_window[k] > j.network.calls[k]) bad.push(`network.${k}: in-window calls exceed the total`);
     if (j.network.ms_in_window[k] > j.network.ms[k]) bad.push(`network.${k}: in-window ms exceed the total`);
   }
+  // 5b. the same rule over the per-workflow rollups, which carry both figures
+  //     for the same reason the tools do: a long-lived session holds every
+  //     fan-out it ever ran, and only `in_window` answers what THIS run cost.
+  for (const w of j.workflows ?? []) {
+    if (w.agents_in_window > w.agents) bad.push(`workflow ${w.group}: agents_in_window exceeds agents`);
+    for (const k of KEYS)
+      if (w.in_window[k] > w.total[k]) bad.push(`workflow ${w.group}: in_window.${k} exceeds total.${k}`);
+  }
   // 6. the transcript count must agree with the per-session counts. (Whether a
   //    transcript could be READ is handled below, as a DEGRADED condition
   //    rather than here: an unreadable file makes the totals short, which is a
