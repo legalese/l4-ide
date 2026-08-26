@@ -383,3 +383,53 @@ No build, no model, no network. `HG1` was **waived, not signed**, and the waiver
 honest one: the encoding states an announcement, no Bill exists for an expert to review it against,
 and a signature over a moving target would be worth less than the sentence saying so. The waiver
 binds to the corpus digest — edit any module and the gate re-opens.
+
+---
+
+## 10. What this cost
+
+Requested so that a reader can price the capability rather than guess at it. Every token figure
+below is **measured** from the session transcript; every dollar figure is that measurement
+multiplied by Anthropic's published list price for `claude-opus-5` as at 2026-08-26
+([platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing)):
+$5/MTok base input, $10/MTok 1-hour cache write, $0.50/MTok cache hit, $25/MTok output.
+
+Scope: from the first retrieval to the final report — retrieval, statutory reading, encoding,
+debugging, golden regeneration, the pipeline run, the app, the OpenFisca projection, the registers,
+the deposit and this document. One model, `claude-opus-5`; no subagents, no workflows, so nothing
+is attributable to fan-out.
+
+| line | tokens | rate | cost | share |
+| --- | ---: | ---: | ---: | ---: |
+| Cache reads (hits) | 76,274,229 | $0.50 / MTok | **$38.14** | 71% |
+| Cache writes (1h TTL) | 832,674 | $10.00 / MTok | **$8.33** | 16% |
+| Output — incl. ~91,262 reasoning | 283,153 | $25.00 / MTok | **$7.08** | 13% |
+| Fresh (uncached) input | 474 | $5.00 / MTok | $0.00 | 0% |
+| Web search | 6 searches | $10 / 1,000 | $0.06 | 0% |
+| **Total** | | | **$53.61** | |
+
+Wall clock **90 minutes** (20:49:19Z → 22:19:25Z), of which the pipeline's own stage execution was
+**98 seconds**; 237 API requests over 253 tool calls. So roughly **$0.60 a minute**, and about
+**3.5¢ per line of committed L4** (1,536 lines across six modules).
+
+Three caveats, because each of them moves the number:
+
+- **Cache reads are 71% of the bill, and they are the price of a long single-context session.**
+  Nothing here is a defect — re-reading a 200-file worktree from cache is what makes an hour-long
+  encoding coherent — but it means the cost scales with *session length*, not with the size of the
+  law. A shorter subject in a shorter session is cheaper than this per unit of output, and a
+  compaction resets the multiplier.
+- **The cache-write line assumes the 1-hour TTL this session ran under.** At the 5-minute TTL
+  ($6.25/MTok) the same run prices at **$50.48**.
+- **Do not sum the transcript naively.** A raw sum over usage records double-counts, because a
+  single API request appears once per streamed record; `etc/go/lib/cost-ledger.mjs` dedupes by
+  `requestId` and warns that the naive sum over-reports by ~2.2×. Every figure above is deduped.
+  Taken naively this run would have read as roughly **$118**, which is wrong by more than double.
+
+For comparison, the pipeline's own attested ledger (`go-run-cost-ledger.json`), snapshotted at
+22:16:03Z — three minutes before the session ended — recorded 231 requests and 277,311 output
+tokens. The difference is the tail of the run, not a disagreement in method.
+
+**What is not in this figure:** no domain-expert review (HG1 was waived, §9.2), no deployment, and
+no human drafting time. It is the machine cost of one operator saying *"SG Child Support Package:
+go"* and reading what came back.
