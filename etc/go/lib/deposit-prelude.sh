@@ -37,9 +37,9 @@ GO_REGISTER_VALIDATE="$GO_ROOT/etc/go/lib/register-validate.mjs"
 # `kind`, so one string names the format, the validator and the file.
 go_deposit_path() {
   case "$1" in
-    source-bundle) printf '%s' "${GO_S_DENOVO_BUNDLE:-}" ;;
-    external-modifications) printf '%s' "${GO_S_DENOVO_REGISTER:-}" ;;
-    fork-register) printf '%s' "${GO_S_DENOVO_FORKS:-}" ;;
+    source-bundle) printf '%s' "${GO_S_NATLANG_BUNDLE:-}" ;;
+    external-modifications) printf '%s' "${GO_S_NATLANG_REGISTER:-}" ;;
+    fork-register) printf '%s' "${GO_S_COMPARISON_FORKS:-}" ;;
     *)
       echo "go_deposit_path: unknown schema '$1'" >&2
       return 2
@@ -50,9 +50,9 @@ go_deposit_path() {
 # go_deposit_key SCHEMA -> the subject.json key that declares it.
 go_deposit_key() {
   case "$1" in
-    source-bundle) printf 'denovo.bundle' ;;
-    external-modifications) printf 'denovo.register' ;;
-    fork-register) printf 'denovo.fork_register' ;;
+    source-bundle) printf 'natlang_sources.bundle' ;;
+    external-modifications) printf 'natlang_sources.register' ;;
+    fork-register) printf 'comparison.fork_register' ;;
   esac
 }
 
@@ -63,10 +63,10 @@ go_deposit_require() {
   path="$(go_deposit_path "$schema")"
   key="$(go_deposit_key "$schema")"
   if [[ -z "$path" ]]; then
-    go_skip "the '$GO_S_ID' sidecar declares no $key, so this subject has nowhere to deposit a $schema. Add it to $GO_S_DIR/subject.json; the path's existence is optional, because producing the file is agent work owned by the skill's G2 section."
+    go_skip "the '$GO_S_ID' sidecar declares no $key, so this subject has nowhere to deposit a $schema. Add it to $GO_S_DIR/subject.json; the path's existence is optional, because producing the file is agent work owned by the deposit runbook in .claude/skills/running-the-l4-pipeline/SKILL.md."
   fi
   if [[ ! -f "$path" ]]; then
-    go_skip "the declared $key deposit has not been produced yet: $path is not a file. Producing it is agent work (fetch/search/encode with provenance), owned by the G2 section of .claude/skills/running-the-l4-pipeline/SKILL.md. Deposit it and re-run this stage; the receipt is the fact."
+    go_skip "the declared $key deposit has not been produced yet: $path is not a file. Producing it is agent work (fetch/search/encode with provenance), owned by the deposit runbook in .claude/skills/running-the-l4-pipeline/SKILL.md. Deposit it and re-run this stage; the receipt is the fact."
   fi
   GO_DEPOSIT="$path"
   return 0

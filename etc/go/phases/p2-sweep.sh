@@ -7,7 +7,7 @@
 # ambiguity through interpretive guidance; are amendments proposed. That is a
 # web-search stage, and this orchestrator makes no outward network request
 # except §6.4's loopback. Searching, and judging what a finding means, is
-# agent-side work owned by the skill's G2 section.
+# agent-side work owned by the skill's deposit runbook.
 #
 # What IS mechanisable is the discipline SPEC.md §4 attaches to it — "the report
 # states what was searched, not only what was found, so 'no post-enactment
@@ -30,7 +30,7 @@
 # is not.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_FORKS:-}" \
+  printf '%s\n' "${GO_S_NATLANG_REGISTER:-}" "${GO_S_NATLANG_BUNDLE:-}" "${GO_S_COMPARISON_FORKS:-}" \
     "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/deposit-prelude.sh" \
     "$GO_ROOT/etc/go/lib/register-validate.mjs" \
     "$GO_ROOT/specs/todo/single-instruction-demo/schemas/external-modifications.schema.json"

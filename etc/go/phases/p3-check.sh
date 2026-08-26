@@ -1,27 +1,29 @@
 #!/usr/bin/env bash
-# P3-check — the mechanisable P3 house rules, over the milestone's module set.
+# P3-check — the mechanisable P3 house rules, over the run's module set.
 #
 # These are P3 HOUSE RULES, not corpus facts, so the same checks apply to
-# whichever module set the driver resolved (2026-08-09): the committed corpus
-# at g1, the de novo deposit (denovo.modules) at g2. The de novo ACCEPTANCE
-# half of P3 — "the deposit exists and the compiler accepts it" — is
-# etc/go/phases/p3-encode.sh; the two stages deliberately layer.
+# whichever module set the driver resolved (2026-08-09): the committed
+# encoding, or an additional encoding a run selected with `--encoding <id>`.
+# The ACCEPTANCE half of P3 — "the deposit exists and the compiler accepts it"
+# — is etc/go/phases/p3-encode.sh; the two stages deliberately layer.
 #
 # Two of P3's house rules are mechanically checkable and are checked here:
 # BRANCH-over-ELSE-IF, and an @ref FR citation on every dated arm. The third —
 # "isomorphic, reviewable section by section against the regulation" — is not
 # checkable in principle, and it is RECORDED as unverified rather than omitted.
 
-# The milestone-scoped module set, resolved by the driver as GO_MODULES with
-# GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
-# documented direct-invocation route — the committed corpus set is the default,
-# preserving the pre-2026-08-09 contract. Kept byte-for-byte in step with the
-# driver's own derivation (go.sh, the g1 arm): a fallback that resolved a
-# NARROWER set than a run does would make a direct invocation measure something
-# other than what the receipt claims.
+# The module set of the encoding THIS RUN IS ABOUT, resolved by the driver as
+# GO_MODULES. There is no origin sentinel beside it any more: subject.mjs
+# resolves the SELECTED encoding into the ordinary GO_S_ENCODING_MODULES and
+# GO_S_MIN_* names, so this stage reads the encoding it was handed and never
+# asks which one it is. When invoked directly without GO_MODULES — the
+# documented direct-invocation route — the committed encoding's set is the
+# default, preserving the pre-2026-08-09 contract. Kept byte-for-byte in step
+# with the driver's own derivation (go.sh): a fallback that resolved a NARROWER
+# set than a run does would make a direct invocation measure something other
+# than what the receipt claims.
 if [[ -z "${GO_MODULES+x}" ]]; then
   GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
-  GO_MODULES_ORIGIN="corpus"
 fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
@@ -32,11 +34,14 @@ if [[ "${1:-}" == "--inputs" ]]; then
   # (measured 2026-08-09 on p6-tests' twin floor; this stage had the same
   # hole). The undeclared case is a distinct contributor because it changes
   # the receipt (the inapplicable-floor note below).
-  if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
-    _floor="${GO_S_DENOVO_MIN_DATED_ARMS:-undeclared}"
-  else
-    _floor="${GO_S_MIN_DATED_ARMS:-undeclared}"
-  fi
+  # The per-origin branch that used to stand here is DELETED, not renamed:
+  # once floors began travelling with their encoding, the resolver handed this
+  # stage the SELECTED encoding's floor under the ordinary GO_S_MIN_DATED_ARMS
+  # and the two arms became the same expression, character for character. What
+  # still separates two encodings' digests is their MODULE PATHS, printed
+  # below — the resolver forbids an additional encoding from re-declaring a
+  # committed module, so the two sets cannot coincide.
+  _floor="${GO_S_MIN_DATED_ARMS:-undeclared}"
   # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
   # `--fixed-now` is what this stage passes to `l4` a few lines down, and it is
   # the answer to "as at what date does the law say this". It was in NO stage's
@@ -58,7 +63,20 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 declare -a MODULES=()
 read -ra MODULES <<<"${GO_MODULES:-}"
 if [[ ${#MODULES[@]} -eq 0 ]]; then
-  go_skip "the '$GO_S_ID' sidecar declares no module set for this milestone's origin (${GO_MODULES_ORIGIN:-corpus}: denovo.modules), so there is nothing to hold the P3 house rules against. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
+  # WHICH KEY to name is one of the two things in this stage that legitimately
+  # vary with the encoding (the other is FLOOR_KEY below): the committed
+  # encoding's modules are `encoding.modules`, an additional encoding's are
+  # `encodings.<id>.modules`. Built from GO_S_ENCODING_ID so the reader is sent
+  # to a key that exists — the old reason said `denovo.modules`, which no
+  # sidecar has any more.
+  case "${GO_S_ENCODING_ID:-primary}" in
+    primary) MODULES_KEY="encoding.modules" ;;
+    # No additional encoding is DECLARED at all, so there is no id to
+    # name — the reader has to create the entry, not fill one in.
+    undeclared) MODULES_KEY="encodings.<id>.modules (none is declared yet)" ;;
+    *) MODULES_KEY="encodings.${GO_S_ENCODING_ID}.modules" ;;
+  esac
+  go_skip "the '$GO_S_ID' sidecar declares no module set for this run's encoding (${GO_S_ENCODING_ID:-primary}: $MODULES_KEY), so there is nothing to hold the P3 house rules against. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
 fi
 declare -a MISSING=()
 for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING+=("$m"); done
@@ -155,31 +173,43 @@ DATED_ARMS=$(cat "$COUNTFILE" 2>/dev/null || echo 0)
 #
 # So a zero, or a drop below the known population, is a finding about the
 # MATCHER and is reported as one. The floor is the subject's own measured
-# dated-arm count for THIS ORIGIN's module set (D2, 2026-08-09: floors are
-# per-origin — subject.json checks.min_dated_arms for the corpus,
-# denovo.checks.min_dated_arms for the deposit) with the population census in
-# the sidecar's NOTES.md. Raise the floor when the module set gains arms; do
-# not lower it to make this pass.
+# dated-arm count for THIS ENCODING's module set (D2, 2026-08-09: floors
+# travel with their encoding — subject.json checks.min_dated_arms for the
+# committed one, encodings.<id>.checks.min_dated_arms for an additional one,
+# and the resolver hands whichever the run selected down as
+# GO_S_MIN_DATED_ARMS) with the population census in the sidecar's NOTES.md.
+# Raise the floor when the module set gains arms; do not lower it to make this
+# pass.
 #
 # THE ZERO-FLOOR CASE IS NOT A GREEN. A pinned floor of 0 over a matched count
 # of 0 is exactly the vacuous pass this floor exists to prevent, so it prints
 # NOT CHECKED with the reason on the receipt instead of "all 0 dated arm(s)
-# carry an @ref". Measured on the regcf de novo deposit (2026-08-09): the
-# module IS temporally parameterised (8 decisions read the rule date, per the
-# DMN exporter's D-RULEDATE advisory) but routes every arm through a helper
-# abstraction over YMD constants, which this line-shaped matcher cannot see —
-# 0 matched arms is that module's true population under THIS matcher, and the
-# sidecar's NOTES.md carries the census.
+# carry an @ref". Measured on regcf's `cleanroom-2026-08` encoding
+# (2026-08-09): the module IS temporally parameterised (8 decisions read the
+# rule date, per the DMN exporter's D-RULEDATE advisory) but routes every arm
+# through a helper abstraction over YMD constants, which this line-shaped
+# matcher cannot see — 0 matched arms is that module's true population under
+# THIS matcher, and the sidecar's NOTES.md carries the census.
 declare -a TEMPORAL_NOTES=()
-if [[ "${GO_MODULES_ORIGIN:-corpus}" == "denovo" ]]; then
-  MIN_DATED_ARMS="${GO_S_DENOVO_MIN_DATED_ARMS:-0}"
-  FLOOR_KEY="denovo.checks.min_dated_arms"
-  if [[ -z "${GO_S_DENOVO_MIN_DATED_ARMS:-}" ]]; then
-    TEMPORAL_NOTES+=(--note "the sidecar declares no denovo.checks.min_dated_arms; the dated-arm floor defaulted to 0, which makes the temporal-closure sub-check inapplicable rather than green. Measure the deposit and pin its floor.")
-  fi
-else
+# The one thing here that genuinely varies with WHICH encoding this run was
+# handed: the sidecar key a note tells the reader to edit. The committed
+# encoding's floor is the top-level `checks.min_dated_arms`; an additional
+# encoding's sits inside the encoding it measures. Naming the wrong one sends
+# the reader to a key that does not exist — which is what the old note did, it
+# said `denovo.checks.min_dated_arms`. The arms also differ in whether an
+# UNDECLARED floor is reachable at all: subject.mjs REQUIRES `checks` on the
+# committed encoding, so only an additional one can arrive with the floor
+# empty, and when it does the receipt says so rather than passing quietly on a
+# borrowed 0.
+if [[ "${GO_S_ENCODING_ID:-primary}" == "primary" ]]; then
   MIN_DATED_ARMS="$GO_S_MIN_DATED_ARMS"
   FLOOR_KEY="checks.min_dated_arms"
+else
+  MIN_DATED_ARMS="${GO_S_MIN_DATED_ARMS:-0}"
+  FLOOR_KEY="encodings.${GO_S_ENCODING_ID}.checks.min_dated_arms"
+  if [[ -z "${GO_S_MIN_DATED_ARMS:-}" ]]; then
+    TEMPORAL_NOTES+=(--note "the sidecar declares no $FLOOR_KEY; the dated-arm floor defaulted to 0, which makes the temporal-closure sub-check inapplicable rather than green. Measure this encoding and pin its floor.")
+  fi
 fi
 
 if [[ -n "$UNREFD" ]]; then
@@ -190,7 +220,7 @@ elif [[ "$DATED_ARMS" -eq 0 && "$MIN_DATED_ARMS" -eq 0 ]]; then
   note "temporal closure: NOT CHECKED — the matcher found no dated arms in this module set and the pinned floor ($FLOOR_KEY) is 0."
   note "  'every dated arm carries an @ref' over an empty matched set is a vacuous pass, and this stage refuses to print one as a green."
   note "  A 0 floor is honest only when 0 is the measured population; the sidecar's NOTES.md must carry that census."
-  TEMPORAL_NOTES+=(--note "temporal closure NOT CHECKED (does not affect status): 0 dated arms matched and the pinned floor for this origin ($FLOOR_KEY) is 0, so the @ref-per-dated-arm rule had nothing to hold — a vacuous pass refused, not a green earned; see the sidecar's NOTES.md for the population census")
+  TEMPORAL_NOTES+=(--note "temporal closure NOT CHECKED (does not affect status): 0 dated arms matched and the pinned floor for this encoding ($FLOOR_KEY) is 0, so the @ref-per-dated-arm rule had nothing to hold — a vacuous pass refused, not a green earned; see the sidecar's NOTES.md for the population census")
 elif [[ "$DATED_ARMS" -lt "$MIN_DATED_ARMS" ]]; then
   note "FINDING: the temporal-closure check matched only $DATED_ARMS dated arm(s), below the pinned floor of $MIN_DATED_ARMS."
   note "  An empty or near-empty matched set satisfies 'every dated arm carries an @ref' vacuously,"
@@ -260,7 +290,7 @@ note "  module typechecks. It does not mean the encoding is faithful."
 # used to live only in $LOG, which the journal names by path and sha256 — and a
 # sha256 is not invertible, so "nine ELSE IF sites" was a number nobody could
 # get back out of the journal it was said to come from.
-METRICS=(--metric "modules=${#MODULES[@]}" --metric "module_origin=${GO_MODULES_ORIGIN:-corpus}" \
+METRICS=(--metric "modules=${#MODULES[@]}" --metric "encoding_id=${GO_S_ENCODING_ID:-primary}" \
          --metric "else_if_sites=$ELSEIF_N" --metric "dated_arms=$DATED_ARMS" --metric "min_dated_arms=$MIN_DATED_ARMS" \
          --metric "label_only_strings=$LABELS" --metric "label_order_warnings=$LABEL_WARNINGS" --metric "label_gaps=$LABEL_GAPS")
 

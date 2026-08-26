@@ -1,9 +1,9 @@
 # The Single-Instruction Demo — "SEC Regulation Crowdfunding: go"
 
 **Status (2026-08-03): PARTIALLY IMPLEMENTED — milestone G1 runs; the de novo path runs its
-deposit-validating half.** `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed
-corpus through every reachable projection and emits conversion report v0. `--milestone g2` runs
-P1, P2, P3-encode, P4 and P5 as **deposit-validating** stages: they do not fetch, search, encode or
+deposit-validating half.** `etc/go/go.sh run --subject regcf --encoding primary` drives the committed
+corpus through every reachable projection and emits conversion report v0. Naming an additional
+encoding with `--encoding <id>` runs P1, P2, P3-encode, P4 and P5 as **deposit-validating** stages: they do not fetch, search, encode or
 find forks — those are agent acts needing the network or a model — but they check what an agent
 deposited and report `SKIPPED`/`DEGRADED`/`PASS` with an exit code (ORCHESTRATOR.md §5.2). P8's
 script **runs** as of 2026-08-03 (`l4 verify`, R5 rung 1) though the driver does not yet declare
@@ -265,10 +265,80 @@ externally-settled resolution), what each projection preserved and lost (the fid
 are the raw material), test results, and — where an alternative system has published its own
 representation of the same rule — a factual note of where we disagree with it.
 
+#### P9.2 — What the run cost (added 2026-08-25)
+
+**Status (2026-08-25): BUILT.** The stage is `p9-cost`, declared in both `PRIMARY_STAGES` and
+`DEPOSIT_STAGES` immediately before `p9-report`, HG1-gated by §7.3's derivation like everything from
+P6 on. It writes `cost-ledger.json`; `render-report.mjs` renders it under **What this run cost**.
+The measuring code is `etc/go/lib/cost-ledger.mjs`, the clock is `etc/go/lib/clock.sh`, and the
+journal is at **schema 6**.
+
+A report that cannot say what a run cost cannot be compared with the next one, and the pipeline's
+own overheads stay invisible. The design question is not how to total the numbers — it is how to
+keep two different kinds of evidence from being averaged into one.
+
+- **Attested.** Every `stage_end` carries `elapsed_ms` (the phase script) and `dispatch_ms` (the
+  driver's own time before it: asking the stage for its inputs, digesting and itemising them,
+  searching for a replayable receipt). The driver took both readings, and it is the only party that
+  could: it is the process that waited. The figure is **refusable**, which is what makes it worth
+  recording — `ledger.verify` reports any `elapsed_ms` more than a second longer than the interval between its
+  own `stage_begin` and `stage_end`, so an inflated duration fails arithmetic rather than merely
+  being unlikely. The second of slack is not a rounding convenience: `lib/clock.sh` falls back to
+  whole seconds where bash 5's `EPOCHREALTIME` is absent, and two second-truncated readings can
+  overshoot a true interval by just under 1000 ms. A replayed row writes no `stage_begin` and is exempt by construction, not by exception.
+- **Attributed.** Tokens, tool calls and their durations are read out of the agent harness's own
+  JSONL transcripts. Nobody types them — but a transcript is an ordinary file that an agent with a
+  shell could edit, so the ledger names every one it read with its sha256 and byte count, and the
+  standing is stated in the artifact rather than left for the reader to infer.
+
+**The join is the driver's, not the transcript's.** A transcript records what a session did and
+never which run it did it for; a journal records which sessions invoked the driver and nothing
+about what they spent. So the driver writes one `session` row per invocation, observed from
+`CLAUDE_CODE_SESSION_ID` in the environment it was handed, and `p9-cost` measures exactly those
+sessions. A run driven by hand sets no such variable; the row records `null`, the stage reports
+SKIPPED naming that, and the report says a leg was unattributable — because a zero would read as a
+leg that cost nothing.
+
+Three boundaries the report states rather than papers over, each of them measured on this
+pipeline's own runs:
+
+1. **The window understates the front and the session-total overstates it.** The window opens at
+   the run's first journal record, so reading the statute and deciding what to encode fall outside
+   it. Both columns are printed; the truth is between them.
+2. **`busy_ms_lower_bound` is a floor, not an estimate.** It unions attested stage brackets with
+   measured tool-call intervals — union and never sum, since the agent is waiting while the stage
+   it launched runs — and counts nothing for the time a model spends reasoning between two tool
+   calls. The gap between it and the run's span is mostly the human gates.
+3. **The figures stop at `p9-cost` itself**, which runs before the reporting stages so that the
+   report has something to render. The report's own per-stage table, rendered after `run_end`, sees
+   all of them; the two totals differ by exactly the stages between them, and both say so.
+
+**Where the cost went, not only how much.** The journal's stage brackets cut the run into
+segments and every counted request and tool call falls in exactly one, so `by_segment` re-sums to
+the in-window totals — an invariant the stage checks, and the one check in its oracle that is not a
+restatement of how the totals were accumulated. The breakdown makes one thing about the method
+visible that a single total hides: a phase script **calls no model**, so a `during <stage>` row can
+only be work the session was doing concurrently, never the stage's own cost. Attribution is by
+clock and a clock cannot separate concurrent work from the work it overlaps; the `between` rows —
+the agent reading the source, writing the encoding, deciding whether to grant the gate — are where
+a pipeline's tokens actually go.
+
+**Two populations of network activity, never added.** Calls the _model_ made are counted from the
+transcript by tool name (`WebSearch`, `WebFetch`, any `mcp__*`). Requests the _pipeline_ made are
+counted by the script that made them and carried in the source bundle as `retrieval_cost`, which
+`source-bundle.schema.json`'s `retrieval-cost-covers-its-documents` refuses to let state a total
+smaller than the sum of its own documents. A stage running `curl` is invisible to the first and a
+model's web search is invisible to the second, so one figure over both would be a number about
+nothing.
+
+**No money.** Token counts are facts about a run; prices are facts about a contract and change
+without notice. A stale rate table would put a confident wrong figure in a document whose whole
+premise is that every number has a journal row behind it.
+
 #### P9.1 — The explainer report (a sibling, not a rewrite)
 
 **Status (2026-08-03): BUILT at v0, with one named gap.** The stage is `p9-explain`, declared in
-`G1_STAGES` and gated by HG1; the renderer is `etc/go/report/render-explainer.mjs` over
+`PRIMARY_STAGES` and gated by HG1; the renderer is `etc/go/report/render-explainer.mjs` over
 `etc/go/report/explainer-template.md`; the Reg CF narrative is checked in at
 `etc/go/subjects/regcf/explainer/`. **The gap is E17's signature verification**: the provenance
 model carries a per-section review state and derives `stale` when the text or a source moves, but
@@ -326,26 +396,26 @@ and licensing admit it (R2). Publication is outward-facing and human-gated (§7.
 Verified against unstable @ `a94a8f1d` (post-#178) and `gh` on 2026-07-31. "Merged" means on
 unstable now.
 
-| component                  | state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reg CF corpus (hand-built) | `jl4/examples/legal/regcf/regcf.l4`, 1,236 lines, temporally closed (PR #172) — the diff oracle for the de novo run (§8)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| temporal rule versions     | `EVAL UNDER RULES EFFECTIVE AT` + dated `BRANCH` merged and CI-covered; design in `TEMPORAL-RULE-VERSION-DESIGN.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| BPMN export                | `l4 export --to bpmn`, byte-golden in `l4-cli-test`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| DMN export                 | `l4 export --to dmn` / `dmn-md`; itemDefinitions (PR #175), engine-intersection fixtures (PR #176), law-time (PR #178) all merged; two-engine CI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| DMN executability          | MAYBE→typeRef + NOTHING lowering merged in #175 (§11-R8); hydration for computed fields + MAYBE→null (R8-d′) + isJust recognition delivered as **PR #180** (MERGED to unstable — emitted hydrators 44/44 on both engines); BKM emission (DMN spec Phase 5, sequenced after the Phase 4 un-lifting analysis) **not started** — the load-bearing gap                                                                                                                                                                                                                                                                                                 |
-| ladder diagrams            | Steps 1 and 3 merged; Step 2 half-merged (metrics done, theming + leaf-wrapping open); Step 4 + S6 pan/zoom + S8 palette = PR #177 (MERGED to unstable); Step 5 (the side-by-side IDE toggle) unstarted; the default flip is Step 7, gated on 6a — E1 critical path 1→3→4→5→6a→7                                                                                                                                                                                                                                                                                                                                                                   |
-| state-graph / trace dumps  | `l4 state-graph` (DOT only, to stdout) + `l4 trace` (dot\|png\|svg) merged                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| LTS visualizer proper      | **not built** — the P2 visualiser sits behind two falsification experiments and three preconditions (`lexipedia-superset/LTS-VISUALISER.md` §0), and `StateGraph` as shipped is explicitly not its scaffold (its Q8). A gap for G3; interim = state-graph DOT through external graphviz                                                                                                                                                                                                                                                                                                                                                            |
-| MCP via jl4-service        | MCP server merged in tree (`jl4-service/src/McpServer.hs`, `WebMCPPage.hs`); a live deployment serving other corpus modules as MCP tools is reported by Meng (2026-07-31), not verifiable from this repo; Reg CF joins in P7                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| web wizard / query planner | wizard exports merged (PR #162; the law-time control added by PR #172); deploy legs outstanding per `lexipedia-superset/SPEC.md`; `QUESTION-ORDERING-SPEC.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| TYPICALLY defaults         | `TYPICALLY-DEFAULTS-SPEC.md` **and** the metadata-only implementation both merged (PR #92, 53dda002, 2026-07-08) — in this worktree's base                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| TNR round-trip             | **forward leg built 2026-08-02**: `l4 nlg FILE` emits the same payload as jl4-test's `jl4NlgAnnotationsGolden`, so `p7-tnr` regenerates and diffs the committed `.nlg.golden`s instead of hashing files it did not produce. The RETURN leg — carrying a prose edit back into the L4 — is still only the prototype on the unpushed local branch `nlg-roundtrip` (`specs/todo/tnr-prototype/`, incl. `tnr_proto.py`; ~28 files, ~5.6k lines over unstable)                                                                                                                                                                                           |
-| inert-style guidance       | repo skill `.claude/skills/writing-l4-rules/` (inert guidance in `drafting-patterns.md`); fuller treatment in the user-level `l4` skill                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| adversarial workflows      | proven pattern (#175, #176, #178 merged; #177 built the same way and since merged); not yet packaged as a reusable pipeline stage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| P8 verifier toolchain      | **rung 1 built 2026-08-02**: `l4 verify` compiles each boolean `DECIDE` through the ladder into the query-planner ROBDD (`jl4-query-plan`) and reports `unsat` / `dead-branch` / `vacuous-guard` / `unreachable-outcome`; text + JSON, exit 0/1, five control fixtures, driven by `etc/go/phases/p8-verify.sh`. Bounded: propositional, per-decision, sound but not complete. Rungs 2 (R4 fork-space sweep) and 3 (external model checker — TLA+/NuSMV/UPPAAL class) remain unbuilt                                                                                                                                                                |
-| P2 sweep tooling           | no repo component needed for the searching — that is agent web search. The register format is now machine-readable: `schemas/external-modifications.schema.json`, validated by `etc/go/lib/register-validate.mjs` (added 2026-08-02, alongside the P1 and P4 contracts)                                                                                                                                                                                                                                                                                                                                                                            |
-| orchestrator ("go")        | **milestones G1 and G2's deposit half run today** — `etc/go/go.sh run --milestone g1 --subject regcf` drives the committed corpus through every reachable projection and emits report v0; `--milestone g2` runs P1, P2, P3-encode, P4 and P5 as stages that VALIDATE an agent-produced deposit (2026-08-03), leaving P10 scaffolded and refusing with a named blocker. P8's script runs as of 2026-08-03 (`l4 verify`) but `go.sh` does not yet declare it, so `go.sh plan` still prints it among the refusers. Producing the deposits, and the §8 acceptance diff, stay agent work. Present-tense inventory: [ORCHESTRATOR.md](./ORCHESTRATOR.md) |
-| corpus-of-law repo         | **exists as of 2026-08-03** — `legalese/canon`, public, scaffolded to R1's ruled shape (inspectable gates, two-axis versioning, sidecar class/instance layout, Apache-2.0 + carried source-terms + optional CC-BY prose) and holding **zero subjects**. Putting a subject in it is an HG2 act                                                                                                                                                                                                                                                                                                                                                      |
+| component                  | state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reg CF corpus (hand-built) | `jl4/examples/legal/regcf/regcf.l4`, 1,236 lines, temporally closed (PR #172) — the diff oracle for the de novo run (§8)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| temporal rule versions     | `EVAL UNDER RULES EFFECTIVE AT` + dated `BRANCH` merged and CI-covered; design in `TEMPORAL-RULE-VERSION-DESIGN.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| BPMN export                | `l4 export --to bpmn`, byte-golden in `l4-cli-test`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| DMN export                 | `l4 export --to dmn` / `dmn-md`; itemDefinitions (PR #175), engine-intersection fixtures (PR #176), law-time (PR #178) all merged; two-engine CI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| DMN executability          | MAYBE→typeRef + NOTHING lowering merged in #175 (§11-R8); hydration for computed fields + MAYBE→null (R8-d′) + isJust recognition delivered as **PR #180** (MERGED to unstable — emitted hydrators 44/44 on both engines); BKM emission (DMN spec Phase 5, sequenced after the Phase 4 un-lifting analysis) **not started** — the load-bearing gap                                                                                                                                                                                                                                                                                                      |
+| ladder diagrams            | Steps 1 and 3 merged; Step 2 half-merged (metrics done, theming + leaf-wrapping open); Step 4 + S6 pan/zoom + S8 palette = PR #177 (MERGED to unstable); Step 5 (the side-by-side IDE toggle) unstarted; the default flip is Step 7, gated on 6a — E1 critical path 1→3→4→5→6a→7                                                                                                                                                                                                                                                                                                                                                                        |
+| state-graph / trace dumps  | `l4 state-graph` (DOT only, to stdout) + `l4 trace` (dot\|png\|svg) merged                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| LTS visualizer proper      | **not built** — the P2 visualiser sits behind two falsification experiments and three preconditions (`lexipedia-superset/LTS-VISUALISER.md` §0), and `StateGraph` as shipped is explicitly not its scaffold (its Q8). A gap for G3; interim = state-graph DOT through external graphviz                                                                                                                                                                                                                                                                                                                                                                 |
+| MCP via jl4-service        | MCP server merged in tree (`jl4-service/src/McpServer.hs`, `WebMCPPage.hs`); a live deployment serving other corpus modules as MCP tools is reported by Meng (2026-07-31), not verifiable from this repo; Reg CF joins in P7                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| web wizard / query planner | wizard exports merged (PR #162; the law-time control added by PR #172); deploy legs outstanding per `lexipedia-superset/SPEC.md`; `QUESTION-ORDERING-SPEC.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| TYPICALLY defaults         | `TYPICALLY-DEFAULTS-SPEC.md` **and** the metadata-only implementation both merged (PR #92, 53dda002, 2026-07-08) — in this worktree's base                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| TNR round-trip             | **forward leg built 2026-08-02**: `l4 nlg FILE` emits the same payload as jl4-test's `jl4NlgAnnotationsGolden`, so `p7-tnr` regenerates and diffs the committed `.nlg.golden`s instead of hashing files it did not produce. The RETURN leg — carrying a prose edit back into the L4 — is still only the prototype on the unpushed local branch `nlg-roundtrip` (`specs/todo/tnr-prototype/`, incl. `tnr_proto.py`; ~28 files, ~5.6k lines over unstable)                                                                                                                                                                                                |
+| inert-style guidance       | repo skill `.claude/skills/writing-l4-rules/` (inert guidance in `drafting-patterns.md`); fuller treatment in the user-level `l4` skill                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| adversarial workflows      | proven pattern (#175, #176, #178 merged; #177 built the same way and since merged); not yet packaged as a reusable pipeline stage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| P8 verifier toolchain      | **rung 1 built 2026-08-02**: `l4 verify` compiles each boolean `DECIDE` through the ladder into the query-planner ROBDD (`jl4-query-plan`) and reports `unsat` / `dead-branch` / `vacuous-guard` / `unreachable-outcome`; text + JSON, exit 0/1, five control fixtures, driven by `etc/go/phases/p8-verify.sh`. Bounded: propositional, per-decision, sound but not complete. Rungs 2 (R4 fork-space sweep) and 3 (external model checker — TLA+/NuSMV/UPPAAL class) remain unbuilt                                                                                                                                                                     |
+| P2 sweep tooling           | no repo component needed for the searching — that is agent web search. The register format is now machine-readable: `schemas/external-modifications.schema.json`, validated by `etc/go/lib/register-validate.mjs` (added 2026-08-02, alongside the P1 and P4 contracts)                                                                                                                                                                                                                                                                                                                                                                                 |
+| orchestrator ("go")        | **milestones G1 and G2's deposit half run today** — `etc/go/go.sh run --subject regcf --encoding primary` drives the committed corpus through every reachable projection and emits report v0; `--encoding <id>` runs P1, P2, P3-encode, P4 and P5 as stages that VALIDATE an agent-produced deposit (2026-08-03), leaving P10 scaffolded and refusing with a named blocker. P8's script runs as of 2026-08-03 (`l4 verify`) but `go.sh` does not yet declare it, so `go.sh plan` still prints it among the refusers. Producing the deposits, and the §8 acceptance diff, stay agent work. Present-tense inventory: [ORCHESTRATOR.md](./ORCHESTRATOR.md) |
+| corpus-of-law repo         | **exists as of 2026-08-03** — `legalese/canon`, public, scaffolded to R1's ruled shape (inspectable gates, two-axis versioning, sidecar class/instance layout, Apache-2.0 + carried source-terms + optional CC-BY prose) and holding **zero subjects**. Putting a subject in it is an HG2 act                                                                                                                                                                                                                                                                                                                                                           |
 
 ## 6. Gaps → milestones
 
@@ -359,14 +429,13 @@ unstable now.
   with oracle class `execution` on both engines (ORCHESTRATOR.md §5.4).
 - **G2 — de novo run.** P1–P6 executed from the SEC source by agents; acceptance = the §8
   diff oracle. Entry condition satisfied 2026-08-02: fork representation ruled (R4, the
-  `Interpretation` parameter). **Half built as of 2026-08-03**: `go.sh run --milestone g2` runs
+  `Interpretation` parameter). **Half built as of 2026-08-03**: a deposit-path `go.sh run` runs
   P1, P2, P3-encode, P4 and P5 as deposit-validating stages, each with an exit code over the
-  agent's deposit and a `SKIPPED` naming the deposit it is waiting for; the sidecar's `denovo`
-  section says where those deposits live. **The measurement wiring landed 2026-08-09**: the
-  driver resolves one module set per milestone, so `p3-check`, `p6-tests` and `p8-verify` run
-  over the deposit at g2, `p7-dmn` runs emit-only over it, and the acceptance comparator
+  agent's deposit and a`SKIPPED`naming the deposit it is waiting for; the sidecar's`denovo`section says where those deposits live. **The measurement wiring landed 2026-08-09**: the
+  driver resolves one module set per run, so`p3-check`, `p6-tests`and`p8-verify`run
+  over the deposit at g2,`p7-dmn` runs emit-only over it, and the acceptance comparator
   (`etc/go/lib/denovo-diff.mjs`, designed in
-  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md)) **is called by the `p8-diff` stage** over
+  [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md)) \*\*is called by the `p8-diff` stage\*\* over
   the sidecar's declared surface map. What remains agent work, by design, is everything that
   PRODUCES a deposit (the driver takes neither the network nor a model) and the triage of any
   divergence the comparator reports.
@@ -498,9 +567,10 @@ suite.** What a fresh run must supply that _neither_ has: the authorising instru
 by §4 P1) and the background rules of construction, which no run has ever ingested — see §9.
 
 **The structural half of that gap closed on 2026-08-09.** When this section was written,
-`G2_STAGES` had no assertion stage, no projection leg, and no stage calling §8's diff oracle, so
+the deposit stage list (then spelled `G2_STAGES`, renamed `DEPOSIT_STAGES` by R9) had no
+assertion stage, no projection leg, and no stage calling §8's diff oracle, so
 every axis this table assigns to run 1 was unreachable at G2 by construction. The wiring named
-as "the first item of work" landed: `G2_STAGES` now declares `p3-check`, `p6-tests`, `p7-dmn`
+as "the first item of work" landed: `DEPOSIT_STAGES` now declares `p3-check`, `p6-tests`, `p7-dmn`
 (emit-only), `p8-verify` and `p8-diff` over the deposited module set, so a g2 run MEASURES the
 deposit's assertions (39/39 on the committed de novo module, floor `denovo.checks`), verifies it
 (2 `vacuous-guard` findings, on the record), emits its DMN (both engines refuse it — 35 blocking
@@ -563,7 +633,7 @@ elsewhere should say "SI-Rn".
   per stage, not a checkpoint file, so a re-entered run cannot report `replayed` for a stage whose
   inputs moved; (b) every `PASS` oracle declares a **class**, and `wellformedness`/`presence` are
   barred from `PASS`, because "PASS requires an oracle" without that bar is satisfied by any cheap
-  checker; (c) the milestone verdict is completeness of **accounting**, not greenness, which is
+  checker; (c) the run verdict is completeness of **accounting**, not greenness, which is
   what §6's "only if the report says so in Blocking terms" already implied; (d) the two human
   gates are detached SSH signatures over a journal-derived payload, with `--waive GATE="reason"`
   as the recorded alternative — there is no unrecorded way past a gate.
@@ -728,6 +798,38 @@ elsewhere should say "SI-Rn".
   the **vendored lane's** mechanism, and its standing yield-to-Thomas instruction is inherited
   untouched. Entries **do** pin by SHA (mandatory, per sub-ruling 1). Canon does **not** mirror
   against link rot (sub-ruling 2).
+
+- **R10 — run cost accounting**: **ANSWERED 2026-08-25, and built in the same change (§4 P9.2).**
+  What a run costs is recorded in **two kinds** and they are never merged: the driver **attests**
+  per-stage wall clock, and the harness transcripts are read to **attribute** tokens and tool calls.
+  Four sub-rulings, each of which had a cheaper wrong answer available:
+  (1) **The attested figure must be refusable.** A duration nothing could falsify is decoration, so
+  `elapsed_ms` is checked against the bracket between its own `stage_begin` and `stage_end`, and
+  that check is why this is a journal **schema bump** (to 6) rather than a free field — the same
+  test schema 4 met when it added the read-set. The cost, paid once and by design: a run begun
+  under schema 5 cannot be resumed by a schema-6 binary.
+  (2) **Attribution is OBSERVED, not declared.** The driver reads `CLAUDE_CODE_SESSION_ID` from
+  the environment it was invoked in and writes one `session` row per invocation. The rejected
+  alternative was the deposit shape used everywhere else here — the agent produces a cost record
+  and a stage validates it — which was the working assumption until the environment variable was
+  found. Observation beats validation when observation is available.
+  (3) **Dispatch is recorded separately from execution — on an EXECUTED stage.** The driver's own
+  pre-stage time is real, is spent on every stage including the ones that then replay in
+  milliseconds, and folding it into `elapsed_ms` would make the pipeline look faster than it is
+  while making the stage look slower. The exception is structural and is stated rather than
+  smoothed over: on a REPLAYED stage the driver writes the receipt itself and has one figure to
+  write, so dispatch is inside `elapsed_ms` and `dispatch_ms` is null. The report says so at the
+  point it prints the totals, because the dispatch total then omits those rows while the elapsed
+  total contains them — which matters most in the replay-heavy runs where harness overhead
+  dominates. (An earlier draft of this ruling stated (3) without the exception, which the review
+  of this change caught: the rule was written from the executed path and the replay path was not
+  re-read against it.)
+  (4) **Every derived figure states its bound.** `busy_ms_lower_bound` is a union and never a sum,
+  and is explicitly a floor; the window column and the session-total column are printed together
+  because one understates and the other overstates; the two network populations are counted
+  separately because neither can see the other.
+  Not ruled here and left open: whether the ledger should be **committed** alongside a published
+  run. That is R7's question (report versioning) and P10's act.
 
 ---
 

@@ -13,8 +13,9 @@
 //        [--oracle-cmd CMD --oracle-exit N --oracle-class CLASS] \
 //        [--oracle-because TEXT] [--artifact PATH]... [--inputs-digest D] \
 //        [--replayed-from HASH] [--replayed-from-run RUNID]
-//        [--metric key=value]...
-//   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --milestone M --subject S ...
+//        [--metric key=value]... [--elapsed-ms N] [--dispatch-ms N]
+//   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --encoding E --subject S ...
+//   node etc/go/lib/receipt.mjs session    --run DIR [--session UUID] [--agent NAME] [--cwd DIR]
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
 //   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
 //        [--namespace NS] [--payload-digest D] [--corpus-digest D] \
@@ -31,9 +32,11 @@ import {
   statSync,
 } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-import { append, read, sha256File } from "./ledger.mjs";
+import { append, read, refold, sha256File } from "./ledger.mjs";
+import { rolesFor } from "./readset.mjs";
 import {
   checkClaim,
+  indexRecords,
   materialise,
   put,
   storeRoot,
@@ -133,7 +136,12 @@ switch (kind) {
     append(journal, {
       kind: "run_begin",
       run_id: args.run_id,
-      milestone: args.milestone,
+      // WHICH ENCODING THIS RUN IS ABOUT — `primary`, a declared id, or
+      // `undeclared`. It replaced `milestone` at journal schema 5 (R9, §3.9):
+      // a run is about one subject and one encoding of it, and a capability
+      // label named neither. `g2` in particular named an ordinal, which stops
+      // identifying anything once a subject declares two additional encodings.
+      encoding: args.encoding,
       subject: args.subject,
       repo_head: args.repo_head ?? null,
       tree_state: args.tree_state ?? null,
@@ -173,12 +181,87 @@ switch (kind) {
     } catch {
       store = null;
     }
+    // R4's read-set. It arrives as a FILE rather than on argv because a corpus
+    // read-set is routinely larger than ARG_MAX.
+    let readSet = null;
+    if (args.read_set) {
+      if (!existsSync(args.read_set)) {
+        process.stderr.write(
+          `receipt.mjs: --read-set ${args.read_set} does not exist\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      try {
+        readSet = JSON.parse(readFileSync(args.read_set, "utf8"));
+      } catch (e) {
+        process.stderr.write(
+          `receipt.mjs: --read-set is not JSON: ${e.message}\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      if (!Array.isArray(readSet)) {
+        process.stderr.write(
+          "receipt.mjs: --read-set must be an array of members\n",
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      // REFUSE A READ-SET THAT DOES NOT PROVE ITS OWN DIGEST. Same discipline
+      // as refusing a receipt whose status exceeds its evidence: a read-set
+      // that does not re-fold is not weak evidence about the inputs, it is a
+      // claim about them already known to be false — and writing it would seal
+      // that falsehood inside a hash chain, where it reads as attested.
+      const proof = refold(readSet);
+      if (args.inputs_digest && proof !== args.inputs_digest) {
+        process.stderr.write(
+          "receipt.mjs: the read-set does not re-fold to the stage's inputs digest —\n" +
+            `  digest ${args.inputs_digest}\n  refold ${proof}\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+    }
+
+    // R5's precondition, carried INTO THE STORE rather than left in the
+    // journal. Two encodings differ interpretively only if their upstream
+    // `natlang_sources` were identical; a journal answers that for about two
+    // to five days, which is exactly the half-life R11 exists to escape. So the
+    // fold over the natlang_sources members rides on every admission, and
+    // `store diff` can still refuse to call a difference a fork long after the
+    // run that produced it is gone.
+    //
+    // Derived, but a fact about THIS ADMISSION and fixed forever — the same
+    // standing as `inputs_digest` beside it. What must never be stored is a
+    // fact about HISTORY (role, freshness), because that is recomputed.
+    let sourcesDigest = null;
+    if (Array.isArray(readSet)) {
+      // THE REAL STORE INDEX, not []. A natlang_sources member is classified
+      // by the record of the stage that PRODUCED it, and for a member produced
+      // by an EARLIER RUN that record lives only in the store — passing an
+      // empty index made the store branch unreachable, so `sources_digest` was
+      // structurally null for every cross-run case, which is the only case it
+      // exists to serve. Read defensively: put() is fail-open, and admission
+      // must never be blocked by an unreadable index.
+      let storeIndex = [];
+      try {
+        if (store) storeIndex = indexRecords(store);
+      } catch {
+        storeIndex = [];
+      }
+      const roled = rolesFor(readSet, read(journal), storeIndex, repoRoot);
+      const srcs = roled.filter((m) => m.role === "natlang_sources");
+      // null, not the empty fold: "this witness recorded no sources" and "this
+      // witness recorded sources that happened to hash to X" are different
+      // claims, and conflating them would let two source-less encodings look
+      // comparable — the spurious fork R5 exists to prevent.
+      sourcesDigest = srcs.length ? refold(srcs) : null;
+    }
+
     const meta = {
       subject: args.subject ?? process.env.GO_SUBJECT ?? null,
       stage: args.stage ?? null,
       run_id: args.run_id ?? process.env.GO_RUNID ?? null,
       inputs_digest: args.inputs_digest ?? null,
       produced_under: null,
+      sources_digest: sourcesDigest,
     };
     const ctx = { runDir, repoRoot, store, meta };
 
@@ -312,6 +395,14 @@ switch (kind) {
         verified: false,
       })),
       inputs_digest: args.inputs_digest || null,
+      // R4. The read-set lives HERE, on the receipt, beside the fold it proves
+      // — not on `stage_begin`, which also carries the digest. One home, and
+      // this is the row that always exists: a REPLAYED stage writes no
+      // `stage_begin` at all (it never began; claiming otherwise would be a
+      // receipt exceeding its evidence), yet its inputs are exactly as worth
+      // recording, because R8 says a run directory must be answerable on its
+      // own by someone holding only that directory.
+      read_set: readSet,
       attempt: Number(args.attempt ?? 1),
       replayed_from: args.replayed_from ?? null,
       // The RUN the borrowed receipt came from. null means the same run — the
@@ -322,6 +413,27 @@ switch (kind) {
       // told where to look.
       replayed_from_run: args.replayed_from_run ?? null,
       label: args.label ?? null,
+      // SCHEMA 6: WHAT THIS STAGE COST IN WALL CLOCK.
+      //
+      // Two numbers because they are two different things, and rolling them
+      // into one would make the pipeline look faster than it is:
+      //
+      //   elapsed_ms   the phase script — the work the stage names.
+      //   dispatch_ms  what the DRIVER spent before the script started:
+      //                asking the script for its inputs, digesting them, and
+      //                looking for a replayable receipt. Over a corpus of
+      //                hundreds of files that is not rounding error, and it is
+      //                spent on every stage including the ones that then
+      //                replay in milliseconds.
+      //
+      // Both arrive from the caller, and unlike a STATUS that is fine: this
+      // file's asymmetry exists because a status must be earned from evidence,
+      // while a duration is an observation only the process that waited can
+      // make. It is not unchecked, either — ledger.verify refuses an
+      // elapsed_ms larger than the bracket between this row and its own
+      // stage_begin, which is the arithmetic a fabricated figure fails.
+      elapsed_ms: args.elapsed_ms == null ? null : Number(args.elapsed_ms),
+      dispatch_ms: args.dispatch_ms == null ? null : Number(args.dispatch_ms),
     };
 
     // WHICH GATE GATES THIS STAGE, and what blessing is open for it — both
@@ -404,6 +516,34 @@ switch (kind) {
     process.stdout.write(
       `${rec.stage}: ${rec.status}${rec.replayed_from ? " (replayed)" : ""}\n`,
     );
+    break;
+  }
+
+  case "session": {
+    // WHO DROVE THIS INVOCATION — OBSERVED FROM THE ENVIRONMENT, NOT DECLARED.
+    //
+    // One row per `go.sh run`, not one per run: a human-gated pipeline is
+    // driven in several sittings, and the sittings are routinely different
+    // agent sessions. The set of rows is therefore the answer to "whose token
+    // spend belongs to this run", which is the question the cost ledger needs
+    // and the only one it cannot measure for itself — a transcript says what a
+    // session did, never which run it did it for.
+    //
+    // `CLAUDE_CODE_SESSION_ID` is set by the harness in the environment the
+    // driver is invoked in, so this is an observation rather than a claim. A
+    // human at a terminal sets nothing and the row records null, which is the
+    // honest answer and not a defect: the run had no agent cost to attribute.
+    const sid = args.session || process.env.CLAUDE_CODE_SESSION_ID || null;
+    append(journal, {
+      kind: "session",
+      session: sid,
+      // WHAT KIND OF THING drove it. Recorded so that a report can say "this
+      // leg was run by hand" instead of silently attributing zero tokens to it
+      // and letting the reader assume the leg was free.
+      agent: args.agent || process.env.AI_AGENT || null,
+      entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT || null,
+      cwd: args.cwd || process.cwd(),
+    });
     break;
   }
 

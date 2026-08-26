@@ -9,12 +9,12 @@ and the G2 measurement half on `mengwong/g2-wiring`, each verified the same way.
 
 What that means precisely, in the present tense:
 
-- **`etc/go/go.sh run --milestone g1 --subject regcf` runs end to end today.** It drives the
+- **`etc/go/go.sh run --subject regcf --encoding primary` runs end to end today.** It drives the
   committed Reg CF corpus through every reachable projection, records a receipt per stage, and
   emits conversion report v0. It refuses at HG1 unless a signature verifies or a waiver is
   recorded. The subject is resolved from a per-subject sidecar (§2.3), so the driver and phase
   scripts carry no Reg CF facts of their own.
-- **`etc/go/go.sh run --milestone g2 --subject <id>` runs its DEPOSIT-VALIDATING half (as of
+- **`etc/go/go.sh run --subject <id> --encoding <encoding-id>` runs its DEPOSIT-VALIDATING half (as of
   2026-08-03) and its MEASUREMENT half (as of 2026-08-09).** `p1-ingest`, `p2-sweep`,
   `p3-encode`, `p4-forks` and `p5-gate` each validate a deposit an agent produced, with three
   outcomes — `SKIPPED` when the deposit is not there (a missing prerequisite, not a defect),
@@ -31,9 +31,9 @@ What that means precisely, in the present tense:
   prints what it would do and what is blocking it, then exits 3. With R1 closed in full on
   2026-08-02 (`legalese/canon`, which exists as of 2026-08-03) it waits only on HG2 acts and
   unbuilt tooling — no stage waits on an open ruling. §5.2 names the blocker.
-- **`p8-verify` was the seventh refuser, now runs, and is DECLARED — at both milestones, as of
+- **`p8-verify` was the seventh refuser, now runs, and is DECLARED — on both paths, as of
   2026-08-09.** R5's rung 1, `l4 verify`, exists; read §5.1a for what it measures and what its
-  `PASS` is worth. `go.sh` names it in `G1_STAGES` (after `p6-tests`) and in `G2_STAGES`,
+  `PASS` is worth. `go.sh` names it in `PRIMARY_STAGES` (after `p6-tests`) and in `DEPOSIT_STAGES`,
   HG1-gated at both — it verifies whichever module set the driver resolved, so at g2 it runs
   over the de novo deposit and its verdict is about the deposit. It left
   `UNIMPLEMENTED_STAGES` in the same change.
@@ -41,7 +41,7 @@ What that means precisely, in the present tense:
   module set per run (`GO_MODULES`: the committed corpus at g1, `denovo.modules` at g2) and
   `p3-check`, `p6-tests` and `p8-verify` iterate it; `p7-dmn` runs emit-only over the deposit.
   The p7 legs other than `p7-dmn` still read committed goldens the deposit does not have;
-  `go.sh plan --milestone g2` marks each `NOT WIRED` with its own precise missing piece.
+  A deposit-path `go.sh plan` marks each `NOT WIRED` with its own precise missing piece.
 - **G2's acceptance comparator exists AND is wired**, as of 2026-08-09: `etc/go/lib/denovo-diff.mjs`
   plus `schemas/surface-map.schema.json`, designed in
   [DENOVO-DIFF-ORACLE.md](./DENOVO-DIFF-ORACLE.md), called by the declared g2 stage `p8-diff`
@@ -133,7 +133,7 @@ stages. Two mechanisms close the gap, both in the tree:
   claims. `JL4_GO_SERVICE_URL` is **never** discovered: a deployment target must be named by
   a human, not found by a probe. Nothing is ever built — the build lock stands.
 - **The doctor** (`go.sh doctor`, `etc/go/lib/doctor.mjs`): the front-door forecast. For the
-  chosen milestone it names every declared stage that will not run whole, with its remedy,
+  chosen encoding it names every declared stage that will not run whole, with its remedy,
   before any stage spends time. Exit 0 whole · 1 not whole · 2 no usable `l4`. `run` prints
   the same forecast in brief at the door, and under `L4_GO_REQUIRED=1` refuses there (exit 5)
   instead of minutes in. The forecast **licenses nothing**: receipts remain the only record of
@@ -265,14 +265,14 @@ evidence does not support.
 Scripts own every fact. The skill owns every judgement. Scripts never call a model; the skill
 never writes a status.
 
-| in `etc/go/`                                                | in `.claude/skills/running-the-l4-pipeline/`                           |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| every `l4` / `etc/*.mjs` / `npm` invocation and its argv    | which model runs which phase (SPEC.md §7.1)                            |
-| exit-code interpretation, including the `l4 run` workaround | the P5 adversarial checklist, P4 fork discovery, §8 triage             |
-| sha256 and byte count of every input and output             | how to write a note, and that a note renders as _claimed, unverified_  |
-| toolchain probing → `SKIPPED(named reason)`                 | what to do on `DEGRADED`: record and continue, never retry-until-green |
-| the milestone verdict                                       | mapping the instruction to `go.sh --milestone g1 --subject regcf`      |
-| the hash-chained journal and the report                     | escalation text for `BROKEN` and for a refused gate                    |
+| in `etc/go/`                                                | in `.claude/skills/running-the-l4-pipeline/`                              |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| every `l4` / `etc/*.mjs` / `npm` invocation and its argv    | which model runs which phase (SPEC.md §7.1)                               |
+| exit-code interpretation, including the `l4 run` workaround | the P5 adversarial checklist, P4 fork discovery, §8 triage                |
+| sha256 and byte count of every input and output             | how to write a note, and that a note renders as _claimed, unverified_     |
+| toolchain probing → `SKIPPED(named reason)`                 | what to do on `DEGRADED`: record and continue, never retry-until-green    |
+| the run verdict                                             | mapping the instruction to `go.sh run --subject regcf --encoding primary` |
+| the hash-chained journal and the report                     | escalation text for `BROKEN` and for a refused gate                       |
 
 The line sits there because SPEC.md §7.2 asks for control flow that is _deterministic_ and
 _resumable after interruption_, and only the half that survives context loss can carry either. A
@@ -321,7 +321,7 @@ sidecars and the recipe for adding one. Both refusals are selftest-covered.
 **The `legs` object is the leg declaration.** `go.sh` declares `p0-preflight`, `p3-check`,
 `p6-tests` and `p9-report` for every subject, and a p7 stage iff `legs` has its entry; the
 wizard-dependent halves of p0/p3/p6/p7-mcp engage iff `encoding.wizard` is present. This is what
-keeps the §3.2 milestone rule honest across subjects: a future subject with no wizard and no
+keeps the §3.2 run rule honest across subjects: a future subject with no wizard and no
 regulative rules (so no bpmn/lts legs and no NLG goldens) omits those entries, and `COMPLETE`
 still means every stage _that subject declares_ is accounted for — not that its sidecar faked
 nine legs. The BNA corpus (PR #195, unmerged) will slot in as exactly such a sidecar; it is
@@ -358,7 +358,7 @@ This is why the AKN leg reports `UNVERIFIED` rather than `PASS`, and why the LTS
 its `digraph` count against an independently-derived rule count instead of settling for "the file
 is non-empty".
 
-### 3.2 The milestone rule
+### 3.2 The run rule
 
 ```
 G1 = COMPLETE  iff  every declared stage has a receipt
@@ -418,11 +418,11 @@ Three properties, all mechanically checked by `etc/go/selftest.mjs --with-driver
   "11/11 stages fresh with `replayed_from` null" described the pre-2026-08-20 driver and would be
   false if run today. Resuming with `--run-id` remains the route that reuses the same run
   _directory_; a bare run is still a distinct run, it is simply no longer a redo);
-- the milestone verdict is unchanged by replay;
+- the run verdict is unchanged by replay;
 - replayed receipts keep their original verdict.
 
 **A replayed `PASS` is not demoted.** Demotion was implemented first and is wrong: it makes the
-milestone verdict depend on how many times you ran it, which destroys the only reason resumability
+run verdict depend on how many times you ran it, which destroys the only reason resumability
 is worth having. The evidence for a replayed `PASS` is the earlier row, in the same hash-chained
 journal, which `go.sh verify` re-checks.
 
@@ -430,11 +430,21 @@ journal, which `go.sh verify` re-checks.
 report renders, so a report cannot digest its own future; the under-declared-input hazard in its
 most damaging form is a stale report claiming to be current.
 
+**`p9-cost` never replays either**, for that reason and one of its own: what it measures — the
+agent harness's transcripts — lives outside the tree entirely and changes with every token the
+measuring session spends, so there is no set of files whose digest its answer is a function of.
+`lib/ledger.mjs` also names it in `CROSS_RUN_INELIGIBLE`, which is unreachable today and is there
+against the edit that gives it a digest later: borrowing that receipt would report another run's
+hours and tokens as this one's, which is the most misleading number this pipeline could produce
+precisely because it would be precise, sourced, and about the wrong run.
+
 ### 4.1 The journal
 
 One append-only, hash-chained `journal.ndjson` per run. Each record carries `prev` (the previous
 record's hash) and `hash` (sha256 of its own canonical JSON), so a record cannot be altered or
-removed without breaking every hash after it. `journal_schema: 1`; an unknown schema is `BROKEN`,
+removed without breaking every hash after it. Every record declares a `journal_schema`, and one
+chain may carry only one of them; the current writer emits **6** (lib/ledger.mjs owns the number and
+the reason for each bump). An unknown schema is `BROKEN`,
 not guessed at.
 
 The chain is not a security control — an agent that can write the journal can rewrite the whole
@@ -451,27 +461,28 @@ keeps the latest few runs **and** every run holding a granted gate.
 
 ### 5.1 Stages that run
 
-| stage          | oracle                                                                                                                                              | notes                                                                                                                                                                                                                                                                 |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p0-preflight` | discovery calls vs the subject's `pins.json`, plus checker existence, plus the `l4 run` tripwire                                                    | pins are **narrow** — four CLI enumerations and the module's rule names, not a hash of `l4 --help`. A tripwire that fires on an unrelated help reflow gets deleted                                                                                                    |
-| `p3-check`     | `l4 check` ×2, `ELSE IF` absence, `@ref` per dated arm                                                                                              | the third house rule — isomorphism against the source — is recorded as unverified and carried by HG1, never omitted                                                                                                                                                   |
-| `p6-tests`     | `results[]` parsed out of `l4 run --json`, plus a floor on the assertion count                                                                      | the exit code is **not** the oracle; see §5.3                                                                                                                                                                                                                         |
-| `p7-dmn`       | canonicalise-then-diff vs golden + `etc/validate-dmn.mjs` + both engine harnesses over the committed cases file                                     | `PASS`/`execution` 2026-08-02..09; as of 2026-08-09 a fresh run measures `DEGRADED` — the committed golden predates the 501(a)(4) corpus decomposition (fidelity counts unchanged 0/21/133); regenerating it via the sanctioned jl4-test route is open work. See §5.4 |
-| `p7-dmn-md`    | canonicalise-then-diff vs golden                                                                                                                    | `DEGRADED` by construction                                                                                                                                                                                                                                            |
-| `p7-bpmn`      | byte-diff vs goldens + soundness + interchange                                                                                                      | **PASS** as of 2026-08-09: the mandated wiring landed (PR #198, with its checker `etc/check-bpmn-dmn-refs.mjs`) and the hardcoded DEGRADED left the script; an earlier note here said the wiring was unbuilt                                                          |
-| `p7-ladder`    | regenerate, then `git diff` over the committed figures must be **empty**                                                                            | a non-empty diff means the committed figures were stale, which is a fail and never a pass. The run never commits                                                                                                                                                      |
-| `p7-lts`       | `digraph` count == regulative-rule count from the BPMN discovery call                                                                               | `PASS (INTERIM)` — the label rides in the status                                                                                                                                                                                                                      |
-| `p7-mcp`       | HTTP 2xx, poll to `ready`, then a JSON-RPC `tools/list` POST whose non-generic tool count equals the deployment's function count, **loopback only** | see §6.4. A GET on `.mcp` is 405 by design, and a non-empty tool list is met vacuously by the service's own four generic tools                                                                                                                                        |
-| `p7-tnr`       | regenerate with `l4 nlg`, then diff against the subject's declared `.nlg.golden`s                                                                   | `PASS`/`differential`. The goldens are held still by jl4-test's in-process producer, so this is not a self-comparison. Forward direction only — nothing carries a prose edit back                                                                                     |
-| `p7-wizard`    | well-formedness + measured negative controls                                                                                                        | `DEGRADED`; the only oracle available is barred from `PASS`                                                                                                                                                                                                           |
-| `p7-akn`       | shallow well-formedness                                                                                                                             | `UNVERIFIED`, declared `EXTRA`                                                                                                                                                                                                                                        |
-| `p9-report`    | section-presence over the rendered report                                                                                                           | reads the journal and nothing else                                                                                                                                                                                                                                    |
+| stage          | oracle                                                                                                                                              | notes                                                                                                                                                                                                                                                                                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `p0-preflight` | discovery calls vs the subject's `pins.json`, plus checker existence, plus the `l4 run` tripwire                                                    | pins are **narrow** — four CLI enumerations and the module's rule names, not a hash of `l4 --help`. A tripwire that fires on an unrelated help reflow gets deleted                                                                                                                                                                                                  |
+| `p3-check`     | `l4 check` ×2, `ELSE IF` absence, `@ref` per dated arm                                                                                              | the third house rule — isomorphism against the source — is recorded as unverified and carried by HG1, never omitted                                                                                                                                                                                                                                                 |
+| `p6-tests`     | `results[]` parsed out of `l4 run --json`, plus a floor on the assertion count                                                                      | the exit code is **not** the oracle; see §5.3                                                                                                                                                                                                                                                                                                                       |
+| `p7-dmn`       | canonicalise-then-diff vs golden + `etc/validate-dmn.mjs` + both engine harnesses over the committed cases file                                     | `PASS`/`execution` 2026-08-02..09; as of 2026-08-09 a fresh run measures `DEGRADED` — the committed golden predates the 501(a)(4) corpus decomposition (fidelity counts unchanged 0/21/133); regenerating it via the sanctioned jl4-test route is open work. See §5.4                                                                                               |
+| `p7-dmn-md`    | canonicalise-then-diff vs golden                                                                                                                    | `DEGRADED` by construction                                                                                                                                                                                                                                                                                                                                          |
+| `p7-bpmn`      | byte-diff vs goldens + soundness + interchange                                                                                                      | **PASS** as of 2026-08-09: the mandated wiring landed (PR #198, with its checker `etc/check-bpmn-dmn-refs.mjs`) and the hardcoded DEGRADED left the script; an earlier note here said the wiring was unbuilt                                                                                                                                                        |
+| `p7-ladder`    | regenerate, then `git diff` over the committed figures must be **empty**                                                                            | a non-empty diff means the committed figures were stale, which is a fail and never a pass. The run never commits                                                                                                                                                                                                                                                    |
+| `p7-lts`       | `digraph` count == regulative-rule count from the BPMN discovery call                                                                               | `PASS (INTERIM)` — the label rides in the status                                                                                                                                                                                                                                                                                                                    |
+| `p7-mcp`       | HTTP 2xx, poll to `ready`, then a JSON-RPC `tools/list` POST whose non-generic tool count equals the deployment's function count, **loopback only** | see §6.4. A GET on `.mcp` is 405 by design, and a non-empty tool list is met vacuously by the service's own four generic tools                                                                                                                                                                                                                                      |
+| `p7-tnr`       | regenerate with `l4 nlg`, then diff against the subject's declared `.nlg.golden`s                                                                   | `PASS`/`differential`. The goldens are held still by jl4-test's in-process producer, so this is not a self-comparison. Forward direction only — nothing carries a prose edit back                                                                                                                                                                                   |
+| `p7-wizard`    | well-formedness + measured negative controls                                                                                                        | `DEGRADED`; the only oracle available is barred from `PASS`                                                                                                                                                                                                                                                                                                         |
+| `p7-akn`       | shallow well-formedness                                                                                                                             | `UNVERIFIED`, declared `EXTRA`                                                                                                                                                                                                                                                                                                                                      |
+| `p9-cost`      | the ledger's own parts re-summed against the totals it states, and each interval union checked against the bounds a union must satisfy              | `structural`. Two standings in one artifact and they are never merged: the per-stage timings are the DRIVER's, and `ledger.verify` refuses one more than a second longer than the bracket it sits in (a second of slack, for the whole-second clock fallback); the token and tool figures are read from the agent harness's transcripts, each named with its sha256 |
+| `p9-report`    | section-presence over the rendered report                                                                                                           | reads the journal and nothing else                                                                                                                                                                                                                                                                                                                                  |
 
-### 5.1a `p8-verify` — R5 rung 1, declared at both milestones
+### 5.1a `p8-verify` — R5 rung 1, declared on both paths
 
 This stage refused until `l4 verify` existed. It no longer refuses, and since 2026-08-09 it is
-declared: `G1_STAGES` names it after `p6-tests`, `G2_STAGES` names it too, and it runs over the
-module set the driver resolved for the milestone — the committed corpus at g1, the de novo
+declared: `PRIMARY_STAGES` names it after `p6-tests`, `DEPOSIT_STAGES` names it too, and it runs over the
+module set the driver resolved for the run — the committed encoding on the primary path, the de novo
 deposit at g2 (with the deposit contract: no declared or deposited module set is `SKIPPED`).
 
 `l4 verify FILE [--format text|json]` takes each boolean `DECIDE` down the same path the web
@@ -531,8 +542,10 @@ today's regcf the coalescing earns its keep instead of being a no-op.
 sweep → external model checker. Rung 2 needs the fork register P4 does not yet produce; rung 3
 waits on the LTS semantics.
 
-**Declared, in the present tense (2026-08-09).** `go.sh` names `p8-verify` in `G1_STAGES` and
-`G2_STAGES` and no longer lists it in `UNIMPLEMENTED_STAGES`, so `go.sh run` reaches the script
+**Declared, in the present tense (2026-08-09).** `go.sh` names `p8-verify` in
+`PRIMARY_STAGES` (`G1_STAGES` until R9) and in
+`DEPOSIT_STAGES` (`G2_STAGES` until R9),
+and no longer lists it in `UNIMPLEMENTED_STAGES`, so `go.sh run` reaches the script
 and `--only p8-verify` runs exactly it (behind its HG1 gate). The measurement above predates the
 declaration — it was taken by invoking `etc/go/phases/p8-verify.sh` directly against a real run
 directory, which writes an ordinary receipt into the ordinary hash-chained journal, and that
@@ -598,7 +611,7 @@ The same pass retensed the renderer's own ABSENT prose, which commit `e10a64f2` 
 it corrected the documents and not the output: on **every** `g1` run the report printed that
 `p1-ingest`, `p2-sweep` and `p4-forks` "are entry points that refuse" and that "the de novo tooling
 is unbuilt". Those stages had stopped refusing. A `g1` report now says only that they are not
-declared at that milestone, which is the true reason they are silent there.
+declared for that run, which is the true reason they are silent there.
 
 **Findings are attributed to the file they were reported against.** `register-validate.mjs`
 validates every file on its command line and its exit code is a total, so a clean source bundle
@@ -612,8 +625,8 @@ peer, by path, that is not.
 #### The one that still refuses
 
 It exits 3 after printing what it would do and what is blocking it. It is not a member of any
-milestone's declared stage list, so its absence cannot make a milestone `INCOMPLETE`.
-(`p8-verify` left this table on 2026-08-09: it is declared at both milestones — §5.1a.)
+declared stage list, so its absence cannot make a run `INCOMPLETE`.
+(`p8-verify` left this table on 2026-08-09: it is declared on both paths — §5.1a.)
 
 | stage         | blocker                                                                                                                                                                                                                                                                                                                                   |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -644,13 +657,13 @@ included — into its run dir with no receipt, no journal row and no gate coveri
 announced the path; measured 2026-08-09).
 
 `p9-report` **is** declared at g2: it reads `journal.ndjson` and nothing else, so it is correct for
-any milestone. HG1 gates P6 onward (`p6-tests p7-dmn p8-verify p8-diff p9-report`), per SPEC.md
+any milestone. HG1 gates P6 onward (`p6-tests p7-dmn p8-verify p8-diff p9-cost p9-report`), per SPEC.md
 §7.3, and at g2 the gate binds to the digest of the **de novo deposit set** (surface map included)
 rather than the committed corpus — a waiver granted over the replay corpus says nothing about an
 encoding that did not exist when it was granted, and because `digestSet` records a missing file as
 `ABSENT` rather than skipping it, _depositing_ a bundle, a module or a map re-opens the gate.
 
-The consequence for the milestone verdict, stated plainly so nobody has to infer it: **`g2
+The consequence for the run verdict, stated plainly so nobody has to infer it: **`g2
 COMPLETE` means every g2 stage is accounted for. It does not, by itself, mean a de novo run
 happened.** A run with every deposit absent produces `SKIPPED` receipts, each carrying a reason
 that appears in the report, and `COMPLETE` — §3.2's completeness-of-accounting doing exactly its
@@ -798,7 +811,7 @@ outward-facing, and no agent decides that on its own; the rule used to live only
 the driver accepted the flag and `gate-verify.sh` recommended it by name.
 
 The G1 path that bypasses HG1 is the identical code path that would bypass it at G2. That is the
-point of implementing waivers rather than special-casing the replay milestone.
+point of implementing waivers rather than special-casing the replay path.
 
 ### 6.3 What the gate machinery does not do
 
@@ -849,7 +862,7 @@ is HG2's.
 
 | rot                                                                              | mechanism                                                                   | counterweight                                                                                                                                                                                                                                                                                                                 |
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| the lattice collapses to PASS/FAIL, because eight statuses feel like bureaucracy | one edit in `verdict.mjs`                                                   | `etc/go/selftest.mjs` constructs a receipt for each status, asserts `PASS` is refused with a null, failing, **weak-class**, or artifact-less oracle, and asserts a `BROKEN` receipt cannot yield a `COMPLETE` milestone. CI-gated by the new `go:` filter                                                                     |
+| the lattice collapses to PASS/FAIL, because eight statuses feel like bureaucracy | one edit in `verdict.mjs`                                                   | `etc/go/selftest.mjs` constructs a receipt for each status, asserts `PASS` is refused with a null, failing, **weak-class**, or artifact-less oracle, and asserts a `BROKEN` receipt cannot yield a `COMPLETE` run. CI-gated by the new `go:` filter                                                                           |
 | measured numbers get transcribed into report prose and go stale                  | somebody pastes a figure into the template                                  | `report/template.md` contains **no** literal measurement, and `render-report.mjs` refuses to render one: any digit-run outside a small allowlist of spec coordinates is a template defect (exit 4), and an unresolved placeholder is too. Fidelity counts are parsed by `lib/fidelity-counts.mjs`, never typed                |
 | the stage table drifts from the CLI and harness reality                          | a renamed checker, a new `--to` target, `--fail-on-assert` finally shipping | `p0-preflight` re-derives the four enumerations and the module's rule names **by discovery call** and compares them as sets, so a rename fails loudly naming the exact strings; it existence-checks every checker in the subject's `pins.json`; and the failing-`#ASSERT` tripwire fires the day the workaround becomes wrong |
 

@@ -19,7 +19,7 @@
 // about what the stages will do.
 //
 // Usage (driven by go.sh; env is the interface):
-//   node etc/go/lib/doctor.mjs --milestone g1 --stages "p0-preflight p3-check …" [--brief]
+//   node etc/go/lib/doctor.mjs --encoding primary --stages "p0-preflight p3-check …" [--brief]
 //
 // Reads: L4, GO_L4_PROVENANCE, JL4_LSP_CMD, GO_LSP_PROVENANCE,
 //        JL4_GO_SERVICE_URL, JL4_LIBRARY_PATH, GO_S_* (subject sidecar).
@@ -39,7 +39,7 @@ const arg = (name, dflt = "") => {
   return i >= 0 ? args[i + 1] : dflt;
 };
 const BRIEF = args.includes("--brief");
-const MILESTONE = arg("--milestone", "g1");
+const ENCODING = arg("--encoding", "primary");
 const STAGES = arg("--stages", "").split(/\s+/).filter(Boolean);
 const env = process.env;
 
@@ -114,6 +114,24 @@ if (!executable(env.L4)) {
 }
 
 // --- per-leg forecasts, only for stages this run declares -------------------
+if (declared("p9-cost") && !env.CLAUDE_CODE_SESSION_ID) {
+  // NOT a missing prerequisite, and the wording says so. `p9-cost` needs
+  // nothing this machine could lack; what it needs is somebody to attribute
+  // the tokens TO, and a run driven by a human or by CI has nobody. The stage
+  // reports SKIPPED with that reason and — unlike an ordinary skip — is not
+  // fatal under L4_GO_REQUIRED=1, because a run with no agent session has no
+  // token cost to report rather than a gap in its toolchain.
+  //
+  // The forecast exists anyway: a reader who expects a cost section and gets
+  // none should learn why here, before the run spends ten minutes, rather than
+  // from a receipt afterwards.
+  findings.push({
+    stage: "p9-cost",
+    what: "will report SKIPPED for its ATTRIBUTED half — CLAUDE_CODE_SESSION_ID is unset, so no agent session can be attributed to this run. The attested per-stage timings are unaffected: the driver writes those on every receipt",
+    remedy:
+      "none needed; this is what a run driven by hand or by CI looks like. Drive the pipeline from an agent session if you want the token figures",
+  });
+}
 if (declared("p7-ladder")) {
   if (!probes.npm?.present) {
     findings.push({
@@ -224,7 +242,7 @@ const provLine = (name, val, prov) =>
 
 if (!BRIEF) {
   process.stdout.write(
-    `doctor: milestone ${MILESTONE} — ${STAGES.length} declared stage(s)\n`,
+    `doctor: encoding ${ENCODING} — ${STAGES.length} declared stage(s)\n`,
   );
   process.stdout.write(
     provLine("l4", env.L4, env.GO_L4_PROVENANCE || "explicit") + "\n",

@@ -13,12 +13,12 @@
   with no journal row cannot be printed here.
 -->
 
-# {{run.milestone_upper}} conversion report — {{run.subject}}
+# Conversion report — {{run.subject}} ({{run.encoding}})
 
 |             |                                                                                  |
 | ----------- | -------------------------------------------------------------------------------- |
 | run id      | `{{run.id}}`                                                                     |
-| milestone   | {{run.milestone_upper}} — {{run.milestone_gloss}}                                |
+| encoding    | {{run.encoding}} — {{run.encoding_gloss}}                                        |
 | subject     | {{run.subject}}                                                                  |
 | repo HEAD   | `{{run.repo_head}}` ({{run.tree_state}})                                         |
 | clock       | `{{run.fixed_now}}`                                                              |
@@ -86,6 +86,12 @@
 
 ---
 
+## What this run cost
+
+{{sections.cost}}
+
+---
+
 ## Every artifact this run put on disk
 
 {{artifacts.table}}
@@ -101,7 +107,7 @@ etc/go/go.sh verify --run-id {{run.id}} --gates
 That re-reads `journal.ndjson`, re-hashes every artifact a receipt names, checks
 that each granted gate was recorded before the first stage it gates began (by
 record of either kind, so gated work run outside the driver is caught), and
-recomputes the milestone verdict. It runs no build, calls no model, and makes no
+recomputes the run verdict. It runs no build, calls no model, and makes no
 network request. A second party can run it later against the same run directory
 and does not have to believe anything this report says.
 

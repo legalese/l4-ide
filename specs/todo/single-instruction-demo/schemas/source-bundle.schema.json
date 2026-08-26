@@ -62,6 +62,30 @@
         "note": { "type": "string", "minLength": 1 }
       }
     },
+    "retrieval_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "elapsed_ms"],
+      "description": "What the RETRIEVAL cost, when the fetch measured itself. Optional, because a bundle assembled by hand or from an archive cannot know it, and a fabricated zero would be worse than a silence. It exists because the pipeline reports two SEPARATE populations of network activity and must never add them: calls the MODEL made (counted from the agent transcript by p9-cost, by tool name) and requests the FETCH made (counted here, by the script that made them). A shell call running curl is invisible to the first, so without this the report's own sentence about the second would have nothing behind it.",
+      "properties": {
+        "requests": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "HTTP requests issued. One document usually costs more than one: a PDF and its landing page are two."
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wall clock spent in those requests, measured by the fetching process."
+        },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What did the fetching, e.g. the script's own path. Recorded so a reader can re-run it."
+        }
+      }
+    },
     "documents": {
       "type": "array",
       "minItems": 1,
@@ -138,6 +162,30 @@
           }
         },
         "covers_absent_reason": { "type": "string", "minLength": 1 },
+        "retrieval_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requests", "elapsed_ms"],
+          "description": "What the RETRIEVAL cost, when the fetch measured itself. Optional, because a bundle assembled by hand or from an archive cannot know it, and a fabricated zero would be worse than a silence. It exists because the pipeline reports two SEPARATE populations of network activity and must never add them: calls the MODEL made (counted from the agent transcript by p9-cost, by tool name) and requests the FETCH made (counted here, by the script that made them). A shell call running curl is invisible to the first, so without this the report's own sentence about the second would have nothing behind it.",
+          "properties": {
+            "requests": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "HTTP requests issued. One document usually costs more than one: a PDF and its landing page are two."
+            },
+            "elapsed_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Wall clock spent in those requests, measured by the fetching process."
+            },
+            "bytes": { "type": "integer", "minimum": 0 },
+            "tool": {
+              "type": "string",
+              "minLength": 1,
+              "description": "What did the fetching, e.g. the script's own path. Recorded so a reader can re-run it."
+            }
+          }
+        },
         "annotations": {
           "type": "array",
           "items": { "$ref": "#/$defs/annotation_group" },
@@ -194,7 +242,12 @@
       "description": "The same check for the assembled artifact."
     },
     {
+      "id": "retrieval-cost-covers-its-documents",
+      "description": "Where the bundle states a total retrieval_cost, it may not be less than the sum of whatever the documents state. A total smaller than what it is a total of is not an approximation; it is a number nothing produced, and this pipeline's rule is that a wrong figure is worse than a missing one. Only that direction is refused: a total may legitimately be LARGER, because a landing page, a redirect or a retry costs a request that no single document owns. Absent on either side, the rule has nothing to say and says nothing — it is not a cross-file join and never reports a skip."
+    },
+    {
       "id": "covers-or-absent-reason",
+
       "description": "Exactly one of covers and covers_absent_reason."
     },
     {

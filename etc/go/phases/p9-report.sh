@@ -74,6 +74,7 @@ node -e '
     "## Every other stage that reported",
     "## Where another system published its own representation of the same rule",
     "## Triage",
+    "## What this run cost",
     "## Every artifact this run put on disk",
   ];
   const missing = required.filter((h) => !t.includes(h));
