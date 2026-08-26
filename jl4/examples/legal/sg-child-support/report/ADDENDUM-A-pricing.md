@@ -45,7 +45,7 @@ Two variants of the same measured run, for readers whose arrangement differs:
 | Batch API (50% off both directions) | **$26.80** | not applicable here — the Batch API is asynchronous, and this run was interactive and human-steered throughout |
 | Naive, un-deduped transcript sum    |      ~$118 | **wrong.** See §10's third caveat; recorded only so the error is recognisable if someone reproduces it         |
 
-## A.3 Under a subscription, the cash cost of this run is nothing
+## A.3 Under a subscription, this run costs nothing and the capacity is ~40 a month
 
 The $53.61 above is what this run would cost billed **per token at list on the API**. It is not what
 it cost, and for most people running the pipeline it is not what it would cost.
@@ -53,24 +53,59 @@ it cost, and for most people running the pipeline it is not what it would cost.
 Claude Code draws on whatever plan the operator already has. Anthropic's published consumer tiers
 are Pro at $20/month and **Max from $100/month (5× Pro), with a $200/month 20× tier**; Claude Code
 usage on those plans is included in the subscription rather than metered per token. On a Max seat,
-this run's **marginal** cost was **$0** — it consumed a share of a fixed monthly allowance, not a
-line on an invoice.
+this run's **marginal** cash cost was **$0** — it consumed a share of a fixed monthly allowance, not
+a line on an invoice.
 
-Two honest consequences, in both directions:
+### A.3.1 What the operator observed, which is not what §A.2 predicts
 
-- **The subscription pays for itself quickly at this workload.** A $200/month Max 20× seat is worth
-  about **four runs of this size** at list. A team encoding one body of law a week is, in list-price
-  terms, getting roughly **$215/month of inference for $200** — the fourth run crosses the
-  line, and everything after it is free until the usage window binds.
-- **"Free" means "already paid for", not "unlimited".** Plan usage is capped by rolling windows, not
-  by tokens, so the ceiling is _how many such runs fit in a window_, which this run does not
-  measure and which this addendum therefore does not claim. The list-price figure is the one that
-  is comparable across arrangements, which is why §A.2 leads with it.
+The operator of this run reports, from the in-session usage display and offered as a fallible
+impression rather than a measurement, that the whole session consumed **at most 10% of a weekly
+allowance** on a Max 20× seat.
 
-The reason to state both is that they answer different questions. **$53.61** answers _what is this
-capability worth per unit of work_ — the number to put beside a quote for a lawyer's time.
-**$0 marginal** answers _what does it cost me to run it again this afternoon_, which is the number
-that decides whether anyone actually does.
+Pro-rate the seat and that is a number this addendum can be checked against:
+
+|                                 |               |
+| ------------------------------- | ------------: |
+| Max 20× seat                    |  $200 / month |
+| ÷ 4 weeks (÷ 4.35 gives $46.03) | $50.00 / week |
+| × ≤10%, this session            |   **≤ $5.00** |
+| The same session at list (§A.2) |        $53.61 |
+| Implied ratio, as a floor       |   **≥ 10.7×** |
+
+Two consequences, and the second is the one that matters.
+
+**Capacity, not value.** At ≤10% of a week, the seat sustains **≥10 runs a week — on the order of 40
+a month**, not the "about four" that dividing $200 by $53.61 suggests. Those two numbers answer
+different questions and this addendum's first draft ran them together. **$53.61 is a valuation** —
+what one encoding is worth per unit of work, the figure to set beside a quote for a lawyer's time.
+**Forty a month is the capacity** — what the pipeline can actually be pointed at before anything
+binds. Nobody holding a Max seat pays list, so the list figure never governs how often they run it.
+
+**The subscription is worth about an order of magnitude more than list at this workload.** That is a
+floor, since "at most 10%" bounds the consumption from above and not below.
+
+One caveat on "forty", so nobody plans a quarter around it. **"Free" here means "already paid for",
+not "unlimited"**: plan usage is capped by rolling windows rather than by a token budget, so forty is
+a linear extrapolation from one observation of one session, and forty runs crammed into a week is
+not the same proposition as forty spread across a month. The claim this addendum will stand behind
+is the weaker and more useful one — **the binding constraint on how often this pipeline runs is not
+money.**
+
+### A.3.2 Why the gap is that large — two live explanations, neither confirmed
+
+This addendum does not know, and says so rather than picking one.
+
+- **Cache reads may barely register against a plan allowance.** They are 71% of the list invoice
+  ($38.14 of $53.61) and 76.3M of the 77.4M tokens this session touched. Strip them and the residual
+  is $15.41; strip cache writes too and output alone is **$7.08** — the same order as the ≤$5
+  observed. If plan accounting weights a cache hit far below its 0.1× _price_, then list price
+  systematically overstates the cost of exactly the long-context agentic work Claude Code does.
+- **Or a flat plan is simply priced below list for heavy users**, which is what flat plans are for,
+  and the 10× is the subsidy rather than a difference in what is being counted.
+
+The first is testable without guessing: run a session engineered to be cache-read-heavy and
+output-light, and watch whether the usage display moves with the reads or with the output. Until
+someone does, both stay on the page.
 
 ## A.4 What is still not counted
 
