@@ -48,12 +48,19 @@
     "never be applied to the committed corpus, which would let it shrink",
     "unnoticed.",
     "",
-    "'encodings.cleanroom-2026-08.checks.min_assertions' is 1789, MEASURED",
+    "'encodings.cleanroom-2026-08.checks.min_assertions' is 1907, MEASURED",
     "2026-08-26 with assert-report.mjs over `l4 run --json` for all six modules:",
     "wills-act 341 + intestate-succession-act 381 +",
     "probate-administration-act 429 + guardianship-of-infants-act 404 +",
-    "family-cases 234 = 1789, 0 failed; family-domain contributes none, being",
-    "types only. The same 1789 appears in the committed .golden files.",
+    "family-cases 352 = 1907, 0 failed; family-domain contributes none, being",
+    "types only. The same 1907 appears in the committed .golden files.",
+    "",
+    "family-cases was 234 when this corpus was first deposited and is 352 now:",
+    "the joins rebuild replaced eleven claimed cross-Act compositions that were",
+    "adjacency -- two single-Act assertions standing side by side -- with five",
+    "that a break-the-upstream-Act mutation actually detects, and relabelled the",
+    "rest honestly as cross-checks, duplicates or blocked. RAISE THIS FLOOR when",
+    "the corpus grows; never lower it to make a run pass.",
     "",
     "'natlang_sources' and 'comparison' now point at the CLEANROOM registers,",
     "which cover four Acts as retrieved on 26 Aug 2026 and supersede the",
@@ -114,7 +121,7 @@
       ],
       "checks": {
         "min_dated_arms": 0,
-        "min_assertions": 1789
+        "min_assertions": 1907
       }
     }
   }
