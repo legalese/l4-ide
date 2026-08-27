@@ -1,10 +1,24 @@
 -- An IMPORTED infix operator (prelude `is in`) as an operand of a built-in
--- connective. This pins the merged-hints registry path: the CLI's hint
--- registry is module-local while the LSP merges imported hints, so before
--- infix operands were admitted under built-ins the two disagreed on this
--- shape; both now accept it.
+-- connective, in a module that also declares a LOCAL operator.
+--
+-- The local operator matters: it makes this module's hint registry non-empty,
+-- so the parser's mixfix keyword gate is ACTIVE and `is in` parses only
+-- because the import merge supplies its hint. (With no local operator the
+-- registry is empty and any identifier chain is accepted permissively, which
+-- pins nothing.) The prelude matters too: it wraps everything in `§ Prelude`,
+-- so its hints exist only because buildMixfixHintRegistry recurses into
+-- sections. Severing either link — the import merge in GetMixfixRegistry, or
+-- the section recursion — turns the #EVALs below into loud parse errors
+-- ("unexpected `is in`").
 IMPORT prelude
+
+@infixl 6
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+DECIDE a LOCALOP b IS a MINUS b
 
 #EVAL 3 `is in` (SET OF 1, 2) OR 3 `is in` (SET OF 3, 4)
 #EVAL 5 `is in` (SET OF 1, 2) OR 5 `is in` (SET OF 3, 4)
 #EVAL 2 `is in` (SET OF 1, 2) AND 3 `is in` (SET OF 3, 4)
+#EVAL 10 LOCALOP 3 EQUALS 7 AND 4 `is in` (SET OF 3, 4)

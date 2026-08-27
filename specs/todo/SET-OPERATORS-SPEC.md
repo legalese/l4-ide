@@ -2064,13 +2064,24 @@ now that the defect is gone:
   `displayPosToken` still prints the `^` the user wrote, because exactprint byte-identity
   reconstructs source text through it. The old bare-`^` rendering is what mis-recorded this
   defect as "a ditto cannot copy a mixfix operator" for three weeks.
-- **Hint-registry asymmetry (pre-existing, narrowed).** The CLI's mixfix hint registry is
-  module-local (`L4/Import/Resolution.hs`) while the LSP merges imported modules' hints
-  (`LSP/L4/Rules.hs`), so before this change an _imported_ operator (prelude `UNION`) in
-  operand position parsed under `l4 run` (via juxtaposition) while a same-module operator did
-  not — and the IDE disagreed with the CLI. Outcomes now converge (both parse everywhere),
-  though the two paths can still produce the two different flat `App` shapes, both of which the
-  typechecker resolves.
+- **Hint-registry facts, corrected by adversarial re-verification (2026-08-27).** Two claims an
+  earlier draft of this note made were wrong, and one live bug hid behind them. (1) The CLI is
+  _not_ module-local: `l4 run` drives the same Shake rules as the LSP (`jl4/app/L4/Cli/Run.hs`
+  uses `Rules.SuccessfulTypeCheck`, whose `GetMixfixRegistry` merges imported hints). The
+  genuinely module-local path is `typecheckWithDependencies` in `L4/Import/Resolution.hs`, used
+  only by the VirtualFS API (`L4/API/VirtualFS.hs`). (2) "Outcomes converge (both parse
+  everywhere)" was false in the one configuration that exercises the machinery: the hint gate is
+  _skipped_ when a module's merged registry is empty (any identifier chain parses permissively,
+  failing only at scope-check), so import-merge severing is silent in an importer with no local
+  operators — and in an importer _with_ a local operator, prelude word operators (`` `is in` ``)
+  were a parse error, live, because `buildMixfixHintRegistry` used one-layer `foldTopDecls` and
+  the prelude wraps everything in `§ Prelude`: **section-nested `DECIDE`s contributed zero
+  hints**. Fixed in the same PR (registry recursion into `Section`); pinned by
+  `ok/infix-under-connective-imported.l4`, which now declares a local operator precisely so its
+  registry is non-empty and the gate is active — severing the import merge or the section
+  recursion turns its `#EVAL`s into loud parse errors. Verdict trail: the review finding
+  "imported infix operator under a connective is unpinned" survived its 3-refuter panel 2–1 and
+  the strengthened pin is its discharge.
 
 **Style 4 — `any`-fold over the enumeration.** The list-shaped form for _predicate_ limbs; the
 prelude's `any`/`all` carry `@nlg` templates already. NOTE: L4 functions are **not curried** —

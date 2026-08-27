@@ -1,9 +1,11 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-infix-under-connective-imported.l4:8:1-57:
+infix-under-connective-imported.l4:21:1-57:
   TRUE
-infix-under-connective-imported.l4:9:1-57:
+infix-under-connective-imported.l4:22:1-57:
   FALSE
-infix-under-connective-imported.l4:10:1-58:
+infix-under-connective-imported.l4:23:1-58:
+  TRUE
+infix-under-connective-imported.l4:24:1-56:
   TRUE

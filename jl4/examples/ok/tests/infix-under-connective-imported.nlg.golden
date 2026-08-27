@@ -1,3 +1,4 @@
 `_ is in _` with 3 and `SET` with list of 1 and 2 or `_ is in _` with 3 and `SET` with list of 3 and 4
 `_ is in _` with 5 and `SET` with list of 1 and 2 or `_ is in _` with 5 and `SET` with list of 3 and 4
 `_ is in _` with 2 and `SET` with list of 1 and 2 and `_ is in _` with 3 and `SET` with list of 3 and 4
+`_ LOCALOP _` with 10 and 3 is equal to 7 and `_ is in _` with 4 and `SET` with list of 3 and 4
