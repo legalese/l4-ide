@@ -1181,9 +1181,9 @@ spec bin = do
       sout `shouldSatisfy` ("blawx" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
-      -- Vacuously entailed by "state-graph" above; kept for parity so the
-      -- list reads as the full subcommand set.
-      sout `shouldSatisfy` ("graph" `isInfixOf`)
+      -- "graph" is a substring of "state-graph" (asserted above), so pin the
+      -- graph entry by a word unique to its own description instead.
+      sout `shouldSatisfy` ("Mermaid" `isInfixOf`)
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $

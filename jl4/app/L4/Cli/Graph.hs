@@ -59,7 +59,6 @@ graphFormatReader = eitherReader \input ->
   case Text.toLower (Text.pack input) of
     "dot"     -> Right GfDot
     "mermaid" -> Right GfMermaid
-    "mmd"     -> Right GfMermaid
     other     -> Left $ "Invalid format: " <> Text.unpack other <> " (expected dot|mermaid)"
 
 graphOptionsParser :: Parser GraphOptions

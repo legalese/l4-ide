@@ -31,6 +31,17 @@ this spec on graph structure; nothing there re-decides anything here.)
 
 ## Graph Structure
 
+**Shipped structure (2026-08-27).** The implementation extends the three tables below in ways this
+spec did not anticipate, and the module haddock of `L4.DependencyGraph` is the authoritative record
+of each decision. In brief: a record's explicit constructor and an enum's member constructors are
+nodes distinct from their type (so `DECLARE Color IS ONE OF Red, Green` mints three nodes, not
+one), constructor arguments mint selector nodes, and a `DECLARE` carries structural edges — type →
+its selectors and constructors, record constructor → its type, selector/constructor → the
+references in its field/argument types — so a reachable type keeps its whole schema. The
+entry-point list additionally includes `#EVALTRACE` and `#ASSERT` directives and the references in
+a `TIMEZONE IS` expression, and entry points are harvested from the main module only (a
+dependency's directives run when *it* is the module being run, not when its importer is).
+
 ### Nodes
 
 Every named definition is a node:

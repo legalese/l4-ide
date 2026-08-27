@@ -393,11 +393,15 @@ spec = do
         [i.name | i <- Map.elems g.nodes, i.name == "p"] `shouldBe` []
 
   describe "DOT renderer" $ do
-    it "emits a digraph and harvests @desc as a tooltip" $
+    it "emits a digraph and harvests @desc as a tooltip, only where one exists" $ do
       withGraph exportSrc $ \gr -> do
         let out = depGraphToDot defaultDepGraphRenderOptions gr
         ("digraph" `Text.isInfixOf` out) `shouldBe` True
+        ("tooltip" `Text.isInfixOf` out) `shouldBe` True
         ("the main entry" `Text.isInfixOf` out) `shouldBe` True
+      withGraph chainSrc $ \g ->
+        ("tooltip" `Text.isInfixOf` depGraphToDot defaultDepGraphRenderOptions g)
+          `shouldBe` False
 
     it "draws surplusage dashed, but marks nothing when there are no entry points" $ do
       withGraph renderSrc $ \g -> do
@@ -424,6 +428,16 @@ spec = do
         ("derived amount" `Text.isInfixOf` out) `shouldBe` True
         ("base amount" `Text.isInfixOf` out) `shouldBe` True
         ("stranded definition" `Text.isInfixOf` out) `shouldBe` False
+
+    it "judges surplusage on the whole graph even under a slice" $
+      withGraph renderSrc $ \g -> do
+        strandedU <- node g DepFunction "stranded definition"
+        let out =
+              depGraphToDot
+                defaultDepGraphRenderOptions {slice = Just (Set.singleton strandedU)}
+                g
+        ("stranded definition" `Text.isInfixOf` out) `shouldBe` True
+        ("dashed" `Text.isInfixOf` out) `shouldBe` True
 
   describe "Mermaid renderer" $ do
     it "starts with the frozen header and draws nodes, edges and surplusage" $
