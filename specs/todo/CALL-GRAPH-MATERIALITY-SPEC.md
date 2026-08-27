@@ -133,7 +133,10 @@ note (4 `#EVAL`, regulative), `ok/ledger/bitemporal-recall.l4`, plus a controlle
   the boolean decision skeleton per definition (everything non-boolean: "NOT ANALYSED"), CNF-based,
   with atoms coalesced by the wizard's stable `atomId`. The atom-identity layer D3 needs already
   exists and is already shared with the wizard; what is missing is inter-definitional scope,
-  instance-relative analysis (verify is instance-free), and non-boolean leaves.
+  instance-relative analysis (verify is instance-free), and non-boolean leaves. (Post-measurement
+  note, 2026-08-27: that layer had a referential-transparency hole — zero-arity `WHERE` bindings
+  became opaque atoms — found and fixed upstream in PR #307; see the D3 atom-identity
+  requirement.)
 
 ## 5. Design — decision-logic side
 
@@ -185,6 +188,19 @@ of a run):
 
 The same engine exports prose: "because {…}" from the covering AXp, "unless {…}" from the nearest
 CXps — the wizard's explanation text and the LLM tool-call payload, from one computation.
+
+**Atom identity must be referentially transparent (added 2026-08-27, from the WHERE-inlining
+handoff).** Two resolved names can denote one proposition: a zero-arity `WHERE e MEANS m` made
+`e` and `m` distinct atoms in `l4 verify`, so `m AND NOT e` produced no findings while the
+`flat` spelling was `[unsat]` — measured, and fixed by `L4.Transform.inlineLocalBindings`
+(`specs/todo/WHERE-INLINING-SPEC.md`, PR #307, open as of 2026-08-27, wired into `l4 verify`
+only). D3 inherits the obligation directly: compile the BDD **after** zero-arity local-binding
+inlining, or M3 mis-sizes (a minimal flip set containing both `e` and `m` reports size 2 for a
+truth of size 1), M4's 1/(k+1) reads the wrong k, and the wizard asks one fact twice. Note the
+deliberate asymmetry with D1/D5: the dependency graph and the fold boundary **keep** the WHERE
+binding as a node — it is an abstraction boundary the drafter wrote — while the propositional
+skeleton **collapses** it. Same definition, two representations, one meaning; what must agree is
+what the rule means, not how much of it either surface draws at once.
 
 ### D4. Defeat edges
 
@@ -289,6 +305,12 @@ whether anything can still be done — the difference between analysis and advic
   home for the full value a node's label elides.
 - **The metric-is-doctrine parameter (6.2) must be surfaced, not defaulted invisibly.** A tool that
   silently picks the intervention set is doing legal reasoning without saying so.
+- **Known hazard if D5 reuses the ladder's inline gesture.** `LSP.L4.Viz.Ladder.inlineExpr`
+  (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs:622–641`, verified 2026-08-27) matches `App _ resolved _args`
+  while _ignoring the argument list_ and substitutes the bare definiens — so inlining a call with
+  arguments would silently drop them. Masked today because the IDE offers only zero-arity
+  targets. Any D5 unfold-into-definition behavior built on `l4/inlineExprs` must add an explicit
+  arity guard first (as `L4.Transform.inlineLocalBindings` did) or fix the pattern.
 - This spec does not modify `#EVALTRACE`/`#TRACE` surface syntax and does not touch the exactprint
   or `prettyLayout` printers.
 
