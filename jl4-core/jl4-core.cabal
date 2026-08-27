@@ -127,6 +127,7 @@ library
     L4.Catala.Emit
     L4.Catala.Equivalence
     L4.Citations
+    L4.DependencyGraph
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
@@ -246,6 +247,7 @@ test-suite jl4-core-test
     BlawxImportImageSpec
     BlawxLiftSpec
     BlawxParseSpec
+    DependencyGraphSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
