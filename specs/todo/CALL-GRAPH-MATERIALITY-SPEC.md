@@ -1,12 +1,18 @@
 # Specification: Call Graphs, Materiality, and Counterfactual Explanation
 
-**Status (2026-08-27): PROPOSED, not implemented.** Nothing below ships except where a section
-explicitly says "exists today" and names the module or command. The empirical claims in §4 were
-measured on 2026-08-27 with the installed `l4` binary dated 2026-08-04 (`~/.local/bin/l4`) against
-the corpus at `origin/unstable` commit `3c5acd1a`; the exact protocol is in Appendix A. The static
-dependency graph this spec consumes is owned by `GLOBAL-DEPENDENCY-GRAPH-SPEC.md` and is also not
-yet built; this spec adds visualization and counterfactual analysis as a second and third consumer
-of that graph, and does not re-decide anything that spec owns.
+**Status (2026-08-27): D1 built in this tree; D2–D5 and §6 PROPOSED, not implemented.** What
+ships: the graph core `L4.DependencyGraph` (jl4-core; Passes 1–3 of
+`GLOBAL-DEPENDENCY-GRAPH-SPEC.md`), the renderers `L4.DependencyGraph.Render` (DOT and Mermaid),
+and the `l4 graph` CLI subcommand (`jl4/app/L4/Cli/Graph.hs`; R5 is answered, §8). Within D1's own
+mandate, two pieces remain proposed: re-pointing `L4.Dmn.Lower` (`freeRefs`/`survivingRefs`) onto
+the new module, and subsuming `Export.Document`'s `UnitGraph` — both are untouched today. LSP
+integration (R6) is not built. Nothing else below ships except where a section explicitly says
+"exists today" and names the module or command. The empirical claims in §4 were measured on
+2026-08-27 with the installed `l4` binary dated 2026-08-04 (`~/.local/bin/l4`) against the corpus
+at `origin/unstable` commit `3c5acd1a`; the exact protocol is in Appendix A. The static dependency
+graph this spec consumes is owned by `GLOBAL-DEPENDENCY-GRAPH-SPEC.md`, whose build status lives
+in that spec's own header; this spec adds visualization and counterfactual analysis as further
+consumers of that graph, and does not re-decide anything that spec owns.
 
 ## 1. Motivation
 
@@ -80,7 +86,7 @@ atoms arrive pre-phrased as threshold predicates, which is the form the NLG want
 | "Which inputs still matter"                      | `jl4-query-plan` (`BooleanDecisionQuery`, `VarImpact`), surfaced via LSP `l4/queryPlan`                                                 | ships; intra-decision                  |
 | Edge relation "who does this DECIDE reference"   | `freeRefs` + `classifyRef` in `L4.Dmn.Lower`, feeding DRD `informationRequirement` edges                                                | ships, but private to the DMN exporter |
 | Reachability + topological rank over definitions | `UnitGraph`/`closure`/`rankByBlockId` in `L4.Export.Document`                                                                           | ships, private to the export path      |
-| Global dependency graph                          | `GLOBAL-DEPENDENCY-GRAPH-SPEC.md` → `L4.DependencyGraph`                                                                                | **specified, not built**               |
+| Global dependency graph + renderers + CLI        | `L4.DependencyGraph`, `L4.DependencyGraph.Render`, `l4 graph` (`jl4/app/L4/Cli/Graph.hs`)                                               | **built 2026-08-27** (D1 status)       |
 | Intra-decision visualization                     | ladder pipeline: `L4.Viz.Ladder` → custom LSP methods → webview                                                                         | ships                                  |
 | Partial-evaluation shading vocabulary            | `specs/done/PARTIAL-EVAL-VISUALIZER-SPEC.md`: live / short-circuited / irrelevant; Not Asked / Still Needed / Don't Care                | shipped for ladders                    |
 
@@ -153,6 +159,19 @@ Immediate legal payoffs, before any trace is involved: unreachable definitions f
 points = surplusage (a drafting smell with a canon named after it); high fan-in nodes = definitional
 concentration risk — the single definition on which many rules hinge is where an ambiguity does the
 most damage; SCCs = circular definitions.
+
+**Status (2026-08-27): built, except the two subsumptions.** `L4.DependencyGraph` (jl4-core)
+builds the graph over the main module plus its import closure — nodes, edges, entry-point roots,
+SCCs and reachability, Passes 1–3 of the owning spec. `L4.DependencyGraph.Render` (jl4-core)
+emits DOT (via the `graphviz` library, on the `L4.StateGraph` template) and Mermaid (header
+frozen as `flowchart TD`), with surplusage drawn dashed/grey, cyclic-SCC members bordered red,
+and `@desc` as the DOT tooltip. `l4 graph` (`jl4/app/L4/Cli/Graph.hs`) is the CLI entry point,
+with exactly the filters above: `--root` (forward slice), `--reverse` (who consumes it),
+`--depth`; R5 records its naming and exit codes (§8). The edge collector reimplements the
+`freeRefs` semantics with four recorded deviations (see the module haddock) rather than lifting
+the code: `L4.Dmn.Lower` still carries its private collector, and `Export.Document`'s
+`UnitGraph` still stands — re-pointing the former and subsuming the latter (with the export
+render goldens as the invariant) are staged follow-ups, as is LSP integration (R6).
 
 ### D2. Call-shaped collapse of the trace
 
@@ -329,9 +348,16 @@ Recorded here when answered, per repo convention (`CLAUDE.md` §4).
   and with what the wizard treats as one question.
 - **R4 — winning-region computation site** (6.1): inside `L4.StateGraph` (it already computes
   static reachability, F9) is the working assumption.
-- **R5 — CLI surface**: extend `l4 trace` / `l4 state-graph` with flags, or a new `l4 graph`
-  subcommand for D1 + overlays? Interacts with the pipeline artifact set (a per-subject
-  `callgraph.dot` / `.mmd` joining `PROJECTIONS.md`).
+- **R5 — CLI surface** — **ANSWERED 2026-08-27: a new `l4 graph` subcommand**
+  (`jl4/app/L4/Cli/Graph.hs`), not flags on `l4 trace` / `l4 state-graph`. Formats `dot` and
+  `mermaid` (`json` deliberately reserved for the D5 topology payload); filters `--root` /
+  `--reverse` / `--depth`. Exit codes were chosen deliberately where the precedents split
+  (`l4 state-graph` exits 1 when it finds no regulative rules; `l4 verify` exits 0 when clean)
+  and are pinned in tests-cli: a degenerate — even empty — graph exits 0 and emits the
+  rendering, because an empty diagram is an answer about the module, not a failure of the
+  command; typecheck failure exits 1, as does a `--root` naming no definition. Still open within
+  this ruling's remit: the pipeline-artifact interaction (a per-subject `callgraph.dot` / `.mmd`
+  joining `PROJECTIONS.md`) — to be decided when the overlays land, not here.
 - **R6 — IDE transport**: a custom `l4/callGraph` LSP method following the seven existing custom
   methods, feeding a webview; the LSP-standard call-hierarchy protocol (unimplemented today) as a
   cheap tree-view complement, or skipped? _Partially answered 2026-08-27 (see D5): the primary

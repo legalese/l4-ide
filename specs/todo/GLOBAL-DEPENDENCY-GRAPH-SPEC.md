@@ -1,5 +1,16 @@
 # Specification: Global Dependency Graph
 
+**Status (2026-08-27): Passes 1–3 built; the integration points are not.** `L4.DependencyGraph`
+(jl4-core) builds the graph over the resolved main module plus its import closure (Pass 1: nodes,
+edges, entry-point roots), detects cycles (`cyclicSccs` / `computedFieldCycles`, Pass 2), and
+computes reachability and dead code (`reachableFrom` / `unreachableFrom` over an explicit
+`RootSet`, Pass 3). Its consumers today are `L4.DependencyGraph.Render` (DOT + Mermaid) and the
+`l4 graph` CLI subcommand — see `CALL-GRAPH-MATERIALITY-SPEC.md` D1 and R5. None of the callers
+in the "Integration Points" table is built: `TypeCheck.hs` does not run cycle detection
+(computed-field cycle errors still come only from the intra-record check in `Desugar.hs` plus the
+evaluator's runtime blackhole detection), there are no LSP dead-code warnings or grey-out, no
+tree-shaking (Pass 4), and no `EvaluateLazy` hook.
+
 ## Motivation
 
 The computed fields implementation (see `COMPUTED-FIELDS-SPEC.md`, "Cross-Record Cycles") revealed that L4 lacks a global dependency graph. Intra-record cycles between computed fields are caught at compile time, but cross-record cycles through top-level bindings are only caught at runtime by the lazy evaluator's blackhole detection. A global dependency graph would close this gap and enable several other analyses.
