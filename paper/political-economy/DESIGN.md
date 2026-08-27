@@ -320,6 +320,20 @@ academic-industrial complex is the CFO who offshored the factory — except the 
 population's ability to understand its own law, and the low-cost overseas supplier it got outsourced
 to owes the West nothing.
 
+### 4.9 The second enclosure: who is *allowed* to fill the gap
+
+Everything above concerns the enclosure of the **corpus**. There is a second enclosure on the
+**supply** side, and it cuts the other way: unauthorised-practice law makes it an offence for
+anyone but a licensed professional to apply a rule to another person's facts. Every filler in §3
+below the sovereign row is unlicensed — and the prohibition binds them asymmetrically, reaching the
+domestic, incorporated, accountable filler hardest and the anonymous offshore one not at all. So
+the second enclosure **disarms the defenders** the way the first manufactured the liberators.
+
+See [`SIDEBAR-unauthorised-practice.md`](SIDEBAR-unauthorised-practice.md) — the Singapore
+provisions (LPA ss 32–36), the two _Turner_ tests, the judicial rationale on the record, why the
+taxi-medallion analogy breaks, the steelman against the argument, and the exemption power at
+s 34(2) that already exists and appears never to have been used.
+
 ## 5. The constructive half: what closes the attack surface
 
 The paper must not be only a warning; it must name the defence, and the defence is the L4 thesis
