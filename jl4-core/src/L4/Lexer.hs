@@ -847,7 +847,7 @@ instance Stream TokenStream where
 instance VisualStream TokenStream where
   showTokens :: Proxy TokenStream -> NonEmpty (Token TokenStream) -> String
   showTokens Proxy xs =
-    concat (toList (Text.unpack . displayPosToken <$> xs))
+    concat (toList (Text.unpack . displayPosTokenDiag <$> xs))
 
   tokensLength :: Proxy TokenStream -> NonEmpty (Token TokenStream) -> Int
   tokensLength Proxy xs = sum ((.range.length) <$> xs)
@@ -1050,6 +1050,22 @@ displayPosToken :: PosToken -> Text
 displayPosToken (MkPosToken _r tt) =
   displayTokenType tt
 
+-- | Diagnostic-only rendering of a token: identical to 'displayPosToken'
+-- except that a /resolved/ ditto — @TCopy (Just _)@ — is shown as the caret
+-- the user wrote plus the token it resolved to, e.g.
+-- @^ (resolved to `resides in`)@, so a parse error caused by the copied
+-- token names the real offender instead of blaming the caret. An unresolved
+-- ditto (@TCopy Nothing@) still renders as a bare @^@.
+--
+-- Only megaparsec's error text goes through this (the 'VisualStream'
+-- 'showTokens' instance); everything that reconstructs source text —
+-- exactprint byte-identity, semantic-token splitting, NLG re-rendering —
+-- must keep using 'displayPosToken', where a resolved ditto stays @^@.
+displayPosTokenDiag :: PosToken -> Text
+displayPosTokenDiag (MkPosToken _r (RealTCopy tt)) =
+  "^ (resolved to " <> displayTokenType tt <> ")"
+displayPosTokenDiag pt = displayPosToken pt
+
 -- | "turns around" a map that is expected to
 -- - be surjective
 -- - be injective
@@ -1095,8 +1111,14 @@ displayTokenType = \case
     TDirectiveContinue -> "#"  -- continuation marker is just "#"
     _ -> "#" <> inverseCompleteLookup dir directives
   TKeywords kws -> inverseCompleteLookup kws keywords
-  -- NOTE: we cannot look up TCopy (Just _) in the map - instead we just act as if it was
-  -- TCopy Nothing, which is fine
+  -- A resolved ditto, TCopy (Just _), deliberately prints as the "^" the
+  -- user wrote: this function renders concrete syntax, and exactprint
+  -- byte-identity ('L4.ExactPrint.exactprint' concatenates
+  -- 'displayPosToken'), semantic-token splitting, and NLG re-rendering all
+  -- depend on that. It also cannot go through 'inverseCompleteLookup' —
+  -- only @TCopy Nothing@ is a key in 'symbols', so the lookup would error.
+  -- Parser diagnostics name the resolved token via 'displayPosTokenDiag'
+  -- in the 'VisualStream' 'showTokens' instance instead.
   RealTCopy _ -> displayTokenType (TSymbols (TCopy Nothing))
   -- `TOtherSymbolic` carries the verbatim source run of an unrecognized
   -- operator; render it as-is rather than looking it up (it is not a key in
