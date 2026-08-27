@@ -14,6 +14,10 @@ A single global dependency graph supports three analyses:
 
 All three are different queries over the same graph.
 
+(2026-08-27: `CALL-GRAPH-MATERIALITY-SPEC.md` adds two further consumers of this same graph —
+call-graph visualization, and instance-relative materiality/counterfactual analysis. It defers to
+this spec on graph structure; nothing there re-decides anything here.)
+
 ## Graph Structure
 
 ### Nodes
