@@ -24,6 +24,13 @@ plan.
 **Evidence legend.** **[E]** = read out of the named file/PR at the named date; **[U]** = believed
 true, not re-verified here. Tree facts verified against `unstable` at `8af7d332`, 2026-08-16.
 
+**A figure is the highest-risk thing a cell can hold.** Test counts and measurements read as
+evidence whether or not anyone re-derived them, and they are the part of a rewritten cell least
+likely to be re-run — so stamp every count with where it came from and when, or leave it out. This
+is not hypothetical: the DocAssemble row's `l4-cli-test` and `jl4-test` counts survived a full
+rewrite of that cell untouched, having been copied from a PR body written while that PR was still
+a draft and never updated after its final rebase (corrected 2026-08-28).
+
 ---
 
 ## 0. Ruling status
