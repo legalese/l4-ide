@@ -30,11 +30,17 @@ what makes the logic-programming abilities above available to rules you wrote in
   engines cannot produce and most legal users most want.
 - **Ask the question backwards.** Abductive reasoning lets you ask what facts would change the
   outcome — a question a forward evaluator cannot answer.
-- **A subject-matter expert can inspect the rules without reading L4.** The blocks view is
-  legible to a domain expert, which makes Blawx useful as a _review_ surface even when it is not
-  the deployment target.
+- **A subject-matter expert can inspect _and edit_ the rules without reading L4.** The blocks view
+  is legible to a domain expert — and an emitted project opens in the real Blawx editor and saves
+  back **byte-identical**, so their edits are not fighting a generator that rewrites the file
+  underneath them. That is what makes Blawx a genuine review-and-edit surface rather than a
+  one-shot dump.
+- **The explanation cites the statute.** Workspaces are anchored per `@export` decision with
+  synthesized rule text, and the identifiers Blawx regenerates line up with the emitted workspace
+  names — so the justification tree points back at the source provision, not just at a rule name.
 - **Defeasibility has somewhere to live.** Blawx expresses rules that defeat other rules directly,
-  which is the same structure L4's `SUBJECT-TO`/`NOTWITHSTANDING` work is about.
+  which is the structure L4's `SUBJECT-TO`/`NOTWITHSTANDING` spec _proposes_ — **proposed, not
+  implemented**. `UNLESS` is the shipped L4 operator today.
 
 ## The command
 
@@ -42,8 +48,8 @@ what makes the logic-programming abilities above available to rules you wrote in
 l4 blawx FILE
 ```
 
-Compiles the decision-rule subset of `FILE` to a Blawx project — a `.blawx` YAML file, plus the
-s(CASP) program it contains.
+Compiles the decision-rule subset of `FILE` to a Blawx project and prints the `.blawx` YAML to
+standard output. The s(CASP) program is written alongside it only when you pass `--output`.
 
 | Flag            | Effect                                                                     |
 | --------------- | -------------------------------------------------------------------------- |
@@ -74,10 +80,40 @@ argument position, and the body becomes a conjunction of goals to satisfy.
 
 ## What doesn't survive
 
-Blawx carries fidelity notes for the constructs s(CASP) cannot take directly. The general pattern
-is that anything requiring genuinely functional evaluation — rather than relational satisfaction —
-has to be re-expressed, and where that cannot be done faithfully the compiler reports it rather
-than emitting a program that would answer a different question.
+Two different things happen, and it matters which one you are looking at.
+
+**Blocking — the compiler refuses**, with a named diagnostic and nothing emitted. Each of these has
+a fixture under `jl4/examples/blawx/not-ok/`:
+
+- a `DATE`-sorted field or argument (v1)
+- more than ten arguments — a Blawx relationship block's ceiling
+- fewer than three, unless the shape is attribute-like (one category-sorted parameter plus an
+  optional result); Blawx relationships start at three
+- a subjectless nullary input
+- **unstratified negation** — a cycle through a negation. The shared middle-end admits it; the
+  Blawx leg is where it is refused.
+
+**Lossy — the compiler emits anyway and tells you what it dropped.** The one to know is
+`TYPICALLY` on an `ASSUME`. The name becomes an input predicate and the default is deliberately
+**not** seeded, because seeding it "would answer the question the target's interview exists to
+ask". That is a design decision rather than a limitation: Blawx's whole value is asking the user,
+so pre-filling their answer would defeat it.
+
+Worth setting beside [docassemble](docassemble.md), which consumes `TYPICALLY` as a `default:`
+prefill. The same L4 annotation is honoured by one interaction backend and deliberately dropped by
+the other, and both are right for what they are for.
+
+## Before you deploy on a stock Blawx instance
+
+Two limits our encodings hit on an unmodified Blawx, both reported upstream. Neither is a defect in
+your L4, and hitting one does not mean the export is broken:
+
+- the interview endpoint's assumption-finding can crash on classical negation in the answer tree,
+  which our negation-carrying encodings trigger; and
+- abductive search gets impractically slow when input predicates are left unpinned — pinning a
+  couple of pruning facts is the difference between seconds and minutes.
+
+The test-editor `run/` path is unaffected, which is why demos drive it.
 
 ## Where to look
 

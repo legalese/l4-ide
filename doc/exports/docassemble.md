@@ -59,6 +59,13 @@ field, dates a date picker, and an enumeration of nullary constructors becomes a
 stored values are the L4 constructor names. Lists of records are gathered with docassemble's own
 repeated-item machinery, and `MAYBE` values become a paired "is this known?" question.
 
+A `TYPICALLY` default becomes a docassemble `default:` — the question is still asked, but arrives
+pre-filled with the typical answer, which the user can change. Worth contrasting with
+[Blawx](blawx.md), which deliberately **drops** `TYPICALLY` rather than seeding it, on the grounds
+that pre-filling would answer the very question its interview exists to ask. The same annotation,
+honoured by one interaction backend and dropped by the other, and both are right for what they are
+for.
+
 ## What doesn't survive
 
 Run with `--fail-on` or read the emitted fidelity report; the recurring items are:
