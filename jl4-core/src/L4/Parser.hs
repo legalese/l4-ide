@@ -1326,10 +1326,11 @@ singleLineExpressionCont startLine = try $ do
   guard (sameLine || isContinuation)
   -- If it's a continuation marker, consume it
   when isContinuation $ void $ spacedToken_ (TDirectives TDirectiveContinue)
-  -- Now parse the operator and argument (use regular baseExpr)
+  -- Now parse the operator and argument (mixfixChainExpr, in lockstep with
+  -- expressionCont, so #EVAL operands admit user-defined infix operators too)
   (prio, assoc, op) <- operator
   l <- currentLine
-  arg <- baseExpr
+  arg <- mixfixChainExpr
   pure (MkCont op prio assoc l (mkPos 1) arg)
 
 data Stack a =
@@ -1511,8 +1512,16 @@ cont pop pbase p =
 currentLine :: Parser Pos
 currentLine = sourceLine <$> getSourcePos
 
+-- | The operand after a built-in operator parses via 'mixfixChainExpr', the
+-- same production the chain-head positions use ('indentedExpr',
+-- 'singleLineExpr'), so a user-defined infix operator is admitted on both
+-- sides of every built-in operator and binds tighter than all of them —
+-- exactly as prefix application already does. The assembled chain reaches
+-- 'combine' as a single pre-built operand. Before this, a user-defined
+-- infix call was admitted only at the outermost level of an expression or
+-- inside parentheses (SET-OPERATORS-SPEC §17.3).
 expressionCont :: Pos -> Parser (Cont Expr)
-expressionCont p = cont operator baseExpr p
+expressionCont p = cont operator mixfixChainExpr p
 
 data ExprLineInfo =
   MkExprLineInfo

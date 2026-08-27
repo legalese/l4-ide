@@ -1,0 +1,11 @@
+-- An UNDECLARED chain of a user-defined operator under a built-in
+-- connective stays an error now that user-infix operands are admitted
+-- under built-ins: there is no default fixity, so the flat chain does not
+-- re-associate and the operator is applied to 4 arguments (compare
+-- not-ok/tc/fixity-undeclared-chain.l4, the same rule at top level).
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x PLAIN y MEANS x PLUS y
+
+#EVAL 1 PLAIN 2 PLAIN 3 OR TRUE

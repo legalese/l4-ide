@@ -1,0 +1,13 @@
+`may apply` with `alice`
+`may apply` with `carol`
+`may apply` with `dave`
+`may apply broadly` with `erin`
+`may apply broadly` with `dave`
+the sum of 10 and `_ SCALEDBY _` with 2 and 3
+the sum of `_ SCALEDBY _` with 2 and 3 and 10
+`_ SCALEDBY _` with 2 and 3 is equal to 6 and `TRUE`
+`qualifies` with `dave` and 5
+`qualifies` with `dave` and 2
+`may apply prefix` with `carol`
+`may apply parens` with `carol`
+`may apply prefix` with `dave`
