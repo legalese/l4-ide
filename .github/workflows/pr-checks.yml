@@ -117,6 +117,20 @@ jobs:
             docs:
               - 'doc/**'
               - 'specs/**'
+              # paper/** for the same reason, learned the same way. PR #306
+              # merged two unformatted markdown files under
+              # paper/political-economy/ WITHOUT ever running `format:check`,
+              # because paper/** matched no filter — not this one and not
+              # 'typescript'. `prettier --check .` then failed on every
+              # subsequent PR into unstable, naming files their authors had
+              # not touched. Third instance of this bug class in this file;
+              # see the specs/** note above and the .claude/** note below.
+              # Verified before widening that the other 22 markdown files
+              # under paper/ are prettier-clean, so this adds coverage without
+              # turning CI red. (The .tex/.bib/Makefile/.pdf files there are
+              # untouched: `prettier --check .` skips extensions it has no
+              # parser for.)
+              - 'paper/**'
             # The `go` orchestrator, and the skill that is its entry point.
             # `.claude/**` matches NO other filter — not 'typescript' (which does
             # carry etc/**) and not 'docs' (doc/** + specs/**) — so before this
