@@ -87,3 +87,38 @@ GIVETH A BOOLEAN
 #EVAL `may apply prefix` carol
 #EVAL `may apply parens` carol
 #EVAL `may apply prefix` dave
+
+§ `Declared fixity composes with built-in operators`
+
+@infixl 6
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x `plusop` y MEANS x PLUS y
+
+@infixl 7
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x `timesop` y MEANS x TIMES y
+
+-- The declared-fixity chain re-associates (timesop binds tighter) and the
+-- whole chain is one operand of the built-in operator on either side.
+#EVAL 1 `plusop` 2 `timesop` 3
+#EVAL TRUE OR 1 `plusop` 2 `timesop` 3 EQUALS 8
+#EVAL 1 `plusop` 2 EQUALS 3 AND 2 `timesop` 3 EQUALS 6
+
+§ `Same-line discipline for operand chains`
+
+-- A chain keyword in operand position must be on the operand's own line;
+-- a next-line keyword is NOT absorbed (it would routinely be the next
+-- declaration's head). This is why the following top-level definition,
+-- whose name is also an operator in scope, parses as a definition:
+qq MEANS 1 PLUS
+2
+
+GIVEN r IS A NUMBER
+GIVETH A NUMBER
+`plusop-shadow` r MEANS r PLUS 100
+
+#EVAL qq

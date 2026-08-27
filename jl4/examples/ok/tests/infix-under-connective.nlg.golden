@@ -11,3 +11,7 @@ the sum of `_ SCALEDBY _` with 2 and 3 and 10
 `may apply prefix` with `carol`
 `may apply parens` with `carol`
 `may apply prefix` with `dave`
+`_ plusop _` with 1 and `_ timesop _` with 2 and 3
+`TRUE` or `_ plusop _` with 1 and `_ timesop _` with 2 and 3 is equal to 8
+`_ plusop _` with 1 and 2 is equal to 3 and `_ timesop _` with 2 and 3 is equal to 6
+`qq`

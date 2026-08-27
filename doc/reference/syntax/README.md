@@ -191,8 +191,16 @@ p INTERSECT q MEANS ...
 - Chaining operators of equal priority requires them to associate in the
   same direction; mixed `@infixl`/`@infixr` at one priority is an error.
 - Keyword operators (`PLUS`, `AND`, ...) have their own built-in precedence
-  table; mixing keyword and identifier operators in one unparenthesized
-  expression is not re-associated — parenthesize.
+  table, and identifier operators may appear unparenthesized on either side
+  of them. An identifier-operator chain **binds tighter than every keyword
+  operator** — ``10 PLUS 2 `scaledby` 3`` is ``10 PLUS (2 `scaledby` 3)``,
+  and ``p `resides in` "NY" OR p `resides in` "NJ"`` is a disjunction of the
+  two calls. Declared priority numbers govern grouping **among**
+  identifier operators only; they do not interleave with the keyword table
+  (even an `@infixl 1` operator binds tighter than `TIMES`). In operand
+  position (after a keyword operator) chain keywords must be on the same
+  line as the operand; at the head of an expression an aligned continuation
+  line is also accepted.
 
 ---
 

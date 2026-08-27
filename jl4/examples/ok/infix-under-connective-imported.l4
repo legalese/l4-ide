@@ -1,0 +1,10 @@
+-- An IMPORTED infix operator (prelude `is in`) as an operand of a built-in
+-- connective. This pins the merged-hints registry path: the CLI's hint
+-- registry is module-local while the LSP merges imported hints, so before
+-- infix operands were admitted under built-ins the two disagreed on this
+-- shape; both now accept it.
+IMPORT prelude
+
+#EVAL 3 `is in` (SET OF 1, 2) OR 3 `is in` (SET OF 3, 4)
+#EVAL 5 `is in` (SET OF 1, 2) OR 5 `is in` (SET OF 3, 4)
+#EVAL 2 `is in` (SET OF 1, 2) AND 3 `is in` (SET OF 3, 4)

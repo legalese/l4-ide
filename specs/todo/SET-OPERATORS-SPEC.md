@@ -2045,11 +2045,15 @@ disjunction for every consumer in §17.4.
 
 A user-defined infix operator is now admitted as an operand of the built-in operator chain
 (`AND` / `OR` / `..` / comparisons / arithmetic), binding tighter than every built-in operator —
-the same grouping prefix application always had. The change is two lines in the parser
-(`expressionCont` and `singleLineExpressionCont` parse their operand via `mixfixChainExpr`, the
-production chain-head positions already used); the typechecker, both printers, and the fixity
-machinery needed nothing, because parentheses leave no AST trace on this tree — the new operands
-are indistinguishable from the parenthesized ones that always worked. Fixity still governs
+the same grouping prefix application always had. The change is confined to the parser
+(`expressionCont` and `singleLineExpressionCont` parse their operand via `mixfixChainOperand` —
+the chain-head production restricted to same-line keywords); the typechecker, both printers, and
+the fixity machinery needed nothing, because parentheses leave no AST trace on this tree — the
+new operands are indistinguishable from the parenthesized ones that always worked. **Operand
+chains are same-line only**: chain-head positions sit behind a `withIndent GT` column guard, but
+operand position does not, and adversarial review showed an aligned next-line keyword there is
+routinely the _next declaration's head_ (or an unmarked continuation of a `#EVAL`) — cross-line
+capture turned previously-valid programs into parse errors before the restriction. Fixity still governs
 grouping _among_ user operators (typechecker re-association); user-vs-built-in grouping is fixed
 at "user binds tighter", and an undeclared user-op chain under a connective stays an error
 (pinned by `not-ok/tc/infix-under-connective-undeclared.l4`). Two residual truths worth keeping

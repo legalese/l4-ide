@@ -1296,6 +1296,13 @@ whereExpr p =
 --   #EVAL 1            -- parses "1 + 2" as one expression
 --   # + 2              -- continuation line with # prefix
 --
+-- CAVEAT (pre-existing): the HEAD of a directive expression parses via
+-- 'mixfixChainExpr', which accepts an aligned mixfix chain keyword on the
+-- next line even without a '#' marker — so a directive head can absorb an
+-- unmarked continuation line that starts with a chain keyword at the right
+-- column. Operand positions ('singleLineExpressionCont') use
+-- 'mixfixChainOperand' (same-line only) and do not have this hole.
+--
 -- IMPORTANT: When stripping directives with grep (e.g., `grep -v '^#'`), be aware
 -- that L4 supports multiline strings with literal newlines. If a string literal
 -- contains a line starting with '#', that line would be incorrectly stripped.
@@ -1326,11 +1333,12 @@ singleLineExpressionCont startLine = try $ do
   guard (sameLine || isContinuation)
   -- If it's a continuation marker, consume it
   when isContinuation $ void $ spacedToken_ (TDirectives TDirectiveContinue)
-  -- Now parse the operator and argument (mixfixChainExpr, in lockstep with
-  -- expressionCont, so #EVAL operands admit user-defined infix operators too)
+  -- Now parse the operator and argument (mixfixChainOperand, in lockstep with
+  -- expressionCont, so #EVAL operands admit user-defined infix operators too;
+  -- same-line keywords only, preserving the directive's line discipline)
   (prio, assoc, op) <- operator
   l <- currentLine
-  arg <- mixfixChainExpr
+  arg <- mixfixChainOperand
   pure (MkCont op prio assoc l (mkPos 1) arg)
 
 data Stack a =
@@ -1512,16 +1520,18 @@ cont pop pbase p =
 currentLine :: Parser Pos
 currentLine = sourceLine <$> getSourcePos
 
--- | The operand after a built-in operator parses via 'mixfixChainExpr', the
--- same production the chain-head positions use ('indentedExpr',
--- 'singleLineExpr'), so a user-defined infix operator is admitted on both
--- sides of every built-in operator and binds tighter than all of them —
+-- | The operand after a built-in operator parses via 'mixfixChainOperand' —
+-- the chain-head production ('indentedExpr', 'singleLineExpr') restricted to
+-- same-line chain keywords — so a user-defined infix operator is admitted on
+-- both sides of every built-in operator and binds tighter than all of them,
 -- exactly as prefix application already does. The assembled chain reaches
 -- 'combine' as a single pre-built operand. Before this, a user-defined
 -- infix call was admitted only at the outermost level of an expression or
--- inside parentheses (SET-OPERATORS-SPEC §17.3).
+-- inside parentheses (SET-OPERATORS-SPEC §17.3). Same-line only, because
+-- operand position lacks the @withIndent GT@ column guard that protects
+-- chain heads from capturing an aligned next-line declaration.
 expressionCont :: Pos -> Parser (Cont Expr)
-expressionCont p = cont operator mixfixChainExpr p
+expressionCont p = cont operator mixfixChainOperand p
 
 data ExprLineInfo =
   MkExprLineInfo
@@ -1722,10 +1732,25 @@ peekNextTokenLayout = do
       , exprIndentColumn = Just tok.range.start.column
       }
 
+-- | Chain-head positions ('indentedExpr', 'singleLineExpr', 'implicitSeq')
+-- admit an aligned chain keyword on the following line: their operand column
+-- is guarded by @withIndent GT@, so a following sibling declaration can never
+-- align with the operand and be captured. Operand position after a built-in
+-- operator has no such column guard — an aligned next-line token there is
+-- routinely the NEXT declaration's head, or an unmarked next line of a
+-- directive — so 'mixfixChainOperand' forms chains from same-line keywords
+-- only. (Found by adversarial review: cross-line capture turned
+-- previously-valid programs into parse errors.)
 mixfixChainExpr :: Parser (Expr Name)
-mixfixChainExpr = do
+mixfixChainExpr = mixfixChainExprNextLine True
+
+mixfixChainOperand :: Parser (Expr Name)
+mixfixChainOperand = mixfixChainExprNextLine False
+
+mixfixChainExprNextLine :: Bool -> Parser (Expr Name)
+mixfixChainExprNextLine nextLineOk = do
   hints <- asks (.mixfixHints)
-  let allowNextLine = hasMixfixHints hints
+  let allowNextLine = nextLineOk && hasMixfixHints hints
   firstLayoutHint <- peekNextTokenLayout
   firstExpr <- baseExpr
   -- Compute end-line + indentation info for alignment-aware keywords.
@@ -1793,7 +1818,9 @@ mixfixChainExpr = do
     mixfixKeywordAligned :: Bool -> MixfixHintRegistry -> ExprLineInfo -> Parser (Epa Name)
     mixfixKeywordAligned allowNextLine hints anchorInfo = do
       tok <- lookAhead (spaceOrAnnotations *> anySingle)
-      let allowWithToken = allowNextLine || isQuotedIdentifierToken tok
+      -- The quoted-token allowance also rides the position's next-line policy:
+      -- in operand position even a backticked keyword must be same-line.
+      let allowWithToken = allowNextLine || (nextLineOk && isQuotedIdentifierToken tok)
       guard (keywordAlignedWith allowWithToken anchorInfo tok.range.start)
       kw <- (MkName emptyAnno . NormalName) <<$>>
         (spacedToken (#_TIdentifiers % #_TQuoted) "mixfix keyword"
