@@ -1076,6 +1076,16 @@ for all 250 decisions. Whatever else is true, the info-gain ranker is presently 
 priors on this corpus, and any future work premised on `TYPICALLY` priors should verify they are
 being read before assuming they are.
 
+**Do not "fix" R7 on the strength of the paragraph above — it does not apply to this backend, and
+the resemblance is a trap.** The finding is about `collectTypicallyDefaults` feeding the ordering
+priors. **The docassemble prefill is a different consumer and reads record fields perfectly well:**
+`fieldSpecOf` (`Lower.hs:135`) captures the field's `TYPICALLY` — the 4th component of
+`MkTypedName` — into `fsDefault`, and it reaches `qDefault` through `scalarArts`
+(`Lower.hs:1255`). So a record-field `TYPICALLY` **does** prefill the generated interview while
+**not** reaching the ranker, and R7 is correctly implemented for exactly the shape idiomatic L4
+uses. Traced and confirmed 2026-08-28, prompted by the `xpile-blawx` session asking whether the
+portfolio's "designated consumer of `TYPICALLY`" claim had gone stale. It has not.
+
 ### 8.8 R8 — `MAYBE` erased to optionality
 
 **Evidence.** Both shipped schema consumers erase `MAYBE OF T` to `T` + not-required
