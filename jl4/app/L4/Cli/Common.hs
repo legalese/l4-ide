@@ -115,7 +115,8 @@ fixedNowParser = fmap FixedNowOpt $ optional $
 ----------------------------------------------------------------------------
 
 -- | Build an `EvalConfig` honoring either the `--fixed-now` flag or the
--- `L4_NOW` environment variable. Use this for `run`, `check`, `batch`.
+-- `JL4_FIXED_NOW` environment variable (the name 'readFixedNowEnv' reads).
+-- Use this for `run`, `check`, `batch`.
 makeEvalConfig :: FixedNowOpt -> IO EvalConfig
 makeEvalConfig (FixedNowOpt mClock) = do
   envFixed <- readFixedNowEnv
