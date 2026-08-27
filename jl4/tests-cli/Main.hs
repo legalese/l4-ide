@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
+import Data.Foldable (toList)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
@@ -1083,6 +1084,13 @@ verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 
+-- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
+-- WHERE/LET binding is inlined before analysis, so a rule means the same thing
+-- however its limbs are named. The recursive file is the termination control.
+verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
+verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
+verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
+
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
 -- FOR BYTE — that equality is the whole reason the orchestrator's p7-tnr leg
@@ -1131,6 +1139,7 @@ main = do
        , shadowExtraEntry, shadowImporterEntry
        , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
        , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
+       , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
        , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
        , exportTwoRulesFixture, exportNothingFixture
        , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
@@ -2689,13 +2698,45 @@ spec bin = do
         Just (Number n) -> n `shouldBe` 1
         other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
 
-    -- The nested body is `y AND NOT y`. It stays invisible, and this test
-    -- exists so that a future change which starts descending announces itself
-    -- here rather than by silently altering what a clean run means.
-    it "does not report a contradiction that lives only in a WHERE clause" $ do
+    -- This test used to assert the OPPOSITE, as a tripwire: "a future change
+    -- which starts descending announces itself here rather than by silently
+    -- altering what a clean run means". It announced itself, and the change was
+    -- the right one (specs/todo/WHERE-INLINING-SPEC.md), so the assertion is
+    -- inverted rather than deleted — the tripwire did its job and the new
+    -- behaviour deserves the same guard the old one had.
+    --
+    -- The nested body is `y AND NOT y`, and `the outer one` is `x AND` it. The
+    -- pass substitutes the zero-arity binding before analysis, so the whole
+    -- decision is unsatisfiable and says so. Note this is NOT descent: the
+    -- inner definition is still not analysed as a decision of its own, which is
+    -- why the count above is unchanged.
+    it "reports a contradiction that a WHERE clause used to hide" $ do
       Output code sout _ <- runL4 bin ["verify", verifyNestedFixture, "--format", "json"]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("unsat" `isInfixOf`)
+
+    -- Referential transparency. Four spellings of `m AND NOT m`, three of which
+    -- put a limb behind a local name; all four must report the contradiction,
+    -- because they are the same rule. `parameterised` is the control: a binding
+    -- that takes arguments is NOT inlined, so it stays two atoms and clean.
+    it "analyses a rule the same however its limbs are named" $ do
+      env <- jsonEnvelope bin ["verify", verifyWhereTransparencyFixture, "--format", "json"]
+      let unsats =
+            [ nm
+            | Just (Array ds) <- [objField env "decisions"]
+            , d <- toList ds
+            , Just (String nm) <- [objField d "name"]
+            , Just (Array fs) <- [objField d "findings"]
+            , any (\ f -> objField f "kind" == Just (String "unsat")) (toList fs)
+            ]
+      sort unsats `shouldBe`
+        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`"]
+
+    -- Termination, not correctness: a cycle among local bindings must be
+    -- detected rather than substituted. A regression here hangs the suite.
+    it "terminates on recursive and mutually recursive local bindings" $ do
+      Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` (not . ("unsat" `isInfixOf`))
 
     -- The corpus figure the p8-verify receipt now carries.
     it "reports the Reg CF corpus's own nested count" $ do

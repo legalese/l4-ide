@@ -75,6 +75,7 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import qualified L4.Decision.QueryPlan as QP
+import qualified L4.Transform as Transform
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as VizQP
 import qualified LSP.L4.Viz.VizExpr as VizExpr
@@ -115,13 +116,18 @@ propositionalBound =
     , "  leaf here too. A DECIDE that does not return BOOLEAN is not analysed,"
     , "  and is reported as skipped rather than as clean."
     , ""
-    , "  Only TOP-LEVEL decisions are visited. A definition inside a WHERE"
-    , "  clause is a DECIDE too, and this command does not descend into one --"
-    , "  the ladder's own entry point does not either, and the two must not"
-    , "  disagree about what a rule is. So `analysed + skipped' does NOT total"
-    , "  the decisions in the file. The count that is missing is reported as"
-    , "  summary.nestedNotVisited, and it is a number rather than a caveat"
-    , "  because an exclusion nobody can size is an exclusion nobody believes."
+    , "  A local WHERE / LET binding that takes no parameters is INLINED before"
+    , "  analysis, so a decision is read with its helpers substituted in rather"
+    , "  than as opaque atoms: `m AND NOT e WHERE e MEANS m' is found unsat, as"
+    , "  the same rule written flat always was. Bindings that take parameters,"
+    , "  and recursive ones, stay opaque -- the first wants beta reduction, the"
+    , "  second would not terminate."
+    , ""
+    , "  Those nested definitions are still not visited AS DECISIONS OF THEIR"
+    , "  OWN, so `analysed + skipped' does NOT total the decisions in the file."
+    , "  The count that is missing is reported as summary.nestedNotVisited, and"
+    , "  it is a number rather than a caveat because an exclusion nobody can"
+    , "  size is an exclusion nobody believes."
     , ""
     , "  Each decision is read ON ITS OWN. A call to another DECIDE is a leaf,"
     , "  not an inlined body, so a contradiction that only appears once two"
@@ -332,10 +338,19 @@ topLevelDecides tc = foldTopLevelDecides (\d -> [d]) tc.module'
 -- @foldDecides@ is the cosmos fold: it yields a decision and everything nested
 -- inside it, so subtracting the top-level count leaves exactly the nested ones.
 --
--- Descending into them is deliberately NOT done: "LSP.L4.Viz.Ladder"'s own
--- entry point is @foldTopLevelDecides@, and a verifier that disagreed with the
--- ladder about what a rule is would be reporting on a program the wizard never
--- shows anyone.
+-- Descending into them AS DECISIONS OF THEIR OWN is deliberately not done:
+-- "LSP.L4.Viz.Ladder"'s own entry point is @foldTopLevelDecides@, and a verifier
+-- that disagreed with the ladder about what a rule is would be reporting on a
+-- program the wizard never shows anyone.
+--
+-- That reasoning used to be given for leaving them opaque INSIDE their callers
+-- too, and there it was wrong: a rule and the same rule with one limb named are
+-- the same program, so reading them differently was the disagreement, not the
+-- fix for it. Zero-arity bindings are now inlined before analysis
+-- ('L4.Transform.inlineLocalBindingsInDecide'; specs/todo/WHERE-INLINING-SPEC.md).
+-- What the ladder and the verifier must agree about is what a rule MEANS; how
+-- much of it either chooses to draw at once is a separate question, and the
+-- @l4\/inlineExprs@ gesture exists precisely so a reader can choose.
 nestedNotVisited :: Rules.TypeCheckResult -> Int
 nestedNotVisited tc =
   sum [length (foldDecides (\_ -> [() :: ()]) d) | d <- tops] - length tops
@@ -343,7 +358,7 @@ nestedNotVisited tc =
     tops = topLevelDecides tc
 
 analyseDecide :: VerifyOptions -> Rules.TypeCheckResult -> Decide Resolved -> DecisionReport
-analyseDecide opts tc decide =
+analyseDecide opts tc decide0 =
   case LadderViz.doVisualize decide vizCfg of
     Left err ->
       DecisionReport
@@ -390,6 +405,12 @@ analyseDecide opts tc decide =
         { LSP._uri = LSP.filePathToUri opts.verifyFile
         , LSP._version = 1
         }
+    -- Referential transparency: `x WHERE x MEANS e` must be analysed as `e`.
+    -- Without this a one-line WHERE turns a proposition into an opaque atom and
+    -- silently defeats the analysis of the rule that uses it — see
+    -- specs/todo/WHERE-INLINING-SPEC.md.
+    decide = Transform.inlineLocalBindingsInDecide decide0
+
     astName = case decide of
       MkDecide _ _ (MkAppForm _ n _ _) _ -> prettyLayout (getOriginal n)
 
