@@ -128,6 +128,7 @@ library
     L4.Catala.Equivalence
     L4.Citations
     L4.DependencyGraph
+    L4.DependencyGraph.Render
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter

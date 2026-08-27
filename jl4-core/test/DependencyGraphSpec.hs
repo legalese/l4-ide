@@ -20,6 +20,7 @@ import qualified Data.Set as Set
 
 import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.DependencyGraph
+import L4.DependencyGraph.Render
 import L4.Import.Resolution (TypeCheckWithDepsResult (..), ResolvedImport (..))
 import L4.Syntax (Unique)
 import L4.TypeCheck.Types (CheckResult (..))
@@ -180,6 +181,21 @@ chainSrc =
   [ "c MEANS 1"
   , "b MEANS c + 1"
   , "a MEANS b + 1"
+  ]
+
+-- | Multi-word names so the renderer assertions cannot collide with DOT\/
+-- Mermaid keywords, and one deliberately dead definition for surplusage.
+renderSrc :: [Text]
+renderSrc =
+  [ "`base amount` MEANS 1"
+  , "`derived amount` MEANS `base amount` + 1"
+  , "`stranded definition` MEANS 2"
+  , "#EVAL `derived amount`"
+  ]
+
+quotedNameSrc :: [Text]
+quotedNameSrc =
+  [ "`says \"hello\"` MEANS 1"
   ]
 
 declareSrc :: [Text]
@@ -375,3 +391,71 @@ spec = do
         hasEdge g fU ageU `shouldBe` True
         hasEdge g fU thU `shouldBe` True
         [i.name | i <- Map.elems g.nodes, i.name == "p"] `shouldBe` []
+
+  describe "DOT renderer" $ do
+    it "emits a digraph and harvests @desc as a tooltip" $
+      withGraph exportSrc $ \gr -> do
+        let out = depGraphToDot defaultDepGraphRenderOptions gr
+        ("digraph" `Text.isInfixOf` out) `shouldBe` True
+        ("the main entry" `Text.isInfixOf` out) `shouldBe` True
+
+    it "draws surplusage dashed, but marks nothing when there are no entry points" $ do
+      withGraph renderSrc $ \g -> do
+        let out = depGraphToDot defaultDepGraphRenderOptions g
+        ("stranded definition" `Text.isInfixOf` out) `shouldBe` True
+        ("dashed" `Text.isInfixOf` out) `shouldBe` True
+      withGraph chainSrc $ \g ->
+        ("dashed" `Text.isInfixOf` depGraphToDot defaultDepGraphRenderOptions g)
+          `shouldBe` False
+
+    it "thickens cycle members' borders, and only theirs" $ do
+      withGraph mutualSrc $ \g ->
+        ("penwidth" `Text.isInfixOf` depGraphToDot defaultDepGraphRenderOptions g)
+          `shouldBe` True
+      withGraph renderSrc $ \g ->
+        ("penwidth" `Text.isInfixOf` depGraphToDot defaultDepGraphRenderOptions g)
+          `shouldBe` False
+
+    it "draws the slice and nothing outside it" $
+      withGraph renderSrc $ \g -> do
+        derivedU <- node g DepFunction "derived amount"
+        let s = closure g.edges (Set.singleton derivedU)
+            out = depGraphToDot defaultDepGraphRenderOptions {slice = Just s} g
+        ("derived amount" `Text.isInfixOf` out) `shouldBe` True
+        ("base amount" `Text.isInfixOf` out) `shouldBe` True
+        ("stranded definition" `Text.isInfixOf` out) `shouldBe` False
+
+  describe "Mermaid renderer" $ do
+    it "starts with the frozen header and draws nodes, edges and surplusage" $
+      withGraph renderSrc $ \g -> do
+        let out = depGraphToMermaid defaultDepGraphRenderOptions g
+        (mermaidHeader `Text.isPrefixOf` out) `shouldBe` True
+        (" --> " `Text.isInfixOf` out) `shouldBe` True
+        ("base amount" `Text.isInfixOf` out) `shouldBe` True
+        ("surplusage" `Text.isInfixOf` out) `shouldBe` True
+
+    it "omits the surplusage and cyclic classes when neither applies" $
+      withGraph chainSrc $ \g -> do
+        let out = depGraphToMermaid defaultDepGraphRenderOptions g
+        ("surplusage" `Text.isInfixOf` out) `shouldBe` False
+        ("cyclic" `Text.isInfixOf` out) `shouldBe` False
+
+    it "draws a self-edge and classes its node cyclic" $
+      withGraph recursionSrc $ \g -> do
+        let out = depGraphToMermaid defaultDepGraphRenderOptions g
+        ("n0 --> n0" `Text.isInfixOf` out) `shouldBe` True
+        ("cyclic" `Text.isInfixOf` out) `shouldBe` True
+
+    it "draws the slice and nothing outside it" $
+      withGraph renderSrc $ \g -> do
+        derivedU <- node g DepFunction "derived amount"
+        let s = closure g.edges (Set.singleton derivedU)
+            out = depGraphToMermaid defaultDepGraphRenderOptions {slice = Just s} g
+        ("derived amount" `Text.isInfixOf` out) `shouldBe` True
+        ("stranded definition" `Text.isInfixOf` out) `shouldBe` False
+
+    it "folds a double quote in a name to a typographic quote" $
+      withGraph quotedNameSrc $ \g -> do
+        let out = depGraphToMermaid defaultDepGraphRenderOptions g
+        ("says \x201dhello\x201d" `Text.isInfixOf` out) `shouldBe` True
+        ("\"hello\"" `Text.isInfixOf` out) `shouldBe` False
