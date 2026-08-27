@@ -1,12 +1,21 @@
 # Logic-Programming Backends Specification
 
-**Status:** Proposal — not implemented. No relational lowering and no
-logic-programming emitter exists anywhere in this tree as of 2026-08-12
-(verified: no module in `jl4-core/src` or `jl4-mlir/src` mentions Horn
-clauses, A-normal form, Prolog, PROLEG, or ASP; `jl4-proleg` contains a
-PROLEG reader/printer and a burden monad, not a transpiler — see §8.1).
+**Status:** Partly implemented, and no longer blocked. The middle-end this
+spec calls for exists: `L4.Relational.{IR,Lower,Debug}` landed 2026-08-18
+(legalese/l4-ide#272) to the brief in
+[RELATIONAL-M1-BRIEF.md](../todo/RELATIONAL-M1-BRIEF.md), and the first of
+the four emitters — the **s(CASP)** leg — shipped on top of it as the Blawx
+bridge over 2026-08-19 (#273, #277, #278, #279; raw s(CASP) is dumped by
+`l4 blawx --scasp`), specified by
+[BLAWX-EXPORT-SPEC.md](../todo/BLAWX-EXPORT-SPEC.md). The other three legs —
+**SWI-Prolog**, **Logical English**, **PROLEG** — remain unbuilt (verified
+against `origin/unstable` on 2026-08-28: no emitter module for any of them
+under `jl4-core/src`; `jl4-proleg` is still the reader/printer/burden-monad
+trio of §8.1, not a transpiler). The design below is unchanged and still
+governs those three; read its present-tense statements about what the tree
+contains as claims of its 2026-08-12 authorship date, not of today.
 **Author:** Meng Wong
-**Date:** 2026-08-12
+**Date:** 2026-08-12 (status refreshed 2026-08-28)
 **Related:**
 [VERIFICATION-BACKEND-LOWERING-SPEC.md](VERIFICATION-BACKEND-LOWERING-SPEC.md),
 [NEGATION-AS-FAILURE-SPEC.md](../done/NEGATION-AS-FAILURE-SPEC.md),
@@ -24,6 +33,12 @@ targets: **SWI-Prolog**, **Answer Set Programming** (clingo / s(CASP)),
 > relational lowering from L4's typed functional core to moded, typed Horn
 > clauses — plus four comparatively thin emitters. The middle-end is the hard
 > part, it does not exist, and every target is blocked on it.
+
+_(Written 2026-08-12. The middle-end now exists — see the status header — so the
+"does not exist" clause is history, not a description of the tree. The
+one-middle-end architecture is what got built; whether the remaining three
+emitters are as thin as claimed is still untested, since only the s(CASP) leg
+has been written.)_
 
 The ICAIL paper names the pass and its theory. §6 ("Two Readings of One
 Program: Functional and Relational", `paper/icail/l4-icail.tex:500`) observes

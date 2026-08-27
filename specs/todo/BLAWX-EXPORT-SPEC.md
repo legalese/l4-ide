@@ -1,14 +1,28 @@
 # L4 ⇄ Blawx: expressive-domain overlap and transpiler spec
 
-_Status: **rulings answered (R1–R14, Meng, 2026-08-18); implementation beginning.** Design
-written 2026-08-16 (merged as PR #261); rulings recorded 2026-08-18. As of that date nothing
-exists under `jl4-core/src/L4/Blawx/` or `jl4-core/src/L4/Relational/`; per R2 the shared
-middle-end is built first, Blawx-driven, on branch `mengwong/l4-relational`, followed by the
-`L4.Blawx.{IR,Lower,Emit}` triple plus the `l4 blawx` CLI verb mirroring the shipped OpenFisca
-backend (`jl4-core/src/L4/OpenFisca/`), and later a `Parse`/`Lift` pair for import (R14).
-Siblings: `CATALA-EXPORT-SPEC.md` (PR #260) is the house template this spec follows;
-`specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` (PR #258) proposes the shared relational
-middle-end this spec consumes (§1.1, R2); the defeasibility prior-art evidence of §5.2 is
+_Status: **shipped and merged; this file is retained as the ruling record.** Design written
+2026-08-16 (merged as PR #261); rulings R1–R14 answered by Meng 2026-08-18; all five phases of
+§10 built and merged over 2026-08-18…08-19 — the shared relational middle-end
+`L4.Relational.{IR,Lower,Debug}` first, Blawx-driven per R2 (PR #272), then
+`L4.Blawx.{IR,Lower,Emit}` plus the `l4 blawx` CLI verb mirroring the OpenFisca backend
+(#273), `EmitXml` and the re-save fixpoint (#277), the P4 showcase ladder (#278), and the
+`Parse`/`Lift` pair for import behind `l4 blawx --import`, R14 (#279). Per-phase evidence is
+recorded inline in §10; reader-facing documentation landed as PR #280
+(`doc/concepts/neighbours/blawx-and-scasp.md`, `doc/tutorials/blawx/l4-to-blawx.md`).
+**Verified against `origin/unstable` on 2026-08-28**: eight modules under
+`jl4-core/src/L4/Blawx/`, three under `jl4-core/src/L4/Relational/`, sixteen `.l4` files under
+`jl4/examples/blawx/` (eleven emitting seeds, five `not-ok/` refusal fixtures), and the verb
+wired at `jl4/app/Main.hs:110` →
+`jl4/app/L4/Cli/Blawx.hs`. What remains open is not code: R10's fork fixes wait in
+`legalese/blawx` (#1–#5, filed 2026-08-20, see §8.10) until upstreaming to Lexpedite is
+warranted. (This header read "implementation beginning … nothing exists under
+`jl4-core/src/L4/Blawx/` or `jl4-core/src/L4/Relational/`" until 2026-08-28. That was true the
+day it was written and false the day after; it survived because §10's per-phase EXECUTED notes
+were appended without re-reading the top of the file. Do not restore it.) Siblings:
+`CATALA-EXPORT-SPEC.md` (PR #260) is the house template this spec follows;
+`specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` (PR #258) specified the shared relational
+middle-end this spec consumes (§1.1, R2) — built as `L4.Relational` by #272, to the
+implementation brief in `RELATIONAL-M1-BRIEF.md`; the defeasibility prior-art evidence of §5.2 is
 consolidated into `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` by PR #262, whose
 `BACKEND-PORTFOLIO-SPEC.md` records this bridge as seam S2 of the backend portfolio._
 
