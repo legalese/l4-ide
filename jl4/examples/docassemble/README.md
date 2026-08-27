@@ -4,7 +4,8 @@
 a single docassemble interview YAML that a stock docassemble server (or the
 headless harness below) runs unmodified. `l4 docassemble FILE --package DIR`
 compiles the same thing into an installable docassemble package instead.
-Design and rulings R1–R11: `specs/todo/DOCASSEMBLE-EXPORT-SPEC.md`.
+Design and rulings R1–R11: `specs/done/DOCASSEMBLE-EXPORT-SPEC.md` (discharged 2026-08-20; moved
+out of `specs/todo/` when all four milestones were resolved).
 
 _Status: M1 (corpus, backend, goldens and harness) landed 2026-08-16 on branch
 `mengwong/docassemble-backend`; the same day a review pass repaired five
