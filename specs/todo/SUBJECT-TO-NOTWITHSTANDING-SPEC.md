@@ -36,6 +36,7 @@
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
 **Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
 **Revised:** 2026-08-28 — added §10 (defeasance by recorded act: the discretionary override — Hohfeldian power/immunity typing, the three strengths of fiat, the ledger as defeater store, the control-effect / intuitionistic reading) plus §10 references. Same-day companions: `doc/concepts/legal-modeling/residual.md` (the residual bridge) and `paper/hohfeld-higher-order/DESIGN.md` (2026-08-28 addendum).
+**Revised:** 2026-08-28 (later, same day) — §8.7's prior-art pass **run**; findings in new §10.6.2. The §10.6.1 citations are verified and five are corrected; the claim that the received view "did not go intuitionistic" is **demoted** (iALC; MIND), and the delta narrows to the control-effect join. §8.7 discharged; §10 references extended.
 **Branch:** mengwong/spec-notwithstanding
 
 ---
@@ -571,7 +572,7 @@ Defaults, provisos, and overrides are therefore not separate features but points
 4. **Implement prototype:** Add to L4 parser and evaluator
 5. **Test with real documents:** Validate against British Nationality Act, PDPA, etc.
 6. **Prototype the read side (§9):** derive per-provision `inScope` / `excluded` / `triggered` / `applies` / `satisfied` projections during elaboration, and pilot them on the Contracts (Rights of Third Parties) Act 2001 (§9.4), whose nine sections exercise every role in the design.
-7. **Prior-art verification pass for §10 (research; blocks any print claim):** before the intuitionistic delta of §10.5–10.6 is asserted publicly, run a focused literature search on (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), (d) Agda/Coq/Lean deontic formalisations, (e) **authorization logics** (§10.6.1: ABLP `says`/speaks-for; `says` as lax modality/monad via DCC and Garg–Abadi; Garg–Pfenning constructive authorization logic; Appel–Felten proof-carrying authorization; Aura; Delegation Logic; SPKI/SDSI; SecPAL/DKAL/Binder), and (f) **database authorization semantics** (Griffiths–Wade 1976; Fagin 1978 revocation correction; SQL-standard `CASCADE`/`RESTRICT`; XACML combining algorithms) — verifying the recalled citations in §10.6.1 and executing its repositioning instruction if they hold. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here.
+7. **Prior-art verification pass for §10 (research) — RUN 2026-08-28; findings in §10.6.2.** The pass confirmed the §10.6.1 mirror, corrected five citations, demoted the "the received view did not go intuitionistic" claim, and left the control-effect join (§8.7(b)) as the surviving delta. Unresolved paywalled items are listed as dead ends at the end of §10.6.2 and still block the specific citations they name. What was searched: (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), (d) Agda/Coq/Lean deontic formalisations, (e) **authorization logics** (§10.6.1: ABLP `says`/speaks-for; `says` as lax modality/monad via DCC and Garg–Abadi; Garg–Pfenning constructive authorization logic; Appel–Felten proof-carrying authorization; Aura; Delegation Logic; SPKI/SDSI; SecPAL/DKAL/Binder), and (f) **database authorization semantics** (Griffiths–Wade 1976; Fagin 1978 revocation correction; SQL-standard `CASCADE`/`RESTRICT`; XACML combining algorithms) — verifying the recalled citations in §10.6.1 and executing its repositioning instruction if they hold. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here. **It was: the pass demoted one claim and widened another.**
 
 ---
 
@@ -985,32 +986,54 @@ The neighbouring formalisms, and what each lacks for §10's purposes:
 
 The delta this section claims: **actor-indexed defeasance with control-operator semantics and
 proof-term provenance** — powers as handlers, fiat as a provenanced classical hole in an
-intuitionistic derivation. We have not found this move in the legal-logic literature. **A
-focused prior-art verification pass is owed before the claim is made in print** — the
-`hohfeld-higher-order` facet's own deep-research pass demoted its headline claim, and this one
-should expect the same scrutiny.
+intuitionistic derivation.
 
-#### 10.6.1 The access-control mirror (added same day; citations recalled, unverified — feed §8.7)
+> **Amended 2026-08-28 by the §8.7 pass (§10.6.2).** The paragraph above originally read "we
+> have not found this move in the legal-logic literature", which was true but was carrying more
+> weight than it could bear: _intuitionistic legal reasoning_ and _intuitionistic deontic logic_
+> are both **occupied** (iALC; MIND — §10.6.2), and the constructive turn in authorization logic
+> is **dated and attributable** (Garg & Pfenning 2006). What the pass did not find is the
+> **join**: the _exercise_ of a power as a control effect over a constructive derivation, with
+> the actor as handler and the fiat as a provenanced proof term. That join, not intuitionism as
+> such, is what §10 may claim — and it must concede the three neighbours by name in the same
+> breath. Catala's mechanisation is also narrower than stated below: see correction 4.
 
-Hohfeldian power has a forty-year-old engineering mirror: **database and distributed-systems
-authorization**. Meng's instinct — "I'd always thought of Hohfeld power as akin to an SQL
-`GRANT`/`REVOKE`" — is not an analogy but a partial occupation of §10's territory, and it both
-strengthens and repositions the claimed delta. The correspondences (all citations recalled from
-memory 2026-08-28 and **to be verified in the §8.7 pass** before any is relied on in print):
+#### 10.6.1 The access-control mirror (citations verified 2026-08-28 — corrections in §10.6.2)
+
+Hohfeldian power has a **fifty**-year-old engineering mirror: **database and
+distributed-systems authorization**. Meng's instinct — "I'd always thought of Hohfeld power as
+akin to an SQL `GRANT`/`REVOKE`" — is not an analogy but a partial occupation of §10's
+territory, and it both strengthens and repositions the claimed delta. The correspondences were
+recalled from memory on 2026-08-28 and **verified the same day**; the text below has been
+rewritten to say what the sources actually say, and §10.6.2 records every correction the pass
+forced.
 
 - **The grant graph is the ledger.** System R's authorization mechanism (Griffiths & Wade,
-  _TODS_ 1976) records every `GRANT` as a timestamped event — grantor, grantee, privilege — and
-  computes current authority as a view over that history: §10.4's defeater store, deployed in 1976. Fagin (_TODS_ 1978) then corrected System R's revocation semantics — even the database
-  community got revocation wrong on the first try, which is comforting precedent for §10's
-  care.
-- **`REVOKE … CASCADE` vs `RESTRICT` is annulment vs abrogation.** Whether revoking a power
-  unwinds everything derived through it, or lets downstream positions stand, is exactly
-  Governatori & Rotolo (2010)'s distinction — and the law's lazy answer (the de facto officer
-  doctrine, apparent authority, _omnia praesumuntur rite esse acta_) is a **reliance-protecting
-  refusal to cascade** that SQL has no equivalent of, because SQL validates exercises _eagerly_
-  at execution time while law validates them _lazily_, on review, after reliance has accreted.
-  Lazy validation is why §10.4's invalid-exercise-is-a-verdict rule matters: an eager system
-  can afford to reject at the door; a lazy one must represent the questionable act.
+  _TODS_ 1(3) (1976) 242–255) records every `GRANT` as a **timestamped** edge of a directed
+  graph — grantor, grantee, privilege — and computes current authority as a view over that
+  history: §10.4's defeater store, deployed in 1976. Fagin (_TODS_ 3(3) (1978) 310–319) then
+  corrected it, and the _direction_ of the error is the instructive part: Fagin showed by
+  example that the original mechanism could **forbid a user from exercising or granting a
+  privilege he should have been allowed** — i.e. it over-revoked — and repaired it by admitting
+  multiple edges of each type between two nodes, with a correctness proof. Even the database
+  community got revocation wrong on the first try, and got it wrong in the over-cascading
+  direction: precedent both for §10's care and for the reliance-protecting instinct of the next
+  bullet.
+- **`REVOKE … CASCADE` vs `RESTRICT` gestures at annulment vs abrogation — but SQL is missing
+  the option law actually uses.** The recalled gloss ("unwinds everything derived through it,
+  or lets downstream positions stand") is **wrong about `RESTRICT`**, and the correction
+  matters. Under the SQL standard, `CASCADE` revokes the dependent privileges too, while
+  `RESTRICT` makes the revocation **fail outright** when dependents exist. SQL therefore offers
+  _cascade_ or _abort_ — and has **no** operation for law's third answer: revoke the power, yet
+  let what was already done under it stand. That third answer is the whole content of the de
+  facto officer doctrine, apparent authority, and _omnia praesumuntur rite esse acta_, and it
+  is Governatori & Rotolo (2010)'s abrogation as against annulment. So this correspondence
+  **widens** the delta instead of narrowing it: the reliance-protecting middle option is a legal
+  primitive with no access-control counterpart. The reason is the eager/lazy split — SQL
+  validates exercises _eagerly_ at execution time, law validates them _lazily_, on review, after
+  reliance has accreted. An eager system can afford cascade-or-abort because nothing has
+  accreted yet; a lazy one must represent the questionable act, which is why §10.4's
+  invalid-exercise-is-a-verdict rule matters.
 - **`WITH GRANT OPTION` is the degenerate tower.** SQL does have second-order power — but only
   as a uniform boolean: the option to re-grant _the same privilege_, a fixed point `μX. Grant(X
 ∨ p)`, never a free nesting. **The legal tower is generative**: exercising the higher power
@@ -1019,29 +1042,175 @@ memory 2026-08-28 and **to be verified in the §8.7 pass** before any is relied 
   closed vocabulary, whereas Hohfeldian powers range over _rules_, including further powers.
   (SQL's one generative loophole proves the point: granting access to a _view_ is granting a
   rule you authored — but the power to create views is again a flat privilege.) The security
-  literature acknowledges the tower only as a depth parameter (Li–Grosof–Feigenbaum's
-  Delegation Logic; SPKI/SDSI's delegation bit), never as free higher-order structure.
+  literature acknowledges the tower only as a **numeric depth parameter** — Delegation Logic
+  (Li, Grosof & Feigenbaum, _TISSEC_ 6(1) (2003) 128–171) makes "delegation depth" an explicit
+  construct over Datalog, alongside k-out-of-n threshold principals, and SPKI/SDSI reduces it to
+  a single delegation bit — never as free higher-order structure over rules. (The threshold
+  principals are worth noting for a different reason: they are quorum rules, which law also has,
+  and which §10 does not yet type.)
 - **Priority precedents.** SQL Server's `DENY` overriding `GRANT` is a hardcoded lex superior;
-  XACML's policy-combining algorithms (deny-overrides, permit-overrides, first-applicable) are
-  §2's priority taxonomy ratified as an OASIS access-control standard — a sibling to the
-  LegalRuleML note in this spec's header. Roles are offices (powers attach to the office;
+  XACML's rule- and policy-combining algorithms are §2's priority taxonomy ratified as an OASIS
+  access-control standard — a sibling to the LegalRuleML note in this spec's header. There are
+  twelve standard operators, and two of them are worth §9's attention rather than §2's:
+  `deny-unless-permit` and `permit-unless-deny` are the closed- and open-world defaults of
+  §9.5, standardised; `only-one-applicable` is an applicability check of exactly the kind §9.6
+  wants to make statically. Roles are offices (powers attach to the office;
   `SET ROLE` is assuming it); `SECURITY DEFINER` functions are acting in official capacity.
-- **The intuitionistic square is partially occupied — by security, not law.** The
-  authorization-logic line went constructive where legal logic did not: the ABLP calculus's
-  `says`/speaks-for (Abadi–Burrows–Lampson–Plotkin 1993), `says` reconstructed as a **lax
-  modality — a monad** (Abadi's DCC reading; Garg–Abadi 2008), **constructive authorization
-  logic** (Garg & Pfenning 2006), **proof-carrying authorization** (Appel & Felten 1999) —
-  where the requester literally presents a proof term checked by a small kernel — and **Aura**
-  (Jia et al., _ICFP_ 2008), a language for _authorization and audit_ whose logged evidence
-  terms are §10.4's provenanced fiat, almost exactly.
+- **The intuitionistic square is partially occupied — and the occupier is dated.** The
+  authorization-logic line went constructive, but _later_ than the recalled version of this
+  bullet implied, and the date is the useful part. The **ABLP** calculus
+  (Abadi–Burrows–Lampson–Plotkin, _TOPLAS_ 15(4) (1993) 706–734) supplies `says` and
+  `speaks for` but is itself **classical** — Garg & Pfenning describe it as "a classical
+  propositional logic with a rich algebra of principals", axiom-based, with a Kripke semantics
+  and no proof-theoretic analysis. The constructive turn is **Garg & Pfenning, "Non-Interference
+  in Constructive Authorization Logic" (_CSFW_ 19 (2006) 283–296)**, which claims it in terms:
+  "to our knowledge, this is the first time that an access control logic has been developed
+  constructively". Their motivation is ours — "to understand the meaning of a proposition in
+  authorization logic ... requires us to understand its proofs", constructive "to keep evidence
+  contained in proofs as direct as possible". They relate their logic to **lax logic**
+  (Fairtlough & Mendler) and show `K says A` **forms a strong monad** (Moggi); DCC (Abadi,
+  _ICFP_ 2006) supplies the lattice-indexed family of strong monads, and Garg & Abadi
+  (_FoSSaCS_ 2008) give a sound and complete translation of `says` into S4. Add
+  **proof-carrying authentication** (Appel & Felten, _CCS_ 1999 — note: _authentication_, see
+  §10.6.2 correction 1), where the requester literally presents a proof term checked by a small
+  kernel, and **Aura** (Jia et al., _ICFP_ 2008), a dependently-typed language for
+  _authorization and audit_ built on polymorphic DCC, whose logged evidence terms are §10.4's
+  provenanced fiat, almost exactly. Aura is the closest prior art §10 has, and it is a security
+  language.
 
-**Repositioning instruction for the delta, if the pass confirms the above:** the claim is not
-"nobody built constructive actor-indexed authority with proof-term provenance" — security did.
-The claim narrows to what security lacks and law requires: **generative higher-order deontics**
-(powers over rules, not over atomic permissions), **lazy validation** with
-invalid-exercise-as-verdict, **grounds and review standards** (Wednesbury/_Braganza_) rather
-than formal validity alone, **defeasibility interaction** (§5.6 burden), and the **appeal tower
-as handler stack**. Concede the logic; claim the law.
+**Repositioning — executed 2026-08-28, the pass having confirmed the above.** The claim is not
+"nobody built constructive actor-indexed authority with proof-term provenance" — security did,
+in 2006–2008, and Aura did it with proof terms and an audit log. The claim narrows to what
+security lacks and law requires: **generative higher-order deontics** (powers over rules, not
+over atomic permissions), **lazy validation** with invalid-exercise-as-verdict — sharpened by
+the `RESTRICT` correction above, since SQL has _no_ revoke-but-preserve operation at all —
+**grounds and review standards** (Wednesbury/_Braganza_) rather than formal validity alone,
+**defeasibility interaction** (§5.6 burden), and the **appeal tower as handler stack**. Concede
+the logic; claim the law.
+
+One consequence for venue, worth recording where the paper's editor will see it: **Abadi took
+this material to DEON itself** — "Variations in Access Control Logic", _DEON_ 2008 (LNCS 5076,
+96–109), in a volume edited by van der Meyden and van der Torre. The access-control and deontic
+communities have already met, at the venue the Hohfeld facet is considering. A DEON referee will
+know the `says` line, so conceding it early is not merely honest but expected.
+
+#### 10.6.2 The verification pass (run 2026-08-28; discharges §8.7 item 7)
+
+Areas (a)–(f) of §8.7 were searched. The pass **confirms the access-control mirror, corrects
+five citations, and demotes one claim**: the answer to "did the received view go
+intuitionistic?" is no longer a clean no.
+
+**Confirmed** (primary source or authoritative index; ACM abstracts via dblp and author-hosted
+copies, see dead ends):
+
+| citation                                                                | verified as                                                                                                              |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Griffiths & Wade, "An Authorization Mechanism…"                         | _TODS_ 1(3) (Sept 1976) 242–255 — grant graph, timestamped edges, two edge types (with/without grant option)             |
+| Fagin, "On an Authorization Mechanism"                                  | _TODS_ 3(3) (Sept 1978) 310–319 — corrects the above; see §10.6.1                                                        |
+| Abadi, Burrows, Lampson & Plotkin, "A Calculus for Access Control…"     | _TOPLAS_ **15(4)** (1993) 706–734 (not 15(3), as one index reports)                                                      |
+| Garg & Pfenning, "Non-Interference in Constructive Authorization Logic" | _CSFW_ 19 (2006) 283–296 — read in full; quotations in §10.6.1 are from the paper                                        |
+| Abadi, "Access Control in a Core Calculus of Dependency"                | _ICFP_ (2006) — DCC's lattice-indexed family of strong monads                                                            |
+| Garg & Abadi, "A Modal Deconstruction of Access Control Logics"         | _FoSSaCS_ (2008) — sound and complete translation of `says` into S4                                                      |
+| Jia et al., "AURA: A Programming Language for Authorization and Audit"  | _ICFP_ (2008) — polymorphic DCC, dependent types, mechanically verified soundness                                        |
+| Li, Grosof & Feigenbaum, "Delegation Logic"                             | _TISSEC_ 6(1) (2003) 128–171 — delegation **depth** and k-out-of-n thresholds as explicit constructs                     |
+| XACML combining algorithms                                              | OASIS; twelve standard operators incl. deny-overrides, permit-overrides, first-applicable, only-one-applicable           |
+| SQL `REVOKE … CASCADE` / `RESTRICT`                                     | standard semantics confirmed — and they are **not** what §10.6.1 recalled; see correction 3                              |
+| Griffin, "A Formulae-as-**Type** Notion of Control"                     | _POPL_ (1990) — singular _type_ in the title; the plural is the usual miscitation                                        |
+| Plotkin & Pretnar, "Handlers of Algebraic Effects"                      | _ESOP_ (2009) 80–94                                                                                                      |
+| Benzmüller, Parent & van der Torre, LogiKEy                             | _Artificial Intelligence_ 287 (2020) 103348 — **classical** HOL, shallow embeddings in Isabelle/HOL, as §8.7(c) expected |
+| eFLINT                                                                  | van Binsbergen, Liu, van Doesburg & van Engers, _GPCE_ (2020) — transition systems + Hohfeld, as §10.6 says              |
+| Catala                                                                  | Merigoux, Chataing & Protzenko, _PACMPL_ 5(ICFP) art. 77 (2021) 1–29 — but see correction 4                              |
+
+**Corrected.** Five recalled claims did not survive contact with the sources:
+
+1. **Appel & Felten 1999 is "Proof-Carrying _Authentication_"** (_CCS_ 6 (1999) 52–62), not
+   "…Authorization". "Proof-carrying authorization" is the later term of art. Using it as the
+   1999 title is a visible slip to a security referee.
+2. **ABLP is classical, not constructive.** "The authorization-logic line went constructive" is
+   right about the line and wrong about its origin. The constructive turn is **2006**
+   (Garg & Pfenning), not 1993, and it must be conceded to them by name — they claim the first
+   such logic in terms, and their stated motivation (keep the evidence in the proof) is
+   §10.5's.
+3. **`REVOKE … RESTRICT` does not "let downstream positions stand"** — it makes the revocation
+   _fail_ when dependents exist. SQL offers cascade-or-abort and has **no** revoke-but-preserve
+   operation. This _widens_ the delta: law's reliance-protecting middle option has no
+   access-control counterpart at all. §10.6.1's bullet is rewritten accordingly.
+4. **Catala's F\* result is compiler correctness, not mechanised metatheory.** The ICFP 2021
+   abstract claims proofs of "the correctness of its core compilation steps". §10.6 above and
+   the Hohfeld addendum both overstated it; the accurate phrase is "compilation correctness
+   proven in F\*".
+5. **`says`-as-lax-modality is Garg & Pfenning's framing** (relating their logic to lax logic
+   after Fairtlough & Mendler, and showing `K says A` forms a strong monad after Moggi). The
+   recalled attribution to Abadi/DCC is half right: DCC supplies the lattice-indexed monads, but
+   the lax reading should be cited to Garg & Pfenning.
+
+**Demoted — §8.7(a) found prior art the addendum's flat "no" missed.** The Hohfeld facet answers
+Meng's "did the received view go intuitionistic?" with _no_. That is untenable as stated:
+
+- **iALC** — Haeusler, de Paiva & Rademaker, "Intuitionistic Description Logic for Legal
+  Reasoning" (2011); extended in "On How Kelsenian Jurisprudence and Intuitionistic Logic help
+  to avoid Contrary-to-Duty paradoxes in Legal Ontologies" (2018). An intuitionistic `ALC` whose
+  motivation is expressly legal: individually valid legal statements as the inhabitants of the
+  ontology, intuitionistic negation so that conflict of laws does not explode, and **Kelsen** as
+  the jurisprudential warrant — the same Kelsen this facet's lineage runs through. It is
+  presented via a **sequent calculus**; the text carries no proof terms, no λ-calculus, no
+  Curry–Howard, and no treatment of powers, actors or discretion.
+- **MIND** — "Towards an Intuitionistic Deontic Logic Tolerating Conflicting Obligations",
+  WoLLIC 2022 (LNCS 13468, ch. 18). A minimal deontic logic on an **intuitionistic** base in
+  which obligation and permission are _not_ dual and conflicting obligations do not trivialise
+  the norm set; neighbourhood semantics, cut-free sequent calculus. (Authors unresolved — see
+  dead ends. Do not cite with guessed authors.)
+- **Abadi, "Variations in Access Control Logic", _DEON_ 2008** (LNCS 5076, 96–109), in a volume
+  edited by van der Meyden and van der Torre. The access-control and deontic communities have
+  already met, at the venue this facet is considering.
+
+So **intuitionistic + legal is occupied, and intuitionistic + deontic is occupied.** The
+addendum's answer must be rewritten from "no" to "yes, twice, but not in the way that matters
+here" — which is the honest form and, as it happens, the stronger one, because it forces the
+claim down onto ground that is actually defensible.
+
+**Not found — the surviving delta (§8.7(b), and the sharpest claim).** Searches for control
+operators, continuations, algebraic effects or handlers applied to legal or normative reasoning
+returned **nothing**. The two literatures do not touch. The control-operator work is entirely
+PL-theoretic; the legal-formalisation work reaches proof theory — sequent calculi (iALC, MIND),
+neighbourhood semantics, defeasible proof tags (+∂/−∂), argumentation fixpoints — but never
+propositions-as-types. Neither iALC nor MIND nor LogiKEy treats a derivation as a proof _term_,
+and none puts an **actor index** on the defeater.
+
+So the defensible residue of §10.5 is **not** "discretion is intuitionistic" — that is taken —
+but the conjunction:
+
+> the **exercise** of a discretionary power read as a **control effect** over an otherwise
+> constructive derivation, with the empowered actor as the **handler**, the appeal hierarchy as
+> the **handler stack**, and the fiat carried as a **provenanced proof term**.
+
+Every half of that is old: intuitionistic legal reasoning (iALC), intuitionistic deontics
+(MIND), constructive authority with proof terms (Garg–Pfenning, Aura), control operators as
+classical axioms (Griffin), handlers (Plotkin–Pretnar). **The join has not been made.** The join
+is what §10 claims, and it concedes all five neighbours in the same breath.
+
+**§8.7(d): no proof-assistant deontic corpus to concede.** No substantial Agda, Coq or Lean
+deontic or normative formalisation surfaced. Isabelle/HOL is the vehicle for this area, through
+LogiKEy, and it is classical (§8.7(c) confirmed as expected). Catala's F\* is the nearest
+dependently-typed neighbour and is a compiler proof (correction 4). **Aura** is the closest
+thing anywhere to a dependently-typed, proof-carrying normative language — and it is a security
+language, which is precisely §10.6.1's point.
+
+**Dead ends.** Not resolved by this pass; do not assert what they gate until a session with more
+reach (or a human at a browser) clears them:
+
+- **`dl.acm.org` returns 403** to this environment. ACM records were verified through dblp and
+  author-hosted copies instead of the publisher of record. Nothing above rests on ACM's own
+  page.
+- **`link.springer.com` auth-walls chapter pages** (303 to `idp.springer.com`). The **authors of
+  the MIND paper are therefore unknown to this pass** — venue and content come from syndicated
+  abstract text, not the chapter. Cite MIND only after the authors are confirmed.
+- **Garg & Abadi (_FoSSaCS_ 2008)** was verified to abstract level only, behind the same wall.
+  The S4 translation is confirmed; their internal treatment of lax logic is not, so §10.6.1
+  attributes the lax reading to Garg & Pfenning, where it was read directly.
+- A search engine reported MIND as **DEON 2023**; the ISBN resolves to **WoLLIC 2022**, and
+  dblp's DEON 2023 listing does not contain it. Syndicated venue metadata is not evidence — this
+  one would have gone into print wrong.
 
 ### 10.7 Open questions specific to discretion
 
@@ -1135,11 +1304,30 @@ as handler stack**. Concede the logic; claim the law.
 - Gelati, J., Governatori, G., Rotolo, A. & Sartor, G. "Normative Autonomy and Normative Co-ordination: Declarative Power, Representation, and Mandate." _Artificial Intelligence and Law_ 12 (2004) 53–81.
 - Griffin, T. "A Formulae-as-Types Notion of Control." _POPL_ (1990) — `call/cc` inhabits Peirce's law; classical axioms as control operators.
 - Plotkin, G. & Pretnar, M. "Handlers of Algebraic Effects." _ESOP_ (2009) — the handler-stack reading of §10.5.
-- Merigoux, D., Chataing, N. & Protzenko, J. "Catala: A Programming Language for the Law." _ICFP_ (2021) — the typed default calculus, mechanised in F\*.
+- Merigoux, D., Chataing, N. & Protzenko, J. "Catala: A Programming Language for the Law." _PACMPL_ 5(ICFP) art. 77 (2021) 1–29 — the typed default calculus; **compilation** correctness proven in F\* (§10.6.2 correction 4).
 - van Binsbergen, L.T., Liu, L.-C., van Doesburg, R. & van Engers, T. "eFLINT: a Domain-Specific Language for Executable Norm Specifications." _GPCE_ (2020).
 - _Braganza v BP Shipping Ltd_ [2015] UKSC 17 — rationality review imported into _contractual_ discretion; the private/public unification of §10.7.2.
 - _Associated Provincial Picture Houses Ltd v Wednesbury Corp_ [1948] 1 KB 223.
 - Grossman, S. & Hart, O. (1986); Hart, O. & Moore, J. (1990) — residual control rights; full citations and the incomplete-contracts bridge in `doc/concepts/legal-modeling/residual.md`.
+
+#### The access-control mirror and the verification pass (§10.6.1–10.6.2, verified 2026-08-28)
+
+- Griffiths, P.P. & Wade, B.W. "An Authorization Mechanism for a Relational Database System." _ACM TODS_ 1(3) (1976) 242–255 — the grant graph with timestamped edges.
+- Fagin, R. "On an Authorization Mechanism." _ACM TODS_ 3(3) (1978) 310–319 — corrects the above; the original could refuse a privilege the holder should have kept.
+- Abadi, M., Burrows, M., Lampson, B. & Plotkin, G. "A Calculus for Access Control in Distributed Systems." _ACM TOPLAS_ 15(4) (1993) 706–734 — `says` and `speaks for`; **classical**.
+- Garg, D. & Pfenning, F. "Non-Interference in Constructive Authorization Logic." _CSFW_ 19 (2006) 283–296 — the constructive turn, claimed as the first; `says` as lax modality / strong monad.
+- Abadi, M. "Access Control in a Core Calculus of Dependency." _ICFP_ (2006) — DCC's lattice-indexed strong monads.
+- Garg, D. & Abadi, M. "A Modal Deconstruction of Access Control Logics." _FoSSaCS_ (2008) — `says` translated soundly and completely into S4.
+- Abadi, M. "Variations in Access Control Logic." _DEON_ 2008, LNCS 5076, 96–109 — the access-control line presented **at the deontic venue**.
+- Appel, A.W. & Felten, E.W. "Proof-Carrying **Authentication**." _ACM CCS_ 6 (1999) 52–62 — note the title (§10.6.2 correction 1).
+- Jia, L., Vaughan, J.A., Mazurak, K., Zhao, J., Zarko, L., Schorr, J. & Zdancewic, S. "AURA: A Programming Language for Authorization and Audit." _ICFP_ (2008) — dependently typed, proof-carrying, audit-logging; §10's closest prior art.
+- Li, N., Grosof, B.N. & Feigenbaum, J. "Delegation Logic: A Logic-based Approach to Distributed Authorization." _ACM TISSEC_ 6(1) (2003) 128–171 — delegation depth as a numeric parameter; k-out-of-n thresholds.
+- Fairtlough, M. & Mendler, M. "Propositional Lax Logic." (cited by Garg & Pfenning for the lax reading of `says`.)
+- Moggi, E. "Notions of Computation and Monads." (cited by Garg & Pfenning for `K says A` as a strong monad.)
+- OASIS. _eXtensible Access Control Markup Language (XACML) Version 3.0_ — twelve combining algorithms; `deny-unless-permit` / `permit-unless-deny` are §9.5's world defaults, `only-one-applicable` is a §9.6-style check.
+- Haeusler, E.H., de Paiva, V. & Rademaker, A. "Intuitionistic Description Logic for Legal Reasoning." (2011); and Haeusler, E.H. & Rademaker, A. "On How Kelsenian Jurisprudence and Intuitionistic Logic help to avoid Contrary-to-Duty paradoxes in Legal Ontologies." arXiv:1803.07543 (2018) — **iALC**; intuitionistic + legal, occupied.
+- "Towards an Intuitionistic Deontic Logic Tolerating Conflicting Obligations." _WoLLIC_ 2022, LNCS 13468, ch. 18 — **MIND**; intuitionistic + deontic, occupied. _Authors unverified — Springer auth-wall; see §10.6.2 dead ends._
+- Benzmüller, C., Parent, X. & van der Torre, L. "Designing normative theories for ethical and legal reasoning: LogiKEy framework, methodology, and tool support." _Artificial Intelligence_ 287 (2020) 103348 — classical HOL in Isabelle/HOL.
 
 ### Related L4 Documentation
 

@@ -162,7 +162,11 @@ of the second-order square. To map before drafting:
 - [ ] Worked legal example beyond arrest: a **power-of-attorney / agency** chain, or
       **delegated legislation** (constitution → statute → regulation → order) as the
       currying tower — pick one that a referee will find load-bearing, not toy.
-- [ ] **Prior-art verification pass on the intuitionistic delta** (addendum 2026-08-28
+- [x] **Prior-art verification pass on the intuitionistic delta** — **RUN 2026-08-28.**
+      Outcome below, under "Verification pass". Headline: the expected outcome held for
+      security, and a second demotion arrived from a direction the addendum had not looked —
+      intuitionistic _deontic_ logic. Part (2) of the delta survives, narrowed to the join.
+      (addendum 2026-08-28
       below; also logged as `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §8.7): constructive-
       type-theory deontics; control operators / algebraic effects for legal reasoning;
       LogiKEy (confirm expected-classical); Agda/Coq/Lean deontic formalisations;
@@ -174,8 +178,9 @@ of the second-order square. To map before drafting:
       _generative higher-order deontics_ (powers over rules, not atomic permissions;
       the `GRANT (… GRANT (… REVOKE …))` tower of `HOMOICONICITY-SPEC.md`) plus lazy
       validation, review standards, defeasibility, and the appeal tower.
-      **Blocks claiming part (2) of the delta in print** — this facet was demoted once
-      by its own prior-art pass, and the claim must survive the same scrutiny.
+      This **blocked** claiming part (2) of the delta in print; it no longer does, for the
+      narrowed claim recorded below. Unresolved paywalled items still block the specific
+      citations they name (`SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §10.6.2, "Dead ends").
 
 ---
 
@@ -224,8 +229,11 @@ evaluation is morally `ReaderT Ledger (Either Fiat)`.
 
 ### Prior art: did the received view go intuitionistic? (Meng's question, answered)
 
-Short answer: **no** — the neighbours are proof-theoretic at most, and the one type-theoretic
-neighbour lacks the actor layer.
+Short answer as first written: **no**. **Corrected 2026-08-28 by the verification pass: yes,
+twice — but not in the way that matters here.** The received view of _institutional power_
+(Jones–Sergot, Gelati et al., Prakken–Sartor) did not; but two lines this survey had not looked
+at did, and both must now be conceded by name. The corrected answer is below the original list;
+the list itself stands as written and was not disturbed by the pass.
 
 - **Jones & Sergot 1996** (counts-as): classical modal logic; Kripke semantics; no proof
   objects.
@@ -239,19 +247,68 @@ neighbour lacks the actor layer.
   constructive flavour), but arguments are meta-level objects.
 - **eFLINT 2020**: executable, operational, not type-theoretic.
 - **Catala (Merigoux–Chataing–Protzenko, ICFP 2021)**: the genuine intuitionistic-direction
-  neighbour — a typed default calculus with mechanised metatheory in F\*. But its
-  ⟨default | exceptions⟩ terms are static rule-vs-rule structure: no actor index, no
-  speech-act defeater, no power/immunity layer, no handler stack.
+  neighbour — a typed default calculus, with **compilation correctness** proven in F\*
+  (_corrected 2026-08-28_: the ICFP abstract claims proofs of "the correctness of its core
+  compilation steps", which is a compiler result, not mechanised metatheory for the default
+  calculus — say the narrower thing in print). But its ⟨default | exceptions⟩ terms are static
+  rule-vs-rule structure: no actor index, no speech-act defeater, no power/immunity layer, no
+  handler stack.
 
 So the claimed delta for this facet becomes two-part: (1) the typed executable instantiation
 (as before), and (2) **powers-as-control-effects with proof-term provenance** — the
-intuitionistic/classical boundary as the codified/discretionary boundary. Part (2) appears
-unoccupied. **Verification owed:** a focused literature pass on "deontic logic / normative
-systems in constructive type theory" and "control operators for legal reasoning" before this
-is claimed in print — this facet has been demoted by its own prior-art pass once, and the
-posture (concede-then-claim) must be earned again. Candidate additional referee-baits to check:
-Benzmüller–Parent–van der Torre LogiKEy (classical HOL shallow embeddings — expected
-classical), and any Agda/Coq deontic formalisations.
+intuitionistic/classical boundary as the codified/discretionary boundary.
+
+### Verification pass, run 2026-08-28 (what it changed)
+
+Full record, with citations and dead ends, in `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md`
+§10.6.2, which owns it. What this facet must carry:
+
+**Two concessions this section did not have.** "Part (2) appears unoccupied" was too broad,
+because "intuitionistic" was doing work that "control effect" should have been doing:
+
+- **iALC** (Haeusler, de Paiva & Rademaker, 2011; 2018) — an intuitionistic `ALC` for **legal**
+  reasoning, motivated by conflict of laws and grounded in **Kelsen**, i.e. in this facet's own
+  jurisprudential lineage. Sequent calculus; no proof terms, no Curry–Howard, no actors, no
+  powers.
+- **MIND** (WoLLIC 2022) — an intuitionistic **deontic** logic in which obligation and
+  permission are not dual and conflicting obligations do not trivialise. Neighbourhood
+  semantics, cut-free sequent calculus. _Authors unresolved behind a paywall — do not cite until
+  confirmed._
+
+So intuitionistic-and-legal and intuitionistic-and-deontic are both occupied. Claiming "we went
+intuitionistic where the field did not" in print would have drawn a referee's correction.
+
+**One concession sharpened on the security side.** The constructive turn in authorization logic
+is **Garg & Pfenning (CSFW 2006)**, who claim the first constructive access-control logic in
+terms, for our reason — keeping the evidence inside the proof — with `says` as a lax modality and
+strong monad. **Aura** (ICFP 2008) is dependently typed, proof-carrying, and _audit_-logging:
+the closest prior art this facet has anywhere, and a security language. ABLP (1993) is classical
+and should not be cited as the constructive ancestor.
+
+**And a venue fact that changes how to open the paper.** Abadi took exactly this material to
+**DEON 2008** ("Variations in Access Control Logic", LNCS 5076, 96–109, in a van der
+Meyden / van der Torre volume). If the "settle venue" checkbox lands on DEON, the audience
+already knows the `says` line — the concession has to come early and by name, not in related
+work.
+
+**What survived, and it is the part worth having.** Nothing was found joining control operators,
+continuations, algebraic effects or handlers to legal or normative reasoning — the two
+literatures do not touch. Legal formalisation reaches proof theory (sequent calculi,
+neighbourhood semantics, ±∂ tags, argumentation fixpoints) and stops short of
+propositions-as-types; no neighbour treats a derivation as a proof _term_ or puts an **actor
+index** on the defeater. LogiKEy is confirmed **classical** HOL in Isabelle/HOL, as expected,
+and no substantial Agda/Coq/Lean deontic corpus exists to concede.
+
+Part (2) therefore restates as a **join**, not a novelty of intuitionism:
+
+> the **exercise** of a power as a **control effect** over an otherwise constructive derivation
+> — actor as **handler**, appeal hierarchy as **handler stack**, fiat as a **provenanced proof
+> term**.
+
+Every half is old (iALC, MIND, Garg–Pfenning, Aura, Griffin, Plotkin–Pretnar); the join is not.
+Concede all six by name, then claim the join and the executable instantiation. That is a
+narrower claim than the addendum first drafted and a defensible one — which is what the
+concede-then-claim posture is for.
 
 ### One more referee-bait worth pre-empting
 
