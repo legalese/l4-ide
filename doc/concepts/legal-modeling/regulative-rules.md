@@ -276,6 +276,8 @@ The residual obligation is the contract, frozen mid-flight, as a first-class val
 
 This is why L4 is a _contract_ language rather than just a _checking_ language: contracts can survive partial execution and be resumed indefinitely.
 
+> **Sidebar:** the word _residual_ leads parallel lives in economics (residual control rights, the incomplete-contracts work behind the 2016 Nobel Prize) and in public law (residual discretionary powers — who decides when the statute runs out). The three senses illuminate each other: see [Residual: One Word, Three Disciplines](residual.md).
+
 ---
 
 ## Reparation Clauses: LEST as Another Obligation
