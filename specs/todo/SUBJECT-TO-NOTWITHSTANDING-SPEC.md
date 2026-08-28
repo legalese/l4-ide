@@ -3,6 +3,7 @@
 > - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (`jl4-core/src/L4/Lexer.hs:230-299`) and appear nowhere in core; no priority-graph or defeater machinery.
 > - Only `UNLESS` exists as a keyword (`Lexer.hs:298`) but without the defeasibility semantics §6.1 proposes. "Next Steps" remain unstarted.
 > - §9 (`APPLIES`, added 2026-08-16) is likewise PROPOSED, not implemented — `APPLIES` is not a lexer keyword, and no per-provision applicability projections are derived anywhere in core.
+> - §10 (defeasance by recorded act, added 2026-08-28) is likewise PROPOSED, not implemented — no power/immunity constructs and no ledger-consulting defeasible nodes exist in core.
 
 > **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
 > battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
@@ -34,6 +35,7 @@
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
 **Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
+**Revised:** 2026-08-28 — added §10 (defeasance by recorded act: the discretionary override — Hohfeldian power/immunity typing, the three strengths of fiat, the ledger as defeater store, the control-effect / intuitionistic reading) plus §10 references. Same-day companions: `doc/concepts/legal-modeling/residual.md` (the residual bridge) and `paper/hohfeld-higher-order/DESIGN.md` (2026-08-28 addendum).
 **Branch:** mengwong/spec-notwithstanding
 
 ---
@@ -828,6 +830,182 @@ to **unfold**.
 
 ---
 
+## 10. Defeasance by Recorded Act: the Discretionary Override
+
+> Added 2026-08-28, distilled from a design conversation (session `paper-residuals`) building on
+> the residual-obligation / residual-control-rights bridge in
+> `doc/concepts/legal-modeling/residual.md`. PROPOSED, not implemented — nothing in this section
+> exists in core. The paper-facet record of the same material is the 2026-08-28 addendum in
+> `paper/hohfeld-higher-order/DESIGN.md`.
+
+### 10.1 The phenomenon: a third defeater source
+
+§2's taxonomy defeats provision A with provision B — rule against rule. §2.9 defeats A by
+rewriting its text. There is a third defeater source, pervasive in both private and public law,
+in which A yields not to a sibling rule but to **an empowered actor's act**:
+
+- "We reserve the right to modify these terms…" — the unilateral variation clause
+- "…unless the Minister otherwise determines"; "the Registrar may waive this requirement"
+- "except with the prior written consent of the Lender"
+- HRA 1998 s 10 (already quoted verbatim in §9.4): a Minister may by remedial order amend
+  primary legislation — a statutory power to defeat statute, triggered by a court's s 4
+  declaration
+- rulebook-wide exemption powers of the LPA s 34(2) type (see
+  `paper/political-economy/SIDEBAR-unauthorised-practice.md`): a dispensation power held but,
+  on the record, never exercised
+
+Grammatically these often wear the same `SUBJECT TO` clothing as §2 — §2.7's own first example
+("subject to any determination to the contrary under Section 40") is one. Semantically they
+differ in kind: **the defeater is not resident in the rulebook.** It is a speech act that may or
+may not have happened, performed by an actor the rule names, on grounds the rule constrains.
+Call this **defeasance by recorded act**.
+
+### 10.2 The Hohfeldian type: powers and immunities over the advice lattice
+
+`paper/hohfeld-higher-order/DESIGN.md` reads Hohfeld's second-order square as operators over
+first-order deontic positions: a power is a `MAY` whose argument is another deontic position.
+The discretionary override is that arrow applied to _this spec's_ defeat lattice: the empowered
+actor holds a `MAY` over whether A `proceed()`s (§2.8). The adviser is an actor's act rather
+than a provision; the advice-kind taxonomy of §2.8 carries over unchanged, and what is new is an
+**authorisation index** (who may install the advice) and an **evidence requirement** (the act
+must be on the record — §10.4).
+
+The dual constructor is entrenchment, Hohfeld's immunity/disability axis: a savings clause
+(§2.5) indexed by _actor_ rather than by provision. Sketch syntax, to be bikeshed:
+
+```
+-- around-advice installable by an actor, not a provision
+A SUBJECT TO DETERMINATION BY `the Minister` ON GROUNDS OF g
+
+-- disability / entrenchment: the actor-indexed savings clause
+A IMMUNE FROM VARIATION BY `the Registrar`
+```
+
+So the wrapper is not `Rule -> Rule` but `Power actor grounds procedure -> Rule -> Rule`, with
+`Immune actor` as its negation at the same order. The same constructor pair serves private law
+("we reserve the right…") and public law (the Minister's determination); the two differ only in
+the review standard attached to the exercise (§10.7.2).
+
+### 10.3 The three strengths of fiat
+
+A single "Fiat" mechanism would flatten three legally distinct acts. They differ in what the act
+fixes, in scope, in mechanism, and — decisively — in the standard a reviewing court applies:
+
+| strength          | the act fixes                       | advice kind (§2.8)                    | mechanism                                            | scope                   | public-law review                    | private-law review     |
+| ----------------- | ----------------------------------- | ------------------------------------- | ---------------------------------------------------- | ----------------------- | ------------------------------------ | ---------------------- |
+| **determination** | the _answer_, for one case          | `around`, declining `proceed()`       | ledger event + early return (§10.4–10.5)             | instant case only       | procedural fairness                  | _Braganza_ rationality |
+| **variation**     | the _rule_, prospectively           | none — this is §2.9 amendment         | materialised rewrite A′, version-tagged              | class-wide, prospective | vires                                | unfair-terms control   |
+| **dispensation**  | _applicability_, for a named person | `before` guard (`UNLESS exempted(p)`) | ledger-backed exemption predicate; rule stays intact | named person(s)         | consistency / legitimate expectation | waiver, estoppel       |
+
+George Clooney's fast-tracked naturalisation decomposes cleanly: a **dispensation** from the
+language requirement plus a **determination** of the ultimate question, neither of which
+**varies** the Code civil for anyone else.
+
+**Design rule (no flattening).** Three constructs, not one: a flattened `Fiat` erases exactly
+the index review needs. The audit trail of a determination records a case; of a variation, a
+provision version; of a dispensation, a person.
+
+**Design rule (variation materialises).** Fiat-the-rule is an amendment and takes §2.9's route:
+an explicit source-to-source transform materialising a re-typecheckable A′. The varied rule is a
+new version along an _authority_ axis exactly parallel to the temporal axis the shipped
+`EVAL … UNDER RULES EFFECTIVE AT` machinery (`jl4-core/src/L4/TemporalContext.hs`) already
+gives us; evaluation under a variation is evaluation under the version the empowered actor
+enacted.
+
+### 10.4 Mechanism: the ledger is the defeater store
+
+A discretionary act is an **event in the state ledger** — machinery L4 already has
+(`RECORD`/`COMMIT`/`ATTEST`/`RECALL`; see `skills/writing-l4-rules/references/state-ledger.md`).
+A ministerial determination is an `ATTEST`ed official-record entry naming the power exercised,
+the grounds asserted, and the content decided. Evaluation of a defeasible node then:
+
+1. `RECALL` the official record for a valid exercise of the governing power over this node and
+   these facts;
+2. if one exists, return the fiat content, **labelled as fiat** (§10.5's design rule);
+3. otherwise fall through to ordinary derivation.
+
+Morally: `ReaderT Ledger (Either Fiat)`. No new runtime state is required; the novelty is (a)
+the typed wrapper naming who may write such entries and on what grounds, and (b) the trace
+discipline:
+
+**Design rule (provenanced fiat).** A fiat answer is never silent. Its explanation trace cites
+the empowering provision, the recorded act (actor, ledger timestamp), and the grounds asserted —
+"by determination of the Minister under s 34(2), recorded at t". That is an honest, checkable
+citation: explainability survives contact with discretion instead of being embarrassed by it.
+
+**Design rule (invalid exercise is a verdict, not a type error).** An act by an actor without
+the power, outside its grounds, or absent from the ledger does not fail silently and is not
+unrepresentable — it evaluates to an **invalid exercise**, a first-class outcome. Review needs
+to _reason about_ unlawful exercises; a representation that cannot express them cannot check
+them.
+
+### 10.5 The intuitionistic reading: discretion as a control effect
+
+Ordinary L4 derivation is constructive: the evaluation trace is a proof term, and an answer
+carries the evidence that produced it. A defeasible conclusion that is neither established nor
+refuted is the **residual** — the undecided middle; incomplete contract theory calls authority
+over that middle a _residual control right_ (`doc/concepts/legal-modeling/residual.md`).
+
+A discretionary power is a **licence to decide the undecided middle**, and its exercise — the
+early return with the fiat answer — is, under Curry–Howard, precisely a **control effect**:
+Griffin (1990) showed that control operators inhabit the classical axioms (`call/cc` : Peirce's
+law). The architecture that falls out:
+
+- the object-language derivation is **intuitionistic** — every answer carries its proof;
+- empowered actors are **handlers** (Plotkin–Pretnar) installed above the computation, one per
+  institutional layer; §2.8's `proceed()` is the handler's _resume_;
+- a handler may resume (the derivation continues; the power lay dormant) or abort with a
+  provenanced fiat — a logged, localised application of excluded middle;
+- **appeal is the outer handler**: the court's quashing power is a handler over the Minister's
+  handler; the institutional hierarchy _is_ the handler stack, and `lift` is an appeal.
+
+Slogan: _fiat is double-negation elimination as an act of state — classical reasoning admitted
+into an intuitionistic system only at named points, by named actors, leaving a named trace._
+
+### 10.6 Prior art and the claimed delta
+
+The neighbouring formalisms, and what each lacks for §10's purposes:
+
+- **Jones & Sergot (1996)** — institutional power via the counts-as conditional. Classical
+  modal; no proof objects, no exercise semantics.
+- **Gelati, Governatori, Rotolo & Sartor (2004)** — declarative power, representation, mandate
+  in defeasible logic; **Governatori & Rotolo (2010**, already cited under §9's references**)**
+  — abrogation vs annulment, which is the variation/determination distinction operating at the
+  rulebook level. Proof-theoretic and constructive-_flavoured_ (a defeasible tag and its
+  negation can both fail to be provable — no excluded middle for defeasible conclusions), but
+  the proof tags are meta-level annotations, not proof terms: no Curry–Howard content.
+- **Prakken & Sartor** argumentation — grounded semantics is a least fixpoint (constructive
+  flavour again), but arguments remain meta-level objects.
+- **eFLINT (2020)** — executable Hohfeld; operational, not type-theoretic.
+- **Catala (§5.1)** — the one neighbour that genuinely went the intuitionistic direction: a
+  typed default calculus mechanised in F\*. But its exceptions are static rule-against-rule
+  structure — no actor index, no speech-act defeater, no power/immunity layer.
+- **LegalRuleML `Override`** — interchange data; no semantics of exercise at all.
+
+The delta this section claims: **actor-indexed defeasance with control-operator semantics and
+proof-term provenance** — powers as handlers, fiat as a provenanced classical hole in an
+intuitionistic derivation. We have not found this move in the legal-logic literature. **A
+focused prior-art verification pass is owed before the claim is made in print** — the
+`hohfeld-higher-order` facet's own deep-research pass demoted its headline claim, and this one
+should expect the same scrutiny.
+
+### 10.7 Open questions specific to discretion
+
+1. **Procedure index.** Many powers are conditional on procedure (consultation, laying before
+   Parliament, giving reasons). Is procedure a type index on `Power`, a runtime guard, or both?
+2. **Grounds review.** _Braganza_ (private) and Wednesbury/proportionality (public) as
+   pluggable review standards over the one `Power` constructor — how much belongs in-language
+   versus in the verifier?
+3. **The tower.** Powers over powers: the court quashes the Minister; the legislature strips
+   the court. Termination/stratification interacts with §4.2 (circular priority) and with the
+   planned "Who May Change the Rules" facet (`paper/README.md`) — layered amendment authority
+   is this tower at the rulebook level.
+4. **Burden interaction (§5.6).** Who must prove the act happened, and who that it was valid?
+5. **Notice.** Dispensations for named persons live in the official record; what does a third
+   party's evaluation see? (Publicity of the ledger; cf. gazettal practice.)
+
+---
+
 ## References
 
 ### Legal Drafting
@@ -895,6 +1073,19 @@ to **unfold**.
 ### Philology (§9.8)
 
 - Etymonline: [apply](https://www.etymonline.com/word/apply), [imply](https://www.etymonline.com/word/imply), [comply](https://www.etymonline.com/word/comply); OED "comply, v.²" — _apply_ / _imply_ < Latin _plicare_ (fold); _comply_ < Latin _complēre_ (fill up), the _-ply_ spelling by attraction to "ply".
+
+### Discretionary Power and Control (§10)
+
+- Hohfeld, W.N. "Some Fundamental Legal Conceptions as Applied in Judicial Reasoning." _Yale Law Journal_ 23 (1913) 16–59 — the power/liability and immunity/disability axes.
+- Jones, A.J.I. & Sergot, M. "A Formal Characterisation of Institutionalised Power." _Journal of the IGPL_ 4(3) (1996) 427–443 — the counts-as conditional.
+- Gelati, J., Governatori, G., Rotolo, A. & Sartor, G. "Normative Autonomy and Normative Co-ordination: Declarative Power, Representation, and Mandate." _Artificial Intelligence and Law_ 12 (2004) 53–81.
+- Griffin, T. "A Formulae-as-Types Notion of Control." _POPL_ (1990) — `call/cc` inhabits Peirce's law; classical axioms as control operators.
+- Plotkin, G. & Pretnar, M. "Handlers of Algebraic Effects." _ESOP_ (2009) — the handler-stack reading of §10.5.
+- Merigoux, D., Chataing, N. & Protzenko, J. "Catala: A Programming Language for the Law." _ICFP_ (2021) — the typed default calculus, mechanised in F\*.
+- van Binsbergen, L.T., Liu, L.-C., van Doesburg, R. & van Engers, T. "eFLINT: a Domain-Specific Language for Executable Norm Specifications." _GPCE_ (2020).
+- _Braganza v BP Shipping Ltd_ [2015] UKSC 17 — rationality review imported into _contractual_ discretion; the private/public unification of §10.7.2.
+- _Associated Provincial Picture Houses Ltd v Wednesbury Corp_ [1948] 1 KB 223.
+- Grossman, S. & Hart, O. (1986); Hart, O. & Moore, J. (1990) — residual control rights; full citations and the incomplete-contracts bridge in `doc/concepts/legal-modeling/residual.md`.
 
 ### Related L4 Documentation
 
