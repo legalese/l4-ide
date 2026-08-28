@@ -165,7 +165,15 @@ of the second-order square. To map before drafting:
 - [ ] **Prior-art verification pass on the intuitionistic delta** (addendum 2026-08-28
       below; also logged as `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §8.7): constructive-
       type-theory deontics; control operators / algebraic effects for legal reasoning;
-      LogiKEy (confirm expected-classical); Agda/Coq/Lean deontic formalisations.
+      LogiKEy (confirm expected-classical); Agda/Coq/Lean deontic formalisations;
+      **authorization logics** (ABLP speaks-for; `says` as lax monad; Garg–Pfenning;
+      proof-carrying authorization; Aura; Delegation Logic) and **database
+      authorization** (Griffiths–Wade; Fagin; CASCADE/RESTRICT ↔ annulment/abrogation)
+      per the spec's §10.6.1 access-control mirror — expected outcome: the
+      intuitionistic square is partially occupied by security, and the claim narrows to
+      _generative higher-order deontics_ (powers over rules, not atomic permissions;
+      the `GRANT (… GRANT (… REVOKE …))` tower of `HOMOICONICITY-SPEC.md`) plus lazy
+      validation, review standards, defeasibility, and the appeal tower.
       **Blocks claiming part (2) of the delta in print** — this facet was demoted once
       by its own prior-art pass, and the claim must survive the same scrutiny.
 

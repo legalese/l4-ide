@@ -571,7 +571,7 @@ Defaults, provisos, and overrides are therefore not separate features but points
 4. **Implement prototype:** Add to L4 parser and evaluator
 5. **Test with real documents:** Validate against British Nationality Act, PDPA, etc.
 6. **Prototype the read side (§9):** derive per-provision `inScope` / `excluded` / `triggered` / `applies` / `satisfied` projections during elaboration, and pilot them on the Contracts (Rights of Third Parties) Act 2001 (§9.4), whose nine sections exercise every role in the design.
-7. **Prior-art verification pass for §10 (research; blocks any print claim):** before the intuitionistic delta of §10.5–10.6 is asserted publicly, run a focused literature search on (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), and (d) Agda/Coq/Lean deontic formalisations. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here.
+7. **Prior-art verification pass for §10 (research; blocks any print claim):** before the intuitionistic delta of §10.5–10.6 is asserted publicly, run a focused literature search on (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), (d) Agda/Coq/Lean deontic formalisations, (e) **authorization logics** (§10.6.1: ABLP `says`/speaks-for; `says` as lax modality/monad via DCC and Garg–Abadi; Garg–Pfenning constructive authorization logic; Appel–Felten proof-carrying authorization; Aura; Delegation Logic; SPKI/SDSI; SecPAL/DKAL/Binder), and (f) **database authorization semantics** (Griffiths–Wade 1976; Fagin 1978 revocation correction; SQL-standard `CASCADE`/`RESTRICT`; XACML combining algorithms) — verifying the recalled citations in §10.6.1 and executing its repositioning instruction if they hold. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here.
 
 ---
 
@@ -989,6 +989,59 @@ intuitionistic derivation. We have not found this move in the legal-logic litera
 focused prior-art verification pass is owed before the claim is made in print** — the
 `hohfeld-higher-order` facet's own deep-research pass demoted its headline claim, and this one
 should expect the same scrutiny.
+
+#### 10.6.1 The access-control mirror (added same day; citations recalled, unverified — feed §8.7)
+
+Hohfeldian power has a forty-year-old engineering mirror: **database and distributed-systems
+authorization**. Meng's instinct — "I'd always thought of Hohfeld power as akin to an SQL
+`GRANT`/`REVOKE`" — is not an analogy but a partial occupation of §10's territory, and it both
+strengthens and repositions the claimed delta. The correspondences (all citations recalled from
+memory 2026-08-28 and **to be verified in the §8.7 pass** before any is relied on in print):
+
+- **The grant graph is the ledger.** System R's authorization mechanism (Griffiths & Wade,
+  _TODS_ 1976) records every `GRANT` as a timestamped event — grantor, grantee, privilege — and
+  computes current authority as a view over that history: §10.4's defeater store, deployed in 1976. Fagin (_TODS_ 1978) then corrected System R's revocation semantics — even the database
+  community got revocation wrong on the first try, which is comforting precedent for §10's
+  care.
+- **`REVOKE … CASCADE` vs `RESTRICT` is annulment vs abrogation.** Whether revoking a power
+  unwinds everything derived through it, or lets downstream positions stand, is exactly
+  Governatori & Rotolo (2010)'s distinction — and the law's lazy answer (the de facto officer
+  doctrine, apparent authority, _omnia praesumuntur rite esse acta_) is a **reliance-protecting
+  refusal to cascade** that SQL has no equivalent of, because SQL validates exercises _eagerly_
+  at execution time while law validates them _lazily_, on review, after reliance has accreted.
+  Lazy validation is why §10.4's invalid-exercise-is-a-verdict rule matters: an eager system
+  can afford to reject at the door; a lazy one must represent the questionable act.
+- **`WITH GRANT OPTION` is the degenerate tower.** SQL does have second-order power — but only
+  as a uniform boolean: the option to re-grant _the same privilege_, a fixed point `μX. Grant(X
+∨ p)`, never a free nesting. **The legal tower is generative**: exercising the higher power
+  _creates a new rule_, as in `HOMOICONICITY-SPEC.md`'s `GRANT (PARTY parliament MAY GRANT
+(PARTY officer MAY REVOKE (PARTY person MAY leave)))` — SQL privileges are atoms drawn from a
+  closed vocabulary, whereas Hohfeldian powers range over _rules_, including further powers.
+  (SQL's one generative loophole proves the point: granting access to a _view_ is granting a
+  rule you authored — but the power to create views is again a flat privilege.) The security
+  literature acknowledges the tower only as a depth parameter (Li–Grosof–Feigenbaum's
+  Delegation Logic; SPKI/SDSI's delegation bit), never as free higher-order structure.
+- **Priority precedents.** SQL Server's `DENY` overriding `GRANT` is a hardcoded lex superior;
+  XACML's policy-combining algorithms (deny-overrides, permit-overrides, first-applicable) are
+  §2's priority taxonomy ratified as an OASIS access-control standard — a sibling to the
+  LegalRuleML note in this spec's header. Roles are offices (powers attach to the office;
+  `SET ROLE` is assuming it); `SECURITY DEFINER` functions are acting in official capacity.
+- **The intuitionistic square is partially occupied — by security, not law.** The
+  authorization-logic line went constructive where legal logic did not: the ABLP calculus's
+  `says`/speaks-for (Abadi–Burrows–Lampson–Plotkin 1993), `says` reconstructed as a **lax
+  modality — a monad** (Abadi's DCC reading; Garg–Abadi 2008), **constructive authorization
+  logic** (Garg & Pfenning 2006), **proof-carrying authorization** (Appel & Felten 1999) —
+  where the requester literally presents a proof term checked by a small kernel — and **Aura**
+  (Jia et al., _ICFP_ 2008), a language for _authorization and audit_ whose logged evidence
+  terms are §10.4's provenanced fiat, almost exactly.
+
+**Repositioning instruction for the delta, if the pass confirms the above:** the claim is not
+"nobody built constructive actor-indexed authority with proof-term provenance" — security did.
+The claim narrows to what security lacks and law requires: **generative higher-order deontics**
+(powers over rules, not over atomic permissions), **lazy validation** with
+invalid-exercise-as-verdict, **grounds and review standards** (Wednesbury/_Braganza_) rather
+than formal validity alone, **defeasibility interaction** (§5.6 burden), and the **appeal tower
+as handler stack**. Concede the logic; claim the law.
 
 ### 10.7 Open questions specific to discretion
 
