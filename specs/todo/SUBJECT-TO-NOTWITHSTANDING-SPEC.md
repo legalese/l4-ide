@@ -571,6 +571,7 @@ Defaults, provisos, and overrides are therefore not separate features but points
 4. **Implement prototype:** Add to L4 parser and evaluator
 5. **Test with real documents:** Validate against British Nationality Act, PDPA, etc.
 6. **Prototype the read side (§9):** derive per-provision `inScope` / `excluded` / `triggered` / `applies` / `satisfied` projections during elaboration, and pilot them on the Contracts (Rights of Third Parties) Act 2001 (§9.4), whose nine sections exercise every role in the design.
+7. **Prior-art verification pass for §10 (research; blocks any print claim):** before the intuitionistic delta of §10.5–10.6 is asserted publicly, run a focused literature search on (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), and (d) Agda/Coq/Lean deontic formalisations. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here.
 
 ---
 

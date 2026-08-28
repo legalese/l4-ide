@@ -162,6 +162,12 @@ of the second-order square. To map before drafting:
 - [ ] Worked legal example beyond arrest: a **power-of-attorney / agency** chain, or
       **delegated legislation** (constitution → statute → regulation → order) as the
       currying tower — pick one that a referee will find load-bearing, not toy.
+- [ ] **Prior-art verification pass on the intuitionistic delta** (addendum 2026-08-28
+      below; also logged as `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §8.7): constructive-
+      type-theory deontics; control operators / algebraic effects for legal reasoning;
+      LogiKEy (confirm expected-classical); Agda/Coq/Lean deontic formalisations.
+      **Blocks claiming part (2) of the delta in print** — this facet was demoted once
+      by its own prior-art pass, and the claim must survive the same scrutiny.
 
 ---
 
