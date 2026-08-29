@@ -1,8 +1,9 @@
-> **Status (audited 2026-07-03):** OPEN — analysis-only; none of the proposed override constructs are implemented.
+> **Status (re-audited 2026-08-28):** OPEN — analysis-only; none of the proposed override constructs are implemented.
 >
-> - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (`jl4-core/src/L4/Lexer.hs:230-299`) and appear nowhere in core; no priority-graph or defeater machinery.
-> - Only `UNLESS` exists as a keyword (`Lexer.hs:298`) but without the defeasibility semantics §6.1 proposes. "Next Steps" remain unstarted.
+> - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (the `keywords` table is `jl4-core/src/L4/Lexer.hs:245-332`) and appear nowhere in core; no priority-graph or defeater machinery.
+> - Only `UNLESS` exists as a keyword (`Lexer.hs:330`) but without the defeasibility semantics §6.1 proposes. "Next Steps" items 2-5 remain unstarted.
 > - §9 (`APPLIES`, added 2026-08-16) is likewise PROPOSED, not implemented — `APPLIES` is not a lexer keyword, and no per-provision applicability projections are derived anywhere in core.
+> - §10 (corpus survey, added 2026-08-28) is a **measurement of existing corpora**, not a proposal; it discharges "Next Steps" item 1 for the read side. The line references above were re-verified on that date; the 2026-07-03 audit's `Lexer.hs:230-299`/`:298` had drifted.
 
 > **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
 > battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
@@ -34,7 +35,8 @@
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
 **Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
-**Branch:** mengwong/spec-notwithstanding
+**Revised:** 2026-08-28 — added §10, the corpus survey (559 sites across `legalese/canon` and `legalese/l4-ide`): `appl*` is four verbs of which only half are applicability; encoders already hand-roll §9.5's projections; a Boolean `applies` was measured insufficient (a six-member verdict, arrived at by adversarial review); four Acts encode "cannot be applied on this evidence" four incompatible ways; all three R10 escapes have witnesses. Discharges "Next Steps" item 1 for the read side, answers §7.1 and §9.9.1 (which had cited a §8.1 that never existed), and re-verifies the drifted `Lexer.hs` line references.
+**Branch:** mengwong/applies-corpus-survey (§10); mengwong/spec-notwithstanding (original)
 
 ---
 
@@ -545,7 +547,10 @@ Defaults, provisos, and overrides are therefore not separate features but points
 
 ## 7. Open Questions
 
-1. **Granularity:** Should override apply to entire rules or individual conclusions?
+1. **Granularity:** Should override apply to entire rules or individual conclusions? On the read
+   side this is **measured** (§10.7): the corpus cites whole Acts, sections, subsections,
+   paragraphs, lettered limbs and separate instruments, so projections must attach to every
+   labelled node. The write side is not yet measured.
 
 2. **Temporal dynamics:** Can priority change over time? (e.g., grace periods)
 
@@ -563,7 +568,10 @@ Defaults, provisos, and overrides are therefore not separate features but points
 
 ## 8. Next Steps
 
-1. **Gather corpus examples:** Collect real statutory and contract examples using each pattern
+1. **Gather corpus examples:** Collect real statutory and contract examples using each pattern —
+   **done for the read side, §10** (559 sites across two corpora, 2026-08-28); the write-side
+   classification into the seven roles of §2.1-2.7 is still outstanding, for the reason §10.2
+   gives
 2. **Propose concrete syntax:** Design L4 keyword syntax for each semantic function
 3. **Define formal semantics:** Specify evaluation rules precisely
 4. **Implement prototype:** Add to L4 parser and evaluator
@@ -810,7 +818,9 @@ to **unfold**.
 ### 9.9 Open questions specific to the read side
 
 1. **Default projection:** which prefix of the four conjuncts does a bare `APPLIES` denote?
-   Needs the corpus survey of §8.1; explicit qualifiers are the conservative interim answer.
+   **Measured in §10** (2026-08-28), which finds that no single prefix serves and that a Boolean
+   return is the wrong shape — see §10.4. The design choice that follows is open, and is being
+   taken with Meng as part of the concrete-syntax work (§8 item 2).
 2. **Defeasible reads:** Reason-Based Logic says applicability is only a _reason_ for
    application. Should `S APPLIES` return the defeasible Boolean of §6.4 rather than a plain one,
    so a later defeater can rebut the read itself?
@@ -825,6 +835,230 @@ to **unfold**.
 5. **Cross-instrument reads:** "applies for the purposes of this Act" versus reading another
    instrument entirely — is that an `IMPORT` of the other instrument's projections, pinned to a
    version via conjunct 1?
+
+---
+
+## 10. Corpus survey (measured 2026-08-28)
+
+> **Status:** MEASUREMENT, not a design. Every number below was counted on `legalese/canon`
+> @ `2589fdd` (branch `mengwong/drafts`) and `legalese/l4-ide` @ `81f0f752` (`origin/unstable`),
+> and every quotation was read in its source file. Nothing here is implemented; §10.8 separates
+> what the measurement settles from what it hands to the syntax decision (§8 item 2).
+
+§8 item 1 has asked since January for a corpus of real override and applicability usage, and
+§9.9.1 could not be answered without one. This section is that survey. It also discharges §8
+item 1 for the read side; the write-side role classification (§2.1–2.7) remains partly open, for
+the reason given in §10.2.
+
+### 10.1 What was surveyed
+
+Two corpora, all `.l4` files:
+
+| Corpus                                                               | Files | Files touching the idiom | Matching lines |
+| -------------------------------------------------------------------- | ----- | ------------------------ | -------------- |
+| `legalese/canon` (`subjects/**`)                                     | 20    | 10                       | 274            |
+| `legalese/l4-ide` (`jl4/examples/legal/**`, `paper/case-studies/**`) | 20    | 20                       | 285            |
+
+reproducible with
+
+```bash
+grep -rn --include='*.l4' -iE '(subject to|notwithstanding|despite|(section|subsection|paragraph|this [A-Za-z]+) applies|applies (to|where|if|in|for)|does not apply|shall not apply)' <paths>
+```
+
+Six jurisdictions are represented (Singapore, Jersey, England & Wales, the United States, and the
+Jersey COVID orders' references to the Mental Health (Jersey) Law), across primary legislation,
+subordinate legislation, and one federal regulation.
+
+### 10.2 `appl*` is four verbs, and only half of them are applicability
+
+Deduplicating every backtick-quoted L4 identifier containing `appl*` across both corpora gives
+**130 distinct names**. Hand-classified, they divide:
+
+| Sense                                                          | Count | Example                                                                    |
+| -------------------------------------------------------------- | ----- | -------------------------------------------------------------------------- |
+| **applicability read** — does provision P reach case c?        | 64    | `` `s 27 — this section applies to the person` ``                          |
+| **applicability write** — another instrument dis/applies P     | 3     | `` `an Order under Article 5(3) disapplies paragraph (2) …` ``             |
+| **applicability, epistemically blocked** (§10.5)               | 2     | `` `… not being in evidence, section 4 cannot be applied` ``               |
+| _subtotal: applicability_                                      | _69_  |                                                                            |
+| **petition** — to apply _to a court or registrar_ for an order | 41    | `` `the guardian may apply to the court under section 7(4)` ``             |
+| **appropriation** — to apply _property or funds_ to a purpose  | 15    | `` `apply the remaining property for the preserved charitable purposes` `` |
+| **execution** — to apply _a rule or test_ to facts             | 5     | `` `The charity test applied` ``                                           |
+
+**47% of `appl*` identifiers in the corpus have nothing to do with applicability.** The same holds
+of the write-side keyword: of the occurrences of "subject to", the majority are the ordinary
+predicate ("an issuer _subject to_ a disqualification", "_subject to_ a court order") rather than
+the drafting connective ("_subject to_ section 6"), and the two are not lexically separable — the
+predicate sense frequently cites a section too ("subject to a disqualification as specified in
+section 227.503(a)").
+
+This is the survey's first finding and it is about syntax, not semantics: **`APPLIES` and
+`SUBJECT TO` are homonyms of high-frequency corpus vocabulary**, and both senses already appear
+inside identifier text that the parser sees. Compare the known mixfix/identifier collision traps
+(smucclaw/l4-ide#944, #948). Any keyword design under §8 item 2 has to survive this.
+
+### 10.3 Encoders already hand-roll the projections of §9.5
+
+§9.5 proposes deriving `inScope` / `excluded` / `triggered` / `applies` per labelled provision.
+Encoders write them by hand today, with the citation baked into a backtick name:
+
+```l4
+`s 5(9) — this section applies to the will of this testator` `the case` MEANS …
+`s 6(5) — this section applies to the grant` g MEANS …
+`s 10(4) — subsection (3) applies to the will of this testator` `the case` MEANS …
+`s 27 — this section applies to the person` `the person` MEANS …
+`s 35(1) — the saving in section 35(1) applies to this grant` d g MEANS …
+`Article 12(4) — a ground in paragraph (1)(a) to (d) applies to the proposed name` c MEANS …
+`Article 17(4) — the carve-out applies to the act` g a MEANS …
+```
+
+Nobody instructed this; it is what the two-step drafting idiom of §9.4 forces once you try to be
+isomorphic. Three of our own encodings contain the source-side idiom verbatim — Guardianship of
+Infants Act s 5A(1) "This section applies where —", Charities (Jersey) Law Art 27(1) "Paragraph
+(2) applies if the Commissioner believes that -", and Art 10(4) "Paragraph (5) applies if …" —
+which, with CA 2006 s 724 and HRA s 10 (§9.4), puts the pattern in four jurisdictions.
+
+The weaving, by contrast, is **not** written down. It is done in the encoder's head and recorded
+in a comment. Two witnesses, both from cleanroom encodings whose authors were being careful:
+
+> "The words 'subject to the provisions of this Act' are carried, not dropped: they are why the
+> composition below reads s 7(3)'s objection limb and s 10's removal."
+> — `guardianship-of-infants-act.l4`
+
+> "The nine rules are mutually exclusive once read together, but the Act does not say so … rule 3
+> is expressed 'subject to the rights of the surviving spouse, if any' … BRANCH gives the reading
+> its own shape."
+> — `sg-isa.l4`
+
+In both, a global `SUBJECT TO` was discharged by manually chasing which other provisions could
+bite and hard-wiring the result into a composition or a branch order. The override survives as
+prose beside code that no longer contains it — precisely the isomorphism loss
+Bench-Capon & Coenen warn against, and precisely what §2.8's advice model exists to avoid.
+
+### 10.4 A Boolean `applies` was measured insufficient — twice, by review
+
+The sharpest result. `intestate-succession-act.l4`'s consumer needed to say what the Act does with
+an estate, and arrived — after two rounds of adversarial review — at a **six-member verdict**, not
+a Boolean:
+
+```l4
+DECLARE `What this corpus can say about the distribution of an estate` IS ONE OF
+    `the Intestate Succession Act 1967 governs the distribution, and its rules have been applied`
+    `nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it`
+    `the Intestate Succession Act 1967 applies to the estate but has no effect on these facts`
+    `the deceased was domiciled outside Singapore and left no immovable property here, so section 4(1) sends the distribution of his movable property to the law of his domicile, and no Act in this corpus is that law`
+    `the deceased was domiciled in Singapore and was possessed beneficially of no property situated here, so section 4(1) names the law of Singapore and section 5 reaches no property to distribute`
+    `the death is not proved to be after 2 June 1967, so section 5 does not reach this estate, and no other Act in this corpus distributes it`
+```
+
+The file records why it grew. An earlier three-member draft collapsed the renvoi case and the
+pre-commencement case into "applies to the estate but has no effect on these facts" — and the
+review found that verdict actively misleading, because it "suggests that other facts might have
+produced one, and on those two it is another law that governs."
+
+Mapped onto §9.2, the six members are: all four conjuncts plus effect; conjunct 2 failing at
+instrument level; **conjuncts 1–3 holding while the effect is vacuous**; a conjunct-2 read that
+_refers out of the corpus entirely_ (renvoi); in-scope with an empty domain; and conjunct 1
+unresolved on the evidence. Only the first two are expressible as `applies = TRUE/FALSE`.
+
+Two consequences for §9.9.1. First, **no prefix of the four conjuncts is the right default**,
+because the distinctions the corpus needed do not lie along that axis alone — "applies but is
+inert" and "applies but refers out" both have conjuncts 1–3 true. Second, and more usefully:
+the reason a reader asks whether a section applies is almost always to obtain a **verdict with a
+because**, and a bare Boolean discards exactly the part they came for. §9.5's projections remain
+the right decomposition; what is now in doubt is the return type of the top-level read.
+
+### 10.5 Four Acts, four incompatible answers to "not on this evidence"
+
+One case (`the Menon will`: age and date of death nowhere in evidence) was put to four Acts in the
+same cleanroom corpus. Each encoded the resulting non-application differently:
+
+| Act                      | Encoding of "cannot be applied for want of evidence"                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| Wills Act                | a named third value: `` `… section 4 cannot be applied` ``                          |
+| Probate & Administration | plain `FALSE` — "the s 21(1) bar does not bite and nothing is said about the doubt" |
+| Guardianship of Infants  | `NOTHING` (a `MAYBE`), with a named outcome downstream                              |
+| Intestate Succession     | a verdict member: `` `the death is not proved to be after 2 June 1967 …` ``         |
+
+The encoder chose consciously each time — the comments argue each choice — which is the point:
+four defensible conventions, mutually incomparable, in one corpus by one author in one week.
+Applicability-under-uncertainty is a language-level question that the language currently declines
+to answer, so it is re-answered per file. This connects the read side to the ladder's
+FALSE-vs-UNKNOWN axis (PR #191) and to §6.4's defeasible Boolean.
+
+### 10.6 All three escapes of §9.5 have corpus witnesses
+
+§9.5 routes three constructs to `HOMOICONICITY-SPEC` R10 as beyond closed-world elaboration. Each
+occurs in the corpus, and in each the encoder's workaround is visible and lossy:
+
+1. **Open quantification over provisions.** Charities (Jersey) Law Art 18(3): the duties "apply
+   despite any contrary provision in the constitution … except to any extent that such provision
+   imposes a more onerous duty." Encoded by making the target a value —
+   `GIVEN p IS AN Article18ConstitutionalProvision` — i.e. provisions reified as data by hand,
+   which is R10 done manually. Note also that this priority is **not static**: which of the two
+   provisions wins depends on comparing their strictness, so `priority(A, B) = A` (§2.1) does not
+   model it.
+2. **Application with modification.** The Jersey COVID orders reach admission "under Article 6, 7
+   or 7A **as applied by** Article 14" of the Mental Health Law. Encoded as a string inside an
+   enum constructor: the modification is named, not modelled.
+3. **Runtime dis/application.** Art 5(3): "The Minister may by Order disapply paragraph (2) in
+   relation to any entity or description of entity specified in the Order." Encoded as an input
+   boolean on the entity record —
+   `` `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity` `` — so the
+   Order's own conditions, its scope, and its quantification over "description of entity" are all
+   unmodelled, and the user is asked to assert the conclusion.
+
+The spec previously asserted these three escapes analytically. They are now measured, and each has
+a named cost.
+
+### 10.7 Granularity: every structural level is cited, and some reads are not Boolean
+
+Answering §7.1 from the data. Reads in the corpus cite, at minimum: a whole Act
+(`` `this Act applies to the estate` ``), a section (`` `s 27 — this section applies …` ``), a
+subsection (`` `s 10(4) — subsection (3) applies …` ``), a paragraph
+(`` `Article 10(4) — paragraph (5) applies` ``), a lettered limb
+(`` `a ground in paragraph (1)(a) to (d) applies …` ``), and a separate instrument
+(`` `an Order under Article 13(9)(c) applies to the registered charity` ``). §9.4's requirement
+that projections attach to **every labelled node, not only `§` provisions**, is confirmed.
+
+Five reads are not Boolean at all but **selectors**, returning which provision governs:
+
+| Name                                            | Returns                                   |
+| ----------------------------------------------- | ----------------------------------------- |
+| `` `the schedule that applies in` ``            | `"First Schedule"` / `"Second Schedule"`  |
+| `` `which limb applies` ``                      | which paragraph of Rule 100(a)(2) governs |
+| `` `the law that applies` ``                    | the Act governing the distribution        |
+| `` `the provision applied` ``                   | the provision reached                     |
+| `` `which part of Rule 501(a)(4) applies to` `` | prose naming the limb and why it excepts  |
+
+The last is worth its own note: its `GIVETH` is a `STRING` of explanation, so the applicability
+read and the explanation channel are the same function. That is a hint about what §10.4's "verdict
+with a because" should carry.
+
+### 10.8 What this settles, and what it does not
+
+Settled by measurement, and recorded here as the answer to §8 item 1 for the read side:
+
+- **S1.** The two-step drafting idiom is not an English or a UK peculiarity: it is in four
+  jurisdictions in our own corpus (§10.3), so `APPLIES` is not a niche construct.
+- **S2.** The projections of §9.5 are already being written by hand, at every structural level,
+  with the citation encoded in the identifier (§10.3, §10.7). The design does not need to be
+  motivated; it needs to be mechanised.
+- **S3.** The weaving is _not_ written down — it lives in comments (§10.3). This is the isomorphism
+  cost of having no write side, and it grows with every subject encoded.
+- **S4.** All three R10 escapes are real and each currently costs modelled content (§10.6).
+- **S5.** Applicability-under-uncertainty has no house answer and is being re-invented per file
+  (§10.5).
+
+**Not settled, and deliberately left to the concrete-syntax decision (§8 item 2):**
+
+- **Q1.** The return type of a top-level applicability read: Boolean, the defeasible Boolean of
+  §6.4, a three-valued answer, or a verdict-with-reason. §10.4 shows the corpus needed the last of
+  these; whether the _language primitive_ should be that rich, or should be Boolean with the
+  richness built above it, is a design call.
+- **Q2.** How to spell it, given §10.2's homonymy — a keyword, an annotation on the cited label, or
+  a derived name in a reserved namespace.
+- **Q3.** Whether selector reads (§10.7) are the same construct returning a provision, or a
+  different one.
 
 ---
 
@@ -903,6 +1137,13 @@ to **unfold**.
 - `jl4/experiments/Singapore-Data-Protection-Act.l4` - Example using "subject to" informally
 - `specs/todo/TEMPORAL_EVAL_SPEC.md` - the `EVAL … UNDER RULES EFFECTIVE AT` axis (§9.2 conjunct 1)
 - `specs/todo/HOMOICONICITY-SPEC.md` - R10 owns the citation forms that escape §9.5's closed world
+
+### Corpus Surveyed (§10)
+
+Measured 2026-08-28. Counts in §10 are reproducible at these commits with the `grep` in §10.1.
+
+- `legalese/canon` @ `2589fdd` (`mengwong/drafts`) — `subjects/sg/{succession,pdpa-2012,penal-code-1871,child-support}`. Chief witnesses: `cleanroom-2026-08/family-cases.l4` (the six-member verdict, §10.4; the four-Act evidence comparison, §10.5), `cleanroom-2026-08/guardianship-of-infants-act.l4` ("carried, not dropped", §10.3; s 5A(1)'s two-step), `cleanroom-2026-08/wills-act.l4` (hand-rolled projections, §10.3).
+- `legalese/l4-ide` @ `81f0f752` (`origin/unstable`) — `jl4/examples/legal/**`, `paper/case-studies/**`. Chief witnesses: `charities-jersey-2014/part-3-charity-test.l4` (Art 5(3) runtime disapplication, §10.6), `part-5-governors.l4` (Art 18(3) open quantification and non-static priority, §10.6), `gco-jersey-covid/MHO-as-at-20210115.l4` ("as applied by Article 14", §10.6), `regcf/regcf-wizard.l4` (selector reads, §10.7), `sg-succession/sg-isa.l4` (hand-woven `SUBJECT TO`, §10.3).
 
 ---
 
