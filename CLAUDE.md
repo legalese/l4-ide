@@ -86,7 +86,7 @@ the string anywhere is `-Wno-name-shadowing` in `jl4-wasm`.
 Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-lsp-test`,
 `jl4-service-test`, `jl4-mlir-test`, `jl4-websessions-test`.
 
-### 3.1 Three traps that produce fake failures
+### 3.1 Four traps that produce fake failures
 
 **Pin `JL4_LIBRARY_PATH` when running goldens locally.** CI sets it
 (`.github/workflows/pr-checks.yml`); without it you get unrelated failures that look like
@@ -120,6 +120,23 @@ looked at is how a wrong answer becomes the expected answer.
 > repaired by #212 — after it had already knocked another PR out of the merge queue. `etc/check-corpus-goldens.mjs`
 > now runs in CI on every event with no filter and no build, and names the missing files. If you are
 > reading this because that check failed, it has done its job.
+
+**Never point an `l4` binary at a prelude newer than itself.** New prelude annotations
+(`@nonexhaustive`, in `jl4-core/libraries/prelude.l4` since #256) are parse errors to a binary
+built before them, and the failure does NOT present as a version mismatch: the prelude fails to
+load, so whatever you are checking drowns in cascading `could not find a definition` errors for
+`setFromList`, `UNION`, and every other prelude name — which reads as a broken spec or example. A
+binary run with `JL4_LIBRARY_PATH` unset resolves its own **embedded** prelude, which matches by
+construction (resolution order: `JL4_LIBRARY_PATH → root → importer-relative → embedded → XDG →
+bundle`); the trap is pinning `JL4_LIBRARY_PATH` at a tree newer than the binary. Two rigs that
+both "run the prelude" are therefore not interchangeable: pinned-path and embedded-prelude runs
+can resolve different prelude versions. Rebuild, or drop the pin.
+
+> **Why.** 2026-08-27: a 7 Aug `dist-newstyle` binary pointed at the current tree's libraries made
+> a known-green Style 2 probe produce nine errors that looked like the prelude had lost
+> `setFromList`. The same probe on the 4 Aug installed binary with its embedded prelude: zero
+> errors. The mismatch was one `@nonexhaustive` annotation the older parser could not read, and
+> nothing in the output said so.
 
 ### 3.2 There are TWO printers, and they are guarded differently
 
