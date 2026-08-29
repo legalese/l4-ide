@@ -38,6 +38,7 @@ Representing legal concepts in code
 - **[Regulative Rules](legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
 - **[Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)** - Definitions vs duties, and why L4 separates them at the type level
 - **[Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)** - Defeasibility, UNLESS, and encoding general-rule-plus-exception structure
+- **[Residual: One Word, Three Disciplines](legal-modeling/residual.md)** - How L4's residual obligation relates to residual control rights in incomplete contract theory and residual discretionary power in public law
 
 **Key Ideas:** Deontic modalities, legal rules as code, contract patterns, defeasibility
 

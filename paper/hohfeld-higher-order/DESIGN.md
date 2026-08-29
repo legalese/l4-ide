@@ -162,3 +162,157 @@ of the second-order square. To map before drafting:
 - [ ] Worked legal example beyond arrest: a **power-of-attorney / agency** chain, or
       **delegated legislation** (constitution → statute → regulation → order) as the
       currying tower — pick one that a referee will find load-bearing, not toy.
+- [x] **Prior-art verification pass on the intuitionistic delta** — **RUN 2026-08-28.**
+      Outcome below, under "Verification pass". Headline: the expected outcome held for
+      security, and a second demotion arrived from a direction the addendum had not looked —
+      intuitionistic _deontic_ logic. Part (2) of the delta survives, narrowed to the join.
+      (addendum 2026-08-28
+      below; also logged as `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §8.7): constructive-
+      type-theory deontics; control operators / algebraic effects for legal reasoning;
+      LogiKEy (confirm expected-classical); Agda/Coq/Lean deontic formalisations;
+      **authorization logics** (ABLP speaks-for; `says` as lax monad; Garg–Pfenning;
+      proof-carrying authorization; Aura; Delegation Logic) and **database
+      authorization** (Griffiths–Wade; Fagin; CASCADE/RESTRICT ↔ annulment/abrogation)
+      per the spec's §10.6.1 access-control mirror — expected outcome: the
+      intuitionistic square is partially occupied by security, and the claim narrows to
+      _generative higher-order deontics_ (powers over rules, not atomic permissions;
+      the `GRANT (… GRANT (… REVOKE …))` tower of `HOMOICONICITY-SPEC.md`) plus lazy
+      validation, review standards, defeasibility, and the appeal tower.
+      This **blocked** claiming part (2) of the delta in print; it no longer does, for the
+      narrowed claim recorded below. Unresolved paywalled items still block the specific
+      citations they name (`SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §10.6.2, "Dead ends").
+
+---
+
+## Addendum 2026-08-28: discretion as a control effect (the intuitionistic delta)
+
+> Distilled from the `paper-residuals` design conversation. The language-design decisions this
+> produced are owned by `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §10 (defeasance by
+> recorded act); the documentation-facing bridge is `doc/concepts/legal-modeling/residual.md`.
+> This addendum records what the material adds to **this paper's** claim.
+
+### The move
+
+The prior-art verdict above left "a typed, functional, model-checked instantiation" as the
+defensible residue. This addendum sharpens that residue with a second, distinct axis: the
+**Curry–Howard reading of the exercise of a power**.
+
+- Ordinary derivation in L4 is constructive: the evaluation trace is a proof term.
+- A defeasible conclusion neither established nor refuted is the **undecided middle** — which
+  is, in incomplete-contract terms, the _residual_, and authority over it a _residual control
+  right_ (Grossman–Hart–Moore; the bridge is worked out in
+  `doc/concepts/legal-modeling/residual.md`).
+- A discretionary power is a **licence to decide the undecided middle**, and its exercise — the
+  early return with the fiat answer — is a **control effect**. Griffin (1990): control
+  operators inhabit the classical axioms (`call/cc` : Peirce's law). So _fiat is
+  double-negation elimination as an act of state_ — classical reasoning admitted into an
+  intuitionistic system only at named points, by named actors, leaving a named trace.
+- Institutionally: empowered actors are **handlers** (Plotkin–Pretnar) in a stack; a handler
+  may _resume_ (the power lies dormant, derivation proceeds) or _abort_ with a provenanced
+  fiat; **appeal is the outer handler** — the court's quashing power is a handler over the
+  Minister's handler.
+
+### What this settles from the open questions above
+
+The "decide the **type** of a power" checkbox splits three ways rather than two — the
+`DP→DP` vs `NormState→NormState` tension dissolves once fiat is disaggregated (spec §10.3):
+
+| strength of fiat  | what the act fixes          | type                                                       |
+| ----------------- | --------------------------- | ---------------------------------------------------------- |
+| **determination** | the answer, one case        | control effect: abort with provenanced value               |
+| **variation**     | the rule, prospectively     | `NormState→NormState`, materialised (amendment discipline) |
+| **dispensation**  | applicability, named person | ledger-backed guard on the wrapped rule                    |
+
+All three consult the event-sourced ledger (`RECORD`/`ATTEST`), which resolves the "reconcile
+with the ledger semantics" half of the checkbox: the ledger _is_ the defeater store, and
+evaluation is morally `ReaderT Ledger (Either Fiat)`.
+
+### Prior art: did the received view go intuitionistic? (Meng's question, answered)
+
+Short answer as first written: **no**. **Corrected 2026-08-28 by the verification pass: yes,
+twice — but not in the way that matters here.** The received view of _institutional power_
+(Jones–Sergot, Gelati et al., Prakken–Sartor) did not; but two lines this survey had not looked
+at did, and both must now be conceded by name. The corrected answer is below the original list;
+the list itself stands as written and was not disturbed by the pass.
+
+- **Jones & Sergot 1996** (counts-as): classical modal logic; Kripke semantics; no proof
+  objects.
+- **Gelati/Governatori/Rotolo/Sartor 2004** (`DeclPow`) and **Governatori & Rotolo 2010**
+  (abrogation vs annulment): defeasible logic — constructive-_flavoured_ in the weak sense
+  (a defeasible tag and its negation can both fail to be provable; derivability is an
+  inductive/least-fixpoint definition), but the proof tags (+∂, −∂) are meta-level
+  annotations, not proof terms. No propositions-as-types, no computational content, no
+  Curry–Howard.
+- **Prakken & Sartor** argumentation: grounded semantics is a least fixpoint (again a
+  constructive flavour), but arguments are meta-level objects.
+- **eFLINT 2020**: executable, operational, not type-theoretic.
+- **Catala (Merigoux–Chataing–Protzenko, ICFP 2021)**: the genuine intuitionistic-direction
+  neighbour — a typed default calculus, with **compilation correctness** proven in F\*
+  (_corrected 2026-08-28_: the ICFP abstract claims proofs of "the correctness of its core
+  compilation steps", which is a compiler result, not mechanised metatheory for the default
+  calculus — say the narrower thing in print). But its ⟨default | exceptions⟩ terms are static
+  rule-vs-rule structure: no actor index, no speech-act defeater, no power/immunity layer, no
+  handler stack.
+
+So the claimed delta for this facet becomes two-part: (1) the typed executable instantiation
+(as before), and (2) **powers-as-control-effects with proof-term provenance** — the
+intuitionistic/classical boundary as the codified/discretionary boundary.
+
+### Verification pass, run 2026-08-28 (what it changed)
+
+Full record, with citations and dead ends, in `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md`
+§10.6.2, which owns it. What this facet must carry:
+
+**Two concessions this section did not have.** "Part (2) appears unoccupied" was too broad,
+because "intuitionistic" was doing work that "control effect" should have been doing:
+
+- **iALC** (Haeusler, de Paiva & Rademaker, 2011; 2018) — an intuitionistic `ALC` for **legal**
+  reasoning, motivated by conflict of laws and grounded in **Kelsen**, i.e. in this facet's own
+  jurisprudential lineage. Sequent calculus; no proof terms, no Curry–Howard, no actors, no
+  powers.
+- **MIND** (WoLLIC 2022) — an intuitionistic **deontic** logic in which obligation and
+  permission are not dual and conflicting obligations do not trivialise. Neighbourhood
+  semantics, cut-free sequent calculus. _Authors unresolved behind a paywall — do not cite until
+  confirmed._
+
+So intuitionistic-and-legal and intuitionistic-and-deontic are both occupied. Claiming "we went
+intuitionistic where the field did not" in print would have drawn a referee's correction.
+
+**One concession sharpened on the security side.** The constructive turn in authorization logic
+is **Garg & Pfenning (CSFW 2006)**, who claim the first constructive access-control logic in
+terms, for our reason — keeping the evidence inside the proof — with `says` as a lax modality and
+strong monad. **Aura** (ICFP 2008) is dependently typed, proof-carrying, and _audit_-logging:
+the closest prior art this facet has anywhere, and a security language. ABLP (1993) is classical
+and should not be cited as the constructive ancestor.
+
+**And a venue fact that changes how to open the paper.** Abadi took exactly this material to
+**DEON 2008** ("Variations in Access Control Logic", LNCS 5076, 96–109, in a van der
+Meyden / van der Torre volume). If the "settle venue" checkbox lands on DEON, the audience
+already knows the `says` line — the concession has to come early and by name, not in related
+work.
+
+**What survived, and it is the part worth having.** Nothing was found joining control operators,
+continuations, algebraic effects or handlers to legal or normative reasoning — the two
+literatures do not touch. Legal formalisation reaches proof theory (sequent calculi,
+neighbourhood semantics, ±∂ tags, argumentation fixpoints) and stops short of
+propositions-as-types; no neighbour treats a derivation as a proof _term_ or puts an **actor
+index** on the defeater. LogiKEy is confirmed **classical** HOL in Isabelle/HOL, as expected,
+and no substantial Agda/Coq/Lean deontic corpus exists to concede.
+
+Part (2) therefore restates as a **join**, not a novelty of intuitionism:
+
+> the **exercise** of a power as a **control effect** over an otherwise constructive derivation
+> — actor as **handler**, appeal hierarchy as **handler stack**, fiat as a **provenanced proof
+> term**.
+
+Every half is old (iALC, MIND, Garg–Pfenning, Aura, Griffin, Plotkin–Pretnar); the join is not.
+Concede all six by name, then claim the join and the executable instantiation. That is a
+narrower claim than the addendum first drafted and a defensible one — which is what the
+concede-then-claim posture is for.
+
+### One more referee-bait worth pre-empting
+
+_Braganza v BP Shipping_ [2015] UKSC 17 imported Wednesbury-style rationality review into
+contractual discretion — the private/public unification the handler type predicts (one `Power`
+constructor, review standard as an index). A referee from the law side will know _Braganza_;
+citing it shows the type is tracking doctrine, not just metaphor.
