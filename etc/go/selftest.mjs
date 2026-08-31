@@ -769,7 +769,33 @@ const SUBJECTS = execFileSync(
   .split("\n")
   .filter(Boolean);
 check("at least one subject sidecar exists", SUBJECTS.length >= 1);
-const FIXTURE_SUBJECT = SUBJECTS[0];
+// THE FIXTURE MUST BE A SIDECAR RICH ENOUGH FOR THE TESTS THAT MUTATE IT, and
+// alphabetical position does not establish that.
+//
+// This was `SUBJECTS[0]`, whose comment above claims the list is read "so this
+// file stays green when a second subject lands". It did — twice, by luck.
+// `sg-succession` sorts after `regcf`, so the fixture never moved. `chubb`
+// (2026-08-31) sorts BEFORE it, and the fixture moved to a subject that is
+// entirely constitutive: no `encoding.wizard`, no `explainer`, no `p7-dmn`
+// leg, because it has no regulative rules and no committed DMN goldens. The
+// blocks below build their cases by COPYING the fixture's descriptor and
+// mutating one key, so eighteen checks went red describing keys their fixture
+// did not have, and one crashed the run outright with a TypeError.
+//
+// So the selection states its requirement instead of relying on sort order: a
+// subject that declares a wizard module, an explainer directory and a DMN leg —
+// the three shapes the mutation blocks below assume. The fallback keeps a
+// single-subject tree working; those checks then fail as checks, which is
+// noisy but honest, rather than throwing.
+const fixtureDescOf = (id) =>
+  JSON.parse(
+    readFileSync(resolve(HERE, "subjects", id, "subject.json"), "utf8"),
+  );
+const FIXTURE_SUBJECT =
+  SUBJECTS.find((s) => {
+    const d = fixtureDescOf(s);
+    return d.encoding?.wizard && d.explainer?.dir && d.legs?.["p7-dmn"];
+  }) ?? SUBJECTS[0];
 // The additional encoding this subject declares, if any. DERIVED, never
 // hardcoded: R9 replaced "the second pass" with a NAMED id, and a test that
 // spelled the name out would go quietly wrong the day a sidecar renames it —
@@ -824,7 +850,21 @@ const FIXTURE_ENCODING =
     ),
   );
   desc.id = "bad";
-  desc.legs["p7-dmn"].golden = "jl4/does/not/exist.dmn";
+  // THE BAD GOLDEN IS INJECTED, not borrowed from whatever the fixture happens
+  // to declare. This line used to read `desc.legs["p7-dmn"].golden = …`, which
+  // silently assumed the alphabetically-FIRST sidecar declares a DMN leg. That
+  // held while `regcf` was first and stopped holding the moment a subject
+  // sorting before it declared none — `chubb`, 2026-08-31, whose corpus is
+  // entirely constitutive and carries no DMN goldens — and the failure was a
+  // TypeError out of the selftest itself, not a check reporting `not ok`.
+  // What this test is about is the resolver refusing a file it was told to
+  // expect and cannot find, and that needs no cooperation from the fixture.
+  desc.legs = {
+    "p7-dmn": {
+      golden: "jl4/does/not/exist.dmn",
+      fidelity_golden: "jl4/does/not/exist.fidelity.txt",
+    },
+  };
   writeFileSync(resolve(bad, "subject.json"), JSON.stringify(desc));
   const r = spawnSync("node", [resolve(HERE, "lib/subject.mjs"), "bad"], {
     encoding: "utf8",

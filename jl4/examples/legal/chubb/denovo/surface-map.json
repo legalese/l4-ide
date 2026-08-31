@@ -1,0 +1,1331 @@
+{
+  "schema": "l4-go/surface-map@1",
+  "subject": "chubb",
+  "note": [
+    "SPEC.md §8's declared pairing for the Kant et al. 2025 replication: the committed corpus encoding of the Codex/Chubb hospitalization policy (left) against the de novo encoding of the same policy (right). Both were written blind, from the policy text alone, by different encoders in different house styles — the corpus in the INERT style (every operative clause quoted verbatim inside the rule that encodes it), the de novo in the GUARDED-ROWS style (every clause a BRANCH whose row shape carries its connective). Written 2026-08-31 by the role licensed to read both; every measurement quoted below was made on that date with the prebuilt l4 at l4wt/callgraph-materiality/dist-newstyle/.../l4.",
+    "",
+    "WHAT CANNOT BE PAIRED, AND WHY — THE TOP-LEVEL DECISION ITSELF. Neither `a benefit is payable on this claim` (left) nor `benefit is payable` (right) appears below, and the reason is a decoder limit rather than a difference between the encodings. Both read the hospitalization-ground enum (`Ground of hospitalization` / `Hospitalization Ground`), and `JSONDECODE` delivers a constructor name as a bare STRING, so the first `CONSIDER` over it raises `reached a CONSIDER that has no branch for it`. MEASURED 2026-08-31 on both modules: the left errors on the value \"Accidental injury\", the right on \"accidental injury\" — the SAME defect with DIFFERENT text, which the comparator would report as a divergence about the law. Feeding the constructor as an object (`{\"accidental injury\":{}}`) decodes to NOTHING and fails the same way. The limit is already stated in the oracle's own Limits section; what is new here is that it costs this subject its top-level question, so the pairs below are the top-level decision taken apart into the five limbs that do not touch an enum.",
+    "",
+    "This is worth stating plainly because it is the one thing the benchmark measures: Kant et al. score a model on nine yes/no answers, and those answers ARE this top-level decision. The comparator cannot see them. What it can see is every clause underneath, which is the larger part of both encodings and the part no query in the benchmark exercises at all.",
+    "",
+    "PAIRS CONSIDERED AND REJECTED, with the reason for each. (1) `the claim is premised on a hospitalization for sickness or accidental injury` — identically named on both sides, and unfeedable for the enum reason above; it is also the site of fork F-Q5-ACCIDENTAL-INJURY, whose readings the encoding cannot tell apart in any case because the ground arrives pre-construed. (2) `2.1(1)-(4) — the event arose directly or indirectly out of an excluded activity` (left) against nothing on the right: the de novo has no separate decision for limbs 1-4, they are four rows of `an exclusion in clause 2.1 applies` — and both sides are unfeedable over a non-empty LIST OF Cause. (3) `1.1(1) — this agreement is signed`, `1.1(2) — the applicable premium for the policy period has been paid`, `1.1(4) — the policy has not been canceled`, `3.1.1 — the Policy insures You twenty-four hours a day anywhere in the world` and `the premium was paid in one lump sum at the signing of the policy` (all left): the de novo declares no counterpart rule for any of them — 1.1(1), 1.1(2) and 1.1(4) are rows read inline, 3.1.1 is a comment (fork F-31-24-HOUR), 3.5.1 is folded into 1.1(2)'s boolean. The comparator refuses a call the named module does not declare, and inventing one would be editing an encoding to make a diff run. (4) `the hospitalization is within the policy term` (left) against `the policy term had begun at the time of the hospitalization` (right): the two are NOT the same question — the left closes the term at both ends, the right only at the start — so the pair would manufacture a divergence at month 12 that is a fact about the declaration. The term's far end is measured by `term-expired` instead. (5) `arbitration was not commenced within three months of the impasse` (left) against `arbitration was commenced within the clause 3.2.1 window` (right): they are complements, so they would disagree on every row by construction. What they feed is compared by `arbitration-extinguished`.",
+    "",
+    "THE BATTERY IS HAND-WRITTEN AND BOUNDARY-DENSE. `battery.cases` is unset: there is no subject sidecar with a `legs['p7-dmn'].cases` file for this subject, so there is no DMN-sanitised seed set to un-sanitise. The 34 rows are built from the policy text and from the nine benchmark queries — every deadline the policy states (months 6, 7 and 12), the age bar at 78/79/80/81, the arbitration window, and the sixty-day bar — and they are placed ON the boundaries deliberately, because with perturbation off the boundaries are the only place a one-month divergence can show.",
+    "",
+    "PERTURBATION IS OFF, AND THE REASON IS THE FACT SCHEMAS. Nine of the sixteen live leaves are pure renames and would perturb coherently. Five are NOT: the corpus dates the premium, the fraud and the misrepresentation-or-withholding as MAYBE NUMBER months, while the de novo asks three (and, splitting the last, four) undated BOOLEANs. Those live in the row as separate keys — the union-payload technique — so a single-field mutation of any one of them moves ONE side and leaves the other reading its own untouched twin. The divergence that produces is a fact about this map, not about either encoding, and `perturb` is per-SLOT while both encodings take exactly one argument, so there is no way to freeze the five and mutate the nine. The boundary values a generator would have found are written into the rows by hand instead.",
+    "",
+    "EACH ROW IS A UNION PAYLOAD. Every row object carries the corpus's field names as canonical, the nine renames listed under `slots.claim.right.rename`, and the six keys only the de novo declares. JSONDECODE ignores what a record does not declare, so each side reads its own vocabulary out of one object. SAME-NAME COLLISIONS WERE HUNTED FOR: exactly two labels are shared — `this agreement is signed` and `a valid arbitration award has been issued` — and both are the same L4 type with the same referent, so one key serves both sides. No other label appears in both records.",
+    "",
+    "THE ENUM-VALUED KEYS ARE DELIBERATELY NOT RENAMED. `the hospitalization on which the claim is premised was for` / `the hospitalization was for` and the two cause lists are carried as four separate keys rather than two renamed ones, because the two modules spell their constructors differently (`Accidental injury` against `accidental injury`, `Skydiving` against `skydiving`). Nothing below forces either value — that is the point of the enum limit above — but a later editor who adds a pair that does force one will find each side already holding its own spelling rather than a shared string that is wrong for one of them."
+  ],
+  "sides": {
+    "left": {
+      "label": "corpus",
+      "module": "jl4/examples/legal/chubb/chubb.l4",
+      "timezone": "America/New_York",
+      "provenance": {
+        "source": "arXiv:2502.17638 Appendix A.1 (Kant, Chakraborty, Srivastava et al. 2025), an anonymised and abridged Chubb form",
+        "retrieved": "2026-08-31",
+        "cite": "Codex Insurance Limited hospitalization policy, the benchmark fixture as published"
+      },
+      "note": "The reference encoding of the foundation phase — the INERT style, 526 lines, scored best-candidate on both isomorphism and soundness. It declares 25 rules and no imported types beyond `prelude`, so `l4 render --include-unused` sees the whole surface. TIMEZONE is declared here rather than in the module because neither module declares one and neither needs one: every time in this policy is carried as a NUMBER of months relative to the effective date, on the benchmark's own instruction. America/New_York is the honest zone anyway — clause 1.2 cancels at 'midnight, US Eastern time then in effect' and clause 3.3.1 chooses New York law."
+    },
+    "right": {
+      "label": "de novo",
+      "module": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+      "timezone": "America/New_York",
+      "provenance": {
+        "source": "arXiv:2502.17638 Appendix A.1 (Kant, Chakraborty, Srivastava et al. 2025), an anonymised and abridged Chubb form",
+        "retrieved": "2026-08-31",
+        "cite": "Codex Insurance Limited hospitalization policy, the benchmark fixture as published"
+      },
+      "note": "The de novo encoding — the GUARDED-ROWS style, 536 lines. Written from the same policy text with no sight of the corpus encoding and no sight of the benchmark's answer key. Its fact schema is materially different from the corpus's, which is the interesting part: it asks four undated booleans where the corpus asks three dated months, and it has no field at all for clause 1.3's qualified-provider requirement."
+    }
+  },
+  "slots": {
+    "claim": {
+      "kind": "record",
+      "left": {
+        "type": "Claim"
+      },
+      "right": {
+        "type": "Claim",
+        "rename": {
+          "the month of the hospitalization on which the claim is premised": "month of the hospitalization",
+          "your age in years at the time of the hospitalization": "age at the time of the hospitalization",
+          "the month in which a wellness visit for yourself occurred": "month the wellness visit occurred",
+          "the month in which written confirmation from that medical provider was supplied to us": "month written confirmation of the visit was supplied",
+          "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": "a dispute or disagreement has arisen",
+          "the month on which the parties were unable to settle the dispute or difference": "month the parties were unable to settle the dispute",
+          "the month in which arbitration was commenced": "month arbitration was commenced",
+          "the month in which written proof of claim was submitted to us": "month written proof of claim was submitted",
+          "the month in which you seek to recover on this Policy": "month recovery on the policy is sought"
+        },
+        "note": "Nine renames. The other eight of the de novo's seventeen fields are either shared by name with the corpus (two) or supplied as their own keys in every row (six), because no rename can bridge a MAYBE NUMBER month to a BOOLEAN."
+      },
+      "note": [
+        "ONE SLOT, because each side's every decision takes exactly one record and both call it `Claim`. The two records are NOT the same record: seventeen fields each, two labels in common, nine more that differ only in wording, and six that differ in what they can say.",
+        "The corpus's `that wellness visit was with a qualified medical provider` has no counterpart on the right at all — clause 1.3's qualification requirement is simply not in the de novo's fact schema (fork F-13-PROVENANCE). It is supplied in every row and read by the left only."
+      ]
+    }
+  },
+  "battery": {
+    "rows": [
+      {
+        "name": "clean claim, hospitalization in month 3",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "The all-favourable baseline. Every pair should agree here; a divergence on this row is a divergence about the ordinary case, not about a boundary."
+      },
+      {
+        "name": "hospitalization in month 11 — inside the term on either reading",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 11,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "hospitalization in month 12 — the last day of the one-year term",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 12,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "THE TERM-END BOUNDARY (fork F-12-TERM-END). The corpus reads 1.2's automatic cancelation as biting AT month 12 (`AT LEAST 12`); the de novo reads it as biting after (`GREATER THAN 12`). One month apart, and no query in the benchmark sits here."
+      },
+      {
+        "name": "hospitalization in month 13 — after the term on either reading",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 13,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "hospitalization in month −1 — before the effective date",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": -1,
+            "the month of the hospitalization on which the claim is premised": -1,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "The premium is dated to the same month so the corpus's 1.1(2) limb does not mask the point. THE TERM-START PLACEMENT (fork F-36-TERM-START): clause 1.1's own four-limb list does not mention the start of the term, and the two encodings put 3.6's term-start test in different places — the corpus in its top-level decision, the de novo inside its 1.1 in-effect decision."
+      },
+      {
+        "name": "Q4 — confirmation supplied in month 8, hospitalization in month 3",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 8,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "Benchmark query 4 as the reference encodings marshalled it: a fall abroad, confirmation of the wellness visit given 8 months after the effective date, and NO hospitalization month stated by the query. This row takes the favourable default the benchmark's own preamble directs."
+      },
+      {
+        "name": "Q4 — the same claim with the hospitalization in month 7",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 7,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 8,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "The same claim, one fact moved: the month clause 1.1 makes operative. Fork F-Q4-MOMENT-UNSTATED, and also the pendency boundary F-13-PENDING-BOUNDARY."
+      },
+      {
+        "name": "Q4 — the same claim with the hospitalization in month 9",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 9,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 8,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "The same claim after the month-7 deadline has passed with no conforming confirmation. Both encodings should refuse."
+      },
+      {
+        "name": "no wellness visit, hospitalization in month 5",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 5,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": null,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": null,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "no wellness visit, hospitalization in month 7",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 7,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": null,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": null,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "THE PENDENCY BOUNDARY (fork F-13-PENDING-BOUNDARY). The corpus stops treating the 1.3 condition as pending AT month 7 (`AT LEAST 7`); the de novo stops after it (`GREATER THAN 7`)."
+      },
+      {
+        "name": "no wellness visit, hospitalization in month 8",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 8,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": null,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": null,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "wellness visit with a provider who was not qualified",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": false,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "Fork F-13-PROVENANCE. Clause 1.3 requires the visit to be with a QUALIFIED medical provider and the confirmation to come FROM THE MEDICAL PROVIDER IN QUESTION. The corpus carries the qualification as a fact; the de novo's `Claim` has no field for it."
+      },
+      {
+        "name": "wellness visit in month 5, hospitalization in month 4, confirmation in month 2",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 4,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 5,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "A visit that has not yet happened when the question is asked, and a confirmation that predates the visit it confirms. Clause 1.3 states no ordering; the corpus tests only the confirmation as at the hospitalization, the de novo tests both."
+      },
+      {
+        "name": "confirmation in month 7, hospitalization in month 8",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 8,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 7,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "wellness visit in month 7 — after the 6-month deadline",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 8,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 7,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 7,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "fraud in month 1, hospitalization in month 3",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": 1,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": true,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "fraud in month 9, hospitalization in month 3",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": 9,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": true,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "THE CANCELLATION-MOMENT FORK (F-12-CANCELLATION-MOMENT). Clause 1.2 never says when a deemed cancelation takes effect. The corpus dates each conduct ground and requires it to precede the hospitalization; the de novo treats the grounds as undated, so conduct AFTER a good hospitalization still defeats the claim."
+      },
+      {
+        "name": "misrepresentation in month 2",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": 2,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": true,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "material withholding in month 2",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": 2,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": true
+          }
+        },
+        "note": "The corpus's single dated field cannot tell a misrepresentation from a material withholding; the de novo has a separate boolean for each. Both should answer alike here — the difference is in what each fact schema can express, not in the answer."
+      },
+      {
+        "name": "misrepresentation in month 9, hospitalization in month 3",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": 9,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": true,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "premium never paid",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": null,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": false,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "premium paid in month 5, hospitalization in month 3",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 5,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "Fork F-11-PREMIUM-TIMING. 1.1(2) asks whether the premium 'has been paid', and 1.1 takes every limb as at the hospitalization. The corpus dates the payment; the de novo asks a bare boolean, which cannot express a premium paid after the loss."
+      },
+      {
+        "name": "age 79 at the hospitalization",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 79,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "age 80 at the hospitalization",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 80,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "Fork F-215-THRESHOLD: 'equal to or greater than 80' is inclusive, so exactly 80 is excluded. Benchmark query 2 turns on the other side of this line (78)."
+      },
+      {
+        "name": "age 81 at the hospitalization",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 81,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "dispute, impasse in month 2, arbitration commenced in month 4, award issued",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": true,
+            "the month on which the parties were unable to settle the dispute or difference": 2,
+            "the month in which arbitration was commenced": 4,
+            "a valid arbitration award has been issued": true,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "dispute, impasse in month 2, arbitration commenced in month 6 — outside the window",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": true,
+            "the month on which the parties were unable to settle the dispute or difference": 2,
+            "the month in which arbitration was commenced": 6,
+            "a valid arbitration award has been issued": true,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "dispute, impasse in month 2, arbitration never commenced",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": true,
+            "the month on which the parties were unable to settle the dispute or difference": 2,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "Fork F-321-EXTINGUISHMENT-WINDOW, and the shared defect: the hospitalization is in month 3, one month into a three-month window that has not run out, and BOTH encodings extinguish the claim already. Agreement here is evidence of a bug, not of correctness."
+      },
+      {
+        "name": "dispute, no day of impasse yet",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": true,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "dispute, arbitration commenced in time but no award yet",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": true,
+            "the month on which the parties were unable to settle the dispute or difference": 2,
+            "the month in which arbitration was commenced": 3,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": null,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "recovery sought one month after written proof of claim",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": 1,
+            "the month in which you seek to recover on this Policy": 2,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "recovery sought two months after written proof of claim",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": 1,
+            "the month in which you seek to recover on this Policy": 3,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        },
+        "note": "THE SIXTY-DAY BOUNDARY (fork F-321-SIXTY-DAY-EXPIRY). Both encodings carry the sixty days as two months; the corpus lets recovery be sought AT the expiry (`AT LEAST`), the de novo only after it (`GREATER THAN`)."
+      },
+      {
+        "name": "recovery sought three months after written proof of claim",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": 1,
+            "the month in which you seek to recover on this Policy": 4,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      },
+      {
+        "name": "recovery sought with no written proof of claim submitted",
+        "slots": {
+          "claim": {
+            "this agreement is signed": true,
+            "the month the applicable premium for the policy period was paid": 0,
+            "the month of the hospitalization on which the claim is premised": 3,
+            "the hospitalization on which the claim is premised was for": "Accidental injury",
+            "your age in years at the time of the hospitalization": 40,
+            "the event causing the sickness or accidental injury arose directly or indirectly out of": [],
+            "the month in which there was fraud": null,
+            "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": null,
+            "the month in which a wellness visit for yourself occurred": 1,
+            "that wellness visit was with a qualified medical provider": true,
+            "the month in which written confirmation from that medical provider was supplied to us": 2,
+            "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": false,
+            "the month on which the parties were unable to settle the dispute or difference": null,
+            "the month in which arbitration was commenced": null,
+            "a valid arbitration award has been issued": false,
+            "the month in which written proof of claim was submitted to us": null,
+            "the month in which you seek to recover on this Policy": 3,
+            "the hospitalization was for": "accidental injury",
+            "the event arose directly or indirectly out of": [],
+            "the applicable premium for the policy period has been paid": true,
+            "there is fraud": false,
+            "there is a misrepresentation of information provided to the Company": false,
+            "there is a material withholding of information provided to the Company": false
+          }
+        }
+      }
+    ],
+    "perturbation": {
+      "enabled": false,
+      "note": "Off by construction — see the map note. Every boundary a generator would have reached is written into a row by hand."
+    }
+  },
+  "pairs": [
+    {
+      "id": "policy-in-effect",
+      "citation": "Codex policy clause 1.1, with 1.2, 1.3 and 3.6",
+      "left": {
+        "call": "the policy is in effect at the time of the hospitalization",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the policy was in effect at the time of the hospitalization",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": [
+        "The whole of clause 1.1's four-limb conjunction, and through limbs 3 and 4 the whole of 1.2 and 1.3. This is as close to the top-level question as the comparator can get: the top-level decisions on both sides read the hospitalization-ground enum, which JSONDECODE cannot supply (see the map note).",
+        "THE TWO SIDES ARE NOT SHAPED ALIKE HERE, and the difference is declared rather than hidden: the de novo folds 3.6's term-start test into this decision, the corpus states it as a separate limb of its top-level decision. A hospitalization before the effective date should therefore diverge, and that divergence is about placement, not about the law — fork F-36-TERM-START."
+      ],
+      "fork": "F-36-TERM-START"
+    },
+    {
+      "id": "cancelation",
+      "citation": "Codex policy clause 1.2",
+      "left": {
+        "call": "cancelation is deemed to have occurred on or before the hospitalization",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the policy has been canceled",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": [
+        "Clause 1.2's four grounds of deemed cancelation, as at the hospitalization. The corpus's name says 'on or before the hospitalization' because it dates each ground; the de novo's does not, because it does not.",
+        "Expect divergence wherever a conduct ground postdates the hospitalization (fork F-12-CANCELLATION-MOMENT) and at the last month of the term (fork F-12-TERM-END)."
+      ],
+      "fork": "F-12-CANCELLATION-MOMENT"
+    },
+    {
+      "id": "term-expired",
+      "citation": "Codex policy clause 1.2, last sentence, with clause 3.6",
+      "left": {
+        "call": "1.2(d) — automatic cancelation on the last day of the policy term",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the policy term had expired at the time of the hospitalization",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": "Both sides ask one question — has the one-year term run out as at the hospitalization — and answer it with a different comparator. This pair exists to isolate fork F-12-TERM-END from everything else clause 1.2 does.",
+      "fork": "F-12-TERM-END"
+    },
+    {
+      "id": "clause-1-3-satisfied",
+      "citation": "Codex policy clause 1.3, read through clause 1.1(3)",
+      "left": {
+        "call": "the Section 1.3 condition has been satisfied in a timely fashion by the time of the hospitalization",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the clause 1.3 condition has been satisfied in a timely fashion",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": [
+        "The corpus splits 1.3 in two — a bare 'satisfied in a timely fashion' and an as-at-the-hospitalization wrapper — while the de novo builds the as-at test into the single decision. The WRAPPER is what the de novo's decision corresponds to, so it is the wrapper that is paired; pairing the bare one would compare two different questions.",
+        "Expect divergence on the qualified-provider fact (fork F-13-PROVENANCE) and on a visit that postdates the hospitalization."
+      ],
+      "fork": "F-13-PROVENANCE"
+    },
+    {
+      "id": "clause-1-3-pending",
+      "citation": "Codex policy clause 1.1(3)",
+      "left": {
+        "call": "the Section 1.3 condition is still pending at the time of the hospitalization",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the clause 1.3 condition is still pending",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": "Clause 1.1(3)'s 'still pending' limb — on FOUNDATION.md's account the single most consequential choice in either encoding, because it decides every claim between the two deadlines. Expect divergence at exactly month 7 (fork F-13-PENDING-BOUNDARY).",
+      "fork": "F-13-PENDING-BOUNDARY"
+    },
+    {
+      "id": "clause-1-1-limb-3",
+      "citation": "Codex policy clause 1.1(3)",
+      "left": {
+        "call": "1.1(3) — the Section 1.3 condition is still pending or has been satisfied in a timely fashion",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "clause 1.1 limb 3 is met",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": "The disjunction of the two previous pairs, as clause 1.1(3) states it. Paired separately because a divergence in one disjunct can be masked by the other, and the masking is itself worth seeing."
+    },
+    {
+      "id": "cancel-ground-1-3",
+      "citation": "Codex policy clause 1.2, third ground",
+      "left": {
+        "call": "1.2(c) — the Section 1.3 condition has not been satisfied in a timely fashion",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the clause 1.3 condition has not been satisfied in a timely fashion",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": [
+        "Clause 1.2's third cancelation ground. The two encodings reach the same harmonising reading of the 1.1(3)/1.2 contradiction (fixture defect D3) by different routes: the corpus dates the ground to month 7 and requires the hospitalization to be at or after it; the de novo defines the ground as 'neither satisfied nor pending'.",
+        "The routes are not extensionally equal at the boundary, which is what this pair is here to show."
+      ],
+      "fork": "F-13-PENDING-BOUNDARY"
+    },
+    {
+      "id": "exclusions",
+      "citation": "Codex policy clause 2.1",
+      "left": {
+        "call": "a general exclusion in Section 2.1 applies to this claim",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "an exclusion in clause 2.1 applies",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": [
+        "THIS PAIR IS SOUND ONLY BECAUSE EVERY ROW SUPPLIES AN EMPTY CAUSE LIST. Limbs 1-4 of clause 2.1 test a LIST OF an enum, and JSONDECODE delivers a constructor name as a bare string: measured 2026-08-31, the corpus's `any` over a non-empty list raises `reached a CONSIDER that has no branch for it` and the de novo's `elem` raises `Trying to check equality on types that do not support it`. Two DIFFERENT error texts, which the comparator would report as a divergence about the law. With the list empty, neither limb is reached and the pair measures limb 5 — the age bar — on both sides.",
+        "So: this pair exercises fork F-215-THRESHOLD and nothing else. Limbs 1-4, and with them forks F-21-DISJUNCTION, F-21-CAUSAL-NEXUS and F-21-WHOSE-SERVICE, are out of the comparator's reach entirely."
+      ],
+      "fork": "F-215-THRESHOLD"
+    },
+    {
+      "id": "arbitration-extinguished",
+      "citation": "Codex policy clause 3.2.1, second sentence",
+      "left": {
+        "call": "your right to make a claim has been extinguished",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the right to make a claim has been extinguished under clause 3.2.1",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": "The extinguishment limb. Both encodings are expected to AGREE and both are expected to be wrong in the same way — neither gives the limb an 'as at' moment, so a claim is extinguished while the three-month window is still open (fork F-321-EXTINGUISHMENT-WINDOW). Agreement on the 'dispute, arbitration never commenced' row is the exhibit for that.",
+      "fork": "F-321-EXTINGUISHMENT-WINDOW"
+    },
+    {
+      "id": "award-condition-precedent",
+      "citation": "Codex policy clause 3.2.1, third sentence",
+      "left": {
+        "call": "the arbitration-award condition precedent is satisfied",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "the clause 3.2.1 condition precedent to liability is met",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": "'Where there is a dispute or disagreement, the issuance of a valid arbitration award shall also be a condition precedent to our liability.' Both sides gate it on a dispute having arisen, so it is vacuous on an undisputed claim."
+    },
+    {
+      "id": "sixty-day-bar",
+      "citation": "Codex policy clause 3.2.1, last sentence",
+      "left": {
+        "call": "you may seek to recover on this Policy",
+        "args": [
+          "claim"
+        ]
+      },
+      "right": {
+        "call": "you may seek to recover on the policy now",
+        "args": [
+          "claim"
+        ]
+      },
+      "note": [
+        "Both encodings treat the sixty-day bar as procedural and keep it OUT of the payability decision (fork F-321-SIXTY-DAY-BAR), and both carry the sixty days as two months (fork F-321-SIXTY-DAYS). Neither of those choices is visible to this pair, because both sides made them alike.",
+        "What IS visible is the expiry boundary: fork F-321-SIXTY-DAY-EXPIRY."
+      ],
+      "fork": "F-321-SIXTY-DAY-EXPIRY"
+    }
+  ]
+}

@@ -1,0 +1,1886 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "chubb",
+  "note": "P4's fork register for the de novo encoding of the Codex/Chubb hospitalization policy — the fixture Kant et al. 2025 (arXiv:2502.17638) published as Appendix A.1 and scored nine queries against in Appendix A.2. WHY THIS FILE EXISTS AT ALL. The benchmark this replicates resolved every ambiguity in the policy SILENTLY: its ground truth is nine labels of the form `Answer: \"No.\"`, with no clause citation, no rationale, and no record of any interpretive choice. Twenty-eight of those choices are below. TEN of them bear on at least one of the paper's nine queries, and four are outcome-determinative for a published label — F-13-PENDING-SCOPE decides query 3, F-Q4-MOMENT-UNSTATED query 4, F-Q5-ACCIDENTAL-INJURY query 5, and F-Q9-CHAPEAU-SCOPE queries 2 and 9 jointly. The other EIGHTEEN are invisible to all nine queries: no query mentions a dispute, none supplies a wellness-visit date, none sits at a deadline boundary, and none puts the premium, the term or the arbitration machinery in issue. The claim this register makes is not that the paper's answers are wrong — on eight of nine we agree with them — but that a key which records only its outputs cannot be audited, cannot be disagreed with in detail, and cannot tell a downstream user which of its labels were hard. NOTHING HERE IS MATERIALISED, AND THE REASON IS WHEN THE ENCODINGS WERE WRITTEN. R4 (R4-FORK-REPRESENTATION.md, RULED 2026-08-02) maps a materialised fork 1:1 onto a field of an `Interpretation` record threaded as an ordinary GIVEN. Neither module has such a record: both were written blind, from the policy text alone, by encoders whose brief was to encode the policy and answer nine queries and who were given no fork machinery to reach for. So 24 entries are `resolved-at-encode`, 4 are `delegated-to-fact`, and `interpretation_type` is absent because there is no type to name. That places this register beside the BNA's twelve (PR #195), which materialised none, and NOT beside the Reg CF de novo register at jl4/examples/legal/regcf/denovo/fork-register.json, which materialises SIX of its twenty-six as fields of an `Interpretation` record. VERIFIED 2026-08-31 by counting the `materialisation` values in both committed registers, because an earlier framing of this exercise asserted that no inventory anyone has produced had ever materialised a fork, and that is not so. Materialisation is a discriminator, not a default: it is what an encoder does when a fork has two live readings, an executable difference, and an encoding built to carry both. WHICH OF THESE WOULD BE MATERIALISED IN A REBUILD. Ten entries carry TWO LIVE readings — F-11-CLOCK is not among them, but F-11-PREMIUM-TIMING, F-13-PENDING-BOUNDARY, F-13-PROVENANCE, F-13-AS-AT-WHICH-EVENT, F-12-CANCELLATION-MOMENT, F-12-TERM-END, F-36-TERM-START, F-321-EXTINGUISHMENT-WINDOW, F-321-SIXTY-DAY-EXPIRY and F-31-24-HOUR are — and that is the shape R4 materialises. Eight of the ten are ones the two encodings actually split on; the other two (F-321-EXTINGUISHMENT-WINDOW, F-31-24-HOUR) have two live readings that neither encoding threads. A rebuild under R4 would put those ten on an `Interpretation` record and leave the remaining eighteen where they are. SITE PATHS point at the de novo module and use ANCHORS AND NO LINE NUMBERS, deliberately: this register was written in the same run that deposited the module, other agents were still editing it, and a line number that rots looks exactly like a line number that is right. WITNESSES MARKED 'MEASURED' were produced on 2026-08-31 by the SPEC.md §8 diff oracle (`node etc/go/lib/denovo-diff.mjs run --map jl4/examples/legal/chubb/denovo/surface-map.json`), which compared the two encodings over 11 declared pairs and 34 battery rows: 374 evaluations per side, 350 agreements, 24 divergences, 12 distinct witnesses, exit 1, every disposition UNTRIAGED. EVERY ONE OF THE TWELVE LANDS ON A FORK RECORDED HERE — F-13-PENDING-BOUNDARY (triage rows 1, 4, 5 and part of 9), F-12-TERM-END (2, 12 and part of 9), F-12-CANCELLATION-MOMENT (3 and part of 10), F-13-PROVENANCE (6, 7), F-13-AS-AT-WHICH-EVENT (8), F-36-TERM-START (10), F-11-PREMIUM-TIMING (part of 9) and F-321-SIXTY-DAY-EXPIRY (11) — so the oracle found no divergence this register cannot explain, and the register predicted every divergence the oracle found. WITNESSES NOT SO MARKED are fact patterns reasoned from the two modules' text, and each says where the instrument cannot reach them. The commonest reason is that JSONDECODE cannot supply an enum constructor, which puts the whole of clause 2.1's causal limbs and BOTH top-level payability decisions outside the comparator — measured, with the two error texts, in the surface map's note. READ THIS REGISTER AGAINST FOUNDATION.md §4.2, which is its source: 35 raw entries recorded by three blind encoders, consolidated here rather than re-derived. Where an entry cites a FOUNDATION.md item (A1-A35) or a fixture defect (D1-D20), that is the provenance of the observation, not a second authority for it. WHAT DID NOT BECOME AN ENTRY, named so nobody has to diff the two documents. A4 (is clause 1.1's numbered list definitional or merely sufficient) and A8 (one policy period or renewable ones): both encodings took the same reading and neither recorded a competing one worth executing. A6 (whose signature clause 1.1(1) tests): stipulated away by the benchmark's own prompt. A10 (does 'in a timely fashion' attach to one of clause 1.3's deadlines or both): ABSORBED — on re-reading the de novo module its satisfaction test consults BOTH deadlines, so what FOUNDATION.md saw as a one-deadline reading is the PENDENCY test, and that is carried by F-13-PENDING-SCOPE and F-13-PENDING-BOUNDARY. A18 (at which month a clause 1.2 cancelation for failure of clause 1.3 bites): absorbed into F-13-PENDING-BOUNDARY, which is where the two encodings actually differ about it. A23 (does 'arising out of' modify the event or the sickness or injury): FOUNDATION.md records that no fact pattern was found on which the two readings diverge, and none was found here either. A31 (the arbitration award as a condition precedent): both encodings gate it on a dispute having arisen and it is measured by the `award-condition-precedent` pair, with no second reading surviving. A34 (whether clause 3.3.1's choice of law is operative on payability): both took it as not operative, and it appears here as the LICENCE for a reading rather than as a fork of its own — see F-Q5-ACCIDENTAL-INJURY. A12 and A13 are folded into F-13-AS-AT-WHICH-EVENT's notes. THREE ENTRIES HERE APPEAR IN NO FOUNDATION.md ROW. F-Q4-MOMENT-UNSTATED promotes its §1.3 argument to a fork; F-13-AS-AT-WHICH-EVENT is new; and F-321-SIXTY-DAY-EXPIRY is new because no single encoder could have seen it — it takes two encodings side by side to notice that one wrote AT LEAST where the other wrote GREATER THAN. That last one is the clearest thing this exercise found that nobody had already written down, and it is an argument for the §8 oracle as a fork-FINDING instrument and not only a fork-checking one.",
+  "entries": [
+    {
+      "id": "F-DOC-NO-INSURING-CLAUSE",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`benefit is payable`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy, the document as a whole",
+          "Codex Insurance Limited hospitalization policy clause 1.1",
+          "Codex Insurance Limited hospitalization policy clause 2.1",
+          "Codex Insurance Limited hospitalization policy clause 3.1.1"
+        ]
+      },
+      "source": {
+        "quote": "The payment of any benefit under this policy is conditioned on the policy being in effect at the time of the hospitalization for sickness or accidental injury on which the claim for such benefit is premised.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy, the document as a whole"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "necessaryConditionsTest",
+          "description": "The document states a complete set of NECESSARY conditions and no sufficient one, so the answerable question is whether every condition it makes operative is met and no exclusion bites. TRUE means \"nothing in the policy as supplied defeats this claim\", not \"the insurer owes $X\". Both encodings say so in their module headers.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, whose only operative verb is \"is conditioned on\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, whose only operative verb is \"will not apply to\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.1.1, the sole affirmative statement that the policy does anything, which names a time and a place and no peril and no payment"
+            }
+          ]
+        },
+        {
+          "id": "strictlyUnanswerable",
+          "description": "There is no insuring clause, so \"is a benefit payable\" cannot be answered from this text at all, and the only honest output is \"I do not know\".",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the exercise, not by any argument against it: a benchmark that scores nine yes/no answers has no cell for \"I do not know\", and four of its nine gold answers (queries 2, 3, 7 and 9) are derived entirely from the ABSENCE of a firing exclusion rather than from any grant. An encoder that took this reading would be scored wrong on four of nine items for reading the document correctly. Nobody has refuted it; it is simply not a reading the instrument can be encoded under.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy, which nowhere states what benefit is payable, in what amount, or on what trigger"
+            },
+            {
+              "kind": "instrument",
+              "cite": "Codex Insurance Limited hospitalization policy clauses 1.2 and 3.5.1, which cross-refer to a \"Section 5\" that is not in the document and would have carried the benefit schedule"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "necessaryConditionsTest",
+        "mechanism": "encoded",
+        "rationale": "Taken because it is the only reading under which the document can be encoded at all, and it is stated in the header of both encodings so that no reader mistakes a TRUE for an entitlement computation. Note what this costs: every \"Yes\" the benchmark scores is a double negative — no condition failed and no exclusion fired — and the encoding cannot distinguish \"covered\" from \"not defeated\"."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §2.1 defect D1. `grep -nE '\\$|percent|%'` over the fixture finds no monetary amount anywhere.",
+        "All three blind encodings took this reading independently. That is agreement among three careful readings and carries no weight beyond that.",
+        "Divergence is 'none' rather than 'observable' because the alternative reading produces no answer at all, so no fact pattern can exhibit the two side by side."
+      ]
+    },
+    {
+      "id": "F-DOC-SECTION-5",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`length of the policy term in months`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.2",
+          "Codex Insurance Limited hospitalization policy clause 3.5.1",
+          "Codex Insurance Limited hospitalization policy clause 3.6"
+        ]
+      },
+      "source": {
+        "quote": "It will also be automatically canceled at midnight, US Eastern time then in effect, on the last day of the policy term described in Section 5 below.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "readClause36ForTheTerm",
+          "description": "\"Section 5\" is a drafting error, and clause 3.6 — the only clause in the document that describes a term — is the clause meant. The term is one year from the effective date.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.6: \"will last for a period of one year from that date\""
+            }
+          ]
+        },
+        {
+          "id": "unresolvableReference",
+          "description": "The reference points outside the document, so neither the term nor the premium nor the benefit schedule can be ascertained, and clause 1.2's automatic cancelation has no date to run to.",
+          "status": "rejected",
+          "rejection_rationale": "It would make the policy perpetual — a cancelation clause with no ascertainable date never fires — and clause 3.6 supplies exactly the missing fact in terms. What the encodings do NOT recover is the premium amount and the benefit schedule, which are genuinely unrecoverable and are not modelled by either.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, which cross-refers to Section 5 for the term"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.5.1, which cross-refers to Section 5 for the premium"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "readClause36ForTheTerm",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings. The document's highest section is 3, and both live cross-references to \"Section 5\" are the money-and-time clauses — the term and the premium — so the omission is systematic rather than a typo in one place."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "Battery row `hospitalization in month 13 — after the term on either reading`: under `readClause36ForTheTerm` the policy has expired and both encodings answer that it is canceled; under `unresolvableReference` nothing ever expires and the claim survives. Both encodings take the first reading, so the row exhibits the difference between the READINGS and not a disagreement between the encodings — the `cancelation` and `term-expired` pairs agree on it."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §2.2 defect D2, and D14: clause 1.2 defines cancelation by reference to the term while clause 3.6 defines the term by reference to cancelation, one leg of which is this dangling reference."
+      ]
+    },
+    {
+      "id": "F-11-CLOCK",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the policy was in effect at the time of the hospitalization`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1",
+          "Codex Insurance Limited hospitalization policy clause 1.1(1)",
+          "Codex Insurance Limited hospitalization policy clause 1.1(2)",
+          "Codex Insurance Limited hospitalization policy clause 1.1(3)",
+          "Codex Insurance Limited hospitalization policy clause 1.1(4)"
+        ]
+      },
+      "source": {
+        "quote": "The payment of any benefit under this policy is conditioned on the policy being in effect at the time of the hospitalization for sickness or accidental injury on which the claim for such benefit is premised.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "oneClockForAllFourLimbs",
+          "description": "Clause 1.1 fixes ONE instant — the time of the hospitalization — and every one of its four limbs is tested at it. A premium paid after the loss was not paid when the policy had to be in effect.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, \"in effect AT THE TIME OF the hospitalization\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1(5), which fixes its own test expressly \"at the time of the hospitalization\" and shows the drafter using the phrase as an operative moment"
+            }
+          ]
+        },
+        {
+          "id": "onlyCancellationIsTemporal",
+          "description": "Limbs 1 to 3 are satisfied once and for all — a signature, a payment, a condition — and only limb 4 asks a question about a moment. On this reading a policy that was ever in effect answers limb 1 to 3 forever.",
+          "status": "rejected",
+          "rejection_rationale": "It lets a policyholder cure a lapse after the loss: pay the premium, or supply the wellness confirmation, on the day after the hospitalization and the claim becomes good retrospectively. Clause 1.1's own words place the test at the hospitalization and not at the claim.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clauses 1.1(1)-(3), all three of which are drafted in the present perfect (\"is signed\", \"has been paid\", \"has been satisfied\")"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "oneClockForAllFourLimbs",
+        "mechanism": "encoded",
+        "rationale": "Taken by all three blind encodings independently. It is the reading that makes clause 2.1(5)'s express \"at the time of the hospitalization\" a repetition of the general rule rather than a special one."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "Battery row `premium paid in month 5, hospitalization in month 3`: under `oneClockForAllFourLimbs` clause 1.1(2) fails, under `onlyCancellationIsTemporal` it holds. MEASURED 2026-08-31 — the corpus answers FALSE and the de novo TRUE on the `policy-in-effect` pair, though for the further reason recorded at F-11-PREMIUM-TIMING: the de novo's fact schema cannot express a dated premium at all.",
+        "Battery rows `fraud in month 9, hospitalization in month 3` and `misrepresentation in month 9, hospitalization in month 3`: same clock, applied to clause 1.2's grounds. MEASURED — corpus FALSE, de novo TRUE on `policy-in-effect`; see F-12-CANCELLATION-MOMENT."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A3, flagged there as load-bearing for benchmark query 4.",
+        "This entry is about WHICH INSTANT the clause fixes. Which month that instant falls in, on a query that never says, is a separate fork: F-Q4-MOMENT-UNSTATED."
+      ]
+    },
+    {
+      "id": "F-Q4-MOMENT-UNSTATED",
+      "kind": "fact-convention",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "`Claim`'s `month of the hospitalization`",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Claim`'s `month of the hospitalization`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1",
+          "Codex Insurance Limited hospitalization policy clause 1.3",
+          "arXiv:2502.17638 Appendix A.2, query 4"
+        ]
+      },
+      "source": {
+        "quote": "will my policy apply if I was hospitalized due to a fall while traveling abroad and I had given confirmation of my wellness visit 8 months after the policy's effective date?",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "favourableDefault",
+          "description": "The benchmark's own stipulated preamble directs that every fact the query does not reference be taken at the value that lets the policy apply. The query never says when the hospitalization occurred, so it takes an early month, before the clause 1.3 condition can have failed. Answer: the policy applies.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "arXiv:2502.17638 Appendix A.2, the preamble to all nine queries: \"Assuming all other conditions are met and no other exclusions apply (where by 'other,' I mean anything not referenced in the query that follows)\"",
+              "url": "https://arxiv.org/abs/2502.17638"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), under which the condition is satisfied while it \"is still pending\""
+            }
+          ]
+        },
+        {
+          "id": "sequencedByTheQueryGrammar",
+          "description": "The query's pluperfect — \"I WAS hospitalized … and I HAD GIVEN confirmation … 8 months after\" — sequences the confirmation before the hospitalization, which puts the hospitalization after month 8, by when the policy has been canceled under clause 1.2. Answer: the policy does not apply. This is the reading the published answer key takes.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the benchmark's own instruction, not by any argument against it. The reading is a reading of the QUESTION's English aspect rather than of the policy, and it points the opposite way to the preamble every query is issued under: a system that follows the stated instruction is scored wrong and one that instead parses English aspect is scored right. Nobody has refuted it — it is a perfectly natural reading of the sentence, and it is how the published label is reached — which is exactly why it is recorded here rather than argued away.",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "arXiv:2502.17638 Appendix A.2, query 4 and its published answer, \"No.\"",
+              "url": "https://arxiv.org/abs/2502.17638"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "favourableDefault",
+        "mechanism": "fact-supplied",
+        "rationale": "The encoding decides nothing here: `month of the hospitalization` is a field of `Claim`, and whoever marshals a query into a claim record decides it. All three blind encodings marshalled query 4 at an early month, following the preamble mechanically, and all three answered \"Yes\" where the key says \"No\". THE HONEST VERDICT FOR THE BENCHMARK ITEM IS UNDER-DETERMINED, and this entry exists so that the disagreement is a recorded fork rather than a scored error."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31 through the two committed modules, on three battery rows identical in every respect but the hospitalization month, with the confirmation supplied in month 8 as query 4 states: `Q4 — confirmation supplied in month 8, hospitalization in month 3` → BOTH encodings answer TRUE on `policy-in-effect`; `Q4 — the same claim with the hospitalization in month 9` → BOTH answer FALSE. One fact the query never supplies flips the answer.",
+        "`Q4 — the same claim with the hospitalization in month 7` → the corpus answers FALSE and the de novo TRUE. The two encodings do not even agree on WHERE the flip happens; that boundary is fork F-13-PENDING-BOUNDARY."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §1.3. Three independent lines of evidence — an adversarial audit of the key, three blind encoders, and the paper's own error analysis (\"it consistently failed to answer Questions 9 and 4\") — put query 4 outside the mechanical.",
+        "The paper diagnoses its own model's miss here as \"ambiguity in encoding time-based conditions\", i.e. as the encoder's problem rather than the query's. The measurement above says the operative fact is simply absent from the query.",
+        "FOUNDATION.md §2.1 defect D7 reaches the same gap from the other side: clause 1.2 says cancelation \"will be deemed to have occurred\" and never says when, so even a stated hospitalization month leaves the cancelation date to be construed. See F-12-CANCELLATION-MOMENT."
+      ]
+    },
+    {
+      "id": "F-Q5-ACCIDENTAL-INJURY",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "`Claim`'s `the hospitalization was for` (`Hospitalization Ground`)",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Claim`'s `the hospitalization was for` (`Hospitalization Ground`)",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1",
+          "Codex Insurance Limited hospitalization policy clause 2.1",
+          "Codex Insurance Limited hospitalization policy clause 3.3.1",
+          "arXiv:2502.17638 Appendix A.2, query 5"
+        ]
+      },
+      "source": {
+        "quote": "the hospitalization for sickness or accidental injury on which the claim for such benefit is premised",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "unintendedResultFromTheInsuredsStandpoint",
+          "description": "Whether an injury is \"accidental\" is judged by whether the RESULT was unexpected, unusual and unforeseen from the insured's point of view, not by whether the act that produced it was voluntary. A deliberate stunt punch that fractures a bone is a deliberate act with an unintended injury, and so an accidental injury.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.3.1: \"Your Policy is governed by the laws of New York.\""
+            },
+            {
+              "kind": "authority",
+              "cite": "Miller v Continental Ins. Co., 40 NY2d 675, 358 NE2d 258 (NY Court of Appeals, 23 November 1976) (Fuchsberg J) — a self-administered drug overdose held capable of being an accidental death, the intentional act notwithstanding, applying New York's rule that no distinction is drawn between accidental means and accidental results (McGroarty v Great Am. Ins. Co., 36 NY2d 358 (1975))",
+              "url": "https://caselaw.findlaw.com/court/ny-court-of-appeals/1143020.html"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, which enumerates skydiving, military, fire, police and age and contains NO intentionally-self-inflicted-injury exclusion"
+            }
+          ]
+        },
+        {
+          "id": "accidentalMeansNotAccidentalResults",
+          "description": "\"Accidental injury\" requires accidental MEANS: an injury produced by a voluntary act is not accidental however unwelcome its consequence. On this reading a hospitalization for punching one's own face is neither a sickness nor an accidental injury, and clause 1.1's definite description does not reach it. This is the reading the published answer key takes.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the policy's own choice of law rather than by any argument against it: New York, whose law clause 3.3.1 selects, is reported to have abandoned the accidental-means/accidental-result distinction. The reading remains good law in jurisdictions that keep the distinction, it is the reading the benchmark's published label depends on, and nobody in this exercise has refuted it. VERIFICATION LEVEL, stated so it cannot be laundered: the Miller citation was checked on 2026-08-31 against secondary sources — the New York Court of Appeals opinion in RJC Realty Holding Corp v Republic Franklin Ins. Co. (2004), which cites it, and case-database summaries giving 40 NY2d 675, 358 NE2d 258, decided 23 November 1976 per Fuchsberg J. The case is real, it is a New York Court of Appeals decision, and it is cited for the proposition stated. The official reporter text has NOT been read, and Miller concerns accidental DEATH under a group policy rather than \"accidental injury\" in a hospitalization policy, so the extension to this clause is by analogy.",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "arXiv:2502.17638 Appendix A.2, query 5 and its published answer, \"No.\"",
+              "url": "https://arxiv.org/abs/2502.17638"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy, which has no definitions section at all — `grep -iE 'means|defined|definition|shall mean'` over the fixture returns no match"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "unintendedResultFromTheInsuredsStandpoint",
+        "mechanism": "fact-supplied",
+        "rationale": "NEITHER ENCODING DECIDES THIS, and that is the point of the three-constructor enum: `sickness`, `accidental injury`, `neither sickness nor accidental injury`. The ground arrives already construed, from whoever marshals a query into a claim record. What the register records is which construction the policy's own choice of law supports — the unintended-result one — and NOT the construction the benchmark run applied. All three blind encodings answered \"No\" to query 5 by marshalling the ground as `neither sickness nor accidental injury`; the counterfactual is in the same file (`Q5b claim`, identical but typed `accidental injury`, returns TRUE). So on this item the benchmark scores the MARSHALLING step, not the encoding step."
+      },
+      "status": "open",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §1.4, where the adversarial audit of the answer key rated this the one published label that is NOT defensible.",
+        "The \"No\" can only be produced by construing an undefined term in the COVERAGE GRANT against the insured, in a document with no definitions section, while treating the absence of any self-harm exclusion from clause 2.1 as irrelevant.",
+        "The paper's own error analysis concedes the term is not defined: its best model missed query 5 in 9 of 10 trials, and it attributes the failure to identifying \"whether it was sickness or accidental injury, which are addressed indirectly in the contract\".",
+        "Divergence is 'none' — not because the readings agree, but because the encoding cannot tell them apart: the field arrives pre-construed, which is precisely what `delegated-to-fact` records. The oracle cannot reach it either, for an unrelated reason: JSONDECODE cannot supply an enum constructor, so the decisions that read this field are out of the surface map entirely.",
+        "OWED: read the official report of Miller before any Q5 argument is published. FOUNDATION.md carries the same open item."
+      ]
+    },
+    {
+      "id": "F-11-PREMIUM-TIMING",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Claim`'s `the applicable premium for the policy period has been paid`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1(2)",
+          "Codex Insurance Limited hospitalization policy clause 3.5.1"
+        ]
+      },
+      "source": {
+        "quote": "2. The applicable premium for the policy period has been paid, and",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1(2)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "undatedFactOfPayment",
+          "description": "Clause 1.1(2) asks a yes/no question — has the premium been paid — and the fact schema asks it the same way, as one BOOLEAN.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(2), whose words state a state of affairs and no date"
+            },
+            {
+              "kind": "scholarship",
+              "cite": "arXiv:2502.17638, the unguided prompt's convention that all times be expressed relative to the effective date, under which a fact with no stated time has no time to express"
+            }
+          ]
+        },
+        {
+          "id": "paymentDatedAndTestedAsAtTheHospitalization",
+          "description": "\"Has been paid\" is a present-perfect state and clause 1.1 takes every limb as at the hospitalization, so the fact needed is the MONTH of payment, and a premium paid after the loss does not put the policy in effect at the loss.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, \"in effect at the time of the hospitalization\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.5.1: \"shall be paid in one lump sum at the signing of the policy\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "undatedFactOfPayment",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo encoding, which carries clause 1.1(2) as a bare BOOLEAN. The corpus takes the other reading and carries a MAYBE NUMBER month. Both readings are live and the difference is in what the FACT SCHEMA can say, not in any rule: no value of the de novo's boolean can express a premium paid after the hospitalization, so on that fact pattern its answer is not wrong, it is unavailable."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31: battery row `premium paid in month 5, hospitalization in month 3` — corpus FALSE, de novo TRUE on the `policy-in-effect` pair. In the oracle's triage table this row is folded into witness 9's group of four (`also seen on: 3`), because the oracle groups witnesses by pair and direction rather than by cause."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A7. Both encodings agree on the separate question A7 raises — that clause 3.5.1 prescribes the MANNER and TIME of payment while clause 1.1(2) makes only the FACT of payment a condition — but they record it differently: the corpus keeps 3.5.1 as its own named decision that the payability test deliberately does not consume, the de novo records it in a comment and gives it no rule. That is why no `premium-lump-sum` pair could be declared in the surface map.",
+        "This is the fork FOUNDATION.md §3.3 GAP 2 predicts in general: under the benchmark's relative-time convention an age and an elapsed time are both plain NUMBERs and a date is not available at all, so the convention adopted to make Prolog tractable is the one that removes the type safety L4 would otherwise bring."
+      ]
+    },
+    {
+      "id": "F-13-PENDING-SCOPE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the clause 1.3 condition is still pending`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1(3)",
+          "Codex Insurance Limited hospitalization policy clause 1.3"
+        ]
+      },
+      "source": {
+        "quote": "3. The condition set out in Section 1.3 is still pending or has been satisfied in a timely fashion, and",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "pendingUntilTheStatedDeadline",
+          "description": "The condition is pending until the deadline clause 1.3 states has passed. \"Still pending\" is measured against the only date the clause supplies — the 7th month anniversary — and against nothing else.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3: \"No later than the 7th month anniversary of the effective date of this policy\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), which offers \"still pending\" as an alternative to timely satisfaction and so must denote a state in which neither has yet happened"
+            }
+          ]
+        },
+        {
+          "id": "pendingOnlyWhileTimelySatisfactionRemainsPossible",
+          "description": "\"Pending\" means awaiting an outcome, and once a conforming visit can no longer occur there is nothing left to await: the condition has failed, whatever the calendar says. On this reading an insured who has had no wellness visit by the 6th month anniversary is already outside clause 1.1(3), a month before the other reading says so.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the operative words rather than by an argument: clause 1.1(3) says \"still pending\", not \"still possible\", and nothing in it conditions pendency on the continued possibility of performance. Nobody refuted it, and it is worth a whole month of cover to every insured who has not yet seen a provider.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3, which sets the visit's own deadline at the 6th month anniversary — a date the pendency test on the taken reading never consults"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "pendingUntilTheStatedDeadline",
+        "mechanism": "encoded",
+        "rationale": "Taken by all three blind encodings. FOUNDATION.md §4.2 calls it the single most consequential choice in any of them, because it decides every claim between the two deadlines, and it decides benchmark query 3."
+      },
+      "status": "resolved",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A9. The guarded arm's reviewing auditor called the same choice a boundary error while the other two auditors did not; the disagreement is about the reading, not about different code.",
+        "Divergence is 'unassessed' and the reason is the clock. The two readings first differ at a moment strictly between the 6th and 7th month anniversaries — after a conforming visit has become impossible and before the confirmation deadline arrives — and the benchmark's convention gives every encoding a clock whose only unit is the whole month. Neither encoding can represent that moment, so no battery row can exhibit the difference and no claim of extensional equivalence can be made either. It is a real fork that this instrument cannot measure.",
+        "This is also where fixture defect D3 lives: clause 1.1(3) is satisfied while the condition is \"still pending OR … satisfied in a timely fashion\", while clause 1.2 deems cancelation where it \"has NOT been satisfied in a timely fashion\" with no pendency carve-out. Read literally the two return opposite answers on the same month-5 fact. Both encodings take the harmonising reading; see F-13-PENDING-BOUNDARY for the boundary they then disagree about."
+      ]
+    },
+    {
+      "id": "F-13-PENDING-BOUNDARY",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the clause 1.3 condition is still pending`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1(3)",
+          "Codex Insurance Limited hospitalization policy clause 1.2",
+          "Codex Insurance Limited hospitalization policy clause 1.3"
+        ]
+      },
+      "source": {
+        "quote": "No later than the 7th month anniversary of the effective date of this policy, you will supply us with written confirmation from the medical provider in question of a wellness visit for yourself with a qualified medical provider occurring no later than the 6th month anniversary of the effective date of this policy.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "theSeventhMonthIsStillInsideTheWindow",
+          "description": "\"No later than the 7th month anniversary\" includes the anniversary itself, so ON the 7th month anniversary the confirmation can still be supplied and the condition is still pending. Encoded as `GREATER THAN 7`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3, \"no later than\", which by ordinary usage includes the day named"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), which keeps the policy in effect while the condition is pending"
+            }
+          ]
+        },
+        {
+          "id": "theSeventhMonthIsWhenTimeIsUp",
+          "description": "The anniversary is the deadline, so at it the condition is either satisfied or breached and never pending: from the 7th month anniversary the answer to \"is it still pending?\" is no. Encoded as `AT LEAST 7`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, which deems cancelation where the condition \"has not been satisfied in a timely fashion\" — a judgement that can first be made when the time is up"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3, whose deadline is a point and not an interval"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theSeventhMonthIsStillInsideTheWindow",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo encoding (`GREATER THAN 7`). The corpus takes the other reading (`AT LEAST 7`) and uses the same comparator again in its clause 1.2(c) ground, so the choice propagates. Both readings are live and neither encoding argued the other away; the register records the pair because the difference is a whole month of cover and the benchmark cannot see it."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31 by the §8 oracle, triage rows 1, 4 and 5 of `/tmp/chubb-diff-dryrun/denovo-diff.md`. Battery row `Q4 — the same claim with the hospitalization in month 7`: `clause-1-3-pending` corpus FALSE / de novo TRUE; `clause-1-1-limb-3` corpus FALSE / de novo TRUE; `cancel-ground-1-3` corpus TRUE / de novo FALSE. The same three divergences appear again on battery row `no wellness visit, hospitalization in month 7`.",
+        "The divergence propagates to the largest question the oracle can ask: `policy-in-effect` diverges on both month-7 rows (corpus FALSE, de novo TRUE), folded into witness 9's group."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A14 records the inclusivity question and notes that here the difference is a whole month, not a day.",
+        "No benchmark query sits at month 7, so this divergence is invisible to the nine-item score and both encodings would be marked correct.",
+        "It is also the reason the two encodings disagree about WHERE benchmark query 4 flips: see F-Q4-MOMENT-UNSTATED."
+      ]
+    },
+    {
+      "id": "F-13-PROVENANCE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`a conforming wellness visit had occurred` / `conforming written confirmation had been supplied`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.3",
+          "Codex Insurance Limited hospitalization policy clause 1.1(3)"
+        ]
+      },
+      "source": {
+        "quote": "written confirmation from the medical provider in question of a wellness visit for yourself with a qualified medical provider",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.3"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "descriptiveColour",
+          "description": "\"From the medical provider in question\" and \"qualified\" describe the ordinary case rather than stating conditions: what clause 1.3 requires is a wellness visit and written confirmation of it, by the stated dates. The de novo's `Claim` has no field for either qualifier.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3, which is drafted as a covenant (\"you will supply us with\") rather than as a condition, and whose qualifiers are adjectival"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), which incorporates \"the condition set out in Section 1.3\" without itemising it"
+            }
+          ]
+        },
+        {
+          "id": "bothQualifiersOperative",
+          "description": "The visit must be with a QUALIFIED medical provider and the confirmation must come FROM THE MEDICAL PROVIDER IN QUESTION. A confirmation the insured wrote himself, of a visit to an unqualified provider, does not satisfy clause 1.3.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3, whose words \"qualified\" and \"from the medical provider in question\" would otherwise do no work"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, which makes failure of the clause 1.3 condition a ground of cancelation and so gives the qualifiers consequences"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "descriptiveColour",
+        "mechanism": "encoded",
+        "rationale": "TAKEN BY OMISSION RATHER THAN BY ARGUMENT, and the register says so rather than dressing it up. The de novo module has no field for either qualifier and no comment recording the choice; FOUNDATION.md §4.1 calls it the one undisclosed omission of operative text in any of the three blind encodings. It is entered here because the corpus encodes both qualifiers and the two therefore disagree — measured — but nobody should read this `taken` as a considered reading."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31, triage row 7: battery row `wellness visit with a provider who was not qualified` — `clause-1-3-satisfied` corpus FALSE / de novo TRUE. Under the de novo's encoding a claimant who saw an unqualified provider has satisfied clause 1.3.",
+        "The same row, triage row 6: `clause-1-3-pending` corpus TRUE / de novo FALSE — the corpus keeps the condition pending precisely because it has not been satisfied, so the two encodings differ in state as well as in verdict. The divergence is then MASKED at `clause-1-1-limb-3`, which is the disjunction of the two: both answer TRUE. A benchmark that only ever asks the top-level question could not see this at all."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A11, and fixture defect D18.",
+        "The masking at clause 1.1(3) is the argument for pairing the disjuncts separately in the surface map, and is worth more than the divergence itself: two encodings can disagree about the state of the world and agree about the answer."
+      ]
+    },
+    {
+      "id": "F-13-AS-AT-WHICH-EVENT",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`a conforming wellness visit had occurred`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.1(3)",
+          "Codex Insurance Limited hospitalization policy clause 1.3"
+        ]
+      },
+      "source": {
+        "quote": "3. The condition set out in Section 1.3 is still pending or has been satisfied in a timely fashion, and",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "bothEventsMustPrecedeTheHospitalization",
+          "description": "Nothing can have \"been satisfied\" by an event still in the future, so BOTH clause 1.3 events — the visit and the confirmation — must have happened by the time of the hospitalization.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), \"has been satisfied\", read at the instant clause 1.1 fixes"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, which fixes that instant at the time of the hospitalization"
+            }
+          ]
+        },
+        {
+          "id": "onlyTheConfirmationMustPrecedeIt",
+          "description": "The condition is SATISFIED by the supply of the confirmation; the visit has its own deadline, which clause 1.3 measures against the 6th month anniversary and not against the hospitalization. So the as-at test attaches to the confirmation only.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3, which gives the visit its own express deadline"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), whose subject is \"the condition\", satisfied by the act clause 1.3 requires of the insured"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "bothEventsMustPrecedeTheHospitalization",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo encoding, which tests both events against the hospitalization month. The corpus takes the other reading: it splits clause 1.3 into a bare timeliness decision and an as-at-the-hospitalization wrapper, and the wrapper tests the confirmation only."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31, triage row 8: battery row `wellness visit in month 5, hospitalization in month 4, confirmation in month 2` — `clause-1-3-satisfied` corpus TRUE / de novo FALSE."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entries A12 and A13 sit next to this one and were resolved the same way by both encodings, so neither is registered separately: clause 1.3 states an UPPER bound on the visit and no lower one, and both encodings declined to invent a floor (adding one would repair the drafting rather than encode it); and clause 1.3 states no ordering between the visit and the confirmation that confirms it, and neither encoding imposes one — which is why the witness row above, in which the confirmation predates the visit, is accepted by both.",
+        "Kind is `encoding-placement` rather than `statutory-wording`: the words being read are the same on both readings, and what differs is which decision carries the as-at test."
+      ]
+    },
+    {
+      "id": "F-12-CANCELLATION-MOMENT",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the policy has been canceled`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.2",
+          "Codex Insurance Limited hospitalization policy clause 1.1(4)"
+        ]
+      },
+      "source": {
+        "quote": "Cancelation will be deemed to have occurred if there is fraud, or any misrepresentation or material withholding of any information provided by you to the Company in connection with any communication or information relating to this policy, or if the condition set out in Section 1.3 has not been satisfied in a timely fashion.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "undatedGrounds",
+          "description": "The clause says cancelation \"will be deemed to have occurred\" and never says when. The grounds are therefore timeless: conduct at any time defeats the claim, including conduct after the hospitalization.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, which supplies no date for any of its three conduct grounds"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy, which has no notice provision, no cure period, no refund and no reinstatement clause, so nothing else in the document dates a cancelation either"
+            }
+          ]
+        },
+        {
+          "id": "groundsDatedAndRequiredToPrecedeTheLoss",
+          "description": "Clause 1.1 asks whether the policy was in effect AT the hospitalization, so a ground must have taken effect by then. A misrepresentation made after a hospitalization cannot retrospectively unmake a claim that was good when it arose.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, \"in effect at the time of the hospitalization\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(4), \"The policy has not been canceled\" — a state, tested at that instant"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "undatedGrounds",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo encoding, which carries the three conduct grounds as undated BOOLEANs. The corpus takes the other reading and dates each of them. Note the DIRECTION, because it is not symmetric in its consequences: the taken reading is pro-insurer and costs an insured a claim that was good when it was made. Neither encoding argued the other away, and the text supplies no date to settle it."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31, triage row 3: battery row `fraud in month 9, hospitalization in month 3` — `cancelation` corpus FALSE / de novo TRUE, and `policy-in-effect` corpus TRUE / de novo FALSE. The same divergence appears on battery row `misrepresentation in month 9, hospitalization in month 3`.",
+        "Triage row 2, on the fourth ground rather than the conduct grounds: battery row `hospitalization in month 12 — the last day of the one-year term` — `cancelation` corpus TRUE / de novo FALSE. That one is fork F-12-TERM-END."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A15, which calls this the sharpest divergence among the three blind encodings, and fixture defect D7.",
+        "Not exercised by any of the nine benchmark queries: queries 5 and 8 only NEGATE the fraud limb, so the benchmark cannot distinguish the two readings and would score both encodings correct.",
+        "A third reading — cancelation ab initio, voiding claims already earned — is available on the same silence and is taken by neither encoding. It is not registered as a separate reading because no fact pattern in this instrument tells it apart from `undatedGrounds`: with a single hospitalization and no premium refund modelled, voiding from inception and voiding from the conduct produce the same answer."
+      ]
+    },
+    {
+      "id": "F-12-MATERIAL-SCOPE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the policy has been canceled`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.2"
+        ]
+      },
+      "source": {
+        "quote": "if there is fraud, or any misrepresentation or material withholding of any information provided by you to the Company",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "materialityOnWithholdingOnly",
+          "description": "The adjective sits immediately before \"withholding\" and governs it alone, so ANY misrepresentation cancels the policy however trivial, while only a MATERIAL withholding does.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, whose word order is \"any misrepresentation or material withholding\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, which uses \"any\" twice and \"material\" once, in that order"
+            }
+          ]
+        },
+        {
+          "id": "materialityGovernsBoth",
+          "description": "\"Material\" distributes across the disjunction: it is material misrepresentation or material withholding that cancels, which is what an insured would understand and what the general law of insurance misrepresentation supposes.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the word order, not by any argument: reading \"material\" backwards across \"or\" onto \"misrepresentation\" is available in principle but is not what the sentence says. Nobody refuted it, and it is the commercially sane reading — on the taken reading a trivial misstatement in any communication relating to the policy cancels it.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, read as a single compound object of \"material\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "materialityOnWithholdingOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings, and recorded by both as harsh and probably unintended."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A16; fixture defect D6(a).",
+        "Divergence is 'none' because neither fact schema carries a materiality fact for a misrepresentation: the de novo asks `there is a misrepresentation of information provided to the Company`, the corpus asks for the month of \"a misrepresentation or material withholding\", and in both the construction has already happened before the record is filled. The alternative reading would need a fact neither record has.",
+        "A second-order observation the surface map records: the corpus's single dated field cannot tell a misrepresentation from a material withholding at all, while the de novo has a separate boolean for each. Battery row `material withholding in month 2` exists to show that this difference in expressive power does not move any answer — measured, the `cancelation` pair agrees on it."
+      ]
+    },
+    {
+      "id": "F-12-FRAUD-BY-WHOM",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Claim`'s `there is fraud`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.2"
+        ]
+      },
+      "source": {
+        "quote": "if there is fraud, or any misrepresentation or material withholding of any information provided by you to the Company in connection with any communication or information relating to this policy",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "fraudStandsAlone",
+          "description": "\"Fraud\" is complete before the comma and takes no qualifier: the trailing \"provided by you to the Company…\" attaches to the information withheld or misrepresented, not to the fraud. Read literally, fraud by ANYONE — including the insurer — deems the policy canceled.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, in which \"there is fraud\" is a complete clause standing before the disjunction"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, whose qualifier is attached to \"information\" by \"of any information provided by you\""
+            }
+          ]
+        },
+        {
+          "id": "theTrailingQualifierDistributes",
+          "description": "The qualifier reaches all three species, so only YOUR fraud, in connection with a communication relating to this policy, cancels it.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by where the qualifier sits — after \"withholding of any information\", not after \"fraud\" — and by nothing else. It is not refuted, and it is the only reading under which the clause does not deem the policy canceled by the insurer's own fraud.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2, read as three species of one qualified genus"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "fraudStandsAlone",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo, whose `there is fraud` field names no actor and no time, and by the corpus, whose dated fraud field does the same. Recorded because the literal reading is absurd in the insured's favour and nobody drafted it deliberately."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A17; fixture defect D6, which finds four faults in this one sentence — \"material\" scope-ambiguous, \"withholding of any information PROVIDED BY YOU\" self-contradictory, \"the Company\" undefined (the insurer is defined as \"us\" and \"the Company\" is used exactly once), and \"there is fraud\" binding no actor and no time.",
+        "Divergence is 'none' for the same reason as F-12-MATERIAL-SCOPE: the field arrives pre-construed and records no actor, so no value of it can tell the readings apart."
+      ]
+    },
+    {
+      "id": "F-12-TERM-END",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the policy term had expired at the time of the hospitalization`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 1.2",
+          "Codex Insurance Limited hospitalization policy clause 3.6"
+        ]
+      },
+      "source": {
+        "quote": "It will also be automatically canceled at midnight, US Eastern time then in effect, on the last day of the policy term described in Section 5 below.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 1.2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "midnightClosesTheLastDaySoTheAnniversaryIsInside",
+          "description": "Cancelation bites at the END of the last day, so a hospitalization AT the one-year mark is still inside the term and only one after it is outside. Encoded as `GREATER THAN 12`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.2: \"automatically canceled at midnight … on the LAST DAY of the policy term\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.6: \"will last for a period of one year from that date\""
+            }
+          ]
+        },
+        {
+          "id": "theAnniversaryClosesThePeriodSoItIsOutside",
+          "description": "A period of one year from the effective date closes at the anniversary, so the anniversary month is already outside the term. Encoded as `AT LEAST 12`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.6, \"a period of one year from that date\", a period measured from an origin and closing at its anniversary"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(4), which asks whether the policy has been canceled and takes the answer as at the hospitalization"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "midnightClosesTheLastDaySoTheAnniversaryIsInside",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo, which says so in a comment. The corpus takes the other reading. Both are defensible and neither argued the other away; what settles it in a real policy is the calendar and the clause 1.2 midnight, and under the benchmark's relative-month convention there is no calendar and no clock to consult."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31, triage row 12: battery row `hospitalization in month 12 — the last day of the one-year term` — `term-expired` corpus TRUE / de novo FALSE. The same row drives triage row 2 (`cancelation`, corpus TRUE / de novo FALSE) and triage row 9 (`policy-in-effect`, corpus FALSE / de novo TRUE), so one comparator disagreement propagates through three declared pairs."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A19. One month apart, and unexercised: no benchmark query sits at the boundary.",
+        "Clause 1.2's \"midnight, US Eastern time then in effect\" is UNENCODABLE under the benchmark's own convention, in either target language: the convention has no calendar and no zone. L4 can express it — `jl4-core/libraries/timezone.l4` maps EST and EDT to America/New_York so the tz database picks the offset for the actual date — which is a capability the benchmark's prompt forbids anyone from using."
+      ]
+    },
+    {
+      "id": "F-36-TERM-START",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the policy term had begun at the time of the hospitalization`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.6",
+          "Codex Insurance Limited hospitalization policy clause 1.1"
+        ]
+      },
+      "source": {
+        "quote": "The term of this policy will begin on the date accepted by Us as signified by our signature of the policy (the effective date) and will last for a period of one year from that date, unless previously canceled pursuant to Section 1 above.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.6"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "aRowOfTheClause11InEffectTest",
+          "description": "The term's beginning is part of what \"in effect at the time of the hospitalization\" means, so it belongs inside the clause 1.1 decision as a further row.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.6, which is the only source of cover and so bounds clause 1.1 at both ends"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, \"the policy being in effect\", a state the term defines"
+            }
+          ]
+        },
+        {
+          "id": "aSeparateLimbOfThePayabilityDecision",
+          "description": "Clause 1.1's own enumeration has four items and this is not one of them, so putting it inside the clause 1.1 decision interpolates a row the clause does not contain. It belongs beside that decision, in the top-level test, where a reviewer auditing against clause 1.1 will not mistake it for part of the clause.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1, whose list is numbered 1 to 4 and closed"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.6, which states the term without reference to clause 1.1"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "aRowOfTheClause11InEffectTest",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo, which makes it the first row of its in-effect BRANCH. The corpus takes the other reading and states it as a separate limb of the top-level decision. BOTH encodings place a test inside or beside clause 1.1 that clause 1.1's own enumeration does not contain, and two of the three reviewing auditors flagged the interpolation."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31, triage row 10: battery row `hospitalization in month −1 — before the effective date` — `policy-in-effect` corpus TRUE / de novo FALSE.",
+        "THIS WITNESS IS NOT ABOUT THE LAW, and the register says so where a reader will see it. The two encodings agree that a hospitalization before the effective date is outside cover; they disagree only about which decision says so, and the comparator can see the disagreement precisely because the pair is `policy-in-effect` rather than the top-level payability decision. The top-level decisions would agree — and the oracle CANNOT check that claim, because both of them read the hospitalization-ground enum and JSONDECODE cannot supply an enum constructor. The claim is therefore reasoned, not measured."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A35.",
+        "This is the encoding-placement fork the surface map's `policy-in-effect` pair note declares in advance. It is registered rather than papered over because a divergence that a reviewer would triage as IMPROVEMENT-OVER-CORPUS or ENCODING-ERROR is here neither: it is an artifact of where the comparator was able to cut."
+      ]
+    },
+    {
+      "id": "F-21-DISJUNCTION",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`an exclusion in clause 2.1 applies`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 2.1"
+        ]
+      },
+      "source": {
+        "quote": "Your policy will not apply to, and no benefit will be paid with respect to, any event causing sickness or accidental injury arising directly or indirectly out of:\n1. Skydiving; or\n2. Service in the military; or\n3. Service as a fire fighter; or\n4. Service in the police; or\n5. If your age at the time of the hospitalization is equal to or greater than 80 years of age.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "disjunctive",
+          "description": "The limbs are joined by \"or\" and each defeats the claim on its own.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, in which items 1 to 4 each end with \"; or\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1's chapeau, \"no benefit will be paid with respect to ANY event … arising … out of\""
+            }
+          ]
+        },
+        {
+          "id": "conjunctive",
+          "description": "All five limbs must hold before the exclusion bites.",
+          "status": "rejected",
+          "rejection_rationale": "The connective is \"or\" at every join, and item 5 could never co-occur with a causal limb in a way that made the conjunction meaningful. It is registered only because it is the paper's own documented failure mode: DeepSeek-R1 lowered this list conjunctively in Prolog, and FOUNDATION.md §3.3 GAP 1 measures that L4's type system does not catch it either — `l4 check` succeeds on both versions, and only a scenario test tells them apart.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, read as a single compound condition"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "disjunctive",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings, and by both DELIBERATELY VISIBLY: the de novo writes clause 2.1 as five independent BRANCH rows each answering THEN TRUE so that a conjunctive misreading is not available to a reader of the code, and the corpus writes it as an OR chain with each item quoted verbatim beside its limb. Neither relies on the type checker, because the type checker cannot help."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "A claim arising out of skydiving and nothing else: excluded under `disjunctive`, not excluded under `conjunctive`. NOT REACHABLE BY THIS INSTRUMENT — the surface map's `exclusions` pair supplies an empty cause list on every row, because JSONDECODE delivers an enum constructor as a bare string and, measured 2026-08-31, a non-empty list makes the corpus raise \"reached a CONSIDER that has no branch for it\" and the de novo raise \"Trying to check equality on types that do not support it\". Two different error texts, which the comparator would report as a divergence about the law."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A20; the paper's error analysis at arXiv:2502.17638 for the DeepSeek-R1 failure."
+      ]
+    },
+    {
+      "id": "F-Q9-CHAPEAU-SCOPE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`an exclusion in clause 2.1 applies`, row 5",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 2.1",
+          "Codex Insurance Limited hospitalization policy clause 2.1(5)"
+        ]
+      },
+      "source": {
+        "quote": "any event causing sickness or accidental injury arising directly or indirectly out of: … 5. If your age at the time of the hospitalization is equal to or greater than 80 years of age.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "freeStandingStatusBar",
+          "description": "Item 5 does not parse through the chapeau — substituted into it the sentence reads \"any event causing sickness or accidental injury arising directly or indirectly out of: If your age at the time of the hospitalization is equal to or greater than 80 years of age\", which is not a sentence — and it carries its own \"If\" where items 1 to 4 are bare noun phrases. It is a status bar that bites on the age at the hospitalization whatever the cause.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1(5), the only item that begins \"If\" and the only one that is a finite conditional"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1(5), which fixes its own moment (\"at the time of the hospitalization\") where items 1 to 4 are tested at the time of the EVENT"
+            }
+          ]
+        },
+        {
+          "id": "readThroughTheCausalChapeau",
+          "description": "One chapeau, one connective, five items: the drafter presented them as a single list and an encoder that lowers all five uniformly is being more faithful to the surface form than one that switches semantics at item 5 on its own authority. On this reading age alone excludes nothing, because no event arises out of an age.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by grammar rather than by argument: item 5 will not substitute into the chapeau and produce a sentence. Nobody refuted it, and THE BENCHMARK'S OWN KEY NEEDS BOTH READINGS AT ONCE — its route to query 2's answer runs through item 5 as a status bar (78 is under the threshold) and its route to query 9's runs through items 1 to 4 as causal (a son's bite does not arise out of police service). An encoder that lowers all five uniformly, which is the more faithful thing to do given the surface form, must lose one of the two.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, whose five items sit under one chapeau joined by one connective, with nothing in the text signalling a switch"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "freeStandingStatusBar",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings, each of which says so in a comment at the site. It is the reading the words of item 5 force, and it is the reading the answer key needs for query 2."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "Battery rows `age 80 at the hospitalization` and `age 81 at the hospitalization`, both with an empty cause list: under `freeStandingStatusBar` the exclusion applies, under `readThroughTheCausalChapeau` it cannot, because no event arose out of anything. MEASURED 2026-08-31: BOTH encodings answer TRUE on the `exclusions` pair for both rows, and the pair agrees on all 34 rows. So the witness exhibits the difference between the READINGS; the two encodings took the same one."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A21 and fixture defect D4, which FOUNDATION.md marks as deciding benchmark queries 2 and 9 jointly.",
+        "Fixture defect D12 is the same seam from another side: items 1 to 4 are tested at the time of the EVENT and item 5 expressly at the time of the HOSPITALIZATION, and the text supplies no rule for the gap between them. Neither encoding models the two moments separately, because the benchmark's fact records give a claim one hospitalization month and no separate event month."
+      ]
+    },
+    {
+      "id": "F-21-CAUSAL-NEXUS",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Cause` / `Claim`'s `the event arose directly or indirectly out of`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 2.1",
+          "Codex Insurance Limited hospitalization policy clause 2.1(1)",
+          "Codex Insurance Limited hospitalization policy clause 2.1(2)",
+          "Codex Insurance Limited hospitalization policy clause 2.1(3)",
+          "Codex Insurance Limited hospitalization policy clause 2.1(4)"
+        ]
+      },
+      "source": {
+        "quote": "any event causing sickness or accidental injury arising directly or indirectly out of",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "aSetOfContributingCauses",
+          "description": "\"Directly or indirectly\" contemplates a chain, so one event may arise out of several of the named activities at once and the fact recorded is a LIST of every activity the event arose out of. Any one of them fires the exclusion.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1's chapeau, \"arising DIRECTLY OR INDIRECTLY out of\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, which excludes \"any event\" without limiting the count of causes"
+            }
+          ]
+        },
+        {
+          "id": "aSingleProximateCause",
+          "description": "The exclusion asks for the cause of the event, singular, and the fact is one value.",
+          "status": "rejected",
+          "rejection_rationale": "\"Indirectly\" is the word that defeats a single-proximate-cause model: pneumonia contracted in hospital after a skydiving injury arises indirectly out of skydiving and directly out of something else, and a single-value fact cannot record both.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1's chapeau, read as identifying the operative cause"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "aSetOfContributingCauses",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings — the de novo as a `LIST OF Cause` with a residual constructor for a cause the policy does not name, the corpus the same way. FOUNDATION.md marks the causal element as what decides benchmark query 9, whose gold answer requires the exclusion to need a nexus that a son's bite does not supply."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "A claim whose event arose indirectly out of skydiving and directly out of something the policy does not name: excluded under `aSetOfContributingCauses`, not excluded under `aSingleProximateCause` if the proximate cause is the unnamed one. NOT REACHABLE BY THIS INSTRUMENT — see the note on the enum limit at F-21-DISJUNCTION; every battery row supplies an empty cause list."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A25."
+      ]
+    },
+    {
+      "id": "F-21-WHOSE-SERVICE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Cause`'s `service in the military` / `service as a fire fighter` / `service in the police`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 2.1(2)",
+          "Codex Insurance Limited hospitalization policy clause 2.1(3)",
+          "Codex Insurance Limited hospitalization policy clause 2.1(4)"
+        ]
+      },
+      "source": {
+        "quote": "2. Service in the military; or\n3. Service as a fire fighter; or\n4. Service in the police; or",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 2.1(2)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "theInsuredsOwnService",
+          "description": "The items are read against the insured: it is YOUR service in the military, as a fire fighter or in the police that excludes. An injury caused by a third party's police service is not excluded.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1, whose other item speaks of \"YOUR age\" and whose chapeau speaks of \"YOUR policy\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.1.1, which insures \"You\" and frames the whole instrument around the insured"
+            }
+          ]
+        },
+        {
+          "id": "anyonesService",
+          "description": "The items are bare noun phrases with no possessive at all, so an event arising out of ANYONE's military, fire or police service is excluded — including a bystander injured by a police operation.",
+          "status": "rejected",
+          "rejection_rationale": "A policy sold to an individual excludes the individual's own hazardous occupations; on the wider reading an insured is uncovered for injuries caused by strangers' occupations, which is not a risk allocation any insured would understand themselves to have bought. The rejection is an argument and not a certainty — a court could hold that the absence of a possessive means what it says, and the register records the reading rather than deleting it.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1(2)-(4), which are drafted without a possessive, unlike item 5"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theInsuredsOwnService",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings. It bears on benchmark query 9, whose facts involve a son who serves in the police: under the taken reading the son's service is irrelevant and only the causal nexus matters, and under the rejected reading the exclusion would need only that the bite arose out of police service at all."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "A claim whose event arose indirectly out of a third party's police service: excluded under `anyonesService`, not excluded under `theInsuredsOwnService`. NOT REACHABLE BY THIS INSTRUMENT — see F-21-DISJUNCTION; and it would not be reachable even with a feedable enum, because neither fact schema records WHOSE service a cause was."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A24, which calls the resulting gap a live one on a natural fact pattern.",
+        "Note what the witness costs: the reading is baked into the meaning of a constructor rather than into any rule, so no value of any field can exhibit it. That is the same shape as F-Q5-ACCIDENTAL-INJURY, one layer down."
+      ]
+    },
+    {
+      "id": "F-215-THRESHOLD",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`an exclusion in clause 2.1 applies`, row 5",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 2.1(5)"
+        ]
+      },
+      "source": {
+        "quote": "5. If your age at the time of the hospitalization is equal to or greater than 80 years of age.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 2.1(5)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "inclusiveAtEighty",
+          "description": "\"Equal to or greater than 80\" is AT LEAST 80, so exactly 80 is excluded.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1(5), \"equal to or greater than\", which states inclusivity in terms"
+            }
+          ]
+        },
+        {
+          "id": "eightyIsTheFirstCoveredAge",
+          "description": "The threshold names the first excluded age as the one above 80.",
+          "status": "rejected",
+          "rejection_rationale": "The clause says \"equal to OR greater than\", which forecloses it on the face of the words. It is registered only because the benchmark's query 2 turns on the other side of this line (an insured aged 78) and a threshold read one year out would flip an item.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 2.1(5), read as naming a boundary rather than a set"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "inclusiveAtEighty",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings — the corpus through a named constant `the excluded age in years` = 80, the de novo with the figure inline. Both use AT LEAST."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31 on the `exclusions` pair: battery row `age 79 at the hospitalization` → both FALSE; battery row `age 80 at the hospitalization` → both TRUE; battery row `age 81 at the hospitalization` → both TRUE. The readings differ at exactly 80 and both encodings sit on the same side of the line, so this is agreement AT the boundary rather than agreement away from it — which is the only kind that is evidence."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A22.",
+        "This is the ONE thing the surface map's `exclusions` pair actually measures. With the cause list empty on every row — forced by the enum limit — limbs 1 to 4 are never reached, so all 34 agreements on that pair are agreements about the age bar."
+      ]
+    },
+    {
+      "id": "F-321-DISPUTE-DEFINITION",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "`Claim`'s `a dispute or disagreement has arisen`",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Claim`'s `a dispute or disagreement has arisen`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1"
+        ]
+      },
+      "source": {
+        "quote": "If any dispute or disagreement arises regarding any matter pertaining to or concerning this Policy",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "aDisputeThePartiesHaveIdentified",
+          "description": "A dispute is something the parties have joined — a matter they have taken up with each other — and not merely the ordinary friction of a claim being assessed. The fact is supplied.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, whose arbitration machinery presupposes two parties who have failed to settle something between them"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, \"the day such parties are unable to settle the dispute or difference\", which supposes an identifiable moment of impasse"
+            }
+          ]
+        },
+        {
+          "id": "aDeclinedClaimIsItselfADisagreement",
+          "description": "\"Any dispute or disagreement … regarding any matter pertaining to or concerning this Policy\" is as wide as language gets: the moment an insurer declines a claim, there is a disagreement about a matter concerning the policy. On this reading the policy is arbitrate-first throughout and no benefit is ever payable without an arbitration award.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed only by the delegation. The clause states no test whatever, so neither encoding can apply this reading or refuse it: whoever fills `a dispute or disagreement has arisen` decides it, and the burden sits with them. Nobody refuted it, and it swings the policy between \"pay claims\" and \"arbitrate every claim\".",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, \"ANY dispute or disagreement … regarding ANY matter pertaining to or concerning this Policy\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, which makes a valid award \"a condition precedent to our liability\" wherever there is a dispute"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "aDisputeThePartiesHaveIdentified",
+        "mechanism": "fact-supplied",
+        "rationale": "Both encodings gate the whole of clause 3.2.1 on this one supplied boolean, so with it FALSE the arbitration limbs are inert. That is what makes clause 3.2.1 invisible to the benchmark: NO QUERY MENTIONS A DISPUTE, so every one of the nine is answered with this field false."
+      },
+      "status": "open",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A27.",
+        "This entry is the reason F-321-EXTINGUISHMENT-WINDOW's shared bug survived three independent encodings and a nine-item benchmark: the clause it lives in is switched off by default, by a field no query sets."
+      ]
+    },
+    {
+      "id": "F-321-IMPASSE-DAY",
+      "kind": "vagueness",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "`Claim`'s `month the parties were unable to settle the dispute`",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`Claim`'s `month the parties were unable to settle the dispute`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1"
+        ]
+      },
+      "source": {
+        "quote": "such arbitration to be commenced within three (3) months from the day such parties are unable to settle the dispute or difference",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "anAscertainableDay",
+          "description": "There is a determinate day on which the parties became unable to settle, and it is supplied as a fact. The three-month clock runs from it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, which measures a rights-extinguishing period from that day and so must suppose it ascertainable"
+            }
+          ]
+        },
+        {
+          "id": "noFixedStart",
+          "description": "\"The day such parties are unable to settle\" names no event anyone can date: inability to settle is a state that arrives gradually, \"such parties\" has no antecedent in the clause, and no notice or declaration is required to fix it. On this reading the three-month window has no start and the extinguishment can never be shown to have run.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the delegation, as with F-321-DISPUTE-DEFINITION: the encodings take the day as a supplied MAYBE month rather than computing it, so a fact-supplier who cannot identify one supplies NOTHING and — measured, and agreed by both encodings — nothing is extinguished. The reading is therefore not refuted; it is expressible, as the absence of the fact.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, in which \"such parties\" has no antecedent"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy, which contains no notice provision of any kind"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "anAscertainableDay",
+        "mechanism": "fact-supplied",
+        "rationale": "Both encodings take the day as supplied and neither computes it. Both also handle its absence the same way and by the same reasoning: if the clock has not started there is nothing to have failed to do in time. MEASURED 2026-08-31 — battery row `dispute, no day of impasse yet`, on which the `arbitration-extinguished` pair agrees on FALSE."
+      },
+      "status": "open",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A28; fixture defect D9(c), which notes that a rights-extinguishing clock runs from an unascertainable day.",
+        "Divergence is 'none' because the construction happens before the field is filled: both readings are expressible only as the presence or absence of a month, and neither encoding can distinguish \"there was no impasse\" from \"the impasse cannot be dated\"."
+      ]
+    },
+    {
+      "id": "F-321-EXTINGUISHMENT-WINDOW",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the right to make a claim has been extinguished under clause 3.2.1`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1"
+        ]
+      },
+      "source": {
+        "quote": "such arbitration to be commenced within three (3) months from the day such parties are unable to settle the dispute or difference. If You fail to commence arbitration in accordance with this clause, it is agreed that any cause of action and any right to make a claim that You have or may have against Us shall be extinguished completely.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "extinguishedWheneverArbitrationHasNotBeenCommenced",
+          "description": "The test is whether arbitration has been commenced within the window; if it has not, the right is extinguished. The clause is read without an \"as at\" moment.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, \"If You fail to commence arbitration in accordance with this clause\", which states a condition and no time at which it is assessed"
+            }
+          ]
+        },
+        {
+          "id": "extinguishedOnlyOnceTheWindowHasRun",
+          "description": "Nothing is extinguished until the three months have run: before the deadline there is no failure to commence, only a period in which commencement is still open. The limb needs the same three-valued treatment — pending, performed, breached — that clause 1.3 gets.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, which grants three months and so makes commencement timely at any point inside them"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.1(3), the drafter's own three-valued treatment of a deadline elsewhere in the same instrument (\"still pending or has been satisfied in a timely fashion\")"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "extinguishedWheneverArbitrationHasNotBeenCommenced",
+        "mechanism": "encoded",
+        "rationale": "TAKEN BY OMISSION IN BOTH ENCODINGS, and this is the most interesting agreement in the whole comparison. Neither gives the limb an as-at moment, so a claim is extinguished while the three-month window is still open. FOUNDATION.md §4.1 records that all three blind encodings made the same omission and diagnoses the cause as LEXICAL rather than logical: clause 1.3 is reached through clause 1.1(3)'s words \"still pending\", and every encoder built careful three-valued machinery for it; clause 3.2.1 says only \"If You fail to commence\", and every encoder built none. A three-valued treatment appears where the source text names the third value and not where it does not."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31: battery row `dispute, impasse in month 2, arbitration never commenced`, with the hospitalization in month 3 — one month into a three-month window that has not run out. BOTH encodings answer TRUE (extinguished) on the `arbitration-extinguished` pair, which agrees on all 34 rows. Under `extinguishedOnlyOnceTheWindowHasRun` the answer is FALSE.",
+        "AGREEMENT HERE IS EVIDENCE OF A BUG, NOT OF CORRECTNESS. The oracle's own Limits section names this failure mode — \"both sides erroring identically counts as agreement\" — and this is its non-erroring twin: two encodings can agree perfectly and be wrong together."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A32 and §4.1. It is also threat T5 in FOUNDATION.md §5.2, demonstrated rather than argued: three encodings share a confirmed logic error and all three still score 8 of 9, because no benchmark query mentions a dispute.",
+        "It is deliberately NOT fixed here. FOUNDATION.md's open item 3 asks whether to repair it before the measurement phase or leave it in as a documented control; leaving it in is what makes it evidence."
+      ]
+    },
+    {
+      "id": "F-321-SIXTY-DAY-EXPIRY",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`you may seek to recover on the policy now`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1"
+        ]
+      },
+      "source": {
+        "quote": "In no case shall You seek to recover on this Policy before the expiration of sixty (60) days after written proof of claim has been submitted to Us in accordance with the provisions of this Policy.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "recoveryOpensAfterTheExpiry",
+          "description": "\"Before the expiration of sixty days\" bars recovery up to and including the moment of expiry, so recovery opens strictly after it. Encoded as `GREATER THAN`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, \"before the EXPIRATION of sixty (60) days\", an instant the bar runs to"
+            }
+          ]
+        },
+        {
+          "id": "recoveryOpensAtTheExpiry",
+          "description": "The expiry is the moment the sixty days are up, so recovery may be sought at it. Encoded as `AT LEAST`.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, which bars recovery \"before\" a moment and so permits it at that moment"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "recoveryOpensAfterTheExpiry",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo. The corpus takes the other reading. Neither said anything about the choice: it is carried by a comparator, `GREATER THAN` against `AT MOST`/`AT LEAST`, and would be invisible to any reader who did not run the two side by side."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "MEASURED 2026-08-31, triage row 11: battery row `recovery sought two months after written proof of claim` — `sixty-day-bar` corpus TRUE / de novo FALSE. The neighbouring rows at one month and three months agree, so the divergence is exactly one month wide and sits on the boundary.",
+        "Under the benchmark's month clock the boundary is two months rather than sixty days; see F-321-SIXTY-DAYS-AS-MONTHS."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "Not registered by FOUNDATION.md §4.2, because no single encoder saw it: it takes two encodings side by side to notice that one wrote `AT LEAST` and the other `GREATER THAN`. It is the clearest thing the §8 oracle found that nobody had already written down."
+      ]
+    },
+    {
+      "id": "F-321-SIXTY-DAYS-AS-MONTHS",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`proof of claim waiting period in months`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1"
+        ]
+      },
+      "source": {
+        "quote": "the expiration of sixty (60) days after written proof of claim has been submitted to Us",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "sixtyDaysIsTwoMonths",
+          "description": "The only unit of time the benchmark's convention supplies is the month, so sixty days is carried as two months and the conversion is bound to a named constant so that it is visible in one place.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "scholarship",
+              "cite": "arXiv:2502.17638, unguided prompt: \"Assume that all dates/times in any query to this code (apart from the claimant's age) will be given RELATIVE to the effective date … there will never be a need to calculate the time elapsed between two dates.\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, which is the only clause in the instrument whose clock is in days"
+            }
+          ]
+        },
+        {
+          "id": "sixtyDaysIsNotAWholeNumberOfMonths",
+          "description": "Sixty days is sixty days: two calendar months are 59, 61 or 62 days depending on where they start, so the conversion is wrong by up to two days in either direction.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by the benchmark's own convention, which fixes the unit of time at the month and forbids date arithmetic. No encoding produced under that convention can express sixty days at all, in either target language. Outside the convention L4 can: `jl4-core/libraries/daydate.l4` does month-granular calendar arithmetic with the end-of-month clamp documented and cross-validated against Excel EDATE and FEEL on Drools and Camunda.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, which states a period in days"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 1.3 and clause 3.6, which state every other period in months and years — the mismatch is the drafter's"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "sixtyDaysIsTwoMonths",
+        "mechanism": "encoded",
+        "rationale": "Taken by all three blind encodings, and disclosed in each. FOUNDATION.md calls it the one genuine encoded shortcut in every file."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A29.",
+        "Divergence is 'none' because the month clock cannot represent the difference: no fact either encoding accepts distinguishes 59 days from 62. The harm is currently nil for a second reason — the decision that consumes the constant is deliberately not wired into payability. See F-321-SIXTY-DAY-BAR.",
+        "This is FOUNDATION.md §5.2 threat T3 in miniature: the convention adopted to make the Prolog arm tractable is the one that removes the capability the L4 arm was supposed to demonstrate."
+      ]
+    },
+    {
+      "id": "F-321-SIXTY-DAY-BAR",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`you may seek to recover on the policy now`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1"
+        ]
+      },
+      "source": {
+        "quote": "In no case shall You seek to recover on this Policy before the expiration of sixty (60) days after written proof of claim has been submitted to Us in accordance with the provisions of this Policy.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "proceduralBarOnWhenYouMaySue",
+          "description": "The sentence postpones a REMEDY and says nothing about entitlement: the benefit is payable, and for sixty days you may not sue for it. Encoded as its own decision that the payability test deliberately does not consume.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, whose immediately preceding sentence uses the words \"condition precedent to our liability\" and whose own does not"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, \"In no case shall YOU SEEK TO RECOVER\", which addresses the insured's conduct rather than the insurer's obligation"
+            }
+          ]
+        },
+        {
+          "id": "furtherConditionPrecedentToLiability",
+          "description": "A bar on recovering on the policy is a bar on the policy responding, so it is one more thing that must be true before a benefit is payable.",
+          "status": "rejected",
+          "rejection_rationale": "The drafter used \"condition precedent to our liability\" in the sentence immediately before this one and did not use it here, which is about as clear an internal signal as an instrument gives. Folding it in would turn \"not yet enforceable\" into \"not covered\" for every claim in its first two months.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, read as a single set of conditions on liability"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "proceduralBarOnWhenYouMaySue",
+        "mechanism": "encoded",
+        "rationale": "Taken by both encodings, and both keep the decision OUT of the top-level payability test while still exposing it as a named answer — so a reviewer can see the clause was read and see that it was not allowed to defeat cover."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "Battery rows `recovery sought one month after written proof of claim` and `recovery sought with no written proof of claim submitted`: MEASURED 2026-08-31, both encodings answer FALSE on the `sixty-day-bar` pair and neither lets that answer reach payability. Under `furtherConditionPrecedentToLiability` those same rows would defeat the claim. The divergence between the readings is therefore in WHICH DECISION CONSUMES THE ANSWER, and no value of any fact exhibits it — which is why the pair agrees on all 34 rows and why the fork has to be written down rather than measured."
+      ],
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A30.",
+        "Kind is `encoding-placement`: both encodings read the words the same way and differ from the rejected reading only in what the answer is wired to. That is the BNA A12 shape, and a wording-only schema would have had nowhere to put it."
+      ]
+    },
+    {
+      "id": "F-321-ARBITRATION-ACT",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "`the right to make a claim has been extinguished under clause 3.2.1`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.2.1",
+          "Codex Insurance Limited hospitalization policy clause 3.3.1"
+        ]
+      },
+      "source": {
+        "quote": "the dispute or disagreement must be referred to arbitration in accordance with the provisions of the Arbitration Act (Cap. 10) and any statutory modification or re-enactment thereof then in force",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "timingOnly",
+          "description": "\"In accordance with this clause\", in the extinguishment sentence, refers to the three-month timing the clause states. A procedurally defective commencement is still a commencement for the purpose of the extinguishment.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.2.1, whose extinguishment sentence refers to \"this clause\" and whose only requirement stated in it is the three-month window"
+            }
+          ]
+        },
+        {
+          "id": "procedureIncorporatedIntoTheTrigger",
+          "description": "Commencement must comply with the named Act, so an arbitration begun otherwise than in accordance with it does not stop the extinguishment.",
+          "status": "arguable",
+          "foreclosure": "Foreclosed by unencodability rather than by argument: neither encoding has, or could have, a fact recording compliance with the procedure of an unspecified statute — and the statute named is a SINGAPORE Act (\"Cap. 10\" is the Singapore citation form) inside a policy that clause 3.3.1 governs by the laws of New York, so it is not clear which procedure would even be tested. Nobody refuted the reading; it was dropped.",
+          "citations": [
+            {
+              "kind": "instrument",
+              "cite": "Arbitration Act (Cap. 10) (Singapore), named by clause 3.2.1"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.3.1: \"Your Policy is governed by the laws of New York.\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "timingOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken by all three blind encodings, AND DISCLOSED BY NONE OF THEM AT THE POINT OF DROPPING — FOUNDATION.md §4.2 entry A33 records that a procedurally defective commencement counts as good in every arm. This entry is that disclosure."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "Fixture defect D8: a Singapore statute cited in a policy governed by the laws of New York — template residue the paper's anonymisation missed. The de novo module flags the tension in a comment and correctly calls it a drafting finding rather than a rule.",
+        "Divergence is 'none': neither fact schema has a field for procedural compliance, so no fact pattern can tell the readings apart."
+      ]
+    },
+    {
+      "id": "F-31-24-HOUR",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+        "anchor": "section `7A. The parts of Section 3 that are NOT operative on payability`",
+        "provisions": [
+          "Codex Insurance Limited hospitalization policy clause 3.1.1"
+        ]
+      },
+      "source": {
+        "quote": "3.1.1 Your Policy insures You twenty-four (24) hours a day anywhere in the world.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Codex Insurance Limited hospitalization policy clause 3.1.1"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "recordedInACommentOnly",
+          "description": "The clause forecloses any territorial or time-of-day limitation, so no fact about place or hour can change any answer. Recording one would misrepresent the policy as having a limit it disclaims, and encoding a constant-TRUE conjunct puts dead weight into every downstream projection.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.1.1, which imposes no condition and removes two"
+            },
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy, which contains no other territorial or temporal limitation for 3.1.1 to be read against"
+            }
+          ]
+        },
+        {
+          "id": "keptAsAnUnconditionallySatisfiedLimb",
+          "description": "The clause is operative, negatively, and is encoded as a limb of the top-level decision that is always satisfied — so that a reviewer can tell \"considered and inert\" from \"missed\".",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Codex Insurance Limited hospitalization policy clause 3.1.1, the only affirmative statement in the instrument that the policy does anything"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "recordedInACommentOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken by the de novo, with a comment explaining why its `Claim` has no territory or hour field. The corpus takes the other reading and carries `3.1.1 — the Policy insures You twenty-four hours a day anywhere in the world` as a constant-TRUE limb of its top-level decision. All three reviewing auditors flagged the constant-TRUE conjunct as dead weight that shows up in any call-graph, ladder or DMN projection; the defence is that silently dropping it leaves a reviewer unable to tell a clause that was considered from one that was missed."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": [],
+      "notes": [
+        "FOUNDATION.md §4.2 entry A26.",
+        "Divergence is 'none' — the limb is constant TRUE on either reading and no fact can move it. What the fork costs is not an answer but a PAIR: because one encoding has a rule here and the other has a comment, the surface map could declare no pairing for clause 3.1.1, and the oracle refuses a call the named module does not declare.",
+        "Fixture defect D11 sits underneath: clause 3.1.1 grants cover unqualified, with no \"subject to the terms, conditions and exclusions\" saver, so on its face it conflicts with clause 2.1. Both encodings read it as inert rather than as overriding, and neither registers that as a fork."
+      ]
+    }
+  ]
+}
