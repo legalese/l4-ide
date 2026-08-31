@@ -39,6 +39,18 @@ const VIOLATION = {
   THREW: "threw", // the query raised at evaluation time
   NON_BOOLEAN: "non_boolean", // it answered, but not with a yes/no
   WRONG_COUNT: "wrong_count", // the trial emitted the wrong number of answers
+  ABSTAINED: "abstained", // "I do not know" — permitted, scored wrong, tracked apart
+};
+
+// Referencing a key that is not in this map yields `undefined`, which flows
+// silently into the report as a null violation and files the item as a plain
+// missing answer. That happened once, to ABSTAINED. Fail loudly instead.
+for (const [k, v] of Object.entries(VIOLATION)) {
+  if (typeof v !== "string") throw new Error(`VIOLATION.${k} is not a string`);
+}
+const violation = (k) => {
+  if (!(k in VIOLATION)) throw new Error(`no such violation kind: ${k}`);
+  return VIOLATION[k];
 };
 
 const firstDiag = (e) =>
@@ -206,6 +218,63 @@ function norm(v) {
   if (s === "TRUE") return "Yes";
   if (s === "FALSE") return "No";
   return null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Vanilla arm                                                        *
+ * ------------------------------------------------------------------ */
+
+/**
+ * The vanilla cell involves no encoding: the model answers the nine questions
+ * directly. It is shared between the two languages, so it is a control on the
+ * whole encode-then-execute pipeline rather than a cell of either arm.
+ *
+ * "I do not know" is a permitted answer, per the paper's own prompt. It scores
+ * as wrong against both keys, but it is tracked separately as `abstained`,
+ * because a model that declines is telling us something different from one that
+ * asserts the opposite — and an aggregate that merges them hides it.
+ */
+function runVanilla(trialDir) {
+  const f = join(trialDir, "answers.json");
+  if (!existsSync(f))
+    return {
+      violation: VIOLATION.LOAD_ERROR,
+      detail: "no answers.json",
+      answers: null,
+    };
+  let doc;
+  try {
+    doc = JSON.parse(readFileSync(f, "utf8"));
+  } catch (e) {
+    return {
+      violation: VIOLATION.LOAD_ERROR,
+      detail: `unparseable answers.json: ${e.message}`,
+      answers: null,
+    };
+  }
+
+  const answers = IDS.map((id) => {
+    const raw = doc[String(id)] ?? doc[id];
+    if (typeof raw !== "string")
+      return { id, answer: null, violation: VIOLATION.MISSING };
+    const t = raw.trim().toLowerCase();
+    if (t === "yes") return { id, answer: "Yes" };
+    if (t === "no") return { id, answer: "No" };
+    if (t === "i do not know" || t === "i don't know" || t === "unknown")
+      return { id, answer: null, violation: violation("ABSTAINED") };
+    return {
+      id,
+      answer: null,
+      violation: VIOLATION.NON_BOOLEAN,
+      raw: raw.slice(0, 100),
+    };
+  });
+  return {
+    violation: null,
+    answers,
+    baseline: null,
+    selected_by: "answers.json",
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -411,7 +480,7 @@ const cmd = process.argv[2];
 
 if (cmd === "trial") {
   const dir = resolve(arg("dir") ?? die("--dir required"));
-  const armName = arg("arm") ?? die("--arm l4|prolog required");
+  const armName = arg("arm") ?? die("--arm l4|prolog|vanilla required");
   const label = arg("label", basename(dir));
   const libPath = arg("lib", process.env.JL4_LIBRARY_PATH);
 
@@ -424,7 +493,9 @@ if (cmd === "trial") {
         })
       : armName === "prolog"
         ? runProlog(dir, {})
-        : die(`unknown arm ${armName}`);
+        : armName === "vanilla"
+          ? runVanilla(dir)
+          : die(`unknown arm ${armName}`);
 
   const sc = score(r.answers);
   const rec = {
@@ -454,7 +525,7 @@ if (cmd === "aggregate") {
 }
 
 die(`usage:
-  bench.mjs trial --arm l4|prolog --dir <trialdir> [--label L] [--lib PATH] [--out J]
+  bench.mjs trial --arm l4|prolog|vanilla --dir <trialdir> [--label L] [--lib PATH] [--out J]
                   [--apply apply.l4] [--no-baseline]
   bench.mjs aggregate <trial.json>...`);
 
@@ -499,6 +570,13 @@ function render(rec) {
     `**Key B**: mechanical ${rec.key_b.mechanical.correct}/${rec.key_b.mechanical.of} = ${rec.key_b.mechanical.accuracy}` +
       ` · interpretive ${rec.key_b.interpretive.agreed_with_annotator}/${rec.key_b.interpretive.of} agreement (not correctness)`,
   );
+  const abst = rec.per_item.filter((p) => p.violation === "abstained").length;
+  if (abst)
+    L.push(
+      `**Abstained** ("I do not know") on ${abst} item(s) — scored wrong against both keys, ` +
+        `but counted apart: a model that declines is saying something different from one that ` +
+        `asserts the opposite, and an aggregate that merges them hides it.`,
+    );
   L.push(
     `**Conformance**: answered ${rec.conformance.answered}/${rec.conformance.of}` +
       (rec.conformance.violations.length
