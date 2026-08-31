@@ -151,48 +151,74 @@ interpretive ones — which is what the graded key was built to expose, and it m
 headline differences between methods are differences about two contested items, not about legal
 reasoning.
 
-### 5.1 Why Q5 moves — and it is NOT the guided vocabulary
+### 5.1 Why Q5 moves — and what two successive n=1 corrections taught
 
-The first reading of this pilot was that the guided cells reach 9/9 because `bench/schema.md`
-hands them a `hospitalization_ground` field with a `Neither` constructor, reintroducing as a fact
-slot the distinction that Kant et al.'s deletion of §2 removed. **The `prolog-guided` control
-refutes that**, and it is recorded here rather than quietly dropped.
+All ten trials, per item (`.` = agrees with the key, `X` = does not):
 
-`prolog-guided/t2` gets the identical schema, **does** make the ground a coverage condition —
-`hospitalization_ground_valid(C)` is a conjunct of its `covered/1` — and still scores 8/9,
-missing Q5. It used the vocabulary exactly as intended and reached the opposite answer.
+```
+l4-guided/t1         .........  1.000      prolog-guided/t1     .........  1.000
+l4-guided/t2         .........  1.000      prolog-guided/t2     ....X....  0.889
+l4-unguided/t1,t2    ....X....  0.889      prolog-unguided/t1,t2 ....X.... 0.889
+vanilla/t1,t2        ....X....  0.889
+```
 
-The whole difference is one line, and it is in the **fact-supply** step, not the rules:
+guided: n=4, mean 0.972 · everything else: n=6, all exactly 0.889 · **every trial 7/7 mechanical**.
 
-| trial                            | rule reads the ground?   | q5 marshalled as    | Q5                |
-| -------------------------------- | ------------------------ | ------------------- | ----------------- |
-| `l4-guided/t1`, `t2`             | yes                      | `Neither`           | ✓ agrees with key |
-| `prolog-guided/t2`               | yes                      | `accidental_injury` | ✗                 |
-| `l4-unguided`, `prolog-unguided` | **no such field at all** | —                   | ✗                 |
+The whole run turns on **one fact-supply decision**, and the rules are not where it lives:
 
-So Q5 is decided by whether an encoder classifies "punching my own face to show off for my
-friends" as an accidental injury or as neither. Given the same schema and the same information,
-encoders split. **The benchmark scores that judgement, not the encoding** — which is what
-`FOUNDATION.md` §1.4 argued from the reference encodings and what §5.1's requirement R3 ("score
-the two generation steps separately; a pipeline that lets one model do both is measuring their
-sum") exists to separate. This pilot supplies the natural experiment: rules held constant across
-languages, the answer moving on marshalling alone.
+| trial                | ground field in the encoding?   | q5 marshalled as    | Q5  |
+| -------------------- | ------------------------------- | ------------------- | --- |
+| `l4-guided/t1`, `t2` | yes                             | `Neither`           | ✓   |
+| `prolog-guided/t1`   | yes                             | `neither`           | ✓   |
+| `prolog-guided/t2`   | yes — a conjunct of `covered/1` | `accidental_injury` | ✗   |
+| all four unguided    | **no such field at all**        | —                   | ✗   |
 
-The unguided cells fail Q5 differently and more interestingly: **neither built a
-hospitalization-ground field at all.** The Prolog trial says so in a comment — _"Self-inflicted
-horseplay is not on the Sec. 2.1 exclusion list, and `fraud_misrep_or_withholding/1` is
-explicitly denied, so it is left unasserted."_ Both concluded coverage turns on policy-in-effect
-plus no §2.1 exclusion, **which is correct for the text as published**, because the operative
-insuring clause requiring "sickness or accidental injury" is precisely the one Kant et al. deleted
-(§2 above). The modified fixture uses the phrase only as a descriptor in clause 1.1, never as a
-condition. A guided schema can put the distinction back; only a _fact-supply_ decision then makes
-it bite.
+So: the guided vocabulary is **necessary** — 6 of 6 non-guided trials fail Q5, and not one of them
+even builds the field — and **not sufficient**: `prolog-guided/t2` had the field, made it a genuine
+coverage condition, and classified the self-punch the other way. The split is _within_ the
+guided-Prolog cell, not between the languages.
 
-What survives about Kant et al.'s own guided/unguided gap is therefore weaker and more careful
-than the first reading: an expert vocabulary is **necessary** for a model to reach the published
-Q5 answer from this text, and it is **not sufficient**. Their guided cells reporting a uniform
-1.00 across three models, where ours split, is a fact about their vocabulary and their
-marshalling that their paper does not publish enough detail to check.
+**This section was rewritten twice from n=1 evidence, and that is the pilot's own lesson.** The
+first reading said the guided cells reach 1.000 _because_ of the vocabulary; `prolog-guided/t2`
+arrived and looked like a refutation; `prolog-guided/t1` arrived and made the refutation itself an
+over-read. At k=2 a single trial is 50% of a cell. Nothing here is a result — it is a conformance
+check that happened to expose a mechanism.
+
+**The mechanism is open texture, relocated rather than removed.** Q5 asks whether "punching my own
+face to show off for my friends" is an _accidental injury_. That is the penumbra of a term with a
+real doctrinal split — accidental **means** versus accidental **results**, litigated at least since
+_Landress v. Phoenix Mutual_ (1934). The `vanilla/t1` trial reached for exactly that distinction
+unprompted and blind: _"the usual insurance-law reading that looks at whether the result (getting
+hurt) was intended, not just whether the underlying act (throwing the punch) was voluntary."_
+
+Formalising does not settle it. A typed field `hospitalization_ground: sickness |
+accidental_injury | neither` converts an open-textured judgement into an _input_. What that buys is
+not determinacy but **localisation** — the discretion becomes a line you can point at:
+
+```prolog
+prolog-guided/t2:  claim_hospitalization_ground(c5, accidental_injury).
+prolog-guided/t1:  claim_hospitalization_ground(c5, neither).
+```
+
+One line, one judgement, one score point, two encoders with identical information. In prose the
+judgement is not locatable at all — which is how a paper can delete the clause that framed it and
+then score models down for failing to find it.
+
+Two things must stay separated here. The excision of §2 is a **defect** of the fixture and is
+repairable. The open texture in "accidental injury" is **not**: restore §2 and Q5 is still
+penumbral, merely penumbral with a clause to hang the judgement on. The deletion does not create
+the indeterminacy; it removes the text that would have framed it.
+
+Note also the classification was **pre-registered** — all nine items were marked mechanical or
+interpretive in `bench/keys.json` before any trial ran. The data then separated along that line
+exactly: 7/7 core for every method in both languages, all variance on the two penumbral items.
+
+### 5.1.1 What this does to the paper's RL proposal
+
+Kant et al.'s §5 proposes reinforcement learning on a correctness reward. On a penumbral item the
+reward is agreement with an annotator, so the gradient points at predicting that annotator's
+discretion rather than at applying the law — and on this benchmark 2 of 9 items, 22% of the
+available score, are of that kind.
 
 ### 5.2 A defect in this pilot: the two guided cells were NOT equivalently guided
 
