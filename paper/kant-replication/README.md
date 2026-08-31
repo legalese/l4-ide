@@ -124,14 +124,67 @@ Both interpreters are present on the development machine (`l4`; SWI-Prolog 9.2.9
 satisfiable — which is what removes the original's worst methodological flaw rather than inheriting
 it.
 
-## 5. The measurement that has NOT been run
+## 5. The measurement: pilot run, k = 2
 
 `FOUNDATION.md` §5.1 specifies a **2 × 3 factorial** — {Prolog, L4} × {vanilla, unguided, guided} —
 with model family held fixed so that target language is the independent variable rather than model
-identity. The paper's own Limitations section invites exactly this: _"we … focused solely on Prolog
-as a logic interpreter. Future work should incorporate a wider variety of models and interpreters."_
+identity. Five cells are distinct, since the vanilla condition involves no encoding and is shared.
 
-Running it needs k fresh encoder trials per cell. Nothing in this directory has run one.
+**A k = 2 pilot ran on 2026-08-31**, one model family throughout, trials blind by construction
+(`bench/setup-pilot.sh` stages a sandbox per trial; the key is never copied in). The full k = 10
+run specified in §5.1 has **not** been run.
+
+| cell            | n   | Key A                          | mechanical | missed |
+| --------------- | --- | ------------------------------ | ---------- | ------ |
+| vanilla         | 2   | 0.889, 0.889                   | 7/7        | Q5     |
+| prolog-unguided | 2   | 0.889, 0.889                   | 7/7        | Q5     |
+| l4-unguided     | 2   | 0.889, 0.889                   | 7/7        | Q5     |
+| l4-guided       | 2   | **1.000, 1.000**               | 7/7        | —      |
+| prolog-guided   | —   | _not complete at this writing_ |            |        |
+
+Conformance was 9/9 on every finished trial: every encoding loaded, and every trial exposed the
+nine queries in the required shape. That was the question the pilot existed to answer before
+committing to k = 10.
+
+**Every trial scored 7/7 on the mechanical items.** All variance in the entire run sits on the two
+interpretive ones — which is what the graded key was built to expose, and it means the benchmark's
+headline differences between methods are differences about two contested items, not about legal
+reasoning.
+
+### 5.1 Why Q5 moves, shown from the artifacts rather than inferred from a score
+
+**Neither unguided cell built a hospitalization-ground field at all.** The Prolog trial says so in
+a comment: _"Self-inflicted horseplay is not on the Sec. 2.1 exclusion list, and
+`fraud_misrep_or_withholding/1` is explicitly denied, so it is left unasserted."_ Both encoders
+concluded that coverage turns on policy-in-effect plus no §2.1 exclusion — **which is correct for
+the text as published**, because the operative insuring clause requiring "sickness or accidental
+injury" is precisely the one Kant et al. deleted (§2 above). The modified fixture uses the phrase
+only as a descriptor in clause 1.1, never as a condition.
+
+The guided cells reach 9/9 because `bench/schema.md` hands them a `hospitalization_ground` field
+with a `Neither` constructor, reintroducing as a fact slot the distinction the deletion removed.
+`l4-guided/t1` sets `hospitalization ground IS Neither` for q5: the **rule** does not decide it,
+the **fact-supply step** does.
+
+That mechanism accounts for both of the paper's headline numbers at once — why its unguided models
+fail Q5 (o1-preview missed it in 9 of 10 trials) and why its guided models reach 1.00 — without
+attributing either to reasoning quality. **Our own schema is implicated identically**, which is why
+`prompts/README.md` says the guided cell measures schema _plus_ language and never language alone.
+
+### 5.2 A defect in this pilot: the two guided cells were NOT equivalently guided
+
+`schema-l4.md` **did not compile** when it was shipped to the `l4-guided` trials. Multi-word record
+fields need backticks, and the `arose out of` helper was written ``c `elem` cs`` when L4 has no
+backtick-infix calling convention — it parses as applying `c` to two arguments, and `elem` was
+never mixfix-registered in the prelude. Both trials found and repaired this independently and
+recorded it in their `NOTES.md`. `schema-prolog.md` loaded cleanly.
+
+So the L4 guided encoders had to debug the vocabulary before they could use it, and the Prolog ones
+did not — **an R4 violation, in the one place a field-name comparison could not see it.** The bias
+runs _against_ the L4 cell, so the 9/9 is not flattered by it; that does not make the run clean.
+Both defects are fixed, and `bench/check-schema-parity.mjs` now **compiles both schemas** as well as
+comparing their field sets and order, with a negative test. Any k = 10 run should re-stage from the
+repaired schema, and its guided-L4 numbers are not poolable with this pilot's.
 
 ## 6. What would make this worth publishing
 
