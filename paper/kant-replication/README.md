@@ -148,7 +148,7 @@ infrastructure failure, not a measurement, so this is a repair, not a resample.
 | l4-unguided     | 10  | 0.911      | 0.047 | 0.889 | 1.000 | 2/10  | 10/10 | 70/70       |
 | l4-guided       | 10  | **0.967**  | 0.054 | 0.889 | 1.000 | 7/10  | 10/10 | 70/70       |
 
-**450 of 450 mechanical items correct, across all fifty trials.** Every point of variance in the
+**350 of 350 mechanical items correct, across all fifty trials** (7 mechanical items × 50 trials — an earlier revision of this line said 450/450, conflating all nine items with the mechanical seven; corrected 2026-09-01, and the same slip survives uncorrectably in two commit titles). Every point of variance in the
 whole arm sits on the two pre-registered interpretive items: Q5 (49 of the 50 trials' misses) and
 one Q4 miss. Conformance: every encoding loaded or typechecked, every trial exposed nine queries;
 the single dent is `vanilla/t10` answering "I do not know" on Q5 — a permitted, principled
@@ -350,7 +350,7 @@ derivability, not answers). Two harness repairs of the same kind as §5's: the r
   exactly at a coin flip, one short of the pre-registered majority. Quotable text moves free
   readers; it does not settle them.
 - **P4 — strictly refuted, by one trial in three hundred and fifty.** `prolog-unguided/t7`
-  answered No on Q9 (349/350 mechanical items correct across the restored arm; 450/450
+  answered No on Q9 (349/350 mechanical items correct across the restored arm; 350/350
   as-published). The dissent is itself informative: Q9's "mechanical" label embeds the causal
   reading of "arising out of", and one blind encoder in ninety-nine took the occupational one.
   "Mechanical" is a judgement about how thin a penumbra is, not proof that it has none.
