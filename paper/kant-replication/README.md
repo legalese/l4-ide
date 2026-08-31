@@ -246,20 +246,39 @@ reward is agreement with an annotator, so the gradient points at predicting that
 discretion rather than at applying the law — and on this benchmark 2 of 9 items, 22% of the
 available score, are of that kind.
 
-### 5.2 A defect in this pilot: the two guided cells were NOT equivalently guided
+### 5.2 A harness bug in the L4 schema, and why it does not qualify the result
 
 `schema-l4.md` **did not compile** when it was shipped to the `l4-guided` trials. Multi-word record
 fields need backticks, and the `arose out of` helper was written ``c `elem` cs`` when L4 has no
-backtick-infix calling convention — it parses as applying `c` to two arguments, and `elem` was
-never mixfix-registered in the prelude. Both trials found and repaired this independently and
-recorded it in their `NOTES.md`. `schema-prolog.md` loaded cleanly.
+backtick-infix calling convention — it parses as applying `c` to two arguments, and `elem` was never
+mixfix-registered in the prelude. Both trials found and repaired it independently and said so in
+their `NOTES.md`. `schema-prolog.md` loaded cleanly.
 
-So the L4 guided encoders had to debug the vocabulary before they could use it, and the Prolog ones
-did not — **an R4 violation, in the one place a field-name comparison could not see it.** The bias
-runs _against_ the L4 cell, so the 9/9 is not flattered by it; that does not make the run clean.
-Both defects are fixed, and `bench/check-schema-parity.mjs` now **compiles both schemas** as well as
-comparing their field sets and order, with a negative test. Any k = 10 run should re-stage from the
-repaired schema, and its guided-L4 numbers are not poolable with this pilot's.
+**This is a bug in our scaffolding, not a confound in the experiment**, for three reasons, and the
+section is kept only so a later reader does not have to re-derive them:
+
+1. **The bias runs against L4, and L4 hit the ceiling anyway.** Both `l4-guided` trials scored
+   1.000 after paying a repair cost the Prolog cell did not. A handicap the handicapped arm
+   overcomes is not an alternative explanation for its score. Had `l4-guided` come in _below_
+   `prolog-guided`, this would be a live confound and the cell would need re-running.
+2. **The surviving finding lives entirely inside the Prolog guided cell.** §5.1's conclusion — the
+   guided vocabulary is necessary and not sufficient — rests on `prolog-guided/t2` marshalling
+   `accidental_injury` where `t1` marshalled `neither`. Both had a clean schema. The bug touches
+   neither side of the comparison that carries the result.
+3. **The repair was syntactic, not semantic.** Same eighteen fields, same order, same helper
+   meanings; backticks and one helper body. A k = 10 run on the repaired schema is measuring the
+   same treatment, so these two trials pool with it — with a footnote that they did strictly more
+   work for the same score, not less.
+
+An earlier draft of this section called it an R4 violation and said the guided-L4 numbers were not
+poolable. Both were over-stated and are withdrawn here rather than silently edited away.
+
+What the episode _does_ justify is the fix already made: `bench/check-schema-parity.mjs` now
+**compiles both schemas** — `l4 check` on the L4 blocks, `swipl` on the Prolog helpers — as well as
+comparing field set and order, with a negative test. Comparing names passed and was useless. And
+there is a modest point in the toolchain's favour buried in it: the type checker rejected our
+mistake immediately and said what was wrong, which is why two encoders working blind both recovered
+without ever asking anyone.
 
 ## 6. What would make this worth publishing
 
