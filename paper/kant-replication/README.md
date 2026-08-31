@@ -134,13 +134,13 @@ identity. Five cells are distinct, since the vanilla condition involves no encod
 (`bench/setup-pilot.sh` stages a sandbox per trial; the key is never copied in). The full k = 10
 run specified in §5.1 has **not** been run.
 
-| cell            | n   | Key A                          | mechanical | missed |
-| --------------- | --- | ------------------------------ | ---------- | ------ |
-| vanilla         | 2   | 0.889, 0.889                   | 7/7        | Q5     |
-| prolog-unguided | 2   | 0.889, 0.889                   | 7/7        | Q5     |
-| l4-unguided     | 2   | 0.889, 0.889                   | 7/7        | Q5     |
-| l4-guided       | 2   | **1.000, 1.000**               | 7/7        | —      |
-| prolog-guided   | —   | _not complete at this writing_ |            |        |
+| cell            | n   | Key A            | mechanical | missed |
+| --------------- | --- | ---------------- | ---------- | ------ |
+| vanilla         | 2   | 0.889, 0.889     | 7/7        | Q5     |
+| prolog-unguided | 2   | 0.889, 0.889     | 7/7        | Q5     |
+| l4-unguided     | 2   | 0.889, 0.889     | 7/7        | Q5     |
+| l4-guided       | 2   | **1.000, 1.000** | 7/7        | —      |
+| prolog-guided   | 1   | 0.889            | 7/7        | Q5     |
 
 Conformance was 9/9 on every finished trial: every encoding loaded, and every trial exposed the
 nine queries in the required shape. That was the question the pilot existed to answer before
@@ -151,25 +151,48 @@ interpretive ones — which is what the graded key was built to expose, and it m
 headline differences between methods are differences about two contested items, not about legal
 reasoning.
 
-### 5.1 Why Q5 moves, shown from the artifacts rather than inferred from a score
+### 5.1 Why Q5 moves — and it is NOT the guided vocabulary
 
-**Neither unguided cell built a hospitalization-ground field at all.** The Prolog trial says so in
-a comment: _"Self-inflicted horseplay is not on the Sec. 2.1 exclusion list, and
-`fraud_misrep_or_withholding/1` is explicitly denied, so it is left unasserted."_ Both encoders
-concluded that coverage turns on policy-in-effect plus no §2.1 exclusion — **which is correct for
-the text as published**, because the operative insuring clause requiring "sickness or accidental
-injury" is precisely the one Kant et al. deleted (§2 above). The modified fixture uses the phrase
-only as a descriptor in clause 1.1, never as a condition.
+The first reading of this pilot was that the guided cells reach 9/9 because `bench/schema.md`
+hands them a `hospitalization_ground` field with a `Neither` constructor, reintroducing as a fact
+slot the distinction that Kant et al.'s deletion of §2 removed. **The `prolog-guided` control
+refutes that**, and it is recorded here rather than quietly dropped.
 
-The guided cells reach 9/9 because `bench/schema.md` hands them a `hospitalization_ground` field
-with a `Neither` constructor, reintroducing as a fact slot the distinction the deletion removed.
-`l4-guided/t1` sets `hospitalization ground IS Neither` for q5: the **rule** does not decide it,
-the **fact-supply step** does.
+`prolog-guided/t2` gets the identical schema, **does** make the ground a coverage condition —
+`hospitalization_ground_valid(C)` is a conjunct of its `covered/1` — and still scores 8/9,
+missing Q5. It used the vocabulary exactly as intended and reached the opposite answer.
 
-That mechanism accounts for both of the paper's headline numbers at once — why its unguided models
-fail Q5 (o1-preview missed it in 9 of 10 trials) and why its guided models reach 1.00 — without
-attributing either to reasoning quality. **Our own schema is implicated identically**, which is why
-`prompts/README.md` says the guided cell measures schema _plus_ language and never language alone.
+The whole difference is one line, and it is in the **fact-supply** step, not the rules:
+
+| trial                            | rule reads the ground?   | q5 marshalled as    | Q5                |
+| -------------------------------- | ------------------------ | ------------------- | ----------------- |
+| `l4-guided/t1`, `t2`             | yes                      | `Neither`           | ✓ agrees with key |
+| `prolog-guided/t2`               | yes                      | `accidental_injury` | ✗                 |
+| `l4-unguided`, `prolog-unguided` | **no such field at all** | —                   | ✗                 |
+
+So Q5 is decided by whether an encoder classifies "punching my own face to show off for my
+friends" as an accidental injury or as neither. Given the same schema and the same information,
+encoders split. **The benchmark scores that judgement, not the encoding** — which is what
+`FOUNDATION.md` §1.4 argued from the reference encodings and what §5.1's requirement R3 ("score
+the two generation steps separately; a pipeline that lets one model do both is measuring their
+sum") exists to separate. This pilot supplies the natural experiment: rules held constant across
+languages, the answer moving on marshalling alone.
+
+The unguided cells fail Q5 differently and more interestingly: **neither built a
+hospitalization-ground field at all.** The Prolog trial says so in a comment — _"Self-inflicted
+horseplay is not on the Sec. 2.1 exclusion list, and `fraud_misrep_or_withholding/1` is
+explicitly denied, so it is left unasserted."_ Both concluded coverage turns on policy-in-effect
+plus no §2.1 exclusion, **which is correct for the text as published**, because the operative
+insuring clause requiring "sickness or accidental injury" is precisely the one Kant et al. deleted
+(§2 above). The modified fixture uses the phrase only as a descriptor in clause 1.1, never as a
+condition. A guided schema can put the distinction back; only a _fact-supply_ decision then makes
+it bite.
+
+What survives about Kant et al.'s own guided/unguided gap is therefore weaker and more careful
+than the first reading: an expert vocabulary is **necessary** for a model to reach the published
+Q5 answer from this text, and it is **not sufficient**. Their guided cells reporting a uniform
+1.00 across three models, where ours split, is a fact about their vocabulary and their
+marshalling that their paper does not publish enough detail to check.
 
 ### 5.2 A defect in this pilot: the two guided cells were NOT equivalently guided
 
