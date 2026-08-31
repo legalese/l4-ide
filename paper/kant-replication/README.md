@@ -124,32 +124,70 @@ Both interpreters are present on the development machine (`l4`; SWI-Prolog 9.2.9
 satisfiable — which is what removes the original's worst methodological flaw rather than inheriting
 it.
 
-## 5. The measurement: pilot run, k = 2
+## 5. The measurement: k = 10 per cell, pooled with the pilot
 
 `FOUNDATION.md` §5.1 specifies a **2 × 3 factorial** — {Prolog, L4} × {vanilla, unguided, guided} —
 with model family held fixed so that target language is the independent variable rather than model
 identity. Five cells are distinct, since the vanilla condition involves no encoding and is shared.
 
-**A k = 2 pilot ran on 2026-08-31**, one model family throughout, trials blind by construction
-(`bench/setup-pilot.sh` stages a sandbox per trial; the key is never copied in). The full k = 10
-run specified in §5.1 has **not** been run.
+**The full run completed on 2026-09-01**: n = 10 per cell, matching the original paper's ten
+trials per configuration. Trials t1/t2 are the 2026-08-31 k = 2 pilot; t3–t10 are the top-up
+(`bench/setup-k10.sh`), pooled per §5.2 — the only staged input that changed between the two was
+the syntactic schema repair. All trials blind by construction (no sandbox contains the key), all
+scored by re-executing artifacts (`bench/score-k10.sh`), which also re-verified the pilot numbers
+from scratch. One harness repair is on the record: two prolog-guided encoder agents (t3, t6 of
+the top-up wave) died on API timeouts having written **zero bytes**, and were relaunched into
+their pristine sandboxes under identical conditions. An agent crash with no partial output is an
+infrastructure failure, not a measurement, so this is a repair, not a resample.
 
-| cell            | n   | Key A            | mechanical | missed |
-| --------------- | --- | ---------------- | ---------- | ------ |
-| vanilla         | 2   | 0.889, 0.889     | 7/7        | Q5     |
-| prolog-unguided | 2   | 0.889, 0.889     | 7/7        | Q5     |
-| l4-unguided     | 2   | 0.889, 0.889     | 7/7        | Q5     |
-| l4-guided       | 2   | **1.000, 1.000** | 7/7        | —      |
-| prolog-guided   | 1   | 0.889            | 7/7        | Q5     |
+| cell            | n   | Key A mean | sd    | min   | max   | Q5    | Q4    | mechanical  |
+| --------------- | --- | ---------- | ----- | ----- | ----- | ----- | ----- | ----------- |
+| vanilla         | 10  | 0.900      | 0.035 | 0.889 | 1.000 | 1/10  | 10/10 | 70/70       |
+| prolog-unguided | 10  | 0.922      | 0.054 | 0.889 | 1.000 | 3/10  | 10/10 | 70/70       |
+| prolog-guided   | 10  | 0.945      | 0.059 | 0.889 | 1.000 | 6/10  | 9/10  | 70/70       |
+| l4-unguided     | 10  | 0.911      | 0.047 | 0.889 | 1.000 | 2/10  | 10/10 | 70/70       |
+| l4-guided       | 10  | **0.967**  | 0.054 | 0.889 | 1.000 | 7/10  | 10/10 | 70/70       |
 
-Conformance was 9/9 on every finished trial: every encoding loaded, and every trial exposed the
-nine queries in the required shape. That was the question the pilot existed to answer before
-committing to k = 10.
+**450 of 450 mechanical items correct, across all fifty trials.** Every point of variance in the
+whole arm sits on the two pre-registered interpretive items: Q5 (49 of the 50 trials' misses) and
+one Q4 miss. Conformance: every encoding loaded or typechecked, every trial exposed nine queries;
+the single dent is `vanilla/t10` answering "I do not know" on Q5 — a permitted, principled
+abstention ("the contract never defines accidental Injury and no exclusion covers self-inflicted
+acts"), scored as a miss under Key A and reported as what it is.
 
-**Every trial scored 7/7 on the mechanical items.** All variance in the entire run sits on the two
-interpretive ones — which is what the graded key was built to expose, and it means the benchmark's
-headline differences between methods are differences about two contested items, not about legal
-reasoning.
+Three readings, in decreasing order of what the data supports:
+
+1. **The guided/unguided/vanilla ordering is real and monotone in both languages** (guided
+   0.945/0.967 > unguided 0.922/0.911 > vanilla 0.900), and it is carried entirely by Q5:
+   the schema roughly triples Q5 gold-agreement (13/20 guided vs 5/20 unguided vs 1/10 vanilla).
+   What the schema buys is a **place to put the judgement** — a typed `Ground` field — not the
+   judgement itself: even guided, 7 of 20 trials marshalled the self-punch as `Accidental injury`
+   and missed.
+2. **The one Q4 miss is the under-determination doing exactly what §T8-style analysis predicts.**
+   `prolog-guided/t5` pinned Q4's unstated hospitalization month at 3 "to isolate the late
+   confirmation as the only operative fact"; its still-pending logic then, correctly on its own
+   reading, answered Yes. Ten other trials pinned the month late (pluperfect reading) and matched
+   the key. The key's own entry calls Q4 under-determined; the variance agrees.
+3. **No language claim.** l4-guided 0.967 versus prolog-guided 0.945 is one trial's Q5
+   marshalling flip at sd ≈ 0.05; treating it as "L4 beats Prolog" would be exactly the
+   over-reading this study exists to refuse. The honest sentence is: on this benchmark, with this
+   model family, the two languages are indistinguishable, the treatment that moves the number is
+   the **schema**, and the number it moves is one open-textured item.
+
+Against the original's own figures (vanilla 0.78 flat across five vendors; unguided Prolog
+0.41–0.89; guided Prolog 1.00 for three models): our vanilla beats their best vanilla by 12
+points, our unguided cells sit above their unguided ceiling, and our guided cells do **not**
+reach their 1.00 — because we score marshalling honestly instead of hand-reading near-miss
+encodings as correct (their footnote 3), and because Q5's gold is not derivable from the fixture
+they shipped (`source-defects.md`; the repaired-benchmark arm in `bench/PREREGISTRATION-restored.md`
+measures what happens when it is).
+
+One further limitation discovered mid-run and held constant across the whole arm:
+`FOUNDATION.md` **T9** — the orchestration harness's own memory index carried result-adjacent
+content into nominally blind sandboxes until it was sanitized after the last as-published launch.
+Two trials disclosed seeing it; both answered against its direction; the unguided cells split on
+Q5 rather than converging. It is a limitation to report, not an invalidation, and the restored
+arm runs without it.
 
 ### 5.1 Why Q5 moves — and what two successive n=1 corrections taught
 

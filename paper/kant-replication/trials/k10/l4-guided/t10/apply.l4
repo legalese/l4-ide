@@ -1,0 +1,245 @@
+IMPORT policy
+
+-- Nine benchmark queries (Kant et al. 2025, Appendix A.2), applied to
+-- `covered` from policy.l4. Standing preamble for every query: assume all
+-- conditions not mentioned by the query are met and no exclusion not
+-- mentioned is triggered; the agreement has been signed and the premium
+-- has been paid on time.
+--
+-- Common "favorable, unrelated" defaults used below unless a query's own
+-- facts say otherwise: agreement signed; premium paid at month 0; no
+-- fraud/misrepresentation; wellness visit at month 1 with a qualified
+-- provider; written confirmation at month 1; no dispute (so the
+-- arbitration fields are moot); written proof of claim at month 0 with no
+-- recovery yet sought (so the 60-day bar is moot); a 12-month policy
+-- term.
+
+-- Q1. will my policy apply if I was hospitalized by burns suffered while
+-- doing my duty as a firefighter?
+q1 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 3
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 40
+    `causes`                            IS LIST Firefighting
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 1
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q1
+
+-- Q2. will my policy apply if I am 78 years old at the time of
+-- hospitalization?
+q2 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 3
+    `hospitalization ground`            IS Sickness
+    `age at hospitalization`            IS 78
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 1
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q2
+
+-- Q3. will my policy apply if I was hospitalized for pneumonia 5 months
+-- after the policy's effective date, and my age at the time of
+-- hospitalization is 65?
+q3 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 5
+    `hospitalization ground`            IS Sickness
+    `age at hospitalization`            IS 65
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 1
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q3
+
+-- Q4. will my policy apply if I was hospitalized due to a fall while
+-- traveling abroad and I had given confirmation of my wellness visit 8
+-- months after the policy's effective date?
+q4 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 9
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 40
+    `causes`                            IS LIST Other
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 8
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q4
+
+-- Q5. will my policy apply if I was hospitalized for punching my own face
+-- to show off for my friends and I did not commit fraud or
+-- misrepresentation?
+q5 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 3
+    `hospitalization ground`            IS Neither
+    `age at hospitalization`            IS 40
+    `causes`                            IS LIST Other
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 1
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q5
+
+-- Q6. will my policy apply if I was hospitalized due to an injury
+-- sustained while skydiving, my age at the time of hospitalization was
+-- 79, and proof of my wellness visit was provided 6.5 months after the
+-- policy's effective date?
+q6 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 7
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 79
+    `causes`                            IS LIST Skydiving
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 2
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 6.5
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q6
+
+-- Q7. will my policy apply if I was hospitalized for a heart attack, proof
+-- of the wellness visit was submitted 2 months after the policy's
+-- effective date, and my age at the time of hospitalization was 75?
+q7 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 4
+    `hospitalization ground`            IS Sickness
+    `age at hospitalization`            IS 75
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 2
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q7
+
+-- Q8. will my policy apply if I was hospitalized after being injured in a
+-- military training exercise, the hospitalization occurred within the
+-- policy term, and I did not commit fraud?
+q8 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 6
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 40
+    `causes`                            IS LIST `Military service`
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 1
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q8
+
+-- Q9. will my policy apply if I was hospitalized due to my son biting me
+-- in the ankle, proof of my wellness visit was provided 6 months after
+-- the effective date, and I was serving as a police officer at the time
+-- of hospitalization?
+--
+-- Judgement call (see NOTES.md): the bite has no causal nexus to police
+-- service, so `causes` does not include `Police service` — merely being
+-- on the force "at the time of hospitalization" does not, on its own,
+-- mean the injury "arose ... out of" that service.
+q9 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 7
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 40
+    `causes`                            IS LIST Other
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 6
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS TRUE
+    `written proof of claim month`      IS JUST 0
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q9

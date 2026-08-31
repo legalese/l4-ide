@@ -1,0 +1,156 @@
+IMPORT prelude
+
+-- Codex Insurance Limited -- Personal Accident and Sickness Policy
+--
+-- All dates/times below, apart from the claimant's age, are encoded as a
+-- NUMBER of months elapsed since the policy's effective date. Every one of
+-- the nine benchmark queries states its facts relative to the effective
+-- date, so no DATE type, no calendar arithmetic, and no "elapsed time
+-- between two dates" calculation is ever needed here -- every comparison is
+-- a direct NUMBER comparison against a threshold drawn from the text (6, 7,
+-- or 12 months).
+--
+-- This file defines ONLY the rules that decide whether a claim is covered.
+-- No claim's data is defined here -- see apply.l4 for the nine queries.
+
+§ `Codex Insurance Limited -- Personal Accident and Sickness Policy`
+
+§§ `The facts of a single hospitalization claim`
+
+DECLARE Claim HAS
+    -- the claimant's age in whole years at the time of the hospitalization --
+    -- the one fact that is NOT relative to the effective date
+    `age at hospitalization`                                IS A NUMBER
+
+    -- when the hospitalization occurred, in months after the effective date
+    `hospitalization month`                                 IS A NUMBER
+
+    -- §1.1.1: a benefit is only payable for a hospitalization "for sickness
+    -- or accidental injury"
+    `hospitalization is for sickness or accidental injury`  IS A BOOLEAN
+
+    -- §2.1: the four activity-based exclusions. Each asks whether the event
+    -- causing the sickness or injury arose directly or indirectly out of the
+    -- named activity -- not merely whether the claimant happens to hold that
+    -- occupation at the time.
+    `event arose out of skydiving`                          IS A BOOLEAN
+    `event arose out of service in the military`            IS A BOOLEAN
+    `event arose out of service as a fire fighter`          IS A BOOLEAN
+    `event arose out of service in the police`              IS A BOOLEAN
+
+    -- §1.3: no later than the 7th month anniversary, written confirmation of
+    -- a wellness visit must be supplied to the Company. NOTHING means no
+    -- confirmation has been supplied (yet).
+    `wellness visit confirmation month`                     IS A MAYBE NUMBER
+
+    -- §1.3: the wellness visit the confirmation attests to must itself have
+    -- occurred no later than the 6th month anniversary. None of the nine
+    -- benchmark queries give this sub-event its own relative month, so it is
+    -- captured as a plain flag rather than as a second relative-month
+    -- number.
+    `wellness visit occurred no later than the 6th month`   IS A BOOLEAN
+
+    -- §1.2 cancelation grounds unrelated to §1.3
+    `claimant committed fraud`                              IS A BOOLEAN
+    `claimant made a misrepresentation`                     IS A BOOLEAN
+    `claimant materially withheld information`              IS A BOOLEAN
+
+    -- §3.2: arbitration is a condition precedent to Our liability, but only
+    -- where a dispute or disagreement exists in the first place.
+    `dispute exists between the parties`                    IS A BOOLEAN
+    `valid arbitration award has been issued`               IS A BOOLEAN
+
+
+§§ `1.1 - 1.3  Policy in effect and conditions`
+
+-- §1.3, read together with §1.2: the wellness-visit condition is treated as
+-- met -- for purposes of the policy remaining in effect -- whenever it has
+-- either been satisfied on time or has not yet fallen due. Reading §1.2's
+-- "has not been satisfied in a timely fashion" as anything broader than the
+-- negation of that same disjunction would mean the 7-month grace period
+-- promised by §1.3 could never actually be relied on: a claimant would
+-- already be in breach on day one, before the deadline even arrives, merely
+-- because confirmation has not yet been supplied. That reading would make
+-- the grace period self-defeating, so §1.1(3) and §1.2 are encoded here as
+-- two statements of one underlying condition, and this predicate is that
+-- condition.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 is satisfied or still pending` claim MEANS
+    CONSIDER claim's `wellness visit confirmation month`
+    WHEN JUST m THEN m AT MOST 7 AND claim's `wellness visit occurred no later than the 6th month`
+    WHEN NOTHING THEN claim's `hospitalization month` AT MOST 7
+
+-- §3.6: the policy term is one year (12 months) from the effective date, and
+-- §1.2 automatically cancels the policy on the last day of that term.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy term has expired` claim MEANS
+    claim's `hospitalization month` GREATER THAN 12
+
+-- §1.2: the grounds for automatic cancelation.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy has been canceled` claim MEANS
+        claim's `claimant committed fraud`
+    OR  claim's `claimant made a misrepresentation`
+    OR  claim's `claimant materially withheld information`
+    OR  NOT (`condition 1.3 is satisfied or still pending` claim)
+    OR  `policy term has expired` claim
+
+-- §1.1: the policy is in effect at the time of the hospitalization if the
+-- agreement is signed and the premium has been paid (assumed throughout,
+-- per the task instructions -- no rule is needed for either), the §1.3
+-- condition is pending-or-satisfied, and the policy has not been canceled.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy is in effect at the time of the hospitalization` claim MEANS
+        `condition 1.3 is satisfied or still pending` claim
+    AND NOT (`policy has been canceled` claim)
+
+
+§§ `2.1  General exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`a general exclusion applies` claim MEANS
+        claim's `event arose out of skydiving`
+    OR  claim's `event arose out of service in the military`
+    OR  claim's `event arose out of service as a fire fighter`
+    OR  claim's `event arose out of service in the police`
+    OR  claim's `age at hospitalization` AT LEAST 80
+
+
+§§ `3.1  Territorial scope`
+
+-- §3.1.1: the policy insures the claimant twenty-four hours a day, anywhere
+-- in the world. This is an unconditional grant, not a restriction, so there
+-- is no location-based fact to test and no predicate is needed for it.
+
+
+§§ `3.2  Arbitration as a condition precedent to Our liability`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the arbitration precondition to liability is satisfied` claim MEANS
+        NOT (claim's `dispute exists between the parties`)
+    OR  claim's `valid arbitration award has been issued`
+
+
+§§ `3.3 - 3.5  Governing law, currency, and premium`
+
+-- §3.3 (New York law), §3.4 (payments in US currency), and §3.5 (the
+-- premium is paid in one lump sum at signing) are procedural/boilerplate
+-- terms. None of them condition whether a given hospitalization is covered,
+-- so they add no predicate to the coverage decision below.
+
+
+§§ `Coverage determination`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`covered` claim MEANS
+        claim's `hospitalization is for sickness or accidental injury`
+    AND `policy is in effect at the time of the hospitalization` claim
+    AND NOT (`a general exclusion applies` claim)
+    AND `the arbitration precondition to liability is satisfied` claim

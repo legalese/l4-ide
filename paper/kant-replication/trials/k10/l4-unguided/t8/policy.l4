@@ -1,0 +1,152 @@
+§ `CODEX Insurance Limited - Hospitalization Policy`
+
+§§ `Claim record - the facts needed to decide whether a claim is covered`
+
+DECLARE Claim HAS
+    `age at hospitalization`                            IS A NUMBER
+    `months after effective date of hospitalization`    IS A NUMBER
+    sickness                                            IS A BOOLEAN
+    `accidental injury`                                 IS A BOOLEAN
+    `arose from skydiving`                              IS A BOOLEAN
+    `arose from service in the military`                IS A BOOLEAN
+    `arose from service as a fire fighter`              IS A BOOLEAN
+    `arose from service in the police`                  IS A BOOLEAN
+    `fraud misrepresentation or withholding`            IS A BOOLEAN
+    `wellness visit months after effective date`        IS A MAYBE NUMBER
+    `wellness confirmation months after effective date` IS A MAYBE NUMBER
+
+§§ `1.3 - wellness visit no later than the 6th month anniversary, confirmed no later than the 7th`
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit was on time` c IS
+    CONSIDER (c's `wellness visit months after effective date`)
+    WHEN JUST v THEN v AT MOST 6
+    WHEN NOTHING THEN FALSE
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit was late` c IS
+    CONSIDER (c's `wellness visit months after effective date`)
+    WHEN JUST v THEN v GREATER THAN 6
+    WHEN NOTHING THEN FALSE
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness confirmation was on time` c IS
+    CONSIDER (c's `wellness confirmation months after effective date`)
+    WHEN JUST k THEN k AT MOST 7
+    WHEN NOTHING THEN FALSE
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness confirmation was late` c IS
+    CONSIDER (c's `wellness confirmation months after effective date`)
+    WHEN JUST k THEN k GREATER THAN 7
+    WHEN NOTHING THEN FALSE
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 satisfied in a timely fashion` c IS
+    `wellness visit was on time` c
+    AND `wellness confirmation was on time` c
+
+-- Once either the visit or its confirmation is definitely known to have
+-- happened too late, no later event can cure it: the condition can never be
+-- satisfied in a timely fashion, no matter what else happens.
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 has not been satisfied in a timely fashion` c IS
+    `wellness visit was late` c
+    OR `wellness confirmation was late` c
+
+§§ `1.1(3) - the condition set out in Section 1.3 is still pending, or has been satisfied`
+
+-- "Still pending" at the time of the hospitalization means: nothing yet
+-- known makes satisfaction impossible, AND the final (7th month) deadline
+-- has not yet passed as of that hospitalization. Note this compares the
+-- hospitalization time only against the fixed 7-month threshold from the
+-- text, never against another claimant-supplied relative time.
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 is still pending` c IS
+    NOT `condition 1-3 satisfied in a timely fashion` c
+    AND NOT `condition 1-3 has not been satisfied in a timely fashion` c
+    AND c's `months after effective date of hospitalization` AT MOST 7
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 is pending or has been satisfied` c IS
+    `condition 1-3 satisfied in a timely fashion` c
+    OR `condition 1-3 is still pending` c
+
+§§ `1.2 / 3.6 - cancelation and the one-year policy term`
+
+-- Section 3.6: the term is one year (12 months) from the effective date.
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy term has expired` c IS
+    c's `months after effective date of hospitalization` GREATER THAN 12
+
+-- Section 1.2: cancelation is deemed to occur on fraud, misrepresentation or
+-- material withholding of information, on failure to satisfy Section 1.3 in
+-- a timely fashion, or automatically at the end of the policy term.
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy has been canceled` c IS
+    c's `fraud misrepresentation or withholding`
+    OR `condition 1-3 has not been satisfied in a timely fashion` c
+    OR `policy term has expired` c
+
+§§ `1.1 - policy in effect at the time of the hospitalization`
+
+-- Section 1.1 conditions (1) the agreement is signed and (2) the premium has
+-- been paid are, per the task instructions, assumed always TRUE and are not
+-- encoded here.
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy is in effect at the hospitalization` c IS
+    `condition 1-3 is pending or has been satisfied` c
+    AND NOT `policy has been canceled` c
+
+§§ `2.1 - general exclusions`
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `age exclusion applies` c IS
+    c's `age at hospitalization` AT LEAST 80
+
+-- Items (1)-(4) of Section 2.1 all share the "arising directly or
+-- indirectly out of" causal chapeau: the hospitalization must actually
+-- arise from the named activity, not merely coincide with the claimant's
+-- occupation or pastime at the time.
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `event is excluded` c IS
+    c's `arose from skydiving`
+    OR c's `arose from service in the military`
+    OR c's `arose from service as a fire fighter`
+    OR c's `arose from service in the police`
+    OR `age exclusion applies` c
+
+§§ `3.1 - territorial scope`
+-- "Your Policy insures You twenty-four (24) hours a day anywhere in the
+-- world." Coverage is worldwide and unconditional, so no exclusion or
+-- Claim field is needed to represent location.
+
+§§ `1.1 - the hospitalization must be for sickness or accidental injury`
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `hospitalization is for sickness or accidental injury` c IS
+    c's sickness
+    OR c's `accidental injury`
+
+§§ `Top-level decision`
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+DECIDE `covered` c IS
+    `hospitalization is for sickness or accidental injury` c
+    AND `policy is in effect at the hospitalization` c
+    AND NOT `event is excluded` c

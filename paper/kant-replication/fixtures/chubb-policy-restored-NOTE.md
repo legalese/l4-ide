@@ -18,6 +18,10 @@ deleted the operative benefits machinery from Goodenough & Carlson's original. A
 The renumbering restores Goodenough & Carlson's original section layout, which is what makes the two
 previously dangling cross-references resolve: §1.2's "the policy term described in Section 5 below"
 and §4.5.1's "The premium described in Section 5 below" now point at a section that exists.
+Resolution is not perfection: §4.5.1's target is clean (§5.2 states the premium), but §1.2's is
+imperfect in the ORIGINAL too — §5 states amounts while the policy term is actually described in
+§4.6. That residual mis-citation is Goodenough & Carlson's own and is faithfully preserved; blind
+encoders on the restored fixture spotted it unprompted.
 
 ## Editorial decisions, all deliberate
 

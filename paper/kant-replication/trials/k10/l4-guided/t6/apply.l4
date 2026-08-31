@@ -1,0 +1,264 @@
+IMPORT policy
+
+-- =====================================================================
+-- Standing preamble (applies to every query, per inputs/queries-blind.md):
+--   "Assuming all other conditions are met and no other exclusions
+--   apply (where by 'other' I mean anything not referenced in the
+--   query that follows)", and "the agreement has been signed and the
+--   premium has been paid on time."
+--
+-- So, for every q1..q9 below:
+--   `agreement signed`   IS TRUE
+--   `premium paid month` IS JUST 0
+-- and every field not implicated by that question's own facts is set
+-- to whatever value is most favorable to coverage (no dispute, no
+-- fraud/misrepresentation, no excluded cause, wellness-visit condition
+-- satisfied or not yet due), so that the only thing `covered` can turn
+-- on is the fact pattern the question actually states.
+-- =====================================================================
+
+-- Q1: hospitalized by burns suffered while doing my duty as a
+-- firefighter. Stated: cause is Firefighting, causally linked ("while
+-- doing my duty as"); the burns are an accidental injury.
+q1 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 1
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 30
+    `causes`                            IS LIST Firefighting
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS NOTHING
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS NOTHING
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q2: 78 years old at the time of hospitalization. Stated: age only.
+-- No cause is described, so `hospitalization ground` is set to the
+-- neutral, unexcluded choice Sickness and `causes` is left empty —
+-- both are unrelated to what is being tested (the age threshold).
+q2 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 1
+    `hospitalization ground`            IS Sickness
+    `age at hospitalization`            IS 78
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS NOTHING
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS NOTHING
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q3: hospitalized for pneumonia 5 months after the effective date;
+-- age 65. Stated: ground Sickness, hospitalization month 5, age 65.
+-- Since month 5 is before the month-7 checkpoint, Section 1.3 is
+-- "still pending" regardless of the (unstated) wellness-visit facts.
+q3 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 5
+    `hospitalization ground`            IS Sickness
+    `age at hospitalization`            IS 65
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS NOTHING
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS NOTHING
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q4: hospitalized due to a fall while traveling abroad; confirmation
+-- of the wellness visit was given 8 months after the effective date.
+-- Stated: ground `Accidental injury` (a fall); `written confirmation
+-- month` JUST 8 (past the 7-month deadline in Section 1.3). Location
+-- ("abroad") is not a Claim field — Section 3.1.1 already makes it
+-- irrelevant. `hospitalization month` is not stated; it is set to 8 so
+-- the stated, late-confirmation fact is actually operative (hospital-
+-- ization is at/after the point the confirmation was "already" given,
+-- and Section 1.3's month-7 checkpoint has passed by then). The
+-- wellness visit's own month is unstated and unrelated to what this
+-- question tests, so it is set favorably (well before month 6).
+q4 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 8
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 30
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 3
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 8
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q5: hospitalized for punching my own face to show off for my
+-- friends; did not commit fraud or misrepresentation. Stated: this is
+-- a deliberate, self-inflicted act — neither a sickness nor an
+-- accidental injury — so `hospitalization ground` is Neither; fraud
+-- and misrepresentation are explicitly negated per the question.
+q5 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 1
+    `hospitalization ground`            IS Neither
+    `age at hospitalization`            IS 30
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS NOTHING
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS NOTHING
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q6: hospitalized due to an injury sustained while skydiving; age 79;
+-- proof of the wellness visit was provided 6.5 months after the
+-- effective date. Stated: `causes` includes Skydiving (causally
+-- linked, "while skydiving"); ground `Accidental injury`; age 79;
+-- `written confirmation month` JUST 6.5 (fractional months are
+-- comparable, and 6.5 is within the 7-month deadline). The wellness
+-- visit's own month is unstated/unrelated and set favorably.
+q6 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 7
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 79
+    `causes`                            IS LIST Skydiving
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 3
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 6.5
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q7: hospitalized for a heart attack; proof of the wellness visit was
+-- submitted 2 months after the effective date; age 75. Stated: ground
+-- Sickness (a heart attack); `written confirmation month` JUST 2; age
+-- 75. The wellness visit's own month is unstated/unrelated and set
+-- favorably (before month 6, and before the stated confirmation).
+q7 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 3
+    `hospitalization ground`            IS Sickness
+    `age at hospitalization`            IS 75
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 1
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 2
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q8: hospitalized after being injured in a military training
+-- exercise; the hospitalization occurred within the policy term; did
+-- not commit fraud. Stated: `causes` includes `Military service`
+-- (causally linked, "injured in a military training exercise"); ground
+-- `Accidental injury`; hospitalization is within the policy term
+-- (hospitalization month at most `policy term months`); fraud
+-- explicitly negated.
+q8 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 3
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 30
+    `causes`                            IS LIST `Military service`
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS NOTHING
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS NOTHING
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+-- Q9: hospitalized due to my son biting me in the ankle; proof of the
+-- wellness visit was provided 6 months after the effective date; I was
+-- serving as a police officer at the time of hospitalization. Stated:
+-- the CAUSE of the injury is a domestic incident (a bite), not police
+-- duty — "serving as a police officer at the time" is a status/
+-- occupation fact, not a causal one, so `causes` is left empty (the
+-- Section 2.1(4) exclusion requires the injury to have arisen out of
+-- police service, not merely that the claimant happens to be a police
+-- officer). Ground `Accidental injury`; `written confirmation month`
+-- JUST 6 (within the 7-month deadline).
+q9 MEANS Claim WITH
+    `agreement signed`                  IS TRUE
+    `premium paid month`                IS JUST 0
+    `hospitalization month`             IS 6
+    `hospitalization ground`            IS `Accidental injury`
+    `age at hospitalization`            IS 30
+    `causes`                            IS EMPTY
+    `fraud month`                       IS NOTHING
+    `misrepresentation month`           IS NOTHING
+    `wellness visit month`              IS JUST 3
+    `wellness visit provider qualified` IS TRUE
+    `written confirmation month`        IS JUST 6
+    `dispute arisen`                    IS FALSE
+    `unable to settle month`            IS NOTHING
+    `arbitration commenced month`       IS NOTHING
+    `valid arbitration award issued`    IS FALSE
+    `written proof of claim month`      IS NOTHING
+    `recovery sought month`             IS NOTHING
+    `policy term months`                IS 12
+
+#EVAL covered q1
+#EVAL covered q2
+#EVAL covered q3
+#EVAL covered q4
+#EVAL covered q5
+#EVAL covered q6
+#EVAL covered q7
+#EVAL covered q8
+#EVAL covered q9
