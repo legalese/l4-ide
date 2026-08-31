@@ -213,6 +213,32 @@ Note also the classification was **pre-registered** — all nine items were mark
 interpretive in `bench/keys.json` before any trial ran. The data then separated along that line
 exactly: 7/7 core for every method in both languages, all variance on the two penumbral items.
 
+### 5.1.1 Localisation is not awareness — the caveat that matters most
+
+`prolog-guided/t1` scored 1.000. Its `NOTES.md` documents **nine** judgement calls — §1.3's timing
+anchor, the premium deadline, the age exclusion being free-standing rather than a fifth "arising out
+of" cause, Q9's occupation-versus-causation split, Q4's unstated hospitalization month, the
+60-day rule, the wellness-visit/confirmation mapping. It does **not mention Q5 at all.** The one
+call that took it from 8/9 to 9/9 — classifying a deliberate self-punch as `neither` — went
+unrecorded, while eight less consequential decisions were written up.
+
+Mentions of that judgement across the four guided trials: `prolog-guided/t1` **0**,
+`prolog-guided/t2` 1, `l4-guided/t1` 2, `l4-guided/t2` 5. (Four trials: an observation, not a
+trend, and certainly not a correlation with score.)
+
+So the localisation claim above needs narrowing, and it is the narrowing that matters. Formalisation
+makes the discretion **locatable in the artifact** — `claim_hospitalization_ground(c5, neither)` is
+right there, greppable, diffable against another trial's `accidental_injury`. It does **not** make
+the encoder aware they exercised discretion, and it does not capture their reasons. The line is
+there to be pointed at; the argument for it may never have existed.
+
+That is a direct warning about the explainable-AI pitch that motivates this whole line of work. An
+execution trace shows _what_ was decided and _which rule fired_. It does not show that anyone
+noticed a decision was being made, still less why. On a penumbral term those are the questions, and
+a trace answers neither. Recovering them needs something the trace does not carry — which is
+precisely the argument for a fork register, and for HG1 being a human reading the encoding against
+the source rather than a machine checking it against a key.
+
 ### 5.1.1 What this does to the paper's RL proposal
 
 Kant et al.'s §5 proposes reinforcement learning on a correctness reward. On a penumbral item the
