@@ -26,9 +26,15 @@ import { readFileSync, writeFileSync, existsSync, mkdtempSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
-const KEYS = JSON.parse(
-  readFileSync(new URL("./keys.json", import.meta.url), "utf8"),
-);
+// --keys <path> swaps the answer key (the restored arm scores against
+// keys-restored.json). Parsed inline because KEYS is needed before arg() exists.
+const keysIdx = process.argv.indexOf("--keys");
+const KEYS_PATH =
+  keysIdx > -1
+    ? resolve(process.argv[keysIdx + 1])
+    : new URL("./keys.json", import.meta.url);
+const KEYS = JSON.parse(readFileSync(KEYS_PATH, "utf8"));
+const KEYS_NAME = keysIdx > -1 ? basename(process.argv[keysIdx + 1]) : "keys.json";
 const IDS = KEYS.items.map((i) => i.id);
 const N = IDS.length;
 
@@ -502,6 +508,7 @@ if (cmd === "trial") {
     schema: "kant-repl/trial@1",
     label,
     arm: armName,
+    keys: KEYS_NAME,
     dir,
     selected_by: r.selected_by ?? null,
     baseline: r.baseline ?? null,
@@ -520,13 +527,18 @@ if (cmd === "aggregate") {
   const files = process.argv.slice(3).filter((f) => !f.startsWith("--"));
   if (!files.length) die("aggregate needs trial json files");
   const trials = files.map((f) => JSON.parse(readFileSync(f, "utf8")));
+  // Trials scored under different keys do not aggregate; mixing the arms'
+  // keys silently would relive exactly the stale-snapshot failure mode.
+  const keysUsed = [...new Set(trials.map((t) => t.keys ?? "keys.json"))];
+  if (keysUsed.length > 1)
+    die(`refusing to aggregate across different keys: ${keysUsed.join(", ")}`);
   console.log(renderAggregate(trials));
   process.exit(0);
 }
 
 die(`usage:
   bench.mjs trial --arm l4|prolog|vanilla --dir <trialdir> [--label L] [--lib PATH] [--out J]
-                  [--apply apply.l4] [--no-baseline]
+                  [--apply apply.l4] [--no-baseline] [--keys keys.json]
   bench.mjs aggregate <trial.json>...`);
 
 /* ------------------------------------------------------------------ *

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Guards FOUNDATION.md R4: the two guided fact vocabularies must be MECHANICAL
- * transliterations of one source schema. If they drift, the guided cells measure
- * whichever schema disambiguated better rather than the languages, and the
- * comparison is void. Run this whenever any of the three files changes.
+ * Guards FOUNDATION.md R4: each guided fact vocabulary must be a MECHANICAL
+ * transliteration of its one source schema. If they drift, the guided cells
+ * measure whichever schema disambiguated better rather than the languages, and
+ * the comparison is void. Run this whenever any schema file changes.
+ *
+ * Two triples are checked: the as-published arm (schema.md + schema-prolog.md +
+ * schema-l4.md) and the restored arm (schema-restored*.md), same rules.
  *
  * Transliteration rules, enforced here:
  *   neutral `foo_bar`  ->  Prolog `claim_foo_bar(C, Value)`
@@ -17,36 +20,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (f) => readFileSync(join(here, f), "utf8");
-
-// Source: numbered rows of the field table only.
-const source = [
-  ...read("schema.md").matchAll(/^\|\s*(\d+)\s*\|\s*`([a-z0-9_]+)`\s*\|/gm),
-].map((m) => m[2]);
-
-const prolog = [
-  ...read("schema-prolog.md").matchAll(/^claim_([a-z0-9_]+)\(C,\s*Value\)\./gm),
-].map((m) => m[1]);
-
-// L4 fields live between HAS and the closing fence; spaces stand in for underscores.
-const l4Block =
-  /DECLARE Claim\n([\s\S]*?)\n```/.exec(read("schema-l4.md"))?.[1] ?? "";
-const l4 = [
-  ...l4Block.matchAll(/^\s*(?:HAS\s+)?`([a-z][a-z ]*?)`\s+IS A /gm),
-].map((m) => m[1].trim().replace(/ /g, "_"));
-
 const problems = [];
-const cmp = (name, got) => {
-  const missing = source.filter((f) => !got.includes(f));
-  const extra = got.filter((f) => !source.includes(f));
-  if (missing.length) problems.push(`${name}: MISSING ${missing.join(", ")}`);
-  if (extra.length) problems.push(`${name}: EXTRA ${extra.join(", ")}`);
-  if (!missing.length && !extra.length && got.join("|") !== source.join("|"))
-    problems.push(
-      `${name}: same fields, DIFFERENT ORDER (source: ${source.join(", ")})`,
-    );
-};
-cmp("prolog", prolog);
-cmp("l4", l4);
 
 /**
  * Comparing field NAMES is not enough, and this is not a hypothetical.
@@ -60,7 +34,7 @@ cmp("l4", l4);
  * the name comparison could not see. A schema that does not compile is not a
  * mechanical transliteration of anything.
  */
-function compiles(name, blocks, ext, run) {
+function compiles(blocks, ext, run) {
   const dir = mkdtempSync(join(tmpdir(), "schema-parity-"));
   const f = join(dir, `schema${ext}`);
   writeFileSync(f, blocks);
@@ -72,47 +46,88 @@ function compiles(name, blocks, ext, run) {
   }
 }
 
-const l4Src =
-  "IMPORT prelude\n\n" +
-  [...read("schema-l4.md").matchAll(/```l4\n([\s\S]*?)```/g)]
-    .map((m) => m[1])
-    .join("\n\n");
-const l4c = compiles("l4", l4Src, ".l4", (dir, f) =>
-  execFileSync("l4", ["check", f], {
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      JL4_LIBRARY_PATH:
-        process.env.JL4_LIBRARY_PATH ??
-        resolve(here, "../../../jl4-core/libraries"),
-    },
-  }),
-);
-if (!/Check succeeded/.test(l4c.out || ""))
-  problems.push(
-    `l4: schema-l4.md does NOT compile — ${(l4c.out || "").slice(0, 400)}`,
-  );
+function checkTriple(label, srcFile, plFile, l4File) {
+  // Source: numbered rows of the field table only.
+  const source = [
+    ...read(srcFile).matchAll(/^\|\s*(\d+)\s*\|\s*`([a-z0-9_]+)`\s*\|/gm),
+  ].map((m) => m[2]);
 
-// Only the helper block is code; the claim-fact block documents what a query supplies.
-const plBlocks = [
-  ...read("schema-prolog.md").matchAll(/```prolog\n([\s\S]*?)```/g),
-].map((m) => m[1]);
-const plc = compiles("pl", plBlocks.at(-1), ".pl", (dir, f) =>
-  execFileSync("swipl", ["-q", "-g", "halt", f], { encoding: "utf8" }),
-);
-if (!plc.ok || /Syntax error|Unknown procedure/i.test(plc.out || ""))
-  problems.push(
-    `prolog: schema-prolog.md helpers do NOT load — ${(plc.out || "").slice(0, 400)}`,
-  );
+  const prolog = [
+    ...read(plFile).matchAll(/^claim_([a-z0-9_]+)\(C,\s*Value\)\./gm),
+  ].map((m) => m[1]);
 
-console.log(
-  `compiles: l4 ${/Check succeeded/.test(l4c.out || "") ? "yes" : "NO"} · prolog ${plc.ok ? "yes" : "NO"}`,
+  // L4 fields live between HAS and the closing fence; spaces stand in for underscores.
+  const l4Block =
+    /DECLARE Claim\n([\s\S]*?)\n```/.exec(read(l4File))?.[1] ?? "";
+  const l4 = [
+    ...l4Block.matchAll(/^\s*(?:HAS\s+)?`([a-z][a-z ]*?)`\s+IS A /gm),
+  ].map((m) => m[1].trim().replace(/ /g, "_"));
+
+  const cmp = (name, got) => {
+    const missing = source.filter((f) => !got.includes(f));
+    const extra = got.filter((f) => !source.includes(f));
+    if (missing.length)
+      problems.push(`${label}/${name}: MISSING ${missing.join(", ")}`);
+    if (extra.length)
+      problems.push(`${label}/${name}: EXTRA ${extra.join(", ")}`);
+    if (!missing.length && !extra.length && got.join("|") !== source.join("|"))
+      problems.push(
+        `${label}/${name}: same fields, DIFFERENT ORDER (source: ${source.join(", ")})`,
+      );
+  };
+  cmp("prolog", prolog);
+  cmp("l4", l4);
+
+  const l4Src =
+    "IMPORT prelude\n\n" +
+    [...read(l4File).matchAll(/```l4\n([\s\S]*?)```/g)]
+      .map((m) => m[1])
+      .join("\n\n");
+  const l4c = compiles(l4Src, ".l4", (dir, f) =>
+    execFileSync("l4", ["check", f], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        JL4_LIBRARY_PATH:
+          process.env.JL4_LIBRARY_PATH ??
+          resolve(here, "../../../jl4-core/libraries"),
+      },
+    }),
+  );
+  const l4ok = /Check succeeded/.test(l4c.out || "");
+  if (!l4ok)
+    problems.push(
+      `${label}/l4: ${l4File} does NOT compile — ${(l4c.out || "").slice(0, 400)}`,
+    );
+
+  // Only the helper block is code; the claim-fact block documents what a query supplies.
+  const plBlocks = [
+    ...read(plFile).matchAll(/```prolog\n([\s\S]*?)```/g),
+  ].map((m) => m[1]);
+  const plc = compiles(plBlocks.at(-1), ".pl", (dir, f) =>
+    execFileSync("swipl", ["-q", "-g", "halt", f], { encoding: "utf8" }),
+  );
+  const plok = plc.ok && !/Syntax error|Unknown procedure/i.test(plc.out || "");
+  if (!plok)
+    problems.push(
+      `${label}/prolog: ${plFile} helpers do NOT load — ${(plc.out || "").slice(0, 400)}`,
+    );
+
+  console.log(
+    `${label}: compiles l4 ${l4ok ? "yes" : "NO"} · prolog ${plok ? "yes" : "NO"} · fields source ${source.length} · prolog ${prolog.length} · l4 ${l4.length}`,
+  );
+}
+
+checkTriple("as-published", "schema.md", "schema-prolog.md", "schema-l4.md");
+checkTriple(
+  "restored",
+  "schema-restored.md",
+  "schema-restored-prolog.md",
+  "schema-restored-l4.md",
 );
-console.log(
-  `source ${source.length} · prolog ${prolog.length} · l4 ${l4.length}`,
-);
+
 if (problems.length) {
   problems.forEach((p) => console.error("  " + p));
   process.exit(1);
 }
-console.log("R4 parity OK — all three agree on field set and order.");
+console.log("R4 parity OK — both triples agree on field set and order, and compile.");

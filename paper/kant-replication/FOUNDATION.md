@@ -814,6 +814,24 @@ reading and all three answered Yes. _We are not treating this as settled_, and t
 should record whether models that answer "No" to Q3 do so because they read 1.2 — which would make
 Q3 a fourth interpretive item, not a mechanical one.
 
+**T9 — The harness's own memory system is a contamination channel into "blind" trials
+[discovered 2026-09-01, during the k = 10 run].** Encoder sub-agents inherit the session's
+project-memory index file, and until mid-run its line for this project read "benchmark fixture has
+§2 DELETED, so Q5's gold is underivable" — result-adjacent content injected into every nominally
+blind sandbox by the orchestration layer itself, outside the staged `inputs/` that the leak check
+audits. Discovered because two trials (`k10/prolog-unguided/t5`, `k10/prolog-guided/t5`)
+spontaneously disclosed it in their NOTES, both stating they did not use it. The empirical evidence
+says the channel did not drive answers toward the key: the unguided cells SPLIT on Q5 in that same
+run (some trials No via a derived trigger, some Yes, one vanilla abstention), the disclosing
+unguided trial answered against the key's direction, and disclosure ran 2 of the first 21
+completions. Disposition: (a) the channel was left CONSTANT for the whole as-published arm — every
+one of the 40 k = 10 trials, and the 10 pilot trials before them, launched with the same index
+content, so within-arm comparisons are unaffected; (b) the index was sanitized to finding-free
+pointers immediately after the last as-published launch and before any restored-arm staging, so the
+restored arm runs clean; (c) this is a limitation to report, not to repair retroactively. The
+general lesson generalises beyond this study: an agent-orchestration harness that injects ambient
+project state must be audited as part of the blinding boundary, exactly like the staged inputs.
+
 ### 5.3 What would make this replication worth publishing
 
 Not "L4 scored higher than Prolog on nine questions" — T1 and T2 make that number close to
