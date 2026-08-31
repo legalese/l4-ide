@@ -1,0 +1,30 @@
+2. If dynamic predicates are necessary, they are declared and managed correctly.
+3. All predicates used in the generated Prolog code, including those referenced in the query, are
+fully defined and error-free to prevent issues like "procedure does not exist."
+4. Logical relationships, conditions, and dependencies in the text are faithfully represented in the
+Prolog rules to ensure accurate query results.
+5. No absolute dates/times (apart from the claimant’s age) are encoded in your query. Only include
+dates/times RELATIVE to the effective date of the policy (again, except for age).
+6. Set any facts/rules/parameters in the code such that ALL conditions (for the policy to apply)
+which are UNRELATED to the above query are satisfied.
+7. Set any facts/rules/parameters in the code such that NO exclusions (which would prevent the
+policy from applying) which are UNRELATED to the above query are satisfied.
+
+– Question:{query}
+
+– Insurance contract: {text_content}
+
+– Insurance contract Prolog encoding: {policy_encoding}
+
+A.3.3 Prompt for Generating LLM Encodings of Insurance Analyst Coverages
+– I have provided below all of the text that pertains to a coverage (or section) of a health insurance
+policy.
+– The text defines all conditions and exclusions that determine whether a patient’s claim is covered
+under this coverage of the policy.
+
+– Please encode a Prolog rule, 'covered(C)', which is true exactly when the patient’s claim, 'C', is
+covered.
+– I have also provided below a set of claim facts that will be defined in any Prolog query to the
+'covered(C)' rule.
+– These are of the form 'claim_Fact(C, Value)', meaning they will be defined for the
+claim 'C' by filling in a value for Value.

@@ -1,0 +1,86 @@
+{
+  "preamble": "Assuming all other conditions are met and no other exclusions apply (where by 'other,' I mean anything not referenced in the query that follows),",
+  "source": "Kant et al. 2025, arXiv 2502.17638, Appendix A.2",
+  "queries": [
+    {
+      "id": 1,
+      "text": "will my policy apply if I was hospitalized by burns suffered while doing my duty as a firefighter?",
+      "gold": "No",
+      "paper_rationale": "2.1(3) service as a fire fighter"
+    },
+    {
+      "id": 2,
+      "text": "will my policy apply if I am 78 years old at the time of hospitalization?",
+      "gold": "Yes",
+      "paper_rationale": "2.1(5) threshold is >= 80"
+    },
+    {
+      "id": 3,
+      "text": "will my policy apply if I was hospitalized for pneumonia 5 months after the policy's effective date, and my age at the time of hospitalization is 65?",
+      "gold": "Yes",
+      "paper_rationale": "1.1(3) 1.3 condition still pending at 5 months"
+    },
+    {
+      "id": 4,
+      "text": "will my policy apply if I was hospitalized due to a fall while traveling abroad and I had given confirmation of my wellness visit 8 months after the policy's effective date?",
+      "gold": "No",
+      "paper_rationale": "1.3 confirmation due by 7th month anniversary"
+    },
+    {
+      "id": 5,
+      "text": "will my policy apply if I was hospitalized for punching my own face to show off for my friends and I did not commit fraud or misrepresentation?",
+      "gold": "No",
+      "paper_rationale": "1.1 requires sickness or accidental injury; self-inflicted intentional injury is neither"
+    },
+    {
+      "id": 6,
+      "text": "will my policy apply if I was hospitalized due to an injury sustained while skydiving, my age at the time of hospitalization was 79, and proof of my wellness visit was provided 6.5 months after the policy's effective date?",
+      "gold": "No",
+      "paper_rationale": "2.1(1) skydiving"
+    },
+    {
+      "id": 7,
+      "text": "will my policy apply if I was hospitalized for a heart attack, proof of the wellness visit was submitted 2 months after the policy's effective date, and my age at the time of hospitalization was 75?",
+      "gold": "Yes",
+      "paper_rationale": "no exclusion fires"
+    },
+    {
+      "id": 8,
+      "text": "will my policy apply if I was hospitalized after being injured in a military training exercise, the hospitalization occurred within the policy term, and I did not commit fraud?",
+      "gold": "No",
+      "paper_rationale": "2.1(2) service in the military"
+    },
+    {
+      "id": 9,
+      "text": "will my policy apply if I was hospitalized due to my son biting me in the ankle, proof of my wellness visit was provided 6 months after the effective date, and I was serving as a police officer at the time of hospitalization?",
+      "gold": "Yes",
+      "paper_rationale": "2.1(4) requires the injury to arise out of police service; a son's bite does not"
+    }
+  ],
+  "paper_results": {
+    "vanilla": {
+      "Mistral-large-latest": 0.78,
+      "Gemini-1.5-pro": 0.78,
+      "Claude-3.5-sonnet": 0.78,
+      "Llama-3.1-405B-instruct": 0.78,
+      "GPT-4o-2024-08-06": 0.78,
+      "DeepSeek-R1": 0.81,
+      "O1-preview": 0.88
+    },
+    "unguided_prolog": {
+      "Mistral-large-latest": 0.5,
+      "Gemini-1.5-pro": 0.56,
+      "Claude-3.5-sonnet": 0.73,
+      "Llama-3.1-405B-instruct": 0.41,
+      "GPT-4o-2024-08-06": 0.6,
+      "DeepSeek-R1": 0.63,
+      "O1-preview": 0.89
+    },
+    "guided_prolog": {
+      "GPT-4o": 1.0,
+      "OpenAI o1": 1.0,
+      "OpenAI o3-mini": 1.0,
+      "DeepSeek-R1": 0.73
+    }
+  }
+}

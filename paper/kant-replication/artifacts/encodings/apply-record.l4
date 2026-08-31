@@ -1,0 +1,352 @@
+IMPORT `ref-record`
+
+§ `Nine coverage questions put to the record encoding`
+
+-- STANDING PREAMBLE, applied to every claim below:
+--   "Assuming all other conditions are met and no other exclusions apply
+--    (where by 'other,' I mean anything not referenced in the query that
+--    follows)"
+-- So every field a query does not touch is set to the value that makes the
+-- policy apply, and only the fields the query names are set from the query.
+--
+-- The favourable baseline is:
+--   signed TRUE; premium paid TRUE;
+--   a wellness visit in month 3, for yourself, with a qualified provider;
+--   written confirmation in month 4, in writing, from that provider
+--     (so the 1.3 condition is SATISFIED in a timely fashion);
+--   no disclosure defaults;
+--   hospitalization in month 3, age 41, all four 2.1(1)-(4) origins FALSE;
+--   no dispute or disagreement;
+--   written proof of claim in month 4, seeking to recover in month 7.
+
+§§ `Reusable favourable 1.3 facts`
+
+`a good wellness visit` MEANS `Wellness visit` WITH
+    `months from the effective date to the visit` IS 3
+    `the visit was for yourself` IS TRUE
+    `the medical provider was qualified` IS TRUE
+
+`a good written confirmation` MEANS `Written confirmation` WITH
+    `months from the effective date to when it was supplied to us` IS 4
+    `it is in writing` IS TRUE
+    `it is from the medical provider in question` IS TRUE
+
+§§ `Q1 -- burns suffered on duty as a fire fighter`
+
+-- Referenced: the hospitalization was caused by burns suffered while doing
+-- duty as a fire fighter. So 2.1(3)'s origin fact is TRUE and the basis is
+-- accidental injury. Everything else favourable.
+`Q1 firefighter burns` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST `a good written confirmation`
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS TRUE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q1 firefighter burns`
+
+§§ `Q2 -- aged 78 at the time of the hospitalization`
+
+-- Referenced: age 78. Basis not referenced, so set to sickness (favourable).
+`Q2 aged 78` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST `a good written confirmation`
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 78
+        `the basis of the hospitalization` IS sickness
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q2 aged 78`
+
+§§ `Q3 -- pneumonia in month 5, aged 65`
+
+-- Referenced: basis (pneumonia = sickness), month 5, age 65.
+`Q3 pneumonia month 5 aged 65` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST `a good written confirmation`
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 5
+        `your age in years at the time of the hospitalization` IS 65
+        `the basis of the hospitalization` IS sickness
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 6
+    `months from the effective date to when you seek to recover` IS 9
+
+#EVAL `a benefit is payable on this claim` `Q3 pneumonia month 5 aged 65`
+
+§§ `Q4 -- a fall while travelling abroad; confirmation supplied in month 8`
+
+-- Referenced: basis (a fall = accidental injury); the written confirmation was
+-- supplied 8 months after the effective date, i.e. after 1.3's month-7
+-- deadline, so the 1.3 condition is NOT satisfied in a timely fashion.
+-- The month of the hospitalization is NOT referenced, so under the preamble it
+-- takes the value that makes the policy apply: month 3, at which the 1.3
+-- condition is "still pending" and 1.1(3)'s first limb carries the claim.
+-- Place is not an operative fact at all (3.1.1).
+`Q4 fall abroad confirmation month 8` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST (`Written confirmation` WITH
+        `months from the effective date to when it was supplied to us` IS 8
+        `it is in writing` IS TRUE
+        `it is from the medical provider in question` IS TRUE)
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q4 fall abroad confirmation month 8`
+
+§§ `Q5 -- punching your own face to show off, with no fraud or misrepresentation`
+
+-- Referenced: the basis of the hospitalization (a deliberate self-inflicted
+-- blow struck to show off is neither sickness nor accidental injury), and the
+-- absence of any fraud or misrepresentation (so the 1.2 default list is empty).
+`Q5 punched own face` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST `a good written confirmation`
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `neither sickness nor accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q5 punched own face`
+
+§§ `Q6 -- skydiving injury, aged 79, confirmation in month 6.5`
+
+-- Referenced: skydiving origin TRUE; age 79 (below 2.1(5)'s 80); the
+-- confirmation supplied at month 6.5, inside 1.3's month-7 deadline.
+`Q6 skydiving aged 79` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST (`Written confirmation` WITH
+        `months from the effective date to when it was supplied to us` IS 6.5
+        `it is in writing` IS TRUE
+        `it is from the medical provider in question` IS TRUE)
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 79
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS TRUE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q6 skydiving aged 79`
+
+§§ `Q7 -- heart attack, confirmation in month 2, aged 75`
+
+-- Referenced: basis (a heart attack is sickness); confirmation supplied at
+-- month 2; age 75. The visit itself is put at month 1 so that it precedes the
+-- confirmation and meets 1.3's month-6 bound.
+`Q7 heart attack aged 75` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST (`Wellness visit` WITH
+        `months from the effective date to the visit` IS 1
+        `the visit was for yourself` IS TRUE
+        `the medical provider was qualified` IS TRUE)
+    `the written confirmation` IS JUST (`Written confirmation` WITH
+        `months from the effective date to when it was supplied to us` IS 2
+        `it is in writing` IS TRUE
+        `it is from the medical provider in question` IS TRUE)
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 75
+        `the basis of the hospitalization` IS sickness
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q7 heart attack aged 75`
+
+§§ `Q8 -- injured in a military training exercise, inside the term, no fraud`
+
+-- Referenced: the injuring event arose out of service in the military; the
+-- hospitalization fell inside the policy term (month 3 of 12); no fraud, so
+-- the 1.2 default list is empty.
+`Q8 military training exercise` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST `a good written confirmation`
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS TRUE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q8 military training exercise`
+
+§§ `Q9 -- bitten in the ankle by your son; a serving police officer`
+
+-- Referenced: basis (a bite from one's son is accidental injury); the
+-- confirmation was supplied at month 6, inside 1.3's month-7 deadline; and You
+-- were serving as a police officer at the time of the hospitalization.
+--
+-- 2.1(4)'s operative fact is not "You are a police officer" but "the event
+-- causing the sickness or accidental injury arose directly or indirectly out
+-- of service in the police". The query states an employment status at the time
+-- of the hospitalization and supplies no causal link at all between police
+-- service and a son's bite, so that fact is FALSE. The sensitivity run below
+-- shows what the encoding says on the opposite reading.
+`Q9 son bit my ankle, a serving officer` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST (`Written confirmation` WITH
+        `months from the effective date to when it was supplied to us` IS 6
+        `it is in writing` IS TRUE
+        `it is from the medical provider in question` IS TRUE)
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `Q9 son bit my ankle, a serving officer`
+
+§§ `Sensitivity runs on the three judgement calls`
+
+-- S5. Q5 read the other way: a deliberate blow to one's own face counted as an
+-- "accidental injury" within 1.1's chapeau.
+`S5 punched own face, counted as accidental injury` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST `a good written confirmation`
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `S5 punched own face, counted as accidental injury`
+
+-- S9. Q9 read the other way: the officer's police service counted as an
+-- indirect origin of the biting.
+`S9 son bit my ankle, police service counted as an origin` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST (`Written confirmation` WITH
+        `months from the effective date to when it was supplied to us` IS 6
+        `it is in writing` IS TRUE
+        `it is from the medical provider in question` IS TRUE)
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS TRUE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `S9 son bit my ankle, police service counted as an origin`
+
+-- S4. Q4 with the unreferenced month of the hospitalization set UNfavourably,
+-- to month 9, after 1.3's month-7 deadline has passed unsatisfied.
+`S4 fall abroad, hospitalization in month 9` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS JUST `a good wellness visit`
+    `the written confirmation` IS JUST (`Written confirmation` WITH
+        `months from the effective date to when it was supplied to us` IS 8
+        `it is in writing` IS TRUE
+        `it is from the medical provider in question` IS TRUE)
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 9
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS `accidental injury`
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 10
+    `months from the effective date to when you seek to recover` IS 12
+
+#EVAL `a benefit is payable on this claim` `S4 fall abroad, hospitalization in month 9`

@@ -1,0 +1,72 @@
+{
+  "note": "Two keys, per FOUNDATION.md R2. Key A is Kant et al.'s answer key verbatim, for comparability. Key B grades each item by how much of it is mechanical application of a clause and how much is annotator judgement. NEVER report B alone (marking our own homework) and NEVER report A alone (that is the inverted-objective problem of FOUNDATION.md 1.5).",
+  "source": "Kant et al. 2025, arXiv 2502.17638, Appendix A.2",
+  "items": [
+    {
+      "id": 1,
+      "gold": "No",
+      "class": "mechanical",
+      "clause": "2.1(3)",
+      "note": "service as a fire fighter; named exclusion"
+    },
+    {
+      "id": 2,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "2.1(5)",
+      "note": "age 78 < the modified threshold of 80"
+    },
+    {
+      "id": 3,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "1.1(3)",
+      "disputed": true,
+      "dispute": "FOUNDATION T8: the fixture auditor says the gold rests on defect D3 and that a faithful reading of 1.2 answers No; the gold auditor says the harmonising reading is the only sane one, since the literal reading cancels every policy on day one. Unresolved. Record WHY a trial answers No."
+    },
+    {
+      "id": 4,
+      "gold": "No",
+      "class": "interpretive",
+      "clause": "1.1 / 1.3",
+      "defensible": "under-determined",
+      "why": "The query never says WHEN the hospitalization occurred, and clause 1.1 makes that the operative moment. Before month 7 the claim is good, after it is not. The benchmark's own preamble says to set unreferenced facts favourably, which yields Yes. The counter-argument is the pluperfect in the question, i.e. grammar, not policy."
+    },
+    {
+      "id": 5,
+      "gold": "No",
+      "class": "interpretive",
+      "clause": "2 (DELETED)",
+      "defensible": "not defensible on the modified text",
+      "why": "Turns on the sickness-or-accidental-injury trigger, which lives in the operative insuring clause 2.1 of Goodenough & Carlson. Kant et al. deleted section 2. The paper itself describes the trigger as 'addressed indirectly in the contract' and scores o1-preview down for missing it in 9 of 10 trials."
+    },
+    {
+      "id": 6,
+      "gold": "No",
+      "class": "mechanical",
+      "clause": "2.1(1)",
+      "note": "skydiving; named exclusion"
+    },
+    {
+      "id": 7,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "none",
+      "note": "no exclusion fires; age 75 is under the modified 80"
+    },
+    {
+      "id": 8,
+      "gold": "No",
+      "class": "mechanical",
+      "clause": "2.1(2)",
+      "note": "service in the military"
+    },
+    {
+      "id": 9,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "2.1(4)",
+      "note": "requires the injury to ARISE OUT OF police service; a son's bite does not"
+    }
+  ]
+}
