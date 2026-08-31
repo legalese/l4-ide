@@ -1,0 +1,167 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited -- Hospital Income Policy`
+
+-- This file encodes the substantive coverage rules of the policy contract
+-- (see fixtures/chubb-policy.txt) as pure functions of a single hospitalization
+-- claim. No claim data is defined in this file -- see apply.l4.
+--
+-- Two simplifications, both directed by the task brief:
+--   * Sec. 1.1(1) "this agreement is signed" and Sec. 1.1(2) "the applicable
+--     premium ... has been paid" are assumed always TRUE and are therefore
+--     not modelled as fields or conjuncts anywhere below.
+--   * Every date/time fact about a claim (other than the claimant's age) is
+--     expressed as a plain NUMBER of months elapsed since the policy's
+--     effective date, e.g. "5 months after the effective date" becomes the
+--     NUMBER 5. There is never a need to difference two calendar dates, so
+--     no DATE arithmetic is used anywhere in this file.
+
+§§ `The facts of a single hospitalization claim`
+
+DECLARE Claim HAS
+    -- Sec. 3.1(5): the claimant's age, in whole years, at the time of the
+    -- hospitalization on which the claim is premised.
+    `age at hospitalization` IS A NUMBER
+
+    -- How many months after the policy's effective date the hospitalization
+    -- began. Used only to decide whether Sec. 1.3's deadlines have already
+    -- come and gone by the time of this hospitalization, and whether the
+    -- one-year policy term (Sec. 4.6) has already run out.
+    `hospitalization month` IS A NUMBER
+
+    -- Sec. 2.1: TRUE only if the confinement is actually a result of
+    -- sickness, or of an *accidental* (i.e. unintended, fortuitous) injury.
+    -- A deliberate, self-inflicted act is neither a sickness nor an
+    -- accidental injury, so this is FALSE for that case.
+    `caused by sickness or accidental injury` IS A BOOLEAN
+
+    -- Sec. 2.2: the Daily Hospital Income Benefit is payable only for
+    -- confinement "in a hospital in the United States" -- distinct from
+    -- Sec. 4.1.1's promise that the claimant is insured worldwide, which
+    -- covers where the sickness/injury may arise, not where the benefit is
+    -- payable.
+    `hospital is in the United States` IS A BOOLEAN
+
+    -- Sec. 3.1(1)-(4): each of these is TRUE only if the sickness or
+    -- accidental injury arose directly or indirectly out of that named
+    -- activity. Simply holding the occupation or status at the time of
+    -- hospitalization, with no causal link to the hospitalization, does not
+    -- make this TRUE.
+    `event arose from skydiving` IS A BOOLEAN
+    `event arose from service in the military` IS A BOOLEAN
+    `event arose from service as a fire fighter` IS A BOOLEAN
+    `event arose from service in the police` IS A BOOLEAN
+
+    -- Sec. 1.2: fraud, misrepresentation, or material withholding of
+    -- information provided to the Company cancels the policy outright.
+    `fraud or misrepresentation occurred` IS A BOOLEAN
+
+    -- Sec. 1.3: how many months after the effective date the wellness visit
+    -- itself took place -- NOTHING if, as of this claim, it has not (yet)
+    -- taken place.
+    `wellness visit month` IS A MAYBE NUMBER
+
+    -- Sec. 1.3: how many months after the effective date written
+    -- confirmation of the wellness visit was supplied to the Company --
+    -- NOTHING if, as of this claim, it has not (yet) been supplied.
+    `wellness visit confirmation month` IS A MAYBE NUMBER
+
+§§ `Sec. 1.3 -- the wellness-visit condition`
+
+-- "No later than the 7th month anniversary of the effective date of this
+-- policy, you will supply us with written confirmation from the medical
+-- provider in question of a wellness visit for yourself with a qualified
+-- medical provider occurring no later than the 6th month anniversary of the
+-- effective date of this policy."
+--
+-- This is two deadlines, not one: the visit itself must occur by month 6,
+-- and confirmation of it must reach the Company by month 7. Either one
+-- being missed defeats Sec. 1.3.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `confirmation deadline missed` claim IF
+    CONSIDER claim's `wellness visit confirmation month`
+    WHEN JUST m  THEN m GREATER THAN 7
+    WHEN NOTHING THEN claim's `hospitalization month` GREATER THAN 7
+    -- With no confirmation on file yet, the deadline is only "missed" once
+    -- we are already past it; before month 7 the condition is still
+    -- pending, not failed (Sec. 1.1(3)).
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit deadline missed` claim IF
+    CONSIDER claim's `wellness visit month`
+    WHEN JUST m  THEN m GREATER THAN 6
+    WHEN NOTHING THEN claim's `hospitalization month` GREATER THAN 6
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 not satisfied in a timely fashion` claim IF
+        `confirmation deadline missed` claim
+    OR  `wellness visit deadline missed` claim
+
+§§ `Sec. 1.2 -- cancellation`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy has been canceled` claim IF
+        claim's `fraud or misrepresentation occurred`
+    OR  `condition 1-3 not satisfied in a timely fashion` claim
+    OR  claim's `hospitalization month` GREATER THAN 12
+    -- Sec. 4.6: the policy term is one year from the effective date, and
+    -- Sec. 1.2 automatically cancels the policy at the end of that term.
+
+§§ `Sec. 1.1 -- policy in effect`
+
+-- Sec. 1.1(1) "this agreement is signed" and Sec. 1.1(2) "the applicable
+-- premium ... has been paid" are assumed always TRUE per the task brief.
+-- Sec. 1.1(3) "the condition set out in Section 1.3 is still pending or has
+-- been satisfied in a timely fashion" and Sec. 1.1(4) "the policy has not
+-- been canceled" are exactly the same fact, seen from two directions --
+-- Sec. 1.2 already cancels the policy the moment Sec. 1.3 is not satisfied
+-- in a timely fashion -- so both are captured by the single
+-- `policy has been canceled` test above.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy is in effect at the time of hospitalization` claim IF
+    NOT `policy has been canceled` claim
+
+§§ `Sec. 3.1 -- general exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `a general exclusion applies` claim IF
+        claim's `event arose from skydiving`
+    OR  claim's `event arose from service in the military`
+    OR  claim's `event arose from service as a fire fighter`
+    OR  claim's `event arose from service in the police`
+    OR  claim's `age at hospitalization` AT LEAST 80
+
+§§ `Sec. 2 -- benefits`
+
+-- Sec. 2.3 (a claim must be made, setting out the basis for it) is a
+-- procedural filing requirement, not a substantive coverage condition; it
+-- is assumed satisfied whenever a claim is being evaluated at all, exactly
+-- as with the signature and premium assumptions above. Sec. 2.2's 365-day
+-- cap limits how many days of benefit are paid for a single continuous
+-- confinement -- it does not switch coverage off, so it is not a conjunct
+-- of the boolean decision below.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the benefit is payable` claim IF
+        claim's `caused by sickness or accidental injury`
+    AND claim's `hospital is in the United States`
+
+§ `Top-level decision`
+
+@export Decide whether a hospitalization claim is covered under the Codex Insurance hospital income policy
+@desc The facts of the hospitalization claim being assessed for coverage
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `covered` claim IF
+        `policy is in effect at the time of hospitalization` claim
+    AND `the benefit is payable` claim
+    AND NOT `a general exclusion applies` claim

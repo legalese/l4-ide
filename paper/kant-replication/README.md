@@ -318,6 +318,54 @@ there is a modest point in the toolchain's favour buried in it: the type checker
 mistake immediately and said what was wrong, which is why two encoders working blind both recovered
 without ever asking anyone.
 
+### 5.3 The repaired benchmark: what restoring the deleted clause measures
+
+The counterfactual arm pre-registered in `bench/PREREGISTRATION-restored.md` ran to completion on
+2026-09-01: the same five cells, n = 10 each, on `fixtures/chubb-policy-restored.txt` — the
+benchmark's own text with exactly the §2/§5/§6 deletion undone — scored against
+`bench/keys-restored.json`, whose gold values equal the published key's (restoration changes
+derivability, not answers). Two harness repairs of the same kind as §5's: the restored
+`prolog-guided/t2` agent died on an API timeout with zero bytes written and was relaunched clean.
+
+| cell            | as-published | restored  | Q5 (as-pub → restored) | mechanical (restored) |
+| --------------- | ------------ | --------- | ---------------------- | --------------------- |
+| vanilla         | 0.900        | 0.945     | 1/10 → 5/10            | 70/70                 |
+| prolog-unguided | 0.922        | 0.956     | 3/10 → 7/10            | **69/70**             |
+| prolog-guided   | 0.945        | 0.945     | 6/10 → 5/10            | 70/70                 |
+| l4-unguided     | 0.911        | 0.967     | 2/10 → 7/10            | 70/70                 |
+| l4-guided       | 0.967        | **0.989** | 7/10 → 9/10            | 70/70                 |
+
+**Verdicts on the pre-registered predictions, none adjusted after the fact:**
+
+- **P1 — supported.** Both unguided cells cleared the ≥6/10 Q5 majority bar (7/10 and 7/10),
+  against 3/10 and 2/10 as-published: unguided Q5 gold-agreement went 5/20 → 14/20 on the single
+  treatment of putting the insuring clause back. This is the deletion's measured cost, and it is
+  the licensed core claim: **on this item, the original's residual "model error" is largely an
+  artifact of its own edit.**
+- **P2 — half supported.** l4-guided rose 7/10 → 9/10; prolog-guided *fell* 6/10 → 5/10, one flip
+  below its as-published rate, so P2 fails as stated for that cell. The mechanism is visible in
+  the artifacts: restored guided rules do test the ground, but the marshalling step still assigns
+  it, and prolog-guided encoders split ~evenly on classifying the self-punch.
+- **P3 — directional, threshold missed.** Vanilla went 1/10 → 5/10 — a five-fold move that stops
+  exactly at a coin flip, one short of the pre-registered majority. Quotable text moves free
+  readers; it does not settle them.
+- **P4 — strictly refuted, by one trial in three hundred and fifty.** `prolog-unguided/t7`
+  answered No on Q9 (349/350 mechanical items correct across the restored arm; 450/450
+  as-published). The dissent is itself informative: Q9's "mechanical" label embeds the causal
+  reading of "arising out of", and one blind encoder in ninety-nine took the occupational one.
+  "Mechanical" is a judgement about how thin a penumbra is, not proof that it has none.
+- **P5 — supported.** Q4 sat at 10/10 in every restored cell (≤1 change from as-published
+  everywhere): restoration did not fix it, because its defect is the query's missing
+  hospitalization date, not the fixture's deletion. The registered apply-vs-payable fork on the
+  abroad element appeared in trial NOTES arguing **both** directions, as predicted, and either
+  reading reaches the gold.
+
+**What no amount of restoration bought: Q5 at ceiling.** With the operative clause in the text
+*and* a typed `Ground` field in the schema, the best cell still missed Q5 once. The
+accidental-means/accidental-results fork (*Landress*) survives the clause, the schema, and both
+languages together. Formalisation localises the judgement to one field of one record; it does not
+make it. That floor — not any language comparison — is the finding.
+
 ## 6. What would make this worth publishing
 
 Explicitly **not** "L4 scored higher than Prolog on nine questions" — T1 and T2 make that number

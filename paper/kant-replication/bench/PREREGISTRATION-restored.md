@@ -1,6 +1,6 @@
 # Pre-registration — the repaired-benchmark (restored-fixture) arm
 
-**Status: registered 2026-09-01, BEFORE any restored-arm trial ran.** The git history is the
+**Status: registered 2026-09-01, BEFORE any restored-arm trial ran.** **Adjudicated later the same day: outcomes against every prediction are in `../README.md` §5.3; this file stays frozen as the pre-data record.** The git history is the
 timestamp: this file, `fixtures/chubb-policy-restored.txt`, `bench/keys-restored.json` and the
 three `schema-restored*.md` files land in one commit, and no directory under
 `trials/restored-k10/` exists at that commit. A restored-arm trial run before this commit

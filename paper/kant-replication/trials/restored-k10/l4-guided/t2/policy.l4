@@ -1,0 +1,190 @@
+IMPORT prelude
+
+§ `Fact vocabulary (from bench/schema-l4.md, verbatim)`
+
+DECLARE Ground IS ONE OF Sickness, `Accidental injury`, Neither
+
+DECLARE Cause IS ONE OF
+  Skydiving, `Military service`, Firefighting, `Police service`, Other
+
+DECLARE Claim
+  HAS `agreement signed`                           IS A BOOLEAN
+      `premium paid month`                         IS A MAYBE NUMBER
+      `hospitalization month`                      IS A NUMBER
+      `hospitalization ground`                     IS A Ground
+      `age at hospitalization`                     IS A NUMBER
+      `causes`                                     IS A LIST OF Cause
+      `fraud month`                                IS A MAYBE NUMBER
+      `misrepresentation month`                    IS A MAYBE NUMBER
+      `wellness visit month`                       IS A MAYBE NUMBER
+      `wellness visit provider qualified`          IS A BOOLEAN
+      `written confirmation month`                 IS A MAYBE NUMBER
+      `dispute arisen`                             IS A BOOLEAN
+      `unable to settle month`                     IS A MAYBE NUMBER
+      `arbitration commenced month`                IS A MAYBE NUMBER
+      `valid arbitration award issued`             IS A BOOLEAN
+      `written proof of claim month`               IS A MAYBE NUMBER
+      `recovery sought month`                      IS A MAYBE NUMBER
+      `policy term months`                         IS A NUMBER
+      `confined in us hospital`                    IS A BOOLEAN
+      `continuous confinement days`                IS A MAYBE NUMBER
+      `claim made setting out basis`               IS A BOOLEAN
+
+-- Supporting helpers (pre-defined -- call them, do not redefine them)
+
+GIVEN  `event month` IS A MAYBE NUMBER
+       `limit month` IS A NUMBER
+GIVETH A BOOLEAN
+`no later than` MEANS
+  CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN m AT MOST `limit month`
+
+GIVEN  cs IS A LIST OF Cause
+       c  IS A Cause
+GIVETH A BOOLEAN
+`arose out of` MEANS elem c cs
+
+§ `Coverage logic`
+
+-- 1.1(2): the applicable premium for the policy period has been paid.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`premium paid` claim MEANS isJust (claim's `premium paid month`)
+
+-- 1.3: written confirmation, from the medical provider, of a wellness visit
+-- with a qualified medical provider -- the visit no later than the 6th
+-- month anniversary, the confirmation no later than the 7th. 1.1(3)'s
+-- "still pending" is treated as equivalent to "satisfied" here; see
+-- NOTES.md for the reasoning.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit condition satisfied` claim MEANS
+       claim's `wellness visit provider qualified`
+   AND `no later than` (claim's `wellness visit month`) 6
+   AND `no later than` (claim's `written confirmation month`) 7
+
+-- 1.2: cancellation for fraud.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`fraud occurred` claim MEANS isJust (claim's `fraud month`)
+
+-- 1.2: cancellation for misrepresentation or material withholding of
+-- information.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`misrepresentation occurred` claim MEANS isJust (claim's `misrepresentation month`)
+
+-- 1.2 / 4.6: the policy is automatically canceled at the end of the
+-- one-year policy term.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy term has expired` claim MEANS
+  claim's `hospitalization month` GREATER THAN claim's `policy term months`
+
+-- 1.1: the policy is in effect at the time of the hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect at the time of hospitalization` claim MEANS
+       claim's `agreement signed`
+   AND `premium paid` claim
+   AND `wellness visit condition satisfied` claim
+   AND NOT `fraud occurred` claim
+   AND NOT `misrepresentation occurred` claim
+   AND NOT `policy term has expired` claim
+
+-- 2.1: the hospitalization must be for sickness or accidental injury --
+-- not, e.g., a deliberate act that is neither.
+GIVEN ground IS A Ground
+GIVETH A BOOLEAN
+`ground is sickness or accidental injury` ground MEANS
+  CONSIDER ground
+    WHEN Sickness THEN TRUE
+    WHEN `Accidental injury` THEN TRUE
+    WHEN Neither THEN FALSE
+
+-- 2.2: at least one day of continuous confinement, to trigger the daily
+-- benefit. The 365-day cap in 2.2 limits how many days are payable; on its
+-- own words it does not disqualify a longer stay altogether, so it is not
+-- enforced here as a coverage gate -- see NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`had continuous confinement` claim MEANS
+  fromMaybe 0 (claim's `continuous confinement days`) GREATER THAN 0
+
+-- 2.1 / 2.2 / 2.3: the benefit-trigger conditions -- sickness-or-injury
+-- ground, confinement in a US hospital, some continuous confinement, and a
+-- claim made setting out the basis for it.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`benefit conditions satisfied` claim MEANS
+       `ground is sickness or accidental injury` (claim's `hospitalization ground`)
+   AND claim's `confined in us hospital`
+   AND `had continuous confinement` claim
+   AND claim's `claim made setting out basis`
+
+-- 3.1: the event causing the sickness or accidental injury must not arise,
+-- directly or indirectly, out of any of the four listed activities, and
+-- the claimant must be under 80 at the time of hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`event excluded under the general exclusions` claim MEANS
+       `arose out of` (claim's `causes`) Skydiving
+   OR  `arose out of` (claim's `causes`) `Military service`
+   OR  `arose out of` (claim's `causes`) Firefighting
+   OR  `arose out of` (claim's `causes`) `Police service`
+   OR  claim's `age at hospitalization` AT LEAST 80
+
+-- 4.2.1: once a dispute has arisen, arbitration must be commenced within
+-- three months of the day the parties became unable to settle. If they
+-- have not yet reached that impasse, the three-month clock has not
+-- started, so this is vacuously satisfied -- see NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration commenced timely` claim MEANS
+  CONSIDER claim's `unable to settle month`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST u  THEN `no later than` (claim's `arbitration commenced month`) (u PLUS 3)
+
+-- 4.2.1: where a dispute has arisen, timely arbitration and the issuance of
+-- a valid award are conditions precedent to liability. Where no dispute has
+-- arisen, this clause does not bite.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration precondition satisfied` claim MEANS
+  IF claim's `dispute arisen`
+  THEN `arbitration commenced timely` claim AND claim's `valid arbitration award issued`
+  ELSE TRUE
+
+-- 4.2.1: in no case may recovery on the policy be sought before the
+-- expiration of sixty days after written proof of claim has been
+-- submitted. Sixty days is approximated as two months here, to match the
+-- granularity of the given month fields -- see NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`recovery not sought prematurely` claim MEANS
+  CONSIDER claim's `recovery sought month`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST r THEN
+      CONSIDER claim's `written proof of claim month`
+        WHEN NOTHING THEN FALSE
+        WHEN JUST w THEN r AT LEAST (w PLUS 2)
+
+-- 4.2: the arbitration and no-action preconditions to liability, taken
+-- together.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration and no-action conditions satisfied` claim MEANS
+       `arbitration precondition satisfied` claim
+   AND `recovery not sought prematurely` claim
+
+§ `Coverage decision`
+
+-- True exactly when a benefit is payable on the claim.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered claim IF
+       `policy in effect at the time of hospitalization` claim
+   AND `benefit conditions satisfied` claim
+   AND NOT `event excluded under the general exclusions` claim
+   AND `arbitration and no-action conditions satisfied` claim

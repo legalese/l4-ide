@@ -1,0 +1,235 @@
+-- ===========================================================================
+-- Nine benchmark queries against policy.l4.
+--
+-- Standing preamble (applies to every query): assume all other conditions are
+-- met and no other exclusions apply, where "other" means anything not
+-- referenced by the query; the agreement is signed and the premium paid on
+-- time. Per the task brief, every claim below sets any UNMENTIONED
+-- condition-satisfying / non-exclusionary field to its benign value.
+-- ===========================================================================
+
+IMPORT policy
+
+-- Q1: hospitalized by burns suffered while doing duty as a firefighter.
+-- Firefighter-service exclusion (§3.1.3) squarely applies.
+q1 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 0
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS NOTHING
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS FALSE
+    `hospitalized due to bodily injury`                                    IS TRUE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS TRUE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 40
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q1
+
+-- Q2: 78 years old at the time of hospitalization -- below the age-80 threshold.
+-- Cause of hospitalization is unreferenced by the query, so set to a benign
+-- non-excluded sickness.
+q2 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 0
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS NOTHING
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS TRUE
+    `hospitalized due to bodily injury`                                    IS FALSE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 78
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q2
+
+-- Q3: pneumonia (sickness), 5 months after the effective date, age 65.
+-- At 5 months the §1.3 wellness-visit condition is not yet due (deadline is
+-- month 7), so it is "still pending" and does not cancel the policy.
+q3 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 5
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS NOTHING
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS TRUE
+    `hospitalized due to bodily injury`                                    IS FALSE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 65
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q3
+
+-- Q4: hospitalized due to a fall while traveling abroad; confirmation of the
+-- wellness visit was given 8 months after the effective date -- after the
+-- 7-month deadline, so §1.3 was not satisfied in a timely fashion (§1.2
+-- cancellation). Separately, "traveling abroad" is read as meaning the
+-- hospital confinement itself was outside the United States, which alone
+-- fails §2.2's US-hospital requirement regardless of §4.1's worldwide cover
+-- of the insured person.
+q4 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 8
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS JUST 8
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS FALSE
+    `hospitalized due to bodily injury`                                    IS TRUE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS FALSE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 40
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q4
+
+-- Q5: hospitalized for punching own face to show off for friends; claimant
+-- did not commit fraud or misrepresentation. The act was intentional and
+-- self-inflicted, so it is not an "accidental" injury; the express denial of
+-- fraud/misrepresentation independently confirms §1.2's fraud ground is not
+-- in play (it is a separate question from whether the injury was accidental).
+q5 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 0
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS NOTHING
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS FALSE
+    `hospitalized due to bodily injury`                                    IS TRUE
+    `the injury was self-inflicted intentionally`                          IS TRUE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 40
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q5
+
+-- Q6: skydiving injury (squarely excluded, §3.1.1), age 79 (below the age-80
+-- threshold on its own), wellness confirmation given at 6.5 months (within
+-- the 7-month deadline). The skydiving exclusion alone should defeat the claim.
+q6 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 6.5
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS JUST 6.5
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS FALSE
+    `hospitalized due to bodily injury`                                    IS TRUE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS TRUE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 79
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q6
+
+-- Q7: heart attack (sickness), wellness confirmation given at 2 months (well
+-- within the 7-month deadline), age 75 (below the age-80 threshold). Clean
+-- case with no exclusions and no cancellation.
+q7 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 2
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS JUST 2
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS TRUE
+    `hospitalized due to bodily injury`                                    IS FALSE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 75
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q7
+
+-- Q8: injured in a military training exercise (military-service exclusion,
+-- §3.1.2); hospitalization occurred within the policy term (so no §4.6
+-- expiry issue); claimant did not commit fraud (so §1.2's fraud ground is
+-- not in play either). The military exclusion alone should defeat the claim.
+q8 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 3
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS NOTHING
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS FALSE
+    `hospitalized due to bodily injury`                                    IS TRUE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS TRUE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 40
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q8
+
+-- Q9: hospitalized because the claimant's son bit their ankle; wellness
+-- confirmation given at 6 months (within the 7-month deadline); claimant was
+-- serving as a police officer at the time of hospitalization. Being a police
+-- officer at the time is a status, not a cause: the bite did not arise
+-- directly or indirectly out of police service, so §3.1.4 does not apply.
+q9 MEANS Claim WITH
+    `months after the effective date to the hospitalization`               IS 6
+    `the wellness visit occurred within 6 months of the effective date`    IS TRUE
+    `months after the effective date the wellness confirmation was given` IS JUST 6
+    `committed fraud or misrepresentation`                                 IS FALSE
+    `hospitalized due to sickness`                                         IS FALSE
+    `hospitalized due to bodily injury`                                    IS TRUE
+    `the injury was self-inflicted intentionally`                          IS FALSE
+    `days confined in the hospital`                                        IS 1
+    `confined in a hospital in the United States`                          IS TRUE
+    `a claim was made setting out the basis for the claim`                 IS TRUE
+    `the injury arose from skydiving`                                      IS FALSE
+    `the injury arose from service in the military`                        IS FALSE
+    `the injury arose from service as a fire fighter`                      IS FALSE
+    `the injury arose from service in the police`                          IS FALSE
+    `age at the time of the hospitalization`                               IS 40
+    `a dispute or disagreement exists regarding the policy`                IS FALSE
+    `a valid arbitration award has been issued`                            IS FALSE
+
+#EVAL `covered` q9
