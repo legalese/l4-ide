@@ -66,7 +66,67 @@
       "note": [
         "ONE SLOT, because each side's every decision takes exactly one record and both call it `Claim`. The two records are NOT the same record: seventeen fields each, two labels in common, nine more that differ only in wording, and six that differ in what they can say.",
         "The corpus's `that wellness visit was with a qualified medical provider` has no counterpart on the right at all — clause 1.3's qualification requirement is simply not in the de novo's fact schema (fork F-13-PROVENANCE). It is supplied in every row and read by the left only."
-      ]
+      ],
+      "freeze": [
+        "the month the applicable premium for the policy period was paid",
+        "the applicable premium for the policy period has been paid",
+        "the month in which there was fraud",
+        "there is fraud",
+        "the month in which there was a misrepresentation or material withholding of information provided by you to the Company",
+        "there is a misrepresentation of information provided to the Company",
+        "there is a material withholding of information provided to the Company",
+        "the hospitalization on which the claim is premised was for",
+        "the hospitalization was for",
+        "the event causing the sickness or accidental injury arose directly or indirectly out of",
+        "the event arose directly or indirectly out of"
+      ],
+      "domains": {
+        "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": {
+          "integer": true,
+          "min": 0
+        },
+        "the month in which written confirmation from that medical provider was supplied to us": {
+          "integer": true,
+          "min": 0
+        },
+        "the month in which you seek to recover on this Policy": {
+          "integer": true,
+          "min": 0
+        },
+        "the month the applicable premium for the policy period was paid": {
+          "integer": true,
+          "min": 0
+        },
+        "the month in which written proof of claim was submitted to us": {
+          "integer": true,
+          "min": 0
+        },
+        "the month in which arbitration was commenced": {
+          "integer": true,
+          "min": 0
+        },
+        "the month of the hospitalization on which the claim is premised": {
+          "integer": true,
+          "min": 0
+        },
+        "the month in which a wellness visit for yourself occurred": {
+          "integer": true,
+          "min": 0
+        },
+        "the month in which there was fraud": {
+          "integer": true,
+          "min": 0
+        },
+        "the month on which the parties were unable to settle the dispute or difference": {
+          "integer": true,
+          "min": 0
+        },
+        "your age in years at the time of the hospitalization": {
+          "integer": true,
+          "min": 0,
+          "max": 130
+        }
+      }
     }
   },
   "battery": {
@@ -1108,8 +1168,8 @@
       }
     ],
     "perturbation": {
-      "enabled": false,
-      "note": "Off by construction — see the map note. Every boundary a generator would have reached is written into a row by hand."
+      "enabled": true,
+      "note": "ON since 2026-09-01, and only because `slots.<n>.freeze` now exists. The map note's paragraph on why it was off is still correct and still the reason for the freeze list: five fact families are NOT renames but per-side twins — the corpus dates the premium, the fraud and the misrepresentation-or-withholding as MAYBE NUMBER months while the de novo asks undated BOOLEANs, and the two enum-valued families are carried as separate keys per side because the modules spell their constructors differently. A single-field mutation of any of those moves ONE side and leaves the other reading its own untouched twin, so the divergence is a fact about this map. `perturb` is per-SLOT and both encodings take one argument, so freezing them was impossible until the per-FIELD freeze landed. The nine renames and the shared keys are perturbed; these eleven are not, and `battery.frozen_fields` names them in every report because agreement on a frozen field is silence, not evidence."
     }
   },
   "pairs": [

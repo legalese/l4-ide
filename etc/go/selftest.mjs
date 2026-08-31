@@ -3835,6 +3835,62 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     !numCands.includes(100) &&
       !ddCandidates({ path: ["b"], value: true }, [], cfg, null).includes(true),
   );
+
+  {
+    // Per-FIELD freeze: `slot.perturb:false` is all-or-nothing, which cannot
+    // express "mutate these nine leaves, leave those five alone". A union-payload
+    // row needs exactly that, because a field only one side declares moves that
+    // side and leaves the other reading its own untouched twin.
+    const map = {
+      slots: {
+        claim: {
+          freeze: ["frozen_leaf", "nested.deep_frozen"],
+          domains: { monthish: { integer: true, min: 0 } },
+        },
+      },
+    };
+    const seeds = [
+      {
+        name: "s",
+        origin: "o#0",
+        rule_date: null,
+        slots: {
+          claim: {
+            live_leaf: 1,
+            frozen_leaf: 1,
+            monthish: 2,
+            nested: { deep_frozen: 1 },
+          },
+        },
+      },
+    ];
+    const { rows, frozen_fields } = ddExpand(map, seeds);
+    const moved = new Set(
+      rows.filter((r) => r.kind === "perturbation").map((r) => r.mutation.path),
+    );
+    check(
+      "a frozen field is never perturbed, by bare name or by dotted path",
+      !moved.has("claim.frozen_leaf") && !moved.has("claim.nested.deep_frozen"),
+    );
+    check(
+      "freezing one field does not stop the others being perturbed",
+      moved.has("claim.live_leaf") && moved.has("claim.monthish"),
+    );
+    check(
+      "the report names which fields were frozen, since agreement on them is silence",
+      frozen_fields.length === 2 && frozen_fields.includes("claim.frozen_leaf"),
+    );
+    const monthVals = rows
+      .filter(
+        (r) =>
+          r.kind === "perturbation" && r.mutation.path === "claim.monthish",
+      )
+      .map((r) => r.mutation.to);
+    check(
+      "a declared numeric domain drops non-integral and negative candidates",
+      monthVals.every((v) => Number.isInteger(v) && v >= 0),
+    );
+  }
   check(
     "a boolean leaf is flipped",
     ddCandidates({ path: ["b"], value: true }, [], cfg, null).includes(false),
@@ -8243,9 +8299,35 @@ process.stdout.write("\n-- store verbs --\n");
   // spaces, so every produced member missed and reported `unknown`. Invisible
   // in a diff, which is exactly why the separator is now an escape and this
   // test reads the file as BYTES.
+  const nulOffenders = (() => {
+    // Widened from readset.mjs alone on 2026-09-01, because the narrow check
+    // let three files keep the defect it was written to prevent:
+    // denovo-diff.mjs, discover.mjs and check-bpmn-dmn-refs.mjs each embedded
+    // a literal NUL as a composite-key separator.
+    //
+    // The cost is not theoretical. A file containing a NUL is classified
+    // BINARY, so grep with -I (which is the default in some shells) skips it
+    // SILENTLY — no match, no warning, indistinguishable from "the string is
+    // not there". That produced a false "denovo-diff.mjs has no perturbation
+    // support" reading while the tool's own output said leaves_perturbed: 209.
+    // Write the escape `\0` instead; it is the same byte at runtime.
+    const bad = [];
+    const walk = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        const full = resolve(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (e.name.endsWith(".mjs") && readFileSync(full).includes(0))
+          bad.push(full.slice(HERE.length - 3));
+      }
+    };
+    walk(resolve(HERE, ".."));
+    return bad;
+  })();
   check(
-    "readset.mjs contains no raw NUL byte — a separator must be visible in source",
-    !readFileSync(resolve(HERE, "lib/readset.mjs")).includes(0),
+    "NO .mjs under etc/ contains a raw NUL byte — a separator must be visible in source" +
+      (nulOffenders.length ? ` (raw NUL in: ${nulOffenders.join(", ")})` : ""),
+    nulOffenders.length === 0,
   );
   check(
     "witnessKey is the ONE key builder, so the two ends cannot disagree",
