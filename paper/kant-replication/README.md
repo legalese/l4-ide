@@ -379,6 +379,9 @@ relative-time convention removes the type safety producing one of those wins.
 
 ## 7. Artifacts
 
+**Production provenance for every encoding — trial wrappers verbatim, verified encoder model
+(`claude-sonnet-5`), toolchain pins, and the disclosed gaps — is in `PROVENANCE.md`.**
+
 | path                        | what it is                                                                                                                               |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `FOUNDATION.md`             | the foundation-phase report: gold-standard provenance, the Q4/Q5 audits, what L4 can and cannot express here, the design and its threats |
