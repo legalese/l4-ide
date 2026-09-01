@@ -366,6 +366,15 @@ accidental-means/accidental-results fork (*Landress*) survives the clause, the s
 languages together. Formalisation localises the judgement to one field of one record; it does not
 make it. That floor — not any language comparison — is the finding.
 
+### 5.4 Specified, not run: the autonomous-pipeline experiment
+
+`bench/PREREGISTRATION-go.md` (committed 2026-09-01, before any run) specifies the next
+experiment: the unguided go-style pipeline — dual blind encoders, deterministic disagreement
+detection, computed escalation — pointed at the restored fixture for performance and at the
+as-published fixture as a defect-detection probe. **No `trials/go-*` data exist yet.** That
+file is result-adjacent and sits on the forbidden list of the sandboxes it governs. A backlog
+for the harder second subject (the Cardinal Care ART/CI coverages) is `TODO-cardinal-care.md`.
+
 ## 6. What would make this worth publishing
 
 Explicitly **not** "L4 scored higher than Prolog on nine questions" — T1 and T2 make that number
