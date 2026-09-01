@@ -2001,6 +2001,36 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
       | Just (fn, a, b) <- selectIdiomIn oracle e -> call e fn [a, b]
       | otherwise ->
           triple e FullFeel (\tc tt tf -> "(if " <> tc <> " then " <> tt <> " else " <> tf <> ")") c t f
+    -- A @BRANCH@ in EXPRESSION position is a right-nested FEEL @if@. FEEL has no
+    -- multi-way conditional, so the chain is the only spelling; guard order is
+    -- preserved, which is what keeps first-match semantics ("L4.Viz.GuardedRows"
+    -- documents the same ordering constraint on the table path).
+    --
+    -- This case CANNOT capture a table. A @BRANCH@ that is a whole decision body
+    -- reaches 'normaliseGuarded' and becomes rows; 'renderFeelIn' sees only the
+    -- nested occurrences, which before this case fell to 'verbatim' and so
+    -- raised @D-NONFEELINPUT@ \/ @D-NONFEELOUTPUT@ \/ @D-LITERALEXPR@ Blocking.
+    -- Nothing is added to 'selectShape' for the same reason: the veto that reads
+    -- it keeps chains ON the table path.
+    --
+    -- Composition is the point, as it is for R8-c below: the reference corpus
+    -- has a @CONSIDER@ over a MAYBE whose JUST arm is a @BRANCH@, and the R8-c
+    -- arm correctly declined to splice L4 text into FEEL while this arm was
+    -- missing. No 'hasEffectfulNode' guard: every guard and arm is rendered
+    -- once, so nothing here duplicates a subterm's text.
+    --
+    -- MEASURED, not assumed: a three-arm chain nested inside the R8-c @!= null@
+    -- test builds clean and takes the arm it looks like it takes, on both
+    -- KIE 8.44.0.Final (XSD + validator + KieBuilder + runtime) and
+    -- zeebe-dmn 8.7.6. On the reference corpus model, whose verbatim arm was
+    -- exactly this shape, KIE reported 3 validator and 3 build errors and
+    -- zeebe-dmn failed to PARSE the model at all, quoting the raw L4 back.
+    MultiWayIf _ guardeds fallback ->
+      let chain (tg : tb : rest) = "if " <> tg <> " then " <> tb <> " else " <> chain rest
+          chain [tf]             = tf
+          chain []               = ""  -- unreachable: the fallback is always present
+      in nary e FullFeel (\ts -> "(" <> chain ts <> ")")
+           (concat [[g, b] | MkGuardedExpr _ g b <- guardeds] <> [fallback])
     -- A call to an L4 function is NOT a FEEL function invocation, and this used
     -- to be rendered @f(args)@ and labelled 'FullFeel' -- a claim of
     -- executability the exporter cannot honour. FEEL resolves an invocation
@@ -2067,6 +2097,31 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                             <> " satisfies " <> bodyR.feText <> ")"
                         , FullFeel
                         )
+    -- Prelude @elem@ is FEEL's @list contains@ builtin (DMN 1.3 Table 76).
+    --
+    -- The ARGUMENTS SWAP: L4 is @elem element list@, FEEL is
+    -- @list contains(list, element)@. Emitting them in source order would be a
+    -- well-formed call that answers the wrong question wherever both operands
+    -- are lists, and a type error otherwise.
+    --
+    -- Recognised by PROVENANCE then name, exactly as 'listQuantKeyword'
+    -- recognises `all`\/`any` and for the same reason: prelude @elem@ is an
+    -- ordinary @DECIDE@ with no `Unique` to match on, and a module that defines
+    -- its own @elem@ must not be lowered as though it were the prelude's.
+    -- 'fromPrelude' is also what supplies the "not defined in the module being
+    -- exported" guard that 'resolveMaybePredicates' has to establish by hand.
+    --
+    -- Unlike the quantifiers above, @elem@ BINDS NOTHING, so #936's
+    -- parameter-read-under-a-binder unsoundness does not arise and no binder
+    -- environment is installed.
+    --
+    -- MEASURED on both engines, in both positions this reaches -- a boxed
+    -- literal and a table @\<inputExpression\>@ -- over a string-enum list:
+    -- KIE 8.44.0.Final and zeebe-dmn 8.7.6 each answer membership correctly,
+    -- including the negative case, so the operand order above is checked and
+    -- not merely reasoned about.
+    App _ r [xE, listE]
+      | preludeElem r -> call e "list contains" [listE, xE]
     -- #936 Gap 2, the saturated-call half. Checked BEFORE un-lifting, because
     -- un-lifting is what discards the argument: under a binder that argument is
     -- the bound element and discarding it is the defect.
@@ -2369,6 +2424,12 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     | otherwise           = Nothing
    where
     named ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
+
+  -- The prelude's list-membership @DECIDE@, and nothing else of that name.
+  preludeElem :: Resolved -> Bool
+  preludeElem r =
+    fromPrelude r
+      && (nameOf r == "elem" || unqualifiedNameToText (getActual r) == "elem")
 
   -- The predicate's binder and the body to render under it. Three shapes, and
   -- nothing else — an unrecognised predicate falls to 'verbatim', which is the

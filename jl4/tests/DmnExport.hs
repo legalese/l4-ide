@@ -3612,6 +3612,120 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         let drg = drgOf (corpus body)
         [n.code | n <- (dmnReport drg).notes, n.severity == Blocking] `shouldBe` []
 
+  -- A BRANCH in EXPRESSION position, and prelude `elem`. Two lowerings, one
+  -- block, because the reference corpus exhibits them together and neither
+  -- alone rescues it: the chubb model has a CONSIDER over a MAYBE whose JUST
+  -- arm is a BRANCH whose guards are `elem` calls, and while either was
+  -- verbatim the R8-c arm correctly declined to compose and both KIE and
+  -- Camunda refused the whole model.
+  describe "BRANCH in expression position, and prelude elem" $ do
+    -- The chubb composition, minimised. A BRANCH as a whole decision body
+    -- becomes a TABLE (normaliseGuarded), so it has to be nested to reach
+    -- renderFeelIn at all.
+    let branchUnderMaybe =
+          "IMPORT prelude\n\
+          \GIVEN m IS A MAYBE NUMBER\n\
+          \GIVETH A STRING\n\
+          \`the answer` m MEANS\n\
+          \  CONSIDER m\n\
+          \  WHEN JUST n THEN\n\
+          \    BRANCH\n\
+          \      IF n AT LEAST 100 THEN \"high\"\n\
+          \      IF n AT LEAST 10 THEN \"mid\"\n\
+          \      OTHERWISE \"low\"\n\
+          \  WHEN NOTHING THEN \"none\"\n"
+        answerOf src = case (decisionNamed "the answer" (drgOf src)).dcnLogic of
+          LogicLiteral e -> e
+          _              -> error "expected a boxed literal for `the answer`"
+
+    it "composes a nested BRANCH into the R8-c absence test as one FEEL literal" $ do
+      let e = answerOf branchUnderMaybe
+      e.feFragment `shouldBe` FullFeel
+      e.feText `shouldBe`
+        "if m != null then (if m >= 100 then \"high\" else if m >= 10 then \"mid\" else \"low\") else \"none\""
+
+    it "raises nothing Blocking for a composed BRANCH" $
+      [n.code | n <- (dmnReport (drgOf branchUnderMaybe)).notes, n.severity == Blocking]
+        `shouldBe` []
+
+    -- The refusal half: one verbatim sub-render takes the WHOLE chain verbatim.
+    -- `p AT LEAST q` on booleans is outside FEEL's Table 54 ordering, which is
+    -- the module's own standing example of a verbatim leaf.
+    it "refuses the whole chain when one arm is not FEEL" $ do
+      let src =
+            "IMPORT prelude\n\
+            \GIVEN m IS A MAYBE BOOLEAN, q IS A BOOLEAN\n\
+            \GIVETH A BOOLEAN\n\
+            \`the answer` m q MEANS\n\
+            \  CONSIDER m\n\
+            \  WHEN JUST p THEN\n\
+            \    BRANCH\n\
+            \      IF p AT LEAST q THEN TRUE\n\
+            \      OTHERWISE FALSE\n\
+            \  WHEN NOTHING THEN FALSE\n"
+      (answerOf src).feFragment `shouldBe` L4Verbatim
+
+    -- `elem` is FEEL's `list contains`, and the ARGUMENTS SWAP. The assertion
+    -- is on the whole text, not an isInfixOf, precisely because emitting the
+    -- operands in source order would still contain both names.
+    let elemCorpus =
+          "IMPORT prelude\n\
+          \DECLARE Peril IS ONE OF skydiving, `military service`, driving\n\
+          \DECLARE Claim HAS causes IS A LIST OF Peril\n\
+          \GIVEN c IS A Claim\n\
+          \GIVETH A BOOLEAN\n\
+          \`excluded` c MEANS elem skydiving (c's causes)\n"
+
+    it "lowers prelude elem to list contains, list first" $ do
+      let e = case (decisionNamed "excluded" (drgOf elemCorpus)).dcnLogic of
+                LogicLiteral x -> x
+                _              -> error "expected a boxed literal for `excluded`"
+      e.feFragment `shouldBe` FullFeel
+      e.feText `shouldBe` "list contains(c.causes, \"skydiving\")"
+
+    -- The table position. Each BRANCH guard becomes an <inputExpression>, and
+    -- before this lowering each was raw L4 and so D-NONFEELINPUT Blocking.
+    let elemTable =
+          "IMPORT prelude\n\
+          \DECLARE Peril IS ONE OF skydiving, `military service`, driving\n\
+          \DECLARE Claim HAS causes IS A LIST OF Peril\n\
+          \GIVEN c IS A Claim\n\
+          \GIVETH A BOOLEAN\n\
+          \`any exclusion applies` c MEANS\n\
+          \  BRANCH\n\
+          \    IF elem skydiving (c's causes) THEN TRUE\n\
+          \    IF elem `military service` (c's causes) THEN TRUE\n\
+          \    OTHERWISE FALSE\n"
+
+    it "puts list contains in the input expressions of a BRANCH table" $ do
+      let t = tableOf "any exclusion applies" elemTable
+      map (.icExpr.feText) t.dtInputs `shouldBe`
+        [ "list contains(c.causes, \"skydiving\")"
+        , "list contains(c.causes, \"military service\")"
+        ]
+      map (.icExpr.feFragment) t.dtInputs `shouldSatisfy` all (/= L4Verbatim)
+
+    it "raises no D-NONFEELINPUT for elem guards" $
+      [n.code | n <- (dmnReport (drgOf elemTable)).notes, n.severity == Blocking]
+        `shouldBe` []
+
+    -- Provenance, not the name string: a module that defines its own `elem`
+    -- must not be lowered as though it were the prelude's. This is the R8-f
+    -- guard that `listQuantKeyword` above carries for `all`/`any`.
+    it "declines a locally defined elem" $ do
+      let src =
+            "DECLARE Claim HAS causes IS A LIST OF BOOLEAN\n\
+            \GIVEN x IS A BOOLEAN, l IS A LIST OF BOOLEAN\n\
+            \GIVETH A BOOLEAN\n\
+            \elem x l MEANS FALSE\n\
+            \GIVEN c IS A Claim\n\
+            \GIVETH A BOOLEAN\n\
+            \`excluded` c MEANS elem TRUE (c's causes)\n"
+      case (decisionNamed "excluded" (drgOf src)).dcnLogic of
+        LogicLiteral e -> e.feText `shouldSatisfy` (not . Text.isInfixOf "list contains")
+        LogicTable _   -> expectationFailure "expected a boxed literal for `excluded`"
+        LogicContext _ -> expectationFailure "expected a boxed literal for `excluded`"
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
