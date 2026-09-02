@@ -1401,7 +1401,7 @@ Parse}` + `L4.Blawx.Lift` + `l4 blawx --import/--parse-only/--reemit`; the emit�
 _Added 2026-09-02, nothing in it landed. Everything here was **measured that day** on
 `origin/unstable` at `f4ae3d5e` with an `l4` built from `31af0995` (the Blawx modules are
 unchanged since #279), against the checkout at `/Volumes/transcend/src/blawx` and the R13
-harnesses. Items are numbered **W1–W8** so later notes can cite them. Each says what was
+harnesses. Items are numbered **W1–W9** so later notes can cite them. Each says what was
 measured, what it implies, and which section it amends; the section it amends is **not**
 rewritten here — a W-item is discharged by editing that section and marking the item done._
 
@@ -1517,6 +1517,24 @@ database; now `Django<5` plus `tzdata`). Still unpinned there: `swipl:latest`, s
 `master.zip`, and `storage.js` from Blockly's `develop` branch. **Do.** Add these build commits to
 §8.10's fork list when they are PR'd; re-run the R12 fixpoint and the tier-2 bird tests on the
 rebuilt image and record the numbers beside the 2023-image numbers in §10.
+
+### W9 — R10's "current generator" now has two candidates, and they disagree
+
+**Measured.** The fixpoint harness regenerates s(CASP) with the generator in `BLAWX_CHECKOUT`.
+With the checkout on `mengwong/main` (upstream plus fork fixes #1–#5 merged, 2026-09-02)
+`rps.blawx` fixpoints **8/9**: `root_section` differs, because fix #1 rewrites the eight
+"Neither" frame axioms that R10 reproduces quirk-for-quirk. With a stock checkout
+(`/Volumes/transcend/src/blawx-stock`, `origin/main` at `6a717b1`) it fixpoints **9/9**.
+**Implies.** The emitter is byte-exact against stock v1.6.22, and the instance rebuilt on
+2026-09-02 (W8) runs the fixed generator — so on our own instance an open-and-save of
+`root_section` will now show a diff, which is the R12 gate failing by construction. Until ruled,
+the harness must run with `BLAWX_CHECKOUT=/Volumes/transcend/src/blawx-stock`. **Do (ruling
+needed, Meng).** Name the target: (a) stock — keep emitting the quirks, treat the fork's
+instance as non-reference for R12, and run the fixpoint against `blawx-stock`; or (b) the
+fork — teach the emitter the fixed axiom forms behind a flag or unconditionally, regenerate
+every `expected/*.blawx`, and make `blawx-stock` the non-reference. (b) is the honest one if
+the fixes are right and upstreaming (R10) is not coming; (a) is the only one under which the
+published `lexipedite/blawx` image re-saves cleanly. Amends R10, R12, R13.
 
 _Related, outside this spec: SARA (Holzenberger, Blair-Stanek & Van Durme 2020 — nine IRC
 sections with a Prolog reference encoding) is nominated on `legalese/canon`
