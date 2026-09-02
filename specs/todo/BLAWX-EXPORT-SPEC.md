@@ -10,8 +10,12 @@ _Status: **shipped and merged; this file is retained as the ruling record.** Des
 recorded inline in §10; reader-facing documentation landed as PR #280
 (`doc/concepts/neighbours/blawx-and-scasp.md`, `doc/tutorials/blawx/l4-to-blawx.md`).
 **Verified against `origin/unstable` on 2026-08-28**: eight modules under
-`jl4-core/src/L4/Blawx/`, three under `jl4-core/src/L4/Relational/`, sixteen `.l4` files under
-`jl4/examples/blawx/` (eleven emitting seeds, five `not-ok/` refusal fixtures), and the verb
+`jl4-core/src/L4/Blawx/`, three under `jl4-core/src/L4/Relational/`, and the corpus under
+`jl4/examples/blawx/` — nineteen `.l4` files as re-counted on 2026-09-02 (twelve emitting seeds
+each with a golden in `expected/`, six `not-ok/` refusal fixtures, one `imported/`; it read
+"sixteen … eleven … five" for the 2026-08-28 tree, and the §11 work moves it, so re-derive with
+`ls jl4/examples/blawx/*.l4 jl4/examples/blawx/not-ok/*.l4` rather than trusting the number) —
+and the verb
 wired at `jl4/app/Main.hs:110` →
 `jl4/app/L4/Cli/Blawx.hs`. What remains open: R10's fork fixes wait in
 `legalese/blawx` (#1–#5, filed 2026-08-20, see §8.10) until upstreaming to Lexpedite is
@@ -423,11 +427,52 @@ Calendar-month/year arithmetic, and the entire broken block family of §2, are O
 diagnostics. Durations are day/hour/minute/second-granular seconds counts; no calendar
 components exist in the target.
 
-### 4.7 Strings
+### 4.7 Strings — literals in rule bodies only, never a typed field
 
-`STRING` literals survive as atoms, usable for equality only (mangled per R3; collisions with
-identifier atoms checked). All string _computation_ is OUT — the target has no string
-operations at all.
+**Narrowed 2026-09-02 (§11 W2). This section previously read "`STRING` literals survive as
+atoms, usable for equality only", which is true and was being read as though it covered
+string-typed _fields_ as well. It does not, and it cannot: Blawx v1.6 has no string attribute
+value type.**
+
+**The ceiling is in the target, and it is a closed list [E].** A declaration block picks its
+attribute's value type from a dropdown, and on the stock checkout
+(`/Volumes/transcend/src/blawx-stock`, `origin/main` at `6a717b1`) that dropdown is written out
+literally as `[["true / false","boolean"], ["number","number"], ["date","date"],
+["time","time"], ["datetime","datetime"], ["duration","duration"], ['list','list']]`
+(`blawx-blocks.js:5376`). The list the field is _re-populated_ from as categories are declared is
+the same six datatypes concatenated with the declared category names, with `"true / false"` put
+back at the front (`blawx-blocks.js:5577-5583`); the relationship block's per-argument dropdowns
+draw on the same `allTypes` (`:5262`, `:5314`). `scasp_generator.js` adds nothing: R3's
+value-type evidence at `:927-1156` has exactly two branches, `boolean` and not-`boolean`, and
+otherwise passes the dropdown value straight through into
+`blawx_attribute(Cat,Name,Type)` (`:927`). The only occurrence of the word `string` in either
+file is `typeof code == "string"` (`scasp_generator.js:107`). So there is no string option to
+select, and no per-type branch that could emit one.
+
+**What that means, in two halves.**
+
+- **Refused — a `STRING`-sorted field, parameter or result.** `blawxValueType`
+  (`L4.Blawx.Lower`) has a named `RSString` arm as of 2026-09-02, and its message says what to
+  write instead: an enum (`DECLARE … IS ONE OF …`) for a fixed vocabulary, or a category for
+  identity. Measured on `jl4/examples/blawx/not-ok/string-field.l4` (`l4 blawx` on it, exit 1):
+  _"in `name`: STRING-sorted field or argument (Blawx): `name` is STRING-sorted, and Blawx's
+  ontology has no string attribute type — a declaration block offers boolean, number, date, time,
+  datetime, duration, list and the declared categories, and nothing else…"_. The enum remedy
+  was executed, not assumed: the same module with `name IS A PlayerName` emits
+  `blawx_category(player_name).` and `blawx_attribute(player,name,player_name).` [E]. (Do not
+  name the enum `Name`: `Name` and `name` both mangle to `name` and R3's injectivity check then
+  refuses the module for an unrelated-looking reason [E].)
+- **Admitted — a `STRING` literal inside a rule body.** Unchanged: it mangles to an atom through
+  the program-global string-atom table (`stringAtomTable`, R3 mangling, collisions with declared
+  names and with other literals both refused by name), and is usable for equality only. Measured
+  with a probe module whose only string is the literal (a nullary `GIVETH A STRING` constant,
+  which classifies as `PCUndeclared` and so needs no declaration block): the emitted s(CASP)
+  carries `Thehousesign = rock.`, and the fixture re-saves clean under the R12 harness —
+  `blawx-fixpoint-harness: 3 checked, 0 failed` [E]. The probe is pinned as a unit test
+  (`BlawxAssumeSpec`, "still admits a string LITERAL in a rule body, as an atom"), not as a
+  corpus seed, because there is no _legal_ text in it.
+
+All string _computation_ is OUT, as before — the target has no string operations at all.
 
 ### 4.8 Lists, aggregates, recursion
 
@@ -1398,7 +1443,10 @@ Parse}` + `L4.Blawx.Lift` + `l4 blawx --import/--parse-only/--reemit`; the emit�
 
 ## 11. Worklist after the Blawx v3 webinar (2026-09-02)
 
-_Added 2026-09-02, nothing in it landed. Everything here was **measured that day** on
+_Added 2026-09-02. **Per-item status lives on the item**: an item that has landed carries a dated
+`DISCHARGED` / `PARTIAL` / `BLOCKED` note of its own, and an item with no such note has not
+landed. (The file header's summary of what remains open is not re-cut per item; read the notes
+below.) Everything here was **measured that day** on
 `origin/unstable` at `f4ae3d5e` with an `l4` built from `31af0995` (the Blawx modules are
 unchanged since #279), against the checkout at `/Volumes/transcend/src/blawx` and the R13
 harnesses. Items are numbered **W1–W9** so later notes can cite them. Each says what was
@@ -1454,6 +1502,27 @@ attribute value type to be declared under. **Do.** Verify against `scasp_generat
 (R3's value-type evidence) whether v1.6 has any string-valued attribute type; if not, narrow §4.7
 to say so and make the diagnostic say "use an enum or a category for identity"; if it does, give
 `classifyPred` the image. Amends §4.7.
+
+**DISCHARGED 2026-09-02.** Measured: **there is no string-valued attribute type in v1.6**, so the
+narrowing branch is the one taken and no image was built. The attribute-type dropdown is written
+out as a literal seven-entry array (`blawx-blocks.js:5376`) and re-populated at runtime from six
+datatypes plus the declared categories (`:5577-5583`, and the relationship block's per-argument
+dropdowns share that `allTypes` at `:5262`/`:5314`); R3's cited generator range has two branches,
+`boolean` and not-`boolean`, and otherwise passes the dropdown value through unexamined into
+`blawx_attribute(Cat,Name,Type)` (`scasp_generator.js:927`); the word `string` occurs in neither
+file except as `typeof code == "string"` (`scasp_generator.js:107`). §4.7 is rewritten to split
+the admitted half (a literal in a rule body) from the refused half (a typed field), with those
+citations. `blawxValueType` grows a named `RSString` arm whose message names the value types that
+do exist and prescribes the enum or the category; the enum remedy was executed rather than
+asserted (`name IS A PlayerName` → `blawx_category(player_name).` +
+`blawx_attribute(player,name,player_name).`). New fixture
+`jl4/examples/blawx/not-ok/string-field.l4` (refuses, exit 1) and three `BlawxAssumeSpec` cases —
+the refusal and its advice, the enum that replaces it, and the surviving literal. Evidence:
+`cabal test jl4-core-test` **424 examples, 0 failures**; all twelve `expected/*.blawx` regenerated
+byte-identical (`git status --porcelain jl4/examples/blawx/expected/` empty); fixpoint on `rps`
+and `beard` **18 checked, 0 failed**; tier-1 on both **8/8**. Not done, and not asked for: no
+positive corpus seed carries a string literal — the probe lives in the unit test, because a
+string literal with no legal text around it is not a seed.
 
 ### W3 — section numbers follow `§` order, not the source's
 

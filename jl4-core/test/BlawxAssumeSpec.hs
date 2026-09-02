@@ -216,6 +216,40 @@ spec = do
           err `shouldSatisfy` Text.isInfixOf "ATTRIBUTE-shaped"
           err `shouldSatisfy` Text.isInfixOf "start at total arity 3"
 
+    -- BLAWX-EXPORT-SPEC §11 W2, measured 2026-09-02. Blawx's attribute-type
+    -- dropdown is a closed list -- boolean, number, date, time, datetime,
+    -- duration, list, plus the declared categories
+    -- (@blawx-blocks.js:5376@ and @:5577-5583@ on the stock v1.6.22-alpha
+    -- checkout) -- and @scasp_generator.js@ has no per-type branch that could
+    -- add one. So a string-sorted FIELD is refused, while a string LITERAL in a
+    -- rule body is not: the two halves are pinned separately below, because
+    -- §4.7 used to state the surviving half as though it covered both.
+    it "refuses a STRING-sorted field, and says what to write instead" $
+      case blawxYaml stringFieldModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for a STRING field"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "no string attribute type"
+          -- the advice, which is the point of the message: an enum for a fixed
+          -- vocabulary, a category for identity
+          err `shouldSatisfy` Text.isInfixOf "DECLARE ... IS ONE OF ..."
+          err `shouldSatisfy` Text.isInfixOf "category for identity"
+          -- and it must not send the author looking for a spelling that works:
+          -- literals in a rule body are fine, so the message says so
+          err `shouldSatisfy` Text.isInfixOf "String literals inside a rule body are fine"
+
+    it "accepts the enum the diagnostic recommends, in the same shape" $ do
+      out <- emitted enumFieldModule
+      hasLine out "blawx_category(player_name)."
+      hasLine out "blawx_attribute(player,name,player_name)."
+
+    it "still admits a string LITERAL in a rule body, as an atom" $ do
+      -- The half of §4.7 that survives the narrowing. The literal reaches
+      -- the s(CASP) through the program-global string-atom table and is
+      -- compared by unification.
+      out <- emitted stringLiteralModule
+      hasLine out "Thehousesign = rock."
+
     it "admits an arity-3 input with no category parameter at all" $ do
       -- Not a defect: Blawx relationship blocks are n-ary over any declared
       -- value type. It is only the SPEC that claimed otherwise.
@@ -282,6 +316,59 @@ spec = do
     , "GIVEN c IS A Consequence"
     , "GIVETH A BOOLEAN"
     , "DECIDE `qualifies` c IF `is severe` c AND `severity exceeds` c 10"
+    ]
+
+  -- A STRING-sorted stored field: refused, because there is no attribute value
+  -- type it could be declared under. The corpus twin is
+  -- `jl4/examples/blawx/not-ok/string-field.l4`.
+  stringFieldModule = Text.unlines
+    [ "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    name   IS A STRING"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `throws rock` p IF p's throws EQUALS Rock"
+    ]
+
+  -- The same module with the field's sort changed to the enum the diagnostic
+  -- recommends. Not `Name`: that and `name` both mangle to `name` and the
+  -- injectivity check refuses the module for an unrelated-looking reason.
+  enumFieldModule = Text.unlines
+    [ "DECLARE PlayerName IS ONE OF Jane, Bob"
+    , "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    name   IS A PlayerName"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `throws rock` p IF p's throws EQUALS Rock"
+    ]
+
+  -- A string LITERAL in a rule body, with no string-sorted field anywhere: the
+  -- nullary constant is `PCUndeclared` (rules only, no declaration block), so
+  -- the literal is the only string in sight and it survives as an atom.
+  stringLiteralModule = Text.unlines
+    [ "ASSUME Player IS A TYPE"
+    , ""
+    , "GIVEN p IS A Player"
+    , "ASSUME `is registered` p IS A BOOLEAN"
+    , ""
+    , "GIVETH A STRING"
+    , "DECIDE `the house sign` IS \"rock\""
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `qualifies` p IF"
+    , "      `is registered` p"
+    , "  AND `the house sign` EQUALS \"rock\""
     ]
 
   -- Total arity 3, and not one argument is a category.

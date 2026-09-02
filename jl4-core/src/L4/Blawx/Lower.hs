@@ -639,9 +639,9 @@ categoryOf = \case
 valueType :: Env -> RPred -> RSort -> Either [LowerError] BValueType
 valueType env p = blawxValueType env p.rpName.rnBase p.rpProv.rpvRange
 
--- | Sort → Blawx value type, with the two named rejections: dates (v1, by
--- name — see the module header) and everything else the ontology cannot
--- declare.
+-- | Sort → Blawx value type, with the three named rejections: strings (no
+-- attribute value type exists — see the 'RSString' arm), dates (v1, by name —
+-- see the module header) and everything else the ontology cannot declare.
 blawxValueType :: Env -> Text -> Maybe SrcRange -> RSort -> Either [LowerError] BValueType
 blawxValueType env who rng = \case
   RSBool     -> Right BVBoolean
@@ -649,6 +649,32 @@ blawxValueType env who rng = \case
   RSEnum e   -> BVCategory <$> atomOf env e
   RSRecord r -> BVCategory <$> atomOf env r
   RSList _   -> Right BVList
+  -- __Blawx v1.6 has no string attribute value type__, and this is a
+  -- measurement, not an inference: the declaration block's type dropdown is
+  -- literally @[["true / false","boolean"], ["number","number"],
+  -- ["date","date"], ["time","time"], ["datetime","datetime"],
+  -- ["duration","duration"], ['list','list']]@
+  -- (@blawx-blocks.js:5376@), and the list it is re-populated from at runtime
+  -- is that same set of datatypes concatenated with the declared categories
+  -- (@blawx-blocks.js:5577-5583@). @scasp_generator.js@ has no per-type branch
+  -- to add one either: its attribute arm splits only on @boolean@ vs
+  -- not-boolean and otherwise passes the dropdown value straight through into
+  -- @blawx_attribute(Cat,Name,Type)@ (@scasp_generator.js:927-1010@).
+  --
+  -- So the refusal is total for a string-sorted FIELD, parameter or result,
+  -- and the message says what to write instead. String /literals/ in a rule
+  -- body are unaffected — they mangle to atoms through 'stringAtomTable' and
+  -- are usable for equality (BLAWX-EXPORT-SPEC §4.7).
+  RSString ->
+    Left [ blawxErr who rng
+             (LEUnsupported "STRING-sorted field or argument (Blawx)")
+             ( "`" <> who <> "` is STRING-sorted, and Blawx's ontology has no \
+               \string attribute type — a declaration block offers boolean, \
+               \number, date, time, datetime, duration, list and the declared \
+               \categories, and nothing else. Use an enum \
+               \(DECLARE ... IS ONE OF ...) for a fixed vocabulary, or a \
+               \category for identity. String literals inside a rule body are \
+               \fine; it is the typed field that has nowhere to go" ) ]
   RSOpaque t | t `elem` (["DATE", "TIME", "DATETIME", "DURATION"] :: [Text]) ->
     Left [ blawxErr who rng
              (LEUnsupported "dates (Blawx v1)")

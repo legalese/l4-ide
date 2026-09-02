@@ -1,0 +1,62 @@
+-- A STRING-sorted FIELD, which Blawx's ontology has nowhere to put.
+--
+-- Blawx declares an attribute by picking its value type from a dropdown, and
+-- that dropdown is a closed list. Measured on the stock v1.6.22-alpha checkout
+-- (`/Volumes/transcend/src/blawx-stock`, `origin/main` at `6a717b1`):
+--
+--   blawx-blocks.js:5376       the `new_attribute_declaration` type field is
+--                              [["true / false","boolean"], ["number","number"],
+--                               ["date","date"], ["time","time"],
+--                               ["datetime","datetime"], ["duration","duration"],
+--                               ['list','list']]
+--   blawx-blocks.js:5577-5583  the list it is re-populated from at runtime is
+--                              those same six datatypes concatenated with the
+--                              declared categories, with "true / false" put back
+--                              at the front
+--   scasp_generator.js:927     the generator's attribute arm branches only on
+--                              boolean vs not-boolean and otherwise passes the
+--                              dropdown value straight through into
+--                              blawx_attribute(Cat,Name,Type)
+--
+-- There is no string option to select and no per-type branch that would emit
+-- one, so this is a hard ceiling in the target, not a gap in the exporter: a
+-- string-typed field, parameter or result is refused.
+--
+-- What a user does about it. If the values are a fixed vocabulary — which is
+-- what most legislative "strings" turn out to be — write an enum, and it lowers
+-- to a category plus one object per constructor:
+--
+--     DECLARE PlayerName IS ONE OF Jane, Bob
+--     DECLARE Player HAS
+--         name IS A PlayerName
+--
+-- (Measured 2026-09-02: that emits `blawx_category(player_name).` and
+-- `blawx_attribute(player,name,player_name).`. Do not call the enum `Name`:
+-- `Name` and `name` both mangle to the atom `name`, and the injectivity check
+-- refuses the module with a second, unrelated-looking error.)
+--
+-- If the string was carrying IDENTITY rather than a value — a party's name used
+-- only to tell two parties apart — drop the field: a record already lowers to a
+-- category, and Blawx compares objects by atom, so the identity is already
+-- there without a name to hang it on.
+--
+-- What is NOT refused: string LITERALS in a rule body. They mangle to atoms
+-- through the program-global string-atom table and stay usable for equality
+-- (BLAWX-EXPORT-SPEC §4.7). It is the typed field that has nowhere to go.
+--
+-- Measured 2026-09-02 (spec §11 W2) with `l4 blawx` on this file:
+--   in `name`: STRING-sorted field or argument (Blawx): `name` is
+--   STRING-sorted, and Blawx's ontology has no string attribute type — …
+
+§ `String-typed field`
+
+DECLARE Sign IS ONE OF Rock, Paper, Scissors
+
+DECLARE Player HAS
+    name   IS A STRING
+    throws IS A Sign
+
+@export 1. A player throws rock.
+GIVEN p IS A Player
+GIVETH A BOOLEAN
+DECIDE `throws rock` p IF p's throws EQUALS Rock
