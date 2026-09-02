@@ -954,6 +954,11 @@ as **legalese/blawx#3**; the category-dropdown race (quirk #4, above) as **legal
 and the negative `blawx_defeated` NLG asymmetry (quirk #3, above) as **legalese/blawx#5**.
 Per R10, all four wait on the fork beside #1 until upstreaming to Lexpedite is warranted._
 
+**Which generator (ruled 2026-09-02, §11 W9).** "The current generator" means the STOCK
+`scasp_generator.js` of Lexpedite/blawx v1.6.22 (`origin/main` 6a717b1). The fork's generator
+fixes (#1, #5) are not the target and are not carried by our instance; a fixpoint run must point
+`BLAWX_CHECKOUT` at a stock-generator checkout.
+
 ### 8.11 R11 — tests: one BlawxTest per `#EVAL`/`#ASSERT`; the oracle is L4
 
 **Evidence.** Test anatomy and query conventions §2 **[E]**; run-endpoint payload/response
@@ -1104,6 +1109,10 @@ the server would return) and awaits the queue. Headless remains the fast 99%, no
 the same timezone the harness pins (`TZ=UTC`), because date and datetime blocks encode through the
 local-time `Date` constructor (`scasp_generator.js:528-535`, `:790-800`) — latent for this corpus,
 which has no numeric date literals, and live for the next one that does._
+
+**Instance for the re-save gate (ruled 2026-09-02, §11 W9).** The gate is run on an instance whose
+generator is stock; since 2026-09-02 that is `legalese/blawx:edge` built from the fork's
+`mengwong/main` with the generator fixes reverted (see W8 for the build pins).
 
 ### 8.13 R13 — validation harness: two tiers, optional-when-present, never a build dependency
 
@@ -1551,6 +1560,15 @@ fork — teach the emitter the fixed axiom forms behind a flag or unconditionall
 every `expected/*.blawx`, and make `blawx-stock` the non-reference. (b) is the honest one if
 the fixes are right and upstreaming (R10) is not coming; (a) is the only one under which the
 published `lexipedite/blawx` image re-saves cleanly. Amends R10, R12, R13.
+
+**ANSWERED 2026-09-02 (Meng): (a), stock — with the instance re-cut.** The stock v1.6.22 generator
+stays R10's byte-exact target, because it is what the published `lexipedite/blawx` image, any
+third-party instance, and (as far as anyone outside can tell) app.blawx.dev regenerate with. Our
+instance is rebuilt from the fork with only the server-side fixes (#2 `ldap.py`, #3 `reasoner.py`,
+#4 `blawx-blocks.js` dropdown race — none of which changes generated s(CASP)) and WITHOUT #1 and #5,
+which are reverted on `legalese/blawx` `mengwong/main` and stay open as upstream PRs. So one instance
+serves tier 2 and the R12 re-save gate. The harness default `BLAWX_CHECKOUT=/Volumes/transcend/src/blawx`
+is that branch; `blawx-stock` remains as an independent witness.
 
 _Related, outside this spec: SARA (Holzenberger, Blair-Stanek & Van Durme 2020 — nine IRC
 sections with a Prolog reference encoding) is nominated on `legalese/canon`
