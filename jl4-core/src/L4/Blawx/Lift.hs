@@ -429,10 +429,44 @@ renderDoc ctx doc = do
         ( "the rule's doc_selector names " <> renderSectionRef r.brSection
             <> ", not the workspace it is drawn in; the attribution wins" )
 
-  for_ defeatGroups \g ->
+  -- __An `overrules` names three sections, and the fold has to be checked on
+  -- all of them.__ Only the workspace was checked before, which is how a
+  -- defeat naming a paragraph was silently dropped: the rule was filed under
+  -- the FOLDED section while the group was keyed on the RAW one, so
+  -- `isDefeated` was False, the `AND NOT <defeated>` conjunct was never
+  -- emitted, and the `… is defeated` decision was defined and never used —
+  -- exit 0, no diagnostic, clean `l4 check`.
+  --
+  -- Folding the group keys as well fixes that, but only where the fold is
+  -- MEANING-PRESERVING, and measurement says it is not always. s(CASP) keys
+  -- `holds/3` on the exact section, so `holds(sec_1_section, qualifies_s1b)`
+  -- with the rule attributed to `sec_1__para_b_section` has no clause at all
+  -- and the defeat is INERT in Blawx; the fold would give it a body and make
+  -- it fire. The mirror hazard is on the defeated side: a defeat aimed at one
+  -- paragraph would cover a sibling paragraph's rules that fold into the same
+  -- §§. Both change the answer, so both are refused by name rather than
+  -- folded quietly.
+  for_ defeatGroups \g@((_, l), ms) -> do
     unless (groupHome g `elem` flatRefs) $
       refuse_ "defeat-section" (renderSectionRef (fst (fst g)))
-        "an `overrules` names a section that is not a flat numbered section"
+        ( "an `overrules` is drawn in a workspace that is neither a flat "
+            <> "numbered section nor a paragraph of one" )
+    for_ (nub [o.bovDefeated | (_, _, o) <- ms]) \rd ->
+      defeatSideOk "defeated" rd l
+    for_ ms \(_, _, o) ->
+      defeatSideOk "defeating" o.bovDefeating (overruleLit o.bovDefeatingStmt)
+
+  -- The defeat layer's half of `rule-section-flattened`: say so when an
+  -- `overrules` survives only because of the fold.
+  for_ defeatGroups \g ->
+    for_ [r | r <- groupRawSections g, foldSec r /= r] \r ->
+      warn "defeat-section-flattened" (renderSectionRef r)
+        ( "an `overrules` names " <> renderSectionRef r
+            <> ", a paragraph; it is folded into " <> renderSectionRef (foldSec r)
+            <> " with the rest of that paragraph's blocks (§11 W3 still owns "
+            <> "the eId question), and the defeat is emitted as the parent "
+            <> "section's. The fold is extension-preserving here, which is "
+            <> "what `blawx-lift/defeat-fold-unsound` checks" )
 
   for_ appliesSections \s ->
     unless (s `elem` flatRefs) $
@@ -673,22 +707,74 @@ renderDoc ctx doc = do
   overruleLit c = (bNameText c.bcPred, c.bcSign)
 
   -- One group per defeated (section, literal) pair, in first-appearance
-  -- order; two `overrules` naming the same pair become one OR.
+  -- order; two `overrules` naming the same pair become one OR. The key is the
+  -- FOLDED section, because that is the section the defeated rule's decisions
+  -- are filed under ('foldSec'); keying it raw is what silently dropped a
+  -- paragraph's defeat.
   defeatGroups :: [((BSectionRef, Lit), [(Int, BSectionRef, BOverrule)])]
   defeatGroups =
     [ (k, [(i, ws, o) | (i, (ws, o)) <- overrs, key o == k])
     | k <- nub [key o | (_, (_, o)) <- overrs]
     ]
    where
-    key o = (o.bovDefeated, overruleLit o.bovDefeatedStmt)
+    key o = (foldSec o.bovDefeated, overruleLit o.bovDefeatedStmt)
 
   -- A group is emitted in the section of its first defeating block — which is
   -- where a reader looks for "what this section overrides". A defeater drawn
-  -- somewhere unplaceable falls back to the defeated section.
+  -- somewhere unplaceable falls back to the defeated section. Folded, for the
+  -- same reason the key is: an `overrules` drawn on a paragraph canvas belongs
+  -- to that paragraph's parent §§, which is the only §§ that exists.
   groupHome :: ((BSectionRef, Lit), [(Int, BSectionRef, BOverrule)]) -> BSectionRef
   groupHome (k, ms) = case ms of
-    (_, ws, _) : _ | ws `elem` flatRefs -> ws
+    (_, ws, _) : _ | foldSec ws `elem` flatRefs -> foldSec ws
     _ -> fst k
+
+  -- The raw (unfolded) sections a defeat group names, for provenance and for
+  -- the flattening warnings. @fst (fst g)@ is already folded.
+  groupRawSections :: ((BSectionRef, Lit), [(Int, BSectionRef, BOverrule)]) -> [BSectionRef]
+  groupRawSections (_, ms) =
+    nub (concat [[ws, o.bovDefeating, o.bovDefeated] | (_, ws, o) <- ms])
+
+  -- | The rules the LIFT files under @(s, l)@ — the extension of the emitted
+  -- @according_to@\/@holds@ pair.
+  rulesFiledUnder :: BSectionRef -> Lit -> [BRule]
+  rulesFiledUnder s l = [r | (_, r) <- arules, secOf r == s, litOfRule r == l]
+
+  -- | …of which the ones BLAWX files under the raw section: the extension
+  -- s(CASP)'s own @holds(s, l, X)@ has. Always a subset of the above, since
+  -- @secOf r == foldSec r.brSection@.
+  rulesAttributedTo :: BSectionRef -> Lit -> [BRule]
+  rulesAttributedTo s l = [r | (_, r) <- arules, r.brSection == s, litOfRule r == l]
+
+  -- | One side of one `overrules`, checked against the fold. @side@ is
+  -- \"defeated\" or \"defeating\", for the message.
+  defeatSideOk :: Text -> BSectionRef -> Lit -> L ()
+  defeatSideOk side raw l = do
+    unless (foldSec raw `elem` flatRefs) $
+      refuse_ "defeat-section" (renderSectionRef raw)
+        ( "an `overrules` names " <> renderSectionRef raw <> " as its " <> side
+            <> " section, which is neither a flat numbered section nor a "
+            <> "paragraph of one" )
+    when (null attributed) $
+      refuse_ "defeat-target" (renderSectionRef raw)
+        ( "the `overrules` names " <> scaspLit l <> " in " <> renderSectionRef raw
+            <> " as its " <> side <> " conclusion, but no attributed_rule is "
+            <> "attributed to that section with that conclusion, so s(CASP) "
+            <> "derives no `holds(" <> renderSectionRef raw <> "," <> scaspLit l
+            <> ",X)` and the defeat has no effect in Blawx; folding the section "
+            <> "would either dangle the reference or give the defeat a body it "
+            <> "does not have" )
+    unless (null attributed || length filed == length attributed) $
+      refuse_ "defeat-fold-unsound" (renderSectionRef raw)
+        ( "the `overrules` names " <> scaspLit l <> " in " <> renderSectionRef raw
+            <> " as its " <> side <> " conclusion, but folding that section into "
+            <> renderSectionRef (foldSec raw) <> " (§11 W3) would widen the "
+            <> "defeat from " <> Text.textShow (length attributed) <> " rule(s) to "
+            <> Text.textShow (length filed)
+            <> ": the lifted defeat would cover rules Blawx's does not" )
+   where
+    attributed = rulesAttributedTo raw l
+    filed = rulesFiledUnder (foldSec raw) l
 
   isDefeated :: BSectionRef -> Lit -> Bool
   isDefeated s l = any ((== (s, l)) . fst) defeatGroups
@@ -837,7 +923,7 @@ renderDoc ctx doc = do
     baseEdges =
       [(NLit l, NHolds s l, False) | l <- concludedLits, s <- sectionsConcluding l]
     defeatEdges =
-      [ (NDefeated s l, NHolds o.bovDefeating (overruleLit o.bovDefeatingStmt), False)
+      [ (NDefeated s l, NHolds (foldSec o.bovDefeating) (overruleLit o.bovDefeatingStmt), False)
       | ((s, l), ms) <- defeatGroups
       , (_, _, o) <- ms
       ]
@@ -924,20 +1010,42 @@ renderDoc ctx doc = do
   flatRefs :: [BSectionRef]
   flatRefs = map bSec secNumbers
 
-  -- __The section a rule is FILED under__, as distinct from the section it is
-  -- ATTRIBUTED to. R4 ruled flat numbered sections for v1, and Blawx files a
-  -- paragraph's rules under a nested workspace (`sec_1__para_a_section`).
-  -- Until W3 gives paragraphs their own eId, the least-bad handling is to
-  -- fold a paragraph into its parent `sec_n` — the rules still fire, the
-  -- attribution is still printed on the decision's @ref line, and the loss is
-  -- the § nesting, which the flat scaffolding never had. Everything that
-  -- NAMES a decision or PLACES it goes through here; `brSection` itself is
-  -- what the @ref lines print.
-  secOf :: BRule -> BSectionRef
-  secOf r = case r.brSection of
+  -- __The section a decision is FILED under__, as distinct from the section it
+  -- is ATTRIBUTED to. R4 ruled flat numbered sections for v1, and Blawx files
+  -- a paragraph's blocks under a nested workspace (`sec_1__para_a_section`).
+  -- Until W3 gives paragraphs their own eId, the least-bad handling is to fold
+  -- a paragraph into its parent `sec_n`: the rules still fire and the
+  -- attribution is still printed on the decision's @ref line.
+  --
+  -- __EVERY reference to a section that names or places a decision has to go
+  -- through here, not just a rule's own attribution.__ The defeat layer is
+  -- keyed on (section, literal) pairs, so a fold applied to the rule but not
+  -- to the `overrules` that defeats it leaves the two keyed differently: the
+  -- `AND NOT <defeated>` conjunct is then never emitted and the
+  -- `… is defeated` decision is defined and never used, with no diagnostic
+  -- and a clean `l4 check`. That was this branch's own defect, found in
+  -- review; the guards and warnings below are what replaced it.
+  --
+  -- What the fold costs, disclosed rather than hidden. The § nesting goes, and
+  -- the flat scaffolding never had it. What it must NOT do is change which
+  -- rules a defeat reaches, and it would in two directions — a sibling
+  -- paragraph concluding the same literal folds into the same §§, and an
+  -- `overrules` naming the flat parent while the rule sits in a paragraph is
+  -- inert in s(CASP) but would gain a body here. Both are refused by name
+  -- (`defeat-fold-unsound`, `defeat-target`); the surviving fold is
+  -- extension-preserving and only warns (`defeat-section-flattened`).
+  foldSec :: BSectionRef -> BSectionRef
+  foldSec = \case
     BPath (st :| _ : _) | bStepKind st == "sec", BPath (st :| []) `elem` flatRefs ->
       BPath (st :| [])
     other -> other
+
+  secOf :: BRule -> BSectionRef
+  secOf r = foldSec r.brSection
+
+  -- | The literal an attributed rule concludes.
+  litOfRule :: BRule -> Lit
+  litOfRule r = (bNameText r.brConclusion.bcPred, r.brConclusion.bcSign)
 
   -- ------------------------------------------------------------------
   -- Workspace comments (ruling P5-4)
@@ -1116,8 +1224,7 @@ renderDoc ctx doc = do
         -- and their meaning is the OR of their bodies. One decision per RULE
         -- would emit the same name twice; one per (section, literal) pair, as
         -- the unfolding requires, has to join them.
-        litOf r = (bNameText r.brConclusion.bcPred, r.brConclusion.bcSign)
-        groups = [(l, [r | r <- mine, litOf r == l]) | l <- nub (map litOf mine)]
+        groups = [(l, [r | r <- mine, litOfRule r == l]) | l <- nub (map litOfRule mine)]
     outs <- traverse defeatPara outward
     apps <- if s `elem` appliesSections then appliesParas s else pure []
     rulePs <- concat <$> traverse (uncurry (rulePara s)) groups
@@ -1260,7 +1367,10 @@ renderDoc ctx doc = do
 
   defeatPara :: ((BSectionRef, Lit), [(Int, BSectionRef, BOverrule)]) -> L Text
   defeatPara ((s, l), ms) = do
-    let arms = [ident (holdsName o.bovDefeating (overruleLit o.bovDefeatingStmt)) <> " x" | (_, _, o) <- ms]
+    -- The arm names the DEFEATING section's `holds` decision, which is filed
+    -- under the folded section — so the reference has to be folded too, or it
+    -- dangles.
+    let arms = [ident (holdsName (foldSec o.bovDefeating) (overruleLit o.bovDefeatingStmt)) <> " x" | (_, _, o) <- ms]
         edge o =
           labelOf o.bovDefeating <> " (" <> scaspLit (overruleLit o.bovDefeatingStmt)
             <> ") defeats " <> labelOf o.bovDefeated
@@ -1508,11 +1618,19 @@ renderDoc ctx doc = do
   -- expression that reads it; @headVar@ is the rule's object variable, and a
   -- second one in object position is refused rather than silently collapsed
   -- into the same @x@ (the collapse was invisible while every goal was unary).
+  --
+  -- The @Bool@ threaded through @go@ is \"this goal sits under default
+  -- negation\". It matters for exactly one shape: a binary attribute goal is a
+  -- BINDING only in a positive position. Under @not@ it binds nothing — the
+  -- value variable must already be bound elsewhere — so the goal is a TEST of
+  -- that value and has to lift to the definedness conjunct AND the equality,
+  -- which the surrounding @NOT@ then negates. Reusing the positive image there
+  -- turned @not attr(X,V)@ into \"attr is undefined\", dropping the comparison.
   liftGoal :: Text -> Map Text Text -> Maybe Text -> BGoal -> L Text
-  liftGoal who env headVar = go
+  liftGoal who env headVar = go False
    where
-    go = \case
-      BGCall True p [o, v] | Just d <- valueDeclOf (bNameText p) -> binary d o v
+    go neg = \case
+      BGCall True p [o, v] | Just d <- valueDeclOf (bNameText p) -> binary neg d o v
       BGCall True p [a] -> app (bNameText p) a
       BGCall False p [a] -> app (phrase (bNameText p, False)) a
       BGNewObjectCategory p a -> app (bNameText p) a
@@ -1527,28 +1645,32 @@ renderDoc ctx doc = do
       BGNegated BNegDefault (BGNegated BNegClassical (BGApplies s a)) -> do
         t <- arg a
         pure ("naf (" <> ident (negAppliesName s) <> " " <> t <> ")")
-      BGNaf p [a] -> do
-        t <- app (bNameText p) a
-        pure ("NOT (" <> t <> ")")
+      BGNaf p [a] -> notOf <$> app (bNameText p) a
       BGNegated BNegClassical (BGCall True p [a]) -> app (phrase (bNameText p, False)) a
-      BGNegated BNegDefault g -> do
-        t <- go g
-        pure ("NOT (" <> t <> ")")
+      BGNegated BNegDefault g -> notOf <$> go True g
       g -> refuse "goal-shape" who ("the condition `" <> renderGoal g <> "` has no L4 image this phase")
     -- `attr(X, V)`: the object slot must be the rule's own object variable.
     -- A variable value slot is a binding, already discharged into `env`, so
     -- all that is left of the goal is definedness; a literal value slot is a
     -- test, and gets the definedness conjunct plus the equality.
-    binary d o v = case o of
+    binary neg d o v = case o of
       BTVar (MkBVar ov) | not (Map.member ov env) -> do
         _ <- arg (BTVar (MkBVar ov))
         case v of
-          BTVar (MkBVar vn) | Map.member vn env -> pure defined
+          -- `_` is anonymous on both sides of the polarity: positively it is
+          -- \"attr is defined\", negatedly \"attr is undefined\".
           BTVar (MkBVar "_") -> pure defined
-          BTVar (MkBVar vn) ->
+          -- Positively, a bound variable is the binding itself, already
+          -- discharged into `env` by 'valueBindings'; nothing is left but
+          -- definedness. Negatedly it is a test against the value `env`
+          -- carries, and falls through to the equality arm below.
+          BTVar (MkBVar vn) | Map.member vn env, not neg -> pure defined
+          BTVar (MkBVar vn) | not (Map.member vn env) ->
             refuse "unbound-value" who
               ( "the variable " <> vn <> " sits in the value slot of `"
-                  <> d.dclName <> "(X,V)` but is not bound there" )
+                  <> d.dclName <> "(X,V)`"
+                  <> (if neg then " under `not`, which binds nothing," else "")
+                  <> " but is not bound there" )
           _ -> do
             t <- value v
             pure ("(" <> defined <> " AND " <> ident (accessorName d.dclName) <> " x EQUALS " <> t <> ")")
@@ -1596,6 +1718,31 @@ renderDoc ctx doc = do
 -- ---------------------------------------------------------------------------
 -- Text helpers
 -- ---------------------------------------------------------------------------
+
+-- | @NOT@ over an already-parenthesised operand, without doubling the
+-- brackets. A binary attribute goal under negation lifts to
+-- @(p x AND `the p of` x EQUALS v)@, and @\"NOT (\" <> that <> \")\"@ would
+-- read @NOT ((… ))@ — valid, and a distraction in an artifact whose whole
+-- point is being read.
+notOf :: Text -> Text
+notOf t
+  | wholeParen = "NOT " <> t
+  | otherwise = "NOT (" <> t <> ")"
+ where
+  wholeParen = case Text.uncons t of
+    Just ('(', rest) -> Text.length rest > 0 && Text.last rest == ')' && closesAtEnd rest 0
+    _ -> False
+  -- the opening bracket's partner is the LAST character, not an earlier one:
+  -- @(a) AND (b)@ must not be treated as one parenthesised whole.
+  closesAtEnd :: Text -> Int -> Bool
+  closesAtEnd rest d = case Text.uncons rest of
+    Nothing -> False
+    Just (')', r)
+      | Text.null r -> d == 0
+      | d == 0 -> False -- the opening bracket closed early: `(a) AND (b)`
+      | otherwise -> closesAtEnd r (d - 1)
+    Just ('(', r) -> closesAtEnd r (d + 1)
+    Just (_, r) -> closesAtEnd r d
 
 -- | @blawx_comparison(X,op,Y)@ in L4's spelling. There is no disequality
 -- operator, so @neq@ is the negation of @EQUALS@ — which is also why it is

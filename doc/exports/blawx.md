@@ -78,8 +78,11 @@ construct, so a refusal tells you _which block_ has no L4 image rather than that
 unsupported. The fragment is a **flat universe of objects** under unary predicates, plus
 **value-typed attributes**: a `number` or category-valued attribute becomes an optional field with
 two readers — "is it set?" and "what is it?" — and a comparison on it becomes an ordinary L4
-comparison. What is still out: n-ary relationships, rules that _compute_ an attribute's value,
-arithmetic, and the date and event layers.
+comparison. A section's **paragraph** canvases (`sec_1__para_a_section`) fold into their numbered
+parent, which is warned about and keeps the paragraph's own eId on the decision's `@ref` line —
+and an `overrules` the fold cannot carry across unchanged is refused rather than folded, because
+Blawx keys defeat on the exact section. What is still out: n-ary relationships, rules that
+_compute_ an attribute's value, arithmetic, and the date and event layers.
 
 ## What it consumes
 

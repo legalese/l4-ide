@@ -149,12 +149,84 @@ spec = do
           Text.isInfixOf "`according to sec_1_section, x is a bird (clause 1)` x" t
             && Text.isInfixOf "`according to sec_1_section, x is a bird (clause 2)` x" t
 
+  describe "a value-typed attribute goal under default negation" $ do
+    -- Found in review of the first W5a commit.
+    -- `not attr(A,V)` binds nothing: V has to be bound already, and the goal
+    -- is then a TEST of the attribute's value against it. Reusing the
+    -- positive image — which is only the definedness conjunct, because the
+    -- binding is discharged by substitution — turned the test into
+    -- \"the attribute is undefined\" and dropped the comparison.
+    it "under `not`, tests the bound value rather than asserting absence" $
+      textOf (twoValueDoc [attrGoal, BGNegated BNegDefault nailsGoal])
+        `shouldSatisfy` Text.isInfixOf "NOT (nails x AND `the nails of` x EQUALS `the hair of` x)"
+
+    it "under `not`, still reads an anonymous value slot as `absent`" $
+      textOf (twoValueDoc [attrGoal, BGNegated BNegDefault (BGCall True (bn "nails") [va, anon])])
+        `shouldSatisfy` Text.isInfixOf "NOT (nails x)"
+
+    -- `valueBindings` scans POSITIVE goals only, so a variable that only a
+    -- negated goal mentions is bound by nothing and must be refused, not
+    -- quietly read as an anonymous slot.
+    it "refuses a value variable only a negated goal mentions" $
+      refusalsOf (twoValueDoc [BGNegated BNegDefault nailsGoal])
+        `shouldSatisfy` anyMentioning "blawx-lift/unbound-value"
+
   describe "paragraph sections (§11 W3 is still open)" $ do
     it "files a paragraph's rules under its parent section" $
       lifts paragraphDoc `shouldBe` Right ()
 
     it "warns that the paragraph survives only in the @ref line" $
       warningsOf paragraphDoc `shouldSatisfy` anyMentioning "blawx-lift/rule-section-flattened"
+
+    -- __The defect the paragraph fold shipped with__, found in review and
+    -- reproduced end to end by the two fixtures under
+    -- `jl4/tests-cli/fixtures/blawx-import/paragraph-defeat*.blawx`. The rule
+    -- was filed under the FOLDED section while the `overrules` was keyed on
+    -- the RAW paragraph, so `isDefeated` was False: the `AND NOT <defeated>`
+    -- conjunct was never emitted, the `… is defeated` decision was defined
+    -- and never used, and the module type-checked with exit code 0 and no
+    -- diagnostic. Both halves are asserted, because the dangling decision
+    -- alone satisfied the first.
+    it "keeps a defeat both of whose sections are paragraphs" $
+      textOf paragraphDefeatDoc
+        `shouldSatisfy` \t ->
+          Text.isInfixOf
+            "AND NOT `the conclusion in sec_1_section that x is a bird is defeated` x"
+            t
+            && Text.isInfixOf
+              "IF `the conclusion in sec_1_section that x is an ostrich holds` x"
+              t
+            && not (Text.isInfixOf "no overrules names" t)
+
+    it "warns that the defeat, too, only survives the fold" $
+      warningsOf paragraphDefeatDoc
+        `shouldSatisfy` anyMentioning "blawx-lift/defeat-section-flattened"
+
+    -- __And what the fold may NOT do.__ Folding the keys makes the defeat
+    -- survive, but it also makes section identity coarser than s(CASP)'s, and
+    -- measurement says that changes answers in two directions. Both are
+    -- refused by name rather than folded quietly.
+    --
+    -- (a) A sibling paragraph concluding the same literal folds into the same
+    -- §§, so a defeat aimed at one paragraph would cover the other.
+    it "refuses a fold that would widen a defeat over a sibling paragraph" $
+      refusalsOf paragraphDefeatWideDoc
+        `shouldSatisfy` anyMentioning "blawx-lift/defeat-fold-unsound"
+
+    -- (b) The mirror, and the shape the review counterexample actually had:
+    -- an `overrules` whose DEFEATING pair is the flat parent while the rule
+    -- concluding it sits in a paragraph. s(CASP) keys `holds/3` on the exact
+    -- section, so `holds(sec_1_section, ostrich, X)` has no clause at all and
+    -- the defeat never fires in Blawx — while the fold would give it a body.
+    -- Measured on `paragraph-defeat.blawx`: swipl answers MODEL for
+    -- `qualifies_s1a(p)` in every scenario, i.e. never defeated.
+    it "refuses an `overrules` whose defeating conclusion is inert in Blawx" $
+      refusalsOf paragraphDefeatInertDoc
+        `shouldSatisfy` anyMentioning "blawx-lift/defeat-target"
+
+    it "refuses an `overrules` naming an unplaceable DEFEATED section" $
+      refusalsOf (paragraphDefeatDocIn (BPath (mkStep "art" "II" :| [])))
+        `shouldSatisfy` anyMentioning "blawx-lift/defeat-section"
 
   describe "comments (ruling P5-4)" $ do
     it "lifts a workspace comment under the § of its section" $
@@ -402,6 +474,100 @@ paragraphDoc =
           ]
         ]
     ]
+
+-- | Two rules attributed to PARAGRAPHS of section 1 and drawn on their own
+-- paragraph canvases, the way Blawx files them, plus an @overrules@ naming a
+-- paragraph on the given side. The defeated conclusion is @sec_1__para_a@'s
+-- @bird@; the defeater is @sec_1__para_b@'s @ostrich@.
+paragraphDefeatWith :: BSectionRef -> BSectionRef -> BSectionRef -> [BWorkspace] -> BlawxDoc
+paragraphDefeatWith drawnIn defeating defeated extra =
+  baseDoc
+    ( [ ws
+          (bSec 1)
+          [ [ BDeclareCategory
+                MkBCategoryDecl {bcName = bn "penguin", bcPrefix = "", bcPostfix = "is a penguin", bcProv = Nothing}
+            , BDeclareCategory
+                MkBCategoryDecl {bcName = bn "ostrich", bcPrefix = "", bcPostfix = "is an ostrich", bcProv = Nothing}
+            , BDeclareCategory
+                MkBCategoryDecl {bcName = bn "bird", bcPrefix = "", bcPostfix = "is a bird", bcProv = Nothing}
+            ]
+          ]
+      , paraRuleWs "a" True "bird"
+      , paraRuleWs "b" False "ostrich"
+      ]
+        <> extra
+        <> [ ws
+               drawnIn
+               [ [ BOverrules
+                     MkBOverrule
+                       { bovDefeating = defeating
+                       , bovDefeatingStmt = MkBConclusion {bcSign = True, bcPred = bn "ostrich", bcArgs = [va]}
+                       , bovDefeated = defeated
+                       , bovDefeatedStmt = MkBConclusion {bcSign = True, bcPred = bn "bird", bcArgs = [va]}
+                       , bovProv = Nothing
+                       }
+                 ]
+               ]
+           ]
+    )
+
+-- | One paragraph canvas carrying one rule attributed to that paragraph.
+paraRuleWs :: Text -> Bool -> Text -> BWorkspace
+paraRuleWs l defeasible concl =
+  ws
+    (para l)
+    [ [ BAttributedRule
+          (rule 1 True concl [BGCall True (bn "penguin") [va]] defeasible)
+            {brSection = para l}
+      ]
+    ]
+
+para :: Text -> BSectionRef
+para l = BPath (mkStep "sec" "1" :| [mkStep "para" l])
+
+-- | The sound shape: the `overrules` is drawn in the flat parent and names,
+-- on both sides, the paragraph that actually carries the rule. The fold is
+-- extension-preserving, so the defeat survives it.
+paragraphDefeatDoc :: BlawxDoc
+paragraphDefeatDoc = paragraphDefeatWith (bSec 1) (para "b") (para "a") []
+
+-- | …plus a SIBLING paragraph concluding the same literal, which the fold
+-- would sweep into the same defeat.
+paragraphDefeatWideDoc :: BlawxDoc
+paragraphDefeatWideDoc =
+  paragraphDefeatWith (bSec 1) (para "b") (para "a") [paraRuleWs "c" True "bird"]
+
+-- | The review counterexample's own shape: the DEFEATING pair is the flat
+-- parent, which no rule is attributed to, so Blawx never fires the defeat.
+paragraphDefeatInertDoc :: BlawxDoc
+paragraphDefeatInertDoc = paragraphDefeatWith (bSec 1) (bSec 1) (para "a") []
+
+-- | The `overrules` names a section the fold cannot place.
+paragraphDefeatDocIn :: BSectionRef -> BlawxDoc
+paragraphDefeatDocIn s' = paragraphDefeatWith (bSec 1) (para "b") s' []
+
+-- | Two number-valued attributes, so a goal can test one against the other.
+twoValueDoc :: [BGoal] -> BlawxDoc
+twoValueDoc conds =
+  baseDoc
+    [ ws
+        (bSec 1)
+        [ [ BDeclareCategory
+              MkBCategoryDecl {bcName = bn "person", bcPrefix = "", bcPostfix = "is a person", bcProv = Nothing}
+          , BDeclareAttribute (boolAttr "person" "bearded" "is bearded")
+          , BDeclareAttribute (valueAttr "person" "hair" BVNumber)
+          , BDeclareAttribute (valueAttr "person" "nails" BVNumber)
+          ]
+        , [BAttributedRule (rule 1 True "bearded" conds False)]
+        ]
+    ]
+
+-- | @nails(A, L)@ — the same value variable @attrGoal@ binds.
+nailsGoal :: BGoal
+nailsGoal = BGCall True (bn "nails") [va, BTVar (MkBVar "L")]
+
+anon :: BTerm
+anon = BTVar (MkBVar "_")
 
 objDecl :: Text -> Text -> BObjectDecl
 objDecl n cat =
