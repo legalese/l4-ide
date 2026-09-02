@@ -92,6 +92,12 @@ a fixture under `jl4/examples/blawx/not-ok/`:
 - a subjectless nullary input
 - **unstratified negation** — a cycle through a negation. The shared middle-end admits it; the
   Blawx leg is where it is refused.
+- **`EQUALS` (or a disequality) on two whole records.** L4 compares records by value, Blawx
+  compares objects by atom, and the test flattening gives each _occurrence_ of a record value its
+  own object — so two structurally equal records reach the reasoner as two different atoms. Until
+  the flattening shares one object per distinct value, this is refused rather than emitted, because
+  the emitted version runs and quietly answers differently. Say the rule once per slot (which needs
+  no identity at all), or compare an enum- or number-valued field of the two records.
 
 **Lossy — the compiler emits anyway and tells you what it dropped.** The one to know is
 `TYPICALLY` on an `ASSUME`. The name becomes an input predicate and the default is deliberately

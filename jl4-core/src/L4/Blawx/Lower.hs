@@ -17,7 +17,8 @@
 -- * skolemisation of query subjects (one constant per @(rqId, rvId)@);
 -- * Blawx-specific rejections, each a named diagnostic: relationship arity
 --   above 10, 'RUnstratified', 'RMod', non-integral literals while the R7
---   measurement gate holds.
+--   measurement gate holds, and equality\/disequality on record-sorted
+--   operands ('recordIdentity', §11 W1).
 --
 -- == Decisions made here (P1 stage B), so nobody re-derives them
 --
@@ -28,7 +29,10 @@
 -- other equality becomes unification @X = Y@ (@REq@) or
 -- @blawx_diseq(X,Y)@ (@RNeq@). @=:=@-style arithmetic equality on an atom
 -- would raise rather than fail, which is why the split is by operand sort
--- and not by operator.
+-- and not by operator. __Record-sorted operands are refused__ rather than
+-- dispatched at all ('recordIdentity', spec §11 W1): the two languages
+-- disagree on what equality of a record /means/, so any answer would be a
+-- guess. See that function's haddock.
 --
 -- __The boolean-projection peephole__: @'RProj' a f V@ over a
 -- 'RSBool'-sorted field followed immediately by @'RUnify' V ('RTBool' b)@
@@ -982,16 +986,16 @@ convertGoals env cctx = go
       x' <- convertTerm env cctx x
       y' <- convertTerm env cctx y
       let numeric = isNumeric cctx x || isNumeric cctx y
-      pure . pure $ case op of
-        RLt  -> BGCompare BLt  x' y'
-        RLeq -> BGCompare BLte x' y'
-        RGt  -> BGCompare BGt  x' y'
-        RGeq -> BGCompare BGte x' y'
+      case op of
+        RLt  -> pure [BGCompare BLt  x' y']
+        RLeq -> pure [BGCompare BLte x' y']
+        RGt  -> pure [BGCompare BGt  x' y']
+        RGeq -> pure [BGCompare BGte x' y']
         -- the explicit REq/RNeq dispatch: see the module header
-        REq  | numeric   -> BGCompare BEq x' y'
-             | otherwise -> BGUnify x' y'
-        RNeq | numeric   -> BGCompare BNeq x' y'
-             | otherwise -> BGDiseq x' y'
+        REq  | numeric -> pure [BGCompare BEq x' y']
+        RNeq | numeric -> pure [BGCompare BNeq x' y']
+        REq  -> [BGUnify x' y'] <$ recordIdentity cctx "EQUALS" x y
+        RNeq -> [BGDiseq x' y'] <$ recordIdentity cctx "a disequality" x y
     REval v e -> do
       e' <- convertArith env cctx e
       pure [BGIs (bvar cctx v) e']
@@ -1174,6 +1178,55 @@ isNumeric cctx = \case
   RTNum _ -> True
   RTVar v -> Map.lookup v.rvId cctx.ccSorts == Just RSNum
   _       -> False
+
+-- | The category a term's recovered sort names, if it names one. Everything
+-- record-shaped is a variable by the time it reaches here (the middle-end is in
+-- ANF: a record-typed @GIVEN@ parameter, the target of an 'RProj' over an
+-- object-valued field, and the result of a record-returning 'RCall' are all
+-- variables carrying an 'RSRecord' sort out of 'varSorts'). 'RSMaybe' is peeled
+-- because a @MAYBE@ of a record is still compared by value on the L4 side.
+recordSort :: CCtx -> RTerm -> Maybe RName
+recordSort cctx = \case
+  RTVar v -> peel =<< Map.lookup v.rvId cctx.ccSorts
+  _       -> Nothing
+ where
+  peel = \case
+    RSRecord r -> Just r
+    RSMaybe s  -> peel s
+    _          -> Nothing
+
+-- | __Record identity does not survive the flattening__ (BLAWX-EXPORT-SPEC
+-- §11 W1, measured 2026-09-02). L4 compares records __by value__; Blawx
+-- compares objects __by atom__; and R11's query flattening emits one object per
+-- /occurrence/ of a record value, so two structurally equal records reach
+-- s(CASP) as two distinct atoms and the comparison answers differently — the
+-- §3.2.1 failure class, source that parses, type-checks and means something
+-- else. It was silent until this refusal: the first Rock Paper Scissors
+-- encoding lowered clean, L4 said @TRUE@ and the tier-1 harness said no model
+-- (@jl4\/examples\/blawx\/not-ok\/record-identity.l4@ is that encoding, kept).
+--
+-- Refusing is a v1 measure, not the fix. The fix is to hash-cons
+-- structurally-equal record arguments in 'skolemise' so one distinct value
+-- becomes one object, after which this check lifts; §11 W1 records it as the
+-- next step. Until then the diagnostic must name a reachable edit, so it names
+-- both: state the rule once per slot (which needs no identity — that is what
+-- the shipped @rps.l4@ does), or compare a field whose sort /is/ an atom.
+recordIdentity :: CCtx -> Text -> RTerm -> RTerm -> Either [LowerError] ()
+recordIdentity cctx opName x y = case recordSort cctx x <|> recordSort cctx y of
+  Nothing  -> Right ()
+  Just cat ->
+    Left [ blawxErr cctx.ccFn Nothing
+             (LEUnsupported "record identity (Blawx)")
+             ( opName <> " on operands of record type `" <> cat.rnBase
+                 <> "` has no faithful Blawx image: L4 compares records by \
+                    \value, Blawx compares objects by atom, and the query \
+                    \flattening (R11) emits one object per occurrence of a \
+                    \record value — so two structurally equal `" <> cat.rnBase
+                 <> "` records arrive as two distinct atoms and the comparison \
+                    \silently answers differently. State the rule once per slot \
+                    \so no identity is needed (see jl4/examples/blawx/rps.l4), \
+                    \or compare an enum- or number-valued FIELD of the two \
+                    \records instead of the records themselves" ) ]
 
 -- ---------------------------------------------------------------------------
 -- Queries → tests (R11)

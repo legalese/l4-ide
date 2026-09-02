@@ -338,6 +338,25 @@ v1 with a named diagnostic. A `MAYBE T` field maps to attribute _optionality_: `
 fact asserted, `JUST v` = the fact — with the §4.3 caveat that "absent" and "unknown" are
 different states in Blawx's three-valued world; the lowering must pick per R5.
 
+**Records project as categories, but record _identity_ does not project at all, and since
+2026-09-02 comparing two records is refused.** An L4 record is a value and `EQUALS` on it is
+structural; a Blawx object is an atom and `=` on it is identity of the name. The two coincide only
+if every distinct record value gets exactly one object, and R11's query flattening does not do that
+— it emits one object per _occurrence_ (§8.11). So `L4.Blawx.Lower.recordIdentity` rejects an `REq`
+or `RNeq` whose operands carry an `RSRecord` sort — a record-typed parameter, an object-valued
+field read, or a record-returning call — with the named diagnostic `record identity (Blawx)`, and
+the diagnostic names both the divergence and the two edits that avoid it (state the rule once per
+slot; or compare an enum- or number-valued field, whose sorts _are_ atoms and do survive the
+flattening). The refusal is in the Blawx leg and not in `L4.Relational.Lower` because it is the
+Blawx-side flattening that breaks the correspondence: the shared IR's `REq` is generic equality
+whose meaning each emitter dispatches (§8.2), and a backend that gives one object per distinct
+value would need no such rejection. Fixture:
+`jl4/examples/blawx/not-ok/record-identity.l4`; tests in `jl4-core/test/BlawxAssumeSpec.hs` and
+`jl4/tests-cli/Main.hs`; the measurement that forced it is §11 W1. This is a v1 refusal, not the
+final answer — hash-consing structurally-equal record arguments in `skolemise` would make identity
+and value agree and let the refusal lift. That is **not implemented**; §11 W1 records it as the
+next step.
+
 ### 4.2 Decisions become relations
 
 The load-bearing move, opposite in direction to Catala's: **L4 is functional, Blawx is
@@ -971,6 +990,20 @@ emit as `false :-` constraints (runtime-checked both sides).
 
 **ANSWERED 2026-08-18 (Meng).** As proposed — and yes: `#ASSERT`s additionally emit as `false :-` constraints, runtime-checked on both sides.
 
+**Amended 2026-09-02 (§11 W1): the flattening is one object per _occurrence_, and that is now a
+stated limit rather than an unstated one.** `skolemise` mints a constant per `(rqId, rvId)` — per
+_place_ a record value appears in the query's arguments — so a `#EVAL` that passes the same
+structural value twice emits two objects. Measured this session on
+`jl4/examples/blawx/not-ok/record-identity.l4`: the query's Player becomes `p1` with
+`throws(p1,rock)` while the game's first-player slot becomes `p2` with `throws(p2,rock)`; L4
+evaluates the directive to `TRUE`, the tier-1 harness returns **no model** (`0/1 queries passed`,
+`python3 etc/blawx-tier1-harness.py`). Keeping the oracle outside the artifact is what exposed it,
+which is the "Against" paragraph above earning its keep. Two consequences, both landed with this
+note: the emitter now refuses `EQUALS`/disequality on record-sorted operands (§4.1), so no module
+can depend on identity that the flattening does not provide; and the honest fix — **hash-consing
+structurally-equal record arguments so one distinct value mints one object** — is scoped and _not
+built_, tracked at §11 W1. Nothing about `#ASSERT`-as-constraint or the interview test changes.
+
 ### 8.12 R12 — dual representation from one block-level IR; the re-save fixpoint is the gate
 
 **Evidence.** Code generation is browser-only; the server stores both representations verbatim
@@ -1444,6 +1477,40 @@ only because R11 keeps the oracle outside the artifact. **Do.** For v1, refuse
 `REq`/`RNeq` whose operands are record-typed with a named `LowerError` (loud), and keep the first
 RPS encoding as a `not-ok/` fixture; later, hash-cons structurally-equal record arguments in the
 query flattening (one object per distinct value) and lift the refusal. Amends §4.1, §8.11.
+
+**DISCHARGED (v1 half) 2026-09-02.** The refusal is built and the fixture is in the tree; the
+hash-consing is **not** built and remains the next step (see below). What was measured this
+session, on this branch, with `l4` built from this worktree:
+
+- _the defect, reproduced before the fix_: `l4 blawx not-ok/record-identity.l4` exited **0** and
+  emitted `P = Firstplayer` / `blawx_diseq(P,Firstplayer2)` beside test facts `throws(p1,rock)`,
+  `first_player(g1,p2)`, `throws(p2,rock)` — two objects for one value. `l4 run` on the same file
+  answers `TRUE`; staged as a temporary seed, `python3 etc/blawx-tier1-harness.py` reported
+  **0/1 queries passed — expected a model; got NO model**. The staged seed and its golden were
+  deleted; the file lives only under `not-ok/`.
+- _the refusal_: `L4.Blawx.Lower.recordIdentity`, kind `LEUnsupported "record identity (Blawx)"`,
+  fired from the `RCmp` arm for `REq` and `RNeq` alike once either operand's recovered sort is
+  `RSRecord` (`RSMaybe` peeled). It is in the **Blawx** leg, not `L4.Relational.Lower`: the shared
+  IR defines `REq` as generic equality that each emitter dispatches (§8.2), and it is Blawx's own
+  occurrence-keyed flattening that breaks the correspondence. `l4 blawx` on the fixture now exits
+  **1** with two diagnostics (one per DNF clause of the `IF`/`ELSE`, matching the house precedent
+  for per-occurrence errors).
+- _no collateral_: all **12** emitting seeds re-lowered and their `expected/*.blawx` **and**
+  `expected/*.pl` are byte-identical — `12 lowered, 12 identical, 0 differing` by `cmp` against
+  the goldens, so no golden was regenerated and none needed to be.
+- _harnesses, both seeds_: fixpoint **9 checked, 0 failed** for `rps.blawx` and **9 checked, 0
+  failed** for `beard.blawx` (`BLAWX_CHECKOUT=…/blawx-stock`, blockly 10.1.3, per W9); tier-1
+  **8/8 queries passed** (`python3 etc/blawx-tier1-harness.py rps beard`).
+- _tests_: `cabal test jl4-core-test` **424 examples, 0 failures** (three new `BlawxAssumeSpec`
+  cases: the `EQUALS` refusal with its message content, the disequality half, and a positive
+  control that `p's throws EQUALS q's throws` still lowers); `cabal test l4-cli-test -m blawx`
+  **46 examples, 0 failures** (one new case over the fixture file).
+
+**Still open — the hash-consing.** One object per _distinct value_ instead of per occurrence, in
+`skolemise`, after which `recordIdentity` lifts and `not-ok/record-identity.l4` moves to the
+emitting corpus with a tier-1 oracle of its own. Deliberately not attempted here: it changes the
+object names in every existing test canvas, so it is a golden-regenerating change and wants its
+own measurement (fixpoint and tier-1 across all 12 seeds) rather than riding a refusal.
 
 ### W2 — `STRING` fields have no ontology image
 

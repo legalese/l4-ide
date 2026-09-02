@@ -3021,6 +3021,20 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("unstratified negation (Blawx v1)" `isInfixOf`)
 
+    it "rejects EQUALS on record-typed operands (§11 W1, the silent one)" $ do
+      -- This fixture is Jason Morris's own reading of RPS s.4 and it USED to
+      -- lower clean: L4 answered TRUE, the tier-1 harness found no model,
+      -- because R11's flattening emits one object per occurrence of a record
+      -- value. A wrong answer with a green exit code is the worst outcome a
+      -- transpiler has, so the refusal is loud and both operand positions of
+      -- the IF/ELSE (the REq and its complement RNeq) are covered.
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
+      serr `shouldSatisfy` ("EQUALS on operands of record type `Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("a disequality on operands of record type `Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("once per slot" `isInfixOf`)
+
     it "rejects a relationship above the arity-10 block ceiling" $ do
       Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
       code `shouldBe` ExitFailure 1

@@ -216,6 +216,46 @@ spec = do
           err `shouldSatisfy` Text.isInfixOf "ATTRIBUTE-shaped"
           err `shouldSatisfy` Text.isInfixOf "start at total arity 3"
 
+    -- BLAWX-EXPORT-SPEC §11 W1, measured 2026-09-02. The corpus twin is
+    -- `jl4/examples/blawx/not-ok/record-identity.l4` — Jason Morris's own
+    -- wording of RPS s.4, which lowered CLEAN and then answered differently
+    -- (L4 TRUE, tier-1 no model), because the R11 flattening gives one object
+    -- per occurrence of a record value. The refusal is what makes that loud.
+    it "refuses EQUALS on record-typed operands, saying why AND what to do" $
+      case blawxYaml recordEqModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for record equality"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "record identity (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "record type `Player`"
+          -- the two halves of the divergence, both named
+          err `shouldSatisfy` Text.isInfixOf "L4 compares records by value"
+          err `shouldSatisfy` Text.isInfixOf "Blawx compares objects by atom"
+          err `shouldSatisfy` Text.isInfixOf "one object per occurrence"
+          -- and a reachable edit: a diagnostic that only names the defect
+          -- leaves the author with a module and no next move (the lesson of
+          -- the arity-two wording above)
+          err `shouldSatisfy` Text.isInfixOf "once per slot"
+          err `shouldSatisfy` Text.isInfixOf "FIELD"
+
+    it "refuses the disequality half of the same rule (the ELSE arm)" $
+      -- IF/THEN/ELSE in value position becomes two clauses, the second
+      -- guarded by the complement, so one source `EQUALS` on records reaches
+      -- the emitter as both an REq and an RNeq. Both must be refused: leaving
+      -- either open would let half the rule through.
+      case blawxYaml recordEqModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for record equality"
+        Left err -> err `shouldSatisfy`
+          Text.isInfixOf "a disequality on operands of record type `Player`"
+
+    it "still admits equality on an ENUM-valued FIELD of the same records" $ do
+      -- The check is on the operand SORT, not on the operator: an enum
+      -- constructor IS an atom in Blawx and does survive the flattening,
+      -- which is exactly the edit the diagnostic recommends. If this ever
+      -- goes red the refusal has over-fired and taken the fix with it.
+      out <- emitted recordFieldEqModule
+      hasLine out "throws(P,Throws),"
+      hasLine out "Throws = Throws2."
+
     it "admits an arity-3 input with no category parameter at all" $ do
       -- Not a defect: Blawx relationship blocks are n-ary over any declared
       -- value type. It is only the SPEC that claimed otherwise.
@@ -282,6 +322,42 @@ spec = do
     , "GIVEN c IS A Consequence"
     , "GIVETH A BOOLEAN"
     , "DECIDE `qualifies` c IF `is severe` c AND `severity exceeds` c 10"
+    ]
+
+  -- The §11 W1 shape, reduced to the one rule that carries it: "the other
+  -- player is whichever of the two is not the one in question", which can
+  -- only be said by comparing two Player RECORDS.
+  recordEqModule = Text.unlines
+    [ "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    throws IS A Sign"
+    , ""
+    , "DECLARE Game HAS"
+    , "    `first player`  IS A Player"
+    , "    `second player` IS A Player"
+    , ""
+    , "@export"
+    , "GIVEN g IS A Game"
+    , "      p IS A Player"
+    , "GIVETH A Player"
+    , "DECIDE `other player` g p IS"
+    , "  IF p EQUALS g's `first player` THEN g's `second player` \
+      \ELSE g's `first player`"
+    ]
+
+  -- The recommended edit, kept green: same EQUALS, enum-sorted operands.
+  recordFieldEqModule = Text.unlines
+    [ "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "      q IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `tied` p q IF p's throws EQUALS q's throws"
     ]
 
   -- Total arity 3, and not one argument is a category.
