@@ -3133,11 +3133,46 @@ spec bin = do
       -- not have to fix them one at a time.
       serr `shouldSatisfy` ("go/4" `isInfixOf`)
 
-    it "refuses a non-boolean attribute by name and value type" $ do
+    -- BLAWX-EXPORT-SPEC §11 W5 made `number` attributes liftable — as an
+    -- input field plus an accessor — so the claim this test used to pin
+    -- ("a non-boolean attribute is refused") is no longer true. What still
+    -- has no image is a rule that DERIVES a value-typed attribute
+    -- (benefit.blawx concludes `benefit_amount(A, Tmp)` from `Tmp is
+    -- 1000 + Bonus`), and it is refused by its own name.
+    it "refuses a value-typed attribute a rule CONCLUDES, by name" $ do
       Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/benefit.blawx"]
       code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-lift/attribute-type" `isInfixOf`)
-      serr `shouldSatisfy` ("has value type number" `isInfixOf`)
+      serr `shouldSatisfy` ("blawx-lift/value-attribute-concluded" `isInfixOf`)
+      serr `shouldSatisfy` ("blawx-lift/conclusion-shape" `isInfixOf`)
+
+    -- Jason Morris's own Beard Tax Act, the second of the two shipped
+    -- examples §11 W5 sized the lift against. Everything this asserts was
+    -- refused by name before that increment: the `number` attribute, the
+    -- binary attribute goal, `blawx_comparison(L,gte,5)`, the paragraph
+    -- workspaces, and the free-variable test query.
+    it "lifts Blawx's own beard_tax, comparisons and paragraphs included" $ do
+      Output code sout serr <- runL4 bin
+        ["blawx", "--import", "examples/blawx/imported/beard_tax.blawx"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("beard_tax did not lift\n--- stderr ---\n" ++ serr)
+      -- the number attribute: one MAYBE NUMBER field, one definedness
+      -- decision, one accessor
+      sout `shouldSatisfy` ("facial_hair_length_mm           IS A MAYBE NUMBER" `isInfixOf`)
+      sout `shouldSatisfy` ("IF isJust (x's facial_hair_length_mm)" `isInfixOf`)
+      sout `shouldSatisfy` ("MEANS fromMaybe 0 (x's facial_hair_length_mm)" `isInfixOf`)
+      -- blawx_comparison(Length, gte, 5)
+      sout `shouldSatisfy` ("AND `the facial_hair_length_mm of` x AT LEAST 5" `isInfixOf`)
+      -- two attributed_rules concluding `bearded` in s.1: one decision each,
+      -- OR-ed by `according_to`
+      sout `shouldSatisfy` ("`according to BTA 1, x is bearded (clause 1)` x" `isInfixOf`)
+      sout `shouldSatisfy` ("OR `according to BTA 1, x is bearded (clause 2)` x" `isInfixOf`)
+      -- the paragraph rules are filed under the parent section, and say so
+      serr `shouldSatisfy` ("blawx-lift/rule-section-flattened" `isInfixOf`)
+      sout `shouldSatisfy` ("sec_1__para_a_section attributed_rule" `isInfixOf`)
+      -- `?- bearded(Person)` over an empty universe: provenance, no #EVAL
+      serr `shouldSatisfy` ("blawx-lift/unbound-query-empty-universe" `isInfixOf`)
+      sout `shouldSatisfy` ("-- blawxtest are_they_bearded" `isInfixOf`)
+      length (filter ("#EVAL" `isPrefixOf`) (lines sout)) `shouldBe` 0
 
     it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
       Output code sout serr <- runL4 bin

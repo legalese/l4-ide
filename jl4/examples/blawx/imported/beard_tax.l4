@@ -1,0 +1,182 @@
+-- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
+--
+--   source        /Volumes/transcend/src/blawx-stock/blawx/static/blawx/examples/beard_tax.yaml
+--   ruledoc       "Beard Tax Act"
+--   rows          4 blawx.workspace, 1 blawx.blawxtest
+--   blocks        62 across 13 block types
+--   WARNING       stored `scasp_encoding` is STALE against the current
+--                 generator (P5-2) in 3 row(s), first sec_1_section.
+--                 The XML is canonical (R14); the encodings were not used.
+--
+-- Blawx models a flat universe of atoms under unary predicates. Every
+-- category and every boolean attribute is one such predicate, so this lift
+-- declares ONE record for the universe, carrying a `MAYBE BOOLEAN` input
+-- slot per predicate that is not derived (the s(CASP) fact channel) and one
+-- BOOLEAN decision per predicate. The defeat layer is unfolded: one decision
+-- per (section, literal) pair, named from the generator's own #pred wording.
+--
+-- A value-typed attribute is a partial FUNCTION, not a predicate: it gets a
+-- field of its own sort instead of a `<p> fact` channel, a `p x` decision
+-- saying the attribute is DEFINED, and a `the p of x` reader for the VALUE.
+
+IMPORT prelude
+IMPORT `negation-as-failure`
+
+§ `Beard Tax Act`
+
+§§ `Ontology`
+
+-- @ref sec_1_section new_category_declaration person  (NLG "" / "is a person")
+-- @ref sec_1_section new_attribute_declaration person.bearded : boolean
+-- @ref sec_1_section new_attribute_declaration person.facial_hair_length_mm : number
+-- @ref sec_1__para_a_section new_attribute_declaration person.facial_hair_on_chin : boolean
+-- @ref sec_1__para_a_section new_attribute_declaration person.facial_hair_below_chin : boolean
+-- @ref sec_1__para_a_section new_attribute_declaration person.qualifies_s1a : boolean
+-- @ref sec_1__para_b_section new_attribute_declaration person.facial_hair_continuous : boolean
+-- @ref sec_1__para_b_section new_attribute_declaration person.qualifies_s1b : boolean
+DECLARE Object
+    HAS
+      @desc the object's Blawx atom
+      name                            IS A STRING
+      @desc x is a person
+      `person fact`                   IS A MAYBE BOOLEAN
+      @desc x is bearded
+      `bearded fact`                  IS A MAYBE BOOLEAN
+      @desc x 's facial hair is on the chin
+      `facial_hair_on_chin fact`      IS A MAYBE BOOLEAN
+      @desc x 's facial hair is below the chin
+      `facial_hair_below_chin fact`   IS A MAYBE BOOLEAN
+      @desc x qualifies under section 1 a
+      `qualifies_s1a fact`            IS A MAYBE BOOLEAN
+      @desc x 's facial hair is ear to ear below the nose
+      `facial_hair_continuous fact`   IS A MAYBE BOOLEAN
+      @desc x qualifies under section 1 b
+      `qualifies_s1b fact`            IS A MAYBE BOOLEAN
+      @desc x 's facial hair is v mm in length
+      facial_hair_length_mm           IS A MAYBE NUMBER
+
+@ref sec_1_section new_attribute_declaration person.facial_hair_length_mm : number
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE facial_hair_length_mm x @nlg there is a value v such that %x% 's facial hair is v mm in length
+    IF isJust (x's facial_hair_length_mm)
+
+-- the value itself, read under the definedness conjunct above.
+GIVEN x IS AN Object
+GIVETH A NUMBER
+`the facial_hair_length_mm of` x
+    MEANS fromMaybe 0 (x's facial_hair_length_mm)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE person x @nlg %x% is a person
+    IF holds (x's `person fact`)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE facial_hair_on_chin x @nlg %x% 's facial hair is on the chin
+    IF holds (x's `facial_hair_on_chin fact`)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE facial_hair_below_chin x @nlg %x% 's facial hair is below the chin
+    IF holds (x's `facial_hair_below_chin fact`)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE facial_hair_continuous x @nlg %x% 's facial hair is ear to ear below the nose
+    IF holds (x's `facial_hair_continuous fact`)
+
+§§ `BTA 1 — In this Act, beard means any facial hair no shorter than 5 millimetres in length that: (a) occurs on or below the chin, or (b) exists in an uninterrupted line from the front of one ear to the front of the other ear below the nose.`
+
+@ref BTA 1 — sec_1_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x is bearded (clause 1)` x
+    IF  person x
+    AND `the facial_hair_length_mm of` x AT LEAST 5
+    AND facial_hair_length_mm x
+    AND qualifies_s1a x
+
+@ref BTA 1 — sec_1_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x is bearded (clause 2)` x
+    IF  person x
+    AND `the facial_hair_length_mm of` x AT LEAST 5
+    AND facial_hair_length_mm x
+    AND qualifies_s1b x
+
+-- `according_to(sec_1_section,bearded,X)` has 2 clauses in this section; their disjunction is the section's answer.
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x is bearded` x
+    IF `according to BTA 1, x is bearded (clause 1)` x
+    OR `according to BTA 1, x is bearded (clause 2)` x
+
+@ref BTA 1 — indefeasible: no `not blawx_defeated` conjunct
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in BTA 1 that x is bearded holds` x
+    IF `according to BTA 1, x is bearded` x
+
+@ref BTA 1 — sec_1__para_a_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x qualifies under section 1 a (clause 1)` x IF facial_hair_on_chin x
+
+@ref BTA 1 — sec_1__para_a_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x qualifies under section 1 a (clause 2)` x IF facial_hair_below_chin x
+
+-- `according_to(sec_1_section,qualifies_s1a,X)` has 2 clauses in this section; their disjunction is the section's answer.
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x qualifies under section 1 a` x
+    IF `according to BTA 1, x qualifies under section 1 a (clause 1)` x
+    OR `according to BTA 1, x qualifies under section 1 a (clause 2)` x
+
+@ref BTA 1 — indefeasible: no `not blawx_defeated` conjunct
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in BTA 1 that x qualifies under section 1 a holds` x
+    IF `according to BTA 1, x qualifies under section 1 a` x
+
+@ref BTA 1 — sec_1__para_b_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to BTA 1, x qualifies under section 1 b` x IF facial_hair_continuous x
+
+@ref BTA 1 — indefeasible: no `not blawx_defeated` conjunct
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in BTA 1 that x qualifies under section 1 b holds` x
+    IF `according to BTA 1, x qualifies under section 1 b` x
+
+§§ `The base predicates`
+
+-- `p(x) :- holds(sec_N, p, x).` for every section concluding p, OR-joined,
+-- plus the scenario fact channel (a bare `p(a).` is another clause of p).
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE bearded x @nlg %x% is bearded
+    IF holds (x's `bearded fact`)
+    OR `the conclusion in BTA 1 that x is bearded holds` x
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE qualifies_s1a x @nlg %x% qualifies under section 1 a
+    IF holds (x's `qualifies_s1a fact`)
+    OR `the conclusion in BTA 1 that x qualifies under section 1 a holds` x
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE qualifies_s1b x @nlg %x% qualifies under section 1 b
+    IF holds (x's `qualifies_s1b fact`)
+    OR `the conclusion in BTA 1 that x qualifies under section 1 b holds` x
+
+§§ `Tests`
+
+-- blawxtest are_they_bearded — `?- bearded(Person).`

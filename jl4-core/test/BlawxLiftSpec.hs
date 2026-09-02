@@ -88,6 +88,74 @@ spec = do
       textOf (docWithTest [BFact True (bn "bird") [BTAtom (bn "pingu")], q])
         `shouldSatisfy` \t -> lineWith t "`bird fact`" "IS JUST TRUE"
 
+  -- BLAWX-EXPORT-SPEC §11 W5: the beard_tax increment. bird has neither a
+  -- non-boolean attribute nor a comparison nor two rules concluding one
+  -- literal in one section nor a paragraph workspace, so none of these
+  -- shapes had a spec before.
+  describe "value-typed attributes (§11 W5)" $ do
+    it "lifts a number attribute, a binding goal and a comparison" $
+      lifts (valueDoc BVNumber [attrGoal, cmpGoal BGte (BTNum 5)]) `shouldBe` Right ()
+
+    it "declares the number attribute as a MAYBE NUMBER field" $
+      textOf (valueDoc BVNumber [attrGoal, cmpGoal BGte (BTNum 5)])
+        `shouldSatisfy` \t -> lineWith t "hair" "IS A MAYBE NUMBER"
+
+    it "renders `gte` as AT LEAST over the accessor" $
+      textOf (valueDoc BVNumber [attrGoal, cmpGoal BGte (BTNum 5)])
+        `shouldSatisfy` Text.isInfixOf "`the hair of` x AT LEAST 5"
+
+    -- The binding goal itself must still say the attribute is DEFINED: with
+    -- the accessor's `fromMaybe 0` and no such conjunct, an absent attribute
+    -- would answer `0 AT LEAST 5` — FALSE here, but TRUE for `AT MOST`.
+    --
+    -- The condition order here is beard_tax's own: the comparison is drawn
+    -- ABOVE the binding goal, which s(CASP) is happy with (the constraint
+    -- delays) and which forces the substitution environment to be computed
+    -- over the whole rule before any single condition is lifted.
+    it "keeps the definedness conjunct, wherever the binding goal is drawn" $
+      textOf (valueDoc BVNumber [cmpGoal BGte (BTNum 5), attrGoal])
+        `shouldSatisfy` \t ->
+          Text.isInfixOf "IF  `the hair of` x AT LEAST 5" t && Text.isInfixOf "AND hair x" t
+
+    it "declares a category-valued attribute as a MAYBE STRING field" $
+      textOf (valueDoc (BVCategory (bn "person")) [attrGoal, cmpGoal BEq (BTAtom (bn "pingu"))])
+        `shouldSatisfy` \t -> lineWith t "hair" "IS A MAYBE STRING"
+
+    it "still refuses a date-valued attribute by name" $
+      refusalsOf (valueDoc BVDate [attrGoal, cmpGoal BGte (BTNum 5)])
+        `shouldSatisfy` anyMentioning "blawx-lift/attribute-type"
+
+    it "refuses a bound VALUE variable used as an OBJECT" $
+      refusalsOf (valueDoc BVNumber [attrGoal, BGCall True (bn "person") [BTVar (MkBVar "L")]])
+        `shouldSatisfy` anyMentioning "blawx-lift/value-variable-in-object-position"
+
+    it "refuses a comparison on a variable no binding goal binds" $
+      refusalsOf (valueDoc BVNumber [cmpGoal BGte (BTNum 5)])
+        `shouldSatisfy` anyMentioning "blawx-lift/unbound-value"
+
+    -- Every object position lifts to the single GIVEN `x`, so a second object
+    -- variable would be silently identified with the first.
+    it "refuses a second object variable rather than collapsing it" $
+      refusalsOf (valueDoc BVNumber [BGCall True (bn "person") [BTVar (MkBVar "B")]])
+        `shouldSatisfy` anyMentioning "blawx-lift/multi-object-variable"
+
+  describe "several rules concluding one literal in one section" $ do
+    it "lifts, rather than emitting the same decision name twice" $
+      lifts twoClauseDoc `shouldBe` Right ()
+
+    it "names each Blawx rule its own clause and ORs them" $
+      textOf twoClauseDoc
+        `shouldSatisfy` \t ->
+          Text.isInfixOf "`according to sec_1_section, x is a bird (clause 1)` x" t
+            && Text.isInfixOf "`according to sec_1_section, x is a bird (clause 2)` x" t
+
+  describe "paragraph sections (§11 W3 is still open)" $ do
+    it "files a paragraph's rules under its parent section" $
+      lifts paragraphDoc `shouldBe` Right ()
+
+    it "warns that the paragraph survives only in the @ref line" $
+      warningsOf paragraphDoc `shouldSatisfy` anyMentioning "blawx-lift/rule-section-flattened"
+
   describe "comments (ruling P5-4)" $ do
     it "lifts a workspace comment under the § of its section" $
       commentBlock (textOf (commentDoc (bSec 1) "drafter's note"))
@@ -273,6 +341,68 @@ orphanCommentWs =
     , bwComment = Just "no § for this"
     }
 
+-- | One section, one category, one boolean attribute the rule concludes, and
+-- one attribute of the caller's value type.
+valueDoc :: BValueType -> [BGoal] -> BlawxDoc
+valueDoc ty conds =
+  baseDoc
+    [ ws
+        (bSec 1)
+        [ [ BDeclareCategory
+              MkBCategoryDecl {bcName = bn "person", bcPrefix = "", bcPostfix = "is a person", bcProv = Nothing}
+          , BDeclareAttribute (boolAttr "person" "bearded" "is bearded")
+          , BDeclareAttribute (valueAttr "person" "hair" ty)
+          ]
+        , [BAttributedRule (rule 1 True "bearded" conds False)]
+        ]
+    ]
+
+-- | @hair(A, L)@ — the binding goal.
+attrGoal :: BGoal
+attrGoal = BGCall True (bn "hair") [va, BTVar (MkBVar "L")]
+
+-- | @blawx_comparison(L, op, rhs)@.
+cmpGoal :: BCmpOp -> BTerm -> BGoal
+cmpGoal op rhs = BGCompare op (BTVar (MkBVar "L")) rhs
+
+-- | Two `attributed_rule`s in ONE section concluding ONE literal: separate
+-- clauses of `according_to/3`, whose meaning is the disjunction.
+twoClauseDoc :: BlawxDoc
+twoClauseDoc =
+  baseDoc
+    [ ws
+        (bSec 1)
+        [ [ BDeclareCategory
+              MkBCategoryDecl {bcName = bn "penguin", bcPrefix = "", bcPostfix = "is a penguin", bcProv = Nothing}
+          , BDeclareCategory
+              MkBCategoryDecl {bcName = bn "ostrich", bcPrefix = "", bcPostfix = "is an ostrich", bcProv = Nothing}
+          , BDeclareCategory
+              MkBCategoryDecl {bcName = bn "bird", bcPrefix = "", bcPostfix = "is a bird", bcProv = Nothing}
+          ]
+        , [BAttributedRule (rule 1 True "bird" [BGCall True (bn "penguin") [va]] False)]
+        , [BAttributedRule (rule 1 True "bird" [BGCall True (bn "ostrich") [va]] False)]
+        ]
+    ]
+
+-- | A rule attributed to @sec_1__para_a_section@, which R4's flat numbering
+-- has no § for.
+paragraphDoc :: BlawxDoc
+paragraphDoc =
+  baseDoc
+    [ ws
+        (bSec 1)
+        [ [ BDeclareCategory
+              MkBCategoryDecl {bcName = bn "penguin", bcPrefix = "", bcPostfix = "is a penguin", bcProv = Nothing}
+          , BDeclareCategory
+              MkBCategoryDecl {bcName = bn "bird", bcPrefix = "", bcPostfix = "is a bird", bcProv = Nothing}
+          ]
+        , [ BAttributedRule
+              (rule 1 True "bird" [BGCall True (bn "penguin") [va]] False)
+                {brSection = BPath (mkStep "sec" "1" :| [mkStep "para" "a"])}
+          ]
+        ]
+    ]
+
 objDecl :: Text -> Text -> BObjectDecl
 objDecl n cat =
   MkBObjectDecl
@@ -305,6 +435,10 @@ boolAttr cat nm post =
     , baPostfix = post
     , baProv = Nothing
     }
+
+valueAttr :: Text -> Text -> BValueType -> BAttributeDecl
+valueAttr cat nm ty =
+  (boolAttr cat nm "mm in length") {baType = ty, baInfix = "'s facial hair is"}
 
 bn :: Text -> BName
 bn t = fromMaybe (error ("not a Blawx atom: " <> Text.unpack t)) (mkBName Nothing t)

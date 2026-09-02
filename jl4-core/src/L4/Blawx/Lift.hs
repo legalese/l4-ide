@@ -44,6 +44,25 @@
 -- __one__ record type per document, never one per category: a /derived/
 -- category is not a type.
 --
+-- __A value-typed attribute is a partial function, not a predicate__
+-- (BLAWX-EXPORT-SPEC §11 W5). @facial_hair_length_mm(X,V)@ maps an object to
+-- a /number/, and @throws(X,S)@ to another /object/; neither is a unary
+-- predicate, so neither gets a @\<p\> fact@ channel. Each gets instead a
+-- field of its own sort (@MAYBE NUMBER@; @MAYBE STRING@, holding the target
+-- atom's __name__, because the universe is flat and an object is already
+-- identified by @x's name@ throughout this module) and __two__ decisions:
+-- @p x@, which is @isJust@ of the field and says the attribute is /defined/,
+-- and @\`the p of\` x@, which is @fromMaybe \<default\>@ of it and is the
+-- /value/. A binary goal @p(X,V)@ in a rule body is then a __binding__: L4
+-- has no logic variables, so @V@ is substituted by the accessor at every use
+-- (which is how @blawx_comparison(V,gte,5)@ becomes @… AT LEAST 5@) and the
+-- goal itself contributes only the definedness conjunct. The accessor's
+-- default is never observed alone, because both conjuncts land in the same
+-- top-level @AND@ chain: an absent attribute makes the body @FALSE@, exactly
+-- as @p(X,V)@ with no clause does. A rule that /concludes/ a value-typed
+-- attribute, and a value variable used in /object/ position, are both refused
+-- by name — the flat universe has no name-to-object lookup this phase.
+--
 -- __Every declared predicate gets an input channel.__ Each category,
 -- attribute and abducible gets one @MAYBE BOOLEAN@ field (@\<atom\> fact@),
 -- OR-ed into that predicate's decision beneath whatever rules conclude it.
@@ -98,6 +117,7 @@ import Base
 import qualified Base.Map as Map
 import qualified Base.Text as Text
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Ratio (denominator, numerator)
 
 import L4.Blawx.Emit (renderGoal)
 import L4.Blawx.IR
@@ -206,9 +226,50 @@ type Lit = (Text, Bool)
 data Decl = MkDecl
   { dclName    :: !Text
   , dclPrefix  :: !Text
+  , dclInfix   :: !Text     -- ^ between object and value; empty unless 'dclValue' is set
   , dclPostfix :: !Text
+  , dclValue   :: !(Maybe ValueSort)
+    -- ^ 'Nothing' for a category or a boolean attribute — a unary predicate
+    -- over the object universe. 'Just' for a __value-typed__ attribute, which
+    -- is a partial function from the universe to a sort L4 has a type for.
+  , dclOrder   :: !BNlgOrder
   , dclRef     :: !Text     -- ^ the @\@ref@ line body
   }
+
+-- | The two value sorts a non-boolean attribute has an L4 image for
+-- (BLAWX-EXPORT-SPEC §11 W5). A @number@ attribute becomes a @MAYBE NUMBER@
+-- field; a __category__-valued one becomes a @MAYBE STRING@ field holding the
+-- target atom's name, because the universe is flat and an object is already
+-- identified by @x's name@ everywhere else in this lift — a @MAYBE Object@
+-- field would make the record recursive and would put record equality (the
+-- W1 unsoundness) on the import side too.
+data ValueSort = VSNumber | VSObject !Text
+  deriving stock (Eq, Show)
+
+-- | The L4 type of a value-typed attribute's field.
+sortType :: ValueSort -> Text
+sortType = \case
+  VSNumber -> "NUMBER"
+  VSObject _ -> "STRING"
+
+-- | The value 'fromMaybe' hands back when the attribute is absent. It is
+-- never observed on its own: every use of a bound value variable is emitted
+-- under the definedness conjunct the binding goal contributes, and both sit
+-- in the same top-level @AND@ chain, so an absent attribute makes the whole
+-- body @FALSE@ — which is what s(CASP) does when @attr(X,V)@ has no clause.
+sortDefault :: ValueSort -> Text
+sortDefault = \case
+  VSNumber -> "0"
+  VSObject _ -> "\"\""
+
+-- | The value sort of an attribute's declared type, or the reason it has no
+-- image this phase.
+valueSortOf :: BValueType -> Either Text (Maybe ValueSort)
+valueSortOf = \case
+  BVBoolean -> Right Nothing
+  BVNumber -> Right (Just VSNumber)
+  BVCategory c -> Right (Just (VSObject (bNameText c)))
+  t -> Left (renderValueType t)
 
 -- | How an atom got into the object universe: an @object_declaration@ names
 -- it and gives it a category, or a ground fact merely mentions it.
@@ -296,13 +357,29 @@ renderDoc ctx doc = do
         "a `query` block belongs to a test, not to a rule workspace"
     _ -> pure ()
 
-  for_ attrDecls \(ws, d) ->
-    when (d.baType /= BVBoolean) $
+  -- W5: `number` and category-valued attributes now have an image (a
+  -- `MAYBE NUMBER` / `MAYBE STRING` field plus an accessor); the date, time,
+  -- duration and list sorts still do not.
+  for_ attrDecls \(ws, d) -> case valueSortOf d.baType of
+    Right _ -> pure ()
+    Left ty ->
       refuse_ "attribute-type" (renderSectionRef ws)
-        ( "attribute " <> bNameText d.baName <> " has value type "
-            <> renderValueType d.baType
-            <> "; only a boolean attribute is a unary predicate over the object "
-            <> "universe, and only those lift this phase" )
+        ( "attribute " <> bNameText d.baName <> " has value type " <> ty
+            <> "; this phase lifts boolean, number and category-valued "
+            <> "attributes, and the date/time/duration/list sorts are the "
+            <> "date layer (owner: DATE-LIBRARY-SPEC)" )
+
+  -- A value-typed attribute is a partial FUNCTION here, not a predicate a
+  -- rule can conclude; it would collide with the accessor pair emitted for it
+  -- in the ontology. (A binary conclusion is already refused by
+  -- `conclusion-shape`; this catches the unary spelling.)
+  for_ arules \(ws, r) ->
+    when (bNameText r.brConclusion.bcPred `elem` valueNames) $
+      refuse_ "value-attribute-concluded" (renderSectionRef ws)
+        ( "the rule concludes " <> bNameText r.brConclusion.bcPred
+            <> ", which is declared as a value-typed attribute; a value-typed "
+            <> "attribute lifts to an input field plus an accessor, and has no "
+            <> "rule-derived spelling this phase" )
 
   for_ facts \(ws, (_, p, as)) ->
     unless (all isAtomArg as && length as == 1) $
@@ -335,11 +412,18 @@ renderDoc ctx doc = do
 
   -- ---- placement ------------------------------------------------------
   for_ arules \(ws, r) -> do
-    unless (r.brSection `elem` flatRefs) $
+    unless (secOf r `elem` flatRefs) $
       refuse_ "rule-section" (renderSectionRef ws)
         ( "the rule is attributed to " <> renderSectionRef r.brSection
-            <> ", which is not a flat numbered section; the § scaffolding has "
-            <> "nowhere to put it" )
+            <> ", which is neither a flat numbered section nor a paragraph of "
+            <> "one; the § scaffolding has nowhere to put it" )
+    when (secOf r /= r.brSection) $
+      warn "rule-section-flattened" (renderSectionRef ws)
+        ( "the rule is attributed to " <> renderSectionRef r.brSection
+            <> ", a paragraph; R4 ruled flat numbered sections for v1 and the "
+            <> "paragraph eId question is still open (§11 W3), so its decisions "
+            <> "are filed under " <> renderSectionRef (secOf r)
+            <> " and the paragraph survives only in the @ref line" )
     when (r.brSection /= ws) $
       warn "rule-filed-elsewhere" (renderSectionRef ws)
         ( "the rule's doc_selector names " <> renderSectionRef r.brSection
@@ -419,7 +503,10 @@ renderDoc ctx doc = do
       [ MkDecl
           { dclName = bNameText d.bcName
           , dclPrefix = d.bcPrefix
+          , dclInfix = ""
           , dclPostfix = d.bcPostfix
+          , dclValue = Nothing
+          , dclOrder = BOrderOV
           , dclRef =
               renderSectionRef ws <> " new_category_declaration "
                 <> padTo (declNameWidth + 2) (bNameText d.bcName)
@@ -431,7 +518,10 @@ renderDoc ctx doc = do
       [ MkDecl
           { dclName = bNameText d.baName
           , dclPrefix = d.baPrefix
+          , dclInfix = d.baInfix
           , dclPostfix = d.baPostfix
+          , dclValue = either (const Nothing) id (valueSortOf d.baType)
+          , dclOrder = d.baOrder
           , dclRef =
               renderSectionRef ws <> " new_attribute_declaration "
                 <> bNameText d.baCategory <> "." <> bNameText d.baName
@@ -444,7 +534,10 @@ renderDoc ctx doc = do
       [ MkDecl
           { dclName = bNameText p
           , dclPrefix = ""
+          , dclInfix = ""
           , dclPostfix = ""
+          , dclValue = Nothing
+          , dclOrder = BOrderOV
           , dclRef = renderSectionRef ws <> " assume " <> bNameText p
           }
       | (ws, p) <- nubOn (bNameText . snd) abducs
@@ -461,24 +554,54 @@ renderDoc ctx doc = do
   -- ------------------------------------------------------------------
   concluding :: [(Lit, (BSectionRef, BRule))]
   concluding =
-    [ ((bNameText r.brConclusion.bcPred, r.brConclusion.bcSign), (r.brSection, r))
+    [ ((bNameText r.brConclusion.bcPred, r.brConclusion.bcSign), (secOf r, r))
     | (_, r) <- arules
     ]
 
   concludedLits :: [Lit]
   concludedLits = nub (map fst concluding)
 
+  -- `nub`bed: several `attributed_rule`s in ONE section may conclude the same
+  -- literal (they are separate clauses of `according_to/3`, joined by
+  -- 'rulePara'), and the base predicate must OR that section's `holds` in
+  -- once, not once per clause.
   sectionsConcluding :: Lit -> [BSectionRef]
-  sectionsConcluding l = [s | (l', (s, _)) <- concluding, l' == l]
+  sectionsConcluding l = nub [s | (l', (s, _)) <- concluding, l' == l]
 
   -- Every declared predicate gets an input channel, whatever its kind and
   -- whether or not a rule concludes it — see the module header for why the
   -- older category/attribute split was unsound. A predicate NO rule concludes
   -- gets its whole decision from the channel ('inputDecision'); one some rule
   -- concludes gets the channel as one more OR arm ('basePred').
-  channelDecls = decls
+  -- A boolean predicate gets a `<p> fact` MAYBE BOOLEAN channel; a
+  -- value-typed attribute gets a `<p>` field of its own sort plus the
+  -- accessor pair in 'valueParas', and never a `fact` channel.
+  channelDecls = [d | d <- decls, isNothing d.dclValue]
   channelNames = map (.dclName) channelDecls
-  inputDecls = [d | d <- decls, (d.dclName, True) `notElem` concludedLits]
+  inputDecls = [d | d <- channelDecls, (d.dclName, True) `notElem` concludedLits]
+
+  valueDecls = [d | d <- decls, isJust d.dclValue]
+  valueNames = map (.dclName) valueDecls
+
+  valueDeclOf :: Text -> Maybe Decl
+  valueDeclOf n = find (\d -> d.dclName == n) valueDecls
+
+  -- The accessor's name. `the name of` (the object's atom) already reads this
+  -- way, so a value attribute's reader matches it.
+  accessorName :: Text -> Text
+  accessorName n = "the " <> n <> " of"
+
+  -- The generator's own binary #pred sentence, with the object and the value
+  -- in the slots the declaration's `order` field puts them in.
+  valuePhrase :: Decl -> Text -> Text -> Text
+  valuePhrase d subj val =
+    Text.unwords
+      ( filter (not . Text.null)
+          [Text.strip d.dclPrefix, a, Text.strip d.dclInfix, b, Text.strip d.dclPostfix] )
+   where
+    (a, b) = case d.dclOrder of
+      BOrderOV -> (subj, val)
+      BOrderVO -> (val, subj)
 
   -- ------------------------------------------------------------------
   -- Section labels
@@ -579,7 +702,7 @@ renderDoc ctx doc = do
       ( [s | (_, g) <- asserts, s <- appliesOf g]
           <> [s | (_, r) <- arules, g <- r.brConditions, s <- appliesOf g]
           <> [s | (_, r) <- urules, g <- r.burConclusion <> r.burConditions, s <- appliesOf g]
-          <> [r.brSection | (_, r) <- arules, r.brInapplicable] )
+          <> [secOf r | (_, r) <- arules, r.brInapplicable] )
    where
     appliesOf = \case
       BGApplies s _ -> [s]
@@ -656,14 +779,26 @@ renderDoc ctx doc = do
   -- ------------------------------------------------------------------
   -- Record fields
   -- ------------------------------------------------------------------
-  fieldDescs :: [(Text, Text)]
+  -- name, @desc, L4 type.
+  fieldDescs :: [(Text, Text, Text)]
   fieldDescs =
-    [("name", "the object's Blawx atom")]
-      <> [(d.dclName <> " fact", phrase (d.dclName, True)) | d <- channelDecls]
-      <> [(exclusionField s, negAppliesName s) | s <- appliesSections]
+    [("name", "the object's Blawx atom", "IS A STRING")]
+      <> [ (d.dclName <> " fact", phrase (d.dclName, True), "IS A MAYBE BOOLEAN")
+         | d <- channelDecls
+         ]
+      <> [ (d.dclName, valuePhrase d "x" "v", "IS A MAYBE " <> sortType vs)
+         | d <- valueDecls
+         , Just vs <- [d.dclValue]
+         ]
+      <> [(exclusionField s, negAppliesName s, "IS A MAYBE BOOLEAN") | s <- appliesSections]
 
   fieldNames :: [Text]
-  fieldNames = map fst fieldDescs
+  fieldNames = [n | (n, _, _) <- fieldDescs]
+
+  -- Only a boolean channel can carry a scenario fact; a value field is
+  -- NOTHING unless an (unlifted, refused) binary fact set it.
+  boolFieldNames :: [Text]
+  boolFieldNames = [n | (n, _, ty) <- fieldDescs, ty == "IS A MAYBE BOOLEAN"]
 
   fieldWidth = maximum (1 : map (Text.length . ident) fieldNames)
 
@@ -696,7 +831,7 @@ renderDoc ctx doc = do
           -- unfolding introduces, and invisible to a scan over rule bodies.
           <> [(NHolds s l, NDefeated s l, True) | r.brDefeasible, isDefeated s l]
       | (_, r) <- arules
-      , let s = r.brSection
+      , let s = secOf r
       , let l = (bNameText r.brConclusion.bcPred, r.brConclusion.bcSign)
       ]
     baseEdges =
@@ -789,6 +924,21 @@ renderDoc ctx doc = do
   flatRefs :: [BSectionRef]
   flatRefs = map bSec secNumbers
 
+  -- __The section a rule is FILED under__, as distinct from the section it is
+  -- ATTRIBUTED to. R4 ruled flat numbered sections for v1, and Blawx files a
+  -- paragraph's rules under a nested workspace (`sec_1__para_a_section`).
+  -- Until W3 gives paragraphs their own eId, the least-bad handling is to
+  -- fold a paragraph into its parent `sec_n` — the rules still fire, the
+  -- attribution is still printed on the decision's @ref line, and the loss is
+  -- the § nesting, which the flat scaffolding never had. Everything that
+  -- NAMES a decision or PLACES it goes through here; `brSection` itself is
+  -- what the @ref lines print.
+  secOf :: BRule -> BSectionRef
+  secOf r = case r.brSection of
+    BPath (st :| _ : _) | bStepKind st == "sec", BPath (st :| []) `elem` flatRefs ->
+      BPath (st :| [])
+    other -> other
+
   -- ------------------------------------------------------------------
   -- Workspace comments (ruling P5-4)
   -- ------------------------------------------------------------------
@@ -847,6 +997,17 @@ renderDoc ctx doc = do
            , "-- BOOLEAN decision per predicate. The defeat layer is unfolded: one decision"
            , "-- per (section, literal) pair, named from the generator's own #pred wording."
            ]
+        -- Emitted only when the document has one, so a boolean-only import
+        -- (bird) is byte-for-byte what it was before §11 W5.
+        <> [ line
+           | not (null valueDecls)
+           , line <-
+               [ "--"
+               , "-- A value-typed attribute is a partial FUNCTION, not a predicate: it gets a"
+               , "-- field of its own sort instead of a `<p> fact` channel, a `p x` decision"
+               , "-- saying the attribute is DEFINED, and a `the p of x` reader for the VALUE."
+               ]
+           ]
 
   importsPara = "IMPORT prelude\nIMPORT `negation-as-failure`"
 
@@ -860,7 +1021,42 @@ renderDoc ctx doc = do
   ontologyParas :: L [Text]
   ontologyParas = do
     inputs <- traverse inputDecision inputDecls
-    pure (["§§ `Ontology`"] <> map commentPara rootComments <> [declarePara] <> inputs)
+    pure
+      ( ["§§ `Ontology`"]
+          <> map commentPara rootComments
+          <> [declarePara]
+          <> valueParas
+          <> inputs )
+
+  -- A value-typed attribute is a PARTIAL FUNCTION from the universe to a
+  -- sort, so it lifts to two decisions rather than one: `p x` says the
+  -- attribute is defined (s(CASP)'s `p(X,V)` succeeding at all), and
+  -- `the p of x` is the value. The accessor is total by `fromMaybe`, and its
+  -- default is never observed on its own — every use of a bound value
+  -- variable is emitted in the same top-level AND chain as the definedness
+  -- conjunct the binding goal contributes, so an absent attribute makes the
+  -- whole body FALSE, exactly as `p(X,V)` having no clause does.
+  valueParas :: [Text]
+  valueParas =
+    concat
+      [ [ Text.intercalate "\n"
+            [ "@ref " <> d.dclRef
+            , givenBoolean
+            , "DECIDE " <> ident d.dclName <> " x @nlg there is a value v such that "
+                <> valuePhrase d "%x%" "v"
+            , "    IF isJust (x's " <> ident d.dclName <> ")"
+            ]
+        , Text.intercalate "\n"
+            [ "-- the value itself, read under the definedness conjunct above."
+            , "GIVEN x IS AN Object"
+            , "GIVETH A " <> sortType vs
+            , ident (accessorName d.dclName) <> " x"
+            , "    MEANS fromMaybe " <> sortDefault vs <> " (x's " <> ident d.dclName <> ")"
+            ]
+        ]
+      | d <- valueDecls
+      , Just vs <- [d.dclValue]
+      ]
 
   declarePara =
     Text.intercalate "\n" $
@@ -868,12 +1064,10 @@ renderDoc ctx doc = do
         <> ["DECLARE Object", "    HAS"]
         <> concat
           [ [ "      @desc " <> desc
-            , "      " <> padTo (fieldWidth + 3) (ident f) <> ty f
+            , "      " <> padTo (fieldWidth + 3) (ident f) <> ty
             ]
-          | (f, desc) <- fieldDescs
+          | (f, desc, ty) <- fieldDescs
           ]
-   where
-    ty f = if f == "name" then "IS A STRING" else "IS A MAYBE BOOLEAN"
 
   inputDecision :: Decl -> L Text
   inputDecision d = do
@@ -916,10 +1110,17 @@ renderDoc ctx doc = do
                   <> maybe "" (\t -> " — " <> noCR (Text.replace "\n" " " t)) (Map.lookup n clauseTexts) )
         outward = [g | g <- defeatGroups, groupHome g == s, fst (fst g) /= s]
         inward = [g | g <- defeatGroups, groupHome g == s, fst (fst g) == s]
-        mine = [r | (_, r) <- arules, r.brSection == s]
+        mine = [r | (_, r) <- arules, secOf r == s]
+        -- Blawx admits several `attributed_rule`s in one section concluding
+        -- the same literal — they are separate clauses of `according_to/3`
+        -- and their meaning is the OR of their bodies. One decision per RULE
+        -- would emit the same name twice; one per (section, literal) pair, as
+        -- the unfolding requires, has to join them.
+        litOf r = (bNameText r.brConclusion.bcPred, r.brConclusion.bcSign)
+        groups = [(l, [r | r <- mine, litOf r == l]) | l <- nub (map litOf mine)]
     outs <- traverse defeatPara outward
     apps <- if s `elem` appliesSections then appliesParas s else pure []
-    rulePs <- concat <$> traverse (rulePara s) mine
+    rulePs <- concat <$> traverse (uncurry (rulePara s)) groups
     ins <- traverse defeatPara inward
     let cs = map commentPara (secComments n)
         filler
@@ -928,28 +1129,48 @@ renderDoc ctx doc = do
           | otherwise = []
     pure ([heading] <> cs <> outs <> apps <> rulePs <> ins <> filler)
 
-  rulePara :: BSectionRef -> BRule -> L [Text]
-  rulePara s r = do
-    let l = (bNameText r.brConclusion.bcPred, r.brConclusion.bcSign)
-        who = renderSectionRef s
-    unless (unaryVar r.brConclusion) $
-      refuse_ "conclusion-shape" who
-        ( "the conclusion `"
-            <> renderGoal (BGCall r.brConclusion.bcSign r.brConclusion.bcPred r.brConclusion.bcArgs)
-            <> "` is not a unary predicate applied to one object variable" )
-    conds <- concat <$> traverse (ruleCondition who s r.brInapplicable) r.brConditions
+  -- One (section, literal) pair, and every `attributed_rule` that concludes
+  -- it in that section. With one rule the shape is what it always was; with
+  -- n > 1 each rule keeps its own named decision — one per Blawx block, which
+  -- is MORE isomorphic, not less — and `according_to` becomes their OR. The
+  -- dependency edges are unchanged by the split: a clause decision is a pure
+  -- conjunction of the very nodes 'depEdges' already draws from `NAcc s l`.
+  rulePara :: BSectionRef -> Lit -> [BRule] -> L [Text]
+  rulePara _ _ [] = pure []
+  rulePara s l rs@(r0 : _) = do
+    let who = renderSectionRef s
+    when (length (nub [(r.brDefeasible, r.brInapplicable) | r <- rs]) > 1) $
+      refuse_ "rule-flag-mismatch" who
+        ( "the " <> Text.textShow (length rs) <> " rules concluding " <> scaspLit l
+            <> " in " <> labelOf s <> " disagree on `defeasible`/`inapplicable`; "
+            <> "the holds-layer is per (section, literal) and cannot represent "
+            <> "two answers" )
+    bodies <- traverse (ruleBody s) rs
     let accName = accordingName s l
-        accRef =
-          "@ref " <> labelOf s <> " — " <> renderSectionRef s
+        refOf r =
+          "@ref " <> labelOf s <> " — " <> renderSectionRef r.brSection
             <> " attributed_rule (defeasible " <> yesNo r.brDefeasible
             <> ", inapplicable " <> yesNo r.brInapplicable <> ")"
-        accPara = case conds of
-          [] -> Text.intercalate "\n" [accRef, givenBoolean, "DECIDE " <> ident accName <> " x IF TRUE"]
-          [c] -> Text.intercalate "\n" [accRef, givenBoolean, "DECIDE " <> ident accName <> " x IF " <> c]
-          c : cs ->
-            Text.intercalate "\n"
-              ( [accRef, givenBoolean, "DECIDE " <> ident accName <> " x", "    IF  " <> c]
-                  <> map ("    AND " <>) cs )
+        clauseName i = accName <> " (clause " <> Text.textShow (i :: Int) <> ")"
+    (clausePs, accPara) <- case zip rs bodies of
+      [(r, conds)] -> pure ([], conjDecision [refOf r] accName conds)
+      numbered -> do
+        let ps =
+              [ conjDecision [refOf r] (clauseName i) conds
+              | (i, (r, conds)) <- zip [1 ..] numbered
+              ]
+        arms <- armsBody accName [ident (clauseName i) <> " x" | i <- [1 .. length numbered]]
+        pure
+          ( ps
+          , Text.intercalate "\n"
+              ( [ "-- `according_to(" <> renderSectionRef s <> "," <> scaspLit l
+                    <> ",X)` has " <> Text.textShow (length numbered)
+                    <> " clauses in this section; their disjunction is the section's answer."
+                , givenBoolean
+                , "DECIDE " <> ident accName <> " x"
+                ]
+                  <> arms ) )
+    let r = r0
         defeated = isDefeated s l
         holdsRef
           | not r.brDefeasible =
@@ -973,7 +1194,52 @@ renderDoc ctx doc = do
         holdsPara =
           Text.intercalate "\n"
             (holdsRef <> [givenBoolean, "DECIDE " <> ident (holdsName s l) <> " x"] <> holdsBody)
-    pure [accPara, holdsPara]
+    pure (clausePs <> [accPara, holdsPara])
+
+  -- One rule's conditions, as L4 conjuncts. Everything that is per-RULE
+  -- rather than per-(section, literal) lives here: the conclusion shape, the
+  -- value-variable environment, and the `inapplicable` guard's position.
+  ruleBody :: BSectionRef -> BRule -> L [Text]
+  ruleBody s r = do
+    let who = renderSectionRef s
+    unless (unaryVar r.brConclusion) $
+      refuse_ "conclusion-shape" who
+        ( "the conclusion `"
+            <> renderGoal (BGCall r.brConclusion.bcSign r.brConclusion.bcPred r.brConclusion.bcArgs)
+            <> "` is not a unary predicate applied to one object variable" )
+    let pairs = valueBindings r.brConditions
+        env = Map.fromList pairs
+        headVar = case r.brConclusion.bcArgs of
+          [BTVar (MkBVar v)] -> Just v
+          _ -> Nothing
+    for_ (nub [v | (v, _) <- pairs, length [() | (v', _) <- pairs, v' == v] > 1]) \v ->
+      refuse_ "value-variable-rebound" who
+        ( "the variable " <> v <> " is bound to an attribute value by more than "
+            <> "one binary attribute goal; the substitution has no single answer" )
+    concat <$> traverse (ruleCondition who env headVar s r.brInapplicable) r.brConditions
+
+  -- `attr(X, V)`, for a value-typed `attr` and a variable `V`, is a BINDING:
+  -- s(CASP) unifies V with the value and every later goal sees it. L4 has no
+  -- logic variables, so the binding is discharged by substitution — V becomes
+  -- `the attr of x` at every use — and the goal itself contributes only the
+  -- definedness conjunct.
+  valueBindings :: [BGoal] -> [(Text, Text)]
+  valueBindings gs =
+    [ (v, ident (accessorName d.dclName) <> " x")
+    | BGCall True p [BTVar _, BTVar (MkBVar v)] <- gs
+    , v /= "_"
+    , Just d <- [valueDeclOf (bNameText p)]
+    ]
+
+  -- `DECIDE <name> x IF c1 AND c2 …`, in the layout the seeds already use.
+  conjDecision :: [Text] -> Text -> [Text] -> Text
+  conjDecision hdr name = \case
+    [] -> Text.intercalate "\n" (hdr <> [givenBoolean, "DECIDE " <> ident name <> " x IF TRUE"])
+    [c] -> Text.intercalate "\n" (hdr <> [givenBoolean, "DECIDE " <> ident name <> " x IF " <> c])
+    c : cs ->
+      Text.intercalate "\n"
+        ( hdr <> [givenBoolean, "DECIDE " <> ident name <> " x", "    IF  " <> c]
+            <> map ("    AND " <>) cs )
 
   yesNo b = if b then "TRUE" else "FALSE"
 
@@ -985,9 +1251,9 @@ renderDoc ctx doc = do
   -- block image is literally `new_object_category`
   -- (scasp_generator.js:1188-1194) and after nothing else. The POSITION is
   -- load-bearing, not just the presence.
-  ruleCondition :: Text -> BSectionRef -> Bool -> BGoal -> L [Text]
-  ruleCondition who s inapplicable g = do
-    t <- liftGoal who g
+  ruleCondition :: Text -> Map Text Text -> Maybe Text -> BSectionRef -> Bool -> BGoal -> L [Text]
+  ruleCondition who env headVar s inapplicable g = do
+    t <- liftGoal who env headVar g
     pure $ case g of
       BGNewObjectCategory _ _ | inapplicable -> [t, ident (appliesName s) <> " x"]
       _ -> [t]
@@ -1060,7 +1326,8 @@ renderDoc ctx doc = do
               <> " but no unattributed_rule defines blawx_applies for it, so the "
               <> "predicate has no clauses and the rule could never fire" )
       Just (ws, r) -> do
-        conds <- traverse (liftGoal (renderSectionRef ws)) r.burConditions
+        let headVar = listToMaybe [v | BGApplies _ (BTVar (MkBVar v)) <- r.burConclusion]
+        conds <- traverse (liftGoal (renderSectionRef ws) mempty headVar) r.burConditions
         body <- armsBody (appliesName s) conds
         pure $
           Text.intercalate "\n" $
@@ -1131,7 +1398,9 @@ renderDoc ctx doc = do
    where
     pad = Text.replicate ind " "
     val "name" = quoted objName
-    val f = if Text.dropEnd 5 f `elem` trues then "JUST TRUE" else "NOTHING"
+    val f
+      | f `elem` boolFieldNames, Text.dropEnd 5 f `elem` trues = "JUST TRUE"
+      | otherwise = "NOTHING"
 
   -- ---- tests -----------------------------------------------------------
   testParas :: L [Text]
@@ -1154,6 +1423,20 @@ renderDoc ctx doc = do
         warn "test-without-query" t.btName
           "the test carries no `query` block, so it asks nothing and emits no #EVAL"
         pure []
+      -- __A free-variable query over an EMPTY universe warns rather than
+      -- refuses__ (BLAWX-EXPORT-SPEC §11 W5). `?- p(X).` lifts to a filter
+      -- over the declared objects, and a document that declares none — Blawx's
+      -- `beard_tax` is one: its single test is an interview seed, where the
+      -- Blawx UI asks the user for the facts — has nothing to filter, and
+      -- `all objects` is not even emitted. Refusing it would cost the whole
+      -- document for the sake of one unanswerable test, so the test's
+      -- provenance line is emitted and the #EVAL is not.
+      [gs] | null universe, any freeVarGoal gs -> do
+        warn "unbound-query-empty-universe" t.btName
+          ( "the query binds a free variable and the document declares no "
+              <> "objects and asserts no ground facts, so there is nothing for "
+              <> "an #EVAL to range over; the test is emitted as provenance only" )
+        pure []
       [gs] -> do
         body <- testExpr t.btName scenario gs
         pure ["#EVAL " <> body]
@@ -1170,6 +1453,14 @@ renderDoc ctx doc = do
           Nothing -> []
           Just c -> concatMap (wrapPrefixed "-- " "-- ") (Text.splitOn "\n" c)
     pure (Text.intercalate "\n" ([provenance] <> commentLines <> directive))
+
+  -- A query goal whose object argument is a free variable.
+  freeVarGoal :: BGoal -> Bool
+  freeVarGoal = \case
+    BGCall True _ [BTVar _] -> True
+    BGNewObjectCategory _ (BTVar _) -> True
+    BGNegated _ g -> freeVarGoal g
+    _ -> False
 
   -- The query, as an L4 expression. A free variable is a filter over the
   -- declared object universe — exact because Blawx has no open domain: an
@@ -1213,14 +1504,23 @@ renderDoc ctx doc = do
   -- ------------------------------------------------------------------
   -- Goals
   -- ------------------------------------------------------------------
-  liftGoal :: Text -> BGoal -> L Text
-  liftGoal who = go
+  -- @env@ maps a variable bound by a binary attribute goal to the L4
+  -- expression that reads it; @headVar@ is the rule's object variable, and a
+  -- second one in object position is refused rather than silently collapsed
+  -- into the same @x@ (the collapse was invisible while every goal was unary).
+  liftGoal :: Text -> Map Text Text -> Maybe Text -> BGoal -> L Text
+  liftGoal who env headVar = go
    where
     go = \case
+      BGCall True p [o, v] | Just d <- valueDeclOf (bNameText p) -> binary d o v
       BGCall True p [a] -> app (bNameText p) a
       BGCall False p [a] -> app (phrase (bNameText p, False)) a
       BGNewObjectCategory p a -> app (bNameText p) a
       BGApplies s a -> app (appliesName s) a
+      BGCompare op a b -> do
+        l <- value a
+        r <- value b
+        pure (compareText op l r)
       -- The one place negation-as-failure earns its keep: the negated
       -- predicate is an INPUT, so "unknown" must behave as "absent", which a
       -- plain NOT over a total BOOLEAN cannot say.
@@ -1235,21 +1535,90 @@ renderDoc ctx doc = do
         t <- go g
         pure ("NOT (" <> t <> ")")
       g -> refuse "goal-shape" who ("the condition `" <> renderGoal g <> "` has no L4 image this phase")
+    -- `attr(X, V)`: the object slot must be the rule's own object variable.
+    -- A variable value slot is a binding, already discharged into `env`, so
+    -- all that is left of the goal is definedness; a literal value slot is a
+    -- test, and gets the definedness conjunct plus the equality.
+    binary d o v = case o of
+      BTVar (MkBVar ov) | not (Map.member ov env) -> do
+        _ <- arg (BTVar (MkBVar ov))
+        case v of
+          BTVar (MkBVar vn) | Map.member vn env -> pure defined
+          BTVar (MkBVar "_") -> pure defined
+          BTVar (MkBVar vn) ->
+            refuse "unbound-value" who
+              ( "the variable " <> vn <> " sits in the value slot of `"
+                  <> d.dclName <> "(X,V)` but is not bound there" )
+          _ -> do
+            t <- value v
+            pure ("(" <> defined <> " AND " <> ident (accessorName d.dclName) <> " x EQUALS " <> t <> ")")
+      _ ->
+        refuse "binary-attribute-shape" who
+          ( "the object slot of `" <> d.dclName
+              <> "(X,V)` must be the rule's object variable" )
+     where
+      defined = ident d.dclName <> " x"
     app n a = do
       t <- arg a
       pure (ident n <> " " <> t)
     arg = \case
-      BTVar _ -> pure "x"
+      BTVar (MkBVar v)
+        | Map.member v env ->
+            refuse "value-variable-in-object-position" who
+              ( "the variable " <> v <> " is bound to an attribute VALUE, and this "
+                  <> "goal uses it as an OBJECT; the flat universe has no "
+                  <> "name-to-object lookup this phase" )
+        | v /= "_", Just h <- headVar, v /= h ->
+            refuse "multi-object-variable" who
+              ( "the rule uses object variables " <> h <> " and " <> v
+                  <> "; every object position lifts to the single GIVEN `x`, so a "
+                  <> "second one would be silently identified with the first" )
+        | otherwise -> pure "x"
       BTAtom o
         | bNameText o `elem` objectNames -> pure (ident (bNameText o))
         | otherwise ->
             refuse "unknown-object" who
               ("the atom `" <> bNameText o <> "` is used as an object but never declared")
       t -> refuse "term-shape" who ("the term `" <> renderTerm t <> "` is not an object")
+    -- A term in VALUE position: a literal, or a variable a binary attribute
+    -- goal bound.
+    value = \case
+      BTNum q -> pure (l4Number q)
+      BTAtom a -> pure (quoted (bNameText a))
+      BTVar (MkBVar v) -> case Map.lookup v env of
+        Just e -> pure e
+        Nothing ->
+          refuse "unbound-value" who
+            ( "the variable " <> v <> " is compared as a value but no binary "
+                <> "attribute goal binds it" )
+      t -> refuse "term-shape" who ("the term `" <> renderTerm t <> "` is not a value")
 
 -- ---------------------------------------------------------------------------
 -- Text helpers
 -- ---------------------------------------------------------------------------
+
+-- | @blawx_comparison(X,op,Y)@ in L4's spelling. There is no disequality
+-- operator, so @neq@ is the negation of @EQUALS@ — which is also why it is
+-- the only arm that parenthesises: the other five are all at precedence 4,
+-- tighter than the @AND@ they are conjoined with.
+compareText :: BCmpOp -> Text -> Text -> Text
+compareText op l r = case op of
+  BEq -> l <> " EQUALS " <> r
+  BNeq -> "NOT (" <> l <> " EQUALS " <> r <> ")"
+  BGt -> l <> " GREATER THAN " <> r
+  BGte -> l <> " AT LEAST " <> r
+  BLt -> l <> " LESS THAN " <> r
+  BLte -> l <> " AT MOST " <> r
+
+-- | A Blawx @number_value@ as an L4 numeric literal. The field is a JS
+-- number, so every value the corpus stores is integral or a terminating
+-- decimal; 'L4.Blawx.IR.readRational' turns the latter into a ratio, and a
+-- non-integral ratio has no literal spelling in L4 — the exact division does,
+-- and is exact.
+l4Number :: Rational -> Text
+l4Number q
+  | denominator q == 1 = Text.textShow (numerator q)
+  | otherwise = "(" <> Text.textShow (numerator q) <> " / " <> Text.textShow (denominator q) <> ")"
 
 -- | Backtick-quote unless the text is already a plain L4 identifier.
 ident :: Text -> Text
