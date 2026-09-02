@@ -576,7 +576,15 @@ section** — every rule carries `according_to(<section>, …)` attribution, and
 canvas per section of the source text. The mapping (R4): L4 `§`/`§§` headers and inert
 scaffolding synthesise the CLEAN `rule_text` (title line, numbered sections, indented
 sub-provisions); each `@ref`-annotated L4 decision lands its rules in the workspace named after
-the corresponding section eId; unanchored declarations land in `root_section`. `@nlg`
+the corresponding section eId; unanchored declarations land in `root_section`. **Since
+2026-09-02 the section number is the author's** (R4, §11 W3(a)): a decision whose section text
+opens with a CLEAN index (`@export 4. The winner of a game is …`) is anchored in
+`sec_4_section`, so the emitted `according_to` reads the Act's numbering rather than the export
+order's, and several decisions may pin one section and share it — `beard.l4`'s chapeau and its
+two limbs all attribute to `sec_1_section`, as Jason Morris's own `beard_tax.yaml` does. A
+citation that ends in a section number (`@ref …, s 4`) pins the same way; a decision that pins
+nothing keeps its 1..n place in export order, and its text is guarded so a leading numeral in it
+cannot be read as part of the index the emitter writes in front of it (§8.4). `@nlg`
 annotations — and, absent those, L4's already-sentence-like mixfix names (`` `eligible for
 benefit` `` → postfix `"is eligible for benefit"`) — populate the `#pred` prefix/infix/postfix
 NLG slots, which is what makes the justification trees and the scenario editor read as English
@@ -907,6 +915,88 @@ i.e. the isomorphism transfer of §4.9. **Not decided.** How `@ref` hierarchical
 to CLEAN sub-provision nesting (flat numbered sections may suffice for v1).
 
 **ANSWERED 2026-08-18 (Meng).** Flat numbered sections for v1.
+
+**The author pins the number (§11 W3(a), landed 2026-09-02).** Flat numbering stands;
+what changed is where the number comes from. If an exported decision's section text — the
+same `@desc`/`@export` prose the fallback above already chooses, or the `@ref` citation
+behind it — opens with a CLEAN section index, that index **is** the section's number and is
+consumed rather than repeated: `@export 4. The winner of a game is …` emits
+`according_to(sec_4_section, …)` and a `rule_text` line reading `4. The winner of a game
+is …`. Failing that, a section text that **ends** in a section citation pins the same
+number — `@ref Mortality Act 2026, s 4` → `sec_4_section` — which is W3's second proposed
+spelling (`L4.Blawx.Lower.citedSection`); there the numeral is _not_ consumed, because it is
+part of the citation and sits where clean-law's index grammar cannot reach it. Decisions
+that pin nothing take the lowest numbers no pin claims, in export order, so **a module with
+no pins is byte-identical to what it emitted before** (measured: all twelve emitting seeds
+regenerate byte-identically against the goldens this ruling committed; only `rps` and
+`beard` pin, and neither `@ref` spelling in the corpus does). Sections are written ascending
+by number, and several decisions may pin the same one — they then share a workspace, an
+attribution and a `rule_text` entry, whose text is their remainders joined in export order.
+`L4.Blawx.Lower.sectionNumbers` is the implementation and
+`jl4-core/test/BlawxAssumeSpec.hs` pins sixteen cases of it.
+
+The leading recogniser is deliberately narrow, because most of the corpus must **not** pin:
+digits, a period, then end-of-line or a space. `1(a): facial hair …` (no period),
+`4, the other seat.` (comma), `0.` and clean-law's insert index `2.1.` all decline. The
+trailing one is narrow for the same reason, and the corpus is what narrowed it: a comma, then
+`s` / `s.` / `sec` / `section`, then bare digits, then end of text — so
+`@ref https://www.legislation.gov.uk/…/section/43` declines (its herald is `section/`, not
+`, section`), and so does
+`@ref Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)`, which is the answer we
+want: `43(1)(b)` is a sub-provision, and pinning it to `sec_43` would anchor the rule one
+level up from where the author cited it. The `2.1.` case is where the still-open half of this
+ruling lives: clean-law would give it eId `sec_2_1`, and recognising it is the door to
+sub-provision anchoring, which §11 W3(b) leaves shut.
+
+**Declining to pin is not by itself safe, and the emitted text is guarded**
+(`L4.Blawx.Lower.sectionTexts`, added 2026-09-02 after review). Every spelling in that
+decline list opens on a **digit**, and the flat number is written as `1. ` in front of it —
+so clean-law reads our period plus that digit as one `insert_index`, and the parse's eIds
+part company with the workspace names. That is the orphaning defect described below, reached
+by a second road. Measured with `etc/blawx-eid-harness.py` on 2026-09-02, unguarded:
+`1(a): …`, `43(1)(a): …` and `4, the other seat.` yield **no sections at all** (pyparsing's
+`And` does not backtrack out of the `Optional`, so the closing `DOT` fails), `0. …` yields
+`sec_1_ 0_section` and `2.1. …` yields `sec_1_ 2_1_section` — all against a workspace named
+`sec_1_section`. So the emitter now guarantees **no section text begins with a digit**:
+
+- a text that pinned by a leading index and whose remainder still opens on an index
+  (`@export 4. 5. …`) is a sub-provision, and is **refused by name** —
+  `sub-provision index (Blawx v1)`, naming the decision and citing §11 W3(b) — rather than
+  emitted. Unrefused it emitted `sec_4_ 5_section` against workspace `sec_4_section`
+  (measured, same harness).
+- any other text opening on a digit is prose that merely starts with a numeral, and is
+  **quoted**: `1. "1(a): facial hair …"`. ASCII `"` is in pyparsing's `printables`, so
+  clean-law keeps it as ordinary section text; `yamlDoubleQuoted` escapes it so the fixture
+  still loads; and it tells the reader the numeral is the author's, not the exporter's.
+  Measured: all five declining spellings, plus `5 apples are enough.` (digit-leading but not
+  index-shaped), a pinned section and the four citation cases, now agree — 11 of 11
+  counterexample documents.
+
+**And the title has the same shape of hazard, one level worse.** Looking for other ways the
+synthesised `rule_text` can fail clean-law, this pass found that P1's title guard is
+incomplete: CLEAN's title grammar is `Word(string.ascii_uppercase, printables)`, so the first
+character must be `A`-`Z`, and re-casing cannot make `1` one. A module whose section heading is
+_1988 Housing Act_ — or, through the filename fallback, a file called `4act.l4` — emitted a
+`rule_text` whose first line clean-law refuses outright:
+`ParseException: Expected W:(A-Z, !-~), found '4act' (at char 0)`, measured 2026-09-02 by
+handing the emitted `rule_text` to clean-law 0.0.4. That is worse than an orphaned canvas:
+`RuleDoc.save()`'s `pre_save` signal makes the same call, so the whole `.blawx` is
+unimportable and the document has no sections at all. `L4.Blawx.Lower.capitalizeFirst` now
+prefixes `The ` to a title whose first character is not an ASCII letter, on the same principle
+as the re-casing it already did — an unimportable title is worse than a heralded one — and
+`etc/blawx-eid-harness.py` reports a `ParseException` as a failure instead of dying on it.
+
+**Why the number and the eId must agree, measured.** clean-law 0.0.4's `generate_section`
+builds the eId as `"sec_" + node['section index'][0]` — the **literal** numeral, never the
+section's position (`clean/clean.py`, read 2026-09-02 from the PyPI sdist). Before this
+change the two new seeds wrote the number twice, once by the emitter and once in the author's
+prose, and `"1. 4. The winner …"` matched clean-law's _insert index_
+(`number ('.' number)* '.'`): `rps.blawx` parsed to eIds `sec_1_ 4` and `sec_3_ 3` against
+workspaces `sec_1_section`…`sec_3_section`, and `beard.blawx` to a single `sec_1_ 1` against
+three. **Every canvas in both was orphaned**, and no golden byte showed it, because both
+halves were ours and each was self-consistent. `etc/blawx-eid-harness.py` now runs clean-law
+over each golden's `rule_text` and compares the parse against the workspace names: 12 of 12
+agree today, and it exits 1 on the pre-W3 goldens (both measured 2026-09-02).
 
 ### 8.5 R5 — negation: complementary operators / classical `-p` on inputs / NAF on computed
 
@@ -1757,6 +1847,72 @@ which is not a flat numbered section"_ on both fixtures. **Do.** (a) Let a numbe
 (`§ 4. …`) or an `@ref … s 4` pin the CLEAN section number, so attributions read
 `according_to(sec_4_section, …)` and the synthesised `rule_text` numbers match the source; (b)
 paragraph eIds are the question R4 left open and stay open. Amends R4, §4.9.
+
+**DISCHARGED (a) 2026-09-02; (b) remains open as ruled.** The property (a) actually establishes
+is **number/eId agreement**: for every module the emitter produces, clean-law's parse of the
+`rule_text` yields exactly the workspace names we wrote, so no canvas is orphaned.
+
+The pin is read off the section's own text — the `@desc`/`@export` prose, else the `@ref`
+citation, i.e. exactly the string R4 already chose as the section body. Two spellings pin, and
+W3(a) named both:
+
+- **a leading CLEAN index** (`@export 4. The winner …`), `L4.Blawx.Lower.pinnedSection`; the
+  numeral is consumed, not repeated.
+- **a trailing section citation** (`@ref Mortality Act 2026, s 4`),
+  `L4.Blawx.Lower.citedSection`, added 2026-09-02 after review — it was named in W3(a) and was
+  silently unimplemented in the first cut. The numeral stays where it is; a citation stripped of
+  its section number would stop being one, and its position at the end of the text is out of
+  reach of clean-law's index grammar. Measured: `@ref Mortality Act 2026, s 4` →
+  `sec_4_section`, `@ref …, section 12` → `sec_12_section`, and both spellings the corpus
+  actually uses still decline (the `legislation.gov.uk` URL, and `…, s.43(1)(b)`, which is a
+  sub-provision and must not be flattened onto `sec_43`).
+
+**The `§` header route is declined**, and that is the one half of W3(a) not built: the section
+text is already in `RPred` and a `§` header is not (`L4.Relational.Lower.topDecls` flattens
+sections away, so a per-decision heading would have to be plumbed through `TopDef` and `RPred`
+first) — for the same authoring gesture, in the same place, on the same string.
+
+`sectionNumbers` hands unpinned decisions the lowest unclaimed numbers in export order, so an
+unpinned module is unchanged, and lets several decisions share a pinned section.
+`sectionTexts` then guarantees that **no emitted section text begins with a digit**, refusing a
+doubly-indexed pinned section by name and quoting everything else; without it, a text that
+merely declines to pin still orphans the whole document. R4 carries all of it.
+
+Measured this session (all commands run in `l4wt/blawx-w3`, `l4` built from this branch):
+
+- **goldens**: all 12 emitting seeds regenerate byte-identically, `.blawx` and `.pl`
+  (`for f in jl4/examples/blawx/*.l4; do … diff …`). Against the pre-W3 goldens the change
+  moved exactly two, `rps` and `beard`.
+- **`rps`** emits `sec_3_section` and `sec_4_section` (pre-W3: `sec_1`…`sec_3`) with 6 and 4
+  `according_to` atoms; `beard` emits `sec_1_section` alone with 10, its three decisions
+  sharing the section as Jason Morris's `beard_tax.yaml` does. `rule_text` for `beard` s.1 is
+  **word-identical to his, not byte-identical**: 248 bytes against his 257, because his carries
+  five CRs and indents the `(a)`/`(b)` limbs and ours is one flat line
+  (`a.split() == b.split()` → `True`, `a == b` → `False`, over both fixtures' `rule_text`).
+  The paragraph canvases those limbs have in his fixture are W3(b).
+- **fixpoint** (`BLAWX_CHECKOUT=…/blawx-stock`, W9): every golden, 196 checked / 0 failed /
+  0 empty-skipped (`rps` and `beard` alone: 15 / 0).
+- **tier-1**: `python3 etc/blawx-tier1-harness.py` over the whole corpus → 154/154.
+- **`--roundtrip`**: all twelve seeds and four guarded counterexamples, "IR and bytes
+  unchanged" every time — the guard lives in `Lower`, so `Emit`/`Parse` remain exact inverses.
+- **unit**: sixteen cases under `describe "the author pins the CLEAN section number"` in
+  `jl4-core/test/BlawxAssumeSpec.hs`, plus a `not-ok/sub-provision-index.l4` corpus fixture and
+  its CLI test; `cabal test jl4-core-test` → 439 examples, 0 failures;
+  `cabal test l4-cli-test --test-options="-m blawx"` → 46 examples, 0 failures.
+- **eId agreement** (`etc/blawx-eid-harness.py`, clean-law 0.0.4 + pyparsing 3.3.2): **12 of 12
+  goldens agree**, and 14 of 14 counterexample documents agree — the five spellings that
+  decline to pin, `5 apples are enough.`, a pinned section, the four citation cases and three
+  titles.
+- **negative controls, all exit 1**: the pre-W3 `rps.blawx` and `beard.blawx` (`sec_1_ 4` and
+  `sec_3_ 3` against `sec_1`…`sec_3`; one `sec_1_ 1` against three); the six pre-guard
+  counterexamples (three yielding no sections at all, `sec_1_ 0`, `sec_1_ 2_1`, and the pinned
+  `sec_4_ 5`); and a hand-edited fixture restoring the unheralded title, which the harness now
+  reports as `clean-law cannot parse the rule_text` rather than dying on. Both seeds' canvases
+  were orphaned on this branch as first committed; so was every document whose section text
+  merely opened on a digit.
+- **found en route, and fixed here**: a title whose first character is not `A`-`Z` made the
+  whole `.blawx` unimportable rather than merely orphaned. Recorded in R4 (§8.4) with its
+  measurement; two unit cases under `describe "the CLEAN title guard"`.
 
 ### W4 — NLG for object-valued attributes
 

@@ -376,29 +376,29 @@ holds(sec_1_section,bearded,P) :- according_to(sec_1_section,bearded,P).
 % BLAWX CHECK DUPLICATES
   bearded(P) :- holds(sec_1_section,bearded,P).
 
-according_to(sec_2_section,qualifies_s1a,P) :- person(P),
+according_to(sec_1_section,qualifies_s1a,P) :- person(P),
 facial_hair_on_chin(P).
 
 % BLAWX CHECK DUPLICATES
-holds(sec_2_section,qualifies_s1a,P) :- according_to(sec_2_section,qualifies_s1a,P).
+holds(sec_1_section,qualifies_s1a,P) :- according_to(sec_1_section,qualifies_s1a,P).
 
 % BLAWX CHECK DUPLICATES
-  qualifies_s1a(P) :- holds(sec_2_section,qualifies_s1a,P).
+  qualifies_s1a(P) :- holds(sec_1_section,qualifies_s1a,P).
 
-according_to(sec_2_section,qualifies_s1a,P) :- person(P),
+according_to(sec_1_section,qualifies_s1a,P) :- person(P),
 facial_hair_below_chin(P).
 
 % BLAWX CHECK DUPLICATES
-holds(sec_2_section,qualifies_s1a,P) :- according_to(sec_2_section,qualifies_s1a,P).
+holds(sec_1_section,qualifies_s1a,P) :- according_to(sec_1_section,qualifies_s1a,P).
 
 % BLAWX CHECK DUPLICATES
-  qualifies_s1a(P) :- holds(sec_2_section,qualifies_s1a,P).
+  qualifies_s1a(P) :- holds(sec_1_section,qualifies_s1a,P).
 
-according_to(sec_3_section,qualifies_s1b,P) :- person(P),
+according_to(sec_1_section,qualifies_s1b,P) :- person(P),
 facial_hair_continuous(P).
 
 % BLAWX CHECK DUPLICATES
-holds(sec_3_section,qualifies_s1b,P) :- according_to(sec_3_section,qualifies_s1b,P).
+holds(sec_1_section,qualifies_s1b,P) :- according_to(sec_1_section,qualifies_s1b,P).
 
 % BLAWX CHECK DUPLICATES
-  qualifies_s1b(P) :- holds(sec_3_section,qualifies_s1b,P).
+  qualifies_s1b(P) :- holds(sec_1_section,qualifies_s1b,P).

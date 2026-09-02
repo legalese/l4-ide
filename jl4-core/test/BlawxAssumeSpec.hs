@@ -180,6 +180,140 @@ spec = do
       out <- emitted (refOnly "")
       hasLine out "1. Definition of is in arrears."
 
+  -- The CLEAN section number is the author's to write (spec §11 W3, 2026-09-02).
+  -- clean-law 0.0.4 builds the eId from the LITERAL numeral it reads, not from
+  -- the section's position (@clean/clean.py:193@, @generate_section@), so a
+  -- pinned number is the whole of what makes @according_to(sec_4_section, ...)@
+  -- agree with the source. Everything below is asserted on the emitted YAML,
+  -- so it cannot drift from what @l4 blawx@ writes.
+  describe "the author pins the CLEAN section number (§11 W3)" $ do
+    it "a leading CLEAN index picks the section, and is written only once" $ do
+      out <- emitted pinnedModule
+      hasLine out "1. The tenant may be given notice.\\n4. The tenant is in arrears."
+      hasLine out "workspace_name: sec_4_section"
+      hasLine out "according_to(sec_4_section,is_in_arrears,T)"
+      -- the numeral clean-law re-emits as the section's <num> is NOT repeated
+      lacksLine out "4. 4. The tenant"
+      lacksLine out "workspace_name: sec_2_section"
+
+    it "an unpinned decision takes the lowest number no pin claims" $ do
+      -- export order is (pinned 4, unpinned); the unpinned one is section 1,
+      -- not section 2, and the rule_text is written in ascending order.
+      out <- emitted pinnedModule
+      hasLine out "workspace_name: sec_1_section"
+      hasLine out "according_to(sec_1_section,may_be_given_notice,T)"
+
+    it "two decisions may pin one section, and then they share it" $ do
+      out <- emitted sharedPinModule
+      -- one numbered workspace, holding both rules
+      Text.count "workspace_name: sec_" out `shouldBe` 1
+      hasLine out "workspace_name: sec_1_section"
+      hasLine out "according_to(sec_1_section,is_in_arrears,T)"
+      hasLine out "according_to(sec_1_section,is_notified,T)"
+      -- and its rule_text is their prose joined in export order
+      hasLine out "1. In this Act, arrears means any amount unpaid, and (a) notified means notified in writing."
+
+    it "a helper follows the pinned section of the decision that reaches it" $ do
+      out <- emitted pinnedHelperModule
+      hasLine out "according_to(sec_7_section,qualifies,T)"
+      hasLine out "according_to(sec_7_section,deeply_in_arrears,T)"
+
+    -- The recogniser is deliberately narrow. Each of these is a real spelling
+    -- from the corpus or from an earlier draft of the two Blawx seeds, and each
+    -- falls through to R4's flat numbering.
+    --
+    -- Their text is QUOTED on the way out, and asserting only "does not pin"
+    -- was the defect in the first cut of this ruling: every one of them opens on
+    -- a DIGIT, we write "1. " in front of it, and clean-law reads our period
+    -- plus that digit as one insert index — so the emitted eIds stop matching
+    -- the emitted workspace names and every canvas in the document is orphaned.
+    -- Measured with etc/blawx-eid-harness.py on 2026-09-02: unquoted,
+    -- `1(a): ...`, `43(1)(a): ...` and `4, ...` yield NO sections at all, `0. `
+    -- yields sec_1_ 0 and `2.1. ` yields sec_1_ 2_1, all against sec_1_section;
+    -- quoted, all five yield sec_1_section. The escaped \" below is the YAML
+    -- escape, so these assertions see exactly the bytes the fixture carries.
+    it "does not pin on a paragraph index with no dot (1(a): ...), and quotes it" $ do
+      out <- emitted (descOnly "1(a): facial hair that occurs on or below the chin.")
+      hasLine out "1. \\\"1(a): facial hair that occurs on or below the chin.\\\""
+
+    it "does not pin on a sub-provision citation (43(1)(a): ...), and quotes it" $ do
+      out <- emitted (descOnly "43(1)(a): the conduct is unreasonable.")
+      hasLine out "1. \\\"43(1)(a): the conduct is unreasonable.\\\""
+
+    it "does not pin on a comma (4, the other seat.), and quotes it" $ do
+      out <- emitted (descOnly "4, the other seat.")
+      hasLine out "1. \\\"4, the other seat.\\\""
+
+    it "does not pin on 0, which no Act has, and quotes it" $ do
+      out <- emitted (descOnly "0. a section number no Act has.")
+      hasLine out "1. \\\"0. a section number no Act has.\\\""
+
+    it "does not pin on clean-law's insert index (2.1.), which W3(b) leaves open" $ do
+      out <- emitted (descOnly "2.1. a sub-provision index.")
+      hasLine out "1. \\\"2.1. a sub-provision index.\\\""
+
+    it "quotes any text opening on a digit, index-shaped or not" $ do
+      -- `5 apples ...` is not an index by anyone's grammar, but clean-law's
+      -- insert_index is DOT + number and OUR separator supplies the DOT, so
+      -- `1. 5 apples ...` fails to parse as a section just the same.
+      out <- emitted (descOnly "5 apples are enough.")
+      hasLine out "1. \\\"5 apples are enough.\\\""
+
+    it "leaves a text that does not open on a digit alone" $ do
+      out <- emitted (descOnly "The tenant is in arrears.")
+      hasLine out "1. The tenant is in arrears."
+      lacksLine out "\\\"The tenant"
+
+    -- W3's second spelling: `@ref ... s 4`. The numeral is NOT consumed here —
+    -- it is part of the citation, and it sits at the END of the text where
+    -- clean-law's index grammar cannot reach it.
+    it "a citation ending in `, s N` pins the section" $ do
+      out <- emitted (refOnly "@ref Mortality Act 2026, s 4")
+      hasLine out "4. Mortality Act 2026, s 4"
+      hasLine out "workspace_name: sec_4_section"
+      hasLine out "according_to(sec_4_section,is_in_arrears,T)"
+
+    it "`, section N` pins too" $ do
+      out <- emitted (refOnly "@ref Mortality Act 2026, section 12")
+      hasLine out "12. Mortality Act 2026, section 12"
+      hasLine out "workspace_name: sec_12_section"
+
+    it "a citation naming a sub-provision does not pin" $ do
+      -- the spelling antisocial.l4 actually uses: pinning s.43(1)(b) to sec_43
+      -- would anchor the rule one level up from where the author cited it.
+      out <- emitted (refOnly "@ref Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)")
+      hasLine out "1. Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)"
+      hasLine out "workspace_name: sec_1_section"
+
+    it "a URL ending in digits does not pin" $ do
+      -- the other spelling in the corpus; the herald is `section/`, not `, section`
+      out <- emitted (refOnly "@ref https://www.legislation.gov.uk/ukpga/2014/12/section/43")
+      hasLine out "workspace_name: sec_1_section"
+      lacksLine out "workspace_name: sec_43_section"
+
+    it "refuses a pinned section whose remainder opens on another index" $
+      -- `4. 5. ...` is a sub-provision, which W3(b) leaves open; emitting it
+      -- would give clean-law the insert index `4. 5` and orphan sec_4_section.
+      case blawxYaml (descOnly "4. 5. A human is mortal.") of
+        Right _  -> expectationFailure "expected a Blawx rejection for a doubly-indexed section"
+        Left err -> err `shouldSatisfy` Text.isInfixOf "sub-provision index"
+
+  -- CLEAN's title grammar is @Word(string.ascii_uppercase, printables)@: the
+  -- FIRST character must be A-Z, and RuleDoc.save()'s pre_save signal runs the
+  -- same parse, so a title it refuses makes the whole .blawx unimportable -- a
+  -- worse outcome than the orphaned canvas §11 W3 is about, because the document
+  -- then has no sections at all. Re-casing (P1) handles `housing Act`; it cannot
+  -- handle `1988 Housing Act`, which is why there is a herald as well.
+  describe "the CLEAN title guard" $ do
+    it "heralds a title whose first character cannot be an ASCII capital" $ do
+      out <- emitted (titledModule "1988 Housing Act")
+      hasLine out "rule_text: \"The 1988 Housing Act"
+
+    it "still only re-cases a letter-initial title" $ do
+      out <- emitted (titledModule "housing Act")
+      hasLine out "rule_text: \"Housing Act"
+      lacksLine out "The Housing Act"
+
   describe "what the Blawx leg refuses, and the middle end does not" $ do
     it "rejects a subjectless input by name, rather than emitting a blank row" $ do
       -- `input p/0` is a fine Horn predicate and the relational golden
@@ -385,6 +519,83 @@ spec = do
     , ""
     , "@export"
     , ann
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    ]
+
+  -- One exported decision over a record, its @\@export@ prose supplied by the
+  -- caller: the section-pin arms differ in nothing else.
+  descOnly d = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , ""
+    , "@export " <> d
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    ]
+
+  -- One pinned decision, one unpinned, in that export order.
+  pinnedModule = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , "    warned  IS A BOOLEAN"
+    , ""
+    , "@export 4. The tenant is in arrears."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    , ""
+    , "@export The tenant may be given notice."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `may be given notice` t IF t's warned"
+    ]
+
+  -- A chapeau and a limb, both pinned to s.1 -- the beard.l4 shape, and what
+  -- Jason Morris's own beard_tax.yaml does with sec_1_section.
+  sharedPinModule = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears  IS A NUMBER"
+    , "    notified IS A BOOLEAN"
+    , ""
+    , "@export 1. In this Act, arrears means any amount unpaid, and"
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    , ""
+    , "@export 1. (a) notified means notified in writing."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is notified` t IF t's notified"
+    ]
+
+  -- A non-exported helper is filed with the exported decision that reaches it,
+  -- which now means the section that decision PINNED, not its export position.
+  pinnedHelperModule = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , ""
+    , "@export 7. The tenant qualifies."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `qualifies` t IF `deeply in arrears` t"
+    , ""
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `deeply in arrears` t IF t's arrears AT LEAST 100"
+    ]
+
+  -- One exported decision under a § heading supplied by the caller: the title
+  -- arms differ in nothing else.
+  titledModule h = Text.unlines
+    [ "§ `" <> h <> "`"
+    , ""
+    , "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , ""
+    , "@export The tenant is in arrears."
     , "GIVEN t IS A Tenant"
     , "GIVETH A BOOLEAN"
     , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"

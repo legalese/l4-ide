@@ -98,8 +98,30 @@ loss or damage caused by rodents, insects, vermin, or birds. …
 
 This is why the seeds put real policy language on the `@export` line: those
 words are what the Blawx user sees as the law, what the navigation tree is
-built from, and what justification trees cite. (It is also why each
-decision gets its _own_ section: section anchoring is per-decision.)
+built from, and what justification trees cite.
+
+By default each decision gets its own section, numbered `1`, `2`, `3` … in
+export order. **Open the prose with the Act's own section number and you get
+that instead**: `@export 4. The winner of a game is …` puts the rule in
+`sec_4_section` and writes the numeral exactly once, and two decisions that open
+with the same number share one section — which is how `jl4/examples/blawx/rps.l4`
+attributes to `sec_4_section` and `sec_3_section`, matching Jason Morris's own
+Rock Paper Scissors Act, and how `beard.l4`'s chapeau and its two limbs all
+attribute to `sec_1_section`. The number must be digits followed by a period and
+then a space or the end of the line. A citation that _ends_ in a section number
+pins the same way — `@ref Mortality Act 2026, s 4` also lands in `sec_4_section`,
+and there the numeral stays where it is, because a citation that lost its section
+number would stop being one.
+
+Anything else (`1(a): …`, `4, the other seat.`) is ordinary prose and does not
+pin. Such prose comes back **quoted** — `1. "1(a): …"` — and that is not
+cosmetic: the exporter writes the flat number as `1. ` in front of your text, and
+CLEAN reads a period followed by a digit as one _insert index_, so an unquoted
+`1. 1(a): …` names the canvas after a section your Act does not have and orphans
+every workspace in the document. If you want the number, pin it; if you do not,
+the quotation marks are the exporter saying the numeral is yours, not its.
+Writing **both** — `@export 4. 5. …` — is refused by name rather than emitted,
+because sub-provision anchoring (Jason's `sec_1__para_a_section`) is not in v1.
 
 **The record becomes the ontology.** `Inputs` lowers to a Blawx category;
 each boolean field to an attribute with an NLG template derived from the

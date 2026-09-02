@@ -402,34 +402,6 @@ sign(rock).
 sign(paper).
 sign(scissors).
 
-according_to(sec_1_section,first_player_wins,G) :- game(G),
-first_player(G,Firstplayer),
-throws(Firstplayer,Throws),
-beats(Throws,Beats),
-second_player(G,Secondplayer),
-throws(Secondplayer,Throws2),
-Beats = Throws2.
-
-% BLAWX CHECK DUPLICATES
-holds(sec_1_section,first_player_wins,G) :- according_to(sec_1_section,first_player_wins,G).
-
-% BLAWX CHECK DUPLICATES
-  first_player_wins(G) :- holds(sec_1_section,first_player_wins,G).
-
-according_to(sec_2_section,second_player_wins,G) :- game(G),
-second_player(G,Secondplayer),
-throws(Secondplayer,Throws),
-beats(Throws,Beats),
-first_player(G,Firstplayer),
-throws(Firstplayer,Throws2),
-Beats = Throws2.
-
-% BLAWX CHECK DUPLICATES
-holds(sec_2_section,second_player_wins,G) :- according_to(sec_2_section,second_player_wins,G).
-
-% BLAWX CHECK DUPLICATES
-  second_player_wins(G) :- holds(sec_2_section,second_player_wins,G).
-
 according_to(sec_3_section,beats,S,scissors) :- sign(S),
 S = rock.
 
@@ -456,3 +428,31 @@ holds(sec_3_section,beats,S,rock) :- according_to(sec_3_section,beats,S,rock).
 
 % BLAWX CHECK DUPLICATES
   beats(S,rock) :- holds(sec_3_section,beats,S,rock).
+
+according_to(sec_4_section,first_player_wins,G) :- game(G),
+first_player(G,Firstplayer),
+throws(Firstplayer,Throws),
+beats(Throws,Beats),
+second_player(G,Secondplayer),
+throws(Secondplayer,Throws2),
+Beats = Throws2.
+
+% BLAWX CHECK DUPLICATES
+holds(sec_4_section,first_player_wins,G) :- according_to(sec_4_section,first_player_wins,G).
+
+% BLAWX CHECK DUPLICATES
+  first_player_wins(G) :- holds(sec_4_section,first_player_wins,G).
+
+according_to(sec_4_section,second_player_wins,G) :- game(G),
+second_player(G,Secondplayer),
+throws(Secondplayer,Throws),
+beats(Throws,Beats),
+first_player(G,Firstplayer),
+throws(Firstplayer,Throws2),
+Beats = Throws2.
+
+% BLAWX CHECK DUPLICATES
+holds(sec_4_section,second_player_wins,G) :- according_to(sec_4_section,second_player_wins,G).
+
+% BLAWX CHECK DUPLICATES
+  second_player_wins(G) :- holds(sec_4_section,second_player_wins,G).
