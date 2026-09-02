@@ -601,7 +601,13 @@ predicted:
   its own world. Baking every test's objects into one module-level `all objects` would let
   `rps`'s `who_wins` find `bobjane`'s game and answer where real Blawx answers nothing. A document
   needing none of this emits **exactly the bytes it did before** — measured on bird, §8.14's
-  2026-09-02 note.
+  2026-09-02 note. The one exception is the _witness_ decision of the bullet above: nothing calls
+  it but the quantifier directly beneath it, so its arity is not pinned by an agreement with
+  another paragraph, and it takes the world only when a conjunct of its own body reads one. `rps`
+  s.4's body is all input predicates, so its witness declares no `w` at all — an unused
+  `w IS A LIST OF Object` is a parameter a reader goes looking for the use of. Both directions are
+  pinned in `BlawxLiftSpec` ("gives the witness decision no world parameter when its body reads
+  none" and "… a world parameter when its body reads one").
 - **A test canvas that cannot be lifted is dropped by name**, with `-- NOT LIFTED (<code>): …`
   written where its `#EVAL` would have gone, and a WARNING rather than a document-level refusal. A
   _rule_ that cannot be lifted still refuses the document. The asymmetry is the point, and it is
@@ -1332,19 +1338,63 @@ are listed in §5.2; what was measured here is whether the artifact runs and agr
 **Numbers, every one run on this branch on 2026-09-02.** tier-1 `python3
 etc/blawx-tier1-harness.py`: **156/156** (121 distinct + 35 twin replays), of which rps contributes
 2 — `bobjane` and `who_wins`; the harness gained `parse_unlifted`, which excludes a test the lift
-refused so the positional pairing does not silently skip the whole seed, and a k-tuple oracle
-reader for a multi-variable query. Fixpoint `BLAWX_CHECKOUT=…/blawx-stock node
-etc/blawx-fixpoint-harness.mjs`: **222 checked, 0 failed, 3 empty-skipped**; `rps.blawx` on its own
-is **13 checked, 0 failed, 1 empty-skipped**. `cabal test jl4-core-test` **427 examples, 0
-failures** (six new `BlawxLiftSpec` cases: the world parameter's absence on a unary document, the
-arity spelling, the tuple channel, the existential closure, the diseq rendering, and the three
-test-drop paths). `cabal test l4-cli-test` **343 examples, 0 failures, 83 pending**.
+refused so the positional pairing does not silently skip the whole seed, a k-tuple oracle reader
+for a multi-variable query, and a self-test for that reader (below). Fixpoint
+`BLAWX_CHECKOUT=…/blawx-stock node etc/blawx-fixpoint-harness.mjs`: **222 checked, 0 failed, 3
+empty-skipped**; `rps.blawx` on its own is **13 checked, 0 failed, 1 empty-skipped**. `cabal test
+jl4-core-test` **429 examples, 0 failures**. `BlawxLiftSpec` gains **eleven** `it` cases and loses
+**three**, a net **+8** (`git diff 803eb206..HEAD -- jl4-core/test/BlawxLiftSpec.hs | grep -c
+'^[+-] *it "'`). The three that went are the refusals the test-drop severity change replaced —
+_refuses a block the #EVAL rendering does not consume_, _refuses a NEGATIVE scenario fact rather
+than dropping it_, _refuses a scenario fact about an undeclared predicate_. The eleven that came
+are: the world parameter's absence on a unary document; a test canvas's `object_declaration`
+landing in that test's own world; the arity spelling; the tuple channel; the existential closure;
+the witness decision's world parameter, once for each direction; the diseq rendering; and the three
+test-drop paths that replaced the three refusals. `cabal test l4-cli-test` **343 examples, 0
+failures, 83 pending**.
 
-**bird is unchanged except for one hunk.** `l4 blawx --import bird.yaml` reproduces
+**bird is unchanged except for two header hunks.** `l4 blawx --import bird.yaml` reproduces
 `jl4/examples/blawx/imported/bird.l4` byte for byte apart from the module header's description of
-the model, which had to change because it said "unary predicates". Nothing else in 291 lines moved:
-that is the regression evidence for the world parameter and the arity generalisation both being
-off when a document does not need them.
+the model, which had to change because it said "unary predicates", and the `source` line, which
+changed for the reason below. Nothing else in the file's 274 lines moved
+(`git diff 803eb206..HEAD -- jl4/examples/blawx/imported/bird.l4` — two hunks, 9 insertions and 7
+deletions, both inside the first 21 lines): that is the regression evidence for the world parameter and the arity
+generalisation both being off when a document does not need them.
+
+**The provenance header names the fixture, not the path it was read from.** The `--   source` line
+used to carry `opts.bxFile` verbatim, so a committed artifact was regenerable byte-for-byte from
+exactly one checkout — and the two committed files disagreed about which
+(`/Volumes/transcend/src/blawx/…` for bird, `/Volumes/transcend/src/blawx-stock/…` for rps) while
+their inputs are byte-identical. It now records `takeFileName` of the input. Measured 2026-09-02:
+`l4 blawx --import <checkout>/blawx/static/blawx/examples/{bird,rps}.yaml` run against both
+`/Volumes/transcend/src/blawx` and `/Volumes/transcend/src/blawx-stock` produces four files that
+`cmp` pairwise identical, and each pair reproduces its committed artifact exactly.
+
+**The witness decision no longer pads its arity with a world it cannot read.** §5.2 records the
+rule; what changed here is `rps.l4`, whose `` `according to RPSA 4, …, witnessed by player2,
+throw1 and throw2` `` dropped its leading `w IS A LIST OF Object` (its seven conjuncts are `game`,
+`player` ×2, the name comparison, `player/2` ×2 and `throw` ×2 — every one an input decision, none
+worlded). The quantifier decision above it keeps `w`, which is the domain it ranges over. `l4
+check` still accepts the file, `l4 run` still answers `LIST "jane"` and `EMPTY`, and tier-1 is
+still 156/156.
+
+**The k-tuple oracle reader is covered by a self-test, because no shipped seed reaches it.** The
+`len(out_vars) > 1` branch of the harness's comparison ladder — and `parse_tuple_oracle`, which it
+calls — exists for a query with two or more free variables. The corpus has exactly one, rps's
+`who_wins`, and its oracle is `EMPTY`, which the ladder answers before it ever looks at the arity;
+so the branch that reads a NON-EMPTY k-tuple answer had no in-repo exercise at all. The comparison
+is now split out of `run_test` as `compare_answer`, and `main` runs **15 pure cases** over it and
+over `parse_tuple_oracle` before anything else — including the datapoint measured for it on
+2026-09-02 (rps's `bobjane` test rewritten to the open query `?- winner(Game,Winner).` by swapping
+the query's `object_selector` for a `variable` block; the lift records the oracle
+`LIST LIST "testgame", "jane"`, and registered as an IMPORTED seed it runs **2/2**, real s(CASP)
+answering `[('testgame','jane')]`), the malformed renderings the reader must refuse to guess at,
+and the one-free-variable case that must NOT take the k-tuple path. That fixture is deliberately
+not committed — it is a document Jason did not write, and its `.blawx` would be a re-emission of an
+XML we edited — so the harness carries the recipe for retaking the measurement instead. The cases
+need no swipl, so they run on a machine with no s(CASP) pack, and they run before the `have_scasp`
+skip. Control: reversing the tuple order inside `parse_tuple_oracle` takes the self-test to
+**10/15** and stops the run before a single seed executes.
 
 **The re-emitted s(CASP) against Jason's stored s(CASP): 9 of 14 rows byte-identical**, and the
 five that differ are exactly the five rows the P5-2 staleness warning names (`sec_1`, `sec_2`,
@@ -1594,14 +1644,20 @@ declarations in tests and open queries buy `rps`. Amends R14, §5.2.
 `l4 blawx --import` lifts `rps.yaml` to `jl4/examples/blawx/imported/rps.l4` (`l4 check` clean) and
 `--reemit`s `rps.blawx` beside it. Measured on this branch that day: tier-1 **156/156** with rps's
 `bobjane` answering `LIST "jane"` on both engines and `who_wins` answering nothing on both;
-fixpoint **222/222** (rps alone 13/13); `jl4-core-test` **427/0**; `l4-cli-test` **343/0/83
-pending**; bird re-imports byte-identically apart from one header hunk. The corpus lift count moves
-**2/15 → 4/15** (`bird`, `mortality`, `rps`, `wills_tutorial`). What was NOT lifted, by name:
-`hypothetical`'s `#abducible`s — the test is dropped with the reason written into the artifact,
-which is a change of severity recorded in §5.2. `beard_tax` still refuses, and its remaining
-diagnostics narrowed from five kinds to four: `attribute-type` and `goal-shape` on numbers (W5a),
-`rule-section` on paragraph sections (W3), and `unbound-query` because it declares no objects at
-all. Amends R14 (§8.14's 2026-09-02 note) and §5.2.
+fixpoint **222/222** (rps alone 13/13); `jl4-core-test` **429/0**; `l4-cli-test` **343/0/83
+pending**; bird re-imports byte-identically apart from two header hunks, and both `bird.l4` and
+`rps.l4` now regenerate byte-for-byte from either local Blawx checkout (§8.14). The corpus lift
+count moves **2/15 → 4/15** (`bird`, `mortality`, `rps`, `wills_tutorial`). What was NOT lifted, by
+name: `hypothetical`'s `#abducible`s — the test is dropped with the reason written into the
+artifact, which is a change of severity recorded in §5.2. `beard_tax` still refuses, on **four**
+distinct diagnostic kinds — `attribute-type` ×1 and `goal-shape` ×2 on numbers (W5a),
+`rule-section` ×3 on paragraph sections (W3), and `unbound-query` ×1 because it declares no objects
+at all — measured on this branch on 2026-09-02 with `l4 blawx --import …/beard_tax.yaml 2>&1 |
+grep -o 'blawx-lift/[a-z-]*' | sort | uniq -c`. (An earlier draft of this note said the kinds had
+"narrowed from five to four". Nothing in this tree measures the five: it would need a build of the
+base branch, and the pre-W5 "Measured" paragraph above lists seven codes across BOTH fixtures
+rather than a per-fixture count. The comparative claim is withdrawn; only the four are measured.)
+Amends R14 (§8.14's 2026-09-02 note) and §5.2.
 
 ### W6 — stale fixtures, witnessed twice more
 

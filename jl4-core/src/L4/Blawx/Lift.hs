@@ -649,6 +649,43 @@ renderDoc ctx doc = do
   litTakesWorld :: Lit -> Bool
   litTakesWorld l = needsWorld && l `elem` concludedLits
 
+  -- | Does the L4 image of this body goal MENTION the world? Read straight off
+  -- 'liftGoal': it emits @w@ exactly where 'callIdent' is given a 'True' world
+  -- flag, which is 'litTakesWorld' for a predicate call and 'needsWorld' for
+  -- the applicability goals. Everything else — the atom comparisons, the
+  -- @naf@ over the negative-applicability input — is world-free.
+  --
+  -- Used by 'rulePara' to keep the WITNESS decision honest: a rule whose body
+  -- is all base predicates (rps s.4 is one) would otherwise declare a
+  -- @w IS A LIST OF Object@ parameter it never reads, and a reader would go
+  -- looking for the use.
+  --
+  -- Total by construction, for the reason 'goalDeps' is: a catch-all reading
+  -- "no world" would silently drop the parameter from a decision that needs
+  -- it, and the module would stop compiling only if the shape ever reached
+  -- here. The arms that 'liftGoal' refuses answer 'False' because a refusal
+  -- makes 'liftBlawx' return 'Left' and nothing is emitted at all.
+  goalUsesWorld :: BGoal -> Bool
+  goalUsesWorld = \case
+    BGCall s p as -> litTakesWorld (litOf s p as)
+    BGNewObjectCategory p tm -> litTakesWorld (litOf True p [tm])
+    BGNaf p as -> litTakesWorld (litOf True p as)
+    BGApplies _ _ -> needsWorld
+    -- the `naf (<negApplies> t)` spelling: an INPUT decision, never worlded
+    BGNegated BNegDefault (BGNegated BNegClassical (BGApplies _ _)) -> False
+    BGNegated BNegClassical (BGCall True p as) -> litTakesWorld (litOf False p as)
+    BGNegated BNegDefault g -> goalUsesWorld g
+    BGNegated BNegClassical _ -> False
+    BGDiseq _ _ -> False
+    BGUnify _ _ -> False
+    -- refused by 'liftGoal', so never emitted
+    BGCompare {} -> False
+    BGIs {} -> False
+    BGFindall {} -> False
+    BGAggregate {} -> False
+    BGHolds {} -> False
+    BGAccordingTo {} -> False
+
   -- | @GIVEN@ block for a decision with the given extra parameters.
   givenBooleanFor :: Bool -> [Text] -> Text
   givenBooleanFor world vs =
@@ -1291,12 +1328,24 @@ renderDoc ctx doc = do
         witName = accName <> ", witnessed by " <> englishList exNames
         bodyName = if null exNames then accName else witName
         bodyVsAll = hvs <> exNames
+        -- The witness decision is the ONE decision in the derived layer whose
+        -- world parameter is not forced: nothing calls it but the quantifier
+        -- immediately below, so it can take the world only when its own body
+        -- reads it. Every other derived decision keeps the uniform flag,
+        -- because 'basePred', 'defeatPara' and the holds layer call each other
+        -- across paragraphs and must agree on arity.
+        witUsesWorld =
+          any goalUsesWorld r.brConditions
+            || ( needsWorld
+                   && r.brInapplicable
+                   && or [True | BGNewObjectCategory _ _ <- r.brConditions] )
+        bodyWorld = if null exNames then world else witUsesWorld
         accRef =
           "@ref " <> labelOf s <> " — " <> renderSectionRef s
             <> " attributed_rule (defeasible " <> yesNo r.brDefeasible
             <> ", inapplicable " <> yesNo r.brInapplicable <> ")"
-        bodyHead = "DECIDE " <> callIdent bodyName world bodyVsAll
-        bodyGiven = givenBooleanFor world bodyVsAll
+        bodyHead = "DECIDE " <> callIdent bodyName bodyWorld bodyVsAll
+        bodyGiven = givenBooleanFor bodyWorld bodyVsAll
         bodyPara = case conds of
           [] -> Text.intercalate "\n" [accRef, bodyGiven, bodyHead <> " IF TRUE"]
           [c] -> Text.intercalate "\n" [accRef, bodyGiven, bodyHead <> " IF " <> c]
@@ -1312,7 +1361,7 @@ renderDoc ctx doc = do
                 <> " attributed_rule, existential closure"
             , givenBooleanFor world hvs
             , "DECIDE " <> callIdent accName world hvs
-            , "    IF " <> quantify exNames (callIdent witName world bodyVsAll)
+            , "    IF " <> quantify exNames (callIdent witName bodyWorld bodyVsAll)
             ]
         defeated = isDefeated s l
         holdsRef

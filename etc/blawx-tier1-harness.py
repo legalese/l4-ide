@@ -353,6 +353,16 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
         capture_output=True, text=True, timeout=300,
     )
     rows = [split_row(m) for m in re.findall(r"^ROW (\[.*\])$", r.stdout, re.M)]
+    return compare_answer(seed, test_name, goal, out_vars, oracle, rows)
+
+
+def compare_answer(seed, test_name, goal, out_vars, oracle, rows):
+    """Compare one query's s(CASP) answer rows against the L4 oracle.
+
+    Split out of `run_test` so that the comparison ladder — which is where the
+    judgement lives — can be exercised without swipl, by `self_test` below.
+    `run_test` is then only program assembly and execution.
+    """
     model = bool(rows)
 
     if oracle is None:
@@ -521,7 +531,99 @@ def twin_preflight(seed, twin):
     )
 
 
+# --- self-test: the comparison ladder, without swipl -----------------------
+#
+# WHY THIS EXISTS.  The k-tuple oracle reader (`parse_tuple_oracle`, and the
+# `len(out_vars) > 1` branch of `compare_answer`) is reached by NO shipped
+# seed: the corpus's only two-free-variable query, rps/who_wins, has oracle
+# EMPTY, and `compare_answer` answers EMPTY before it ever looks at the arity.
+# So the branch that reads a NON-EMPTY k-tuple answer had zero in-repo
+# coverage — new code whose first exercise would have been a future corpus.
+#
+# The row marked (*) below is not invented.  It is a measurement, taken on
+# 2026-09-02, and here is how to retake it: copy Jason's `rps.yaml`, and in the
+# `bobjane` test's `xml_content` replace the query's `first_element` -- the
+# `object_selector` block naming `testgame` -- with a `variable` block named
+# `Game`, so the query reads `?- winner(Game,Winner).` with BOTH places free.
+# `l4 blawx --import` lifts that to the nested comprehension and records the
+# oracle `LIST LIST "testgame", "jane"`; registered here as an IMPORTED seed it
+# runs 2/2, real s(CASP) answering `[('testgame','jane')]`.  The fixture is not
+# committed -- it is a document Jason did not write, and its `.blawx` would be
+# a re-emission of an XML we edited -- so the datapoint is kept here instead.
+#
+# These are PURE cases over `compare_answer` and `parse_tuple_oracle`: no
+# swipl, no s(CASP), no goldens.  They run on every invocation, before the
+# `have_scasp` skip, so the coverage does not depend on a machine having the
+# pack installed.
+SELF_TESTS = [
+    # (label, out_vars, oracle, rows, expect_pass)
+    ("(*) two free variables, non-empty: the measured rps open query",
+     ["Game", "Winner"], 'LIST LIST "testgame", "jane"',
+     [["testgame", "jane"]], True),
+    ("two free variables, two answer rows, order-insensitive",
+     ["Game", "Winner"], 'LIST LIST "g2", "alice", LIST "g1", "bob"',
+     [["g1", "bob"], ["g2", "alice"]], True),
+    ("two free variables, s(CASP) misses a row",
+     ["Game", "Winner"], 'LIST LIST "g1", "bob", LIST "g2", "alice"',
+     [["g1", "bob"]], False),
+    ("two free variables, s(CASP) has a row L4 does not",
+     ["Game", "Winner"], 'LIST LIST "g1", "bob"',
+     [["g1", "bob"], ["g2", "alice"]], False),
+    ("two free variables, EMPTY on both sides",
+     ["Game", "Winner"], "EMPTY", [], True),
+    ("two free variables, EMPTY oracle but s(CASP) answers",
+     ["Game", "Winner"], "EMPTY", [["g1", "bob"]], False),
+    ("two free variables, an oracle this reader was not written for",
+     ["Game", "Winner"], "TRUE and FALSE", [["g1", "bob"]], False),
+    ("one free variable is still the LIST path, not the k-tuple one",
+     ["Player"], 'LIST "jane"', [["jane"]], True),
+]
+
+# (oracle, k) -> expected reader output; None means "refuse to guess"
+TUPLE_ORACLE_CASES = [
+    ('LIST LIST "testgame", "jane"', 2, [("testgame", "jane")]),
+    ('LIST LIST "g1", "bob", LIST "g2", "alice"', 2,
+     [("g1", "bob"), ("g2", "alice")]),
+    ('LIST LIST "a", "b", "c"', 3, [("a", "b", "c")]),
+    ("EMPTY", 2, []),
+    ('LIST "g1", "bob"', 2, None),          # no inner LIST marker
+    ('LIST LIST "g1", "bob", "g2"', 2, None),  # field count not a multiple of k
+    ("TRUE", 2, None),                      # not a list rendering at all
+]
+
+
+def self_test():
+    """Exercise the comparison ladder on cases no shipped seed reaches."""
+    failures = []
+    for oracle, k, want in TUPLE_ORACLE_CASES:
+        got = parse_tuple_oracle(oracle, k)
+        if got != want:
+            failures.append(
+                f"parse_tuple_oracle({oracle!r}, {k}) = {got!r}, expected {want!r}"
+            )
+    for label, out_vars, oracle, rows, expect in SELF_TESTS:
+        goal = "winner(" + ",".join(out_vars) + ")"
+        passed, detail = compare_answer("self-test", label, goal, out_vars,
+                                        oracle, rows)
+        if passed != expect:
+            failures.append(
+                f"{label}: compare_answer returned {passed} "
+                f"({detail}), expected {expect}"
+            )
+    for f in failures:
+        print(f"blawx-tier1: SELF-TEST FAIL {f}")
+    n = len(TUPLE_ORACLE_CASES) + len(SELF_TESTS)
+    print(
+        f"blawx-tier1: self-test {n - len(failures)}/{n} "
+        f"(the k-tuple oracle reader and the comparison ladder; no seed "
+        f"reaches the k-tuple branch)"
+    )
+    return not failures
+
+
 def main():
+    if not self_test():
+        return 1
     ok, why = have_scasp()
     if not ok:
         print(f"blawx-tier1: SKIP ({why}) — the harness is optional-when-present")

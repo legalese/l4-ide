@@ -1,6 +1,6 @@
 -- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
 --
---   source        /Volumes/transcend/src/blawx/blawx/static/blawx/examples/bird.yaml
+--   source        bird.yaml
 --   ruledoc       "New Bird Act"
 --   rows          8 blawx.workspace, 4 blawx.blawxtest
 --   blocks        109 across 17 block types

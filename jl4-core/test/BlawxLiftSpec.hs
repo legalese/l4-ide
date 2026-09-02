@@ -131,8 +131,25 @@ spec = do
     -- that existentially; an L4 decision's parameters are universal, so the
     -- rule splits into a witness decision plus an `any` over the world.
     it "closes a body-only variable with `any` over the world" $ do
-      textOf rpsShaped `shouldSatisfy` Text.isInfixOf ", witnessed by player2` w x1 x2 player2"
+      textOf rpsShaped `shouldSatisfy` Text.isInfixOf ", witnessed by player2` x1 x2 player2"
       textOf rpsShaped `shouldSatisfy` Text.isInfixOf "any (GIVEN player2 YIELD"
+
+    -- The witness decision is the one derived decision nothing else calls, so
+    -- its world parameter is not forced by an arity agreement: it takes the
+    -- world only when its own body reads it. rps s.4's body is all INPUT
+    -- predicates, so the witness there declares no `w` at all — an unused
+    -- `w IS A LIST OF Object` is a parameter a reader looks for the use of.
+    it "gives the witness decision no world parameter when its body reads none" $ do
+      textOf rpsShaped `shouldSatisfy` not . Text.isInfixOf ", witnessed by player2` w"
+      -- but the QUANTIFIER decision keeps it: `w` is the domain it ranges over
+      textOf rpsShaped
+        `shouldSatisfy` \t -> lineWith t "DECIDE" "the winner of x1 is x2` w x1 x2"
+
+    -- ... and it does take the world when a body conjunct is a predicate some
+    -- rule concludes, which is the branch the other case cannot reach.
+    it "gives the witness decision a world parameter when its body reads one" $
+      textOf rpsChained
+        `shouldSatisfy` Text.isInfixOf ", witnessed by player2` w x1 x2 player2"
 
     -- Blawx compares objects by ATOM; L4 compares records by value. The atom
     -- is the `name` field, so that is what the two agree on — the same finding
@@ -343,6 +360,43 @@ rpsShaped =
     { bdName = "Rock Paper Scissors Act"
     , bdRuleText = MkBRuleText {brTitle = "Rock Paper Scissors Act", brSections = []}
     }
+
+-- | 'rpsShaped' plus a second section whose rule has the same witness shape but
+-- reads a DERIVED predicate (`winner`, which s.1 concludes) rather than only
+-- input ones. That is the other side of the witness world parameter: here it
+-- is read, so it is declared.
+rpsChained :: BlawxDoc
+rpsChained =
+  (baseDoc [rpsWs, chainWs])
+    { bdName = "Rock Paper Scissors Act"
+    , bdRuleText = MkBRuleText {brTitle = "Rock Paper Scissors Act", brSections = []}
+    }
+
+chainWs :: BWorkspace
+chainWs =
+  ws
+    (bSec 2)
+    [ [catAttr "game" "champion" "player" BOrderOV "the champion of" "is" ""]
+    , [ BAttributedRule
+          MkBRule
+            { brSection = bSec 2
+            , brConclusion =
+                MkBConclusion
+                  { bcSign = True
+                  , bcPred = bn "champion"
+                  , bcArgs = [BTVar (MkBVar "Game"), BTVar (MkBVar "Player1")]
+                  }
+            , brConditions =
+                [ BGCall True (bn "winner") [BTVar (MkBVar "Game"), BTVar (MkBVar "Player1")]
+                , BGCall True (bn "player") [BTVar (MkBVar "Game"), BTVar (MkBVar "Player2")]
+                , BGDiseq (BTVar (MkBVar "Player1")) (BTVar (MkBVar "Player2"))
+                ]
+            , brDefeasible = False
+            , brInapplicable = False
+            , brProvenance = Nothing
+            }
+      ]
+    ]
 
 rpsWs :: BWorkspace
 rpsWs =

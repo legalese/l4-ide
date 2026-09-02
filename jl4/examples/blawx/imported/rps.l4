@@ -1,6 +1,6 @@
 -- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
 --
---   source        /Volumes/transcend/src/blawx-stock/blawx/static/blawx/examples/rps.yaml
+--   source        rps.yaml
 --   ruledoc       "Rock Paper Scissors Act"
 --   rows          11 blawx.workspace, 3 blawx.blawxtest
 --   blocks        105 across 15 block types
@@ -134,14 +134,13 @@ DECIDE throw x1 x2 x3 @nlg %x1% threw %x2% in %x3%
 §§ `RPSA 4`
 
 @ref RPSA 4 — sec_4_section attributed_rule (defeasible FALSE, inapplicable FALSE)
-GIVEN w       IS A LIST OF Object
-      x1      IS AN Object
+GIVEN x1      IS AN Object
       x2      IS AN Object
       player2 IS AN Object
       throw1  IS AN Object
       throw2  IS AN Object
 GIVETH A BOOLEAN
-DECIDE `according to RPSA 4, the winner of x1 is x2, witnessed by player2, throw1 and throw2` w x1 x2 player2 throw1 throw2
+DECIDE `according to RPSA 4, the winner of x1 is x2, witnessed by player2, throw1 and throw2` x1 x2 player2 throw1 throw2
     IF  game x1
     AND player x2
     AND player player2
@@ -161,7 +160,7 @@ GIVEN w  IS A LIST OF Object
       x2 IS AN Object
 GIVETH A BOOLEAN
 DECIDE `according to RPSA 4, the winner of x1 is x2` w x1 x2
-    IF any (GIVEN player2 YIELD any (GIVEN throw1 YIELD any (GIVEN throw2 YIELD `according to RPSA 4, the winner of x1 is x2, witnessed by player2, throw1 and throw2` w x1 x2 player2 throw1 throw2) w) w) w
+    IF any (GIVEN player2 YIELD any (GIVEN throw1 YIELD any (GIVEN throw2 YIELD `according to RPSA 4, the winner of x1 is x2, witnessed by player2, throw1 and throw2` x1 x2 player2 throw1 throw2) w) w) w
 
 @ref RPSA 4 — indefeasible: no `not blawx_defeated` conjunct
 GIVEN w  IS A LIST OF Object
