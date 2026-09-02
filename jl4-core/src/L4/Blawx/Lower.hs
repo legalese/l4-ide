@@ -17,8 +17,8 @@
 -- * skolemisation of query subjects (one constant per @(rqId, rvId)@);
 -- * Blawx-specific rejections, each a named diagnostic: relationship arity
 --   above 10, 'RUnstratified', 'RMod', non-integral literals while the R7
---   measurement gate holds, and equality\/disequality on record-sorted
---   operands ('recordIdentity', §11 W1).
+--   measurement gate holds, and equality\/disequality whose operand sort
+--   contains a declared record ('recordIdentity', §11 W1).
 --
 -- == Decisions made here (P1 stage B), so nobody re-derives them
 --
@@ -29,10 +29,11 @@
 -- other equality becomes unification @X = Y@ (@REq@) or
 -- @blawx_diseq(X,Y)@ (@RNeq@). @=:=@-style arithmetic equality on an atom
 -- would raise rather than fail, which is why the split is by operand sort
--- and not by operator. __Record-sorted operands are refused__ rather than
--- dispatched at all ('recordIdentity', spec §11 W1): the two languages
--- disagree on what equality of a record /means/, so any answer would be a
--- guess. See that function's haddock.
+-- and not by operator. __An operand whose sort contains a declared record is
+-- refused__ rather than dispatched at all ('recordIdentity', spec §11 W1): the
+-- two languages disagree on what equality of a record /means/, so any answer
+-- would be a guess. An @ASSUME@d abstract category is /not/ a declared record
+-- for this purpose and still unifies. See that function's haddock.
 --
 -- __The boolean-projection peephole__: @'RProj' a f V@ over a
 -- 'RSBool'-sorted field followed immediately by @'RUnify' V ('RTBool' b)@
@@ -306,6 +307,13 @@ data Env = MkEnv
   , envPredResult :: !(Map Unique (Maybe RSort))
   , envFieldSort :: !(Map Unique RSort)
   , envFieldCat  :: !(Map Unique RName)   -- ^ field → owning record
+  , envDeclRecords :: !(Set Unique)
+    -- ^ the @DECLARE … HAS@ record names, and only those. 'RSRecord' also
+    -- carries an @ASSUME T IS A TYPE@ ("L4.Relational.IR": one constructor for
+    -- both, because every declaration-side use wants \"a category named /n/\"),
+    -- so a consumer that needs to tell a record from an abstract category looks
+    -- the name up here — which is what 'recordInSort' does, and the reason
+    -- 'recordIdentity' refuses the first and admits the second.
   }
 
 buildEnv :: RelProgram -> Either [LowerError] Env
@@ -321,6 +329,7 @@ buildEnv prog = do
         [ (f.rfName.rnUnique, f.rfSort) | r <- prog.rpgRecords, f <- r.rrFields ]
     , envFieldCat  = Map.fromList
         [ (f.rfName.rnUnique, r.rrName) | r <- prog.rpgRecords, f <- r.rrFields ]
+    , envDeclRecords = Set.fromList [ r.rrName.rnUnique | r <- prog.rpgRecords ]
     }
  where
   entities =
@@ -994,8 +1003,8 @@ convertGoals env cctx = go
         -- the explicit REq/RNeq dispatch: see the module header
         REq  | numeric -> pure [BGCompare BEq x' y']
         RNeq | numeric -> pure [BGCompare BNeq x' y']
-        REq  -> [BGUnify x' y'] <$ recordIdentity cctx "EQUALS" x y
-        RNeq -> [BGDiseq x' y'] <$ recordIdentity cctx "a disequality" x y
+        REq  -> [BGUnify x' y'] <$ recordIdentity env cctx "EQUALS" x y
+        RNeq -> [BGDiseq x' y'] <$ recordIdentity env cctx "a disequality" x y
     REval v e -> do
       e' <- convertArith env cctx e
       pure [BGIs (bvar cctx v) e']
@@ -1179,21 +1188,59 @@ isNumeric cctx = \case
   RTVar v -> Map.lookup v.rvId cctx.ccSorts == Just RSNum
   _       -> False
 
--- | The category a term's recovered sort names, if it names one. Everything
--- record-shaped is a variable by the time it reaches here (the middle-end is in
--- ANF: a record-typed @GIVEN@ parameter, the target of an 'RProj' over an
--- object-valued field, and the result of a record-returning 'RCall' are all
--- variables carrying an 'RSRecord' sort out of 'varSorts'). 'RSMaybe' is peeled
--- because a @MAYBE@ of a record is still compared by value on the L4 side.
-recordSort :: CCtx -> RTerm -> Maybe RName
-recordSort cctx = \case
-  RTVar v -> peel =<< Map.lookup v.rvId cctx.ccSorts
-  _       -> Nothing
+-- | The declared record a term's recovered sort __contains__, paired with that
+-- sort, if it contains one. Everything record-shaped is a variable by the time
+-- it reaches here (the middle-end is in ANF: a record-typed @GIVEN@ parameter,
+-- the target of an 'RProj' over an object-valued field, and the result of a
+-- record-returning 'RCall' are all variables carrying their sort out of
+-- 'varSorts').
+--
+-- __The search descends 'RSList' and 'RSMaybe'__, because a container of
+-- records diverges exactly as a bare record does: L4 compares the container
+-- element-wise by value, Blawx unifies it element-wise by atom, and the
+-- occurrence-keyed flattening gives the elements different atoms. Measured
+-- 2026-09-02: before the descent, a @LIST OF Player@ field compared with
+-- @EQUALS@ lowered clean and emitted @Members = Members2@ (§11 W1). @RSList@ of
+-- @RSMaybe@ of a record is reachable — 'blawxValueType' types any @RSList@ as
+-- @BVList@ without looking inside — which is what
+-- @jl4\/examples\/blawx\/not-ok\/record-identity-list.l4@ exercises; a bare
+-- @MAYBE@ record is refused earlier, by that same ontology check.
+--
+-- __An @ASSUME T IS A TYPE@ is deliberately not a record here.__ 'RSRecord'
+-- carries both a @DECLARE … HAS@ record and an abstract category, and
+-- "L4.Relational.IR" says a consumer that needs to tell them apart looks the
+-- name up among the declared records — which is what 'envDeclRecords' is. The
+-- distinction matters because an abstract category has no fields for L4 to
+-- compare structurally: its values are atoms on both sides, @=@ on atoms is the
+-- faithful image, and refusing it would delete an emission that works and
+-- recommend an edit (compare a FIELD) that has nothing to name.
+recordInSort :: Env -> CCtx -> RTerm -> Maybe (RName, RSort)
+recordInSort env cctx = \case
+  RTVar v -> do
+    s <- Map.lookup v.rvId cctx.ccSorts
+    fmap (\r -> (r, s)) (peel s)
+  _ -> Nothing
  where
   peel = \case
-    RSRecord r -> Just r
-    RSMaybe s  -> peel s
-    _          -> Nothing
+    RSRecord r | Set.member r.rnUnique env.envDeclRecords -> Just r
+    RSList s  -> peel s
+    RSMaybe s -> peel s
+    _         -> Nothing
+
+-- | An 'RSort' in the surface language's spelling, for a diagnostic. Names are
+-- 'rnBase' — this is the message a reader of the @.l4@ sees, not the debug dump
+-- ("L4.Relational.Debug".@renderSort@ renders the same shapes against a
+-- 'DisplayNames' map instead).
+sortText :: RSort -> Text
+sortText = \case
+  RSBool     -> "BOOLEAN"
+  RSNum      -> "NUMBER"
+  RSString   -> "STRING"
+  RSEnum n   -> n.rnBase
+  RSRecord n -> n.rnBase
+  RSList s   -> "LIST OF " <> sortText s
+  RSMaybe s  -> "MAYBE " <> sortText s
+  RSOpaque t -> t
 
 -- | __Record identity does not survive the flattening__ (BLAWX-EXPORT-SPEC
 -- §11 W1, measured 2026-09-02). L4 compares records __by value__; Blawx
@@ -1205,28 +1252,46 @@ recordSort cctx = \case
 -- encoding lowered clean, L4 said @TRUE@ and the tier-1 harness said no model
 -- (@jl4\/examples\/blawx\/not-ok\/record-identity.l4@ is that encoding, kept).
 --
+-- __What is refused is exactly this__: an 'REq' or 'RNeq' either of whose
+-- operands is a variable whose recovered sort /contains/ a declared record sort
+-- — directly, or under any nesting of @LIST OF@ and @MAYBE@ ('recordInSort').
+-- Nothing else. An @ASSUME@d abstract category is not refused (see
+-- 'recordInSort'), and a record-sorted operand whose sort did not survive into
+-- 'varSorts' — an 'RSOpaque', say — is not detected at all, because there is
+-- nothing left in the sort to detect. No such case is known to be reachable in
+-- the M1 fragment; none was constructed.
+--
 -- Refusing is a v1 measure, not the fix. The fix is to hash-cons
 -- structurally-equal record arguments in 'skolemise' so one distinct value
 -- becomes one object, after which this check lifts; §11 W1 records it as the
 -- next step. Until then the diagnostic must name a reachable edit, so it names
 -- both: state the rule once per slot (which needs no identity — that is what
 -- the shipped @rps.l4@ does), or compare a field whose sort /is/ an atom.
-recordIdentity :: CCtx -> Text -> RTerm -> RTerm -> Either [LowerError] ()
-recordIdentity cctx opName x y = case recordSort cctx x <|> recordSort cctx y of
-  Nothing  -> Right ()
-  Just cat ->
-    Left [ blawxErr cctx.ccFn Nothing
-             (LEUnsupported "record identity (Blawx)")
-             ( opName <> " on operands of record type `" <> cat.rnBase
-                 <> "` has no faithful Blawx image: L4 compares records by \
-                    \value, Blawx compares objects by atom, and the query \
-                    \flattening (R11) emits one object per occurrence of a \
-                    \record value — so two structurally equal `" <> cat.rnBase
-                 <> "` records arrive as two distinct atoms and the comparison \
-                    \silently answers differently. State the rule once per slot \
-                    \so no identity is needed (see jl4/examples/blawx/rps.l4), \
-                    \or compare an enum- or number-valued FIELD of the two \
-                    \records instead of the records themselves" ) ]
+recordIdentity :: Env -> CCtx -> Text -> RTerm -> RTerm -> Either [LowerError] ()
+recordIdentity env cctx opName x y =
+  case recordInSort env cctx x <|> recordInSort env cctx y of
+    Nothing         -> Right ()
+    Just (cat, srt) ->
+      Left [ blawxErr cctx.ccFn Nothing
+               (LEUnsupported "record identity (Blawx)")
+               ( opName <> " on operands of " <> operand cat srt
+                   <> " has no faithful Blawx image: L4 compares records by \
+                      \value, Blawx compares objects by atom, and the query \
+                      \flattening (R11) emits one object per occurrence of a \
+                      \record value — so two structurally equal `" <> cat.rnBase
+                   <> "` records arrive as two distinct atoms and the comparison \
+                      \silently answers differently. State the rule once per slot \
+                      \so no identity is needed (see jl4/examples/blawx/rps.l4), \
+                      \or compare an enum- or number-valued FIELD of the two \
+                      \records instead of the records themselves" ) ]
+ where
+  -- The bare case keeps its original wording; a container says what it is and
+  -- then names the record inside it, because "of record type `Player`" would be
+  -- a false description of a `LIST OF Player` operand.
+  operand cat = \case
+    RSRecord _ -> "record type `" <> cat.rnBase <> "`"
+    s -> "type `" <> sortText s <> "`, which contains the record type `"
+           <> cat.rnBase <> "`,"
 
 -- ---------------------------------------------------------------------------
 -- Queries → tests (R11)

@@ -247,6 +247,53 @@ spec = do
         Left err -> err `shouldSatisfy`
           Text.isInfixOf "a disequality on operands of record type `Player`"
 
+    -- The verifier's counterexample to the first cut of this refusal (2026-09-02):
+    -- the check tested the operand's sort for `RSRecord` at the TOP only, so a
+    -- container of records walked straight through. Measured before the fix, on
+    -- exactly this module: `l4 blawx` exited 0 and emitted
+    -- `members(A,Members), members(B,Members2), Members = Members2.` — the same
+    -- by-value/by-atom divergence the bare-record case has, with a green exit
+    -- code. The corpus twin is `jl4/examples/blawx/not-ok/record-identity-list.l4`.
+    it "refuses EQUALS on a LIST OF records, and says which container it is in" $
+      case blawxYaml recordListEqModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for LIST OF record equality"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "record identity (Blawx)"
+          -- naming the operand's OWN sort matters: "of record type `Player`"
+          -- would be a false description of a `LIST OF Player` operand.
+          err `shouldSatisfy` Text.isInfixOf
+            "type `LIST OF Player`, which contains the record type `Player`"
+
+    it "refuses it under LIST OF MAYBE too, which is the only reachable MAYBE" $
+      -- A bare `MAYBE Player` field never reaches this check: `blawxValueType`
+      -- refuses it first ("sort with no Blawx value type"). `LIST OF MAYBE
+      -- Player` does reach it, because that same function types any RSList as
+      -- BVList without looking inside — so this is the case that exercises the
+      -- `RSMaybe` descent, and without it that arm would be dead code.
+      case blawxYaml recordListMaybeEqModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for LIST OF MAYBE record equality"
+        Left err -> err `shouldSatisfy` Text.isInfixOf
+          "type `LIST OF MAYBE Player`, which contains the record type `Player`"
+
+    it "still admits equality on two ASSUMEd abstract-type operands" $ do
+      -- The other half of the verifier's counterexample, in the opposite
+      -- direction. `RSRecord` carries an `ASSUME T IS A TYPE` as well as a
+      -- `DECLARE … HAS` record (L4.Relational.IR says so and says to
+      -- discriminate by looking the name up among the declared records), so the
+      -- first cut refused this too — removing an emission the parent commit
+      -- had, and recommending an edit ("compare a FIELD") that an abstract
+      -- category has nothing to satisfy. An ASSUMEd category's values ARE atoms
+      -- on both sides; `=` on atoms is the faithful image.
+      out <- emitted abstractEqModule
+      hasLine out "person(A),"
+      hasLine out "A = B."
+
+    it "admits it inside a container as well" $ do
+      -- The descent must not over-fire either: a LIST OF an ASSUMEd category is
+      -- a list of atoms, and unification is still the faithful image.
+      out <- emitted abstractListEqModule
+      hasLine out "Members = Members2."
+
     it "still admits equality on an ENUM-valued FIELD of the same records" $ do
       -- The check is on the operand SORT, not on the operator: an enum
       -- constructor IS an atom in Blawx and does survive the flattening,
@@ -344,6 +391,70 @@ spec = do
     , "DECIDE `other player` g p IS"
     , "  IF p EQUALS g's `first player` THEN g's `second player` \
       \ELSE g's `first player`"
+    ]
+
+  -- The same defect smuggled inside a container: no bare Player appears on
+  -- either side of the EQUALS.
+  recordListEqModule = Text.unlines
+    [ "DECLARE Player HAS"
+    , "    number IS A NUMBER"
+    , ""
+    , "DECLARE Team HAS"
+    , "    members IS A LIST OF Player"
+    , ""
+    , "@export"
+    , "GIVEN a IS A Team"
+    , "      b IS A Team"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `same roster` a b IF a's members EQUALS b's members"
+    ]
+
+  recordListMaybeEqModule = Text.unlines
+    [ "DECLARE Player HAS"
+    , "    number IS A NUMBER"
+    , ""
+    , "DECLARE Team HAS"
+    , "    reserves IS A LIST OF MAYBE Player"
+    , ""
+    , "@export"
+    , "GIVEN a IS A Team"
+    , "      b IS A Team"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `same reserves` a b IF a's reserves EQUALS b's reserves"
+    ]
+
+  -- Not a record: an ASSUMEd abstract category, whose values are atoms.
+  abstractEqModule = Text.unlines
+    [ "ASSUME Person IS A TYPE"
+    , ""
+    , "GIVEN a IS A Person"
+    , "ASSUME `is a claimant` a IS A BOOLEAN"
+    , ""
+    , "GIVEN b IS A Person"
+    , "ASSUME `is an assessor` b IS A BOOLEAN"
+    , ""
+    , "@export"
+    , "GIVEN a IS A Person"
+    , "      b IS A Person"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `self assessed` a b IF"
+    , "  `is a claimant` a AND `is an assessor` b AND a EQUALS b"
+    ]
+
+  abstractListEqModule = Text.unlines
+    [ "ASSUME Person IS A TYPE"
+    , ""
+    , "GIVEN p IS A Person"
+    , "ASSUME `is a claimant` p IS A BOOLEAN"
+    , ""
+    , "DECLARE Panel HAS"
+    , "    members IS A LIST OF Person"
+    , ""
+    , "@export"
+    , "GIVEN a IS A Panel"
+    , "      b IS A Panel"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `same panel` a b IF a's members EQUALS b's members"
     ]
 
   -- The recommended edit, kept green: same EQUALS, enum-sorted operands.

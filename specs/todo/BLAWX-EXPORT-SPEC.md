@@ -342,20 +342,44 @@ different states in Blawx's three-valued world; the lowering must pick per R5.
 2026-09-02 comparing two records is refused.** An L4 record is a value and `EQUALS` on it is
 structural; a Blawx object is an atom and `=` on it is identity of the name. The two coincide only
 if every distinct record value gets exactly one object, and R11's query flattening does not do that
-— it emits one object per _occurrence_ (§8.11). So `L4.Blawx.Lower.recordIdentity` rejects an `REq`
-or `RNeq` whose operands carry an `RSRecord` sort — a record-typed parameter, an object-valued
-field read, or a record-returning call — with the named diagnostic `record identity (Blawx)`, and
-the diagnostic names both the divergence and the two edits that avoid it (state the rule once per
+— it emits one object per _occurrence_ (§8.11).
+
+**What `L4.Blawx.Lower.recordIdentity` refuses, exactly**: an `REq` or `RNeq` either of whose
+operands is a variable whose recovered sort _contains_ a **declared** (`DECLARE … HAS`) record sort
+— directly, or under any nesting of `LIST OF` and `MAYBE` — with the named diagnostic
+`record identity (Blawx)`. Directly covers a record-typed parameter, an object-valued field read
+and a record-returning call; the container cases are what the first cut of this check missed, and
+they are not hypothetical: measured 2026-09-02, `a's members EQUALS b's members` over a
+`LIST OF Player` field lowered clean and emitted
+`members(A,Members), members(B,Members2), Members = Members2.`, which is the same by-value /
+by-atom divergence with a green exit code. A _bare_ `MAYBE Player` field never reaches this check —
+`blawxValueType` refuses it first, "sort with no Blawx value type" — so `LIST OF MAYBE Player` is
+the only reachable way a `MAYBE` gets under it, which is why the fixture carries one.
+
+**What it does not refuse, deliberately.** An operand whose category is an `ASSUME T IS A TYPE`
+still unifies, and must: `RSRecord` carries an abstract category as well as a declared record
+(`L4.Relational.IR` says so, and says the discriminator is a lookup among the declared records),
+but an abstract category has no fields for L4 to compare structurally. Its values are atoms on both
+sides, `=` on atoms is the faithful image, and refusing it would delete an emission that works —
+`a EQUALS b` over two `ASSUME`d `Person`s emits `A = B.` — while recommending an edit, compare a
+field, that has no field to name. Nor is a record-sorted operand detected whose sort did not
+survive into `varSorts` as a sort at all (an `RSOpaque`): there is nothing left in the sort to
+test. No such case is known to be reachable in the M1 fragment and none was constructed.
+
+The diagnostic names both the divergence and the two edits that avoid it (state the rule once per
 slot; or compare an enum- or number-valued field, whose sorts _are_ atoms and do survive the
-flattening). The refusal is in the Blawx leg and not in `L4.Relational.Lower` because it is the
-Blawx-side flattening that breaks the correspondence: the shared IR's `REq` is generic equality
-whose meaning each emitter dispatches (§8.2), and a backend that gives one object per distinct
-value would need no such rejection. Fixture:
-`jl4/examples/blawx/not-ok/record-identity.l4`; tests in `jl4-core/test/BlawxAssumeSpec.hs` and
-`jl4/tests-cli/Main.hs`; the measurement that forced it is §11 W1. This is a v1 refusal, not the
-final answer — hash-consing structurally-equal record arguments in `skolemise` would make identity
-and value agree and let the refusal lift. That is **not implemented**; §11 W1 records it as the
-next step.
+flattening), and it names the operand's own sort, because "of record type `Player`" would be a
+false description of a `LIST OF Player` operand. The refusal is in the Blawx leg and not in
+`L4.Relational.Lower` because it is the Blawx-side flattening that breaks the correspondence: the
+shared IR's `REq` is generic equality whose meaning each emitter dispatches (§8.2), and a backend
+that gives one object per distinct value would need no such rejection. Fixtures:
+`jl4/examples/blawx/not-ok/record-identity.l4` (bare records) and
+`jl4/examples/blawx/not-ok/record-identity-list.l4` (`LIST OF`, `LIST OF MAYBE`); tests in
+`jl4-core/test/BlawxAssumeSpec.hs` (four refusals and three positive controls) and
+`jl4/tests-cli/Main.hs` (two); the measurement that forced it is §11 W1. This is a v1 refusal, not
+the final answer — hash-consing structurally-equal record arguments in `skolemise` would make
+identity and value agree and let the refusal lift. That is **not implemented**; §11 W1 records it
+as the next step.
 
 ### 4.2 Decisions become relations
 
@@ -999,10 +1023,14 @@ structural value twice emits two objects. Measured this session on
 evaluates the directive to `TRUE`, the tier-1 harness returns **no model** (`0/1 queries passed`,
 `python3 etc/blawx-tier1-harness.py`). Keeping the oracle outside the artifact is what exposed it,
 which is the "Against" paragraph above earning its keep. Two consequences, both landed with this
-note: the emitter now refuses `EQUALS`/disequality on record-sorted operands (§4.1), so no module
-can depend on identity that the flattening does not provide; and the honest fix — **hash-consing
+note: the emitter now refuses `EQUALS`/disequality whenever an operand's recovered sort contains a
+declared record — bare, or under any nesting of `LIST OF` and `MAYBE` (§4.1) — so those particular
+comparisons stop instead of answering differently, while an `ASSUME`d abstract category, whose
+values are atoms on both sides, still unifies; and the honest fix — **hash-consing
 structurally-equal record arguments so one distinct value mints one object** — is scoped and _not
-built_, tracked at §11 W1. Nothing about `#ASSERT`-as-constraint or the interview test changes.
+built_, tracked at §11 W1. The refusal is a sort test, so it is only as wide as sort recovery: a
+record-typed operand whose sort reaches the emitter as `RSOpaque` would still lower, and no such
+case was constructed. Nothing about `#ASSERT`-as-constraint or the interview test changes.
 
 ### 8.12 R12 — dual representation from one block-level IR; the re-save fixpoint is the gate
 
@@ -1478,7 +1506,7 @@ only because R11 keeps the oracle outside the artifact. **Do.** For v1, refuse
 RPS encoding as a `not-ok/` fixture; later, hash-cons structurally-equal record arguments in the
 query flattening (one object per distinct value) and lift the refusal. Amends §4.1, §8.11.
 
-**DISCHARGED (v1 half) 2026-09-02.** The refusal is built and the fixture is in the tree; the
+**DISCHARGED (v1 half) 2026-09-02.** The refusal is built and both fixtures are in the tree; the
 hash-consing is **not** built and remains the next step (see below). What was measured this
 session, on this branch, with `l4` built from this worktree:
 
@@ -1489,28 +1517,62 @@ session, on this branch, with `l4` built from this worktree:
   **0/1 queries passed — expected a model; got NO model**. The staged seed and its golden were
   deleted; the file lives only under `not-ok/`.
 - _the refusal_: `L4.Blawx.Lower.recordIdentity`, kind `LEUnsupported "record identity (Blawx)"`,
-  fired from the `RCmp` arm for `REq` and `RNeq` alike once either operand's recovered sort is
-  `RSRecord` (`RSMaybe` peeled). It is in the **Blawx** leg, not `L4.Relational.Lower`: the shared
-  IR defines `REq` as generic equality that each emitter dispatches (§8.2), and it is Blawx's own
+  fired from the `RCmp` arm for `REq` and `RNeq` alike once either operand's recovered sort
+  _contains_ a **declared** record sort — directly, or under any nesting of `LIST OF` and `MAYBE`
+  (`recordInSort`). It is in the **Blawx** leg, not `L4.Relational.Lower`: the shared IR defines
+  `REq` as generic equality that each emitter dispatches (§8.2), and it is Blawx's own
   occurrence-keyed flattening that breaks the correspondence. `l4 blawx` on the fixture now exits
   **1** with two diagnostics (one per DNF clause of the `IF`/`ELSE`, matching the house precedent
   for per-occurrence errors).
+- _the two boundary cases, both measured after review_. The check's first cut tested the operand's
+  sort for `RSRecord` at the **top** only and tested nothing else, which was wrong in both
+  directions. **Under-fire**: a `LIST OF Player` field compared with `EQUALS` exited **0** and
+  emitted `members(A,Members), members(B,Members2), Members = Members2.` — the same divergence,
+  still silent. The sort search now descends `RSList` and `RSMaybe`; the second fixture
+  `not-ok/record-identity-list.l4` carries both a `LIST OF Player` and a `LIST OF MAYBE Player`
+  rule and `l4 blawx` exits **1** with one diagnostic each, naming the operand's own sort
+  (``type `LIST OF Player`, which contains the record type `Player` ``). `LIST OF MAYBE` is the
+  only reachable route to the `MAYBE` arm: a bare `MAYBE Player` field is refused first by
+  `blawxValueType` (measured — "sort with no Blawx value type: … RSMaybe (RSRecord …)"), because
+  that function types any `RSList` as `BVList` without looking inside but has no `RSMaybe` arm.
+  **Over-fire**: `ASSUME Person IS A TYPE` with `a EQUALS b` was refused, telling the author that
+  an abstract category is a "record type" and recommending a FIELD comparison that cannot exist —
+  and removing an emission the parent commit had. `RSRecord` carries both a declared record and an
+  `ASSUME`d type ("L4.Relational.IR"); the discriminator is a lookup among the declared records,
+  which `Env.envDeclRecords` now is. That module emits again, ending in `A = B.`, and so does a
+  `LIST OF Person` over the same `ASSUME`d category.
 - _no collateral_: all **12** emitting seeds re-lowered and their `expected/*.blawx` **and**
-  `expected/*.pl` are byte-identical — `12 lowered, 12 identical, 0 differing` by `cmp` against
+  `expected/*.pl` are byte-identical — `lowered=12 identical=24 differing=0` by `cmp` against
   the goldens, so no golden was regenerated and none needed to be.
-- _harnesses, both seeds_: fixpoint **9 checked, 0 failed** for `rps.blawx` and **9 checked, 0
-  failed** for `beard.blawx` (`BLAWX_CHECKOUT=…/blawx-stock`, blockly 10.1.3, per W9); tier-1
-  **8/8 queries passed** (`python3 etc/blawx-tier1-harness.py rps beard`).
-- _tests_: `cabal test jl4-core-test` **424 examples, 0 failures** (three new `BlawxAssumeSpec`
-  cases: the `EQUALS` refusal with its message content, the disequality half, and a positive
-  control that `p's throws EQUALS q's throws` still lowers); `cabal test l4-cli-test -m blawx`
-  **46 examples, 0 failures** (one new case over the fixture file).
+- _harnesses_: fixpoint **18 checked, 0 failed, 0 empty-skipped** over `rps.blawx` and
+  `beard.blawx` together (`BLAWX_CHECKOUT=…/blawx-stock`, blockly 10.1.3, jsdomErrors 0, per W9);
+  tier-1 over the whole corpus **154/154 queries passed** (119 distinct + 35 twin replays,
+  `python3 etc/blawx-tier1-harness.py`).
+- _tests_: `cabal test jl4-core-test` **428 examples, 0 failures**; the
+  `what the Blawx leg refuses` block is **11 examples, 0 failures**, of which seven are W1's —
+  four refusals (bare `EQUALS`, its disequality half, `LIST OF`, `LIST OF MAYBE`) and three
+  positive controls (an enum-valued FIELD, two `ASSUME`d abstract operands, a `LIST OF` an
+  `ASSUME`d category). `cabal test l4-cli-test -m blawx` **47 examples, 0 failures**; the case
+  added here runs `l4 blawx` over `not-ok/record-identity-list.l4` and asserts exit 1 plus both
+  container spellings.
 
 **Still open — the hash-consing.** One object per _distinct value_ instead of per occurrence, in
-`skolemise`, after which `recordIdentity` lifts and `not-ok/record-identity.l4` moves to the
-emitting corpus with a tier-1 oracle of its own. Deliberately not attempted here: it changes the
-object names in every existing test canvas, so it is a golden-regenerating change and wants its
-own measurement (fixpoint and tier-1 across all 12 seeds) rather than riding a refusal.
+`skolemise`, after which `recordIdentity` lifts and both `not-ok/record-identity.l4` and
+`not-ok/record-identity-list.l4` move to the emitting corpus with tier-1 oracles of their own.
+Deliberately not attempted here: it changes the object names in every existing test canvas, so it
+is a golden-regenerating change and wants its own measurement (fixpoint and tier-1 across all 12
+seeds) rather than riding a refusal. **Also still open, and smaller**: the check is a sort test, so
+its reach is sort recovery's reach — an operand whose record type arrived as `RSOpaque` would carry
+no record name to find. No such case was constructed and none is known reachable in the M1
+fragment; it is written down here rather than claimed away.
+
+**Not W1's to fix**: this section's own status header still counts the corpus as "sixteen `.l4`
+files … (eleven emitting seeds, five `not-ok/` refusal fixtures)". Measured 2026-09-02 with
+`ls jl4/examples/blawx/*.l4 | wc -l` → **12** emitting seeds and
+`ls jl4/examples/blawx/not-ok/*.l4 | wc -l` → **7** `not-ok/` fixtures (six, plus
+`record-identity-list.l4` added here), so the header is stale by one in each direction and this
+item widens the second gap. The header is edited once at integration, by whoever merges the
+W-branches, because every W-item would otherwise rewrite the same paragraph.
 
 ### W2 — `STRING` fields have no ontology image
 

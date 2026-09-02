@@ -3035,6 +3035,18 @@ spec bin = do
       serr `shouldSatisfy` ("a disequality on operands of record type `Player`" `isInfixOf`)
       serr `shouldSatisfy` ("once per slot" `isInfixOf`)
 
+    it "rejects it inside a container too (LIST OF, and LIST OF MAYBE)" $ do
+      -- The first cut of the §11 W1 refusal tested the operand sort for a
+      -- record at the top only, so `a's members EQUALS b's members` over a
+      -- `LIST OF Player` lowered clean and emitted `Members = Members2`. Both
+      -- rules in this fixture are refused now, and each diagnostic names the
+      -- operand's OWN sort, because "of record type `Player`" would be a false
+      -- description of a list.
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity-list.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("type `LIST OF Player`, which contains the record type `Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("type `LIST OF MAYBE Player`, which contains the record type `Player`" `isInfixOf`)
+
     it "rejects a relationship above the arity-10 block ceiling" $ do
       Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
       code `shouldBe` ExitFailure 1
